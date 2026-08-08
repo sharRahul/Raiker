@@ -64,6 +64,13 @@ still resolves to the single runtime rather than failing.
 
 ## Capability gates
 
+The Permissions page separates what you control from what the current Raiker
+agent can derive from it. **Owner** is the gate and decision-mode control;
+**Raiker agent** is a read-only result: `Direct`, `Ask`, `Denied`, or
+`Unavailable`. The agent cannot change its own authority. Each agentic turn uses
+its own short-lived signed machine identity, so Activity and Approvals can name
+the machine actor separately from you, the owner.
+
 **Permissions** lists all 67 gates, grouped:
 
 | Group | Examples |

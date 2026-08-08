@@ -28,6 +28,13 @@ file mutations are additionally checkpointed so they stay reversible.
 Approval remains metadata-only for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
+Per-turn machine identity is `implemented_verified`. Every ordinary, resumed,
+scheduled, plugin-relay, CLI-agentic, and child-agent tool call reaches the
+broker with a short-lived Ed25519-signed identity. Verification precedes policy,
+credential resolution, approvals, hooks, and execution. Owner resource scope is
+carried separately from the machine actor; the API and dashboard expose the
+machine proposer/actor and human authorizer without exposing bearer material.
+
 Daytona execution additionally reserves cumulative owner/profile budget in an
 append-only ledger before launch. Provider actuals reconcile reservations when
 available; an unavailable billing adapter is explicit and retains the estimate.

@@ -543,14 +543,13 @@ npm run build     # exit 0
   Caveat: `_deliver_due` never produces a failure path (hard-codes success), so
   retry machinery is structural-only; `max_retries` is validated but not persisted.
   5 new event types, 7 new tests.
-- Agent identity and least privilege has landed its first slice (backlog item 7):
-  `/principal create <type> <id> [--display-name <name>] [--role <role_id>]...
-  [--scope <domain_scope>]... [--expires <iso_datetime>]` creates non-human
-  principals (ai_agent, automation, system) through the governed admin-mutation
-  path. Bootstrap-owner now enables admin_mutation/role_mutation/policy_mutation
-  capability gates so the owner can manage principals immediately. 4 new tests.
-  Missing: scoped credentials, per-tool grants, user-facing access review (see
-  code-verified audit below).
+- Agent identity and least privilege is now enforced per agentic turn (ADD-03).
+  The embedded workspace issuer creates short-lived Ed25519-signed machine
+  principals; the broker verifies them before policy or credentials and keeps
+  machine actor separate from human owner scope. Permissions provides the
+  Owner/Raiker agent access review, while Approvals and Activity preserve
+  proposer/authorizer attribution. `/principal create` remains the governed
+  administrative surface for durable non-human principals.
 
 ## Asset status
 
@@ -629,14 +628,16 @@ contradictions are recorded honestly. File:line citations are in
      scenarios, outcome review, OpenTelemetry export, configurable trace-layer
      redaction.**
 
-7. **Agent identity and least privilege** — ⚠️ FIRST SLICE
+7. **Agent identity and least privilege** — ✅ ADD-03 COMPLETE
    - ✅ `/principal create` for ai_agent/automation/system through governed
      admin-mutation, with roles, domain scopes, and `expires_at`
      (`raiker/cli/commands.py:2659-2709`).
-   - ❌ **Missing (zero code): short-lived scoped credentials (as an
-     agent-identity feature), per-tool grants, user-facing access review.**
-     Authorisation is by role + global capability gate, not per-principal
-     per-tool grants.
+   - ✅ Agentic turns use short-lived signed machine identities, enforced before
+     policy, credentials, approvals, hooks, and tools. Owner credential scope and
+     machine actor are separate, and Permissions exposes the derived access
+     review. Approvals and Activity preserve machine/human attribution.
+   - ℹ️ Relationship-based per-principal/per-tool grants remain the separate
+     future ReBAC proposal ADD-18; they are not an unfinished ADD-03 control.
 
 ## Prioritised product backlog
 
@@ -672,11 +673,10 @@ governed vertical slice at a time.
    chain with latency, cost, outcome, and user feedback; add record/replayable
    regression scenarios, outcome review, and an OpenTelemetry-compatible export
    with configurable prompt/content redaction before making autonomy broader.
-7. **Agent identity and least privilege:** distinct agent/service identities,
-   short-lived scoped credentials, per-tool grants, and a user-facing access
-   review. Existing principal and approval controls are a base, not a complete
-   agent-identity surface. First slice landed: `/principal create` for
-   non-human principals through the governed admin-mutation path.
+7. **Agent identity and least privilege:** ADD-03 is complete: distinct signed
+   turn and child-agent identities, owner/actor scope separation, broker-first
+   verification, and user-facing access review and attribution. Durable
+   non-human principals remain governable through `/principal create`.
 8. **Reusable governed workflows:** project/user skills and plugin-packaged
    playbooks with clear scope, provenance, review, and versioning. Add
    deterministic pre/post tool and session hooks only where enforcement or
@@ -725,18 +725,18 @@ Primary sources: [Claude support collection](https://support.claude.com/en/colle
 
 ## Next implementation slice — requires design approval
 
-Agent identity and least privilege (backlog item 7) has landed its first slice:
-`/principal create` for non-human principals through the governed admin-mutation
-path, with bootstrap-owner enabling the admin mutation capability gates. Remaining
-work for item 7: short-lived scoped credentials, per-tool grants, and a
-user-facing access review surface.
+Agent identity and least privilege (backlog item 7 / ADD-03) is complete. The
+embedded issuer, turn lifecycle, broker verification, actor/owner separation,
+child ancestry, approval attribution, Activity identity, and Owner/Agent access
+review are implemented. Relationship-based per-principal grants remain ADD-18,
+not unfinished work in this slice.
 
 The code-verified audit above shows that remaining gaps from items 1-7 are now
 concentrated in:
 - Item 4: local scheduler daemon, real delivery failure/retry behavior, persisted
   `max_retries`, and stale reminder docs.
 - Item 6: user feedback, cost model, record/replay, OTel export, trace redaction.
-- Item 7: scoped credentials, per-tool grants, access review.
+- Item 7: complete; relationship-based grants are tracked independently as ADD-18.
 
 Pick one gap and build one governed vertical slice at a time.
 

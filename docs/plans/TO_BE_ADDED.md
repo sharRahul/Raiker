@@ -63,7 +63,7 @@ that would put Raiker ahead of the field.
 |---|---|---|---|
 | ADD-01 | Tier 0 | Execution / container backend | Shipped (see FIXED-47 and FIXED-117) |
 | ADD-02 | Tier 0 | Runtime / tool queue and gates | Shipped |
-| ADD-03 | Tier 0 | Identity / agent attestation | Proposal |
+| ADD-03 | Tier 0 | Identity / agent attestation | Shipped |
 | ADD-04 | Tier 0 | Audit / transaction lineage | Proposal |
 | ADD-05 | Tier 1 | Skills / self-evaluation loop | Proposal |
 | ADD-06 | Tier 1 | Skills / zero-trust authoring gate | Proposal |
@@ -204,29 +204,39 @@ disk.
 
 ## ADD-03 — The agent needs its own identity, not the owner's
 
-**Status: proposal. This is the entry the rest of Tier 0 depends on.**
+**Status: shipped — completed end to end in this change.**
 
-**Today.** When the owner connects a hosted provider, the agent executes under the
-owner's authority. `raiker/runtime/authority/` resolves a principal, and
-`PrincipalType` distinguishes principal *kinds*, but the downstream sandbox still
-reads a request to write a file or call an endpoint as *the owner asked for this*.
+**What shipped.** `raiker/runtime/identity/` provides an embedded workspace
+issuer, canonical Ed25519 attestations, contextual verification, and a turn
+lifecycle. Each ordinary, resumed, scheduled, plugin-relay, CLI-agentic, and
+subagent path has a short-lived machine principal bound to its workspace,
+delegated owner, session, turn, and `tool_broker` audience. Resume rotates the
+token without changing the subject; terminal completion deactivates it; child
+agents carry explicit parent-machine ancestry.
 
-**The vulnerability — privilege mirroring.** An indirect prompt injection — a
-hidden instruction inside a repository the agent is reading, an email it is
-summarising, an MCP tool result — produces a command. Because the agent mirrors
-the owner's identity, the system executes it. Every cage in Tiers 4–6 is useless
-against this: the guard believes the owner unlocked the door.
+`ToolBroker` verifies identity before policy, hooks, credential lookup,
+approval creation, or execution. Its trusted context separates the machine actor
+from the authenticated owner scope: owner resources and credential references
+remain account-scoped, but action, proposal, and event attribution stays with
+the machine. Model arguments cannot substitute another owner, and missing,
+tampered, expired, inactive, or context-mismatched identity fails closed with a
+stable reason code. No bearer or signature enters approval, action, event, or API
+storage.
 
-**Work.** Give each spawned agent thread a short-lived, cryptographically signed
-machine identity — a SPIFFE ID issued by an embedded SPIFFE/SPIRE-style issuer —
-that is *strictly lower-privileged than the human owner* and is minted per turn,
-not per session. The broker checks the identity token, not the session, before it
-brokers an action. Presenting the owner's OAuth token from a machine identity must
-be rejected on the machine identity, so a mirrored credential buys nothing.
+**Governed outcome.** Permissions shows editable Owner controls beside the
+agent's derived `Direct`, `Ask`, `Denied`, or `Unavailable` posture. Approvals
+name the machine proposer and later human authorizer; Activity names the
+turn-bound machine actor. Machines cannot mint identities, change roles, gates,
+or modes, approve work, satisfy step-up, or retrieve raw credentials.
 
-**Governed outcome.** Approvals and the audit log state which identity proposed an
-action — owner or machine — and the capability matrix shows the two as separate
-columns. An owner can see, at a glance, what the agent may do *without* them.
+**Evidence.** Migrations `RAIKER-1039-machine-identities` and
+`RAIKER-1040-machine-action-attribution` persist the encrypted issuer and public
+attribution. Cryptographic, lifecycle, broker, connector, approval, dashboard,
+subagent, and UI tests cover the boundary. The architecture and residual host
+compromise risk are recorded in
+[`docs/threat-models/machine-identity.md`](../threat-models/machine-identity.md).
+Three-provider live evidence is recorded in `docs/WEB_APP_LIVE_TEST.md` after
+the Anthropic, OpenRouter, and Ollama acceptance run.
 
 ---
 

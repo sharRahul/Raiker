@@ -1,5 +1,14 @@
 # OWASP GenAI Security Mapping
 
+## Machine identity control
+
+Per-turn signed machine identity reduces excessive agency and confused-deputy
+risk: model output cannot borrow the human principal, replace owner credential
+scope, or reach policy and tools without a context-bound attestation. The
+machine actor and human authorizer remain distinct in approval and audit views.
+This complements, rather than replaces, prompt-injection handling, least
+privilege, output validation, approvals, and sandboxing.
+
 Raiker must map its controls to OWASP LLM and GenAI security risks. This document converts agent security into concrete Raiker requirements.
 
 ---

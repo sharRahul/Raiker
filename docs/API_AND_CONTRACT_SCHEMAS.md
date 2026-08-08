@@ -19,6 +19,28 @@ backend as the terminal; it adds no direct tool authority.
 | Audit views | Reads sessions, events, checkpoints, approvals, and diagnostics |
 | Code repositories | Lists, connects, selects, and forgets the repository *references* the Build workspace points a coding chat at |
 
+### Machine identity attribution
+
+Agentic turn, event, and approval views use a redacted `IdentityView`:
+
+```text
+principal_id, principal_type, display_name, subject, turn_id,
+key_id, issued_at, expires_at, state
+```
+
+`subject` is the SPIFFE-style public locator, not a bearer credential. Approval
+responses additionally expose `proposed_by`, `approved_by`, and
+`machine_identity`: the proposer is the verified turn machine, while the
+authorizer is the human who resolved the decision. Event views may include the
+correlated `machine_identity`. These contracts never return the signed token,
+signature, private key, token fingerprint, provider key, or raw credential.
+
+At execution time the internal `ToolExecutionContext` keeps
+`acting_principal_id` separate from `owner_principal_id`. The former is the
+verified machine actor; the latter is the authenticated account scope used for
+resources and credential references. Clients cannot supply or replace either
+value through model tool arguments.
+
 ### Code repositories
 
 `GET/POST /api/code/repos`, `PUT /api/code/repos/selection`, and

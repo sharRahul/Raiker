@@ -178,6 +178,12 @@ masked.
 
 ## Approvals
 
+An approval names two identities when both exist: the Raiker machine turn that
+proposed the action and the human owner who approved or denied it. The machine
+label includes its turn for audit correlation. Approval never transfers your
+identity to the agent, and a resumed turn receives a fresh short-lived token
+before it continues.
+
 When Raiker proposes a gated action, the reply says *"Your approval is needed to
 continue"* with a **Review approval** link. **Approvals** shows the proposal —
 for a file write, the exact unified diff — with the capability, risk, session,

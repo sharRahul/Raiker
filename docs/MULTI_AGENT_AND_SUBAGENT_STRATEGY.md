@@ -80,6 +80,15 @@ Raiker subagents must support specialised roles, bounded delegation, independent
 
 ## Subagent Lifecycle
 
+Each parent turn owns a signed machine principal. A spawned subagent receives a
+new signed child principal with `parent_principal_id` pointing to the parent
+machine, while both retain the same authenticated owner scope. The child's token
+is still bound to its workspace, session, turn, audience, and own principal; it
+cannot reuse the parent's bearer or claim the human owner as actor. The broker
+applies the normal identity verification and `DELEGABLE_TOOLS` subset before
+policy and execution. Completion deactivates the child identity and audit views
+preserve the ancestry without storing bearer material.
+
 ```text
 parent proposes subagent
   -> policy review

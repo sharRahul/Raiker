@@ -1,8 +1,17 @@
 # Tools and permissions
 
 Tools are not called directly by clients or models. A proposed action is
-validated, classified by policy, checked against the acting principal and
+validated only after the broker verifies the turn's signed machine identity,
+then classified by policy, checked against the acting machine principal and
 capability state, and routed only through RuntimeAuthority.
+
+Every agentic call carries two non-interchangeable identities: the verified
+machine actor and its authenticated human owner scope. The actor is recorded in
+actions, approvals, and events; the owner scope selects account resources and
+credential references. A missing or mismatched identity is refused before any
+policy, hook, credential, or executor side effect. The Permissions view therefore
+shows owner controls separately from the agent's derived `Direct`, `Ask`,
+`Denied`, or `Unavailable` authority; the agent cannot edit either column.
 
 | Tool class | Posture |
 |---|---|

@@ -5,6 +5,10 @@ secrets, raw prompts, private reasoning, or unbounded tool output.
 
 | Event | Meaning |
 |---|---|
+| `machine_identity_issued` | A signed machine identity was minted for a turn (public IDs, audience, timestamps, and parent principal only) |
+| `machine_identity_rotated` | A resumed turn received a fresh token ID while retaining its machine subject |
+| `machine_identity_refused` | Broker verification failed closed with a stable reason code before policy, credentials, hooks, or tools |
+| `machine_identity_deactivated` | A terminal turn's machine principal was made inactive |
 | `prompt_received` | A client submitted a turn |
 | `conversation_history_replayed` | Prior turns of the session were sent to the model as context (message count and character total only — never the transcript) |
 | `policy_decision` | Policy classified the requested action |

@@ -2,6 +2,11 @@
 
 ## Tasks
 
+Every scheduled cycle is a fresh governed turn with its own signed machine
+identity. A parked task keeps its proposal attribution; continuing after an
+approval rotates the token before work resumes. Activity therefore shows which
+machine turn acted while account resources remain scoped to the human owner.
+
 **Tasks → Plan work.** Pick one of four work types from the chip row; the form
 adapts to your choice.
 

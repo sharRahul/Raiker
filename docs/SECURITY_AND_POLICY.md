@@ -33,6 +33,23 @@ work but cannot grant themselves authority. Approval resolution executes an
 approved local file mutation through the governed execution relay and is
 metadata-only for every other capability.
 
+## Per-turn machine identity boundary
+
+Agentic work never enters the broker as the human owner. An embedded workspace
+issuer mints a short-lived Ed25519 attestation for each turn and binds it to the
+owner delegation, workspace, session, turn, machine principal, and broker
+audience. The broker verifies that attestation before policy, credentials,
+approvals, hooks, or tools. A resume rotates the token, terminal completion
+deactivates it, and a subagent receives a child identity with explicit ancestry.
+
+The verified machine is the action actor; the authenticated human remains the
+owner of account-scoped models, connectors, memory, projects, and credentials.
+Model-controlled arguments cannot change that owner scope. Machines cannot mint
+identities, grant roles, change gates or modes, resolve approvals, satisfy
+step-up, or read raw credentials. Approval records preserve the machine proposer
+and later human authorizer without persisting the bearer token or signature.
+See [the machine-identity threat model](threat-models/machine-identity.md).
+
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 Sensitive and remote capabilities remain fail-closed until a real executor,

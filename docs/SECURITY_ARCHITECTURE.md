@@ -1,5 +1,16 @@
 # Security architecture
 
+## Signed machine-turn trust boundary
+
+Raiker separates the authenticated human owner from the agentic actor. The
+embedded workspace issuer signs a short-lived Ed25519 attestation for each turn;
+the broker validates its workspace, owner delegation, session, turn, audience,
+lifetime, signature, and active machine principal before policy, credentials,
+approvals, hooks, or tools. Executors use the human only as owner scope while
+actions and evidence retain the machine actor. Resumes rotate tokens, terminal
+turns deactivate principals, and subagents receive signed child identities.
+See [the detailed threat model](threat-models/machine-identity.md).
+
 > runtime_enablement_candidate: completed
 > controlled_runtime_mode_activation: implemented
 > local_single_user_production_hardening: implemented

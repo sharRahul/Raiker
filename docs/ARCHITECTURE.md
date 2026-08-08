@@ -11,7 +11,7 @@ tool authority.
 
 ## Governed action flow
 
-`client → gateway → policy → RuntimeAuthority → executor → audit/event store`
+`client → gateway → per-turn identity issuer → broker verification → policy → RuntimeAuthority → owner-scoped executor → machine-attributed audit/event store`
 
 The gateway resolves the principal and records request context. Policy classifies
 the requested action. RuntimeAuthority checks that the agent runtime is
@@ -23,6 +23,18 @@ the historical mode names (`development_preview`, the single-user modes,
 wherever a mode name is read and every one of them resolves to it. `checkpoint_created` and `turn_closed` are gateway finalisation events, not
 runtime states. Strict non-allow blocking, role revoke governed, and capability
 gate per action are enforced. The capability gate per action is mandatory.
+
+Every agentic turn has a short-lived Ed25519-signed machine identity that is
+distinct from its authenticated human owner. The embedded workspace issuer binds
+the attestation to the workspace, delegated owner, session, turn, machine
+principal, and `tool_broker` audience. `AgentGateway` owns issuance and terminal
+deactivation; resume rotates the token without changing the machine subject;
+subagents receive child principals linked to the parent machine principal.
+`ToolBroker` verifies this context before policy, credential lookup, approval
+creation, hooks, or execution. Executors receive both the machine actor and the
+human owner scope: the owner selects account resources and credentials, while
+the machine remains the recorded proposer and actor. Missing, expired, tampered,
+inactive, or context-mismatched identities fail closed.
 
 ## Current Backend Capability Matrix
 

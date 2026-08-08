@@ -265,6 +265,15 @@ sequenceDiagram
 
 ## Action Execution Gate
 
+Before any nested interface reaches policy or an executor, the broker requires a
+workspace-issued, Ed25519-signed identity for the current machine turn. The
+identity is bound to the authenticated owner delegation, workspace, session,
+turn, principal, and `tool_broker` audience. Interface authentication therefore
+does not become agent authority: the human remains the owner scope, while the
+machine is the actor recorded on the action. Child-agent boundaries mint child
+principals with explicit parent ancestry. No interface, plugin relay, scheduled
+run, resume path, or CLI agentic path may bypass this gate.
+
 This is the non-bypass path every tool, command, plugin action, channel action, memory write, graph query, checkpoint restore, model control, or execution adapter must follow.
 
 ```mermaid

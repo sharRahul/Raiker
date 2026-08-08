@@ -25,6 +25,15 @@ Raiker must protect:
 
 ## Core Trust Boundaries
 
+The human-owner/session boundary and machine-turn boundary are separate. An
+embedded workspace issuer signs short-lived turn attestations; the broker
+verifies signature, workspace, delegation, session, turn, audience, lifetime,
+and active principal before any policy or credential operation. Owner-scoped
+credentials are selected internally after verification and never make the
+machine a human principal. See
+[Per-turn machine identity](threat-models/machine-identity.md) for the detailed
+spoofing, replay, key-theft, delayed-approval, and recovery analysis.
+
 | Boundary | Trusted side | Untrusted side | Required control |
 |---|---|---|---|
 | User prompt to gateway | Agent Gateway validator | Prompt text and attachments | Contract validation and provenance. |

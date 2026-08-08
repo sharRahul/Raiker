@@ -97,6 +97,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MACHINE_IDENTITIES_MIGRATION_ID,
+    MACHINE_IDENTITIES_SQL,
     MCP_CONTAINMENT_MIGRATION_ID,
     MCP_CONTAINMENT_SQL,
     MCP_MONITORING_MIGRATION_ID,
@@ -907,6 +909,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
             self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
+            self._apply_migration(
+                MACHINE_IDENTITIES_MIGRATION_ID, MACHINE_IDENTITIES_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -6512,6 +6517,116 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
 
     # ── Phase 10: Runtime Authority (Principals + Risk Acceptance) ──
+
+    def get_active_machine_issuer_key(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM machine_identity_issuers
+                   WHERE is_active=1 ORDER BY created_at, key_id LIMIT 1"""
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_machine_issuer_key(self, key_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM machine_identity_issuers WHERE key_id=? AND is_active=1",
+                (key_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def create_machine_issuer_key_if_absent(
+        self,
+        *,
+        workspace_id: str,
+        key_id: str,
+        public_key: bytes,
+        private_key_encrypted: bytes,
+    ) -> dict[str, Any]:
+        """Atomically install the one active embedded issuer for this workspace."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                """SELECT * FROM machine_identity_issuers
+                   WHERE is_active=1 ORDER BY created_at, key_id LIMIT 1"""
+            ).fetchone()
+            if row is None:
+                connection.execute(
+                    """INSERT INTO machine_identity_issuers
+                       (workspace_id, key_id, public_key, private_key_encrypted,
+                        created_at, rotated_at, is_active)
+                       VALUES (?, ?, ?, ?, ?, NULL, 1)""",
+                    (
+                        workspace_id,
+                        key_id,
+                        public_key,
+                        private_key_encrypted,
+                        utc_now(),
+                    ),
+                )
+                row = connection.execute(
+                    "SELECT * FROM machine_identity_issuers WHERE key_id=?", (key_id,)
+                ).fetchone()
+            assert row is not None
+            return dict(row)
+
+    def list_active_machine_issuer_keys(self) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM machine_identity_issuers
+                   WHERE is_active=1 ORDER BY created_at, key_id"""
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def insert_turn_machine_identity(self, identity: dict[str, Any]) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO turn_machine_identities
+                   (principal_id, owner_principal_id, workspace_id, session_id,
+                    turn_id, subject, key_id, token_id, issued_at, expires_at,
+                    parent_principal_id, is_active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)""",
+                (
+                    identity["principal_id"],
+                    identity["owner_principal_id"],
+                    identity["workspace_id"],
+                    identity["session_id"],
+                    identity["turn_id"],
+                    identity["subject"],
+                    identity["key_id"],
+                    identity["token_id"],
+                    identity["issued_at"],
+                    identity["expires_at"],
+                    identity.get("parent_principal_id"),
+                ),
+            )
+
+    def get_turn_machine_identity(self, principal_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM turn_machine_identities WHERE principal_id=?",
+                (principal_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def rotate_turn_machine_identity(
+        self, principal_id: str, *, token_id: str, issued_at: str, expires_at: str
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE turn_machine_identities
+                   SET token_id=?, issued_at=?, expires_at=?, is_active=1
+                   WHERE principal_id=?""",
+                (token_id, issued_at, expires_at, principal_id),
+            )
+        return cursor.rowcount == 1
+
+    def deactivate_turn_machine_identity(self, principal_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE turn_machine_identities SET is_active=0 WHERE principal_id=?",
+                (principal_id,),
+            )
+        return cursor.rowcount == 1
 
     def insert_principal(self, principal_id: str, principal_type: str, display_name: str,
                          delegated_by_user_id: str | None = None,

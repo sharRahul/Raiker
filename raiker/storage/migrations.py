@@ -2363,6 +2363,45 @@ CREATE INDEX IF NOT EXISTS idx_turn_sources_turn
 """
 
 
+# ADD-03 — a cryptographic identity for each agent turn.
+#
+# The issuer is one active Ed25519 key per workspace database. Its private seed
+# is encrypted with Raiker's internal application key; neither it nor a bearer
+# attestation is stored on the turn row. The turn row keeps only immutable,
+# redacted attribution metadata so approvals and audit evidence can outlive the
+# short-lived token that originally proposed the action.
+MACHINE_IDENTITIES_MIGRATION_ID = "RAIKER-1039-machine-identities"
+MACHINE_IDENTITIES_SQL = """
+CREATE TABLE IF NOT EXISTS machine_identity_issuers (
+  workspace_id TEXT PRIMARY KEY,
+  key_id TEXT NOT NULL UNIQUE,
+  public_key BLOB NOT NULL,
+  private_key_encrypted BLOB NOT NULL,
+  created_at TEXT NOT NULL,
+  rotated_at TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1
+);
+CREATE TABLE IF NOT EXISTS turn_machine_identities (
+  principal_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  workspace_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  subject TEXT NOT NULL,
+  key_id TEXT NOT NULL,
+  token_id TEXT NOT NULL,
+  issued_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  parent_principal_id TEXT,
+  is_active INTEGER NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_turn_machine_identity_context
+  ON turn_machine_identities(workspace_id, session_id, turn_id, principal_id);
+CREATE INDEX IF NOT EXISTS idx_turn_machine_identity_turn
+  ON turn_machine_identities(owner_principal_id, session_id, turn_id);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

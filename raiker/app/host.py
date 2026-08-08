@@ -321,7 +321,11 @@ def _windows_process_is_alive(pid: int) -> bool:
         import ctypes
         from ctypes import wintypes
 
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        win_dll = getattr(ctypes, "WinDLL", None)
+        get_last_error = getattr(ctypes, "get_last_error", None)
+        if win_dll is None or get_last_error is None:
+            return False
+        kernel32 = win_dll("kernel32", use_last_error=True)
         open_process = kernel32.OpenProcess
         open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
         open_process.restype = wintypes.HANDLE
@@ -334,7 +338,7 @@ def _windows_process_is_alive(pid: int) -> bool:
 
         handle = open_process(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
         if not handle:
-            return ctypes.get_last_error() == 5  # access denied still proves existence
+            return get_last_error() == 5  # access denied still proves existence
         try:
             exit_code = wintypes.DWORD()
             return bool(get_exit_code(handle, ctypes.byref(exit_code))) and exit_code.value == 259

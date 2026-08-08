@@ -198,6 +198,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-129 | Low | Permissions / authority matrix ignored readiness failures | Fixed (found during ADD-03 independent review) |
 | FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
 | FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
+| FIXED-132 | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5471,6 +5472,23 @@ legacy projection corruption before attempting a destructive table rebuild.
 the process, and the repair path re-raises lock errors instead of interpreting
 them as corruption. The existing concurrent first-use issuer regression covers
 the hosted failure.
+
+---
+
+## FIXED-132 â€” Linux MyPy rejected guarded Windows process APIs
+
+**Status: fixed in this change; found in ADD-03 GitHub CI.**
+
+**Observed.** Runtime tests and Windows MyPy passed, but Linux MyPy rejected
+direct references to `ctypes.WinDLL` and `ctypes.get_last_error` in the safe
+Windows-only process probe.
+
+**Root cause.** The runtime platform guard does not change the Linux typeshed
+surface, where those Windows-only module attributes are intentionally absent.
+
+**Fix applied.** The probe now resolves both APIs dynamically and fails closed
+when either is unavailable. MyPy is verified with an explicit Linux platform in
+addition to the ordinary local check.
 
 ---
 

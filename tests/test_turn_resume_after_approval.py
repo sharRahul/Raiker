@@ -33,6 +33,7 @@ from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ModelMessage, ModelResponse, ToolCallProposal, ToolSpec
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
@@ -266,7 +267,13 @@ def _park_turn(workspace: Path, router: ScriptedRouter) -> tuple[str, PromptEnve
             (envelope.session_id,),
         )
     store.insert_turn(envelope.session_id, envelope.turn_id, envelope.prompt.text)
-    response = asyncio.run(orchestrator.ahandle(envelope))
+    identity = TurnMachineIdentityLifecycle(workspace, store, writer).start(
+        owner_principal_id="principal_owner",
+        session_id=envelope.session_id,
+        turn_id=envelope.turn_id,
+        role_ids=("assistant",),
+    )
+    response = asyncio.run(orchestrator.ahandle(envelope, identity=identity))
     assert response.approval is not None, response.message
     return str(response.approval["approval_id"]), envelope
 

@@ -129,4 +129,7 @@ class WorkspaceIdentityIssuer:
                 issued_at=claims.issued_at,
                 expires_at=claims.expires_at,
             )
+            self.store.reactivate_machine_principal(
+                machine_principal_id, expires_at=claims.expires_at
+            )
         return MachineAttestation(token=token, claims=claims)

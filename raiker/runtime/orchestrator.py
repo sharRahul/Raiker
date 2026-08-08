@@ -45,6 +45,7 @@ from raiker.models.tool_call_validation import (
 )
 from raiker.runtime.classifier import SimpleClassifier
 from raiker.runtime.conversation_history import conversation_messages, history_char_budget
+from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
 from raiker.runtime.model_usage import ModelUsageLedger
 from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
@@ -1054,31 +1055,43 @@ class RuntimeOrchestrator:
         )
 
     async def astream_handle(
-        self, envelope: PromptEnvelope
+        self, envelope: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
     ) -> AsyncIterator[StreamEvent]:
-        async for event in self._aturn_events(envelope, stream=True):
+        async for event in self._aturn_events(envelope, stream=True, identity=identity):
             yield event
 
-    async def ahandle(self, envelope: PromptEnvelope) -> AgentResponse:
+    async def ahandle(
+        self, envelope: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
+    ) -> AgentResponse:
         final: AgentResponse | None = None
-        async for event in self._aturn_events(envelope, stream=False):
+        async for event in self._aturn_events(envelope, stream=False, identity=identity):
             if event.kind == FINAL and event.response is not None:
                 final = event.response
         assert final is not None
         return final
 
     async def _aturn_events(
-        self, envelope: PromptEnvelope, *, stream: bool
+        self,
+        envelope: PromptEnvelope,
+        *,
+        stream: bool,
+        identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
         self._sink = [] if stream else None
         try:
-            async for event in self._aturn_events_inner(envelope, stream=stream):
+            async for event in self._aturn_events_inner(
+                envelope, stream=stream, identity=identity
+            ):
                 yield event
         finally:
             self._sink = None
 
     async def _aturn_events_inner(
-        self, envelope: PromptEnvelope, *, stream: bool
+        self,
+        envelope: PromptEnvelope,
+        *,
+        stream: bool,
+        identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
         machine = RuntimeStateMachine()
         # B17/C13 — a stop or steer that arrived between turns had no turn to act
@@ -1206,7 +1219,7 @@ class RuntimeOrchestrator:
         )
 
         async for event in self._arun_agent_loop(
-            envelope, machine, messages, stream=stream
+            envelope, machine, messages, stream=stream, identity=identity
         ):
             yield event
 
@@ -1220,6 +1233,7 @@ class RuntimeOrchestrator:
         approval_id: str = "",
         pending_calls: list[ToolCallProposal] | None = None,
         queue_total: int = 1,
+        identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Continue a turn that was parked for an approval (B2, ADD-02).
 
@@ -1260,6 +1274,7 @@ class RuntimeOrchestrator:
                 tool_calls_made=tool_calls_made,
                 pending_calls=pending_calls,
                 queue_total=queue_total,
+                identity=identity,
             ):
                 yield event
         finally:
@@ -1275,6 +1290,7 @@ class RuntimeOrchestrator:
         tool_calls_made: int = 0,
         pending_calls: list[ToolCallProposal] | None = None,
         queue_total: int = 1,
+        identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """The model → tool → model loop, shared by a fresh turn and a resumed one.
 

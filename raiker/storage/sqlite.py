@@ -6606,7 +6606,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM turn_machine_identities WHERE principal_id=?",
                 (principal_id,),
             ).fetchone()
-        return dict(row) if row is not None else None
+        if row is None:
+            return None
+        result = dict(row)
+        result["is_active"] = bool(result["is_active"])
+        return result
+
+    def get_turn_machine_identity_for_turn(
+        self, *, owner_principal_id: str, session_id: str, turn_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM turn_machine_identities
+                   WHERE owner_principal_id=? AND session_id=? AND turn_id=?
+                   ORDER BY issued_at DESC LIMIT 1""",
+                (owner_principal_id, session_id, turn_id),
+            ).fetchone()
+        if row is None:
+            return None
+        result = dict(row)
+        result["is_active"] = bool(result["is_active"])
+        return result
 
     def rotate_turn_machine_identity(
         self, principal_id: str, *, token_id: str, issued_at: str, expires_at: str
@@ -6617,6 +6637,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    SET token_id=?, issued_at=?, expires_at=?, is_active=1
                    WHERE principal_id=?""",
                 (token_id, issued_at, expires_at, principal_id),
+            )
+        return cursor.rowcount == 1
+
+    def reactivate_machine_principal(self, principal_id: str, *, expires_at: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE principals SET expires_at=?, is_active=1 WHERE principal_id=?",
+                (expires_at, principal_id),
             )
         return cursor.rowcount == 1
 

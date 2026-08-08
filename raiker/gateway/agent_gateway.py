@@ -29,6 +29,10 @@ from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.lifecycle import (
+    TrustedTurnIdentity,
+    TurnMachineIdentityLifecycle,
+)
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
@@ -48,6 +52,10 @@ class AgentGateway:
         self.workspace_root = Path(workspace_root).resolve()
         self.store = SQLiteStore(self.workspace_root)
         self.writer = EventLogWriter(self.store)
+        self.owner_principal_id = principal_id
+        self.machine_identities = TurnMachineIdentityLifecycle(
+            self.workspace_root, self.store, self.writer
+        )
         self.sessions = SessionManager(self.store, self.workspace_root)
         # Local-account owner for session attribution: sessions this principal
         # creates are stamped with its user_id so accounts stay isolated. Legacy
@@ -227,7 +235,7 @@ class AgentGateway:
             )
         return prompt_envelope, None
 
-    def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> None:
+    def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)
         self.sessions.track_turn(
@@ -252,6 +260,30 @@ class AgentGateway:
             if existing_session is None:
                 self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
             self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
+        return self.machine_identities.start(
+            owner_principal_id=self.owner_principal_id,
+            session_id=prompt_envelope.session_id,
+            turn_id=prompt_envelope.turn_id,
+            role_ids=("assistant",),
+        )
+
+    def _rotate_identity_for_resume(
+        self, envelope: PromptEnvelope
+    ) -> TrustedTurnIdentity:
+        row = self.store.get_turn_machine_identity_for_turn(
+            owner_principal_id=self.owner_principal_id,
+            session_id=envelope.session_id,
+            turn_id=envelope.turn_id,
+        )
+        if row is None:
+            raise TurnSuspensionError("machine_identity_missing")
+        return self.machine_identities.rotate(
+            owner_principal_id=self.owner_principal_id,
+            session_id=envelope.session_id,
+            turn_id=envelope.turn_id,
+            principal_id=str(row["principal_id"]),
+            role_ids=("assistant",),
+        )
 
     def _finalize_turn(
         self, prompt_envelope: PromptEnvelope, response: AgentResponse
@@ -314,9 +346,12 @@ class AgentGateway:
         if prompt_envelope is None:
             assert error is not None
             return error
-        self._prepare_turn(prompt_envelope)
-        response = await self.runtime.ahandle(prompt_envelope)
-        return self._finalize_turn(prompt_envelope, response)
+        identity = self._prepare_turn(prompt_envelope)
+        response = await self.runtime.ahandle(prompt_envelope, identity=identity)
+        finalized = self._finalize_turn(prompt_envelope, response)
+        if response.status != "needs_approval":
+            self.machine_identities.finish(identity)
+        return finalized
 
     async def astream_prompt(self, envelope: PromptEnvelope | dict[str, object]):  # type: ignore[no-untyped-def]
         """Yield :class:`StreamEvent`s for one turn (text deltas, lifecycle, final).
@@ -331,7 +366,7 @@ class AgentGateway:
             assert error is not None
             yield StreamEvent(kind=FINAL, response=error)
             return
-        self._prepare_turn(prompt_envelope)
+        identity = self._prepare_turn(prompt_envelope)
         tasks = TaskManager(self.store, self.writer)
         task = tasks.create_task(
             session_id=prompt_envelope.session_id,
@@ -341,7 +376,7 @@ class AgentGateway:
         )
         final: AgentResponse | None = None
         try:
-            async for event in self.runtime.astream_handle(prompt_envelope):
+            async for event in self.runtime.astream_handle(prompt_envelope, identity=identity):
                 current = tasks.get_task(task.task_id)
                 if current is not None and current.status == "cancelled":
                     final = AgentResponse(
@@ -363,6 +398,8 @@ class AgentGateway:
                 yield event
             assert final is not None
             enriched = self._finalize_turn(prompt_envelope, final)
+            if final.status != "needs_approval":
+                self.machine_identities.finish(identity)
             yield StreamEvent(kind=FINAL, response=enriched)
         finally:
             current = tasks.get_task(task.task_id)
@@ -459,6 +496,7 @@ class AgentGateway:
         ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
+        identity = self._rotate_identity_for_resume(envelope)
         final: AgentResponse | None = None
         try:
             async for event in self.runtime.aresume_events(
@@ -469,11 +507,15 @@ class AgentGateway:
                 approval_id=approval_id,
                 pending_calls=pending_calls,
                 queue_total=queue_total,
+                identity=identity,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response
             assert final is not None
-            return self._finalize_turn(envelope, final)
+            finalized = self._finalize_turn(envelope, final)
+            if final.status != "needs_approval":
+                self.machine_identities.finish(identity)
+            return finalized
         finally:
             self.store.finalize_suspended_turn(
                 approval_id, status="resumed" if final is not None else "resume_failed"
@@ -491,6 +533,7 @@ class AgentGateway:
         ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
+        identity = self._rotate_identity_for_resume(envelope)
         final: AgentResponse | None = None
         try:
             async for event in self.runtime.aresume_events(
@@ -501,13 +544,17 @@ class AgentGateway:
                 approval_id=approval_id,
                 pending_calls=pending_calls,
                 queue_total=queue_total,
+                identity=identity,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response
                     continue
                 yield event
             assert final is not None
-            yield StreamEvent(kind=FINAL, response=self._finalize_turn(envelope, final))
+            finalized = self._finalize_turn(envelope, final)
+            if final.status != "needs_approval":
+                self.machine_identities.finish(identity)
+            yield StreamEvent(kind=FINAL, response=finalized)
         finally:
             self.store.finalize_suspended_turn(
                 approval_id, status="resumed" if final is not None else "resume_failed"

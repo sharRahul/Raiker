@@ -96,6 +96,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("checkpoint_restore_execution", "task_management_runtime",
                 "project_assignment_runtime"):
         r[cap] = _req(cap, "1", notes="Local, reversible, owner-scoped; executor registered.")
+    # B11 — the git write path. Local and repository-scoped like the file caps
+    # above; hooks are disabled for the invocation so an approved commit cannot
+    # become an un-governed code-execution path.
+    r["git_write_execution"] = _req(
+        "git_write_execution", "1",
+        notes="Local branch/commit in the workspace repository; repository hooks disabled.")
 
     # Tier 2
     for cap in ("shell_execution", "process_execution", "network_execution", "web_fetch"):

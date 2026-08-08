@@ -110,6 +110,7 @@ export const CAPABILITY_DOMAIN_ORDER = [
 const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   file_write_execution: "Workspace",
   patch_apply_execution: "Workspace",
+  git_write_execution: "Workspace",
   memory_write_execution: "Workspace",
   memory_forget_execution: "Workspace",
   task_management_runtime: "Workspace",
@@ -378,6 +379,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   patch_apply_execution: {
     label: "Patch apply",
     description: "Apply unified-diff patches to workspace files (approval-gated).",
+  },
+  git_write_execution: {
+    label: "Git writes",
+    description:
+      "Create a branch or record a commit in the workspace repository when you approve one the agent proposed.",
   },
   memory_write_execution: {
     label: "Memory store",

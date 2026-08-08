@@ -51,6 +51,9 @@ _READ_RISK = "medium"
 
 _RESOURCE_PATHS = {"issue": "issues", "pull_request": "pulls"}
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+# A pull request head/base. Deliberately narrower than git's own rules: it is
+# model-supplied and goes straight into a request path/body.
+_BRANCH_REF_RE = re.compile(r"^[A-Za-z0-9_.\-/]{1,255}$")
 
 
 def _scoped_record(store: SQLiteStore, principal_id: str | None, capability: str) -> dict[str, Any] | None:
@@ -251,26 +254,9 @@ class GithubConnectorService:
             return _failed("empty_body", "comment body must not be empty.")
 
         if enforce_modes:
-            if not self._gate_enabled():
-                return _denied(
-                    "connector_gate_disabled",
-                    "GitHub write denied: the connector_github_runtime gate is disabled (fail closed).",
-                )
-            mode = self._mode()
-            if mode == DecisionMode.DENY:
-                return _denied(
-                    "connector_denied_by_decision_mode",
-                    "GitHub write denied by the owner's decision mode.",
-                )
-            if mode == DecisionMode.ASK or (
-                mode == DecisionMode.AUTO and auto_requires_approval(_READ_RISK)
-            ):
-                return _denied(
-                    f"connector_withheld_{mode.value}",
-                    "GitHub write withheld: reaching the GitHub API with the owner token "
-                    "needs a standing owner decision — raise the connector_github_runtime "
-                    "decision mode to allow.",
-                )
+            withheld = self._write_withheld("write")
+            if withheld is not None:
+                return withheld
 
         if not self.credential_configured():
             return _denied(
@@ -324,6 +310,130 @@ class GithubConnectorService:
             ),
             "content_length": len(body_text),
         }
+
+
+    def create_pull_request(
+        self,
+        repo: str,
+        title: str,
+        head: str,
+        base: str,
+        body: str = "",
+        *,
+        enforce_modes: bool = True,
+    ) -> dict[str, Any]:
+        """Open one governed pull request on a GitHub repository (B11).
+
+        The companion to the local half of the git write path: `git_branch` and
+        `git_commit` produce the branch, and this proposes it. Everything a
+        comment enforces is enforced here — the connector gate, the decision
+        mode, the env-only owner credential and the owner egress allowlist —
+        because it is the same credential reaching the same host.
+
+        ``enforce_modes=False`` skips the gate/decision-mode layer for callers
+        that already passed through governance (the ``route_action`` + approval
+        path applies those layers itself).
+        """
+        repo = (repo or "").strip()
+        if not _REPO_RE.match(repo):
+            return _failed("invalid_repo", "repo must be 'owner/name'.")
+        title_text = (title or "").strip()
+        if not title_text:
+            return _failed("empty_title", "pull request title must not be empty.")
+        head_ref = (head or "").strip()
+        base_ref = (base or "").strip()
+        for label, value in (("head", head_ref), ("base", base_ref)):
+            if not value:
+                return _failed(f"empty_{label}", f"{label} branch must not be empty.")
+            if not _BRANCH_REF_RE.match(value):
+                return _failed(f"invalid_{label}", f"{label} is not a valid branch name.")
+        if head_ref == base_ref:
+            return _failed("head_equals_base", "head and base must be different branches.")
+
+        if enforce_modes:
+            withheld = self._write_withheld("pull request")
+            if withheld is not None:
+                return withheld
+
+        if not self.credential_configured():
+            return _denied(
+                "connector_not_configured",
+                f"GitHub write denied: no owner credential is configured ({GITHUB_TOKEN_ENV}).",
+            )
+        if not self.egress_allowed():
+            return _denied(
+                "connector_egress_denied",
+                f"GitHub write denied: {GITHUB_HOST} is not on the owner connector egress allowlist.",
+            )
+
+        url = f"https://{GITHUB_HOST}/repos/{repo}/pulls"
+        token = os.environ.get(GITHUB_TOKEN_ENV, "").strip()
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+            "User-Agent": "raiker-connector",
+        }
+        try:
+            resp = post_json_url(
+                url,
+                {
+                    "title": title_text,
+                    "head": head_ref,
+                    "base": base_ref,
+                    "body": (body or "").strip()[:MAX_BODY_CHARS],
+                },
+                egress_allowlist=connector_egress_allowlist(),
+                headers=headers,
+            )
+        except SandboxError as exc:
+            return _denied(f"connector_fetch_failed:{exc}", "GitHub write failed closed.")
+        except Exception:  # noqa: BLE001 — every transport failure fails closed
+            return _denied("connector_fetch_failed", "GitHub write failed closed.")
+
+        try:
+            data = json.loads(resp["body_text"])
+        except (json.JSONDecodeError, TypeError):
+            return _failed("connector_bad_response", "GitHub returned an unparseable response.")
+        if not isinstance(data, dict) or not data.get("number"):
+            return _failed("connector_bad_response", "GitHub returned an unexpected response.")
+        html_url = str(data.get("html_url", ""))
+        return {
+            "status": "success",
+            "repo": repo,
+            "number": int(data["number"]),
+            "html_url": html_url,
+            "head": head_ref,
+            "base": base_ref,
+            "untrusted": True,
+            # Untrusted-data framing for the calling model; never instruction authority.
+            "content": f"GitHub pull request opened (untrusted data):\n{html_url}",
+            "content_length": len(title_text) + len((body or "").strip()),
+        }
+
+    def _write_withheld(self, noun: str) -> dict[str, Any] | None:
+        """The gate/decision-mode refusal for a write, or None when it may proceed."""
+        if not self._gate_enabled():
+            return _denied(
+                "connector_gate_disabled",
+                f"GitHub {noun} denied: the connector_github_runtime gate is disabled (fail closed).",
+            )
+        mode = self._mode()
+        if mode == DecisionMode.DENY:
+            return _denied(
+                "connector_denied_by_decision_mode",
+                f"GitHub {noun} denied by the owner's decision mode.",
+            )
+        if mode == DecisionMode.ASK or (
+            mode == DecisionMode.AUTO and auto_requires_approval(_READ_RISK)
+        ):
+            return _denied(
+                f"connector_withheld_{mode.value}",
+                f"GitHub {noun} withheld: reaching the GitHub API with the owner token "
+                "needs a standing owner decision — raise the connector_github_runtime "
+                "decision mode to allow.",
+            )
+        return None
 
 
 def _default_fetch(url: str, headers: dict[str, str]) -> dict[str, Any]:

@@ -811,7 +811,11 @@ export interface ApprovalDetailView {
   arguments: Record<string, unknown>;
   diff: string | null;
   diff_path: string | null;
-  preview_kind: "file_diff" | "patch" | "arguments";
+  // `connector_request` has always been produced by the server for a
+  // `connector_write`; it was missing here, so the union claimed a shape the
+  // backend does not only produce. `git_change` is B11's: a commit's file list
+  // and diff, or the two refs a branch moves between.
+  preview_kind: "file_diff" | "patch" | "git_change" | "connector_request" | "arguments";
   metadata_only_notice: string;
   // Server-computed: does pressing Approve actually perform this action?
   executes_on_approval: boolean;
@@ -850,6 +854,9 @@ export interface ResolveApprovalResult {
     // is a row rather than a file: the task that now exists, the project a
     // conversation was moved into.
     receipt?: { kind: string; title: string; href: string; label: string };
+    // B11 — one sentence naming what the execution did, for a capability whose
+    // result is neither a file nor a row (the branch created, the commit made).
+    summary?: string;
   };
   // B2 — whether a turn was parked on this approval and can now pick up again.
   // ADD-02 adds the batch counters and how many calls the resume still owes.

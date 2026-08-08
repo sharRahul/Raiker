@@ -83,6 +83,13 @@ class StaticPolicyConfig:
     approval_required_actions: frozenset[str] = field(
         default_factory=lambda: frozenset({
             "shell", "write_file", "edit_file", "apply_patch",
+            # B11 — the git write path. A commit rewrites history a file
+            # checkpoint does not cover and a pull request leaves the machine,
+            # so both wait for the owner. `git_write_execution` is the
+            # capability name the runtime authority routes on, listed for the
+            # same reason `remote_execution_cap` is: a capability in neither set
+            # is hard-denied on its way to the executor that carries it out.
+            "git_branch", "git_commit", "git_write_execution", "github_write",
             "memory_write", "memory_forget",
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.

@@ -20,7 +20,8 @@ What is relayed, and what is not:
 
 * only :data:`EXECUTABLE_ON_APPROVAL` — checkpointed file mutations, the
   owner-configured remote/cloud command capabilities, bounded local ``shell``
-  commands, and the two local planning mutations (a task row, a project label).
+  commands, the two local planning mutations (a task row, a project label), and
+  the git write path (a branch, a commit, a GitHub pull request or comment).
   ``process``, ``network`` and every other capability keep metadata-only
   resolution.
 * **critical** approvals never come here. They keep the human-only, step-up
@@ -63,6 +64,12 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     # approving would do, approved it, and got nothing.
     "task_management_runtime",
     "project_assignment_runtime",
+    # B11 — the git write path. A branch and a commit are local and repository
+    # scoped, and a GitHub write is the connector's own credential reaching the
+    # host it already reaches for reads. Leaving them out would have raised a
+    # high-risk decision that said what approving would do and then did nothing.
+    "git_write_execution",
+    "connector_github_runtime",
 })
 
 

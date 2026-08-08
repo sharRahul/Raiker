@@ -53,8 +53,8 @@ def test_bridge_refuses_tools_outside_static_registry(tmp_path: Path) -> None:
 
 
 def test_executor_sends_payload_on_stdin_and_cleans_scratch(
-    tmp_path: Path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any
+) -> None:
     monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
     captured: dict[str, Any] = {}
 
@@ -78,13 +78,16 @@ def test_executor_sends_payload_on_stdin_and_cleans_scratch(
     assert payload["tool_name"] == "list_directory"
     assert payload["repository"] == "/repository"
     assert "list_directory" not in captured["command"]
+    command = captured["command"]
+    assert command[command.index("--workdir") + 1] == "/repository"
+    assert command[command.index("--env") + 1] == "PYTHONDONTWRITEBYTECODE=1"
     assert captured["allowlist"] == frozenset({"podman"})
     assert not (tmp_path / ".raiker" / "container-workspaces" / "act_1").exists()
 
 
 def test_executor_refuses_malformed_bridge_response(
-    tmp_path: Path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any
+) -> None:
     monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
 
     def runner(_command: list[str], **_kwargs: Any) -> dict[str, Any]:
@@ -108,8 +111,8 @@ def test_executor_refuses_malformed_bridge_response(
 
 
 def test_executor_refuses_disallowed_image_before_runtime(
-    tmp_path: Path, monkeypatch
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any
+) -> None:
     monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "different:approved")
     called = False
 

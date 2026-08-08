@@ -75,6 +75,12 @@ def build_container_command(request: ContainerRunRequest) -> list[str]:
         command.extend(
             ["--mount", f"type=bind,src={repository},dst=/repository,readonly"]
         )
+        # The bridge is imported from the read-only repository mount. Disabling
+        # bytecode writes keeps that import compatible with the immutable mount
+        # and avoids leaving interpreter artifacts in the owner's workspace.
+        command.extend(
+            ["--workdir", "/repository", "--env", "PYTHONDONTWRITEBYTECODE=1"]
+        )
     if output is not None:
         command.extend(["--mount", f"type=bind,src={output},dst=/workspace-output"])
     command.extend([request.image, *request.command])

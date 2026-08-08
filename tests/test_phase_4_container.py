@@ -16,11 +16,59 @@ from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES, build_default_executor_registry
 from raiker.runtime.executors.containers import (
     ContainerExecutionExecutor,
+    ContainerRunRequest,
+    build_container_command,
     run_isolated_workspace_command,
 )
 from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "container_execution_cap"
+
+
+@pytest.mark.parametrize("runtime", ["docker", "podman"])
+def test_container_command_has_read_only_repository_and_one_writable_output(
+    tmp_path: Path, runtime: str
+) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    output = repository / ".raiker" / "container-workspaces" / "act_1"
+    output.mkdir(parents=True)
+    request = ContainerRunRequest(
+        runtime=runtime,  # type: ignore[arg-type]
+        image="raiker-tools:approved",
+        command=("python", "-m", "raiker.execution.tool_bridge"),
+        repository=repository,
+        output_dir=output,
+        timeout=12,
+    )
+
+    command = build_container_command(request)
+
+    assert command[:3] == [runtime, "run", "--rm"]
+    assert (
+        f"type=bind,src={repository.resolve()},dst=/repository,readonly" in command
+    )
+    assert f"type=bind,src={output.resolve()},dst=/workspace-output" in command
+    assert command[command.index("--network") + 1] == "none"
+    assert "--read-only" in command
+
+
+def test_container_command_rejects_writable_mount_outside_action_root(tmp_path: Path) -> None:
+    repository = tmp_path / "repo"
+    repository.mkdir()
+    output = tmp_path / "outside"
+    output.mkdir()
+    request = ContainerRunRequest(
+        runtime="docker",
+        image="raiker-tools:approved",
+        command=("true",),
+        repository=repository,
+        output_dir=output,
+        timeout=12,
+    )
+
+    with pytest.raises(ValueError, match="container_output_outside_action_root"):
+        build_container_command(request)
 
 
 def _ws(tmp_path: Path) -> Path:

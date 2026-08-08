@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import os
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, run_command
@@ -22,6 +23,62 @@ CONTAINER_RUN_TIMEOUT = 60.0
 _MAX_TIMEOUT = 300.0
 
 CommandRunner = Callable[..., dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class ContainerRunRequest:
+    runtime: Literal["docker", "podman"]
+    image: str
+    command: tuple[str, ...]
+    repository: Path | None
+    output_dir: Path | None
+    timeout: float
+    stdin_text: str | None = None
+    max_output_bytes: int = 200_000
+
+
+def _action_workspace_root(repository: Path) -> Path:
+    return repository.resolve() / ".raiker" / "container-workspaces"
+
+
+def build_container_command(request: ContainerRunRequest) -> list[str]:
+    if request.runtime not in {"docker", "podman"}:
+        raise ValueError("container_runtime_invalid")
+    if not request.image.strip():
+        raise ValueError("container_image_required")
+    command = [
+        request.runtime,
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--memory",
+        "512m",
+        "--cpus",
+        "1",
+        "--pids-limit",
+        "256",
+        "--read-only",
+        "--cap-drop",
+        "ALL",
+        "--security-opt",
+        "no-new-privileges",
+        *_docker_user_args(),
+    ]
+    repository = request.repository.resolve() if request.repository is not None else None
+    output = request.output_dir.resolve() if request.output_dir is not None else None
+    if output is not None and (
+        repository is None or _action_workspace_root(repository) not in output.parents
+    ):
+        raise ValueError("container_output_outside_action_root")
+    if repository is not None:
+        command.extend(
+            ["--mount", f"type=bind,src={repository},dst=/repository,readonly"]
+        )
+    if output is not None:
+        command.extend(["--mount", f"type=bind,src={output},dst=/workspace-output"])
+    command.extend([request.image, *request.command])
+    return command
 
 
 def _docker_user_args() -> list[str]:

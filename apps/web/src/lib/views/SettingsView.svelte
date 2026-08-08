@@ -11,7 +11,7 @@
   import Runtime from "./settings/Runtime.svelte";
   import Icon from "../components/Icon.svelte";
 
-  let { principal = "—" }: { principal?: string } = $props();
+  let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
 
   // Only sections the runtime actually backs. Voice, trusted-contact
   // recovery, data-export tooling, and cloud/cache controls have no backend
@@ -25,7 +25,7 @@
     { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
   ] as const;
 
-  let active = $state<string>("general");
+  let active = $derived<string>(SECTIONS.some((section) => section.id === tab) ? tab : "general");
   let settings = $state<Record<string, unknown>>({});
   let status = $state<{ vault: string; mfa_enrolled: boolean; username: string }>({
     vault: "missing",
@@ -109,6 +109,11 @@
     saveDetail = null;
   }
 
+  function selectSection(id: string) {
+    active = id;
+    window.location.hash = `#/settings?tab=${encodeURIComponent(id)}`;
+  }
+
   onMount(load);
 </script>
 
@@ -138,7 +143,7 @@
         class="rail-item"
         class:active={active === section.id}
         aria-current={active === section.id ? "page" : undefined}
-        onclick={() => (active = section.id)}
+        onclick={() => selectSection(section.id)}
       >
         <Icon name={section.icon} size={17} /><span>{section.label}</span>{#if dirtySections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
       </button>

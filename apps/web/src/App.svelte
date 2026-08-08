@@ -191,7 +191,7 @@
             projectId={activeProjectId}
           />
         {:else if current !== "new-chat" && current !== "build"}
-          <SettingsView {principal} />
+          <SettingsView {principal} tab={currentTab ?? "general"} />
         {/if}
       </ResponsivePage>
     </main>

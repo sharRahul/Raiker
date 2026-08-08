@@ -61,7 +61,7 @@ that would put Raiker ahead of the field.
 
 | ID | Tier | Area | Status |
 |---|---|---|---|
-| ADD-01 | Tier 0 | Execution / container backend | Partly shipped (see FIXED-47) |
+| ADD-01 | Tier 0 | Execution / container backend | Shipped (see FIXED-47 and FIXED-117) |
 | ADD-02 | Tier 0 | Runtime / tool queue and gates | Shipped |
 | ADD-03 | Tier 0 | Identity / agent attestation | Proposal |
 | ADD-04 | Tier 0 | Audit / transaction lineage | Proposal |
@@ -102,36 +102,31 @@ principal question has to be answered.
 
 ## ADD-01 — Containerised tool execution instead of a record-only mode
 
-**Status: partly shipped — see FIXED-47. This entry records the remainder.**
+**Status: shipped — completed end to end in this change; see FIXED-47 and FIXED-117.**
 
-**Today.** `raiker/runtime/executors/containers.py` already implements the
-proposal's core: an owner-allowlisted image, no network, dropped capabilities, no
-host mounts, memory/CPU/PID limits, a read-only rootfs, a non-root user derived
-from the host uid/gid, and a wall-clock timeout. An empty allowlist denies
-everything, so it fails closed. `command_sandbox_image()` refuses to fall back to
-the host when `RAIKER_COMMAND_SANDBOX_IMAGE` is unset or unmatched — a standing
-grant is not permission to escape the boundary. `raiker/tools/broker.py` routes
-granted commands through it.
+**Today.** `raiker/execution/profiles.py` defines owner-scoped per-tool container
+profiles. The broker resolves a profile only after policy and approval review,
+then `ContainerToolExecutor` invokes a bounded JSON bridge in an ephemeral
+Docker or Podman container. The connected repository is mounted read-only at
+`/repository`; only the action-specific directory under
+`.raiker/container-workspaces/` is writable. The root filesystem is read-only,
+networking is disabled, capabilities are dropped, privilege escalation is
+disabled, and CPU/memory/PID/time/output limits are enforced. Empty or mismatched
+runtime/image/tool configuration fails closed and never falls back to the host.
 
-**Missing.** The boundary covers *commands granted under B5*. It does not yet
-cover the general tool surface, and `container_execution_enabled` is still
-reported `False` by the readiness views (`raiker/workspace/views.py`,
-`raiker/storage/lifecycle_evidence.py`). It is no longer one of the gatherer's
-own hardcoded flags — FIXED-104 deleted that fixed list, so the turn context now
-reports what the owner actually enabled. There is no per-tool container profile,
-no read-only mount of the repository with a single writable workspace
-subdirectory, and no Podman path.
+**What shipped.** The static bridge exposes only `glob`, `grep`,
+`list_directory`, `read_file`, and `stat_path`. Docker and Podman share the same
+command builder and safety contract. Readiness is derived from the account gate,
+runtime discovery, operator image allowlist, and persisted profile rather than a
+constant. Settings advertises only server-allowlisted runtimes, images, and tools,
+shows the repository→output boundary, gives exact unavailable remediation, and
+the Chat/Build badge names the selected runtime.
 
-**Work.** Extend `raiker/execution/profiles.py` with per-tool container profiles
-so any tool call — not only a granted command — can be routed into an ephemeral
-container. Mount the connected repository read-only with one writable workspace
-subdirectory rather than handing the container the whole tree. Add Podman as a
-runtime alternative behind the same interface, and lift
-`container_execution_enabled` to a real gate rather than a constant.
-
-**Governed outcome.** The execution environment selector already shipped by
-FIXED-70 names the container profile a tool will run under, and a tool whose
-profile is unavailable says so instead of silently running on the host.
+**Governed outcome.** A profiled safe read runs inside the selected ephemeral
+container. An unavailable runtime, disabled gate, disallowed image, unsupported
+tool, invalid bridge response, or failed cleanup is explicit; none silently runs
+on the host. Live evidence is recorded in `docs/WEB_APP_LIVE_TEST.md` and
+`output/playwright/add01-container-profile-live.png`.
 
 ---
 

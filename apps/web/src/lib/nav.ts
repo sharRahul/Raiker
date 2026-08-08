@@ -44,6 +44,7 @@ export const HUB_TABS: Record<string, string[]> = {
   models: ["providers", "routing", "pricing", "posture"],
   extensions: ["connectors", "mcp", "skills", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
+  settings: ["general", "notification", "personalisation", "security", "account", "runtime"],
 };
 
 /**

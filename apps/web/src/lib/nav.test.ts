@@ -114,6 +114,7 @@ describe("nav model", () => {
     expect(tabFromHash("#/observe")).toBe("overview");
     expect(tabFromHash("#/observe?tab=nonsense")).toBe("overview");
     expect(tabFromHash("#/extensions?tab=plugins")).toBe("plugins");
+    expect(tabFromHash("#/settings?tab=runtime")).toBe("runtime");
     expect(tabFromHash("#/capabilities")).toBeNull();
   });
 

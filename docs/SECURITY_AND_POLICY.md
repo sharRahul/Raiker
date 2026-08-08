@@ -38,3 +38,21 @@ Strict non-allow blocking, role revoke governed, and capability gate per action 
 Sensitive and remote capabilities remain fail-closed until a real executor,
 explicit gate, policy requirements, and applicable human approval are present.
 Operational security boundaries are defined in [SECURITY_ARCHITECTURE.md](SECURITY_ARCHITECTURE.md).
+
+## Container tool boundary
+
+Container profiles do not grant tools or bypass the broker. Policy, decision
+mode, and any approval are resolved first; only then may a statically registered
+safe tool be routed to the selected profile. The operator separately allowlists
+images through `RAIKER_CONTAINER_IMAGE_ALLOWLIST`; the account separately enables
+`container_execution_cap`; and the profile separately assigns tools. All three
+must agree.
+
+Docker and Podman runs use no network, a read-only root filesystem, dropped Linux
+capabilities, `no-new-privileges`, bounded CPU/memory/PIDs/time/output, a
+read-only `/repository` bind, and one action-scoped writable
+`/workspace-output`. Requests and responses are bounded JSON over attached stdin
+and stdout. The bridge contains no dynamic import, shell, connector, credential,
+or arbitrary-command dispatch. Missing runtimes, disallowed images, unsupported
+tools, malformed responses, and cleanup failures are explicit and never cause a
+host fallback.

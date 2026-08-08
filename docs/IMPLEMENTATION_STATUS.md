@@ -53,9 +53,16 @@ are enforced. Disabled runtime flags remain false where no executor exists:
 `approval_relay_runtime_enabled`, `cleanup_execution_enabled`,
 `rollback_execution_enabled`, `external_channels_enabled`,
 `notifications_enabled`, `remote_execution_enabled`,
-`container_execution_enabled`, `cloud_execution_enabled`,
+`cloud_execution_enabled`,
 `process_execution_enabled`, `shell_execution_enabled`,
 `network_execution_enabled`, and `runtime_execution_enabled`.
+
+`container_execution_enabled` is no longer a fixed false compatibility flag.
+It is derived from the owner account's container gate plus a valid persisted
+profile whose Docker/Podman runtime and operator-allowlisted image are available.
+Profiled safe filesystem/search tools execute through the container bridge with
+a read-only repository and one action-scoped writable output directory; an
+unavailable profile never falls back to native host execution.
 
 The dashboard's Build workspace is a client of these controls and adds no
 authority of its own. Its Plan/Edit/Auto composer modes set the existing
@@ -84,6 +91,6 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 | Slice M | Storage cleanup reports readiness and produces cleanup previews. Cleanup execution remains governed and fail-closed where no executor is available. |
 | Slice N | Plugin server startup readiness reports plugin capability and blockers; plugins do not become an authority bypass. |
 | Slice O | External channels and notifications expose metadata readiness only; runtime dispatch events are introduced only with a governed executor. |
-| Slice P | The historical Phase 3 readiness record remains metadata-only. Current SSH and Daytona profiles have real executors and stay unavailable until an owner configures and selects one; other remote/container/cloud types remain fail-closed. |
+| Slice P | The historical Phase 3 readiness record remains metadata-only. Current SSH, Daytona, and bounded container profiles have real executors and stay unavailable until an owner configures and selects one; other remote/cloud types remain fail-closed. |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. This document distinguishes metadata-only, dry-run-only, contract-only, readiness-only, implemented-read-only, and test-only surfaces from executable capabilities.

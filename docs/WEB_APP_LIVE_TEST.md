@@ -274,6 +274,25 @@ and verified protected-path filtering. Verification also identified the
 cumulative Daytona billing reconciliation and accessibility diagnostics tracked
 as BUG-42 and BUG-43 in `docs/plans/TO_BE_FIXED.md`.
 
+## Result — 2026-08-08 (ADD-01 containerised tool execution)
+
+| Check | Result |
+|---|---|
+| Real Docker bridge | ✅ `python:3.12-alpine` read `README.md` through the bounded JSON bridge with no network, read-only repository, read-only rootfs, dropped capabilities, and action-workspace cleanup |
+| Container governance | ✅ `container_execution_cap` enabled through Permissions step-up; runtime, image, and tools selected only from server-advertised allowlists |
+| Runtime settings | ✅ Docker profile persisted, showed `Docker · python:3.12-alpine`, `2 tools`, and `Read-only repository → writable output`, then became the selected Ready environment |
+| Anthropic | ✅ credential entered through the password field in Models, Haiku 4.5 selected, real Chat response `ADD01 ANTHROPIC LIVE` |
+| OpenRouter | ✅ credential entered through the password field in Models, provider catalogue used, real Chat response `ADD01 OPENROUTER LIVE` |
+| Ollama | ✅ local `gemma4:31b-cloud` selected from the live catalogue, real Chat response `ADD01 OLLAMA LIVE` |
+| Browser suite | ✅ `add-01-container-providers-live.spec.ts`; provider and Ollama response assertions plus container configuration, selection, and badge readiness |
+| Visual review | ✅ five 1440×1000 screenshots inspected; no credential value visible, no clipped controls blocking the tested flow |
+
+Evidence: `output/playwright/add01-providers-connected-live.png`,
+`add01-anthropic-turn-live.png`, `add01-openrouter-turn-live.png`,
+`add01-ollama-turn-live.png`, and `add01-container-profile-live.png`. Live work
+also exposed and closed FIXED-117 (cold import / stdin), FIXED-118 (broken Runtime
+deep link), and FIXED-119 (ambient Ollama in offline tests).
+
 ## Repeatable procedure
 
 1. **Bootstrap + enable the backend's gate** (human owner). For a hosted
@@ -299,12 +318,12 @@ available. Egress hosts must be added to `RAIKER_MODEL_EGRESS_ALLOWLIST`.
 
 | Provider | Profile id | Type | Egress host | Key env | Prompt caching | Status |
 |---|---|---|---|---|---|---|
-| Anthropic | `anthropic-hosted` | hosted | `api.anthropic.com` | `ANTHROPIC_API_KEY` | client `cache_control` breakpoint (5m/1h) | ✅ Verified (Haiku 4.5, 2026-07-10) |
+| Anthropic | `anthropic-hosted` | hosted | `api.anthropic.com` | `ANTHROPIC_API_KEY` | client `cache_control` breakpoint (5m/1h) | ✅ Verified (Haiku 4.5, 2026-08-08) |
 | OpenAI | `openai-hosted` | hosted | `api.openai.com` | `OPENAI_API_KEY` | `prompt_cache_key` + `stream_options.include_usage` (server-side cache) | 🟡 Ready — cloud egress proxy blocks this host; run on a machine that can reach it |
 | Gemini | `gemini-hosted-openai-compatible` | hosted | `generativelanguage.googleapis.com` | `GEMINI_API_KEY` | automatic server-side | 🟡 Ready — egress blocked in this environment |
-| OpenRouter | `openrouter-policy-gated` | hosted | `openrouter.ai` | `OPENROUTER_API_KEY` | automatic server-side | 🟡 Ready — egress blocked in this environment |
+| OpenRouter | `openrouter-policy-gated` | hosted | `openrouter.ai` | `OPENROUTER_API_KEY` | automatic server-side | ✅ Verified (live provider catalogue and turn, 2026-08-08) |
 | llama.cpp | `raiker-local-llama-cpp` | local | `127.0.0.1:8080` | — | `cache_prompt: true` (server KV cache) | 🟡 Ready — needs a running llama.cpp server |
-| Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | 🟡 Ready — needs Ollama + a concrete model |
+| Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | ✅ Verified (`gemma4:31b-cloud`, 2026-08-08) |
 | LM Studio | `lm-studio-local-openai-compatible` | local | `127.0.0.1:1234` | — | automatic server-side | 🟡 Ready — needs LM Studio + a concrete model |
 | Custom OpenAI-compatible | `generic-openai-compatible` | local or home-lab | user-selected | user vault | provider-dependent | 🟡 Ready — configure the endpoint and model in Raiker |
 

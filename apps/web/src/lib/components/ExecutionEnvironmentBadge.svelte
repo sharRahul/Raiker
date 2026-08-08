@@ -20,7 +20,7 @@
   }
 </script>
 
-<a class="environment-badge" class:unavailable={unavailable || selected?.available === false} href="#/settings/runtime" aria-label="Execution environment">
+<a class="environment-badge" class:unavailable={unavailable || selected?.available === false} href="#/settings?tab=runtime" aria-label="Execution environment">
   <span class="dot"></span>
   {#if unavailable}Environment unavailable{:else if selected}{selected.name}{selected.kind === "container" ? ` · ${runtimeName(selected.runtime)}` : ""} · {selected.available ? "Ready" : "Setup required"}{:else}Loading environment…{/if}
 </a>

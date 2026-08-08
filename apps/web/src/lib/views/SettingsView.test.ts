@@ -44,6 +44,17 @@ function stubApi(options: { failPut?: boolean } = {}) {
 }
 
 describe("supported-preferences settings", () => {
+  it("opens the runtime section from a supported deep link", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice", tab: "runtime" } });
+
+    expect(await screen.findByRole("heading", { name: "Runtime configuration" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Runtime configuration" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+  });
+
   it("renders only sections the runtime actually backs", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice" } });

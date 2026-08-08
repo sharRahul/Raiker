@@ -183,6 +183,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-113 | High | Build / Chat — the repository code map | Fixed (was B9) |
 | FIXED-114 | Low | Build / stale repository state after a visit elsewhere | Fixed (found while verifying FIXED-113) |
 | FIXED-116 | High | Models / first-run default | Fixed (Ollama `gemma4:31b-cloud` is the visible and runtime default) |
+| FIXED-117 | High | Container tools / cold start and stdin bridge | Fixed (found during ADD-01 live Docker verification) |
+| FIXED-118 | Medium | Web / execution-environment deep link | Fixed (found during ADD-01 Playwright verification) |
+| FIXED-119 | Low | Tests / live Ollama leaked into offline scenarios | Fixed (found during ADD-01 baseline verification) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5187,6 +5190,65 @@ tests cover the complete path.
 **UI when closed.** On a fresh workspace, the Models card, top-bar chip, Chat
 composer and Build composer all identify **Gemma 4:31B Cloud · Ollama** before
 the owner changes anything.
+
+---
+
+## FIXED-117 — Container tools could not complete a cold, real Docker run
+
+**Status: fixed in this change; found during ADD-01 live Docker verification.**
+
+**Observed.** The injected-runner tests passed, but a clean process could not
+import `ContainerToolExecutor`. After that was exposed, the real Docker process
+could import the bridge but received an empty stdin stream and returned
+`container_bridge_request_invalid`.
+
+**Root cause.** Importing `raiker.runtime.executors.containers` executed the
+package initializer, which eagerly imported orchestration and the broker back
+into the partially initialized container module. The container command also
+mounted the repository without making it the bridge working directory, and
+Docker was started without `--interactive`, so its stdin was detached.
+
+**Fix applied.** Broker-dependent orchestration imports are deferred until use;
+the bridge starts in `/repository` with bytecode writes disabled; and the shared
+Docker/Podman command attaches stdin explicitly. A subprocess cold-import
+regression and command-boundary assertions cover all three conditions. A live
+`python:3.12-alpine` run read `README.md` through the real no-network bridge and
+cleaned its action workspace.
+
+---
+
+## FIXED-118 — The execution-environment badge linked to a route that did not exist
+
+**Status: fixed in this change; found during ADD-01 Playwright verification.**
+
+**Observed.** Clicking the badge, or opening `#/settings/runtime`, silently
+returned the owner to Workbench instead of Runtime configuration.
+
+**Root cause.** Settings kept its active section only as component-local state;
+the application router knew nothing about Settings tabs, while the badge emitted
+an invented nested route.
+
+**Fix applied.** Settings sections are now first-class `?tab=` destinations in
+the shared hash parser. The section rail writes that URL, App passes the resolved
+tab, and the badge links to `#/settings?tab=runtime`. Unit tests cover both the
+router and the rendered destination; the corrected deep link completed the live
+container-profile flow.
+
+---
+
+## FIXED-119 — Offline gateway tests changed meaning when local Ollama was running
+
+**Status: fixed in this change; found during ADD-01 baseline verification.**
+
+**Observed.** Tests intended to prove offline failure started succeeding on a
+developer machine that had the shipped Ollama default available.
+
+**Root cause.** Those scenarios relied on ambient provider availability instead
+of naming the unavailable model boundary they were testing.
+
+**Fix applied.** An opt-in `offline_default_model` fixture gives only those
+scenarios a deterministic unreachable default. Ordinary tests and live runs keep
+the real Ollama default, so the fixture cannot conceal a product regression.
 
 ---
 

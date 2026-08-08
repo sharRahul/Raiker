@@ -1,17 +1,20 @@
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Any
+
 from raiker.cli.commands import handle_slash_command, submit_terminal_prompt
 from raiker.cli.main import main
 
 
-def test_raiker_dispatches_terminal_client(capsys) -> None:  # type: ignore[no-untyped-def]
+def test_raiker_dispatches_terminal_client(capsys: Any) -> None:
     assert main(["--prompt", "/models"]) == 0
     assert "Model profiles" in capsys.readouterr().out
 
 
 def test_terminal_prompt_simple_and_list_files(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
@@ -29,8 +32,8 @@ def test_terminal_prompt_simple_and_list_files(
 
 
 def test_terminal_approval_and_registry_commands(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"

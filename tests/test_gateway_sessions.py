@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
+from typing import Any
 
 from raiker.cli.commands import build_prompt_envelope
 from raiker.gateway.agent_gateway import AgentGateway
@@ -8,7 +10,7 @@ from raiker.sessions.manager import SessionManager
 from raiker.storage.sqlite import SQLiteStore
 
 
-def test_session_create_load(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_session_create_load(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     manager = SessionManager(store, tmp_path)
     created = manager.create_session(title="Test")
@@ -17,7 +19,7 @@ def test_session_create_load(tmp_path) -> None:  # type: ignore[no-untyped-def]
     assert loaded.session_id == created.session_id
 
 
-def test_first_prompt_becomes_a_stable_session_title(tmp_path) -> None:  # type: ignore[no-untyped-def]
+def test_first_prompt_becomes_a_stable_session_title(tmp_path: Path) -> None:
     store = SQLiteStore(tmp_path)
     manager = SessionManager(store, tmp_path)
     created = manager.create_session()
@@ -31,8 +33,8 @@ def test_first_prompt_becomes_a_stable_session_title(tmp_path) -> None:  # type:
 
 
 def test_gateway_preserves_client_metadata_and_writes_events(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
@@ -53,7 +55,9 @@ def test_gateway_preserves_client_metadata_and_writes_events(
     assert lines[0]["payload"]["client"]["interface_status"] == "equal_primary_when_enabled"
 
 
-def test_gateway_finalization_events_are_not_runtime_states(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_gateway_finalization_events_are_not_runtime_states(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"

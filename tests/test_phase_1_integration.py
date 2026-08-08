@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from raiker.cli.commands import build_prompt_envelope
 from raiker.gateway.agent_gateway import AgentGateway
@@ -18,8 +19,8 @@ def _copy_config(tmp_path: Path) -> None:
 
 
 def test_end_to_end_event_sequences_and_checkpoint(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
@@ -50,8 +51,8 @@ def test_end_to_end_event_sequences_and_checkpoint(
 
 
 def test_outside_workspace_read_denied_and_no_tool_started(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(
@@ -68,8 +69,8 @@ def test_outside_workspace_read_denied_and_no_tool_started(
 
 
 def test_local_action_waits_for_approval(
-    tmp_path, monkeypatch, offline_default_model
-) -> None:  # type: ignore[no-untyped-def]
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!pytest"))

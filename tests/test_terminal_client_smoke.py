@@ -9,7 +9,9 @@ def test_raiker_dispatches_terminal_client(capsys) -> None:  # type: ignore[no-u
     assert "Model profiles" in capsys.readouterr().out
 
 
-def test_terminal_prompt_simple_and_list_files(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_terminal_prompt_simple_and_list_files(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"
@@ -26,7 +28,9 @@ def test_terminal_prompt_simple_and_list_files(tmp_path, monkeypatch) -> None:  
     assert (tmp_path / ".raiker" / "checkpoints").exists()
 
 
-def test_terminal_approval_and_registry_commands(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_terminal_approval_and_registry_commands(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"

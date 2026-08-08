@@ -102,7 +102,7 @@ def test_ahandle_unchanged_uses_achat_not_stream() -> None:
     assert response.message == "only-achat"
 
 
-def test_gateway_stream_finalizes_with_checkpoint_offline() -> None:
+def test_gateway_stream_finalizes_with_checkpoint_offline(offline_default_model: None) -> None:
     # No model server in tests -> the real gateway streams the safe model_unavailable
     # result, but the streaming path must still finalise (checkpoint + events path).
     tmp = Path(tempfile.mkdtemp())
@@ -123,7 +123,7 @@ def test_gateway_stream_finalizes_with_checkpoint_offline() -> None:
     assert "model_unavailable" in final.response.message
 
 
-def test_gateway_stream_and_submit_reach_same_status_offline() -> None:
+def test_gateway_stream_and_submit_reach_same_status_offline(offline_default_model: None) -> None:
     tmp = Path(tempfile.mkdtemp())
     gateway = AgentGateway(tmp)
 

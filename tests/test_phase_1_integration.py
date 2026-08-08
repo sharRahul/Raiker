@@ -17,7 +17,9 @@ def _copy_config(tmp_path: Path) -> None:
         )
 
 
-def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_end_to_end_event_sequences_and_checkpoint(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     (tmp_path / "README.md").write_text("hello", encoding="utf-8")
@@ -47,7 +49,9 @@ def test_end_to_end_event_sequences_and_checkpoint(tmp_path, monkeypatch) -> Non
     assert Path(response.checkpoint_path).exists()
 
 
-def test_outside_workspace_read_denied_and_no_tool_started(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_outside_workspace_read_denied_and_no_tool_started(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(
@@ -63,7 +67,9 @@ def test_outside_workspace_read_denied_and_no_tool_started(tmp_path, monkeypatch
     assert "tool_started" not in events
 
 
-def test_local_action_waits_for_approval(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_local_action_waits_for_approval(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     _copy_config(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!pytest"))

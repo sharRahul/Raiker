@@ -112,7 +112,9 @@ def _events(events_path: str) -> list[str]:
     return [json.loads(line)["event_type"] for line in Path(events_path).read_text(encoding="utf-8").splitlines()]
 
 
-def test_no_hook_events_when_unconfigured(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_no_hook_events_when_unconfigured(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _setup(tmp_path)
     response = AgentGateway(tmp_path).submit_prompt(build_prompt_envelope("!echo hi"))
@@ -120,7 +122,9 @@ def test_no_hook_events_when_unconfigured(tmp_path: Path, monkeypatch: pytest.Mo
     assert not any(e.startswith("hook_") for e in _events(response.events_path or ""))
 
 
-def test_pretooluse_builtin_deny_blocks_tool(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_pretooluse_builtin_deny_blocks_tool(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _setup(
         tmp_path,
@@ -143,7 +147,9 @@ def test_pretooluse_builtin_deny_blocks_tool(tmp_path: Path, monkeypatch: pytest
     assert "tool_started" not in events
 
 
-def test_command_hook_denies_via_json(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_command_hook_denies_via_json(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     script = _script(
         tmp_path,
@@ -173,7 +179,9 @@ def test_command_hook_denies_via_json(tmp_path: Path, monkeypatch: pytest.Monkey
     assert "tool_started" not in events
 
 
-def test_command_hook_ask_upgrades_to_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_command_hook_ask_upgrades_to_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     script = _script(
         tmp_path, "ask.sh", '#!/bin/sh\necho \'{"decision":"ask","decision_reason":"confirm"}\'\n'
@@ -199,7 +207,7 @@ def test_command_hook_ask_upgrades_to_approval(tmp_path: Path, monkeypatch: pyte
 
 
 def test_command_hook_outside_workspace_fails_closed_safe(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _setup(
@@ -225,7 +233,9 @@ def test_command_hook_outside_workspace_fails_closed_safe(
     assert response.status == "failed"
 
 
-def test_command_hook_timeout_is_handled(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_command_hook_timeout_is_handled(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     script = _script(tmp_path, "slow.sh", "#!/bin/sh\nsleep 5\n")
     _setup(
@@ -256,7 +266,9 @@ def test_command_hook_timeout_is_handled(tmp_path: Path, monkeypatch: pytest.Mon
     assert response.status == "failed"
 
 
-def test_managed_scope_deny(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_managed_scope_deny(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, offline_default_model: None
+) -> None:
     monkeypatch.chdir(tmp_path)
     _setup(
         tmp_path,

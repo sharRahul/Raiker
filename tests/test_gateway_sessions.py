@@ -30,7 +30,9 @@ def test_first_prompt_becomes_a_stable_session_title(tmp_path) -> None:  # type:
     assert loaded["title"] == "Plan the release checklist."
 
 
-def test_gateway_preserves_client_metadata_and_writes_events(tmp_path, monkeypatch) -> None:  # type: ignore[no-untyped-def]
+def test_gateway_preserves_client_metadata_and_writes_events(
+    tmp_path, monkeypatch, offline_default_model
+) -> None:  # type: ignore[no-untyped-def]
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()
     source_config = __import__("pathlib").Path(__file__).resolve().parents[1] / "config"

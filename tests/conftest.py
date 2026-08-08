@@ -3,8 +3,9 @@ from __future__ import annotations
 import json
 import os
 import secrets
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -12,6 +13,8 @@ from raiker.api.sessions import ApiSessionStore
 from raiker.auth import passwords
 from raiker.cli.principal_resolver import OWNER_BOOTSTRAP_ROLES, _ensure_bootstrap_roles
 from raiker.contracts.ids import new_id, utc_now
+from raiker.models.exceptions import ProviderConnectionError
+from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -30,6 +33,29 @@ def _ensure_git_identity() -> None:
     os.environ.setdefault("GIT_AUTHOR_EMAIL", "raiker-test@example.com")
     os.environ.setdefault("GIT_COMMITTER_NAME", "Raiker Test")
     os.environ.setdefault("GIT_COMMITTER_EMAIL", "raiker-test@example.com")
+
+
+@pytest.fixture()
+def offline_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Make tests that exercise offline finalisation independent of local Ollama.
+
+    Ollama is Raiker's native default and may legitimately be running on a
+    developer machine. Tests for gateway, hook, checkpoint, and terminal
+    behaviour must opt into an unavailable provider instead of treating the
+    host's model availability as part of their contract.
+    """
+
+    async def unavailable_chat(*_args: Any, **_kwargs: Any) -> Any:
+        raise ProviderConnectionError("provider_connection_failed")
+
+    async def unavailable_stream(
+        *_args: Any, **_kwargs: Any
+    ) -> AsyncIterator[Any]:
+        raise ProviderConnectionError("provider_connection_failed")
+        yield  # pragma: no cover - keeps this an async generator
+
+    monkeypatch.setattr(AsyncOpenAICompatibleProvider, "chat", unavailable_chat)
+    monkeypatch.setattr(AsyncOpenAICompatibleProvider, "stream_chat", unavailable_stream)
 
 
 SeedAccount = Callable[..., tuple[str, str]]

@@ -236,7 +236,7 @@ class ModelRouter:
 
     def default_provider(self, *, health_timeout: float = 1.0) -> tuple[str, str]:
         for profile in self.registry.list_profiles():
-            if profile.provider == "llama.cpp":
+            if profile.raw.get("is_native_default"):
                 return profile.provider, profile.model
         raise RegistryError("no_real_model_provider_available")
 

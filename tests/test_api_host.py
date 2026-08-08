@@ -108,7 +108,24 @@ def test_quit_with_nothing_in_flight_stops_without_a_second_press(client: TestCl
     assert body["waiting"] == []
 
 
-def test_restart_is_refused_when_nothing_would_start_the_host_again(client: TestClient) -> None:
+def test_restart_is_refused_when_nothing_would_start_the_host_again(
+    client: TestClient, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.api import routes_host
+    from raiker.app.service import ServiceRegistration
+
+    monkeypatch.setattr(
+        routes_host,
+        "registration",
+        lambda *_args, **_kwargs: ServiceRegistration(
+            supported=True,
+            registered=False,
+            mechanism="Windows Task Scheduler",
+            label="Raiker",
+            path=str(tmp_path / "Raiker.xml"),
+            note="",
+        ),
+    )
     response = client.post("/api/host/restart", headers=_headers(client), json={"confirm": True})
     assert response.status_code == 409
     detail = response.json()["detail"]

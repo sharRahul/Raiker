@@ -89,7 +89,8 @@ class AgentGateway:
                 self.store, principal_id, profile_id
             ),
         )
-        # Native default backend: configured llama.cpp profile only; production never falls back to deterministic test providers.
+        # Native default backend: the one explicitly marked profile in the shipped registry;
+        # production never falls back to deterministic test providers.
         # Honor the operator's selected model profile (e.g. via `/model use`); fall back to the native default.
         self.default_provider = self._resolve_default_provider()
         self.runtime = RuntimeOrchestrator(
@@ -107,7 +108,7 @@ class AgentGateway:
 
         A selection made with ``/model use`` is stored as a ``ModelSessionState``. When it
         resolves to a concrete model, the orchestrator uses it; otherwise (no selection, or an
-        unresolved placeholder model) it falls back to the native llama.cpp default. This is the
+        unresolved placeholder model) it falls back to the registry's native default. This is the
         only place selection is bound to a turn, so the CLI and any future client share it.
         """
         native_default = self.model_router.default_provider()

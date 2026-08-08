@@ -54,7 +54,7 @@ def test_join(base: str, path: str, expected: str) -> None:
 def test_registry_ships_no_test_provider_profiles() -> None:
     registry = ModelProfileRegistry.load()
     router = ModelRouter(registry)
-    assert router.default_provider()[0] == "llama.cpp"
+    assert router.default_provider() == ("ollama", "gemma4:31b-cloud")
     for profile in registry.list_profiles():
         assert profile.provider not in {"mock", "test"}
         assert not profile.raw.get("test_only")
@@ -185,14 +185,10 @@ def test_stream_cancellation_preserves_cancelled_error() -> None:
 
 
 def test_cli_persists_model_state(tmp_path: Path) -> None:
-    assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
-    # A placeholder-model profile now attempts auto-detection; with no server reachable it reports a
-    # connection error and does not persist the selection (the native default stays active).
-    # A developer machine may have a live local Ollama serving multiple models; then the CLI asks
-    # for an explicit --model instead. Either way the placeholder selection must not persist.
+    assert "gemma4:31b-cloud" in handle_model_command("/model current", workspace_root=tmp_path)
     out = handle_model_command("/model use ollama-local-openai-compatible", workspace_root=tmp_path)
-    assert "Could not reach ollama" in out or "Select one with /model use --provider ollama" in out
-    assert "raiker-local-llama-cpp" in handle_model_command("/model current", workspace_root=tmp_path)
+    assert "Selected model profile ollama-local-openai-compatible" in out
+    assert "gemma4:31b-cloud" in handle_model_command("/model current", workspace_root=tmp_path)
     assert "(selected)" in render_models(workspace_root=tmp_path)
     assert "does not support reasoning" in handle_reasoning_command("/reasoning set high", workspace_root=tmp_path)
 

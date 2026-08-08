@@ -159,7 +159,7 @@ class TestAdvisorServiceGovernance:
         self, workspace: Path, store: SQLiteStore
     ) -> None:
         _allow(_enable_gate(workspace, store))
-        store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, "ollama-local-openai-compatible")
+        store.save_model_advisor(TERMINAL_MODEL_SESSION_ID, "lm-studio-local-openai-compatible")
         outcome = AdvisorService(workspace, store).consult("q")
         assert outcome["error"]["type"].startswith("advisor_model_unresolved")
 
@@ -385,7 +385,7 @@ class TestModelAdvisorApi:
     def test_placeholder_profile_fails_closed(self, client: TestClient, owner_token: str) -> None:
         resp = client.put(
             "/api/model-advisor",
-            json={"profile_id": "ollama-local-openai-compatible"},
+            json={"profile_id": "lm-studio-local-openai-compatible"},
             headers=self._auth(owner_token),
         )
         assert resp.status_code == 403

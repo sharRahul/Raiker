@@ -1,20 +1,16 @@
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
-
-import pytest
 
 from raiker.cli.commands import handle_model_command
 from raiker.gateway.agent_gateway import AgentGateway
-from raiker.models.exceptions import ProviderConfigurationError
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.registry import ModelProfileRegistry, profile_with_model
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.storage.sqlite import SQLiteStore
 
 OLLAMA = "ollama-local-openai-compatible"
-LLAMA_CPP_DEFAULT = ("llama.cpp", "local-gguf")
+OLLAMA_DEFAULT = ("ollama", "gemma4:31b-cloud")
 
 
 def test_model_session_state_persists_resolved_model(tmp_path: Path) -> None:
@@ -28,17 +24,16 @@ def test_model_session_state_persists_resolved_model(tmp_path: Path) -> None:
     assert loaded.model == "llama3.1"
 
 
-def test_factory_lists_placeholder_profile_without_requiring_model() -> None:
+def test_factory_can_create_the_concrete_default_ollama_profile() -> None:
     registry = ModelProfileRegistry.load()
     profile = registry.resolve_profile_id(OLLAMA)
-    # Default requires a concrete model and rejects the "<model>" placeholder.
-    with pytest.raises(ProviderConfigurationError):
-        ModelProviderFactory().create(profile)
-    # Listing does not need a concrete model name.
-    provider = ModelProviderFactory().create(profile, require_model=False)
+    provider = ModelProviderFactory().create(profile)
     try:
-        assert provider is not None
+        assert profile.model == "gemma4:31b-cloud"
+        assert provider.model == "gemma4:31b-cloud"
     finally:
+        import asyncio
+
         asyncio.run(provider.aclose())
 
 
@@ -53,7 +48,7 @@ def test_profiles_for_provider_and_profile_with_model() -> None:
 
 def test_gateway_uses_native_default_without_selection(tmp_path: Path) -> None:
     gateway = AgentGateway(tmp_path)
-    assert gateway.default_provider == LLAMA_CPP_DEFAULT
+    assert gateway.default_provider == OLLAMA_DEFAULT
 
 
 def test_gateway_honors_selected_resolved_model(tmp_path: Path) -> None:
@@ -73,7 +68,7 @@ def test_gateway_falls_back_when_placeholder_unresolved(tmp_path: Path) -> None:
         ModelSessionState(session_id=TERMINAL_MODEL_SESSION_ID, profile_id=OLLAMA, model=None)
     )
     gateway = AgentGateway(tmp_path)
-    assert gateway.default_provider == LLAMA_CPP_DEFAULT
+    assert gateway.default_provider == OLLAMA_DEFAULT
 
 
 def test_cli_use_explicit_model_persists(tmp_path: Path) -> None:

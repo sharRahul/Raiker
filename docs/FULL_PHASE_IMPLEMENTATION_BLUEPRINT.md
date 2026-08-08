@@ -174,7 +174,7 @@ All actions available through one enabled primary interface must have an equival
 
 ### Model Runtime
 
-- llama.cpp server provider (native default backend).
+- Ollama provider with `gemma4:31b-cloud` as the native default; llama.cpp remains available.
 - LM Studio/OpenAI-compatible local provider.
 - Model profiles.
 - Streaming.

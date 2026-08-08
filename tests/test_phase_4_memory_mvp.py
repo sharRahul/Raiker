@@ -141,7 +141,7 @@ def test_governed_memory_write_requires_governance_metadata(workspace: Path) -> 
 def test_search_memory_keyword(workspace: Path) -> None:
     broker = _governed_broker(workspace)
     for text in (
-        "The llama.cpp provider is the native default.",
+        "The Ollama gemma4:31b-cloud provider is the native default.",
         "OpenAI compatible providers use httpx.",
         "SQLite is used for metadata storage.",
     ):
@@ -152,8 +152,8 @@ def test_search_memory_keyword(workspace: Path) -> None:
         )
         assert result.status == "success"
 
-    results = search_memory("llama", workspace_root=workspace)
-    assert any("llama.cpp" in r.text for r in results)
+    results = search_memory("Ollama", workspace_root=workspace)
+    assert any("gemma4:31b-cloud" in r.text for r in results)
     results = search_memory("httpx", workspace_root=workspace)
     assert any("httpx" in r.text for r in results)
 

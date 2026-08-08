@@ -100,9 +100,11 @@ class TestResolveFallbackChain:
             TERMINAL_MODEL_SESSION_ID,
             ["missing-profile", "ollama-local-openai-compatible", "raiker-local-llama-cpp"],
         )
-        # The unknown profile and the placeholder-<model> ollama profile (no
-        # persisted concrete model) drop out; only the concrete local backend remains.
-        assert gw._resolve_fallback_chain() == [("llama.cpp", "local-gguf")]
+        # The unknown profile drops out; both concrete local backends remain.
+        assert gw._resolve_fallback_chain() == [
+            ("ollama", "gemma4:31b-cloud"),
+            ("llama.cpp", "local-gguf"),
+        ]
 
     def test_deduplicates(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
@@ -116,13 +118,17 @@ class TestProviderChain:
     def test_primary_then_fallback_deduped(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
         _select_anthropic(gw)
-        # Primary is the native llama.cpp default; fallback lists it again + anthropic.
+        # Primary is the native Ollama default; fallbacks add llama.cpp + anthropic.
         gw.store.save_model_fallback_sequence(
             TERMINAL_MODEL_SESSION_ID, ["raiker-local-llama-cpp", "anthropic-hosted"]
         )
         chain = gw.runtime._provider_chain(_envelope())
-        assert chain[0] == ("llama.cpp", "local-gguf")
-        assert chain == [("llama.cpp", "local-gguf"), ("anthropic", "claude-opus-4-8")]
+        assert chain[0] == ("ollama", "gemma4:31b-cloud")
+        assert chain == [
+            ("ollama", "gemma4:31b-cloud"),
+            ("llama.cpp", "local-gguf"),
+            ("anthropic", "claude-opus-4-8"),
+        ]
 
 
 class TestFallbackEngagement:
@@ -132,7 +138,7 @@ class TestFallbackEngagement:
         gw.store.save_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID, ["anthropic-hosted"])
 
         async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
-            if provider == "llama.cpp":
+            if provider == "ollama":
                 raise ProviderConnectionError("connection refused")
             return ModelResponse(text=f"hello from {provider}", finish_reason="stop")
 
@@ -148,7 +154,7 @@ class TestFallbackEngagement:
         env = _envelope()
 
         async def fake_achat(provider, model, messages, tools=None):  # type: ignore[no-untyped-def]
-            if provider == "llama.cpp":
+            if provider == "ollama":
                 raise ProviderConnectionError("down")
             return ModelResponse(text="ok", finish_reason="stop")
 

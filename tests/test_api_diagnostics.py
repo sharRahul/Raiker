@@ -62,7 +62,8 @@ class TestDiagnostics:
             assert "not probed" in entry["detail"]
             assert {"profile_id", "provider", "requires_network", "local_only"} <= set(entry)
 
-    def test_missing_config_lists_unselected_model(self, workspace: Path, client: TestClient) -> None:
-        # A freshly bootstrapped workspace has no model selected.
+    def test_fresh_workspace_has_a_shipped_default_model(self, workspace: Path, client: TestClient) -> None:
+        # Ollama gemma4:31b-cloud is the usable local default, so a fresh
+        # workspace must not claim that model selection is missing.
         body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
-        assert any("model profile" in gap.lower() for gap in body["missing_config"])
+        assert not any("model profile" in gap.lower() for gap in body["missing_config"])

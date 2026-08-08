@@ -74,8 +74,11 @@ def test_factory_openai_profiles() -> None:
     provider = ModelProviderFactory().create(r.resolve_profile_id("raiker-local-llama-cpp"))
     assert isinstance(provider, AsyncOpenAICompatibleProvider)
     run(provider.aclose())
+    ollama = ModelProviderFactory().create(r.resolve_profile_id("ollama-local-openai-compatible"))
+    assert isinstance(ollama, AsyncOpenAICompatibleProvider)
+    assert ollama.model == "gemma4:31b-cloud"
+    run(ollama.aclose())
     for profile_id in [
-        "ollama-local-openai-compatible",
         "lm-studio-local-openai-compatible",
         "generic-openai-compatible",
         "openrouter-policy-gated",

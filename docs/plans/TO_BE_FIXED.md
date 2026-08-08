@@ -182,6 +182,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-112 | Medium | Runtime / an unperformable proposal raised as a decision | Fixed (found while verifying FIXED-111) |
 | FIXED-113 | High | Build / Chat — the repository code map | Fixed (was B9) |
 | FIXED-114 | Low | Build / stale repository state after a visit elsewhere | Fixed (found while verifying FIXED-113) |
+| FIXED-116 | High | Models / first-run default | Fixed (Ollama `gemma4:31b-cloud` is the visible and runtime default) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5156,6 +5157,36 @@ untouched — it is the state read from the server that is refreshed.
 defects this document keeps recording: a surface stating a posture that stopped
 being true, with nothing holding the two together.
 
+
+---
+
+## FIXED-116 — A fresh workspace silently defaulted to llama.cpp instead of Ollama
+
+**Status: fixed in this change.**
+
+**Observed.** With no saved model selection, the runtime chose the shipped
+llama.cpp profile while Chat and Build showed **Not selected**. This contradicted
+the requested local-first default and made the model serving a first turn
+different from the model presented in the composer.
+
+**Root cause.** Both shipped copies of `model-profiles.json` marked llama.cpp as
+`is_native_default`, the Ollama profile still carried the unresolved `<model>`
+placeholder, and `ModelRouter.default_provider()` ignored the registry flag and
+hard-coded the first llama.cpp profile. `GET /api/models` also returned a null
+selection when no row had been persisted, so the UI could not render the
+runtime fallback.
+
+**Fix applied.** `ollama-local-openai-compatible` now ships with concrete model
+`gemma4:31b-cloud` and is the sole native default. The router resolves the
+registry marker instead of naming a provider in code. A fresh Models response
+projects that default as the current, selected model without creating a hidden
+user preference; an explicit owner selection still wins and persists exactly as
+before. Backend, API, context-injection, CLI-listing and turn-binding regression
+tests cover the complete path.
+
+**UI when closed.** On a fresh workspace, the Models card, top-bar chip, Chat
+composer and Build composer all identify **Gemma 4:31B Cloud · Ollama** before
+the owner changes anything.
 
 ---
 

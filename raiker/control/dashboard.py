@@ -3099,7 +3099,13 @@ class DashboardService:
             self.store.load_principal_model_state(scoped_principal)
             if scoped_principal else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         )
-        current = state.profile_id if state is not None else None
+        native_default = next(
+            (profile for profile in registry.list_profiles() if profile.raw.get("is_native_default")),
+            None,
+        )
+        current = state.profile_id if state is not None else (
+            native_default.profile_id if native_default is not None else None
+        )
         # The persisted per-profile model override (e.g. an Ollama/OpenAI model
         # picked at selection time) is what the runtime actually binds, so the
         # selected profile card shows it instead of the profile's placeholder.
@@ -3262,7 +3268,11 @@ class DashboardService:
                 self.store.load_principal_model_fallback_sequence(scoped_principal)
                 if scoped_principal else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
             ),
-            current_model=self._current_model(registry, state),
+            current_model=(
+                self._current_model(registry, state)
+                if state is not None
+                else (native_default.model if native_default is not None else None)
+            ),
             advisor_profile_id=(
                 self.store.load_principal_model_advisor(scoped_principal)
                 if scoped_principal else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)

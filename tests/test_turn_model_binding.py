@@ -61,9 +61,12 @@ class TestResolveProfileForTurn:
         gateway = _gateway(tmp_path)
         assert gateway._resolve_profile_for_turn("no-such-profile") is None
 
-    def test_rejects_placeholder_model_without_selection(self, tmp_path: Path) -> None:
+    def test_default_ollama_profile_resolves_without_selection(self, tmp_path: Path) -> None:
         gateway = _gateway(tmp_path)
-        assert gateway._resolve_profile_for_turn("ollama-local-openai-compatible") is None
+        assert gateway._resolve_profile_for_turn("ollama-local-openai-compatible") == (
+            "ollama",
+            "gemma4:31b-cloud",
+        )
 
     def test_placeholder_model_resolves_via_persisted_selection(self, tmp_path: Path) -> None:
         gateway = _gateway(tmp_path)
@@ -132,7 +135,8 @@ class TestContextModelProfileItem:
         _gateway(tmp_path)
         item = ContextGatherer()._model_profile(tmp_path)
         assert item is not None
-        assert "provider: llama.cpp" in item.content
+        assert "provider: ollama" in item.content
+        assert "model: gemma4:31b-cloud" in item.content
 
 
 class TestOrchestratorTurnProvider:
@@ -189,9 +193,13 @@ class TestTurnReasoningEffort:
 
         with pytest.raises(ProviderPolicyError, match="reasoning_effort_not_supported"):
             runtime._turn_reasoning(  # noqa: SLF001
-                self._envelope(profile="ollama-local-openai-compatible", model="qwen2.5", effort="high"),
+                self._envelope(
+                    profile="ollama-local-openai-compatible",
+                    model="gemma4:31b-cloud",
+                    effort="high",
+                ),
                 "ollama",
-                "qwen2.5",
+                "gemma4:31b-cloud",
             )
 
     def test_rejects_undeclared_reasoning_effort_value(self, tmp_path: Path) -> None:

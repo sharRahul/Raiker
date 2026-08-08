@@ -463,7 +463,8 @@ def test_service_status_names_the_platform_mechanism(
 ) -> None:
     from apps.api.launcher import main
 
-    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    isolated_home = tmp_path / "home"
+    monkeypatch.setattr(Path, "home", classmethod(lambda cls: isolated_home))
     assert main(["service", "status", "--workspace", str(tmp_path)]) == 0
     out = capsys.readouterr().out
     assert "not registered" in out

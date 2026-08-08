@@ -133,7 +133,7 @@ def test_gateway_async_and_sync_loop_policy(tmp_path: Path) -> None:
     envelope = build_prompt_envelope("hello")
     response = asyncio.run(gateway.submit_prompt_async(envelope))
     assert isinstance(response, AgentResponse)
-    assert gateway.default_provider == ("llama.cpp", "local-gguf")
+    assert gateway.default_provider == ("ollama", "gemma4:31b-cloud")
 
     async def active() -> None:
         with pytest.raises(RuntimeError, match="submit_prompt_async"):
@@ -159,11 +159,13 @@ def test_models_live_listing_and_policy_redaction(
 
     router._factory = factory  # type: ignore[method-assign]
     out = asyncio.run(render_models_async(workspace_root=tmp_path, router=router))
-    assert "raiker-local-llama-cpp (selected)" in out
+    assert "ollama-local-openai-compatible (selected)" in out
     assert "status: available" in out and "qwen2.5-coder" in out
-    assert seen == [
-        "http://127.0.0.1:8080/v1/models",
-        "http://127.0.0.1:8080/props",
+    assert seen[0] == "http://127.0.0.1:11434/v1/models"
+    assert seen[1:] == [
+        "http://127.0.0.1:11434/api/ps",
+        "http://127.0.0.1:11434/api/show",
+        "http://127.0.0.1:11434/api/show",
     ]
 
     SQLiteStore(tmp_path).save_model_session_state(
@@ -222,12 +224,8 @@ def test_cli_model_and_reasoning_events_are_safe(tmp_path: Path) -> None:
 
 def test_provider_policy_matrix(monkeypatch: pytest.MonkeyPatch) -> None:
     r = ModelProfileRegistry.load()
-    assert ModelRouter(r).default_provider() == ("llama.cpp", "local-gguf")
-    for profile_id in [
-        "ollama-local-openai-compatible",
-        "lm-studio-local-openai-compatible",
-        "openrouter-policy-gated",
-    ]:
+    assert ModelRouter(r).default_provider() == ("ollama", "gemma4:31b-cloud")
+    for profile_id in ["lm-studio-local-openai-compatible", "openrouter-policy-gated"]:
         with pytest.raises(Exception) as excinfo:
             ModelProviderFactory(
                 policy=ProviderRuntimePolicy(

@@ -91,6 +91,17 @@ class TestProviderModelListing:
 
 
 class TestSetModelSelection:
+    def test_fresh_workspace_reports_ollama_as_the_default_selection(
+        self, client: TestClient, owner_token: str
+    ) -> None:
+        read = client.get("/api/models", headers=_auth(owner_token)).json()
+        assert read["current_profile_id"] == "ollama-local-openai-compatible"
+        assert read["current_model"] == "gemma4:31b-cloud"
+        selected = [profile for profile in read["profiles"] if profile["selected"]]
+        assert [(profile["provider"], profile["model"]) for profile in selected] == [
+            ("ollama", "gemma4:31b-cloud")
+        ]
+
     def test_requires_auth(self, client: TestClient) -> None:
         resp = client.put(
             "/api/model-selection", json={"profile_id": "raiker-local-llama-cpp"}
@@ -106,7 +117,7 @@ class TestSetModelSelection:
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "unknown_profile:no-such-profile"
 
-    def test_placeholder_profile_requires_concrete_model(
+    def test_default_ollama_profile_does_not_require_a_model_override(
         self, client: TestClient, owner_token: str
     ) -> None:
         resp = client.put(
@@ -114,11 +125,8 @@ class TestSetModelSelection:
             json={"profile_id": "ollama-local-openai-compatible"},
             headers=_auth(owner_token),
         )
-        assert resp.status_code == 403
-        assert (
-            resp.json()["detail"]["reason_code"]
-            == "model_required_for_profile:ollama-local-openai-compatible"
-        )
+        assert resp.status_code == 200, resp.text
+        assert resp.json()["model"] == "gemma4:31b-cloud"
 
     def test_hosted_provider_fails_closed_when_gate_disabled(
         self, client: TestClient, owner_token: str

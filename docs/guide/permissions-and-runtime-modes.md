@@ -64,13 +64,13 @@ still resolves to the single runtime rather than failing.
 
 ## Capability gates
 
-**Permissions** lists all 65 gates, grouped:
+**Permissions** lists all 66 gates, grouped:
 
 | Group | Examples |
 |---|---|
 | Workspace | Audit export, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
-| Network | Network requests, Web fetch, External channels, Channel approval relay |
+| Network | Network requests, Web fetch, Git push, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
 | Connectors | GitHub, Gmail, Google Calendar, Slack, Calendar (local), Email drafts, Reminders, plugin lifecycle |
 | MCP | MCP builder, MCP connector |
@@ -188,6 +188,16 @@ gates, not assumed:
   tree, and the repository's own hooks do not run. The notice names the branch
   or the commit that now exists. This is git history rather than a checkpointed
   file write, so undo it in git.
+- **Approve and publish it once.** A proposed push (`git_push`) is carried out
+  under its own capability, `git_push_execution`, listed in Permissions under
+  **Network** as *Git push* — separate from *Git writes*, because letting Raiker
+  change your repository is not the same decision as letting it publish. Before
+  you decide you see the repository, the remote and its host, the branch, and the
+  commits the remote does not have. It never forces and never deletes a branch,
+  and it does nothing at all until the remote's host is on
+  `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and `RAIKER_GITHUB_TOKEN` is set. Unlike a
+  commit, this leaves your machine and git cannot take it back — undo it on the
+  remote.
 - **Approve (record only).** Everything else — network, process, and any
   capability outside that set — records your decision and executes nothing. The
   response carries `executes_action: false`.

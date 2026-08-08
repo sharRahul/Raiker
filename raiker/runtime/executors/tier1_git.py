@@ -4,11 +4,19 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.tools.git import create_branch, create_commit
+from raiker.tools.git import (
+    create_branch,
+    create_commit,
+    push_branch,
+    repository_label,
+    resolve_repository_root,
+    selected_repository_subpath,
+)
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
     from raiker.runtime.authority.router import GovernedAction
+    from raiker.storage.sqlite import SQLiteStore
 
 
 class GitWriteExecutor:
@@ -29,25 +37,56 @@ class GitWriteExecutor:
 
     capability = "git_write_execution"
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore | None = None) -> None:
         self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    # BUG-66 — the same resolution the broker used to compute the proposal. An
+    # execution that fell back to the workspace root would record the change in a
+    # repository the owner never saw named in the approval.
+    def _repo_root(self, principal: Principal) -> Path:
+        return resolve_repository_root(
+            self._workspace_root,
+            selected_repository_subpath(self._store, self._owner_scope(principal)),
+        )
+
+    def _owner_scope(self, principal: Principal) -> str | None:
+        if self._store is None:
+            return None
+        try:
+            return self._store.account_scope(principal.principal_id) or principal.principal_id
+        except Exception:  # noqa: BLE001 — a storage failure falls back to the workspace
+            return None
+
+    def _repository(self, root: Path) -> str:
+        return repository_label(self._workspace_root, root)
+
+    def _in_repository(self, root: Path) -> str:
+        """" in <repository>", or nothing when the repository *is* the workspace.
+
+        A workspace with one repository is the common case, and naming it there
+        would be noise in the one sentence the owner reads after approving.
+        """
+        label = self._repository(root)
+        return "" if label == "." else f" in {label}"
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = action.action_type
         try:
+            root = self._repo_root(principal)
             if operation == "git_branch":
-                return self._branch(action)
+                return self._branch(action, root)
             if operation == "git_commit":
-                return self._commit(action)
+                return self._commit(action, root)
         except Exception as exc:  # noqa: BLE001 — every failure is reported, never raised
             return self._fail(action.action_id, f"git_write_failed:{type(exc).__name__}")
         return self._fail(action.action_id, f"unknown_git_operation:{operation or 'missing'}")
 
-    def _branch(self, action: GovernedAction) -> ExecutionResult:
+    def _branch(self, action: GovernedAction, root: Path) -> ExecutionResult:
         name = str(action.arguments.get("name", "")).strip()
         base_value = action.arguments.get("base")
         result = create_branch(
-            self._workspace_root, name, str(base_value).strip() if base_value else None
+            root, name, str(base_value).strip() if base_value else None
         )
         if result["status"] != "success":
             error = result["error"]
@@ -59,7 +98,8 @@ class GitWriteExecutor:
             )
         summary = (
             f"Created and checked out {result['branch']} "
-            f"(from {result['previous_branch'] or result['head']})."
+            f"(from {result['previous_branch'] or result['head']})"
+            f"{self._in_repository(root)}."
         )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
@@ -74,12 +114,13 @@ class GitWriteExecutor:
                 "base": result["base"],
                 "previous_branch": result["previous_branch"],
                 "head": result["head"],
+                "repository": self._repository(root),
             },
         )
 
-    def _commit(self, action: GovernedAction) -> ExecutionResult:
+    def _commit(self, action: GovernedAction, root: Path) -> ExecutionResult:
         message = str(action.arguments.get("message", ""))
-        result = create_commit(self._workspace_root, message, action.arguments.get("paths"))
+        result = create_commit(root, message, action.arguments.get("paths"))
         if result["status"] != "success":
             error = result["error"]
             return ExecutionResult(
@@ -90,7 +131,7 @@ class GitWriteExecutor:
             )
         summary = (
             f"Committed {result['file_count']} file(s) as {result['commit']} "
-            f"on {result['branch']}."
+            f"on {result['branch']}{self._in_repository(root)}."
         )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
@@ -102,6 +143,7 @@ class GitWriteExecutor:
                 "subject": result["subject"],
                 "file_count": result["file_count"],
                 "files": [entry["path"] for entry in result["files"]],
+                "repository": self._repository(root),
             },
         )
 
@@ -111,4 +153,90 @@ class GitWriteExecutor:
             reason_code=reason_code,
             summary="Git write failed closed.",
             artifacts={},
+        )
+
+
+class GitPushExecutor:
+    """Real executor for ``git_push_execution`` — one governed push (BUG-67).
+
+    B11 let the agent create a branch and record a commit on it, and stopped
+    there: the branch existed only on this machine, and ``github_write`` could
+    not open a pull request for a head GitHub had never seen. This executor is
+    the missing motion.
+
+    It is deliberately *not* part of ``git_write_execution``. A commit is local
+    and the owner can undo it in git; a push carries repository content off the
+    machine under the owner's credential and nothing unsends it. So it answers to
+    its own switch, and to two boundaries the switch cannot substitute for: the
+    remote's host must be on the owner's connector egress allowlist, and the
+    owner's credential must be configured. Both are checked again here, against
+    the repository as it is now rather than as the approval found it.
+    """
+
+    capability = "git_push_execution"
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore | None = None) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    def _repo_root(self, principal: Principal) -> Path:
+        scope: str | None = None
+        if self._store is not None:
+            try:
+                scope = self._store.account_scope(principal.principal_id) or principal.principal_id
+            except Exception:  # noqa: BLE001 — a storage failure falls back to the workspace
+                scope = None
+        return resolve_repository_root(
+            self._workspace_root, selected_repository_subpath(self._store, scope)
+        )
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        if action.action_type not in ("git_push", "git_push_execution"):
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"unknown_git_operation:{action.action_type or 'missing'}",
+                summary="Git push failed closed.", artifacts={},
+            )
+        try:
+            root = self._repo_root(principal)
+            remote = action.arguments.get("remote")
+            branch = action.arguments.get("branch")
+            result = push_branch(
+                root,
+                str(remote).strip() if remote else None,
+                str(branch).strip() if branch else None,
+            )
+        except Exception as exc:  # noqa: BLE001 — every failure is reported, never raised
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"git_push_failed:{type(exc).__name__}",
+                summary="Git push failed closed.", artifacts={},
+            )
+        repository = repository_label(self._workspace_root, root)
+        if result["status"] != "success":
+            error = result["error"]
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"push_failed:{error['type']}",
+                summary="Push refused; nothing left this machine.",
+                artifacts={"error": error, "repository": repository},
+            )
+        created = " (new remote branch)" if result["created_remote_branch"] else ""
+        summary = (
+            f"Pushed {result['commit_count']} commit(s) on {result['branch']} to "
+            f"{result['remote']} ({result['host']}){created}."
+        )
+        return ExecutionResult(
+            ok=True, capability=self.capability, action_id=action.action_id,
+            summary=summary,
+            artifacts={
+                "summary": summary,
+                "remote": result["remote"],
+                "host": result["host"],
+                "branch": result["branch"],
+                "head": result["head"],
+                "commit_count": result["commit_count"],
+                "created_remote_branch": result["created_remote_branch"],
+                "repository": repository,
+            },
         )

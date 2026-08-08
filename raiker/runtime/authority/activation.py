@@ -107,6 +107,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("shell_execution", "process_execution", "network_execution", "web_fetch"):
         r[cap] = _req(cap, "2", threat_ack=True, human_confirm=True,
                       notes="Sandbox, allowlist, budget required.")
+    # BUG-67 — the governed push. Egress, so Tier 2 and acknowledged like the
+    # rest of it; bound to the owner's own credential and the connector egress
+    # allowlist, neither of which the gate can substitute for.
+    r["git_push_execution"] = _req(
+        "git_push_execution", "2", threat_ack=True, human_confirm=True,
+        notes="Owner credential + connector egress allowlist; never forces, never deletes.")
 
     # Tier 3
     for cap in ("graph_indexing_runtime", "semantic_memory_runtime", "vector_embedding_runtime"):

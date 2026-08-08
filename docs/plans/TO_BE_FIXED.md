@@ -177,8 +177,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-108 | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
 | BUG-65 | Low | Export / a transcript keeps citation markers it cannot resolve | Open (found while verifying FIXED-107) |
 | FIXED-109 | High | Build / Chat — the governed git write path | Fixed (was B11) |
-| BUG-66 | Low | Build / git tools cannot reach a sub-folder repository | Open (found while implementing FIXED-109) |
-| BUG-67 | Medium | Build / a committed branch cannot be pushed | Open (found while implementing FIXED-109) |
+| FIXED-110 | Low | Build / git tools and the selected repository | Fixed (was BUG-66) |
+| FIXED-111 | Medium | Build / Chat — the governed push | Fixed (was BUG-67) |
+| FIXED-112 | Medium | Runtime / an unperformable proposal raised as a decision | Fixed (found while verifying FIXED-111) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B8, B11, B12, B17 complete; 11 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -4873,53 +4874,174 @@ rather than against the product — branch, log subject, clean status, and
 
 ---
 
-## BUG-66 — The git tools cannot reach a repository connected as a sub-folder
+## FIXED-110 — The git tools could not reach a repository connected as a sub-folder
 
-**Status: open. Found while implementing FIXED-109.**
+**Status: fixed in this change. Was BUG-66, found while implementing FIXED-109.**
 
-**Observed.** `git_status`, `git_diff`, `git_log`, and now `git_branch` and
-`git_commit`, all run against the workspace root. Build lets an owner connect a
-repository that is a *folder inside* the workspace (`POST /api/code/repos`, kind
-`local`), and none of the git tools can see it: they report the workspace's own
-repository, or `not_a_git_repository` when the workspace root is not one.
+**Observed.** `git_status`, `git_diff`, `git_log`, `git_branch` and `git_commit`
+all ran against the workspace root. Build lets an owner connect a repository that
+is a *folder inside* the workspace (`POST /api/code/repos`, kind `local`), and no
+git tool could see it: they reported the workspace's own repository, or
+`not_a_git_repository` when the workspace root was not one.
 
-**Why it matters.** The connection surface promises the agent is working in the
-repository the owner picked. For every git tool, it is not. This pre-dates B11 —
-the read tools have always been root-scoped — but B11 makes it consequential,
-because a commit against the wrong repository is a mutation rather than a
-confusing read.
+**Reproduce.** In a workspace that is not itself a repository, connect
+`projects/service` in Build and press **Use**. Ask for `git_log`. The answer is
+`not_a_git_repository` against the workspace root, while the header says
+*"Working in service"*.
 
-**Required fix.** Resolve the git tools against the *selected* code repository
-when there is one, falling back to the workspace root, and name the repository in
-the approval preview so the owner can see which one a commit lands in.
+**Root cause.** `raiker/tools/git.py` resolved every call with
+`resolve_workspace_path(workspace_root, ".")`. The selection Build stores in
+`code_repos.selected` was read by the Build view and by nothing else, so the
+connection surface and the tools disagreed about what the agent was working in.
+
+**Fix applied.** `selected_repository_subpath` reads the owner's selected
+local repository and `resolve_repository_root` resolves it through the *same*
+workspace containment check every other path read uses — a stored sub-path that
+escapes the workspace, or names a folder that is gone, falls back to the
+workspace root rather than widening the tools' reach. The broker
+(`ToolBroker.git_root`), the approval preview (`ControlDashboard._git_root`) and
+the executor (`GitWriteExecutor`) all resolve it the same way, per call rather
+than cached, because the owner can change the selection between turns and a
+cached answer would commit into the repository they stopped working in.
+
+**And the approval says which one.** A workspace can hold more than one
+repository, so every git proposal now carries a workspace-relative
+`repository` label: the commit preview reads *"3 file(s) on main in repository
+service"*, the branch and push previews carry a `repository` line, and the
+executed summary names it (*"…on main in service."*). A workspace that is its own
+repository is labelled `.` and the summary leaves the clause out, because naming
+it there would be noise in the one sentence the owner reads after approving.
 
 **UI when closed.** A commit approval states the repository it will be recorded
 in, and a connected sub-folder repository is the one the git tools read.
 
+**Verified live** — see FIXED-111 below.
+
 ---
 
-## BUG-67 — A committed branch cannot be pushed
+## FIXED-111 — A committed branch could not be pushed
 
-**Status: open. Found while implementing FIXED-109.**
+**Status: fixed in this change. Was BUG-67. Closes the last of GAP-BUILD B11.**
 
-**Observed.** FIXED-109 lets the agent create a branch and record a commit on it.
-There is no push. `github_write` opens a pull request through the connector, and
+**Observed.** FIXED-109 let the agent create a branch and record a commit on it.
+There was no push. `github_write` opens a pull request through the connector, and
 GitHub can only open one for a head branch that already exists on the remote — so
-the outward half is only usable for a branch somebody else pushed.
+the outward half was only usable for a branch somebody else had pushed.
 
 **Why it matters.** "Make the change, commit it, open the PR" is one motion in
-every product this is measured against, and it currently breaks in the middle.
+every product this is measured against, and it broke in the middle.
 
-**Required fix.** A governed `git_push` under its own capability, bound to the
-owner's credential and the connector egress allowlist, approval-required and
-naming remote, branch and commit range in the preview. It is a genuinely
-different question from the local writes — it is egress carrying repository
-content off the machine — so it belongs in its own gate rather than inside
-`git_write_execution`.
+**Fix applied — a push is not a local write, and does not answer to the same
+switch.**
+
+* **Its own capability.** `git_push` maps to `git_push_execution` — Permissions →
+  Network → **Git push** — not to `git_write_execution`. An owner who let the
+  agent commit has not thereby let it publish, and one switch over both would
+  have made that a package deal. It is Tier 2 rather than Tier 1 for the reason
+  every other Tier-2 capability is: it reaches the network.
+* **Two boundaries the gate cannot substitute for.** The remote's host must be on
+  the owner's `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, and `RAIKER_GITHUB_TOKEN` must
+  be set. Neither is model-supplied and both are re-checked at execution, against
+  the machine as it is then rather than as the approval found it.
+* **Only the host the credential belongs to.** `RAIKER_GITHUB_TOKEN` is a GitHub
+  credential; sending it to another forge because a remote happens to be HTTPS
+  would be a credential leak dressed up as a feature. A non-GitHub host is
+  refused as `unsupported_remote_host` naming the host and the credential it
+  would have needed. An SSH remote is refused too: it authenticates with a key
+  this process does not govern.
+* **The preview is computed without touching the network.** Asking the remote for
+  its refs would be egress performed *before* the owner approved any, so
+  `proposed_push_snapshot` says what this machine last knew — the remote and its
+  host, the branch, whether the remote has ever seen it, and the commits it does
+  not have. For a branch the remote already tracks that is everything past its
+  last known position; for one it has never seen it is what no ref on that remote
+  already reaches, so a fork of `main` reports the one commit it adds rather than
+  its whole history.
+* **It never forces and never deletes.** The refspec is written out in full
+  (`refs/heads/<branch>:refs/heads/<branch>`), so a branch name can neither be
+  read as an option nor move a ref it does not name. `--force`, `--delete` and
+  `--mirror` are not reachable from the tool at all.
+* **The credential never reaches the command line.** It is passed in the child's
+  environment and read by an inline credential helper, so it is absent from the
+  process table and from any captured command. An *empty* helper is configured
+  first, so a system keychain cannot quietly supply a different account's
+  credential than the one the owner governed. `GIT_TERMINAL_PROMPT=0` keeps a
+  failure a named failure rather than a process blocked on a prompt, and git
+  output is scrubbed of the token before it is stored or returned.
+* **Hooks still never run.** `-c core.hooksPath=raiker-no-such-hooks` on the push
+  too: `.git/hooks/pre-push` is workspace content the agent may itself have
+  written.
+* **Refusals are named.** `not_a_git_repository`, `detached_head`,
+  `unknown_branch`, `no_remote_configured`, `unknown_remote`,
+  `unsupported_remote_url`, `insecure_remote_url`, `remote_url_has_credentials`,
+  `unsupported_remote_host`, `push_egress_denied`, `push_credential_unset`,
+  `nothing_to_push`, `push_rejected_non_fast_forward`,
+  `push_authentication_failed`, `push_timed_out`.
+* **The sentence a push gets is not the sentence a commit gets.** The approval
+  reads *"Approving this sends the commits above to the remote shown, once, with
+  your own credential. It never forces and never deletes a branch, but it leaves
+  this machine and git cannot take it back — undo it on the remote."*
 
 **UI when closed.** After approving a commit, the owner can approve a push to a
 named remote and branch, and the pull-request proposal then has a head to point
 at.
+
+**Verified live** against a running `raiker-web` on **2026-08-08**, hosted
+Anthropic `claude-haiku-4-5-20251001`, with the workspace a real git repository
+holding a second repository at `projects/service` and an HTTPS GitHub remote:
+the capability standing apart from Git writes
+(`working/bug67-git-push-capability.png`); the sub-folder repository connected
+and selected (`bug66-subfolder-repository.png`) and `git_log` answering with
+*that* repository's history rather than the workspace's
+(`bug66-subfolder-git-log.png`); the push approval naming repository, remote,
+host, branch and the one commit it would send (`bug67-push-approval.png`); the
+execution (`bug67-push-executed.png`); the honest `nothing_to_push` refusal on
+the second attempt (`bug67-nothing-to-push.png`); and the off switch returning it
+to record-only (`bug67-gate-off-record-only.png`). Each claim was checked against
+the remote rather than against the product — `git ls-remote` reported the branch
+at exactly the commit this machine held after the approval, and unchanged after
+the refused one. Spec: `apps/web/e2e/bug67-git-push-live.spec.ts`; unit coverage:
+`tests/test_git_push_path.py`. Threat model: `docs/threat-models/git-push.md`.
+
+---
+
+## FIXED-112 — A proposal the runtime had already refused was raised as a decision
+
+**Status: fixed in this change. Found while verifying FIXED-111.**
+
+**Observed.** Asking for a second `git_push` with nothing left to send parked the
+turn on an approval. The owner was asked to decide on a push the runtime had
+already established it would not perform, and only learned why *after* approving
+it. The same held for every approval-bearing tool whose own proposal refused: a
+`write_file` into `.raiker/`, an `edit_file` whose `old_text` no longer matched,
+a `git_commit` with a clean tree.
+
+**Root cause, in three layers.** `ToolBroker.execute` computed
+`_approval_preview` and then created the approval regardless of what the preview
+said. The orchestrator then classified the call by the *policy verdict* alone:
+`needs_approval` meant "park the turn", whatever the broker had actually
+returned.
+
+**Fix applied.** A proposal whose own precondition check already failed is a
+refusal, not a decision:
+
+1. The broker returns the snapshot's named error as the tool result and creates
+   no approval row (`_unperformable_proposal`).
+2. The orchestrator's boundary is now the *approval*, not the verdict that would
+   have raised one: a call answered by the broker itself is an ordinary completed
+   call with a failed outcome. Parking on it would have stranded the turn on an
+   approval that does not exist; calling it a policy refusal would have replaced
+   the named, correctable reason with a verdict that is not what happened.
+3. So the model is handed the reason and can correct the call or explain it,
+   which is what the owner sees: *"There was nothing to push — the branch is
+   already up to date with the remote `origin`."*
+
+Nothing is weakened by refusing earlier: a call that never reaches an approval
+never reaches an executor either.
+
+**Verified live** — `bug67-nothing-to-push.png`, and unit coverage in
+`tests/test_git_push_path.py::TestUnperformableProposal` and
+`tests/test_tool_broker.py`.
 
 ---
 

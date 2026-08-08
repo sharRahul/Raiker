@@ -1,10 +1,11 @@
 # Threat Model — Git Writes (`git_write_execution`, B11)
 
 > Status marker: implemented and integrated. `git_branch` and `git_commit` are
-> live; a push and a pull-request *send* are separate capabilities — the
-> outward half is `github_write` under the existing
-> `connector_github_runtime` gate (see
-> [connectors-github.md](connectors-github.md)), and there is no push path yet.
+> live; a push and a pull-request *send* are separate capabilities — the push is
+> `git_push` under its own `git_push_execution` gate (see
+> [git-push.md](git-push.md)), and the pull request is `github_write` under the
+> existing `connector_github_runtime` gate (see
+> [connectors-github.md](connectors-github.md)).
 
 Per-capability threat model for letting the agent change the repository it is
 working in. Before B11, Raiker's git surface was `status`, `diff` and `log`: the
@@ -52,7 +53,7 @@ pretending otherwise.
 | Repository hooks never run | Every invocation carries `-c core.hooksPath=raiker-no-such-hooks`. `.git/hooks` is workspace content the agent may itself have written; running it on commit would make a governed write an un-governed code-execution path. |
 | No interactive block | `-c commit.gpgsign=false` / `tag.gpgsign=false`: a configured signing key would otherwise block the commit on a passphrase prompt this process can never answer. |
 | The owner's identity is kept | A committer identity is supplied *only* when the repository has none (`Raiker agent <agent@raiker.local>`). A configured `user.name`/`user.email` is never overridden. |
-| Workspace-scoped | The repository is resolved with `resolve_workspace_path`, and every model-supplied path is re-resolved against the workspace root; a path that escapes it is refused as `path_outside_repository`. |
+| The repository is the one the owner picked | Resolved through `resolve_repository_root` against the code repository selected in Build, falling back to the workspace root, using the same containment check every other path read uses (FIXED-110). A stored sub-path that escapes the workspace falls back rather than widening reach, and every proposal names the repository the change lands in. Model-supplied paths are re-resolved against that repository; one that escapes it is refused as `path_outside_repository`. |
 | Refuses what it cannot honour | Named, machine-readable refusals for: not a git repository, a branch name `git check-ref-format` rejects, a branch that exists, an unknown base, an in-progress merge/rebase/cherry-pick/revert/bisect, an empty message, and nothing to commit. |
 | Uncommitted work is not moved silently | A branch created *from a named base* moves the working tree, so it is refused while there are uncommitted changes. Without a base there is nothing to move to, and the proposal states how many files it carries across. |
 | Bounded | Subprocesses are wall-clock capped; the preview diff is capped at 200 KB and says when it truncated. |
@@ -64,14 +65,10 @@ pretending otherwise.
   in as many words — "It is git history rather than a checkpointed file write,
   so undo it in git" — rather than promising a rewind the runtime cannot
   perform.
-- **No push.** The agent can commit on a branch it cannot publish. `github_write`
-  opens a pull request through the connector, so it is only useful for a branch
-  that already exists on the remote. A governed push is a separate capability
-  with its own credential and egress question; it is tracked as **BUG-67**.
-- **Repository-root scoped.** Like the existing `git_status` / `git_diff` /
-  `git_log` reads, the write tools operate on the workspace root's repository.
-  A repository connected as a sub-folder of the workspace is not reachable by
-  either the read or the write tools; tracked as **BUG-66**.
+- **Publishing is a separate decision.** A commit stays on this machine. The
+  push that takes it off is `git_push` under its own capability, its own egress
+  allowlist and the owner's own credential — see [git-push.md](git-push.md).
+  Turning Git writes on does not turn publishing on.
 - **A commit message is model-authored text.** It is recorded verbatim in git
   history. It is bounded and never interpreted as an instruction, but it is not
   redacted — the owner reads it in the approval before it is written.

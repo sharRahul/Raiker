@@ -90,6 +90,10 @@ class StaticPolicyConfig:
             # same reason `remote_execution_cap` is: a capability in neither set
             # is hard-denied on its way to the executor that carries it out.
             "git_branch", "git_commit", "git_write_execution", "github_write",
+            # BUG-67 — the push, and the capability the runtime authority routes
+            # it on. Listed for the same reason the pair above is: a capability
+            # in neither set is hard-denied on its way to its own executor.
+            "git_push", "git_push_execution",
             "memory_write", "memory_forget",
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.

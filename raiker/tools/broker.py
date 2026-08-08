@@ -37,7 +37,11 @@ from raiker.tools.filesystem import (
 from raiker.tools.git import (
     proposed_branch_snapshot,
     proposed_commit_snapshot,
+    proposed_push_snapshot,
+    repository_label,
+    resolve_repository_root,
     run_git,
+    selected_repository_subpath,
 )
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
 from raiker.tools.memory_tools import (
@@ -160,12 +164,12 @@ class ToolBroker:
                 str(args.get("before_path", ".")),
                 str(args.get("after_path", ".")),
             ),
-            "git_status": lambda args: run_git(self.workspace_root, "status", ["--short"]),
+            "git_status": lambda args: run_git(self.git_root(), "status", ["--short"]),
             "git_diff": lambda args: run_git(
-                self.workspace_root, "diff", list(args.get("args", []))
+                self.git_root(), "diff", list(args.get("args", []))
             ),
             "git_log": lambda args: run_git(
-                self.workspace_root, "log", ["--oneline", "-n", str(args.get("limit", 10))]
+                self.git_root(), "log", ["--oneline", "-n", str(args.get("limit", 10))]
             ),
             "write_file": lambda args: proposed_write_snapshot(
                 self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
@@ -459,6 +463,33 @@ class ToolBroker:
             "session_id": context.session_id,
         }
 
+    # ── BUG-66: the repository the git tools work in ─────────────────────────
+
+    def git_root(self) -> Path:
+        """The repository the owner selected in Build, or the workspace root.
+
+        Resolved per call rather than cached, because the owner can change the
+        selection between turns and a cached answer would quietly commit into
+        the repository they stopped working in.
+        """
+        return resolve_repository_root(
+            self.workspace_root,
+            # `code_repos` rows are keyed on the principal the API wrote them
+            # under, which is the acting principal itself; `owner_scope` narrows
+            # to it only once that principal names a real account.
+            selected_repository_subpath(self.store, self.owner_scope or self.principal_id),
+        )
+
+    def _with_repository(self, snapshot: dict[str, Any]) -> dict[str, Any]:
+        """Name the repository a git proposal was computed against.
+
+        A workspace can hold more than one, so the approval has to say which one
+        the change lands in — otherwise the owner is approving a commit whose
+        destination is an assumption.
+        """
+        snapshot["repository"] = repository_label(self.workspace_root, self.git_root())
+        return snapshot
+
     @property
     def owner_scope(self) -> str | None:
         """The acting principal id, but only when it names a real account.
@@ -539,6 +570,53 @@ class ToolBroker:
                 )
             )
 
+    def _unperformable_proposal(
+        self,
+        action: ToolAction,
+        preview: dict[str, Any],
+        decision: Any,
+        *,
+        session_id: str,
+        turn_id: str | None,
+        client: ClientMetadata | None,
+        sanitized_action: ToolAction,
+        now: str,
+    ) -> tuple[ToolResult, Any]:
+        """Answer a proposal the runtime already knows it cannot honour.
+
+        The refusal the snapshot computed is returned verbatim, so the model gets
+        the same machine-readable reason an execution would have produced and no
+        approval row is created for a decision that has no effect either way.
+        """
+        failed = ToolResult(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            status="failed",
+            output=None,
+            error=preview.get("error", {"type": "proposal_unperformable"}),
+            started_at=now,
+            completed_at=utc_now(),
+        )
+        if self.store is not None:
+            self.store.insert_tool_action(sanitized_action, session_id, turn_id, failed.status)
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="tool_failed",
+            actor="tool_broker",
+            payload=self._event_safe_result_payload(failed),
+            client=client,
+        )
+        self._notify_hook(
+            "PostToolUse",
+            action,
+            session_id=session_id,
+            turn_id=turn_id,
+            client=client,
+            context={"status": failed.status},
+        )
+        return failed, decision
+
     def _approval_preview(self, action: ToolAction) -> dict[str, Any] | None:
         if action.tool_name in {"write_file", "create_document"}:
             if action.tool_name == "create_document" and not str(
@@ -564,16 +642,28 @@ class ToolBroker:
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
         if action.tool_name == "git_branch":
-            return proposed_branch_snapshot(
-                self.workspace_root,
-                str(action.arguments.get("name", "")),
-                str(action.arguments["base"]) if action.arguments.get("base") else None,
+            return self._with_repository(
+                proposed_branch_snapshot(
+                    self.git_root(),
+                    str(action.arguments.get("name", "")),
+                    str(action.arguments["base"]) if action.arguments.get("base") else None,
+                )
             )
         if action.tool_name == "git_commit":
-            return proposed_commit_snapshot(
-                self.workspace_root,
-                str(action.arguments.get("message", "")),
-                action.arguments.get("paths"),
+            return self._with_repository(
+                proposed_commit_snapshot(
+                    self.git_root(),
+                    str(action.arguments.get("message", "")),
+                    action.arguments.get("paths"),
+                )
+            )
+        if action.tool_name == "git_push":
+            return self._with_repository(
+                proposed_push_snapshot(
+                    self.git_root(),
+                    str(action.arguments["remote"]) if action.arguments.get("remote") else None,
+                    str(action.arguments["branch"]) if action.arguments.get("branch") else None,
+                )
             )
         if action.tool_name == "apply_patch":
             try:
@@ -631,6 +721,20 @@ class ToolBroker:
                     return (
                         "Approving records this exact change set as one commit on the "
                         "current branch, once."
+                    )
+                # BUG-67 — a push is the one git write that leaves the machine,
+                # so the sentence says where it goes rather than what it records.
+                if action.tool_name == "git_push":
+                    snapshot = self._approval_preview(action) or {}
+                    if snapshot.get("status") == "success":
+                        return (
+                            f"Approving sends {snapshot['commit_count']} commit(s) on "
+                            f"{snapshot['branch']} to {snapshot['remote']} "
+                            f"({snapshot['host']}) with your own credential, once."
+                        )
+                    return (
+                        "Approving sends this branch to the named remote with your own "
+                        "credential, once."
                     )
                 if action.tool_name == "github_write":
                     repo = str(self._redact_value(str(action.arguments.get("repo", ""))))
@@ -1010,6 +1114,23 @@ class ToolBroker:
                 return preapproved
             approval_id = new_id("appr_")
             proposal_preview = self._approval_preview(action)
+            # BUG-67 — a proposal whose own precondition check already failed is
+            # not a decision, it is a refusal. Raising an approval for it asks
+            # the owner to weigh an action the runtime has already established it
+            # will not perform, and only tells them after they approved. The
+            # named reason goes back to the model instead, which is what lets it
+            # correct the call rather than wait on a person.
+            if isinstance(proposal_preview, dict) and proposal_preview.get("status") == "failed":
+                return self._unperformable_proposal(
+                    action,
+                    proposal_preview,
+                    decision,
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    client=client,
+                    sanitized_action=sanitized_action,
+                    now=now,
+                )
             connector_write = action.tool_name == "connector_write"
             expected_effect = self._expected_effect(action, connector_write)
             self._event(
@@ -1030,9 +1151,9 @@ class ToolBroker:
                         "files": action.tool_name in {"write_file", "create_document", "edit_file", "apply_patch"},
                         # B11 — the repository's own history, which no file-level
                         # checkpoint rewinds.
-                        "repository": action.tool_name in {"git_branch", "git_commit", "github_write"},
+                        "repository": action.tool_name in {"git_branch", "git_commit", "git_push", "github_write"},
                         "memory": action.tool_name in {"memory_write", "memory_forget"},
-                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write", "github_write"},
+                        "network": action.tool_name in {"shell", "remote_execute", "cloud_execute", "connector_write", "github_write", "git_push"},
                         "shell": action.tool_name in {"shell", "remote_execute", "cloud_execute"},
                         "provider": False,
                         "export": False,

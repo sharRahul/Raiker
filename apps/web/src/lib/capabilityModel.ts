@@ -130,6 +130,10 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   multi_agent_teams: "Local execution",
   network_execution: "Network",
   web_fetch: "Network",
+  // BUG-67 — a push is repository work, but what makes it a separate decision is
+  // that it leaves the machine. It sits with the other egress switches so the
+  // owner reviewing "what can reach the network" sees it.
+  git_push_execution: "Network",
   external_channel_runtime: "Network",
   channel_approval_relay: "Network",
   hosted_model_runtime: "Models",
@@ -384,6 +388,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Git writes",
     description:
       "Create a branch or record a commit in the workspace repository when you approve one the agent proposed.",
+  },
+  git_push_execution: {
+    label: "Git push",
+    description:
+      "Send an approved branch to its remote with your own credential. Separate from Git writes because a push leaves this machine: it still needs the remote's host on your connector egress allowlist, and it never forces or deletes a branch.",
   },
   memory_write_execution: {
     label: "Memory store",

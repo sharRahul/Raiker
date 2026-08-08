@@ -58,7 +58,7 @@ that proves it, what is missing, and the concrete work.
 | B6 | BUILD | TIER 1 | Done |
 | B7 | BUILD | TIER 1 | Done |
 | B8 | BUILD | TIER 1 | Complete |
-| B11 | BUILD | TIER 2 | Done |
+| B11 | BUILD | TIER 2 | Complete |
 | B12 | BUILD | TIER 2 | Done |
 | B17 | BUILD | TIER 2 | Done |
 | C1 | BUILD | TIER 0 | Done |
@@ -202,7 +202,8 @@ definition/reference navigation, no type or lint feedback loop. **Work:** an
 LSP-backed read tool set (`find_definition`, `find_references`,
 `document_symbols`, `diagnostics`) — read-only, so it needs no approval path.
 
-**B11. No git write path.** ✅ **Done — see FIXED-109.** `git_branch` and
+**B11. No git write path.** ✅ **Complete — see FIXED-109, FIXED-110 and
+FIXED-111.** `git_branch` and
 `git_commit` are governed, approval-required proposals whose preview *is* the
 computation the execution re-derives: for a commit the exact file list and the
 whole diff — including files git does not track yet — and for a branch the two
@@ -217,11 +218,17 @@ governed write cannot become an un-governed code-execution path. `github_write`
 proposes the work outward (`create_pull_request`, `create_comment`) under the
 existing `connector_github_runtime` gate, owner credential and egress allowlist.
 
-**What is left of B11:** there is no **push**, so the agent can commit on a
-branch it cannot publish and `github_write` is only useful for a branch already
-on the remote. A governed push is a separate credential and egress question and
-is tracked as BUG-67. The read and write tools are also repository-root scoped
-and cannot target a repository connected as a sub-folder (BUG-66).
+**B11 is now complete — see FIXED-110 and FIXED-111.** The push landed as its
+own capability, `git_push_execution` (Permissions → Network → **Git push**),
+because publishing is egress carrying repository content off the machine and an
+owner who let the agent commit has not thereby let it publish. It answers to two
+boundaries the gate cannot substitute for — the remote's host on the owner's
+connector egress allowlist, and the owner's own credential — refuses any host
+that credential does not belong to, computes its preview without touching the
+network, and never forces or deletes a ref. `github_write` now has a head to
+open a pull request against. The git tools also resolve against the repository
+the owner *selected* in Build rather than always the workspace root, and every
+git approval names the repository the change lands in.
 
 **B12. No web access.** ✅ **Done — see FIXED-101.** `web_fetch` returns one page
 as bounded, sanitised text framed as untrusted data, governed by the `web_fetch`

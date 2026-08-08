@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import difflib
+import os
 import subprocess
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from raiker.tools.filesystem import (
     PROTECTED_WORKSPACE_DIRS,
@@ -36,8 +38,71 @@ _WRITE_TIMEOUT = 30
 _BRANCH_REJECT_PREFIXES = ("-", "refs/")
 
 
+# ── BUG-66: which repository the git tools operate in ────────────────────────
+#
+# Build lets an owner connect a repository that is a *folder inside* the
+# workspace, and every git tool used to run against the workspace root anyway —
+# so the surface promised the agent was working in the repository the owner
+# picked and it was not. Resolution happens at call time rather than when the
+# broker is built, because the owner can change the selection between turns.
+
+
+def selected_repository_subpath(store: Any, owner_principal_id: str | None) -> str | None:
+    """The workspace-relative folder of the repository selected in Build, if any.
+
+    A GitHub-kind repository is a coordinate rather than a folder, so it selects
+    nothing here: the git tools stay on the workspace root and `github_read` is
+    the surface that reaches the remote.
+    """
+    if store is None or not owner_principal_id:
+        return None
+    try:
+        rows = store.list_code_repos(owner_principal_id)
+    except Exception:  # noqa: BLE001 — a storage failure must not lose the tool
+        return None
+    for row in rows:
+        if not row.get("selected") or str(row.get("kind", "")) != "local":
+            continue
+        subpath = str(row.get("local_subpath") or "").strip()
+        return subpath or None
+    return None
+
+
+def resolve_repository_root(workspace_root: str | Path, subpath: str | None = None) -> Path:
+    """The directory the git tools run in: the selected repository, or the workspace.
+
+    Containment is unchanged — the stored sub-path goes through the same
+    workspace check every other path read uses — and anything that fails it
+    falls back to the workspace root rather than widening the tools' reach.
+    """
+    root = resolve_workspace_path(workspace_root, ".")
+    if not subpath:
+        return root
+    try:
+        candidate = resolve_workspace_path(workspace_root, subpath)
+    except Exception:  # noqa: BLE001 — an escaping or malformed sub-path is not fatal
+        return root
+    return candidate if candidate.is_dir() else root
+
+
+def repository_label(workspace_root: str | Path, repo_root: str | Path) -> str:
+    """How the owner names this repository: its workspace-relative path.
+
+    The workspace itself is named ``.`` rather than an absolute path, because the
+    label is shown in an approval and stored in the durable record, and neither
+    needs the host's directory layout.
+    """
+    root = resolve_workspace_path(workspace_root, ".")
+    resolved = Path(repo_root).resolve()
+    try:
+        relative = resolved.relative_to(root).as_posix()
+    except ValueError:
+        return resolved.name
+    return relative or "."
+
+
 def run_git(
-    workspace_root: str | Path,
+    repo_root: str | Path,
     subcommand: str,
     args: list[str] | None = None,
     *,
@@ -48,7 +113,7 @@ def run_git(
             "status": "denied",
             "error": {"type": "git_subcommand_denied", "subcommand": subcommand},
         }
-    root = resolve_workspace_path(workspace_root, ".")
+    root = resolve_workspace_path(repo_root, ".")
     command = ["git", "-C", str(root), subcommand, *(args or [])]
     proc = subprocess.run(command, check=False, capture_output=True, text=True, timeout=10)
     output = (proc.stdout + proc.stderr)[:max_bytes]
@@ -90,9 +155,9 @@ def _git_output(proc: subprocess.CompletedProcess[str]) -> str:
     return (proc.stdout + proc.stderr).strip()[:4_000]
 
 
-def _repository(workspace_root: str | Path) -> tuple[Path, dict[str, Any] | None]:
-    """Resolve the workspace's git repository, or the refusal that explains why not."""
-    root = resolve_workspace_path(workspace_root, ".")
+def _repository(repo_root: str | Path) -> tuple[Path, dict[str, Any] | None]:
+    """Resolve the selected repository, or the refusal that explains why not."""
+    root = resolve_workspace_path(repo_root, ".")
     proc = _git(root, ["rev-parse", "--is-inside-work-tree"], timeout=10)
     if proc.returncode != 0 or proc.stdout.strip() != "true":
         return root, _failed("not_a_git_repository", path=str(root))
@@ -268,7 +333,7 @@ def _ref_exists(root: Path, ref: str) -> bool:
 
 
 def proposed_branch_snapshot(
-    workspace_root: str | Path, name: str, base: str | None = None
+    repo_root: str | Path, name: str, base: str | None = None
 ) -> dict[str, Any]:
     """What creating branch *name* would do — computed without touching the repository.
 
@@ -277,7 +342,7 @@ def proposed_branch_snapshot(
     base, an operation already in progress, and — only when a *base* is named,
     because that is the case that moves the working tree — uncommitted changes.
     """
-    root, refusal = _repository(workspace_root)
+    root, refusal = _repository(repo_root)
     if refusal is not None:
         return refusal
     name = (name or "").strip()
@@ -305,13 +370,13 @@ def proposed_branch_snapshot(
 
 
 def create_branch(
-    workspace_root: str | Path, name: str, base: str | None = None
+    repo_root: str | Path, name: str, base: str | None = None
 ) -> dict[str, Any]:
     """Create branch *name* and check it out. Re-validates everything first."""
-    snapshot = proposed_branch_snapshot(workspace_root, name, base)
+    snapshot = proposed_branch_snapshot(repo_root, name, base)
     if snapshot["status"] != "success":
         return snapshot
-    root = resolve_workspace_path(workspace_root, ".")
+    root = resolve_workspace_path(repo_root, ".")
     args = [*_NO_HOOKS, "switch", "--create", snapshot["name"]]
     if snapshot["base"]:
         args.append(str(snapshot["base"]))
@@ -355,14 +420,14 @@ def _normalise_paths(root: Path, paths: Any) -> tuple[list[str] | None, dict[str
 
 
 def proposed_commit_snapshot(
-    workspace_root: str | Path, message: str, paths: Any = None
+    repo_root: str | Path, message: str, paths: Any = None
 ) -> dict[str, Any]:
     """Exactly what committing would record — the file list and the complete diff.
 
     Nothing is staged and nothing is written: the index is left as the owner had
     it, so a rejected proposal costs the repository nothing.
     """
-    root, refusal = _repository(workspace_root)
+    root, refusal = _repository(repo_root)
     if refusal is not None:
         return refusal
     text = (message or "").strip()
@@ -402,13 +467,13 @@ def proposed_commit_snapshot(
 
 
 def create_commit(
-    workspace_root: str | Path, message: str, paths: Any = None
+    repo_root: str | Path, message: str, paths: Any = None
 ) -> dict[str, Any]:
     """Stage the proposed change set and record one commit. Re-validates first."""
-    snapshot = proposed_commit_snapshot(workspace_root, message, paths)
+    snapshot = proposed_commit_snapshot(repo_root, message, paths)
     if snapshot["status"] != "success":
         return snapshot
-    root = resolve_workspace_path(workspace_root, ".")
+    root = resolve_workspace_path(repo_root, ".")
     # Exactly the paths the owner was shown — not `--all`, which would sweep
     # `.raiker/` (the vault key, the audit log, the encrypted store) into the
     # commit, and not the index, which the owner may have staged for themselves.
@@ -440,4 +505,251 @@ def create_commit(
         "subject": str(snapshot["subject"]),
         "files": list(snapshot["files"]),
         "file_count": int(snapshot["file_count"]),
+    }
+
+
+# ── BUG-67: the governed push ────────────────────────────────────────────────
+#
+# A branch and a commit are local: the machine keeps them and the owner can undo
+# them in git. A push is a different question — it carries repository content off
+# the machine with the owner's credential, and nothing brings it back. So it sits
+# behind its own capability (`git_push_execution`) rather than inside
+# `git_write_execution`, and behind the same two boundaries every other egress
+# path answers to: the owner's connector egress allowlist and the owner's own
+# credential. Neither is model-supplied, and both are checked again at execution.
+
+GIT_PUSH_TOKEN_ENV = "RAIKER_GITHUB_TOKEN"
+# The token above is a GitHub credential. Sending it to another forge because a
+# remote happens to be HTTPS would be a credential leak dressed up as a feature,
+# so a push is only offered for the host the credential belongs to.
+GIT_PUSH_CREDENTIAL_HOSTS: frozenset[str] = frozenset({"github.com", "www.github.com"})
+_PUSH_TIMEOUT = 120
+_MAX_PREVIEW_COMMITS = 50
+# The value the inline credential helper reads. It is passed in the child's
+# environment rather than on the command line, so the token never appears in the
+# process table or in a captured command string.
+_PUSH_TOKEN_VAR = "RAIKER_GIT_PUSH_TOKEN"
+_CREDENTIAL_HELPER = (
+    f'!f() {{ echo username=x-access-token; echo "password=${_PUSH_TOKEN_VAR}"; }}; f'
+)
+
+
+def push_egress_allowlist() -> frozenset[str]:
+    """The owner's connector egress allowlist — the hosts a push may reach."""
+    from raiker.runtime.executors.sandbox import connector_egress_allowlist
+
+    return connector_egress_allowlist()
+
+
+def _push_credential() -> str:
+    return os.environ.get(GIT_PUSH_TOKEN_ENV, "").strip()
+
+
+def _remote_names(root: Path) -> list[str]:
+    proc = _git(root, ["remote"], timeout=10)
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _remote_url(root: Path, remote: str) -> str:
+    """The URL a *push* to *remote* would really use.
+
+    ``--push`` because a remote may carry a separate `pushurl`, and `get-url`
+    resolves `url.<base>.insteadOf` rewrites — so what is checked below is the
+    address git will contact rather than the address the config file spells.
+    """
+    proc = _git(root, ["remote", "get-url", "--push", remote], timeout=10)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _upstream_remote(root: Path, branch: str) -> str:
+    """The remote *branch* already tracks, or ``""`` when it tracks nothing."""
+    proc = _git(
+        root, ["config", "--get", f"branch.{branch}.remote"], timeout=10
+    )
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _tracking_ref(root: Path, remote: str, branch: str) -> str:
+    """The local record of where the remote branch was, or ``""`` if there is none.
+
+    Deliberately local. Asking the remote would be egress performed *before* the
+    owner approved any, so the preview says what this machine last knew and the
+    execution finds out the truth.
+    """
+    ref = f"refs/remotes/{remote}/{branch}"
+    return ref if _git(root, ["rev-parse", "--verify", "--quiet", ref], timeout=10).returncode == 0 else ""
+
+
+def _count(root: Path, selection: list[str]) -> int:
+    proc = _git(root, ["rev-list", "--count", *selection], timeout=15)
+    try:
+        return int(proc.stdout.strip())
+    except ValueError:
+        return 0
+
+
+def _commit_lines(root: Path, selection: list[str]) -> list[str]:
+    proc = _git(
+        root,
+        ["log", "--oneline", "--no-decorate", f"-n{_MAX_PREVIEW_COMMITS}", *selection],
+        timeout=15,
+    )
+    if proc.returncode != 0:
+        return []
+    return [line.strip() for line in proc.stdout.splitlines() if line.strip()]
+
+
+def _outgoing(remote: str, branch: str, tracking: str) -> list[str]:
+    """The commits a push would send, as rev-list arguments.
+
+    For a branch the remote already has, that is everything past its last known
+    position. For a branch it has never seen there is no such position, and
+    counting every commit on the branch would tell the owner a fork of `main`
+    carries its whole history — so what is counted is what no ref on that remote
+    already reaches.
+    """
+    if tracking:
+        return [f"{tracking}..{branch}"]
+    return [branch, "--not", f"--remotes={remote}"]
+
+
+def _redact_token(text: str) -> str:
+    token = _push_credential()
+    return text.replace(token, "***") if token else text
+
+
+def proposed_push_snapshot(
+    repo_root: str | Path, remote: str | None = None, branch: str | None = None
+) -> dict[str, Any]:
+    """Exactly what pushing would send — computed without touching the network.
+
+    Fail-closed on every case a later execution could not honour: no repository,
+    a detached or unknown branch, an unknown remote, a remote this process holds
+    no credential for, a host the owner has not allowlisted, and a branch with
+    nothing on it the remote does not already have.
+    """
+    root, refusal = _repository(repo_root)
+    if refusal is not None:
+        return refusal
+    branch_name = (branch or "").strip() or current_branch(root)
+    if not branch_name:
+        return _failed("detached_head")
+    if not _valid_branch_name(root, branch_name) or not _branch_exists(root, branch_name):
+        return _failed("unknown_branch", branch=branch_name)
+    remotes = _remote_names(root)
+    if not remotes:
+        return _failed("no_remote_configured")
+    remote_name = (
+        (remote or "").strip()
+        or _upstream_remote(root, branch_name)
+        or ("origin" if "origin" in remotes else remotes[0])
+    )
+    if remote_name not in remotes:
+        return _failed("unknown_remote", remote=remote_name, remotes=remotes)
+    url = _remote_url(root, remote_name)
+    parsed = urlsplit(url)
+    if parsed.scheme not in ("https", "http") or not parsed.hostname:
+        return _failed("unsupported_remote_url", remote=remote_name, scheme=parsed.scheme or "ssh")
+    if parsed.scheme != "https":
+        return _failed("insecure_remote_url", remote=remote_name, host=parsed.hostname)
+    if "@" in parsed.netloc:
+        # A credential baked into the remote URL would be used instead of the
+        # owner's governed one, and would be pushed past every check below.
+        return _failed("remote_url_has_credentials", remote=remote_name, host=parsed.hostname)
+    host = parsed.hostname.lower()
+    if host not in GIT_PUSH_CREDENTIAL_HOSTS:
+        return _failed("unsupported_remote_host", host=host, credential=GIT_PUSH_TOKEN_ENV)
+    if host not in push_egress_allowlist():
+        return _failed("push_egress_denied", host=host)
+    if not _push_credential():
+        return _failed("push_credential_unset", credential=GIT_PUSH_TOKEN_ENV)
+    tracking = _tracking_ref(root, remote_name, branch_name)
+    creates_remote_branch = not tracking
+    selection = _outgoing(remote_name, branch_name, tracking)
+    ahead = _count(root, selection)
+    behind = _count(root, [f"{branch_name}..{tracking}"]) if tracking else 0
+    if tracking and ahead == 0:
+        return _failed("nothing_to_push", remote=remote_name, branch=branch_name)
+    commits = _commit_lines(root, selection)
+    return {
+        "status": "success",
+        "remote": remote_name,
+        "remote_url": url,
+        "host": host,
+        "branch": branch_name,
+        "head": _head_commit(root),
+        "creates_remote_branch": creates_remote_branch,
+        "commit_count": ahead,
+        "behind": behind,
+        "commits": commits,
+        "truncated": ahead > len(commits),
+    }
+
+
+def push_branch(
+    repo_root: str | Path, remote: str | None = None, branch: str | None = None
+) -> dict[str, Any]:
+    """Push the proposed branch to the proposed remote. Re-validates everything first.
+
+    Never forces and never deletes: the refspec is written out in full so a
+    branch name can neither be read as an option nor move a ref it does not name.
+    """
+    snapshot = proposed_push_snapshot(repo_root, remote, branch)
+    if snapshot["status"] != "success":
+        return snapshot
+    root = resolve_workspace_path(repo_root, ".")
+    remote_name = str(snapshot["remote"])
+    branch_name = str(snapshot["branch"])
+    environment = {
+        **os.environ,
+        _PUSH_TOKEN_VAR: _push_credential(),
+        # No terminal, no GUI prompt: a push that cannot authenticate must fail
+        # with a reason rather than block this process for its wall-clock cap.
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_ASKPASS": "",
+        "SSH_ASKPASS": "",
+    }
+    args = [
+        "git",
+        "-C",
+        str(root),
+        *_NO_HOOKS,
+        # An empty helper first clears whatever the host has configured, so a
+        # system keychain cannot quietly supply a different account's credential
+        # than the one the owner governed.
+        "-c",
+        "credential.helper=",
+        "-c",
+        f"credential.helper={_CREDENTIAL_HELPER}",
+        "push",
+        "--set-upstream",
+        remote_name,
+        f"refs/heads/{branch_name}:refs/heads/{branch_name}",
+    ]
+    try:
+        proc = subprocess.run(
+            args, check=False, capture_output=True, text=True,
+            timeout=_PUSH_TIMEOUT, env=environment,
+        )
+    except subprocess.TimeoutExpired:
+        return _failed("push_timed_out", remote=remote_name, branch=branch_name)
+    output = _redact_token(_git_output(proc))
+    if proc.returncode != 0:
+        lowered = output.lower()
+        if "non-fast-forward" in lowered or "fetch first" in lowered or "rejected" in lowered:
+            return _failed("push_rejected_non_fast_forward", remote=remote_name,
+                           branch=branch_name, output=output)
+        if "authentication failed" in lowered or "403" in lowered or "denied" in lowered:
+            return _failed("push_authentication_failed", remote=remote_name,
+                           branch=branch_name, output=output)
+        return _failed("git_command_failed", command="push", output=output)
+    return {
+        "status": "success",
+        "remote": remote_name,
+        "host": str(snapshot["host"]),
+        "branch": branch_name,
+        "head": _head_commit(root),
+        "commit_count": int(snapshot["commit_count"]),
+        "created_remote_branch": bool(snapshot["creates_remote_branch"]),
+        "output": output,
     }

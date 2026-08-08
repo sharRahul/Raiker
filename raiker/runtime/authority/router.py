@@ -83,6 +83,11 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "git_branch": "git_write_execution",
     "git_commit": "git_write_execution",
     "git_write_execution": "git_write_execution",
+    # BUG-67 — a push is not a local write. It carries repository content off the
+    # machine with the owner's credential, so it answers to its own switch: an
+    # owner who lets the agent commit has not thereby let it publish.
+    "git_push": "git_push_execution",
+    "git_push_execution": "git_push_execution",
     # B11 — a GitHub write is the same credential reaching the same host as
     # `github_read`, so it answers to the connector's own gate rather than
     # inventing a second one.

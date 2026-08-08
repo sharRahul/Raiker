@@ -25,6 +25,10 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     # approval path and neither is ever proposed as read-shaped.
     "git_branch": ("high", True),
     "git_commit": ("high", True),
+    # BUG-67 — the one git write that leaves the machine. Governed by its own
+    # capability (`git_push_execution`), the owner's credential and the connector
+    # egress allowlist, and approval-gated here, because nothing unsends it.
+    "git_push": ("high", True),
     # B11 — proposing the work to the world. Governed inside the connector
     # (connector_github_runtime gate + owner credential + egress allowlist) and
     # approval-gated here, because it leaves the machine and cannot be unsent.
@@ -103,6 +107,9 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "git_log": (),
     "git_branch": ("name",),
     "git_commit": ("message",),
+    # Both arguments are optional: the checked-out branch and the remote it
+    # already tracks are the answer when the model names neither.
+    "git_push": (),
     # Per-operation arguments (number/title/head/base/body) are validated by the
     # connector, which is where a correctable reason can name the operation.
     "github_write": ("operation", "repo"),
@@ -231,6 +238,7 @@ _OPTIONAL_ARGS: dict[str, tuple[str, ...]] = {
     "web_search": ("max_results",),
     "git_branch": ("base",),
     "git_commit": ("paths",),
+    "git_push": ("remote", "branch"),
     "github_write": ("number", "body", "title", "head", "base"),
 }
 
@@ -254,6 +262,13 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
         "message; optional paths limits the commit to those repository-relative files. "
         "The owner sees the exact file list and diff before deciding, and repository "
         "hooks do not run."
+    ),
+    "git_push": (
+        "Propose pushing a branch to its remote (approval required). Optional remote "
+        "and branch default to the tracked remote and the checked-out branch. The push "
+        "never forces and never deletes; the owner sees the remote, the branch and the "
+        "commits it would send before deciding. Only available when the owner enabled "
+        "git pushes, allowlisted the remote's host, and configured their credential."
     ),
     "github_write": (
         "Propose one GitHub write (approval required). Arguments: operation "

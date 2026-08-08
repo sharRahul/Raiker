@@ -241,14 +241,15 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   that creates must name a path that does not, and a patch naming the same file
   twice is rejected before anything is written. There is no fuzzy or partial
   application — one bad hunk fails the whole proposal.
-- **The agent can commit, but it cannot push.** An approved `git_commit`
-  records the exact change set you reviewed on the current branch, and
-  `github_write` can open a pull request through the GitHub connector — but
-  there is no governed push, so the pull request is only usable for a branch
-  that already exists on the remote. Publishing a branch is egress carrying
-  repository content off the machine and belongs in its own capability; it is
-  tracked as BUG-67. The git tools also read and write the workspace root's
-  repository, not one connected as a sub-folder (BUG-66).
+- **A push needs its own switch, its own allowlist and your own credential.**
+  An approved `git_commit` records the change set you reviewed, and an approved
+  `git_push` really publishes the branch — but publishing is egress carrying
+  repository content off the machine, so it answers to **Git push**
+  (`git_push_execution`) rather than to Git writes, and it does nothing until
+  the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and
+  `RAIKER_GITHUB_TOKEN` is set. Only HTTPS GitHub remotes are pushable, because
+  that is the credential Raiker holds; it never forces and never deletes a
+  branch. `github_write` then has a head to open a pull request against.
 - **The agent reaches the web only where you have allowed it, and cannot search
   at all until you configure a provider.** `web_fetch` is gated by its own
   capability, withholds by default at `ask`, and fetches nothing while

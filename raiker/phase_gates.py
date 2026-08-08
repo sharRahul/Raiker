@@ -53,6 +53,7 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "file_write_execution",
     "patch_apply_execution",
     "git_write_execution",
+    "git_push_execution",
     "memory_write_execution",
     "memory_forget_execution",
     "checkpoint_restore_execution",
@@ -174,7 +175,11 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
             policy_ready=True, contract_ready=True, storage_ready=True,
             event_ready=True, test_ready=True,
         )
-    _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch", "network_execution")
+    # BUG-67 — a push is Tier 2 rather than Tier 1 for the reason every other
+    # Tier-2 capability is: it reaches the network. The branch and the commit
+    # beside it stay local and stay Tier 1.
+    _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch",
+                            "network_execution", "git_push_execution")
     for name in _TIER2_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 2, CapabilityState.DISABLED,

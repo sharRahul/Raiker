@@ -10,7 +10,7 @@ from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from raiker.approval_previews import redact_secret_like_text
 from raiker.contracts.ids import new_id, utc_now
@@ -18,6 +18,13 @@ from raiker.control.dtos import ControlResult
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
+from raiker.execution.profiles import (
+    CONTAINER_PROFILE_TOOLS,
+    ContainerRuntime,
+    ExecutionProfile,
+    RepositoryAccess,
+    validate_execution_profile,
+)
 from raiker.memory.store import get_memory, list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
@@ -32,6 +39,7 @@ from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+from raiker.runtime.executors.containers import container_image_allowlist
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
@@ -1065,6 +1073,26 @@ class DashboardService:
     def execution_environments(self, owner_principal_id: str) -> dict[str, Any]:
         """List selectable execution targets without exposing credential values."""
         selected = self.store.selected_execution_environment(owner_principal_id)
+        allowed_images = sorted(container_image_allowlist())
+        gate = self.control.get_capability_gate(
+            "container_execution_cap", owner_principal_id
+        )
+        gate_enabled = gate is not None and gate.state not in _DISABLED_STATES
+        default_image = allowed_images[0] if allowed_images else None
+        default_runtime_available = shutil.which("docker") is not None
+        default_reason = (
+            "container_gate_disabled"
+            if not gate_enabled
+            else (
+                "container_image_required:container_default"
+                if default_image is None
+                else (
+                    "container_runtime_unavailable:docker"
+                    if not default_runtime_available
+                    else None
+                )
+            )
+        )
         environments: list[dict[str, Any]] = [
             {
                 "profile_id": "local_native", "kind": "local", "name": "Local workspace",
@@ -1074,11 +1102,13 @@ class DashboardService:
             },
             {
                 "profile_id": "container_default", "kind": "container", "name": "Local container",
-                "enabled": True, "configured": bool(os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip()),
-                "available": bool(os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip()),
-                "status": "ready" if os.environ.get("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "").strip() else "configuration_required",
+                "enabled": True, "configured": default_image is not None,
+                "available": default_reason is None,
+                "status": "ready" if default_reason is None else "unavailable",
                 "selected": selected == "container_default", "credential_configured": True, "budget": None,
-                "cost": None,
+                "cost": None, "runtime": "docker", "image": default_image,
+                "repository_access": "read_only", "writable_output": True,
+                "assigned_tool_count": 1, "availability_reason": default_reason,
             },
         ]
         for row in self.store.list_remote_execution_profiles(owner_principal_id=owner_principal_id):
@@ -1087,6 +1117,63 @@ class DashboardService:
             except (TypeError, ValueError):
                 config = {}
             kind = "daytona" if row["profile_type"] == "cloud" else str(row["profile_type"])
+            if kind == "container":
+                raw_tools = config.get("tools", [])
+                tools = (
+                    tuple(str(tool) for tool in raw_tools if isinstance(tool, str))
+                    if isinstance(raw_tools, list)
+                    else ()
+                )
+                profile = ExecutionProfile(
+                    str(row["profile_id"]),
+                    "container",
+                    name=str(row["name"]),
+                    enabled=bool(row["enabled"]),
+                    runtime=cast(ContainerRuntime | None, config.get("runtime")),
+                    image=str(config.get("image") or "") or None,
+                    tools=tools,
+                    repository_access=cast(
+                        RepositoryAccess, config.get("repository_access", "none")
+                    ),
+                    writable_output=bool(config.get("writable_output", False)),
+                )
+                reason = validate_execution_profile(profile)
+                if reason is None and profile.image not in container_image_allowlist():
+                    reason = f"container_image_not_allowed:{profile.profile_id}"
+                if reason is None and not gate_enabled:
+                    reason = "container_gate_disabled"
+                if reason is None and profile.runtime and shutil.which(profile.runtime) is None:
+                    reason = f"container_runtime_unavailable:{profile.runtime}"
+                available = bool(profile.enabled and reason is None)
+                environments.append(
+                    {
+                        "profile_id": profile.profile_id,
+                        "kind": "container",
+                        "name": profile.name,
+                        "enabled": profile.enabled,
+                        "configured": validate_execution_profile(profile) is None,
+                        "available": available,
+                        "status": "ready" if available else "unavailable",
+                        "selected": selected == profile.profile_id,
+                        "credential_configured": True,
+                        "budget": None,
+                        "cost": None,
+                        "runtime": profile.runtime,
+                        "image": profile.image,
+                        "repository_access": profile.repository_access,
+                        "writable_output": profile.writable_output,
+                        "assigned_tool_count": len(profile.tools),
+                        "availability_reason": reason,
+                        "config": {
+                            "runtime": profile.runtime,
+                            "image": profile.image,
+                            "tools": list(profile.tools),
+                            "repository_access": profile.repository_access,
+                            "writable_output": profile.writable_output,
+                        },
+                    }
+                )
+                continue
             credential_env = str(config.get("credential_env") or config.get("api_key_env") or "")
             credential_configured = bool(credential_env and os.environ.get(credential_env, "").strip())
             configured = bool(config.get("host") and config.get("user") and credential_env) if kind == "ssh" else bool(config.get("sandbox_id") and credential_env)
@@ -1109,7 +1196,15 @@ class DashboardService:
         if not any(item["selected"] for item in environments):
             environments[0]["selected"] = True
             selected = "local_native"
-        return {"selected_profile_id": selected, "environments": environments}
+        return {
+            "selected_profile_id": selected,
+            "environments": environments,
+            "container_options": {
+                "runtimes": ["docker", "podman"],
+                "images": allowed_images,
+                "supported_tools": sorted(CONTAINER_PROFILE_TOOLS - {"shell"}),
+            },
+        }
 
     def configure_execution_environment(
         self,
@@ -1121,21 +1216,46 @@ class DashboardService:
         enabled: bool,
         owner_principal_id: str,
     ) -> ControlResult:
-        if kind not in {"ssh", "daytona"}:
+        if kind not in {"ssh", "daytona", "container"}:
             return ControlResult(ok=False, reason_code="unsupported_execution_environment")
         forbidden = {"password", "token", "api_key", "secret", "private_key"}
         if any(key.casefold() in forbidden for key in config):
             return ControlResult(ok=False, reason_code="execution_credentials_must_use_environment_reference")
+        if kind == "container":
+            raw_tools = config.get("tools")
+            tools = (
+                tuple(str(tool) for tool in raw_tools if isinstance(tool, str))
+                if isinstance(raw_tools, list)
+                else ()
+            )
+            profile = ExecutionProfile(
+                profile_id or "container_pending",
+                "container",
+                name=name.strip() or "Local container",
+                enabled=enabled,
+                runtime=cast(ContainerRuntime | None, config.get("runtime")),
+                image=str(config.get("image") or "") or None,
+                tools=tools,
+                repository_access=cast(
+                    RepositoryAccess, config.get("repository_access", "none")
+                ),
+                writable_output=bool(config.get("writable_output", False)),
+            )
+            reason = validate_execution_profile(profile)
+            if reason:
+                return ControlResult(ok=False, reason_code=reason)
+            if profile.image not in container_image_allowlist():
+                return ControlResult(ok=False, reason_code="container_image_not_allowed")
         env_key = "credential_env" if kind == "ssh" else "api_key_env"
         credential_env = str(config.get(env_key, "")).strip()
-        if credential_env and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env):
+        if kind != "container" and credential_env and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env):
             return ControlResult(ok=False, reason_code="invalid_execution_credential_reference")
         if kind == "ssh":
             host = str(config.get("host", "")).strip()
             user = str(config.get("user", "")).strip()
             if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", user):
                 return ControlResult(ok=False, reason_code="invalid_ssh_profile")
-        elif not str(config.get("sandbox_id", "")).strip():
+        elif kind == "daytona" and not str(config.get("sandbox_id", "")).strip():
             return ControlResult(ok=False, reason_code="daytona_sandbox_required")
         elif kind == "daytona":
             try:
@@ -1153,8 +1273,12 @@ class DashboardService:
         self.store.insert_remote_execution_profile(
             RemoteExecutionProfile(
                 actual_id,
-                "ssh" if kind == "ssh" else "cloud",
-                name.strip() or ("SSH host" if kind == "ssh" else "Daytona sandbox"),
+                "ssh" if kind == "ssh" else ("cloud" if kind == "daytona" else "container"),
+                name.strip() or (
+                    "SSH host" if kind == "ssh" else (
+                        "Daytona sandbox" if kind == "daytona" else "Local container"
+                    )
+                ),
                 json.dumps(config, sort_keys=True),
                 enabled,
                 owner_principal_id,

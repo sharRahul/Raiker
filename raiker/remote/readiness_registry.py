@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raiker.execution.profiles import execution_profiles_from_rows
 from raiker.readiness.registry import (
     get_readiness_by_id,
     render_readiness_records,
@@ -83,11 +84,33 @@ def remote_readiness_summary(*, workspace_root: str | Path = ".") -> dict[str, A
         count_key="remote_container_cloud_readiness_record_count",
         metadata_only_key="remote_container_cloud_readiness_contract_available",
     )
+    store = SQLiteStore(workspace_root)
+    accounts = store.list_accounts()
+    owner = str(accounts[0]["principal_id"]) if accounts else None
+    gate_enabled = False
+    profiles = []
+    if owner is not None:
+        from raiker.control.service import RuntimeControlService
+
+        gate = RuntimeControlService(workspace_root).get_capability_gate(
+            "container_execution_cap", owner
+        )
+        gate_enabled = gate is not None and gate.state not in {"disabled", "planned"}
+        profiles = execution_profiles_from_rows(
+            store.list_remote_execution_profiles(
+                enabled_only=True, owner_principal_id=owner
+            )
+        )
+    from raiker.remote.readiness import container_readiness
+
+    container = container_readiness(gate_enabled=gate_enabled, profiles=profiles)
     summary.update({
         "ready_for_remote_execution": False,
-        "ready_for_container_execution": False,
+        "ready_for_container_execution": container["ready_for_container_execution"],
         "ready_for_cloud_execution": False,
         **DISABLED_RUNTIME_FLAGS,
+        "container_execution_enabled": container["container_execution_enabled"],
+        "container_blockers": container["container_blockers"],
         "blocker_count": len(latest.blockers),
         "required_gate_count": len(latest.required_gates),
     })

@@ -4,7 +4,7 @@ import json
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
@@ -13,10 +13,9 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.execution.container_tools import ContainerToolExecutor
 from raiker.execution.profiles import (
-    ContainerRuntime,
     ExecutionProfile,
     ProfileResolution,
-    RepositoryAccess,
+    execution_profiles_from_rows,
     list_execution_profiles,
     resolve_tool_profile,
 )
@@ -469,34 +468,7 @@ class ToolBroker:
             enabled_only=True,
             owner_principal_id=self.owner_scope or self.principal_id,
         )
-        for row in rows:
-            if str(row.get("profile_type")) != "container":
-                continue
-            try:
-                config = json.loads(str(row.get("config_json") or "{}"))
-            except (TypeError, ValueError):
-                config = {}
-            raw_tools = config.get("tools", [])
-            tools = (
-                tuple(str(tool) for tool in raw_tools if isinstance(tool, str))
-                if isinstance(raw_tools, list)
-                else ()
-            )
-            profiles.append(
-                ExecutionProfile(
-                    profile_id=str(row.get("profile_id") or ""),
-                    kind="container",
-                    name=str(row.get("name") or ""),
-                    enabled=bool(row.get("enabled")),
-                    runtime=cast(ContainerRuntime | None, config.get("runtime")),
-                    image=str(config.get("image") or "") or None,
-                    tools=tools,
-                    repository_access=cast(
-                        RepositoryAccess, config.get("repository_access", "none")
-                    ),
-                    writable_output=bool(config.get("writable_output", False)),
-                )
-            )
+        profiles.extend(execution_profiles_from_rows(rows))
         return profiles
 
     def _execution_profile(self, tool_name: str) -> ProfileResolution:

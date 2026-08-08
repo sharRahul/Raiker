@@ -6,9 +6,11 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.commands import handle_slash_command
+from raiker.execution.profiles import ExecutionProfile
 from raiker.remote.readiness import (
     DISABLED_RUNTIME_FLAGS,
     RemoteContainerCloudReadinessContract,
+    container_readiness,
     create_remote_container_cloud_readiness_contract,
 )
 from raiker.remote.readiness_registry import (
@@ -41,6 +43,51 @@ def test_disabled_runtime_flags_all_false() -> None:
     for flag, expected in DISABLED_RUNTIME_FLAGS.items():
         assert expected is False
         assert data[flag] is False
+
+
+def test_container_readiness_true_only_for_complete_available_profile() -> None:
+    profile = ExecutionProfile(
+        "container-review",
+        "container",
+        runtime="docker",
+        image="raiker-tools:approved",
+        tools=("grep",),
+        repository_access="read_only",
+        writable_output=True,
+    )
+
+    summary = container_readiness(
+        gate_enabled=True,
+        profiles=[profile],
+        image_allowlist=frozenset({"raiker-tools:approved"}),
+        executable_available=lambda name: name == "docker",
+    )
+
+    assert summary == {
+        "ready_for_container_execution": True,
+        "container_execution_enabled": True,
+        "container_blockers": [],
+    }
+
+
+def test_container_readiness_names_missing_runtime_without_enabling() -> None:
+    profile = ExecutionProfile(
+        "container-review",
+        "container",
+        runtime="podman",
+        image="raiker-tools:approved",
+        tools=("grep",),
+    )
+
+    summary = container_readiness(
+        gate_enabled=True,
+        profiles=[profile],
+        image_allowlist=frozenset({"raiker-tools:approved"}),
+        executable_available=lambda _name: False,
+    )
+
+    assert summary["container_execution_enabled"] is False
+    assert summary["container_blockers"] == ["container_runtime_unavailable:podman"]
 
 
 def test_blockers_required_and_non_empty() -> None:

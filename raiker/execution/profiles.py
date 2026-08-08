@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal, cast
 
 ExecutionKind = Literal["local", "container", "ssh", "daytona"]
 ContainerRuntime = Literal["docker", "podman"]
@@ -43,6 +45,41 @@ DEFAULT_EXECUTION_PROFILES = (
 
 def list_execution_profiles() -> list[ExecutionProfile]:
     return list(DEFAULT_EXECUTION_PROFILES)
+
+
+def execution_profiles_from_rows(
+    rows: Sequence[Mapping[str, Any]],
+) -> list[ExecutionProfile]:
+    profiles: list[ExecutionProfile] = []
+    for row in rows:
+        if str(row.get("profile_type")) != "container":
+            continue
+        try:
+            config = json.loads(str(row.get("config_json") or "{}"))
+        except (TypeError, ValueError):
+            config = {}
+        raw_tools = config.get("tools", [])
+        tools = (
+            tuple(str(tool) for tool in raw_tools if isinstance(tool, str))
+            if isinstance(raw_tools, list)
+            else ()
+        )
+        profiles.append(
+            ExecutionProfile(
+                profile_id=str(row.get("profile_id") or ""),
+                kind="container",
+                name=str(row.get("name") or ""),
+                enabled=bool(row.get("enabled")),
+                runtime=cast(ContainerRuntime | None, config.get("runtime")),
+                image=str(config.get("image") or "") or None,
+                tools=tools,
+                repository_access=cast(
+                    RepositoryAccess, config.get("repository_access", "none")
+                ),
+                writable_output=bool(config.get("writable_output", False)),
+            )
+        )
+    return profiles
 
 
 def validate_execution_profile(profile: ExecutionProfile) -> str | None:

@@ -62,6 +62,79 @@ def test_execution_environment_api_configures_and_selects_ssh(
     assert client.get("/api/execution-environments", headers=headers).json()["selected_profile_id"] == profile_id
 
 
+def test_execution_environment_api_configures_container_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _workspace(tmp_path)
+    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
+    monkeypatch.setattr("raiker.control.dashboard.shutil.which", lambda name: f"/bin/{name}")
+    client = TestClient(create_app(workspace))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    saved = client.put(
+        "/api/execution-environments/configure",
+        headers=headers,
+        json={
+            "kind": "container",
+            "name": "Repository review",
+            "enabled": True,
+            "config": {
+                "runtime": "podman",
+                "image": "raiker-tools:approved",
+                "tools": ["grep", "read_file"],
+                "repository_access": "read_only",
+                "writable_output": True,
+            },
+        },
+    )
+
+    assert saved.status_code == 200, saved.text
+    view = client.get("/api/execution-environments", headers=headers).json()
+    profile = next(
+        item for item in view["environments"] if item["profile_id"] == saved.json()["profile_id"]
+    )
+    assert profile["runtime"] == "podman"
+    assert profile["image"] == "raiker-tools:approved"
+    assert profile["assigned_tool_count"] == 2
+    assert profile["repository_access"] == "read_only"
+    assert profile["writable_output"] is True
+    assert view["container_options"] == {
+        "runtimes": ["docker", "podman"],
+        "images": ["raiker-tools:approved"],
+        "supported_tools": ["glob", "grep", "list_directory", "read_file", "stat_path"],
+    }
+
+
+def test_execution_environment_api_rejects_non_allowlisted_container_image(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _workspace(tmp_path)
+    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "raiker-tools:approved")
+    client = TestClient(create_app(workspace))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+
+    response = client.put(
+        "/api/execution-environments/configure",
+        headers={"Authorization": f"Bearer {token}"},
+        json={
+            "kind": "container",
+            "name": "Unapproved",
+            "enabled": True,
+            "config": {
+                "runtime": "docker",
+                "image": "attacker/latest",
+                "tools": ["grep"],
+                "repository_access": "read_only",
+                "writable_output": True,
+            },
+        },
+    )
+
+    assert response.status_code == 422
+    assert response.json()["detail"]["reason_code"] == "container_image_not_allowed"
+
+
 def test_remote_and_daytona_executors_are_real_bounded_adapters(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import shutil
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.execution.profiles import ExecutionProfile, validate_execution_profile
 from raiker.readiness.contracts import (
     canonical_json,
     deterministic_dict,
@@ -11,6 +14,7 @@ from raiker.readiness.contracts import (
     validate_json_safe_metadata,
     validate_non_empty_strings,
 )
+from raiker.runtime.executors.containers import container_image_allowlist
 
 REMOTE_CONTAINER_CLOUD_DISABLED_REASON = (
     "phase3_slice_p_metadata_only_remote_container_cloud_not_enabled"
@@ -62,6 +66,58 @@ DISABLED_RUNTIME_FLAGS = {
     "network_execution_enabled": False,
     "runtime_execution_enabled": False,
 }
+
+
+def container_readiness(
+    *,
+    gate_enabled: bool,
+    profiles: Sequence[ExecutionProfile],
+    image_allowlist: frozenset[str] | None = None,
+    executable_available: Callable[[str], bool] | None = None,
+    bridge_available: bool = True,
+) -> dict[str, Any]:
+    if not gate_enabled:
+        return {
+            "ready_for_container_execution": False,
+            "container_execution_enabled": False,
+            "container_blockers": ["container_gate_disabled"],
+        }
+    candidates = [profile for profile in profiles if profile.enabled and profile.kind == "container"]
+    if not candidates:
+        return {
+            "ready_for_container_execution": False,
+            "container_execution_enabled": False,
+            "container_blockers": ["container_profile_missing"],
+        }
+    allowed = image_allowlist if image_allowlist is not None else container_image_allowlist()
+    executable = executable_available or (lambda name: shutil.which(name) is not None)
+    blockers: list[str] = []
+    for profile in candidates:
+        reason = validate_execution_profile(profile)
+        if reason:
+            blockers.append(reason)
+            continue
+        assert profile.runtime is not None
+        assert profile.image is not None
+        if profile.image not in allowed:
+            blockers.append(f"container_image_not_allowed:{profile.profile_id}")
+            continue
+        if not executable(profile.runtime):
+            blockers.append(f"container_runtime_unavailable:{profile.runtime}")
+            continue
+        if not bridge_available:
+            blockers.append(f"container_tool_bridge_unavailable:{profile.profile_id}")
+            continue
+        return {
+            "ready_for_container_execution": True,
+            "container_execution_enabled": True,
+            "container_blockers": [],
+        }
+    return {
+        "ready_for_container_execution": False,
+        "container_execution_enabled": False,
+        "container_blockers": sorted(set(blockers)),
+    }
 
 
 @dataclass(frozen=True)

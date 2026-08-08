@@ -35,6 +35,21 @@ DISABLED_EXECUTION_FLAGS: dict[str, bool] = {
 }
 
 
+def _execution_flags(workspace_id: str) -> dict[str, bool]:
+    flags = DISABLED_EXECUTION_FLAGS.copy()
+    try:
+        from raiker.remote.readiness_registry import remote_readiness_summary
+
+        flags["container_execution_enabled"] = bool(
+            remote_readiness_summary(workspace_root=workspace_id).get(
+                "container_execution_enabled", False
+            )
+        )
+    except (OSError, ValueError):
+        flags["container_execution_enabled"] = False
+    return flags
+
+
 def _safe_ids(values: Sequence[str] | None, field_name: str) -> list[str]:
     ids = sorted({str(value) for value in values or [] if str(value)})
     if values is not None and len(ids) != len([value for value in values if str(value)]):
@@ -114,6 +129,7 @@ def create_evidence_bundle(
     counts = {str(k): int(v) for k, v in sorted((record_counts or {}).items())}
     statuses = {str(k): int(v) for k, v in sorted((status_counts or {}).items())}
     summary = json_safe_metadata(dict(redacted_summary or {}))
+    execution_flags = _execution_flags(workspace_id)
     identity = {
         "workspace_id": workspace_id,
         "source_lifecycle_ids": lifecycle_ids,
@@ -122,7 +138,7 @@ def create_evidence_bundle(
         "source_approval_handoff_ids": handoff_ids,
         "record_counts": counts,
         "status_counts": statuses,
-        "disabled_execution_flags": DISABLED_EXECUTION_FLAGS,
+        "disabled_execution_flags": execution_flags,
         "redacted_summary": summary,
         "metadata_only": True,
         "export_only": True,
@@ -139,7 +155,7 @@ def create_evidence_bundle(
         source_approval_handoff_ids=handoff_ids,
         record_counts=counts,
         status_counts=statuses,
-        disabled_execution_flags=DISABLED_EXECUTION_FLAGS.copy(),
+        disabled_execution_flags=execution_flags,
         redacted_summary=summary,
         metadata_only=True,
         export_only=True,

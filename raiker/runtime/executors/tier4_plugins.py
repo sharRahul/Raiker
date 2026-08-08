@@ -238,7 +238,23 @@ class PluginExecutionCapExecutor:
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         from raiker.policy.config import StaticPolicyConfig
         from raiker.policy.engine import PolicyEngine
+        from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
         from raiker.tools.broker import ToolBroker
+
+        owner_principal_id = (
+            self._store.account_scope(principal.principal_id) or principal.principal_id
+        )
+        session_id = action.session_id or "plugin_execution"
+        turn_id = action.turn_id or new_id("turn_plugin_")
+        identity = TurnMachineIdentityLifecycle(
+            self._workspace_root, self._store
+        ).start(
+            owner_principal_id=owner_principal_id,
+            session_id=session_id,
+            turn_id=turn_id,
+            role_ids=("plugin",),
+            parent_principal_id=principal.principal_id,
+        )
 
         plugin_id = action.arguments.get("plugin_id")
         tool_name = action.arguments.get("tool_name")
@@ -303,11 +319,13 @@ class PluginExecutionCapExecutor:
             policy_engine=PolicyEngine(StaticPolicyConfig(self._workspace_root), store=self._store),
             store=self._store,
             writer=None,
+            principal_id=owner_principal_id,
         )
         tool_result, decision = broker.execute(
             tool_action,
-            session_id=action.session_id or "plugin_execution",
-            turn_id=action.turn_id,
+            session_id=session_id,
+            turn_id=turn_id,
+            machine_identity=identity,
         )
         execution_status = (
             "succeeded"

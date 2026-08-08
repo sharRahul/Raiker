@@ -119,7 +119,7 @@ def test_provider_failure_emits_failed_event_without_prompt(tmp_path: Path) -> N
 
 def test_gateway_async_and_sync_loop_policy(tmp_path: Path) -> None:
     gateway = AgentGateway(tmp_path)
-    gateway.runtime.ahandle = lambda envelope: asyncio.sleep(  # type: ignore[method-assign]
+    gateway.runtime.ahandle = lambda envelope, identity=None: asyncio.sleep(  # type: ignore[method-assign]
         0,
         result=AgentResponse(
             envelope.request_id,

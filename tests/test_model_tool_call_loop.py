@@ -4,6 +4,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
     DEFAULT_MAX_TOOL_CALLS,
@@ -17,6 +18,7 @@ from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ModelMessage, ModelResponse, ToolCallProposal, ToolSpec
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
@@ -53,6 +55,7 @@ class FakeRouter:
 
 
 def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
     store = SQLiteStore(tmp_path)
     writer = EventLogWriter(store)
     broker = ToolBroker(
@@ -60,6 +63,7 @@ def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
         policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
         store=store,
         writer=writer,
+        principal_id="principal_owner",
     )
     return RuntimeOrchestrator(
         workspace_root=tmp_path,
@@ -67,6 +71,22 @@ def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
         tool_broker=broker,
         model_router=router,  # type: ignore[arg-type]
     )
+
+
+def _handle(
+    orchestrator: RuntimeOrchestrator, envelope: PromptEnvelope
+):  # type: ignore[no-untyped-def]
+    identity = TurnMachineIdentityLifecycle(
+        orchestrator.workspace_root,
+        orchestrator.tool_broker.store,
+        orchestrator.writer,
+    ).start(
+        owner_principal_id="principal_owner",
+        session_id=envelope.session_id,
+        turn_id=envelope.turn_id,
+        role_ids=("assistant",),
+    )
+    return orchestrator.handle(envelope, identity=identity)
 
 
 def _envelope(
@@ -119,7 +139,7 @@ def test_model_drives_a_tool_call_then_responds(tmp_path: Path) -> None:
     )
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("list files in this project")
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
     assert response.status == "completed"
     assert response.message == "Here are the files."
     events = _events(orchestrator, envelope.session_id)
@@ -148,7 +168,7 @@ def test_model_executes_every_parallel_read_and_returns_every_result(tmp_path: P
         ModelResponse(text="Compared both files.", finish_reason="stop"),
     ])
     orchestrator = _orchestrator(tmp_path, router)
-    response = orchestrator.handle(_envelope("compare a and b"))
+    response = _handle(orchestrator, _envelope("compare a and b"))
     assert response.message == "Compared both files."
     follow_up = router.seen_messages[1]
     assistant = next(message for message in follow_up if message.role == "assistant" and message.tool_calls)
@@ -169,7 +189,7 @@ def test_unknown_tool_call_is_rejected(tmp_path: Path) -> None:
     )
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("do something")
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
     events = _events(orchestrator, envelope.session_id)
     assert "model_tool_call_rejected" in events
     assert "tool_started" not in events
@@ -190,7 +210,7 @@ def test_tool_call_budget_is_enforced(tmp_path: Path) -> None:
     )
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("loop", max_tool_calls=2)
-    orchestrator.handle(envelope)
+    _handle(orchestrator, envelope)
     events = _events(orchestrator, envelope.session_id)
     assert events.count("tool_completed") == 2
 
@@ -208,7 +228,7 @@ def test_tool_round_trip_carries_assistant_tool_call_message(tmp_path: Path) -> 
         ]
     )
     orchestrator = _orchestrator(tmp_path, router)
-    orchestrator.handle(_envelope("list files"))
+    _handle(orchestrator, _envelope("list files"))
     assert len(router.seen_messages) == 2
     follow_up = router.seen_messages[1]
     assistant = [m for m in follow_up if m.role == "assistant" and m.tool_calls]
@@ -257,7 +277,7 @@ def test_model_proposed_shell_requires_approval(tmp_path: Path) -> None:
     )
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("run the tests")
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
     events = _events(orchestrator, envelope.session_id)
     assert response.status == "needs_approval"
     assert "approval_requested" in events
@@ -274,7 +294,7 @@ def test_auto_approval_executes_an_ordinary_file_write_with_preview_evidence(tmp
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("write the report", approval_mode="auto")
 
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
 
     assert response.status == "completed"
     assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
@@ -295,7 +315,7 @@ def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path:
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("write the report", approval_mode="skip")
 
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
 
     assert response.status == "completed"
     assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
@@ -318,7 +338,7 @@ def test_outside_workspace_read_is_denied_even_when_approvals_are_skipped(tmp_pa
     )
     orchestrator = _orchestrator(tmp_path, router)
     envelope = _envelope("read outside", approval_mode="skip")
-    response = orchestrator.handle(envelope)
+    response = _handle(orchestrator, envelope)
     events = _events(orchestrator, envelope.session_id)
     assert response.status == "denied"
     assert "policy_decision" in events

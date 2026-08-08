@@ -12,14 +12,19 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
+    ToolAction,
     UserMetadata,
 )
+from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.engine import PolicyEngine
 from raiker.runtime.identity.lifecycle import (
     TrustedTurnIdentity,
     TurnMachineIdentityLifecycle,
 )
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.broker import ToolBroker, ToolExecutionContext
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -130,3 +135,119 @@ def test_child_identity_records_parent_without_widening_roles(tmp_path: Path) ->
     assert row is not None
     assert row["parent_principal_id"] == parent.claims.principal_id
     assert child.claims.role_ids == ("assistant",)
+
+
+def _broker(workspace: Path) -> ToolBroker:
+    store = SQLiteStore(workspace)
+    return ToolBroker(
+        workspace_root=workspace,
+        policy_engine=PolicyEngine(StaticPolicyConfig(workspace)),
+        store=store,
+        writer=EventLogWriter(store),
+        principal_id="principal_owner",
+    )
+
+
+def test_broker_refuses_missing_identity_before_action_policy_hooks_or_tools(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _workspace(tmp_path)
+    broker = _broker(workspace)
+    broker.executors["list_directory"] = lambda _args: pytest.fail("tool executed")
+    monkeypatch.setattr(
+        broker.policy_engine,
+        "review",
+        lambda _action: pytest.fail("policy reviewed an unauthenticated action"),
+    )
+    action = ToolAction(
+        new_id("act_"), "list_directory", {"path": "."}, "medium", False
+    )
+
+    result, decision = broker.execute(
+        action, session_id="sess_1", turn_id="turn_1", machine_identity=None
+    )
+
+    assert result.status == "denied"
+    assert result.error == {"type": "machine_identity_missing"}
+    assert decision.reasons == ["machine_identity_missing"]
+    events = SQLiteStore(workspace).list_event_index(session_id="sess_1", limit=100)
+    assert "action_proposed" not in {event["event_type"] for event in events}
+    assert "machine_identity_refused" in {event["event_type"] for event in events}
+
+
+def test_broker_binds_verified_actor_and_keeps_owner_as_resource_scope(
+    tmp_path: Path,
+) -> None:
+    workspace = _workspace(tmp_path)
+    broker = _broker(workspace)
+    identity = TurnMachineIdentityLifecycle(workspace).start(
+        owner_principal_id="principal_owner",
+        session_id="sess_1",
+        turn_id="turn_1",
+        role_ids=("assistant",),
+    )
+    captured: list[ToolExecutionContext] = []
+
+    def execute_with_context(
+        _arguments: dict[str, object], context: ToolExecutionContext
+    ) -> dict[str, object]:
+        captured.append(context)
+        return {"status": "success"}
+
+    broker.context_executors["list_directory"] = execute_with_context
+    action = ToolAction(
+        new_id("act_"),
+        "list_directory",
+        {"path": ".", "principal_id": "principal_attacker"},
+        "medium",
+        False,
+        proposed_by="principal_attacker",
+    )
+
+    result, _decision = broker.execute(
+        action,
+        session_id="sess_1",
+        turn_id="turn_1",
+        machine_identity=identity,
+    )
+
+    assert result.status == "success"
+    assert captured == [
+        ToolExecutionContext(
+            session_id="sess_1",
+            turn_id="turn_1",
+            acting_principal_id=identity.claims.principal_id,
+            owner_principal_id="principal_owner",
+            verified_identity=identity,
+        )
+    ]
+    with SQLiteStore(workspace).connect() as connection:
+        stored = connection.execute(
+            "SELECT proposed_by FROM tool_actions WHERE action_id = ?",
+            (action.action_id,),
+        ).fetchone()
+    assert stored is not None and stored["proposed_by"] == identity.claims.principal_id
+
+
+def test_broker_rejects_identity_bound_to_another_turn(tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    broker = _broker(workspace)
+    identity = TurnMachineIdentityLifecycle(workspace).start(
+        owner_principal_id="principal_owner",
+        session_id="sess_1",
+        turn_id="turn_other",
+        role_ids=("assistant",),
+    )
+    action = ToolAction(
+        new_id("act_"), "list_directory", {"path": "."}, "medium", False
+    )
+
+    result, decision = broker.execute(
+        action,
+        session_id="sess_1",
+        turn_id="turn_1",
+        machine_identity=identity,
+    )
+
+    assert result.error == {"type": "machine_identity_turn_mismatch"}
+    assert decision.reasons == ["machine_identity_turn_mismatch"]

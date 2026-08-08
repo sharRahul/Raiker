@@ -23,6 +23,12 @@ from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.contracts import (
+    IDENTITY_AUDIENCE,
+    MachineIdentityError,
+)
+from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
+from raiker.runtime.identity.verifier import MachineIdentityVerifier
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
 from raiker.tools.codemap_tools import code_map_search
@@ -72,8 +78,10 @@ class ToolExecutionContext:
     """Trusted turn identity supplied by the broker, never by a model tool call."""
 
     session_id: str
-    principal_id: str
     turn_id: str
+    acting_principal_id: str
+    owner_principal_id: str
+    verified_identity: TrustedTurnIdentity
 
 # Tools whose arguments/results are scrubbed to metadata before entering event
 # payloads or the stored tool-action record. The advisor question/answer flow
@@ -314,7 +322,7 @@ class ToolBroker:
 
         if self.store is None:
             return {"status": "failed", "error": {"type": "plan_store_unavailable"}}
-        owner = self.owner_scope or context.principal_id
+        owner = context.owner_principal_id
         try:
             steps = normalize_steps(args.get("steps"))
         except PlanValidationError as exc:
@@ -345,7 +353,9 @@ class ToolBroker:
             self.workspace_root,
             args,
             store=self.store,
-            principal_id=context.principal_id,
+            principal_id=context.acting_principal_id,
+            owner_principal_id=context.owner_principal_id,
+            parent_identity=context.verified_identity,
             session_id=context.session_id,
             turn_id=context.turn_id,
         )
@@ -365,7 +375,7 @@ class ToolBroker:
         if self.store is None:
             return {"status": "denied", "error": {"type": "command_grant_required"}}
         grant = self.store.load_session_command_grant(
-            session_id=context.session_id, principal_id=context.principal_id
+            session_id=context.session_id, principal_id=context.owner_principal_id
         )
         if grant is None:
             return {
@@ -410,7 +420,7 @@ class ToolBroker:
             self.workspace_root, self.store,
             path=str(args.get("path", "")), text=str(args.get("text", "")),
             session_id=context.session_id, turn_id=context.turn_id,
-            principal_id=context.principal_id,
+            principal_id=context.owner_principal_id,
         )
 
     def _mcp_call(self, action: ToolAction) -> dict[str, Any]:
@@ -445,8 +455,8 @@ class ToolBroker:
             task = service.create_task(
                 title=title,
                 objective=objective,
-                user_id=self.store.principal_user_id(context.principal_id) if self.store else None,
-                principal_id=context.principal_id,
+                user_id=self.store.principal_user_id(context.owner_principal_id) if self.store else None,
+                principal_id=context.acting_principal_id,
                 scheduled_at=str(args["scheduled_at"]) if args.get("scheduled_at") else None,
                 reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
                 recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
@@ -481,11 +491,13 @@ class ToolBroker:
         if not project_id:
             return {"status": "failed", "error": {"type": "project_id_required"}}
         service = DashboardService(self.workspace_root)
-        result = service.set_session_project(context.session_id, project_id, context.principal_id)
+        result = service.set_session_project(
+            context.session_id, project_id, context.owner_principal_id
+        )
         if not result.ok:
             return {"status": "failed", "error": {"type": result.reason_code}}
         project = self.store.load_project(
-            project_id, user_id=self.store.principal_user_id(context.principal_id)
+            project_id, user_id=self.store.principal_user_id(context.owner_principal_id)
         ) if self.store else None
         return {
             "status": "success",
@@ -1043,15 +1055,97 @@ class ToolBroker:
         )
         return result, executed_decision
 
+    def _identity_refusal(
+        self,
+        action: ToolAction,
+        *,
+        reason_code: str,
+        session_id: str,
+        turn_id: str | None,
+        client: ClientMetadata | None,
+        now: str,
+    ) -> tuple[ToolResult, PolicyDecision]:
+        decision = PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="deny",
+            reasons=[reason_code],
+            requires_user_approval=False,
+            risk_level=action.risk_level,
+            timestamp=now,
+        )
+        result = ToolResult(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            status="denied",
+            output=None,
+            error={"type": reason_code},
+            started_at=now,
+            completed_at=utc_now(),
+        )
+        self._event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type="machine_identity_refused",
+            actor="tool_broker",
+            payload={
+                "action_id": action.action_id,
+                "tool_name": action.tool_name,
+                "reason_code": reason_code,
+            },
+            client=client,
+        )
+        return result, decision
+
     def execute(
         self,
         action: ToolAction,
         *,
         session_id: str,
         turn_id: str | None,
+        machine_identity: TrustedTurnIdentity | None = None,
         client: ClientMetadata | None = None,
         approval_mode: str = "manual",
     ) -> tuple[ToolResult, PolicyDecision]:
+        now = utc_now()
+        if machine_identity is None:
+            return self._identity_refusal(
+                action,
+                reason_code="machine_identity_missing",
+                session_id=session_id,
+                turn_id=turn_id,
+                client=client,
+                now=now,
+            )
+        identity_store = self.store or SQLiteStore(self.workspace_root)
+        expected_owner = self.owner_scope or self.principal_id
+        try:
+            verified = MachineIdentityVerifier(
+                self.workspace_root, identity_store
+            ).verify(
+                machine_identity.token,
+                expected_owner_principal_id=expected_owner,
+                expected_session_id=session_id,
+                expected_turn_id=turn_id or "",
+                expected_audience=IDENTITY_AUDIENCE,
+            )
+        except MachineIdentityError as exc:
+            return self._identity_refusal(
+                action,
+                reason_code=exc.reason_code,
+                session_id=session_id,
+                turn_id=turn_id,
+                client=client,
+                now=now,
+            )
+        action = ToolAction(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            arguments=action.arguments,
+            risk_level=action.risk_level,
+            requires_approval=action.requires_approval,
+            proposed_by=verified.claims.principal_id,
+        )
         sanitized_action = ToolAction(
             action_id=action.action_id,
             tool_name=action.tool_name,
@@ -1069,7 +1163,15 @@ class ToolBroker:
             client=client,
         )
         if self.store is not None:
-            self.store.insert_tool_action(sanitized_action, session_id, turn_id, "proposed")
+            self.store.insert_tool_action(
+                sanitized_action,
+                session_id,
+                turn_id,
+                "proposed",
+                owner_principal_id=verified.claims.owner_principal_id,
+                machine_subject=verified.claims.subject,
+                machine_token_id=verified.claims.token_id,
+            )
         self._event(
             session_id=session_id,
             turn_id=turn_id,
@@ -1105,7 +1207,6 @@ class ToolBroker:
         )
         if self.store is not None:
             self.store.insert_policy_decision(decision)
-        now = utc_now()
         if decision.decision == "deny":
             if self.store is not None:
                 self.store.insert_tool_action(sanitized_action, session_id, turn_id, "denied")
@@ -1314,7 +1415,7 @@ class ToolBroker:
                     session_id=session_id,
                     turn_id=turn_id,
                     client=client,
-                    owner_principal_id=self.owner_scope,
+                    owner_principal_id=verified.claims.owner_principal_id,
                 )
             elif action.tool_name == "memory_forget":
                 raw = self.memory_service.forget_from_action(
@@ -1323,7 +1424,7 @@ class ToolBroker:
                     session_id=session_id,
                     turn_id=turn_id,
                     client=client,
-                    owner_principal_id=self.owner_scope,
+                    owner_principal_id=verified.claims.owner_principal_id,
                 )
             else:
                 failed = ToolResult(
@@ -1350,8 +1451,11 @@ class ToolBroker:
                     raw = context_executor(
                         action.arguments,
                         ToolExecutionContext(
-                            session_id=session_id, principal_id=self.principal_id,
+                            session_id=session_id,
                             turn_id=turn_id or "",
+                            acting_principal_id=verified.claims.principal_id,
+                            owner_principal_id=verified.claims.owner_principal_id,
+                            verified_identity=machine_identity,
                         ),
                     )
                 else:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.types import make_event
@@ -9,7 +11,6 @@ from raiker.events.writer import EventLogWriter
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 
 def test_event_writer_appends_and_indexes(tmp_path) -> None:  # type: ignore[no-untyped-def]

@@ -1349,6 +1349,7 @@ class RuntimeOrchestrator:
                 action,
                 session_id=envelope.session_id,
                 turn_id=envelope.turn_id,
+                machine_identity=identity,
                 client=envelope.client,
                 approval_mode=envelope.options.approval_mode,
             )
@@ -1547,11 +1548,13 @@ class RuntimeOrchestrator:
                     return await asyncio.to_thread(
                         self.tool_broker.execute, action,
                         session_id=envelope.session_id, turn_id=envelope.turn_id,
+                        machine_identity=identity,
                         client=envelope.client,
                         approval_mode=envelope.options.approval_mode,
                     )
                 return self.tool_broker.execute(
                     action, session_id=envelope.session_id, turn_id=envelope.turn_id,
+                    machine_identity=identity,
                     client=envelope.client,
                     approval_mode=envelope.options.approval_mode,
                 )
@@ -1821,11 +1824,16 @@ class RuntimeOrchestrator:
             ),
         )
 
-    def handle(self, envelope: PromptEnvelope) -> AgentResponse:
+    def handle(
+        self,
+        envelope: PromptEnvelope,
+        *,
+        identity: TrustedTurnIdentity | None = None,
+    ) -> AgentResponse:
         import asyncio
 
         try:
             asyncio.get_running_loop()
         except RuntimeError:
-            return asyncio.run(self.ahandle(envelope))
+            return asyncio.run(self.ahandle(envelope, identity=identity))
         raise RuntimeError("handle cannot be called from a running event loop; use ahandle")

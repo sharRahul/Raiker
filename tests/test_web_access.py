@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
@@ -44,7 +45,6 @@ from raiker.runtime.web_access import (
     html_to_text,
 )
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 _CAP = "web_fetch"
 _PAGE = (

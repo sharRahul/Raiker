@@ -46,6 +46,7 @@ from raiker.agents.orchestration import (
 )
 
 if TYPE_CHECKING:
+    from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
     from raiker.storage.sqlite import SQLiteStore
 
 # What a model-spawned subagent may call. It is `DELEGABLE_TOOLS` minus nothing
@@ -120,6 +121,8 @@ def spawn_subagent(
     *,
     store: SQLiteStore,
     principal_id: str,
+    owner_principal_id: str,
+    parent_identity: TrustedTurnIdentity,
     session_id: str,
     turn_id: str,
 ) -> dict[str, Any]:
@@ -157,6 +160,8 @@ def spawn_subagent(
     outcome = SubagentRunner(workspace_root, store).run(
         spec,
         principal_id=principal_id,
+        owner_principal_id=owner_principal_id,
+        parent_identity=parent_identity,
         session_id=session_id,
         turn_id=turn_id or None,
         result_sink=lambda tool_name, output: collected.append((tool_name, output)),

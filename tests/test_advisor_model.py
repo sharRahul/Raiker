@@ -24,6 +24,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
@@ -45,7 +46,6 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.models_runtime import AdvisorModelRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 
 @pytest.fixture

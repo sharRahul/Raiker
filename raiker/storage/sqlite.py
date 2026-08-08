@@ -97,6 +97,8 @@ from raiker.storage.migrations import (
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
+    MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
+    MACHINE_ACTION_ATTRIBUTION_SQL,
     MACHINE_IDENTITIES_MIGRATION_ID,
     MACHINE_IDENTITIES_SQL,
     MCP_CONTAINMENT_MIGRATION_ID,
@@ -911,6 +913,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
             self._apply_migration(
                 MACHINE_IDENTITIES_MIGRATION_ID, MACHINE_IDENTITIES_SQL, connection
+            )
+            self._apply_migration(
+                MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
+                MACHINE_ACTION_ATTRIBUTION_SQL,
+                connection,
             )
             self._rebuild_memory_fts(connection)
             for _alter_sql in (
@@ -3357,14 +3364,29 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
     def insert_tool_action(
-        self, action: ToolAction, session_id: str, turn_id: str | None, status: str
+        self,
+        action: ToolAction,
+        session_id: str,
+        turn_id: str | None,
+        status: str,
+        *,
+        owner_principal_id: str | None = None,
+        machine_subject: str | None = None,
+        machine_token_id: str | None = None,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
-                INSERT OR REPLACE INTO tool_actions
-                (action_id, session_id, turn_id, task_id, tool_name, arguments_json, risk_level, status, proposed_at, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, COALESCE((SELECT proposed_at FROM tool_actions WHERE action_id = ?), ?), ?)
+                  INSERT OR REPLACE INTO tool_actions
+                  (action_id, session_id, turn_id, task_id, tool_name, arguments_json,
+                   risk_level, status, proposed_at, completed_at, proposed_by,
+                   owner_principal_id, machine_subject, machine_token_id)
+                  VALUES (?, ?, ?, ?, ?, ?, ?, ?,
+                          COALESCE((SELECT proposed_at FROM tool_actions WHERE action_id = ?), ?),
+                          ?, ?,
+                          COALESCE(?, (SELECT owner_principal_id FROM tool_actions WHERE action_id = ?)),
+                          COALESCE(?, (SELECT machine_subject FROM tool_actions WHERE action_id = ?)),
+                          COALESCE(?, (SELECT machine_token_id FROM tool_actions WHERE action_id = ?)))
                 """,
                 (
                     action.action_id,
@@ -3378,9 +3400,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     action.action_id,
                     utc_now(),
                     utc_now()
-                    if status in {"success", "failed", "denied", "approval_required"}
-                    else None,
-                ),
+                      if status in {"success", "failed", "denied", "approval_required"}
+                      else None,
+                      action.proposed_by,
+                      owner_principal_id,
+                      action.action_id,
+                      machine_subject,
+                      action.action_id,
+                      machine_token_id,
+                      action.action_id,
+                  ),
             )
 
     def load_tool_action(self, action_id: str) -> dict[str, Any] | None:

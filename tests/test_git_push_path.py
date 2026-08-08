@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL, executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
@@ -48,7 +49,6 @@ from raiker.runtime.executors import (
 from raiker.runtime.executors.tier1_git import GitPushExecutor
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools import git as git_tools
-from raiker.tools.broker import ToolBroker
 from raiker.tools.git import (
     proposed_push_snapshot,
     push_branch,

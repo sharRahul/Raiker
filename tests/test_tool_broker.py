@@ -3,7 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
+from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.writer import EventLogWriter
@@ -18,16 +20,17 @@ from raiker.models.tool_call_validation import (
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 
 def _broker(tmp_path):  # type: ignore[no-untyped-def]
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
     store = SQLiteStore(tmp_path)
     return ToolBroker(
         workspace_root=tmp_path,
         policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
         store=store,
         writer=EventLogWriter(store),
+        principal_id="principal_owner",
     )
 
 
@@ -161,7 +164,7 @@ def test_create_document_generates_and_attaches_without_approval(
     assert result.status == "success"
     assert (tmp_path / "artifacts" / f"report.{suffix}").is_file()
     refs = broker.store.list_session_attachment_refs(  # type: ignore[union-attr]
-        session_id=session_id, owner_principal_id="local_user"
+        session_id=session_id, owner_principal_id="principal_owner"
     )
     assert refs == [
         {
@@ -196,7 +199,7 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(
     session_id = new_id("sess_")
     broker.store.put_session_command_grant(  # type: ignore[union-attr]
         session_id=session_id,
-        principal_id="local_user",
+        principal_id="principal_owner",
         commands=[["python", "-c"]],
         timeout_seconds=5,
         expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),

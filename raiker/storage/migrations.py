@@ -2402,6 +2402,22 @@ CREATE INDEX IF NOT EXISTS idx_turn_machine_identity_turn
 """
 
 
+# ADD-03 -- durable actor/owner attribution for every governed action. The
+# signed bearer token is deliberately not stored; these immutable claims are
+# sufficient for approvals, audit views, and incident review after expiry.
+MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID = "RAIKER-1040-machine-action-attribution"
+MACHINE_ACTION_ATTRIBUTION_SQL = """
+ALTER TABLE tool_actions ADD COLUMN proposed_by TEXT NOT NULL DEFAULT 'agent_runtime';
+ALTER TABLE tool_actions ADD COLUMN owner_principal_id TEXT;
+ALTER TABLE tool_actions ADD COLUMN machine_subject TEXT;
+ALTER TABLE tool_actions ADD COLUMN machine_token_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_tool_actions_actor_time
+  ON tool_actions(proposed_by, proposed_at);
+CREATE INDEX IF NOT EXISTS idx_tool_actions_owner_time
+  ON tool_actions(owner_principal_id, proposed_at);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

@@ -54,6 +54,18 @@ class WorkspaceIdentityIssuer:
         parent_principal_id: str | None = None,
     ) -> MachineAttestation:
         owner = self.store.get_principal(owner_principal_id)
+        if owner is None and owner_principal_id == "local_user":
+            # Embedded/terminal compatibility: older local-only entry points
+            # use this well-known owner without an account bootstrap. They still
+            # receive a signed per-turn machine identity; this creates the
+            # delegation anchor, not an authentication bypass for remote APIs.
+            self.store.insert_principal(
+                principal_id="local_user",
+                principal_type="human",
+                display_name="Local workspace owner",
+                is_active=True,
+            )
+            owner = self.store.get_principal(owner_principal_id)
         if owner is None or not bool(owner.get("is_active")):
             raise MachineIdentityError("machine_identity_delegation_mismatch")
         if ttl_seconds <= 0:

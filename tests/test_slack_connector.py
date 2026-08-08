@@ -16,6 +16,7 @@ import json
 from pathlib import Path
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id, utc_now
@@ -34,7 +35,6 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.connectors import SlackConnectorExecutor
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 _CAP = "connector_slack_runtime"
 _INFO_JSON = json.dumps(

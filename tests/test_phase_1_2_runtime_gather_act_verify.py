@@ -4,6 +4,8 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
+
 from raiker.cli.commands import (
     handle_approvals,
     handle_checkpoints,
@@ -24,7 +26,6 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 
 
 class FakeRouter:

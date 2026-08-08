@@ -11,7 +11,10 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SubagentContract, TeamLedger, ToolAction
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
-from raiker.runtime.authority.models import RAIKER_RUNTIME
+from raiker.runtime.identity.lifecycle import (
+    TrustedTurnIdentity,
+    TurnMachineIdentityLifecycle,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 # Subagents may only be delegated read-only / inspection tools. Mutating and
@@ -197,25 +200,16 @@ class SubagentRunner:
     """
 
     def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
-        # The broker imports container execution. Defer this dependency until a
-        # runner is constructed so container tooling has a clean cold-import
-        # path through the executor package.
-        from raiker.tools.broker import ToolBroker
-
         self._ws = Path(workspace_root).resolve()
         self._store = store
-        self._broker = ToolBroker(
-            workspace_root=self._ws,
-            policy_engine=PolicyEngine(StaticPolicyConfig(self._ws), store=store),
-            store=store,
-            writer=None,
-        )
 
     def run(
         self,
         spec: SubagentSpec,
         *,
         principal_id: str,
+        owner_principal_id: str | None = None,
+        parent_identity: TrustedTurnIdentity | None = None,
         session_id: str = "",
         turn_id: str | None = None,
         result_sink: Callable[[str, dict[str, Any]], None] | None = None,
@@ -229,6 +223,34 @@ class SubagentRunner:
         audit trail, exactly as the MCP executor's ``content_sink`` does.
         """
         subagent_id = new_id("sba_")
+        effective_session_id = session_id or f"sess_{subagent_id}"
+        owner_id = owner_principal_id or self._store.account_scope(principal_id) or principal_id
+        lifecycle = TurnMachineIdentityLifecycle(self._ws, self._store)
+        if parent_identity is None:
+            parent_identity = lifecycle.start(
+                owner_principal_id=owner_id,
+                session_id=effective_session_id,
+                turn_id=turn_id or f"turn_parent_{subagent_id}",
+                role_ids=("assistant",),
+            )
+        child_turn_id = f"{turn_id or 'turn'}:subagent:{subagent_id}"
+        child_identity = lifecycle.start(
+            owner_principal_id=owner_id,
+            session_id=effective_session_id,
+            turn_id=child_turn_id,
+            role_ids=("assistant",),
+            principal_id=subagent_id,
+            parent_principal_id=parent_identity.claims.principal_id,
+        )
+        from raiker.tools.broker import ToolBroker
+
+        broker = ToolBroker(
+            workspace_root=self._ws,
+            policy_engine=PolicyEngine(StaticPolicyConfig(self._ws), store=self._store),
+            store=self._store,
+            writer=None,
+            principal_id=owner_id,
+        )
         now = utc_now()
         eff_depth = min(spec.max_depth, MAX_SUBAGENT_DEPTH)
         budget = spec.budget().effective()
@@ -252,18 +274,6 @@ class SubagentRunner:
             max_steps=budget.max_steps,
             max_tool_calls=budget.max_tool_calls,
             max_tokens=budget.max_tokens,
-        )
-        parent = self._store.get_principal(principal_id)
-        self._store.insert_principal(
-            subagent_id,
-            "ai_agent",
-            spec.name,
-            delegated_by_user_id=(
-                str(parent["delegated_by_user_id"])
-                if parent and parent.get("delegated_by_user_id") else None
-            ),
-            session_id=session_id or None,
-            max_runtime_mode=RAIKER_RUNTIME,
         )
         self._store.insert_subagent_contract(contract)
 
@@ -330,7 +340,12 @@ class SubagentRunner:
                 requires_approval=step.tool_name in MUTATION_PROPOSAL_TOOLS,
                 proposed_by=subagent_id,
             )
-            result, decision = self._broker.execute(action, session_id=session_id, turn_id=turn_id)
+            result, decision = broker.execute(
+                action,
+                session_id=effective_session_id,
+                turn_id=child_turn_id,
+                machine_identity=child_identity,
+            )
             tools_used.append(step.tool_name)
             if step.tool_name in MUTATION_PROPOSAL_TOOLS and result.status == "approval_required":
                 return finish(

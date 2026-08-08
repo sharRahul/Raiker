@@ -76,6 +76,7 @@ class ScriptedRouter:
 
 
 def _orchestrator(tmp_path: Path, router: ScriptedRouter) -> RuntimeOrchestrator:
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
     store = SQLiteStore(tmp_path)
     writer = EventLogWriter(store)
     broker = ToolBroker(
@@ -83,12 +84,26 @@ def _orchestrator(tmp_path: Path, router: ScriptedRouter) -> RuntimeOrchestrator
         policy_engine=PolicyEngine(StaticPolicyConfig(tmp_path)),
         store=store,
         writer=writer,
+        principal_id="principal_owner",
     )
     return RuntimeOrchestrator(
         workspace_root=tmp_path,
         writer=writer,
         tool_broker=broker,
         model_router=router,  # type: ignore[arg-type]
+    )
+
+
+def _identity_for(
+    workspace: Path, orchestrator: RuntimeOrchestrator, envelope: PromptEnvelope
+):  # type: ignore[no-untyped-def]
+    return TurnMachineIdentityLifecycle(
+        workspace, orchestrator.tool_broker.store, orchestrator.writer
+    ).start(
+        owner_principal_id="principal_owner",
+        session_id=envelope.session_id,
+        turn_id=envelope.turn_id,
+        role_ids=("assistant",),
     )
 
 
@@ -128,7 +143,11 @@ class TestTurnIsParkedOnApproval:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Write the quarterly report to report.md")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = asyncio.run(
+            orchestrator.ahandle(
+                envelope, identity=_identity_for(tmp_path, orchestrator, envelope)
+            )
+        )
 
         assert response.status == "needs_approval"
         assert response.approval is not None
@@ -156,7 +175,11 @@ class TestTurnIsParkedOnApproval:
         ])
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Write the quarterly report")
-        asyncio.run(orchestrator.ahandle(envelope))
+        asyncio.run(
+            orchestrator.ahandle(
+                envelope, identity=_identity_for(tmp_path, orchestrator, envelope)
+            )
+        )
 
         path = orchestrator.writer.path_for_session(envelope.session_id)
         suspended = [

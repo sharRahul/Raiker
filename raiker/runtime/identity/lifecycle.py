@@ -37,6 +37,7 @@ class TurnMachineIdentityLifecycle:
         session_id: str,
         turn_id: str,
         role_ids: tuple[str, ...],
+        principal_id: str | None = None,
         parent_principal_id: str | None = None,
     ) -> TrustedTurnIdentity:
         issued = self.issuer.mint(
@@ -45,6 +46,7 @@ class TurnMachineIdentityLifecycle:
             turn_id=turn_id,
             role_ids=role_ids,
             ttl_seconds=DEFAULT_TURN_IDENTITY_TTL_SECONDS,
+            principal_id=principal_id,
             parent_principal_id=parent_principal_id,
         )
         self._event("machine_identity_issued", issued.claims, parent_principal_id)

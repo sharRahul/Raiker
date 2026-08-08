@@ -41,6 +41,7 @@ from raiker.runtime.agent_plan import (
     plan_context_message,
     save_plan,
 )
+from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
 from raiker.tools.subagent_tools import SPAWNABLE_TOOLS
@@ -81,7 +82,20 @@ def _run(broker: ToolBroker, tool_name: str, arguments: dict[str, Any]) -> Any:
         requires_approval=False,
         proposed_by="model",
     )
-    return broker.execute(action, session_id=_SESSION, turn_id=_TURN)
+    identity = TurnMachineIdentityLifecycle(
+        broker.workspace_root, broker.store, broker.writer
+    ).start(
+        owner_principal_id=_OWNER,
+        session_id=_SESSION,
+        turn_id=_TURN,
+        role_ids=("assistant",),
+    )
+    return broker.execute(
+        action,
+        session_id=_SESSION,
+        turn_id=_TURN,
+        machine_identity=identity,
+    )
 
 
 # ── B6: validation ───────────────────────────────────────────────────────────

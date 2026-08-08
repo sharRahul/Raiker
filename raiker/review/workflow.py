@@ -7,11 +7,9 @@ from pathlib import Path
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
-from raiker.contracts.models import ClientMetadata, ToolAction
+from raiker.contracts.models import ClientMetadata
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.policy.config import StaticPolicyConfig
-from raiker.policy.engine import PolicyEngine
 from raiker.review.classifier import generate_findings
 from raiker.review.diff_parser import parse_unified_diff
 from raiker.review.models import (
@@ -27,8 +25,8 @@ from raiker.review.models import (
 )
 from raiker.review.proposals import generate_action_proposals, proposal_risk_counts
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 from raiker.tools.filesystem import FilesystemSafetyError, resolve_workspace_path
+from raiker.tools.git import run_git
 
 _SAFETY_NOTES_CLEAN = (
     "No files were modified.",
@@ -97,12 +95,8 @@ class CodeReviewWorkflow:
             redacted_diff, redaction_applied = redact_text(bounded_diff)
             untracked_files: list[str] = []
             if not staged:
-                untracked_broker = ToolBroker(
-                    workspace_root=root,
-                    policy_engine=PolicyEngine(StaticPolicyConfig(root)),
-                )
                 untracked_files = self._collect_untracked_files(
-                    untracked_broker, path_filter=path_filter
+                    root, path_filter=path_filter
                 )
             mode = mode_base if (files or untracked_files) else "clean"
             scope = ReviewScope(
@@ -222,65 +216,33 @@ class CodeReviewWorkflow:
     ) -> tuple[str, bool]:
         if not self._is_git_workspace(root):
             return "", False
-        broker = ToolBroker(
-            workspace_root=root,
-            policy_engine=PolicyEngine(StaticPolicyConfig(root)),
-        )
-        diff = self._git_diff(broker, path_filter=path_filter, cached=staged)
+        diff = self._git_diff(root, path_filter=path_filter, cached=staged)
         staged_present = False
         if mode_base == "unstaged" and not diff.strip():
-            staged_diff = self._git_diff(broker, path_filter=path_filter, cached=True)
+            staged_diff = self._git_diff(root, path_filter=path_filter, cached=True)
             if staged_diff.strip():
                 staged_present = True
             diff = ""  # default mode does not auto-review staged changes
         return diff, staged_present
 
-    def _git_diff(self, broker: ToolBroker, *, path_filter: str | None, cached: bool) -> str:
+    def _git_diff(self, root: Path, *, path_filter: str | None, cached: bool) -> str:
         args: list[str] = []
         if cached:
             args.append("--cached")
         if path_filter is not None and path_filter != ".":
             args.extend(["--", path_filter])
-        action = ToolAction(
-            action_id=new_id("act_"),
-            tool_name="git_diff",
-            arguments={"args": args},
-            risk_level="low",
-            requires_approval=False,
-            proposed_by="code_review_workflow",
-        )
-        result, _decision = broker.execute(
-            action,
-            session_id=new_id("sess_"),
-            turn_id=new_id("turn_"),
-            client=_review_client(),
-        )
-        if result.status == "success" and isinstance(result.output, dict):
-            return str(result.output.get("output", ""))
-        return ""
+        result = run_git(root, "diff", args)
+        return str(result.get("output", "")) if result.get("status") == "success" else ""
 
     def _collect_untracked_files(
-        self, broker: ToolBroker, *, path_filter: str | None
+        self, root: Path, *, path_filter: str | None
     ) -> list[str]:
-        if not self._is_git_workspace(broker.workspace_root):
+        if not self._is_git_workspace(root):
             return []
-        action = ToolAction(
-            action_id=new_id("act_"),
-            tool_name="git_status",
-            arguments={},
-            risk_level="low",
-            requires_approval=False,
-            proposed_by="code_review_workflow",
-        )
-        result, _decision = broker.execute(
-            action,
-            session_id=new_id("sess_"),
-            turn_id=new_id("turn_"),
-            client=_review_client(),
-        )
-        if result.status != "success" or not isinstance(result.output, dict):
+        result = run_git(root, "status", ["--short"])
+        if result.get("status") != "success":
             return []
-        output = str(result.output.get("output", ""))
+        output = str(result.get("output", ""))
         untracked: list[str] = []
         for line in output.splitlines():
             line = line.rstrip("\n")

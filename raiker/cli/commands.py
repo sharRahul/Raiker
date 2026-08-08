@@ -89,6 +89,7 @@ from raiker.runtime.authority import (
     RiskLevelValue,
     RuntimeAuthority,
 )
+from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 from raiker.storage.cleanup_readiness_registry import (
     cleanup_readiness_summary,
     render_cleanup_readiness,
@@ -1431,16 +1432,48 @@ def _run_terminal_tool_action(
     session_id = new_id("sess_")
     turn_id = new_id("turn_")
     store.create_session(session_id, str(Path(workspace_root).resolve()))
+    principal, resolution_error = resolve_local_principal(workspace_root)
+    if principal is None:
+        now = utc_now()
+        reason = "machine_identity_delegation_mismatch"
+        return (
+            ToolResult(
+                action_id=action.action_id,
+                tool_name=action.tool_name,
+                status="denied",
+                output=None,
+                error={"type": reason, "detail": resolution_error},
+                started_at=now,
+                completed_at=now,
+            ),
+            PolicyDecision(
+                decision_id=new_id("pol_"),
+                action_id=action.action_id,
+                decision="deny",
+                reasons=[reason],
+                requires_user_approval=False,
+                risk_level=action.risk_level,
+                timestamp=now,
+            ),
+        )
+    identity = TurnMachineIdentityLifecycle(workspace_root, store).start(
+        owner_principal_id=principal.principal_id,
+        session_id=session_id,
+        turn_id=turn_id,
+        role_ids=("terminal_assistant",),
+    )
     broker = ToolBroker(
         workspace_root=workspace_root,
         policy_engine=PolicyEngine(StaticPolicyConfig(Path(workspace_root))),
         store=store,
         writer=EventLogWriter(store),
+        principal_id=principal.principal_id,
     )
     return broker.execute(
         action,
         session_id=session_id,
         turn_id=turn_id,
+        machine_identity=identity,
         client=terminal_client(),
     )
 

@@ -26,6 +26,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL, executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
@@ -49,7 +50,6 @@ from raiker.runtime.executors import (
 )
 from raiker.runtime.executors.tier1_git import GitWriteExecutor
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.broker import ToolBroker
 from raiker.tools.git import (
     create_branch,
     create_commit,

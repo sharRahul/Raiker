@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.api.sessions import ApiSessionStore
 from raiker.approvals import ApprovalInbox
@@ -21,7 +22,6 @@ from raiker.runtime.interrupts import InterruptController
 from raiker.runtime.side_questions import SideQuestionRuntime
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
-from raiker.tools.broker import ToolBroker
 from raiker.tools.filesystem import diff_files, proposed_write_snapshot, stat_path
 from raiker.tools.git import run_git
 

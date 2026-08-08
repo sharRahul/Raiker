@@ -4830,6 +4830,13 @@ was also nothing for the policy engine or the approval relay to route.
   working tree, so it is refused while there are uncommitted changes; without a
   base there is nothing to move to and the proposal states how many files it
   carries across.
+* **A rename is one change, not half of one.** Found while probing the executor:
+  a rename's source path has to be committed alongside its destination, or the
+  commit records the addition and leaves the old file's deletion staged behind —
+  a half-recorded rename the owner was told was one change. The source half is
+  already staged by `git mv`, so it is deliberately not re-`add`ed: it matches
+  neither the working tree nor the index any more, and asking would fail the
+  whole commit.
 * **The outward half.** `github_write` proposes the work to the repository —
   `create_pull_request` (new) and `create_comment` (already in the connector
   service, previously reachable only through `connector_write`) — under the

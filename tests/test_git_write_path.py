@@ -253,6 +253,45 @@ class TestCommitProposal:
         ).stdout
         assert ".raiker" not in tracked
 
+    def test_a_rename_is_committed_at_both_ends(self, repo: Path) -> None:
+        # Staging only the new path records the addition and leaves the old
+        # file's deletion behind — a half-recorded rename the owner was told was
+        # one change. The source half is already staged by `git mv`, so it needs
+        # no `git add` of its own; asking for one fails, because it matches
+        # neither the working tree nor the index any more.
+        _git(repo, "mv", "app.py", "renamed.py")
+        (repo / "added.py").write_text("print('added')\n", encoding="utf-8")
+        snapshot = proposed_commit_snapshot(repo, "Rename and add")
+        assert snapshot["commit_paths"] == ["app.py", "renamed.py", "added.py"]
+        assert create_commit(repo, "Rename and add")["status"] == "success"
+        # Nothing of the change set is left behind. `.raiker/` still shows as
+        # untracked, which is the point: it is never swept into a commit.
+        remaining = [
+            line
+            for line in subprocess.run(
+                ["git", "-C", str(repo), "status", "--porcelain"],
+                check=True, capture_output=True, text=True,
+            ).stdout.splitlines()
+            if ".raiker" not in line
+        ]
+        assert remaining == []
+        tracked = subprocess.run(
+            ["git", "-C", str(repo), "ls-files"],
+            check=True, capture_output=True, text=True,
+        ).stdout.split()
+        assert tracked == ["added.py", "renamed.py"]
+
+    def test_a_deletion_is_committed(self, repo: Path) -> None:
+        (repo / "app.py").unlink()
+        assert create_commit(repo, "Drop app.py")["status"] == "success"
+        assert (
+            subprocess.run(
+                ["git", "-C", str(repo), "ls-files"],
+                check=True, capture_output=True, text=True,
+            ).stdout.strip()
+            == ""
+        )
+
     def test_a_protected_path_is_refused_by_name(self, repo: Path) -> None:
         result = proposed_commit_snapshot(repo, "msg", [".raiker/app.key"])
         assert result["error"]["type"] == "protected_workspace_path"

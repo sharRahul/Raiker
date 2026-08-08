@@ -169,9 +169,13 @@ def _porcelain(root: Path, paths: list[str] | None) -> list[dict[str, str]]:
         if len(line) < 4:
             continue
         index_state, worktree_state, path = line[0], line[1], line[3:]
-        # A rename is reported as `old -> new`; the new path is what is committed.
+        # A rename is reported as `old -> new`, and **both** paths have to be
+        # committed: staging only the new one records the addition and leaves the
+        # old file's deletion behind, which is a half-recorded rename the owner
+        # was told was one change.
+        previous = ""
         if " -> " in path:
-            path = path.split(" -> ", 1)[1]
+            previous, path = (part.strip('"') for part in path.split(" -> ", 1))
         path = path.strip('"')
         if _is_protected(path):
             continue
@@ -179,11 +183,27 @@ def _porcelain(root: Path, paths: list[str] | None) -> list[dict[str, str]]:
         entries.append(
             {
                 "path": path,
+                "previous_path": previous,
                 "state": _STATUS_WORDS.get(code, "changed"),
                 "code": (index_state + worktree_state).strip() or code,
+                # Whether the working tree still differs from the index for this
+                # path. A change the owner already staged needs no `git add`, and
+                # asking for one would fail: the source half of a staged rename
+                # matches neither the working tree nor the index any more.
+                "unstaged": "yes" if worktree_state != " " else "",
             }
         )
     return entries
+
+
+def _entry_paths(entries: list[dict[str, str]]) -> list[str]:
+    """Every path a commit of *entries* records, renames counted at both ends."""
+    paths: list[str] = []
+    for entry in entries:
+        if entry.get("previous_path"):
+            paths.append(entry["previous_path"])
+        paths.append(entry["path"])
+    return paths
 
 
 def _untracked_diff(root: Path, path: str) -> str:
@@ -208,7 +228,7 @@ def _commit_diff(root: Path, entries: list[dict[str, str]]) -> str:
     Scoped to the proposal's own paths rather than to the whole tree, so the
     preview and the execution describe one and the same change set.
     """
-    tracked_paths = [e["path"] for e in entries if e["state"] != "untracked"]
+    tracked_paths = _entry_paths([e for e in entries if e["state"] != "untracked"])
     parts: list[str] = []
     if tracked_paths:
         tracked = _git(root, ["diff", "HEAD", "--", *tracked_paths])
@@ -369,7 +389,11 @@ def proposed_commit_snapshot(
         # The complete change set, which the execution stages verbatim. `files`
         # below is the same list bounded for display; committing from the bound
         # would silently drop everything past it.
-        "commit_paths": [entry["path"] for entry in entries],
+        "commit_paths": _entry_paths(entries),
+        # The complete entry list the execution stages from. `files` below is the
+        # same list bounded for display; staging from the bound would silently
+        # drop everything past it.
+        "entries": entries,
         "files": entries[:_MAX_PREVIEW_FILES],
         "file_count": len(entries),
         "diff": diff[:_MAX_DIFF_BYTES],
@@ -389,9 +413,11 @@ def create_commit(
     # `.raiker/` (the vault key, the audit log, the encrypted store) into the
     # commit, and not the index, which the owner may have staged for themselves.
     staging: list[str] = list(snapshot["commit_paths"])
-    staged = _git(root, [*_NO_HOOKS, "add", "--", *staging])
-    if staged.returncode != 0:
-        return _failed("git_command_failed", command="add", output=_git_output(staged))
+    to_add = [entry["path"] for entry in snapshot["entries"] if entry.get("unstaged")]
+    if to_add:
+        staged = _git(root, [*_NO_HOOKS, "add", "--", *to_add])
+        if staged.returncode != 0:
+            return _failed("git_command_failed", command="add", output=_git_output(staged))
     # A path-limited commit records only these paths, whatever else happens to
     # be staged. It is the all-or-nothing property the approval promised.
     commit_args = [

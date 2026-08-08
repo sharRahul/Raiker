@@ -4567,7 +4567,13 @@ class DashboardService:
             if snapshot["status"] != "success":
                 return None, None, "arguments"
             header = "\n".join(
-                f"{entry['state']:>10}  {entry['path']}" for entry in snapshot["files"]
+                f"{entry['state']:>10}  "
+                + (
+                    f"{entry['previous_path']} → {entry['path']}"
+                    if entry.get("previous_path")
+                    else entry["path"]
+                )
+                for entry in snapshot["files"]
             )
             body = redact_secret_like_text(str(snapshot["diff"]))
             truncated = "\n\n(diff truncated)" if snapshot["truncated"] else ""

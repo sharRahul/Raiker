@@ -38,6 +38,7 @@ from tests.test_turn_resume_after_approval import (  # reuse the B2 harness verb
     ScriptedRouter,
     _envelope,
     _event_types,
+    _identity_for,
     _orchestrator,
 )
 
@@ -78,7 +79,10 @@ def _read_call(name: str = "README.md") -> ToolCallProposal:
 def _run(orchestrator, envelope):  # type: ignore[no-untyped-def]
     async def go():  # type: ignore[no-untyped-def]
         events = []
-        async for event in orchestrator._aturn_events(envelope, stream=False):
+        identity = _identity_for(orchestrator.workspace_root, orchestrator, envelope)
+        async for event in orchestrator._aturn_events(
+            envelope, stream=False, identity=identity
+        ):
             events.append(event)
         return events
 

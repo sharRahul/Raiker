@@ -14,7 +14,7 @@ from raiker.cli.commands import (
     handle_reasoning_command,
     render_models_async,
 )
-from raiker.contracts.models import AgentResponse
+from raiker.contracts.models import AgentResponse, PromptEnvelope
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.models.contracts import ModelMessage, ModelResponse
@@ -25,6 +25,7 @@ from raiker.models.router import ModelRouter
 from raiker.models.session_state import ModelSessionState
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.broker import ToolBroker
@@ -119,17 +120,19 @@ def test_provider_failure_emits_failed_event_without_prompt(tmp_path: Path) -> N
 
 def test_gateway_async_and_sync_loop_policy(tmp_path: Path) -> None:
     gateway = AgentGateway(tmp_path)
-    gateway.runtime.ahandle = lambda envelope, identity=None: asyncio.sleep(  # type: ignore[method-assign]
-        0,
-        result=AgentResponse(
+    async def completed(
+        envelope: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
+    ) -> AgentResponse:
+        return AgentResponse(
             envelope.request_id,
             envelope.session_id,
             envelope.turn_id,
             "completed",
             "ok",
             client=envelope.client,
-        ),
-    )
+        )
+
+    gateway.runtime.ahandle = completed  # type: ignore[method-assign]
     envelope = build_prompt_envelope("hello")
     response = asyncio.run(gateway.submit_prompt_async(envelope))
     assert isinstance(response, AgentResponse)

@@ -43,6 +43,7 @@ from raiker.contracts.ids import utc_now
 # without either depending on the other.
 IN_FLIGHT_TASK_STATES = frozenset({"queued", "running", "continuing", "paused"})
 BLOCKED_TASK_STATES = frozenset({"waiting_for_approval"})
+_IS_WINDOWS = os.name == "nt"
 
 
 @dataclass(frozen=True)
@@ -294,14 +295,17 @@ class HostControl:
 def process_is_alive(pid: int) -> bool:
     """Is this pid a live process? False for anything we cannot confirm.
 
-    ``os.kill(pid, 0)`` is the portable "does it exist" probe on POSIX and is
-    emulated on Windows by CPython. ``PermissionError`` means the process exists
-    and belongs to someone else — still alive, so still true. ``OverflowError``
-    is what a corrupted or hand-edited record file produces, and it must answer
-    "not running" rather than take the status read down with it.
+    POSIX uses ``os.kill(pid, 0)``. Windows must not: CPython maps ``os.kill`` to
+    a process signal/termination API there, so even signal zero is not a safe
+    read. Windows opens a query-only process handle instead. ``PermissionError``
+    (or Windows access denied) still proves that the process exists. Corrupted
+    or hand-edited identifiers answer "not running" rather than taking status
+    reads down with them.
     """
     if pid <= 0:
         return False
+    if _IS_WINDOWS:
+        return _windows_process_is_alive(pid)
     try:
         os.kill(pid, 0)
     except PermissionError:
@@ -309,6 +313,35 @@ def process_is_alive(pid: int) -> bool:
     except (OSError, ValueError, OverflowError):
         return False
     return True
+
+
+def _windows_process_is_alive(pid: int) -> bool:
+    """Read process state through a query handle; never signal the target."""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        open_process = kernel32.OpenProcess
+        open_process.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        open_process.restype = wintypes.HANDLE
+        get_exit_code = kernel32.GetExitCodeProcess
+        get_exit_code.argtypes = [wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD)]
+        get_exit_code.restype = wintypes.BOOL
+        close_handle = kernel32.CloseHandle
+        close_handle.argtypes = [wintypes.HANDLE]
+        close_handle.restype = wintypes.BOOL
+
+        handle = open_process(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not handle:
+            return ctypes.get_last_error() == 5  # access denied still proves existence
+        try:
+            exit_code = wintypes.DWORD()
+            return bool(get_exit_code(handle, ctypes.byref(exit_code))) and exit_code.value == 259
+        finally:
+            close_handle(handle)
+    except (AttributeError, OSError, OverflowError, ValueError):
+        return False
 
 
 def _plural(count: int, singular: str, plural: str | None = None) -> str:

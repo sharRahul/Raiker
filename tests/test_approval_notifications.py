@@ -77,13 +77,12 @@ def test_notify_is_skipped_when_no_owner(tmp_path: Path) -> None:
 
 def test_broker_approval_delivers_notification(tmp_path: pytest.TempPathFactory) -> None:
     """A parked approval created through the broker notifies the owner (D2)."""
-    from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
-
     from raiker.contracts.ids import new_id
     from raiker.contracts.models import ToolAction
     from raiker.events.writer import EventLogWriter
     from raiker.policy.config import StaticPolicyConfig
     from raiker.policy.engine import PolicyEngine
+    from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
     ws = _ws(tmp_path)  # type: ignore[arg-type]
     store = SQLiteStore(ws)

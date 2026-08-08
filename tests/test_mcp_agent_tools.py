@@ -376,11 +376,10 @@ class TestGovernedCallEndToEnd:
 
 class TestBrokerRoutesProjectedTools:
     def _broker(self, workspace: Path, store: SQLiteStore):  # type: ignore[no-untyped-def]
-        from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
-
         from raiker.events.writer import EventLogWriter
         from raiker.policy.config import StaticPolicyConfig
         from raiker.policy.engine import PolicyEngine
+        from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
         return ToolBroker(
             workspace_root=workspace,

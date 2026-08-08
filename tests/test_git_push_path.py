@@ -28,7 +28,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL, executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
@@ -56,6 +55,7 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
+from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 _CAP = "git_push_execution"
 _REMOTE = "https://github.com/owner/repo.git"

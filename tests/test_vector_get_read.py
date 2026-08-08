@@ -10,8 +10,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
-
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, ToolAction, VectorRecord
 from raiker.events.writer import EventLogWriter
@@ -19,6 +17,7 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.vector_tools import vector_get
+from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 
 def _seed_vector(ws: Path, vector_id: str = "vec_seed_1", preview: str = "hello world doc") -> None:

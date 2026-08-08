@@ -245,7 +245,7 @@ class PluginExecutionCapExecutor:
             self._store.account_scope(principal.principal_id) or principal.principal_id
         )
         session_id = action.session_id or "plugin_execution"
-        turn_id = action.turn_id or new_id("turn_plugin_")
+        turn_id = action.turn_id or new_id("turn_")
         identity = TurnMachineIdentityLifecycle(
             self._workspace_root, self._store
         ).start(

@@ -41,9 +41,15 @@ from tests.test_turn_resume_after_approval import (  # reuse the B2 harness verb
     ScriptedRouter,
     _envelope,
     _event_types,
+    _identity_for,
     _orchestrator,
     _park_turn,
 )
+
+
+def _handle(orchestrator, envelope):  # type: ignore[no-untyped-def]
+    identity = _identity_for(orchestrator.workspace_root, orchestrator, envelope)
+    return asyncio.run(orchestrator.ahandle(envelope, identity=identity))
 
 __all__ = ["headers", "scripted_model", "workspace"]
 
@@ -83,7 +89,7 @@ class TestTheBatchIsParkedNotDropped:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Write three files")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         assert response.status == "needs_approval"
         assert response.approval is not None
@@ -109,7 +115,7 @@ class TestTheBatchIsParkedNotDropped:
         ])
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Write three files")
-        asyncio.run(orchestrator.ahandle(envelope))
+        _handle(orchestrator, envelope)
 
         types = _event_types(orchestrator, envelope.session_id)
         assert "model_tool_calls_queued" in types
@@ -129,7 +135,7 @@ class TestTheBatchIsParkedNotDropped:
         ])
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Write the merger memo")
-        asyncio.run(orchestrator.ahandle(envelope))
+        _handle(orchestrator, envelope)
 
         path = orchestrator.writer.path_for_session(envelope.session_id)
         log = path.read_text(encoding="utf-8")
@@ -150,7 +156,7 @@ class TestTheBatchIsParkedNotDropped:
         ])
         orchestrator = _orchestrator(tmp_path, router)
 
-        response = asyncio.run(orchestrator.ahandle(_envelope("Write one file")))
+        response = _handle(orchestrator, _envelope("Write one file"))
 
         assert response.approval is not None
         assert response.approval["queue_total"] == 1
@@ -174,7 +180,7 @@ class TestReadsBeforeTheBoundaryAreKept:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Read the notes then write the report")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         assert response.approval is not None
         row = SQLiteStore(tmp_path).load_suspended_turn(
@@ -379,7 +385,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Read the escape hatch and the notes")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         # The refusal is about the first call. The second is a legitimate read
         # that the policy engine allowed, and it must still run and still reach
@@ -408,7 +414,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
             ModelResponse(text="Understood."),
         ])
         orchestrator = _orchestrator(tmp_path, router)
-        asyncio.run(orchestrator.ahandle(_envelope("Read both")))
+        _handle(orchestrator, _envelope("Read both"))
 
         refusal = json.loads(
             next(
@@ -437,7 +443,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Read the escape hatch then write two files")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         # This is the case BUG-52 names: with no approval ahead of the denial,
         # the turn used to end at the refused read and drop both writes. It now
@@ -463,7 +469,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Read the escape hatch then write")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         assert response.approval is not None
         row = SQLiteStore(tmp_path).load_suspended_turn(
@@ -494,7 +500,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
                 ModelResponse(text="Done."),
             ])
             orchestrator = _orchestrator(tmp_path, router)
-            response = asyncio.run(orchestrator.ahandle(_envelope("Read them")))
+            response = _handle(orchestrator, _envelope("Read them"))
             outcomes.append((
                 response.status,
                 sorted(
@@ -520,7 +526,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope("Read outside the workspace")
 
-        response = asyncio.run(orchestrator.ahandle(envelope))
+        response = _handle(orchestrator, envelope)
 
         # Nothing else remained in the batch, so the refusal *is* the turn's
         # outcome. This is the one case that keeps the long-standing `denied`
@@ -537,7 +543,7 @@ class TestAFirstPassDenialSkipsOnlyItsOwnCall:
         ])
         orchestrator = _orchestrator(tmp_path, router)
 
-        response = asyncio.run(orchestrator.ahandle(_envelope("Read outside")))
+        response = _handle(orchestrator, _envelope("Read outside"))
 
         assert response.status == "denied"
         assert response.message.startswith("Action denied by policy: ")

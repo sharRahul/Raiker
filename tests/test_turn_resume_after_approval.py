@@ -33,7 +33,7 @@ from raiker.events.writer import EventLogWriter
 from raiker.models.contracts import ModelMessage, ModelResponse, ToolCallProposal, ToolSpec
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
-from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
+from raiker.runtime.identity.lifecycle import TrustedTurnIdentity, TurnMachineIdentityLifecycle
 from raiker.runtime.orchestrator import RuntimeOrchestrator
 from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
@@ -96,7 +96,7 @@ def _orchestrator(tmp_path: Path, router: ScriptedRouter) -> RuntimeOrchestrator
 
 def _identity_for(
     workspace: Path, orchestrator: RuntimeOrchestrator, envelope: PromptEnvelope
-):  # type: ignore[no-untyped-def]
+) -> TrustedTurnIdentity:
     return TurnMachineIdentityLifecycle(
         workspace, orchestrator.tool_broker.store, orchestrator.writer
     ).start(

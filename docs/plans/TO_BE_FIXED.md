@@ -187,6 +187,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-118 | Medium | Web / execution-environment deep link | Fixed (found during ADD-01 Playwright verification) |
 | FIXED-119 | Low | Tests / live Ollama leaked into offline scenarios | Fixed (found during ADD-01 baseline verification) |
 | FIXED-120 | Low | Activity / machine identity density | Fixed (found during ADD-03 screenshot review) |
+| FIXED-121 | Low | Web tests / export download navigation noise | Fixed (found during ADD-03 full verification) |
+| FIXED-122 | High | Windows host status / destructive PID probe | Fixed (found during ADD-03 full verification) |
+| FIXED-123 | Medium | Plugin execution / invalid fallback turn id | Fixed (found during ADD-03 full verification) |
+| FIXED-124 | Medium | Project export / unstable same-second event order | Fixed (found during ADD-03 full verification) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5271,6 +5275,79 @@ full principal in the title and the unchanged API contract. A component test
 first reproduced the long-ID layout behavior, then focused Activity/Approvals
 tests, Svelte check, ESLint, production build, screenshot review, and all three
 provider live turns verified the correction.
+
+---
+
+## FIXED-121 — A passing export test emitted a delayed jsdom navigation error
+
+**Status: fixed in this change; found during ADD-03 full verification.**
+
+**Observed.** The complete Vitest suite passed, but an asynchronous
+`Not implemented: navigation` error appeared after its result while the next
+quality gate was running.
+
+**Root cause.** The export test called a real temporary anchor's `click()` and
+described it as a jsdom no-op. jsdom instead schedules navigation after the
+test, even for a download anchor.
+
+**Fix applied.** The test now models the browser download boundary explicitly by
+spying on `HTMLAnchorElement.click`, asserts that the download was requested,
+and leaves no delayed navigation task. The full 82-file, 706-case web suite then
+completed without the console error.
+
+---
+
+## FIXED-122 — Windows host-status checks could interrupt the process they inspected
+
+**Status: fixed in this change; found during ADD-03 full verification.**
+
+**Observed.** The complete Python suite reached `test_app_lifecycle` and ended
+with `KeyboardInterrupt` while asking whether its own recorded host PID was
+alive. The same status read could affect a real Windows Raiker host.
+
+**Root cause.** `process_is_alive` treated `os.kill(pid, 0)` as a portable
+read-only probe. That is the POSIX contract; CPython on Windows maps `os.kill`
+to Windows process signaling, so it is not a safe liveness query.
+
+**Fix applied.** Windows now opens a `PROCESS_QUERY_LIMITED_INFORMATION` handle,
+checks `GetExitCodeProcess == STILL_ACTIVE`, and always closes the handle. Access
+denied still proves existence; malformed PIDs fail closed. POSIX retains signal
+zero. A regression proves the Windows dispatch never calls `os.kill`, and all
+38 lifecycle tests now pass on Windows without interrupting their host.
+
+---
+
+## FIXED-123 — Plugin execution generated an unsupported fallback turn ID
+
+**Status: fixed in this change; found during ADD-03 full verification.**
+
+**Observed.** Every plugin action without an existing turn failed before its
+permission or revocation checks with `unsupported_id_prefix:turn_plugin_`.
+
+**Root cause.** The machine-identity relay added a descriptive ID prefix that
+was not part of Raiker's closed ID registry. A plugin fallback is still an
+ordinary governed turn; it does not need a new identifier class.
+
+**Fix applied.** Plugin execution now mints the registered `turn_` identifier
+and then issues its signed machine identity. Installed, missing, permission-
+denied, write-refused, workspace-boundary, and revoked plugin tests all pass.
+
+---
+
+## FIXED-124 — Project exports reversed events created in the same second
+
+**Status: fixed in this change; found during ADD-03 full verification.**
+
+**Observed.** Two audit events appended in order within one timestamp second
+were exported as `second`, then `first`.
+
+**Root cause.** Event-index reads sorted only by second-resolution timestamp.
+The exporter reverses the newest-first query for chronological output, but rows
+with equal timestamps had no deterministic insertion-order tie-breaker.
+
+**Fix applied.** Event-index reads now order equal timestamps by SQLite row ID
+descending; the export reversal therefore restores chronological insertion
+order. The project export regression and the complete affected test set pass.
 
 ---
 

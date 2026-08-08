@@ -4435,7 +4435,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 params.append(user_id)
         if conditions:
             query += " WHERE " + " AND ".join(conditions)
-        query += " ORDER BY events_index.timestamp DESC LIMIT ?"
+        query += " ORDER BY events_index.timestamp DESC, events_index.rowid DESC LIMIT ?"
         params.append(str(limit))
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()

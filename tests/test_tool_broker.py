@@ -3,7 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
@@ -20,6 +19,7 @@ from raiker.models.tool_call_validation import (
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
+from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 
 def _broker(tmp_path):  # type: ignore[no-untyped-def]

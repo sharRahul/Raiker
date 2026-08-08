@@ -20,6 +20,7 @@ from pathlib import Path
 
 import pytest
 
+from raiker.app import host as host_module
 from raiker.app.host import HostControl, process_is_alive
 from raiker.app.service import (
     APP_LABEL,
@@ -129,6 +130,21 @@ def test_a_dead_pid_is_not_alive_and_a_live_one_is() -> None:
     assert not process_is_alive(0)
     # A hand-edited or corrupted record must answer "not running", not raise.
     assert not process_is_alive(2**63)
+
+
+def test_windows_liveness_probe_never_signals_the_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(host_module, "_IS_WINDOWS", True)
+    monkeypatch.setattr(host_module, "_windows_process_is_alive", lambda pid: pid == 42)
+    monkeypatch.setattr(
+        host_module.os,
+        "kill",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("Windows probe sent a signal")),
+    )
+
+    assert process_is_alive(42)
+    assert not process_is_alive(43)
 
 
 # ── pause really stops new background work ───────────────────────────────

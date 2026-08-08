@@ -50,7 +50,12 @@ describe("ExportConversationDialog — BUG-22", () => {
 
   it("posts the chosen format and reports success with the download name", async () => {
     const fetchMock = stubFetch(routes({ "POST /api/sessions/sess_1/export": { ok: true } }));
-    // jsdom has no real download; the anchor click is a no-op we can ignore.
+    // jsdom schedules an unsupported navigation after anchor.click(); model the
+    // browser download boundary explicitly so no asynchronous console error
+    // escapes after the test process has reported success.
+    const downloadClick = vi
+      .spyOn(HTMLAnchorElement.prototype, "click")
+      .mockImplementation(() => {});
     vi.stubGlobal("URL", { ...URL, createObjectURL: () => "blob:x", revokeObjectURL: () => {} });
     render(ExportConversationDialog, { sessionId: "sess_1", onclose: () => {} });
     await screen.findByText("What will be included");
@@ -63,6 +68,7 @@ describe("ExportConversationDialog — BUG-22", () => {
       expect(JSON.parse(String((post![1] as RequestInit).body))).toEqual({ format: "markdown" });
     });
     expect(await screen.findByText(/quarterly-plan\.md/)).toBeInTheDocument();
+    expect(downloadClick).toHaveBeenCalledOnce();
   });
 
   it("reports a refused format at field level rather than generically", async () => {

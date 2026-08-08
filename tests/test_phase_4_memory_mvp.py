@@ -5,7 +5,6 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
-from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction
@@ -22,6 +21,7 @@ from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.memory_tools import memory_forget, memory_search, memory_write
+from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 
 @pytest.fixture

@@ -173,6 +173,9 @@ class TestTerminalCommands:
         assert result == "No checkpoints." or "Checkpoints:" in result
 
     def test_memory_mutation_commands_are_approval_only(self, tmp_path: Path) -> None:
+        handle_slash_command(
+            "/bootstrap-owner myuser --display MyUser", workspace_root=str(tmp_path)
+        )
         store_output = handle_slash_command(
             '/memory-store "project note"', workspace_root=str(tmp_path)
         )

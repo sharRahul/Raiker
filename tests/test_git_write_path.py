@@ -26,7 +26,6 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL, executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
@@ -56,6 +55,7 @@ from raiker.tools.git import (
     proposed_branch_snapshot,
     proposed_commit_snapshot,
 )
+from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 _CAP = "git_write_execution"
 

@@ -8,6 +8,7 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import (
     DEFAULT_MAX_TOOL_CALLS,
+    AgentResponse,
     ClientMetadata,
     PromptEnvelope,
     PromptOptions,
@@ -75,7 +76,7 @@ def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
 
 def _handle(
     orchestrator: RuntimeOrchestrator, envelope: PromptEnvelope
-):  # type: ignore[no-untyped-def]
+) -> AgentResponse:
     identity = TurnMachineIdentityLifecycle(
         orchestrator.workspace_root,
         orchestrator.tool_broker.store,

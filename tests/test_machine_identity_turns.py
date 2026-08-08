@@ -57,8 +57,9 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
     captured: list[TrustedTurnIdentity] = []
 
     async def completed(
-        prompt: PromptEnvelope, *, identity: TrustedTurnIdentity
+        prompt: PromptEnvelope, *, identity: TrustedTurnIdentity | None = None
     ) -> AgentResponse:
+        assert identity is not None
         captured.append(identity)
         return AgentResponse(
             request_id=prompt.request_id,
@@ -68,7 +69,7 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
             message="done",
         )
 
-    gateway.runtime.ahandle = completed  # type: ignore[method-assign]
+    gateway.runtime.ahandle = completed  # type: ignore[assignment]
 
     response = await gateway.submit_prompt_async(envelope)
 

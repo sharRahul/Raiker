@@ -485,7 +485,7 @@ memories into a named, model-selectable skill set, injected only when relevant.
 declares cli, tui, rest, web_ui, desktop, dashboard, ide, apple_mobile,
 android_mobile and webhooks — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False`
-(`raiker/context/gatherer.py`), so there is no mail, chat-tool or mobile surface
+(`raiker/channels/readiness.py`), so there is no mail, chat-tool or mobile surface
 where the assistant reaches the owner. Scheduled routines therefore run and
 finish with nobody told. **Work:** enable the notification path first (it is the
 cheapest and it makes routines useful), then one external channel end to end.

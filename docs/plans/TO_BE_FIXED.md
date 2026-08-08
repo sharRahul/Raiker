@@ -3718,7 +3718,8 @@ process has ever opened.
 command this repository's own CI runs — leaves `__pycache__` directories inside
 the shipped skill folders, after which
 `tests/test_skills.py::TestShippedSkills::test_bundled_files_are_linked_from_the_body`
-fails on a compiled artefact it was never meant to see. Recorded as BUG-56.
+fails on a compiled artefact it was never meant to see. Recorded as BUG-56, and
+closed since as **FIXED-115**.
 
 **UI when closed.** No user-visible change under normal use, and the live run
 holds that claim to its word: after the host served 30 more instance workspaces,

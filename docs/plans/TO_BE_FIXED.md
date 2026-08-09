@@ -211,6 +211,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-73 | Medium | Chat / a resumed turn can deny an execution that happened | Open, intermittent (found in the 2026-08-08 live round) |
 | BUG-74 | Low | Web build / the main production JavaScript chunk exceeds the 500 kB warning threshold | Open (found while closing BUG-69) |
 | BUG-75 | Medium | Model activity / retry, cancellation, and partial-file cleanup are record-only for some job types | Open (found while closing BUG-69) |
+| BUG-76 | Medium | Runtime / no circuit breaker: a failing tool or provider is retried until its budget runs out, every turn | Open (found in the OWASP ASI08 mapping) |
+| BUG-77 | High | Security monitoring / anomaly detection and containment cover MCP connections only | Open (found in the OWASP ASI10 mapping) |
+| BUG-78 | Medium | Subagents / a delegated result carries no identity binding to the spawn that produced it | Open (found in the OWASP ASI07 mapping) |
+| BUG-79 | Medium | Plugins / a manifest signature is a presence marker by default and the owner is never told | Open (found in the OWASP ASI04 mapping) |
+| BUG-80 | Low | Documentation / the GenAI mapping still calls the verifier a stub | Open (found in the OWASP ASI mapping) |
+| BUG-81 | Low | Context / no prompt-injection scanning hook exists, though the security mapping requires one | Open (found in the OWASP ASI01 mapping) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5986,5 +5992,210 @@ destination. Keep **Clear record** metadata-only.
 **UI when closed.** Retry starts real work, cancellation reaches a terminal
 state promptly, and deletion names the exact approved path and bytes before the
 owner confirms.
+
+---
+
+## BUG-76 — A failing tool or provider is retried until its budget runs out
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10 (ASI08 — cascading agent failures).**
+
+**Observed.** Every bound Raiker enforces on a runaway loop is a *budget*, not a
+breaker: `max_tool_calls` per turn (`raiker/runtime/orchestrator.py:1320`), the
+four-dimension subagent budget (`raiker/agents/orchestration.py:75`), API rate
+limiting (`raiker/api/security.py:111`), and per-job `max_retries`
+(`raiker/runtime/executors/reminders.py:171`). None of them carries failure
+state. A provider that fails every call, or a tool that raises on every
+invocation, consumes its entire budget one failing call at a time — and the next
+turn starts with a fresh budget and repeats it.
+
+**Impact.** A hard-down local runtime or a broken connector turns each turn into
+a long sequence of doomed calls before the turn ends. The owner sees latency and
+token spend rather than a stated failure, and nothing tells them which component
+is down. The reference architecture Raiker is measured against
+(`docs/OWASP_AGENTIC_TOP10_MAPPING.md`) treats the circuit breaker, not the
+budget, as the ASI08 control.
+
+**Required fix.** Track consecutive-failure counts per tool and per provider in
+durable state, open a breaker after a threshold, and refuse further calls with a
+stated reason code until a half-open probe succeeds. Reuse the existing
+containment vocabulary from `raiker/security/mcp_monitor.py` — `active` /
+`paused` with an owner-visible reason and a one-call resume — rather than
+inventing a second one. The breaker must be revocable by the owner, in keeping
+with the security posture at the top of this document.
+
+**UI when closed.** A repeatedly failing tool or provider is shown as contained,
+with the reason and the failure count, and a resume control that clears it. A
+turn that hits an open breaker says so instead of stalling.
+
+---
+
+## BUG-77 — Anomaly detection and containment cover MCP connections only
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10 (ASI10 — rogue agents).**
+
+**Observed.** `raiker/security/mcp_monitor.py` is a complete behaviour monitor:
+a rolling per-connection baseline, five deterministic anomaly rules (new host,
+volume spike, tool-set swap, sensitive-data shape, error/refusal burst), redacted
+`security_findings`, an `mcp_anomaly_detected` event, and three containment
+states — `active`, `paused` (automatic on a high-severity anomaly, revocable),
+and `killed` — enforced at the executor
+(`raiker/runtime/executors/mcp.py:604`).
+
+**None of it exists for any other capability family.** Plugins, connectors,
+subagents, and shell/container execution have no baseline, no anomaly rule, no
+finding, no auto-pause and no kill switch. `raiker/runtime/interrupts.py` stops
+a *turn*, not a misbehaving component, and persists no containment state across
+turns.
+
+**Impact.** The security posture at the top of this document promises
+"allow, monitor, surface anomalies as findings + notifications, and give the
+owner an instant stop plus an automatic revocable pause for the
+irreversible/high-severity cases." Today that promise is kept for one capability
+family. A connector exfiltrating on every turn, or a plugin whose tool set
+silently changes after an update, produces no finding and cannot be contained
+short of disabling the whole capability.
+
+**Required fix.** Lift the monitor's baseline/rule/finding/containment machinery
+out of `mcp_monitor.py` into a capability-agnostic substrate keyed by
+`(principal, capability, subject)`, and register connectors, plugins, subagents
+and local execution against it. Keep the hard invariant that the monitor only
+ever receives redacted metadata — counts, netloc, classification labels — never
+a payload. Reuse the existing `security_monitor_state` table
+(`raiker/storage/sqlite.py:2845`) rather than adding a parallel store.
+
+**UI when closed.** The security surface lists findings and containment state
+for every capability, not just MCP, and each contained subject names its reason
+and offers the same one-call pause, kill and resume.
+
+---
+
+## BUG-78 — A delegated subagent result carries no identity binding
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10 (ASI07 — insecure inter-agent communication).**
+
+**Observed.** Subagents are spawned through the governed `subagents` capability
+(`raiker/runtime/executors/orchestration.py:33`) and bounded on four dimensions
+(`raiker/agents/orchestration.py:75`). The result re-enters the parent turn as a
+source (`raiker/runtime/turn_sources.py:327`) with no attestation tying it to
+the spawn that produced it, and the parent performs no verification step before
+treating it as material.
+
+**Impact.** Lower than the networked case AGT addresses — delegation is
+in-process, so forging a result requires local code execution, at which point
+more direct attacks exist. It is still a missing link in an otherwise complete
+chain: Raiker already issues and verifies per-turn machine identity
+(`raiker/runtime/identity/`), and delegation is the one governed hand-off that
+does not use it. Without the binding, the audit trail cannot prove *which* spawn
+produced a given result when several ran in one turn.
+
+**Required fix.** Issue a spawn-scoped identity at delegation, bind the
+subagent's result to it, and verify it in the parent before the result becomes a
+turn source. Record the binding on the existing hash-chained event so the
+delegation is provable after the fact.
+
+**UI when closed.** A turn that used subagents attributes each result to its
+spawn in the activity and audit views, and a result that fails verification is
+refused with a stated reason rather than silently consumed.
+
+---
+
+## BUG-79 — A plugin signature is a presence marker by default
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10 (ASI04 — agentic supply chain).**
+
+**Observed.** `verify_plugin_signature()` reads the owner signing key from
+`RAIKER_PLUGIN_SIGNING_KEY`. When that variable is unset — the default —
+`raiker/plugins/verify.py:53` returns `(True, "signature_present")`: any
+non-empty string in the manifest's `signature` field passes. The checksum check
+beside it (`:35`) is real but proves only that the manifest is internally
+consistent with itself; it detects an accidental edit, not a hostile author.
+
+**Impact.** On a default install nothing distinguishes a genuinely signed plugin
+from one carrying the literal string `signature`, and the owner is never shown
+which state they are in. The supply-chain requirement in
+`docs/OWASP_GENAI_SECURITY_MAPPING.md` ("record plugin provenance", "reject
+untrusted plugin auto-enable") is therefore only half met. This is a deliberate
+local-development baseline, not an oversight — but an unstated one, which is the
+part that fails.
+
+**Required fix.** Surface the verification state as a first-class, owner-visible
+property of every installed plugin: `verified`, `present-only`, or `unsigned`,
+with the reason code that produced it. Do not silently harden the default —
+in keeping with the posture at the top of this document, tell the owner what
+they have and give them the one-step path to configure a key, rather than
+blocking an install that works today.
+
+**UI when closed.** The plugin list and the install permission-diff both state
+the signature verification level, and a `present-only` plugin is visibly
+distinct from a verified one.
+
+---
+
+## BUG-80 — The GenAI security mapping still calls the verifier a stub
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10.**
+
+**Observed.** `docs/OWASP_GENAI_SECURITY_MAPPING.md` rates LLM09
+(Misinformation) with the note "Verifier is a stub
+(`raiker/runtime/verifier.py`); implement verification + citation/provenance
+gating." That is no longer true: `raiker/runtime/verifier.py` is now a
+re-export, and its own comment records that "the previous pass-through
+`VerificationStub` has been replaced by the real `Verifier`" in
+`raiker/verification/verifier.py`.
+
+**Impact.** Low in blast radius, high in kind. This repository treats doc
+honesty as a security control — "a documented mitigation is not a real one" is
+stated in that same file — and the inverse error is just as corrosive: a shipped
+control recorded as absent means the next reviewer either rebuilds it or
+distrusts the rest of the table. AGT's own lessons-learned list names stub
+`verify()` functions as a recurring root cause of real incidents, which makes
+this exactly the row that must be accurate.
+
+**Required fix.** Re-audit the LLM Top-10 table against current code and correct
+every stale row, not only LLM09 — several statuses predate work that has since
+landed. Cite the file that proves each rating.
+
+**UI when closed.** No user-facing surface; the deliverable is a mapping table
+whose every row matches shipped code.
+
+---
+
+## BUG-81 — No prompt-injection scanning hook exists
+
+**Status: open. Found on 2026-08-09 while mapping Raiker to the OWASP Agentic
+Top 10 (ASI01 — agent goal hijack).**
+
+**Observed.** `docs/OWASP_GENAI_SECURITY_MAPPING.md` states under "Prompt
+Injection Requirements" that Raiker must "support prompt-injection scanning
+hooks". No such hook exists. `raiker/runtime/classifier.py` is an intent router
+(does this request need tools, a plan, an approval), not a detector, and nothing
+evaluates input at the point it enters the model context.
+
+**Impact.** Deliberately bounded. The structural controls do the real work here
+and they are in place: external content is framed as untrusted data and never as
+instruction (`raiker/runtime/web_access.py:375`,
+`raiker/runtime/retrieval.py:171`, `raiker/runtime/attachments.py`), and
+hijacked intent still has to cross a deny-by-default tool gate
+(`raiker/policy/engine.py`). What is missing is the *advisory signal* — the
+owner is never told that a fetched page or an attachment contained something
+shaped like an injection attempt, so a hijack attempt that the gate correctly
+refuses leaves no trace naming its source.
+
+**Required fix.** Add a deterministic, explainable scanning hook on untrusted
+context items that raises a redacted `security_findings` row and attributes it
+to the source, in the same vocabulary as `raiker/security/mcp_monitor.py`. Treat
+it as detection and provenance, not prevention — the refusal path stays the tool
+gate. Do not add probabilistic model-based filtering as a control surface; the
+reference architecture Raiker is measured against is explicit that prompt-level
+defence is not one.
+
+**UI when closed.** A turn whose context included suspicious external content
+shows a finding naming the source document or URL, and the finding survives in
+the audit trail whether or not the model acted on it.
 
 ---

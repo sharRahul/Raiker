@@ -189,7 +189,7 @@ Invalidate readiness after connection, model-selection, pull/import, endpoint, o
 Run: `python -m pytest tests/test_api_model_readiness.py tests/test_api_dashboard.py tests/test_api_model_selection.py -q`
 Expected: all pass; `provider_error_unclassified` never appears in API summaries.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/models/readiness.py raiker/control/dashboard.py raiker/api/schemas.py raiker/api/routes_models.py apps/api/main.py tests/test_api_model_readiness.py tests/test_api_dashboard.py tests/test_api_model_selection.py
@@ -210,7 +210,7 @@ git commit -m "fix: make model readiness honest"
 - Consumes: `ModelReadinessService.require_ready()`.
 - Produces: structured HTTP/SSE refusal `{reason_code: "model_not_ready", readiness: {state, summary, remediation, reason_code}}`.
 
-- [ ] **Step 1: Write failing Chat, Build-stream, Task, Schedule, and background tests**
+- [x] **Step 1: Write failing Chat, Build-stream, Task, Schedule, and background tests**
 
 ```python
 @pytest.mark.parametrize("path,payload", [
@@ -224,12 +224,12 @@ def test_unready_model_creates_no_work(client, owner_token, path, payload):
     assert response.json()["detail"]["reason_code"] == "model_not_ready"
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_model_readiness_guards.py -q`
 Expected: requests create a turn/task or fail later at the provider.
 
-- [ ] **Step 3: Add one guard before envelope/task creation and recheck at runtime**
+- [x] **Step 3: Add one guard before envelope/task creation and recheck at runtime**
 
 ```python
 def require_model_ready(workspace: Path, owner_principal_id: str, profile_id: str, model: str) -> ModelReadiness:
@@ -241,7 +241,7 @@ def require_model_ready(workspace: Path, owner_principal_id: str, profile_id: st
 
 Resolve omitted profile/model through the same principal model selection used by the gateway. A task without executable instructions remains a non-agent draft; any task/schedule/background run with an objective must be ready. Convert stream refusal into one final SSE event without creating a session/turn.
 
-- [ ] **Step 4: Verify GREEN and no durable side effects**
+- [x] **Step 4: Verify GREEN and no durable side effects**
 
 Run: `python -m pytest tests/test_model_readiness_guards.py tests/test_api_prompts.py tests/test_api_dashboard.py -q`
 Expected: all pass and rejected requests add no turn, task, attachment reference, or model usage row.

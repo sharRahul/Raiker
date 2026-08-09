@@ -103,7 +103,7 @@ class TestAuthMint:
 
 class TestInstances:
     def test_login_launcher_creates_an_isolated_same_server_instance(
-        self, bootstrapped_workspace: Path, client: TestClient
+        self, bootstrapped_workspace: Path, client: TestClient, mark_model_ready
     ) -> None:
         response = client.post(
             "/api/instances",
@@ -122,6 +122,8 @@ class TestInstances:
             json={"username": "alex", "password": "correct horse battery staple"},
         )
         assert child_login.status_code == 200, child_login.text
+        child_workspace = bootstrapped_workspace / ".raiker" / "instances" / "alex"
+        mark_model_ready(child_workspace, str(child_login.json()["principal_id"]))
         child_headers = _auth_headers(str(child_login.json()["token"]))
         created = client.post(
             "/instances/alex/api/tasks",
@@ -191,7 +193,10 @@ class TestReads:
         assert brain.status_code == 200
         assert brain.json()["nodes"][0]["node_type"] == "user"
 
-    def test_task_create_persists_priority_and_schedule(self, client: TestClient) -> None:
+    def test_task_create_persists_priority_and_schedule(
+        self, client: TestClient, app: FastAPI, mark_model_ready
+    ) -> None:
+        mark_model_ready(app.state.workspace_root)
         token = _token(client)
         response = client.post(
             "/api/tasks",
@@ -233,12 +238,13 @@ class TestReads:
         assert child.json()["recurrence"] == "daily"
 
     def test_immediate_task_keeps_its_independent_model_choice(
-        self, client: TestClient, app: FastAPI
+        self, client: TestClient, app: FastAPI, mark_model_ready
     ) -> None:
         token = _token(client)
         SQLiteStore(app.state.workspace_root).save_configured_model(
             "principal_owner", "ollama-local-openai-compatible", "gemma4:31b-cloud"
         )
+        mark_model_ready(app.state.workspace_root)
 
         response = client.post(
             "/api/tasks",
@@ -256,12 +262,13 @@ class TestReads:
         assert response.json()["model"] == "gemma4:31b-cloud"
 
     def test_schedule_keeps_its_independent_model_choice(
-        self, client: TestClient, app: FastAPI
+        self, client: TestClient, app: FastAPI, mark_model_ready
     ) -> None:
         token = _token(client)
         SQLiteStore(app.state.workspace_root).save_configured_model(
             "principal_owner", "ollama-local-openai-compatible", "gemma4:31b-cloud"
         )
+        mark_model_ready(app.state.workspace_root)
         response = client.post(
             "/api/tasks",
             headers=_auth_headers(token),
@@ -278,7 +285,10 @@ class TestReads:
         assert response.json()["model_profile"] == "ollama-local-openai-compatible"
         assert response.json()["model"] == "gemma4:31b-cloud"
 
-    def test_brain_returns_only_stored_work_relationships(self, client: TestClient) -> None:
+    def test_brain_returns_only_stored_work_relationships(
+        self, client: TestClient, app: FastAPI, mark_model_ready
+    ) -> None:
+        mark_model_ready(app.state.workspace_root)
         token = _token(client)
         created = client.post(
             "/api/tasks",
@@ -311,8 +321,9 @@ class TestReads:
     # what ended it. A terminal task reports its outcome, and a failure that
     # arrived without words still reports the reason the manager recorded.
     def test_brain_reports_a_finished_tasks_outcome_not_its_last_step(
-        self, bootstrapped_workspace: Path, client: TestClient
+        self, bootstrapped_workspace: Path, client: TestClient, mark_model_ready
     ) -> None:
+        mark_model_ready(bootstrapped_workspace)
         token = _token(client)
         created = client.post(
             "/api/tasks",

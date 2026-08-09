@@ -63,6 +63,26 @@ class ModelReadiness:
             "ready": self.ready,
         }
 
+    def public_status(self) -> dict[str, str]:
+        return {
+            "state": self.state.value,
+            "summary": self.summary,
+            "reason_code": self.reason_code,
+            "remediation": self.remediation,
+        }
+
+
+class ModelNotReady(RuntimeError):
+    def __init__(self, readiness: ModelReadiness) -> None:
+        super().__init__("model_not_ready")
+        self.readiness = readiness
+
+    def detail(self) -> dict[str, object]:
+        return {
+            "reason_code": "model_not_ready",
+            "readiness": self.readiness.public_status(),
+        }
+
 
 class ModelProbe(Protocol):
     async def check(self, key: ModelReadinessKey) -> ModelReadiness: ...
@@ -453,3 +473,61 @@ class ModelReadinessService:
             key.model,
             key.endpoint_fingerprint,
         )
+
+    def resolve_request_target(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> tuple[str, str]:
+        from raiker.models.registry import ModelProfileRegistry
+        from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+
+        registry = ModelProfileRegistry.load()
+        state = (
+            self.store.load_principal_model_state(owner_principal_id)  # type: ignore[attr-defined]
+            if self.store.get_account(owner_principal_id) is not None  # type: ignore[attr-defined]
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)  # type: ignore[attr-defined]
+        )
+        requested_profile = (profile_id or "").strip()
+        if requested_profile:
+            profile = registry.resolve_profile_id(requested_profile)
+            effective_model = profile.model
+            if state is not None and state.profile_id == profile.profile_id and state.model:
+                effective_model = state.model
+            if model and model.strip():
+                effective_model = model.strip()
+            return profile.profile_id, effective_model
+
+        if state is not None:
+            profile = registry.resolve_profile_id(state.profile_id)
+            effective_model = state.model or profile.model
+            if effective_model and "<" not in effective_model:
+                return profile.profile_id, effective_model
+
+        native = next(
+            profile
+            for profile in registry.list_profiles()
+            if bool(profile.raw.get("is_native_default"))
+        )
+        return native.profile_id, native.model
+
+    def require_ready(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> ModelReadiness:
+        resolved_profile, resolved_model = self.resolve_request_target(
+            owner_principal_id,
+            profile_id,
+            model,
+        )
+        readiness = self.current_selected(
+            owner_principal_id,
+            resolved_profile,
+            resolved_model,
+        )
+        if not readiness.ready:
+            raise ModelNotReady(readiness)
+        return readiness

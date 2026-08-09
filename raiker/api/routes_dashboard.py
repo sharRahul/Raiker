@@ -39,11 +39,16 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.auth.vault_key_file import ensure_vault_key
-from raiker.control.dashboard import AuthSessionView, DashboardService
+from raiker.control.dashboard import TASK_RECURRENCES, AuthSessionView, DashboardService
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.readiness import (
+    ModelNotReady,
+    ModelReadinessService,
+    ProviderCatalogueProbe,
+)
 from raiker.models.registry import ModelProfileRegistry
 from raiker.runtime.authority.models import Principal
 from raiker.storage.sqlite import SQLiteStore
@@ -1331,6 +1336,35 @@ async def create_task(
     title = body.title.strip()
     if not title:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="task_title_required")
+    if body.recurrence is not None and body.recurrence not in TASK_RECURRENCES:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": f"invalid_recurrence:{body.recurrence}"},
+        )
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    if (
+        body.project_id is not None
+        and store.load_project(body.project_id, principal.delegated_by_user_id) is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": f"unknown_project:{body.project_id}"},
+        )
+    if body.description.strip():
+        try:
+            ModelReadinessService(
+                store,
+                probe=ProviderCatalogueProbe(store),
+            ).require_ready(
+                session.principal_id,
+                body.model_profile,
+                body.model,
+            )
+        except ModelNotReady as exc:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=exc.detail(),
+            ) from exc
     # Project-scoped schedules: an explicit project_id wins; otherwise the task
     # is stamped with the active project so project work stays project-scoped.
     try:

@@ -71,7 +71,9 @@ def test_oversized_body_rejected(workspace: Path) -> None:
 # ── Phase 8 gate: same session accepts a CLI turn and a REST prompt ──
 
 
-def test_same_session_accepts_cli_and_rest_prompt(workspace: Path) -> None:
+def test_same_session_accepts_cli_and_rest_prompt(
+    workspace: Path, mark_model_ready
+) -> None:
     import asyncio
 
     from raiker.contracts.ids import new_id
@@ -85,6 +87,8 @@ def test_same_session_accepts_cli_and_rest_prompt(workspace: Path) -> None:
     from raiker.gateway.agent_gateway import AgentGateway
 
     session_id = new_id("sess_")
+    mark_model_ready(workspace, "local_user")
+    mark_model_ready(workspace, "principal_owner")
     # A CLI-origin turn lands in the session first.
     cli_env = PromptEnvelope(
         request_id=new_id("req_"),
@@ -93,7 +97,7 @@ def test_same_session_accepts_cli_and_rest_prompt(workspace: Path) -> None:
         client=ClientMetadata(type="cli", name="raiker", version="0.0.0"),
         user=UserMetadata(),
         prompt=PromptPayload(text="hello from cli", metadata={"entry_command": "cli"}),
-        options=PromptOptions(model_profile="missing-profile"),
+        options=PromptOptions(),
     )
     asyncio.run(AgentGateway(workspace).submit_prompt_async(cli_env))
 

@@ -30,6 +30,11 @@ from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.models.readiness import (
+    ModelNotReady,
+    ModelReadinessService,
+    ProviderCatalogueProbe,
+)
 from raiker.runtime.attachments import (
     DOCX_MEDIA_TYPE,
     PDF_MEDIA_TYPE,
@@ -62,6 +67,20 @@ def _ws(request: Request) -> str | Path:
 
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(_ws(request)).authenticate(request)
+
+
+def _require_model_ready(
+    request: Request,
+    principal_id: str,
+    profile_id: str | None,
+    model: str | None,
+) -> None:
+    store = SQLiteStore(_ws(request))
+    ModelReadinessService(store, probe=ProviderCatalogueProbe(store)).require_ready(
+        principal_id,
+        profile_id,
+        model,
+    )
 
 
 _MAX_ATTACHMENTS = 8
@@ -288,6 +307,15 @@ async def submit_prompt(
         envelope = _build_envelope(body, session.principal_id, _ws(request))
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
+    try:
+        _require_model_ready(
+            request, session.principal_id, body.model_profile, body.model
+        )
+    except ModelNotReady as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=exc.detail(),
+        ) from exc
     _record_attachment_refs(_ws(request), envelope, session.principal_id)
     gateway = AgentGateway(_ws(request), principal_id=session.principal_id)
     response = await gateway.submit_prompt_async(envelope)
@@ -335,6 +363,32 @@ async def stream_prompt(
             yield _sse(StreamEvent(kind=FINAL, response=final))
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    try:
+        _require_model_ready(
+            request, session.principal_id, body.model_profile, body.model
+        )
+    except ModelNotReady as exc:
+        refusal_detail = exc.detail()
+        refusal = AgentResponse(
+            request_id=envelope.request_id,
+            session_id=envelope.session_id,
+            turn_id=envelope.turn_id,
+            status="failed",
+            message=exc.readiness.summary,
+        )
+
+        async def readiness_error_gen() -> AsyncIterator[str]:
+            yield _sse(
+                StreamEvent(
+                    kind=FINAL,
+                    event_type="model_not_ready",
+                    payload=refusal_detail,
+                    response=refusal,
+                )
+            )
+
+        return StreamingResponse(readiness_error_gen(), media_type="text/event-stream")
 
     _record_attachment_refs(_ws(request), envelope, session.principal_id)
     gateway = AgentGateway(_ws(request), principal_id=session.principal_id)

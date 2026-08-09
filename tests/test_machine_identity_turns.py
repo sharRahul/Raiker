@@ -54,9 +54,10 @@ def _envelope() -> PromptEnvelope:
 
 @pytest.mark.anyio
 async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_terminal_turn(
-    tmp_path: Path,
+    tmp_path: Path, mark_model_ready,
 ) -> None:
     workspace = _workspace(tmp_path)
+    mark_model_ready(workspace)
     gateway = AgentGateway(workspace, principal_id="principal_owner")
     envelope = _envelope()
     captured: list[TrustedTurnIdentity] = []
@@ -102,8 +103,11 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
 
 
 @pytest.mark.anyio
-async def test_gateway_deactivates_identity_when_runtime_raises(tmp_path: Path) -> None:
+async def test_gateway_deactivates_identity_when_runtime_raises(
+    tmp_path: Path, mark_model_ready
+) -> None:
     workspace = _workspace(tmp_path)
+    mark_model_ready(workspace)
     gateway = AgentGateway(workspace, principal_id="principal_owner")
 
     async def fails(
@@ -124,8 +128,11 @@ async def test_gateway_deactivates_identity_when_runtime_raises(tmp_path: Path) 
 
 
 @pytest.mark.anyio
-async def test_gateway_deactivates_identity_when_stream_consumer_closes(tmp_path: Path) -> None:
+async def test_gateway_deactivates_identity_when_stream_consumer_closes(
+    tmp_path: Path, mark_model_ready
+) -> None:
     workspace = _workspace(tmp_path)
+    mark_model_ready(workspace)
     gateway = AgentGateway(workspace, principal_id="principal_owner")
 
     async def partial(

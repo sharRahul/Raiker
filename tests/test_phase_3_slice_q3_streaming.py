@@ -133,8 +133,9 @@ def test_gateway_stream_and_submit_reach_same_status_offline(offline_default_mod
     assert streamed_final.response.status == submitted.status == "failed"
 
 
-def test_gateway_stream_stops_when_its_tracked_task_is_cancelled() -> None:
+def test_gateway_stream_stops_when_its_tracked_task_is_cancelled(mark_model_ready) -> None:
     tmp = Path(tempfile.mkdtemp())
+    mark_model_ready(tmp, "local_user")
     gateway = AgentGateway(tmp)
     gateway.runtime.model_router = StreamingRouter(["first", "second"])  # type: ignore[assignment]
     env = build_prompt_envelope("hello")

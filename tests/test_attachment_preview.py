@@ -604,8 +604,9 @@ class TestPromptRecordsReferences:
         return str(resp.json()["attachment_id"])
 
     def test_prompting_with_a_document_makes_it_previewable(
-        self, client: TestClient, owner_token: str
+        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
     ) -> None:
+        mark_model_ready(workspace)
         attachment_id = self._upload(client, owner_token, MD_SOURCE.encode())
         # Before the turn there is no reference, so nothing is previewable.
         assert client.get(_preview_url(attachment_id), headers=_auth(owner_token)).status_code == 404
@@ -626,8 +627,10 @@ class TestPromptRecordsReferences:
         assert preview.json()["kind"] == KIND_MARKDOWN
 
     def test_an_unowned_attachment_id_records_nothing(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path,
+        seed_account: Any, mark_model_ready
     ) -> None:
+        mark_model_ready(workspace)
         other_principal, _ = seed_account(workspace, "bob")
         stolen = store_document(
             store,

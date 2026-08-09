@@ -78,8 +78,10 @@ class TestPrompts:
         assert client.post("/api/prompts", json={"text": "hi"}).status_code == 401
 
     def test_prompt_routes_use_account_approval_mode_when_omitted(
-        self, workspace: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch
+        self, workspace: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch,
+        mark_model_ready,
     ) -> None:
+        mark_model_ready(workspace)
         SQLiteStore(workspace).put_user_settings(
             "principal_owner", '{"composer":{"approval_mode":"auto"}}', utc_now()
         )
@@ -113,7 +115,10 @@ class TestPrompts:
         assert stream.status_code == 200
         assert [envelope.options.approval_mode for envelope in captured] == ["auto", "auto"]
 
-    def test_prompt_runs_a_governed_turn(self, workspace: Path, client: TestClient) -> None:
+    def test_prompt_runs_a_governed_turn(
+        self, workspace: Path, client: TestClient, mark_model_ready
+    ) -> None:
+        mark_model_ready(workspace)
         token = _token(client)
         resp = client.post("/api/prompts", json={"text": "hello"}, headers=_headers(token))
         assert resp.status_code == 200

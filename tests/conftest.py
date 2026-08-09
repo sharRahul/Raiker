@@ -4,6 +4,7 @@ import json
 import os
 import secrets
 from collections.abc import AsyncIterator, Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -15,6 +16,12 @@ from raiker.cli.principal_resolver import OWNER_BOOTSTRAP_ROLES, _ensure_bootstr
 from raiker.contracts.ids import new_id, utc_now
 from raiker.models.exceptions import ProviderConnectionError
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
+from raiker.models.readiness import (
+    ModelReadiness,
+    ModelReadinessService,
+    ModelReadinessState,
+    ProviderCatalogueProbe,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -57,8 +64,66 @@ def offline_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(AsyncOpenAICompatibleProvider, "chat", unavailable_chat)
     monkeypatch.setattr(AsyncOpenAICompatibleProvider, "stream_chat", unavailable_stream)
 
+    def previously_ready(
+        service: ModelReadinessService,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> ModelReadiness:
+        resolved_profile, resolved_model = service.resolve_request_target(
+            owner_principal_id, profile_id, model
+        )
+        key = service._selected_key(  # noqa: SLF001 - readiness is this fixture's boundary
+            owner_principal_id, resolved_profile, resolved_model
+        )
+        now = datetime.now(UTC)
+        readiness = ModelReadiness(
+            key=key,
+            state=ModelReadinessState.READY,
+            checked_at=now.isoformat(),
+            expires_at=(now + timedelta(minutes=5)).isoformat(),
+            summary="The exact model was reachable before the simulated outage.",
+            reason_code="model_ready",
+            remediation="",
+            evidence={"source": "offline_default_model_fixture"},
+        )
+        service.store.save_model_readiness(readiness)
+        return readiness
+
+    monkeypatch.setattr(ModelReadinessService, "require_ready", previously_ready)
+
 
 SeedAccount = Callable[..., tuple[str, str]]
+MarkModelReady = Callable[[Path, str, str, str], None]
+
+
+@pytest.fixture()
+def mark_model_ready() -> MarkModelReady:
+    """Seed one exact, short-lived observation for downstream behavior tests."""
+
+    def _mark(
+        workspace: Path,
+        principal_id: str = "principal_owner",
+        profile_id: str = "ollama-local-openai-compatible",
+        model: str = "gemma4:31b-cloud",
+    ) -> None:
+        store = SQLiteStore(workspace)
+        key = ProviderCatalogueProbe(store).resolve_key(principal_id, profile_id, model)
+        now = datetime.now(UTC)
+        store.save_model_readiness(
+            ModelReadiness(
+                key=key,
+                state=ModelReadinessState.READY,
+                checked_at=now.isoformat(),
+                expires_at=(now + timedelta(minutes=5)).isoformat(),
+                summary="The exact model is reachable.",
+                reason_code="model_ready",
+                remediation="",
+                evidence={"source": "test_fixture"},
+            )
+        )
+
+    return _mark
 
 
 @pytest.fixture()

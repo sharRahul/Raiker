@@ -457,8 +457,9 @@ class TestUploadApi:
         assert "content_does_not_match_media_type" in json.dumps(resp.json())
 
     def test_prompt_accepts_document_attachment_reference(
-        self, client: TestClient, owner_token: str
+        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
     ) -> None:
+        mark_model_ready(workspace)
         upload = self._upload(client, owner_token)
         attachment_id = upload.json()["attachment_id"]
         resp = client.post(

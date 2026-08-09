@@ -97,7 +97,10 @@ class TestOriginOverTheApi:
         client.headers.update({"Authorization": f"Bearer {token}"})
         return client
 
-    def test_a_task_session_is_listed_but_not_as_a_chat(self, workspace: Path) -> None:
+    def test_a_task_session_is_listed_but_not_as_a_chat(
+        self, workspace: Path, mark_model_ready
+    ) -> None:
+        mark_model_ready(workspace)
         client = self._client(workspace)
         created = client.post(
             "/api/tasks", json={"title": "Nightly sweep", "description": "Sweep"}

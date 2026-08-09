@@ -56,7 +56,7 @@ def test_gateway_preserves_client_metadata_and_writes_events(
 
 
 def test_gateway_finalization_events_are_not_runtime_states(
-    tmp_path: Path, monkeypatch: Any
+    tmp_path: Path, monkeypatch: Any, offline_default_model: None
 ) -> None:
     monkeypatch.chdir(tmp_path)
     (tmp_path / "config").mkdir()

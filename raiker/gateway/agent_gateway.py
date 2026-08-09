@@ -24,6 +24,11 @@ from raiker.hooks.registry import HooksRegistry
 from raiker.models.connections import get_model_connection
 from raiker.models.contracts import ModelMessage, ToolCallProposal
 from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.readiness import (
+    ModelNotReady,
+    ModelReadinessService,
+    ProviderCatalogueProbe,
+)
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
@@ -267,6 +272,38 @@ class AgentGateway:
             role_ids=("assistant",),
         )
 
+    def _model_readiness_refusal(
+        self, prompt_envelope: PromptEnvelope
+    ) -> AgentResponse | None:
+        try:
+            ModelReadinessService(
+                self.store,
+                probe=ProviderCatalogueProbe(self.store),
+            ).require_ready(
+                self.owner_principal_id,
+                prompt_envelope.options.model_profile,
+                prompt_envelope.options.model,
+            )
+        except ModelNotReady as exc:
+            return AgentResponse(
+                request_id=prompt_envelope.request_id,
+                session_id=prompt_envelope.session_id,
+                turn_id=prompt_envelope.turn_id,
+                status="failed",
+                message=exc.readiness.summary,
+                client=prompt_envelope.client,
+            )
+        except (KeyError, ValueError):
+            return AgentResponse(
+                request_id=prompt_envelope.request_id,
+                session_id=prompt_envelope.session_id,
+                turn_id=prompt_envelope.turn_id,
+                status="failed",
+                message="The selected model profile is not available.",
+                client=prompt_envelope.client,
+            )
+        return None
+
     def _rotate_identity_for_resume(
         self, envelope: PromptEnvelope
     ) -> TrustedTurnIdentity:
@@ -346,6 +383,8 @@ class AgentGateway:
         if prompt_envelope is None:
             assert error is not None
             return error
+        if refusal := self._model_readiness_refusal(prompt_envelope):
+            return refusal
         identity = self._prepare_turn(prompt_envelope)
         response: AgentResponse | None = None
         try:
@@ -367,6 +406,14 @@ class AgentGateway:
         if prompt_envelope is None:
             assert error is not None
             yield StreamEvent(kind=FINAL, response=error)
+            return
+        if refusal := self._model_readiness_refusal(prompt_envelope):
+            yield StreamEvent(
+                kind=FINAL,
+                event_type="model_not_ready",
+                payload={"reason_code": "model_not_ready"},
+                response=refusal,
+            )
             return
         identity = self._prepare_turn(prompt_envelope)
         tasks = TaskManager(self.store, self.writer)

@@ -333,8 +333,9 @@ class TestApi:
         assert resp.status_code in (401, 403)
 
     def test_task_list_is_scoped_by_project_through_the_api(
-        self, client: TestClient, workspace: Path
+        self, client: TestClient, workspace: Path, mark_model_ready
     ) -> None:
+        mark_model_ready(workspace)
         headers = self._headers(client)
         _project(SQLiteStore(workspace), "proj_a", "Alpha")
 

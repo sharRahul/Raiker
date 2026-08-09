@@ -451,8 +451,9 @@ class TestUploadApi:
         assert resp.status_code == 400
 
     def test_prompt_accepts_image_attachment_reference(
-        self, client: TestClient, owner_token: str
+        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
     ) -> None:
+        mark_model_ready(workspace)
         upload = self._upload(client, owner_token)
         attachment_id = upload.json()["attachment_id"]
         resp = client.post(

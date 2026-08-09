@@ -6,8 +6,10 @@ nothing and changes no gate, policy, or authority. It only changes the bounded
 context the chat receives: instructions, shared attachments, and the opt-in
 approved-memory boundary. Moving out must remove all of that.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -62,7 +64,9 @@ class TestSessionMove:
         assert result.data["project_id"] == "proj_a"
         assert _session_project(store, "sess_1") == "proj_a"
 
-    def test_move_session_out_of_project(self, store: SQLiteStore, service: DashboardService) -> None:
+    def test_move_session_out_of_project(
+        self, store: SQLiteStore, service: DashboardService
+    ) -> None:
         _project(store, "proj_a", "Alpha")
         store.create_session("sess_1", str(store.paths.workspace_root), user_id="owner")
         service.set_session_project("sess_1", "proj_a", OWNER)
@@ -241,9 +245,7 @@ class TestProjectScopedSchedules:
 
         assert task.project_id == "proj_b"
 
-    def test_task_without_an_active_project_has_no_project(
-        self, service: DashboardService
-    ) -> None:
+    def test_task_without_an_active_project_has_no_project(self, service: DashboardService) -> None:
         task = service.create_task(
             title="Loose task", objective="No project", user_id="owner", principal_id=OWNER
         )
@@ -256,10 +258,18 @@ class TestProjectScopedSchedules:
         _project(store, "proj_a", "Alpha")
         _project(store, "proj_b", "Beta")
         service.create_task(
-            title="Alpha task", objective="a", user_id="owner", principal_id=OWNER, project_id="proj_a"
+            title="Alpha task",
+            objective="a",
+            user_id="owner",
+            principal_id=OWNER,
+            project_id="proj_a",
         )
         service.create_task(
-            title="Beta task", objective="b", user_id="owner", principal_id=OWNER, project_id="proj_b"
+            title="Beta task",
+            objective="b",
+            user_id="owner",
+            principal_id=OWNER,
+            project_id="proj_b",
         )
         service.create_task(title="Loose task", objective="c", user_id="owner", principal_id=OWNER)
 
@@ -303,7 +313,9 @@ class TestApi:
         )
         assert moved_in.status_code == 200, moved_in.text
         assert moved_in.json()["project_id"] == "proj_a"
-        listing = client.get("/api/sessions", params={"project_id": "proj_a"}, headers=headers).json()
+        listing = client.get(
+            "/api/sessions", params={"project_id": "proj_a"}, headers=headers
+        ).json()
         assert [s["session_id"] for s in listing] == ["sess_a"]
         assert listing[0]["project_id"] == "proj_a"
 
@@ -312,7 +324,10 @@ class TestApi:
         )
         assert moved_out.status_code == 200, moved_out.text
         assert moved_out.json()["project_id"] is None
-        assert client.get("/api/sessions", params={"project_id": "proj_a"}, headers=headers).json() == []
+        assert (
+            client.get("/api/sessions", params={"project_id": "proj_a"}, headers=headers).json()
+            == []
+        )
 
     def test_unknown_session_move_is_a_403(self, client: TestClient, workspace: Path) -> None:
         headers = self._headers(client)
@@ -333,7 +348,7 @@ class TestApi:
         assert resp.status_code in (401, 403)
 
     def test_task_list_is_scoped_by_project_through_the_api(
-        self, client: TestClient, workspace: Path, mark_model_ready
+        self, client: TestClient, workspace: Path, mark_model_ready: Callable[..., None]
     ) -> None:
         mark_model_ready(workspace)
         headers = self._headers(client)

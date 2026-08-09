@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import io
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, cast
 
@@ -79,16 +80,14 @@ def make_xlsx(rows: list[list[str]], *, shared: bool = True) -> bytes:
             else:
                 cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{value}</t></is></c>')
         sheet_rows.append(f'<row r="{r}">' + "".join(cells) + "</row>")
-    sheet = f'<worksheet {ns}><sheetData>' + "".join(sheet_rows) + "</sheetData></worksheet>"
+    sheet = f"<worksheet {ns}><sheetData>" + "".join(sheet_rows) + "</sheetData></worksheet>"
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w") as archive:
-        archive.writestr("xl/workbook.xml", f'<workbook {ns}><sheets/></workbook>'.encode())
+        archive.writestr("xl/workbook.xml", f"<workbook {ns}><sheets/></workbook>".encode())
         archive.writestr("xl/worksheets/sheet1.xml", sheet.encode())
         if shared:
             items = "".join(f"<si><t>{value}</t></si>" for value in strings)
-            archive.writestr(
-                "xl/sharedStrings.xml", f'<sst {ns}>{items}</sst>'.encode()
-            )
+            archive.writestr("xl/sharedStrings.xml", f"<sst {ns}>{items}</sst>".encode())
     return buf.getvalue()
 
 
@@ -176,18 +175,25 @@ def _preview_url(attachment_id: str, session_id: str = SESSION_ID) -> str:
 
 class TestPreviewAuthorization:
     def test_preview_is_limited_to_the_attachment_owner_and_session(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+        self,
+        client: TestClient,
+        store: SQLiteStore,
+        owner_token: str,
+        workspace: Path,
+        seed_account: Any,
     ) -> None:
         attachment_id = _attach(
             store, filename="notes.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
         _, other_token = seed_account(workspace, "bob")
-        assert client.get(_preview_url(attachment_id), headers=_auth(owner_token)).status_code == 200
-        assert client.get(_preview_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        assert (
+            client.get(_preview_url(attachment_id), headers=_auth(owner_token)).status_code == 200
+        )
+        assert (
+            client.get(_preview_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        )
 
-    def test_preview_requires_authentication(
-        self, client: TestClient, store: SQLiteStore
-    ) -> None:
+    def test_preview_requires_authentication(self, client: TestClient, store: SQLiteStore) -> None:
         attachment_id = _attach(
             store, filename="notes.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
@@ -219,7 +225,9 @@ class TestPreviewAuthorization:
         assert resp.status_code == 404
 
     def test_unknown_attachment_is_a_404(self, client: TestClient, owner_token: str) -> None:
-        assert client.get(_preview_url("att_missing"), headers=_auth(owner_token)).status_code == 404
+        assert (
+            client.get(_preview_url("att_missing"), headers=_auth(owner_token)).status_code == 404
+        )
 
     def test_service_refuses_an_empty_owner(self, store: SQLiteStore) -> None:
         attachment_id = _attach(
@@ -254,17 +262,15 @@ class TestPreviewRepresentations:
             principal_id=OWNER_PRINCIPAL,
         )
         attachment_id = str(result["attachment_id"])
-        preview = AttachmentPreviewService(store).get(
-            SESSION_ID, attachment_id, OWNER_PRINCIPAL
-        )
+        preview = AttachmentPreviewService(store).get(SESSION_ID, attachment_id, OWNER_PRINCIPAL)
         assert preview is not None
         assert preview.kind == kind
-        assert AttachmentPreviewService(store).get(
-            "sess_wrong", attachment_id, OWNER_PRINCIPAL
-        ) is None
-    def test_markdown_preview_carries_source_text_and_no_html(
-        self, store: SQLiteStore
-    ) -> None:
+        assert (
+            AttachmentPreviewService(store).get("sess_wrong", attachment_id, OWNER_PRINCIPAL)
+            is None
+        )
+
+    def test_markdown_preview_carries_source_text_and_no_html(self, store: SQLiteStore) -> None:
         attachment_id = _attach(
             store, filename="notes.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
@@ -322,9 +328,7 @@ class TestPreviewRepresentations:
 
     def test_text_preview_is_bounded(self, store: SQLiteStore) -> None:
         data = ("x" * (MAX_PREVIEW_TEXT_CHARS + 500)).encode()
-        attachment_id = _attach(
-            store, filename="big.txt", media_type="text/plain", data=data
-        )
+        attachment_id = _attach(store, filename="big.txt", media_type="text/plain", data=data)
         preview = AttachmentPreviewService(store).get(SESSION_ID, attachment_id, OWNER_PRINCIPAL)
         assert preview is not None
         assert len(preview.text) == MAX_PREVIEW_TEXT_CHARS
@@ -453,15 +457,17 @@ class TestPdfPreviewRoute:
             store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
         )
         _, other_token = seed_account(workspace, "bob")
-        assert client.get(self._pdf_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        assert (
+            client.get(self._pdf_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        )
 
     def test_pdf_route_refuses_a_non_pdf_attachment(
         self, client: TestClient, store: SQLiteStore, owner_token: str
     ) -> None:
-        attachment_id = _attach(
-            store, filename="notes.txt", media_type="text/plain", data=b"hello"
+        attachment_id = _attach(store, filename="notes.txt", media_type="text/plain", data=b"hello")
+        assert (
+            client.get(self._pdf_url(attachment_id), headers=_auth(owner_token)).status_code == 404
         )
-        assert client.get(self._pdf_url(attachment_id), headers=_auth(owner_token)).status_code == 404
 
     def test_disposition_filename_cannot_inject_header_parameters(
         self, client: TestClient, store: SQLiteStore, owner_token: str
@@ -507,7 +513,10 @@ class TestImagePreviewRoute:
     ) -> None:
         attachment_id = _attach_image(store)
         _, other_token = seed_account(workspace, "bob")
-        assert client.get(self._image_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        assert (
+            client.get(self._image_url(attachment_id), headers=_auth(other_token)).status_code
+            == 404
+        )
 
     def test_image_route_refuses_another_conversation(
         self, client: TestClient, store: SQLiteStore, owner_token: str
@@ -527,7 +536,10 @@ class TestImagePreviewRoute:
         attachment_id = _attach(
             store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
         )
-        assert client.get(self._image_url(attachment_id), headers=_auth(owner_token)).status_code == 404
+        assert (
+            client.get(self._image_url(attachment_id), headers=_auth(owner_token)).status_code
+            == 404
+        )
         image_id = _attach_image(store)
         pdf_route = _preview_url(image_id) + "/pdf"
         assert client.get(pdf_route, headers=_auth(owner_token)).status_code == 404
@@ -550,7 +562,9 @@ class TestImagePreviewRoute:
             owner_principal_id=OWNER_PRINCIPAL,
             turn_id="turn_1",
         )
-        assert client.get(self._image_url("att_fake"), headers=_auth(owner_token)).status_code == 404
+        assert (
+            client.get(self._image_url("att_fake"), headers=_auth(owner_token)).status_code == 404
+        )
 
 
 # ── the JSON preview route + session file list ──────────────────────────────
@@ -569,7 +583,12 @@ class TestPreviewRoutes:
         assert body["rows"][0] == ["Quarterly report", "Owner"]
 
     def test_session_file_list_is_owner_scoped(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+        self,
+        client: TestClient,
+        store: SQLiteStore,
+        owner_token: str,
+        workspace: Path,
+        seed_account: Any,
     ) -> None:
         attachment_id = _attach(
             store, filename="notes.md", media_type="text/markdown", data=MD_SOURCE.encode()
@@ -604,12 +623,18 @@ class TestPromptRecordsReferences:
         return str(resp.json()["attachment_id"])
 
     def test_prompting_with_a_document_makes_it_previewable(
-        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
+        self,
+        client: TestClient,
+        owner_token: str,
+        workspace: Path,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(workspace)
         attachment_id = self._upload(client, owner_token, MD_SOURCE.encode())
         # Before the turn there is no reference, so nothing is previewable.
-        assert client.get(_preview_url(attachment_id), headers=_auth(owner_token)).status_code == 404
+        assert (
+            client.get(_preview_url(attachment_id), headers=_auth(owner_token)).status_code == 404
+        )
         resp = client.post(
             "/api/prompts",
             json={
@@ -627,8 +652,13 @@ class TestPromptRecordsReferences:
         assert preview.json()["kind"] == KIND_MARKDOWN
 
     def test_an_unowned_attachment_id_records_nothing(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path,
-        seed_account: Any, mark_model_ready
+        self,
+        client: TestClient,
+        store: SQLiteStore,
+        owner_token: str,
+        workspace: Path,
+        seed_account: Any,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(workspace)
         other_principal, _ = seed_account(workspace, "bob")
@@ -687,7 +717,9 @@ class TestPromptRecordsReferences:
             OWNER_PRINCIPAL,
         )
 
-        files = client.get(f"/api/sessions/{SESSION_ID}/attachments", headers=_auth(owner_token)).json()["files"]
+        files = client.get(
+            f"/api/sessions/{SESSION_ID}/attachments", headers=_auth(owner_token)
+        ).json()["files"]
         assert len(files) == 1
         assert files[0]["filename"] == "draft.md"
         assert files[0]["turn_id"] == "turn_generated"
@@ -731,20 +763,28 @@ class TestAttachmentDownload:
         assert response.headers["cache-control"] == "no-store"
 
     def test_download_is_limited_to_the_owner_and_the_conversation(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+        self,
+        client: TestClient,
+        store: SQLiteStore,
+        owner_token: str,
+        workspace: Path,
+        seed_account: Any,
     ) -> None:
         attachment_id = _attach(
             store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
         _, other_token = seed_account(workspace, "bob")
-        assert client.get(_download_url(attachment_id), headers=_auth(other_token)).status_code == 404
-        assert client.get(
-            _download_url(attachment_id, session_id="sess_other"), headers=_auth(owner_token)
-        ).status_code == 404
+        assert (
+            client.get(_download_url(attachment_id), headers=_auth(other_token)).status_code == 404
+        )
+        assert (
+            client.get(
+                _download_url(attachment_id, session_id="sess_other"), headers=_auth(owner_token)
+            ).status_code
+            == 404
+        )
 
-    def test_download_requires_authentication(
-        self, client: TestClient, store: SQLiteStore
-    ) -> None:
+    def test_download_requires_authentication(self, client: TestClient, store: SQLiteStore) -> None:
         attachment_id = _attach(
             store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
@@ -759,9 +799,9 @@ class TestAttachmentDownload:
             media_type="text/markdown",
             data=MD_SOURCE.encode(),
         )
-        disposition = client.get(
-            _download_url(attachment_id), headers=_auth(owner_token)
-        ).headers["content-disposition"]
+        disposition = client.get(_download_url(attachment_id), headers=_auth(owner_token)).headers[
+            "content-disposition"
+        ]
         assert "/" not in disposition.split("filename=", 1)[1]
         assert ";" not in disposition.split('filename="', 1)[1].rsplit('"', 1)[0]
 
@@ -804,13 +844,21 @@ class TestAttachmentProvenance:
         assert body["session_id"] == SESSION_ID
 
     def test_provenance_is_owner_scoped(
-        self, client: TestClient, store: SQLiteStore, owner_token: str, workspace: Path, seed_account: Any
+        self,
+        client: TestClient,
+        store: SQLiteStore,
+        owner_token: str,
+        workspace: Path,
+        seed_account: Any,
     ) -> None:
         attachment_id = _attach(
             store, filename="report.md", media_type="text/markdown", data=MD_SOURCE.encode()
         )
         _, other_token = seed_account(workspace, "bob")
-        assert client.get(
-            f"/api/sessions/{SESSION_ID}/attachments/{attachment_id}/provenance",
-            headers=_auth(other_token),
-        ).status_code == 404
+        assert (
+            client.get(
+                f"/api/sessions/{SESSION_ID}/attachments/{attachment_id}/provenance",
+                headers=_auth(other_token),
+            ).status_code
+            == 404
+        )

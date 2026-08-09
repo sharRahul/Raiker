@@ -200,11 +200,16 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
 | FIXED-132 | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
 | BUG-68 | Medium | Chat / Build — context meter reads `NaN input · NaN output` | Open (found in the 2026-08-08 live round) |
-| BUG-69 | High | First run / the first message fails with a raw reason code | Open (found in the 2026-08-08 live round) |
+| FIXED-133 | High | First run / universal exact-model readiness and setup (BUG-69) | Fixed (2026-08-09 live round) |
+| FIXED-134 | High | Local library / redaction corrupted path-derived deployment IDs | Fixed (found in BUG-69 live download/deploy) |
+| FIXED-135 | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
+| FIXED-136 | High | Managed llama.cpp / graceful host shutdown could leave the child alive | Fixed (found in BUG-69 shutdown verification) |
 | BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
 | BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
 | BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
 | BUG-73 | Medium | Chat / a resumed turn can deny an execution that happened | Open, intermittent (found in the 2026-08-08 live round) |
+| BUG-74 | Low | Web build / the main production JavaScript chunk exceeds the 500 kB warning threshold | Open (found while closing BUG-69) |
+| BUG-75 | Medium | Model activity / retry, cancellation, and partial-file cleanup are record-only for some job types | Open (found while closing BUG-69) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5555,8 +5560,8 @@ next count field added cannot silently become `NaN` again.
 
 ## BUG-69 — A new user's first message fails with a raw reason code
 
-**Status: open. Found on 2026-08-08 on a pristine workspace. Regression surface
-introduced by FIXED-116.**
+**Status: fixed on 2026-08-09 as FIXED-133. Found on 2026-08-08 on a pristine
+workspace. Regression surface introduced by FIXED-116.**
 
 **Observed.** On a brand-new workspace, an owner who registers and immediately
 types a message gets, as the entire reply:
@@ -5607,6 +5612,31 @@ why it cannot and where to go. It never prints a reason code.
 **Evidence.** `screenshots/not-working/BUG-r0808-05-fresh-workspace-defaults-to-absent-ollama.png`,
 `BUG-r0808-05-models-claims-one-provider-set-up.png`,
 `BUG-r0808-05-first-turn-raw-reason-code.png`.
+
+**Implemented.** Readiness is now persisted against the owner, profile, exact
+model, and endpoint fingerprint, expires after five minutes, and is invalidated
+when any binding changes. Local providers must be reachable and list the exact
+model. Hosted providers must additionally pass an owner-triggered one-token
+execution preflight, so catalogue access with no billing or execution access is
+not presented as ready. The shared gate disables model-backed actions in
+Workbench, Chat, Build, Tasks, and Schedule, preserves drafts, and opens a
+single setup dialog linking to Models. First run now prompts for provider/local
+model setup.
+
+Models now includes official Ollama and LM Studio setup paths, Ollama pull,
+approved-root bounded GGUF discovery, managed loopback llama.cpp deployment,
+durable operation views, and Hugging Face search with immutable revisions,
+licence/gated review, GGUF-first downloads, and explicitly confirmed isolated
+Safetensors conversion. No ambient filesystem scan or automatic conversion is
+performed.
+
+**Closing evidence.** Live Chromium on 2026-08-09 verified the first-run setup,
+cross-surface disabled actions, local Ollama `gemma4:31b-cloud`, OpenRouter
+`openai/gpt-4o-mini`, Anthropic catalogue success followed by a correctly
+fail-closed account-credit execution preflight, approved-root GGUF discovery,
+revision-pinned Hugging Face choices, a real tiny GGUF download, and completed
+managed llama.cpp deployment. See the BUG-69 section in
+`RAIKER_LIVE_MANUAL_TEST_PLAN.md` and the screenshot evidence index.
 
 ---
 
@@ -5850,3 +5880,77 @@ seven tabs on real data; Settings' six tabs; theme cycling system → light → 
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
+## FIXED-134 — Redaction corrupted path-derived local model IDs
+
+**Status: fixed in the BUG-69 live download/deploy round.** A revision-like
+numeric segment in the former path-derived `model_id` was correctly redacted in
+the API response, but that made the identifier unusable when the UI sent it
+back to Deploy. Local models now expose a stable opaque `mdl_…` identifier;
+paths remain server-side and redacted. A nested-library API regression proves
+the returned identifier deploys unchanged.
+
+---
+
+## FIXED-135 — Model Activity did not refresh background state
+
+**Status: fixed in the BUG-69 screenshot review.** Activity loaded once, so a
+deployment that completed server-side remained visibly `running`. The mounted
+panel now polls once per second and clears its interval on unmount. The focused
+component test uses fake time to prove a second fetch occurs, and screenshot
+214 shows the newest deployment as complete.
+
+---
+
+## FIXED-136 — Managed llama.cpp could outlive graceful host shutdown
+
+**Status: fixed in the BUG-69 shutdown verification.** The runtime previously
+sent terminate without waiting. Shutdown now waits up to five seconds, kills on
+timeout, waits for exit, and only then clears its state. The live test child was
+verified stopped after the service closed.
+
+---
+
+## BUG-74 — Production web bundle exceeds the chunk warning threshold
+
+**Status: open. Found on 2026-08-09 while running the BUG-69 production build.**
+
+**Observed.** `npm --prefix apps/web run build` succeeds but Vite reports the
+main JavaScript chunk at about 677 kB, above its 500 kB warning threshold.
+
+**Impact.** This is not a correctness or security failure, but it increases the
+initial dashboard download and parse cost, especially on lower-powered devices.
+
+**Required fix.** Split route-heavy views, including Models acquisition panels,
+with stable dynamic imports or an intentional `manualChunks` policy. Preserve
+the current no-flash navigation and mocked browser coverage.
+
+**UI when closed.** The same dashboard loads with no build-size warning and no
+loss of first-route responsiveness.
+
+---
+
+## BUG-75 — Some model-operation lifecycle controls are record-only
+
+**Status: open. Found on 2026-08-09 while closing BUG-69.**
+
+**Observed.** Ollama pull, Hugging Face download, conversion, and managed GGUF
+deployment start real background workers. For a failed operation, however,
+**Retry** currently resets its durable row to `queued` without reconstructing
+and dispatching the original worker. **Cancel** records `cancel_requested`, but
+not every worker polls it. **Clear record** removes the durable row but does not
+delete an incomplete destination.
+
+**Impact.** The activity view is honest about the persisted state, but these
+three controls do not yet provide the complete resumable/cancellable/partial
+cleanup contract expected of a download manager.
+
+**Required fix.** Persist a secret-safe typed operation payload, dispatch retry
+by job kind, add cooperative cancellation checks to every worker, and present a
+separate confirmed **Delete partial files** action restricted to the approved
+destination. Keep **Clear record** metadata-only.
+
+**UI when closed.** Retry starts real work, cancellation reaches a terminal
+state promptly, and deletion names the exact approved path and bytes before the
+owner confirms.
+
+---

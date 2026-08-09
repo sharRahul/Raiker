@@ -26,7 +26,11 @@
     await api.cleanupModelOperation(id);
     await load();
   }
-  onMount(load);
+  onMount(() => {
+    void load();
+    const interval = window.setInterval(() => void load(), 1_000);
+    return () => window.clearInterval(interval);
+  });
 </script>
 
 <section class="activity" aria-labelledby="activity-title">

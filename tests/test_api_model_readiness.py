@@ -99,6 +99,32 @@ def test_check_marks_only_the_exact_catalogue_model_ready(
     ]
 
 
+def test_hosted_check_requires_a_bounded_execution_preflight(
+    client: TestClient,
+    owner_token: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def catalogue(_router: ModelRouter, profile: ModelProfile) -> list[ProviderModelInfo]:
+        return [ProviderModelInfo(id=profile.model, owned_by="provider")]
+
+    async def refused(_router: ModelRouter, _profile: ModelProfile) -> None:
+        raise ProviderConnectionError("provider_http_error:http_400")
+
+    monkeypatch.setattr(ModelRouter, "alist_models_for_profile", catalogue)
+    monkeypatch.setattr(ModelRouter, "aprobe_model", refused)
+
+    response = client.post(
+        "/api/model-readiness/check",
+        headers=_auth(owner_token),
+        json={"profile_id": "anthropic-hosted", "model": "claude-opus-4-8"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["state"] == "unreachable"
+    assert response.json()["reason_code"] == "provider_execution_refused"
+    assert "credential, access, and billing" in response.json()["remediation"]
+
+
 def test_check_reports_plain_language_local_model_missing(
     client: TestClient,
     owner_token: str,
@@ -243,7 +269,10 @@ def test_connection_change_invalidates_profile_readiness(
 
 def test_readiness_routes_require_auth(client: TestClient) -> None:
     assert client.get("/api/model-readiness").status_code == 401
-    assert client.post(
-        "/api/model-readiness/check",
-        json={"profile_id": "ollama-local-openai-compatible", "model": "x"},
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/model-readiness/check",
+            json={"profile_id": "ollama-local-openai-compatible", "model": "x"},
+        ).status_code
+        == 401
+    )

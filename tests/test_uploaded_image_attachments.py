@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import base64
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -103,9 +103,7 @@ class TestImageValidation:
 class TestAttachmentStore:
     def test_store_and_load_roundtrip(self, tmp_path: Path) -> None:
         store = SQLiteStore(tmp_path)
-        stored = store_image(
-            store, filename="shot.png", media_type="image/png", data=PNG_BYTES
-        )
+        stored = store_image(store, filename="shot.png", media_type="image/png", data=PNG_BYTES)
         assert stored.attachment_id.startswith("att_")
         assert stored.byte_size == len(PNG_BYTES)
         record = load_image(store, stored.attachment_id)
@@ -115,9 +113,7 @@ class TestAttachmentStore:
 
     def test_metadata_load_never_carries_bytes(self, tmp_path: Path) -> None:
         store = SQLiteStore(tmp_path)
-        stored = store_image(
-            store, filename="shot.png", media_type="image/png", data=PNG_BYTES
-        )
+        stored = store_image(store, filename="shot.png", media_type="image/png", data=PNG_BYTES)
         metadata = store.load_attachment_metadata(stored.attachment_id)
         assert metadata is not None
         assert "data" not in metadata
@@ -137,9 +133,15 @@ class TestAttachmentStore:
 
 def _profile(raw: dict[str, object]) -> ModelProfile:
     return ModelProfile(
-        profile_id="p", provider="anthropic", model="m",
-        build_phase="phase4", default_state="enabled", tui_launch_action="none",
-        local_only=False, requires_network=True, raw=dict(raw),
+        profile_id="p",
+        provider="anthropic",
+        model="m",
+        build_phase="phase4",
+        default_state="enabled",
+        tui_launch_action="none",
+        local_only=False,
+        requires_network=True,
+        raw=dict(raw),
     )
 
 
@@ -156,7 +158,9 @@ class TestVisionCapability:
 
 def _request(images: tuple[ModelImage, ...]) -> ModelRequest:
     return ModelRequest(
-        profile_id="p", provider="x", model="m",
+        profile_id="p",
+        provider="x",
+        model="m",
         messages=[
             ModelMessage(role="system", content="sys"),
             ModelMessage(role="user", content="what is in this image?", images=images),
@@ -170,7 +174,10 @@ IMAGE = ModelImage(media_type="image/png", base64_data=base64.b64encode(PNG_BYTE
 class TestProviderImageSerialization:
     def test_anthropic_sends_image_block_when_vision(self) -> None:
         provider = AsyncAnthropicMessagesProvider(
-            profile_id="p", provider="anthropic", model="m", endpoint="http://127.0.0.1:1",
+            profile_id="p",
+            provider="anthropic",
+            model="m",
+            endpoint="http://127.0.0.1:1",
             capabilities=ModelCapabilities(supports_vision=True),
         )
         payload = provider._payload(_request((IMAGE,)), stream=False)
@@ -181,7 +188,10 @@ class TestProviderImageSerialization:
 
     def test_anthropic_drops_images_without_vision(self) -> None:
         provider = AsyncAnthropicMessagesProvider(
-            profile_id="p", provider="anthropic", model="m", endpoint="http://127.0.0.1:1",
+            profile_id="p",
+            provider="anthropic",
+            model="m",
+            endpoint="http://127.0.0.1:1",
             capabilities=ModelCapabilities(supports_vision=False),
         )
         payload = provider._payload(_request((IMAGE,)), stream=False)
@@ -193,7 +203,10 @@ class TestProviderImageSerialization:
 
     def test_openai_sends_data_url_when_vision(self) -> None:
         provider = AsyncOpenAICompatibleProvider(
-            profile_id="p", provider="openai", model="m", endpoint="http://127.0.0.1:1",
+            profile_id="p",
+            provider="openai",
+            model="m",
+            endpoint="http://127.0.0.1:1",
             capabilities=ModelCapabilities(supports_vision=True),
         )
         payload = provider._payload(_request((IMAGE,)), stream=False)
@@ -204,7 +217,10 @@ class TestProviderImageSerialization:
 
     def test_openai_keeps_plain_text_without_vision(self) -> None:
         provider = AsyncOpenAICompatibleProvider(
-            profile_id="p", provider="llama.cpp", model="m", endpoint="http://127.0.0.1:1",
+            profile_id="p",
+            provider="llama.cpp",
+            model="m",
+            endpoint="http://127.0.0.1:1",
             capabilities=ModelCapabilities(supports_vision=False),
         )
         payload = provider._payload(_request((IMAGE,)), stream=False)
@@ -217,11 +233,12 @@ class TestProviderImageSerialization:
 class TestImageAttachmentGathering:
     def test_uploaded_image_becomes_metadata_item(self, tmp_path: Path) -> None:
         store = SQLiteStore(tmp_path)
-        stored = store_image(
-            store, filename="shot.png", media_type="image/png", data=PNG_BYTES
-        )
+        stored = store_image(store, filename="shot.png", media_type="image/png", data=PNG_BYTES)
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "image", "attachment_id": stored.attachment_id}],
         )
         items = [i for i in bundle.items if i.source.source_type == "attachment"]
@@ -235,7 +252,10 @@ class TestImageAttachmentGathering:
 
     def test_unknown_image_reported_honestly(self, tmp_path: Path) -> None:
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "image", "attachment_id": "att_missing"}],
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
@@ -243,7 +263,10 @@ class TestImageAttachmentGathering:
 
     def test_missing_attachment_id_reported_honestly(self, tmp_path: Path) -> None:
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "image"}],
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
@@ -327,9 +350,7 @@ class TestOrchestratorImageDelivery:
         orchestrator = _orchestrator(tmp_path, router)
         envelope = _envelope([{"type": "image", "attachment_id": stored.attachment_id}])
         orchestrator.handle(envelope)
-        user_messages = [
-            m for m in router.seen_messages[0] if m.role == "user" and m.images
-        ]
+        user_messages = [m for m in router.seen_messages[0] if m.role == "user" and m.images]
         assert len(user_messages) == 1
         assert user_messages[0].images[0].media_type == "image/png"
         events = _events(orchestrator, envelope.session_id)
@@ -441,7 +462,9 @@ class TestUploadApi:
         self, client: TestClient, owner_token: str
     ) -> None:
         resp = self._upload(
-            client, owner_token, data_base64=base64.b64encode(b"\xff\xd8\xffJPEG").decode(),
+            client,
+            owner_token,
+            data_base64=base64.b64encode(b"\xff\xd8\xffJPEG").decode(),
         )
         assert resp.status_code == 400
         assert "content_does_not_match_media_type" in json.dumps(resp.json())
@@ -451,7 +474,11 @@ class TestUploadApi:
         assert resp.status_code == 400
 
     def test_prompt_accepts_image_attachment_reference(
-        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
+        self,
+        client: TestClient,
+        owner_token: str,
+        workspace: Path,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(workspace)
         upload = self._upload(client, owner_token)

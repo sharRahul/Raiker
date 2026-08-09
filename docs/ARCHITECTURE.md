@@ -78,3 +78,16 @@ again before execution. Resolution is metadata-only for every other capability.
 Strict
 non-allow blocking, role revoke governance, session revocation, and capability
 gates per action are enforced. sessions: deferred; no `/sessions` command is currently implemented.
+
+
+## Model availability plane
+
+Selection and availability are separate. A shared readiness service keys
+evidence by owner, profile, exact model, and endpoint fingerprint, expires it,
+and invalidates it on connection, catalogue, selection, or runtime changes.
+Every model-backed surface consults that service before dispatch. Provider
+catalogues prove exact presence; hosted providers additionally receive an
+owner-triggered minimal execution preflight. The Models acquisition plane owns
+approved GGUF roots, durable jobs, managed loopback llama.cpp, immutable Hugging
+Face snapshots, and the isolated conversion worker; none bypasses turn
+governance.

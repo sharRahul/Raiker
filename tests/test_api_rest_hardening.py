@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -72,7 +73,7 @@ def test_oversized_body_rejected(workspace: Path) -> None:
 
 
 def test_same_session_accepts_cli_and_rest_prompt(
-    workspace: Path, mark_model_ready
+    workspace: Path, mark_model_ready: Callable[..., None]
 ) -> None:
     import asyncio
 

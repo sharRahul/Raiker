@@ -1,8 +1,8 @@
 # Raiker user guide
 
 Task-shaped instructions for running Raiker's local web dashboard. Everything
-here was re-executed against a live instance on **2026-08-08**, against hosted
-Anthropic with every model in its catalogue — see
+here was re-executed against a live instance on **2026-08-09**, including
+Anthropic, OpenRouter, Ollama, approved local GGUF discovery, and Hugging Face — see
 [the live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) for the
 evidence and [To be fixed](../plans/TO_BE_FIXED.md) for what does not work yet.
 
@@ -25,10 +25,10 @@ Raiker **fails closed**. On a fresh account every one of its 67 capability
 gates is off and no model provider is *reachable*. Nothing is broken — you have
 not opened anything yet.
 
-A fresh install does show a model in the composer — Ollama's
-`gemma4:31b-cloud` — but that is a **preference, not a connection**. If Ollama
-is not running on this machine, your first message will fail with a
-`model_unavailable` reason code. Connect a provider first (BUG-69).
+A fresh install may show Ollama's `gemma4:31b-cloud` as a preference, but it is
+not **ready** until that exact model is reported by the reachable runtime. The
+setup flow opens automatically; if it is skipped, every model-backed action is
+disabled with a link to **Models**. Draft work is preserved.
 
 **Configuring something is permission for it.** Connecting a provider in
 **Models** is the whole of the first step: that act authorises the endpoint you

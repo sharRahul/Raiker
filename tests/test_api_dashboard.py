@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -93,7 +94,9 @@ class TestAuthMint:
         assert resp.status_code == 403
         assert resp.json()["detail"]["reason_code"] == "no_local_owner"
 
-    def test_ai_principal_cannot_mint(self, bootstrapped_workspace: Path, client: TestClient) -> None:
+    def test_ai_principal_cannot_mint(
+        self, bootstrapped_workspace: Path, client: TestClient
+    ) -> None:
         ai = _create_ai_principal(bootstrapped_workspace)
         resp = _mint(client, as_principal=ai)
         assert resp.status_code == 403
@@ -103,7 +106,10 @@ class TestAuthMint:
 
 class TestInstances:
     def test_login_launcher_creates_an_isolated_same_server_instance(
-        self, bootstrapped_workspace: Path, client: TestClient, mark_model_ready
+        self,
+        bootstrapped_workspace: Path,
+        client: TestClient,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         response = client.post(
             "/api/instances",
@@ -116,7 +122,10 @@ class TestInstances:
         assert client.get("/instances/alex/api/health").status_code == 200
         # A password login is still required; the launcher session is never
         # inherited by the new workspace.
-        assert client.post("/instances/alex/api/auth/session", json={"as_principal": None}).status_code == 403
+        assert (
+            client.post("/instances/alex/api/auth/session", json={"as_principal": None}).status_code
+            == 403
+        )
         child_login = client.post(
             "/instances/alex/api/auth/login",
             json={"username": "alex", "password": "correct horse battery staple"},
@@ -132,8 +141,14 @@ class TestInstances:
         )
         assert created.status_code == 201, created.text
         root_headers = _auth_headers(_token(client))
-        assert all(task["title"] != "Only Alex can see this" for task in client.get("/api/tasks", headers=root_headers).json())
-        assert any(task["title"] == "Only Alex can see this" for task in client.get("/instances/alex/api/tasks", headers=child_headers).json())
+        assert all(
+            task["title"] != "Only Alex can see this"
+            for task in client.get("/api/tasks", headers=root_headers).json()
+        )
+        assert any(
+            task["title"] == "Only Alex can see this"
+            for task in client.get("/instances/alex/api/tasks", headers=child_headers).json()
+        )
         assert client.post("/api/instances", json={"name": "alex"}).status_code == 409
 
 
@@ -194,7 +209,7 @@ class TestReads:
         assert brain.json()["nodes"][0]["node_type"] == "user"
 
     def test_task_create_persists_priority_and_schedule(
-        self, client: TestClient, app: FastAPI, mark_model_ready
+        self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]
     ) -> None:
         mark_model_ready(app.state.workspace_root)
         token = _token(client)
@@ -238,7 +253,7 @@ class TestReads:
         assert child.json()["recurrence"] == "daily"
 
     def test_immediate_task_keeps_its_independent_model_choice(
-        self, client: TestClient, app: FastAPI, mark_model_ready
+        self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]
     ) -> None:
         token = _token(client)
         SQLiteStore(app.state.workspace_root).save_configured_model(
@@ -262,7 +277,7 @@ class TestReads:
         assert response.json()["model"] == "gemma4:31b-cloud"
 
     def test_schedule_keeps_its_independent_model_choice(
-        self, client: TestClient, app: FastAPI, mark_model_ready
+        self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]
     ) -> None:
         token = _token(client)
         SQLiteStore(app.state.workspace_root).save_configured_model(
@@ -286,7 +301,7 @@ class TestReads:
         assert response.json()["model"] == "gemma4:31b-cloud"
 
     def test_brain_returns_only_stored_work_relationships(
-        self, client: TestClient, app: FastAPI, mark_model_ready
+        self, client: TestClient, app: FastAPI, mark_model_ready: Callable[..., None]
     ) -> None:
         mark_model_ready(app.state.workspace_root)
         token = _token(client)
@@ -305,9 +320,13 @@ class TestReads:
         assert response.status_code == 200, response.text
         body = response.json()
         assert "visual activity only" in body["illustrative_motion_notice"]
-        task_node = next(node for node in body["nodes"] if node["node_id"] == f"task:{created.json()['task_id']}")
+        task_node = next(
+            node for node in body["nodes"] if node["node_id"] == f"task:{created.json()['task_id']}"
+        )
         assert task_node["label"] == "Map the runtime"
-        assert any(node["node_id"] == f"schedule:{created.json()['task_id']}" for node in body["nodes"])
+        assert any(
+            node["node_id"] == f"schedule:{created.json()['task_id']}" for node in body["nodes"]
+        )
         tracks_edge = next(
             edge
             for edge in body["edges"]
@@ -321,7 +340,10 @@ class TestReads:
     # what ended it. A terminal task reports its outcome, and a failure that
     # arrived without words still reports the reason the manager recorded.
     def test_brain_reports_a_finished_tasks_outcome_not_its_last_step(
-        self, bootstrapped_workspace: Path, client: TestClient, mark_model_ready
+        self,
+        bootstrapped_workspace: Path,
+        client: TestClient,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(bootstrapped_workspace)
         token = _token(client)
@@ -362,8 +384,14 @@ class TestReads:
         assert added.status_code == 200, added.text
         assert added.json() == {"ok": True, "path": "research"}
         graph = client.get("/api/brain", headers=_auth_headers(token)).json()
-        assert any(node["node_id"] == "source:research" and node["node_type"] == "folder" for node in graph["nodes"])
-        assert any(node["node_id"] == "source:research/notes.md" and node["node_type"] == "file" for node in graph["nodes"])
+        assert any(
+            node["node_id"] == "source:research" and node["node_type"] == "folder"
+            for node in graph["nodes"]
+        )
+        assert any(
+            node["node_id"] == "source:research/notes.md" and node["node_type"] == "file"
+            for node in graph["nodes"]
+        )
 
         rejected = client.post(
             "/api/brain/sources",
@@ -386,7 +414,10 @@ class TestReads:
         browse = client.get("/api/brain/sources/browse?path=.", headers=headers)
         assert browse.status_code == 200, browse.text
         assert any(item["path"] == "large-review" for item in browse.json()["children"])
-        assert not any(item["name"] in {".git", ".raiker", "node_modules"} for item in browse.json()["children"])
+        assert not any(
+            item["name"] in {".git", ".raiker", "node_modules"}
+            for item in browse.json()["children"]
+        )
         protected = client.post(
             "/api/brain/sources/review", headers=headers, json={"path": ".raiker"}
         )

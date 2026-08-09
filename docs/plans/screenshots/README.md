@@ -217,3 +217,19 @@ images were inspected at original resolution and contain no credential value.
 | `205-ADD-03-anthropic-approval-attribution-live.png` | Anthropic proposed a governed file write as the machine actor; the human owner denied it |
 | `206-ADD-03-openrouter-approval-attribution-live.png` | OpenRouter proposed a governed file write as the machine actor; the human owner denied it |
 | `207-ADD-03-ollama-approval-attribution-live.png` | Ollama proposed a governed file write as the machine actor; the human owner denied it |
+
+
+## BUG-69 closure — 2026-08-09
+
+All seven images were reviewed at rendered resolution and contain no credential
+value.
+
+| File | Records |
+|---|---|
+| `208-BUG-69-first-run-model-setup-live.png` | Fresh-owner provider/local setup prompt and acquisition choices |
+| `209-BUG-69-workbench-readiness-gate-live.png` | No-model Workbench state with disabled Start build and Models remedy |
+| `210-BUG-69-openrouter-ready-live.png` | Exact OpenRouter readiness and a governed turn parked for approval |
+| `211-BUG-69-anthropic-account-block-live.png` | Authenticated catalogue but refused execution account, with draft preserved and Send disabled |
+| `212-BUG-69-local-library-live.png` | Approved-root GGUF discovery with name, architecture, quantization, and Deploy |
+| `213-BUG-69-huggingface-catalogue-live.png` | Live Hub results with immutable revision, licence, format, size, and GGUF variant choices |
+| `214-BUG-69-huggingface-download-deploy-live.png` | A tiny immutable Hub GGUF downloaded into an approved root and the newest managed llama.cpp deployment completed |

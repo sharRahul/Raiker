@@ -20,79 +20,228 @@ from raiker.storage.sqlite import SQLiteStore
 # Key sets transcribed from apps/web/src/lib/apiTypes.ts (required, client-read fields).
 AUTH_SESSION = {"token", "session_id", "principal_id", "expires_at"}
 CAPABILITY_GATE = {
-    "capability", "phase", "state", "default_state", "source", "runtime_enabled",
-    "allowed_transitions", "can_current_principal_change", "blocked_reason_code", "readiness",
+    "capability",
+    "phase",
+    "state",
+    "default_state",
+    "source",
+    "runtime_enabled",
+    "allowed_transitions",
+    "can_current_principal_change",
+    "blocked_reason_code",
+    "readiness",
     "decision_mode",
 }
 RUNTIME_MODE = {"mode_name", "status", "activated_by", "activated_at", "reason", "allowed_modes"}
 RUNTIME_READINESS = {"mode", "gates", "summary"}
 DIAGNOSTICS = {
-    "runtime_mode", "production_ready_local_single_user_runtime", "summary",
-    "disabled_capabilities", "counts", "readiness", "missing_config", "provider_health", "scope_note",
+    "runtime_mode",
+    "production_ready_local_single_user_runtime",
+    "summary",
+    "disabled_capabilities",
+    "counts",
+    "readiness",
+    "missing_config",
+    "provider_health",
+    "scope_note",
 }
 PROVIDER_HEALTH = {
-    "profile_id", "provider", "model", "endpoint_kind", "local_only", "requires_network",
-    "selected", "status", "detail",
+    "profile_id",
+    "provider",
+    "model",
+    "endpoint_kind",
+    "local_only",
+    "requires_network",
+    "selected",
+    "status",
+    "detail",
 }
 MODELS_VIEW = {
-    "profiles", "current_profile_id", "hosted_model_gate_state",
-    "private_network_model_gate_state", "model_egress_allowlist_configured",
-    "remote_profile_count", "no_silent_hosted_fallback",
+    "profiles",
+    "current_profile_id",
+    "hosted_model_gate_state",
+    "private_network_model_gate_state",
+    "model_egress_allowlist_configured",
+    "remote_profile_count",
+    "no_silent_hosted_fallback",
 }
 MODEL_PROFILE = {
-    "profile_id", "provider", "model", "default_state", "local_only", "requires_network",
-    "endpoint_kind", "requires_egress_policy", "requires_budget_policy", "runtime_gate",
-    "off_machine", "selected",
+    "profile_id",
+    "provider",
+    "model",
+    "default_state",
+    "local_only",
+    "requires_network",
+    "endpoint_kind",
+    "requires_egress_policy",
+    "requires_budget_policy",
+    "runtime_gate",
+    "off_machine",
+    "selected",
 }
-EVENT_ENTRY = {"event_id", "session_id", "turn_id", "event_type", "actor", "timestamp", "risk_level", "summary"}
+EVENT_ENTRY = {
+    "event_id",
+    "session_id",
+    "turn_id",
+    "event_type",
+    "actor",
+    "timestamp",
+    "risk_level",
+    "summary",
+}
 CHECKPOINT = {
-    "checkpoint_id", "session_id", "turn_id", "task_id", "checkpoint_type", "created_at",
-    "summary", "last_event_id", "can_restore_state", "can_restore_files",
+    "checkpoint_id",
+    "session_id",
+    "turn_id",
+    "task_id",
+    "checkpoint_type",
+    "created_at",
+    "summary",
+    "last_event_id",
+    "can_restore_state",
+    "can_restore_files",
 }
-SESSION_SUMMARY = {"session_id", "title", "status", "created_at", "updated_at", "turn_count", "pinned", "tags"}
+SESSION_SUMMARY = {
+    "session_id",
+    "title",
+    "status",
+    "created_at",
+    "updated_at",
+    "turn_count",
+    "pinned",
+    "tags",
+}
 TASK_VIEW = {
-    "task_id", "session_id", "status", "title", "objective", "current_step", "progress_percent",
-    "created_at", "updated_at", "completed_at", "summary",
+    "task_id",
+    "session_id",
+    "status",
+    "title",
+    "objective",
+    "current_step",
+    "progress_percent",
+    "created_at",
+    "updated_at",
+    "completed_at",
+    "summary",
 }
 APPROVAL_VIEW = {
-    "approval_id", "action_id", "status", "tool_name", "capability", "risk_level", "session_id",
-    "turn_id", "created_at", "age_seconds", "requires_approval", "expires_at", "is_expired",
-    "executes_action", "critical",
+    "approval_id",
+    "action_id",
+    "status",
+    "tool_name",
+    "capability",
+    "risk_level",
+    "session_id",
+    "turn_id",
+    "created_at",
+    "age_seconds",
+    "requires_approval",
+    "expires_at",
+    "is_expired",
+    "executes_action",
+    "critical",
 }
 APPROVAL_DETAIL = {
-    "approval", "arguments", "diff", "diff_path", "preview_kind", "metadata_only_notice",
+    "approval",
+    "arguments",
+    "diff",
+    "diff_path",
+    "preview_kind",
+    "metadata_only_notice",
     "executes_on_approval",
 }
 AGENT_RESPONSE = {
-    "request_id", "session_id", "turn_id", "status", "message", "events_path", "checkpoint_path",
-    "approval", "last_event_id",
+    "request_id",
+    "session_id",
+    "turn_id",
+    "status",
+    "message",
+    "events_path",
+    "checkpoint_path",
+    "approval",
+    "last_event_id",
 }
 PROJECT_VIEW = {
-    "project_id", "name", "root_subpath", "created_at", "session_count", "selected",
-    "parent_id", "path", "is_archived", "archived_at",
+    "project_id",
+    "name",
+    "root_subpath",
+    "created_at",
+    "session_count",
+    "selected",
+    "parent_id",
+    "path",
+    "is_archived",
+    "archived_at",
 }
 PROJECTS_LIST = {"projects", "active_project_id"}
 CODE_REPO = {
-    "repo_id", "kind", "label", "selected", "created_at", "local_subpath", "local_exists",
-    "github_owner", "github_repo", "branch",
+    "repo_id",
+    "kind",
+    "label",
+    "selected",
+    "created_at",
+    "local_subpath",
+    "local_exists",
+    "github_owner",
+    "github_repo",
+    "branch",
 }
 CODE_REPOS_VIEW = {
-    "repos", "selected_repo_id", "github_gate_state", "github_decision_mode",
-    "github_token_configured", "note",
+    "repos",
+    "selected_repo_id",
+    "github_gate_state",
+    "github_decision_mode",
+    "github_token_configured",
+    "note",
 }
 MEMORY_CONTROL = {
-    "memory_id", "text", "scope", "sensitivity", "memory_type", "created_at", "tags",
-    "source", "provenance", "confidence", "trust_score", "retention", "approval_state",
-    "pinned", "search_enabled", "expires_at",
+    "memory_id",
+    "text",
+    "scope",
+    "sensitivity",
+    "memory_type",
+    "created_at",
+    "tags",
+    "source",
+    "provenance",
+    "confidence",
+    "trust_score",
+    "retention",
+    "approval_state",
+    "pinned",
+    "search_enabled",
+    "expires_at",
 }
 MCP_SERVER = {
-    "server_id", "name", "command", "template", "transport", "status", "created_at",
-    "last_connected_at", "tools", "tool_count", "endpoint_url", "auth_ref", "monitor_state",
-    "paused_reason", "paused_at",
+    "server_id",
+    "name",
+    "command",
+    "template",
+    "transport",
+    "status",
+    "created_at",
+    "last_connected_at",
+    "tools",
+    "tool_count",
+    "endpoint_url",
+    "auth_ref",
+    "monitor_state",
+    "paused_reason",
+    "paused_at",
 }
 MCP_SESSION = {
-    "session_row_id", "server_id", "transport", "operation", "hosts", "tool_calls", "bytes_in",
-    "bytes_out", "error_count", "outcome", "started_at", "ended_at",
+    "session_row_id",
+    "server_id",
+    "transport",
+    "operation",
+    "hosts",
+    "tool_calls",
+    "bytes_in",
+    "bytes_out",
+    "error_count",
+    "outcome",
+    "started_at",
+    "ended_at",
 }
 
 
@@ -132,7 +281,9 @@ def _seed_approval(workspace: Path) -> None:
         risk_level="high",
         requires_approval=True,
     )
-    store.insert_tool_action(action, session_id="sess_c", turn_id="turn_c", status="approval_required")
+    store.insert_tool_action(
+        action, session_id="sess_c", turn_id="turn_c", status="approval_required"
+    )
     store.insert_approval("appr_c", action)
 
 
@@ -143,7 +294,9 @@ class TestObjectContracts:
 
     def test_runtime_mode_and_readiness(self, client: TestClient) -> None:
         h = _headers(_token(client))
-        _assert_contract(RUNTIME_MODE, client.get("/api/runtime-mode", headers=h).json(), "RuntimeMode")
+        _assert_contract(
+            RUNTIME_MODE, client.get("/api/runtime-mode", headers=h).json(), "RuntimeMode"
+        )
         readiness = client.get("/api/runtime-readiness", headers=h).json()
         _assert_contract(RUNTIME_READINESS, readiness, "RuntimeReadiness")
         _assert_contract(CAPABILITY_GATE, readiness["gates"][0], "CapabilityGate (readiness.gates)")
@@ -165,7 +318,7 @@ class TestObjectContracts:
         _assert_contract(MODELS_VIEW, models, "ModelsView")
         _assert_contract(MODEL_PROFILE, models["profiles"][0], "ModelProfile")
 
-    def test_agent_response(self, client: TestClient) -> None:
+    def test_agent_response(self, client: TestClient, offline_default_model: None) -> None:
         h = _headers(_token(client))
         body = client.post("/api/prompts", json={"text": "hello"}, headers=h).json()
         _assert_contract(AGENT_RESPONSE, body, "AgentResponse")
@@ -197,20 +350,28 @@ class TestListContracts:
             started_at="2026-07-18T10:00:00Z",
         )
         h = _headers(_token(client))
-        _assert_contract(MCP_SERVER, client.get("/api/mcp/servers", headers=h).json()[0], "McpServer")
+        _assert_contract(
+            MCP_SERVER, client.get("/api/mcp/servers", headers=h).json()[0], "McpServer"
+        )
         _assert_contract(
             MCP_SESSION,
             client.get(f"/api/mcp/servers/{server_id}/sessions", headers=h).json()[0],
             "McpSession",
         )
 
-    def test_sessions_events_checkpoints(self, client: TestClient) -> None:
+    def test_sessions_events_checkpoints(
+        self, client: TestClient, offline_default_model: None
+    ) -> None:
         h = _headers(_token(client))
         # A governed turn seeds a session, events and a checkpoint.
         client.post("/api/prompts", json={"text": "hello"}, headers=h)
-        _assert_contract(SESSION_SUMMARY, client.get("/api/sessions", headers=h).json()[0], "SessionSummary")
+        _assert_contract(
+            SESSION_SUMMARY, client.get("/api/sessions", headers=h).json()[0], "SessionSummary"
+        )
         _assert_contract(EVENT_ENTRY, client.get("/api/events", headers=h).json()[0], "EventEntry")
-        _assert_contract(CHECKPOINT, client.get("/api/checkpoints", headers=h).json()[0], "Checkpoint")
+        _assert_contract(
+            CHECKPOINT, client.get("/api/checkpoints", headers=h).json()[0], "Checkpoint"
+        )
 
     def test_tasks(self, workspace: Path, client: TestClient) -> None:
         from raiker.events.writer import EventLogWriter
@@ -227,7 +388,9 @@ class TestListContracts:
     def test_approvals(self, workspace: Path, client: TestClient) -> None:
         _seed_approval(workspace)
         h = _headers(_token(client))
-        _assert_contract(APPROVAL_VIEW, client.get("/api/approvals", headers=h).json()[0], "ApprovalView")
+        _assert_contract(
+            APPROVAL_VIEW, client.get("/api/approvals", headers=h).json()[0], "ApprovalView"
+        )
         detail = client.get("/api/approvals/appr_c", headers=h).json()
         _assert_contract(APPROVAL_DETAIL, detail, "ApprovalDetailView")
         _assert_contract(APPROVAL_VIEW, detail["approval"], "ApprovalView (detail.approval)")
@@ -257,4 +420,6 @@ class TestListContracts:
             ),
         )
         h = _headers(_token(client))
-        _assert_contract(MEMORY_CONTROL, client.get("/api/memory", headers=h).json()[0], "MemoryControlView")
+        _assert_contract(
+            MEMORY_CONTROL, client.get("/api/memory", headers=h).json()[0], "MemoryControlView"
+        )

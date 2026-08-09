@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import tempfile
-from collections.abc import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
 
 from raiker.cli.commands import build_prompt_envelope
@@ -31,7 +31,10 @@ class StreamingRouter:
         self.chunks = chunks
 
     async def astream(
-        self, provider: str, model: str, messages: Sequence[ModelMessage],
+        self,
+        provider: str,
+        model: str,
+        messages: Sequence[ModelMessage],
         tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[ModelStreamEvent]:
         for chunk in self.chunks:
@@ -39,7 +42,10 @@ class StreamingRouter:
         yield ModelStreamEvent(event_type="finish", finish_reason="stop")
 
     async def achat(
-        self, provider: str, model: str, messages: Sequence[ModelMessage],
+        self,
+        provider: str,
+        model: str,
+        messages: Sequence[ModelMessage],
         tools: Sequence[ToolSpec] | None = None,
     ) -> ModelResponse:
         return ModelResponse(text="".join(self.chunks), finish_reason="stop")
@@ -133,7 +139,9 @@ def test_gateway_stream_and_submit_reach_same_status_offline(offline_default_mod
     assert streamed_final.response.status == submitted.status == "failed"
 
 
-def test_gateway_stream_stops_when_its_tracked_task_is_cancelled(mark_model_ready) -> None:
+def test_gateway_stream_stops_when_its_tracked_task_is_cancelled(
+    mark_model_ready: Callable[..., None],
+) -> None:
     tmp = Path(tempfile.mkdtemp())
     mark_model_ready(tmp, "local_user")
     gateway = AgentGateway(tmp)

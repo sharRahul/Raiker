@@ -54,21 +54,37 @@ const profiles: ModelProfile[] = [
 
 describe("ModelPicker", () => {
   it("groups models under a logo-and-name provider heading", async () => {
-    render(ModelPicker, { profiles, selectedProfile: profiles[0], value: profiles[0].profile_id });
+    render(ModelPicker, {
+      profiles,
+      selectedProfile: profiles[0],
+      value: profiles[0].profile_id,
+    });
 
-    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    await fireEvent.click(
+      screen.getByRole("button", { name: /model for this turn/i }),
+    );
 
     const anthropic = screen.getByRole("group", { name: "Anthropic models" });
     expect(anthropic).toHaveTextContent("Anthropic");
     expect(anthropic).toHaveTextContent("Haiku 4.5");
     expect(anthropic).toHaveTextContent("Sonnet 4.5");
-    expect(screen.getByRole("group", { name: "OpenAI models" })).toHaveTextContent("GPT-4o Mini");
+    expect(
+      screen.getByRole("group", { name: "OpenAI models" }),
+    ).toHaveTextContent("GPT-4o Mini");
   });
 
   it("distinguishes two configured models on the same provider profile", async () => {
     const sameProvider = [
-      { ...profiles[0], profile_id: "anthropic-hosted", model: "claude-haiku-4-5-20251001" },
-      { ...profiles[1], profile_id: "anthropic-hosted", model: "claude-sonnet-4-5-20250929" },
+      {
+        ...profiles[0],
+        profile_id: "anthropic-hosted",
+        model: "claude-haiku-4-5-20251001",
+      },
+      {
+        ...profiles[1],
+        profile_id: "anthropic-hosted",
+        model: "claude-sonnet-4-5-20250929",
+      },
     ];
     render(ModelPicker, {
       profiles: sameProvider,
@@ -77,15 +93,25 @@ describe("ModelPicker", () => {
       model: "claude-haiku-4-5-20251001",
     });
 
-    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /Sonnet 4.5/i }));
+    await fireEvent.click(
+      screen.getByRole("button", { name: /model for this turn/i }),
+    );
+    await fireEvent.click(
+      screen.getByRole("menuitemradio", { name: /Sonnet 4.5/i }),
+    );
 
-    expect(screen.getByRole("button", { name: /model for this turn: Sonnet 4.5/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /model for this turn: Sonnet 4.5/i }),
+    ).toBeInTheDocument();
   });
 
   it("keeps an unready model out of selection and opens its repair action", async () => {
     resetModelSetup();
-    const ready: ModelProfile = { ...profiles[0], ready: true, readiness_state: "ready" };
+    const ready: ModelProfile = {
+      ...profiles[0],
+      ready: true,
+      readiness_state: "ready",
+    };
     const stopped: ModelProfile = {
       ...profiles[2],
       provider: "ollama",
@@ -102,14 +128,22 @@ describe("ModelPicker", () => {
       model: ready.model,
     });
 
-    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+    await fireEvent.click(
+      screen.getByRole("button", { name: /model for this turn/i }),
+    );
 
     expect(screen.getByText("Ready")).toBeInTheDocument();
     expect(screen.getByText("Needs setup")).toBeInTheDocument();
-    expect(screen.queryByRole("menuitemradio", { name: /GPT-4o Mini/i })).not.toBeInTheDocument();
-    await fireEvent.click(screen.getByRole("button", { name: "Set up Ollama" }));
+    expect(
+      screen.queryByRole("menuitemradio", { name: /GPT-4o Mini/i }),
+    ).not.toBeInTheDocument();
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Set up Ollama for GPT-4o Mini" }),
+    );
     expect(setupDialog.open).toBe(true);
     expect(setupDialog.profile?.profile_id).toBe(stopped.profile_id);
-    expect(screen.getByRole("button", { name: /model for this turn: Haiku 4.5/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /model for this turn: Haiku 4.5/i }),
+    ).toBeInTheDocument();
   });
 });

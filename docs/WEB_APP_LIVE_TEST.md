@@ -371,3 +371,25 @@ model with the gate on but no reachable key/host). The turn should emit
 `model_fallback_engaged` and complete on the next reachable candidate; if every
 candidate fails it fails closed with `model_unavailable`. Fallback never opens a
 policy-denied provider — a denied candidate is skipped, not opened.
+
+
+## Result — 2026-08-09 (BUG-69 universal model readiness)
+
+A fresh isolated workspace was exercised through the built SPA in real Chromium.
+Credentials were entered only through Models and were not persisted in evidence.
+
+| Check | Result |
+|---|---|
+| First-run setup | ✅ Provider/local setup is prompted before model-backed work |
+| Universal gate | ✅ Workbench, Chat, Build, Tasks, and Schedule share the exact readiness gate; actions are disabled and drafts preserved |
+| Ollama | ✅ Local `gemma4:31b-cloud` answered a bounded direct request and passed exact catalogue readiness |
+| OpenRouter | ✅ `openai/gpt-4o-mini` passed catalogue plus execution preflight; a full governed turn parked its local action for approval without execution |
+| Anthropic | ✅ Live catalogue/authentication succeeded; the account's insufficient-credit execution refusal was classified and Send remained disabled |
+| Local library | ✅ An owner-approved root was scanned and GGUF name, architecture, and quantization were shown; no ambient path was scanned |
+| Hugging Face | ✅ Live Hub search showed licence, immutable revision and GGUF-first choices; a tiny permissive GGUF downloaded into an approved root and reached completed managed llama.cpp deployment |
+| Browser console | ✅ No application errors in the BUG-69 specs |
+
+Specs: `bug-69-model-readiness-live.spec.ts`,
+`bug-69-local-model-library-live.spec.ts`, and
+`bug-69-huggingface-live.spec.ts`. Screenshots 208–213 are indexed in
+`docs/plans/screenshots/README.md` (208–214).

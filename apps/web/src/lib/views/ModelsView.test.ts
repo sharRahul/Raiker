@@ -643,6 +643,14 @@ describe("ModelsView action-category tabs", () => {
     render(ModelsView);
     await fireEvent.click(await screen.findByRole("tab", { name: "Pricing" }));
     expect(window.location.hash).toBe("#/models?tab=pricing");
+    expect(screen.getByRole("tab", { name: "Pricing" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(await screen.findByRole("tabpanel")).toHaveAttribute(
+      "aria-labelledby",
+      "tab-pricing",
+    );
   });
 });
 

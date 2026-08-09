@@ -8,7 +8,9 @@
 | Area | Status | Notes |
 |---|---|---|
 | Terminal client and loopback dashboard | implemented_verified | Share the governed backend |
-| Model profiles | implemented_policy_gated | Local first; hosted use requires explicit policy |
+| Model profiles and universal readiness | implemented_verified | Exact owner/profile/model/endpoint evidence gates Workbench, Chat, Build, Tasks, and Schedule; hosted checks include a bounded execution preflight |
+| Local model acquisition | implemented_verified | First-run setup, official Ollama/LM Studio sources, Ollama pull, approved-root GGUF discovery, and managed loopback llama.cpp deployment |
+| Hugging Face acquisition and conversion | implemented_policy_gated | Immutable GGUF-first snapshots; gated/licence review; explicit Safetensors conversion in a digest-pinned networkless worker |
 | Policy, approvals, audit, checkpoints | implemented_verified | Approval resolution executes approved file mutations and bounded allowlisted shell commands (relayed and re-governed; mutations checkpointed); metadata-only for every other capability |
 | Per-turn machine identity | implemented_verified | Embedded Ed25519 issuer; broker verifies workspace/owner/session/turn/audience before policy or credentials; actions name the machine proposer and human authorizer separately |
 | Local runtime executors | implemented_policy_gated | Gate and decision mode checked per action |

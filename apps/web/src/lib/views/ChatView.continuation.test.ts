@@ -9,6 +9,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 const streamResumeMock = vi.hoisted(() => vi.fn());
@@ -27,7 +28,18 @@ afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   streamResumeMock.mockReset();
+  resetModels();
 });
+
+const READY_PROFILE = {
+  profile_id: "test-ready",
+  provider: "ollama",
+  model: "test-model",
+  selected: true,
+  configured: true,
+  ready: true,
+  readiness_state: "ready",
+};
 
 const PARKED: AgentResponse = {
   request_id: "req_1",
@@ -58,7 +70,10 @@ const RESUMABLE = {
 
 function baseRoutes(extra: Record<string, unknown> = {}) {
   return {
-    "GET /api/models": { profiles: [], chat_profiles: [] },
+    "GET /api/models": {
+      profiles: [READY_PROFILE],
+      chat_profiles: [READY_PROFILE],
+    },
     "GET /api/settings": { settings: {}, status: { vault: "ok", mfa_enrolled: false, username: "owner" } },
     "GET /api/sessions/sess_1/attachments": { session_id: "sess_1", files: [] },
     "GET /api/approvals/resumable": { session_id: "sess_1", turns: [] },
@@ -179,7 +194,10 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     // No resumable route: the poll fails, so automatic continuation cannot be
     // promised and the manual path has to appear.
     stubFetch({
-      "GET /api/models": { profiles: [], chat_profiles: [] },
+      "GET /api/models": {
+        profiles: [READY_PROFILE],
+        chat_profiles: [READY_PROFILE],
+      },
       "GET /api/settings": { settings: {}, status: { vault: "ok", mfa_enrolled: false, username: "owner" } },
       "GET /api/sessions/sess_1/attachments": { session_id: "sess_1", files: [] },
     });

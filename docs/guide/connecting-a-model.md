@@ -14,6 +14,39 @@ made.
 > **Local models (llama.cpp, Ollama, LM Studio)**: start the local server, press
 > **Choose model…**, then **Select**. Nothing leaves your machine.
 
+## Configured is not ready
+
+Raiker binds readiness to the owner, profile, exact model, and endpoint. Local
+providers must answer their health/catalogue check and list that exact model.
+Hosted providers must also complete a deliberately tiny one-token execution
+preflight; this can incur a negligible provider charge, and catches credentials
+that can list models but cannot execute because of access or billing. Evidence
+expires after five minutes and is invalidated when credentials, endpoints,
+catalogues, selections, or managed runtimes change. There is no silent fallback.
+
+The same gate protects Workbench, Chat, Build, Tasks, and Schedule. With no
+ready model, the primary action is disabled and **Set up models** opens Models.
+
+## Local discovery and acquisition
+
+- **Ollama:** open the official installer from Models and pull a model by exact
+  name. Raiker tracks progress and rechecks the catalogue when the pull ends.
+- **LM Studio:** Raiker opens LM Studio's official download; Raiker does not
+  redistribute it. Start the local server, then select an exact catalogue model.
+- **Existing GGUF files:** add an explicit folder under **Local library**.
+  Raiker scans only approved roots, does not follow escaping symlinks, reads a
+  bounded GGUF header, groups shards, and leaves original files in place.
+  **Deploy** starts managed loopback llama.cpp for a complete model.
+- **Hugging Face:** search the Hub under **Discover**. Raiker shows immutable
+  revision, files, size, format, licence and gated status; GGUF variants are
+  preferred. Confirming a download writes a collision-safe snapshot beneath an
+  approved library. Gated repositories require your own Hub token and accepted
+  upstream terms.
+- **Conversion:** Safetensors conversion is optional and never automatic. It
+  runs in a digest-pinned llama.cpp container with no network, a read-only
+  source, a separate writable output, and resource limits. Pick GGUF when one
+  exists.
+
 ---
 
 ## Connect a hosted provider
@@ -82,11 +115,9 @@ API cost"*.
 Local providers show *"No API cost — runs on this machine"* instead of a bar.
 A provider you have not used yet says *"Not used yet"*.
 
-> **Read that counter carefully.** It counts a provider that is *configured*,
-> not one that is *reachable* — a fresh install reads "1 of 10 providers set up"
-> because the shipped Ollama default counts, even with no Ollama on the machine.
-> The provider card itself is honest and says **Not connected**. Tracked as
-> **BUG-69**.
+The header separates configured providers from exact models that are ready. A
+shipped preference is never counted as ready merely because it exists in the
+profile registry.
 
 Prices come from the provider where one publishes them, from the list prices
 shipped in `config/model-profiles.json` otherwise, and from your own override

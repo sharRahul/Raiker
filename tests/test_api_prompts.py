@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -59,7 +60,9 @@ def test_prompt_without_approval_mode_defaults_to_manual(workspace: Path) -> Non
 
 def test_prompt_preserves_optional_reasoning_effort_for_the_turn(workspace: Path) -> None:
     envelope = _build_envelope(
-        PromptRequest(text="hello", model_profile="openai-hosted", model="gpt-4o", reasoning_effort="high"),
+        PromptRequest(
+            text="hello", model_profile="openai-hosted", model="gpt-4o", reasoning_effort="high"
+        ),
         "principal_owner",
         workspace,
     )
@@ -78,8 +81,11 @@ class TestPrompts:
         assert client.post("/api/prompts", json={"text": "hi"}).status_code == 401
 
     def test_prompt_routes_use_account_approval_mode_when_omitted(
-        self, workspace: Path, client: TestClient, monkeypatch: pytest.MonkeyPatch,
-        mark_model_ready,
+        self,
+        workspace: Path,
+        client: TestClient,
+        monkeypatch: pytest.MonkeyPatch,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(workspace)
         SQLiteStore(workspace).put_user_settings(
@@ -104,7 +110,9 @@ class TestPrompts:
             captured.append(envelope)
             yield StreamEvent(kind=FINAL, response=response_for(envelope))
 
-        monkeypatch.setattr("raiker.api.routes_prompts.AgentGateway.submit_prompt_async", submit_stub)
+        monkeypatch.setattr(
+            "raiker.api.routes_prompts.AgentGateway.submit_prompt_async", submit_stub
+        )
         monkeypatch.setattr("raiker.api.routes_prompts.AgentGateway.astream_prompt", stream_stub)
         token = _token(client)
 
@@ -116,7 +124,7 @@ class TestPrompts:
         assert [envelope.options.approval_mode for envelope in captured] == ["auto", "auto"]
 
     def test_prompt_runs_a_governed_turn(
-        self, workspace: Path, client: TestClient, mark_model_ready
+        self, workspace: Path, client: TestClient, mark_model_ready: Callable[..., None]
     ) -> None:
         mark_model_ready(workspace)
         token = _token(client)
@@ -146,7 +154,9 @@ class TestPrompts:
 
 
 class TestInterrupts:
-    def test_stop_cancels_active_tasks_at_safe_boundary(self, workspace: Path, client: TestClient) -> None:
+    def test_stop_cancels_active_tasks_at_safe_boundary(
+        self, workspace: Path, client: TestClient
+    ) -> None:
         store = SQLiteStore(workspace)
         store.create_session("sess_i", str(workspace))
         manager = TaskManager(store, EventLogWriter(store))
@@ -161,7 +171,9 @@ class TestInterrupts:
         assert resp.status_code == 200
         body = resp.json()
         assert body["safe_boundary"] is True
-        assert any(a["task_id"] == task.task_id and a["result"] == "cancelled" for a in body["applied"])
+        assert any(
+            a["task_id"] == task.task_id and a["result"] == "cancelled" for a in body["applied"]
+        )
 
         assert store.load_task(task.task_id).status == "cancelled"  # type: ignore[union-attr]
         types = {e["event_type"] for e in store.list_event_index(session_id="sess_i", limit=200)}

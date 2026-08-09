@@ -182,7 +182,11 @@ def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
     instance = create_app(workspace, ui_dir=ui_dir)
     route = Mount(f"/instances/{name}", app=instance, name=f"instance-{name}")
     static_index = next(
-        (index for index, item in enumerate(app.router.routes) if getattr(item, "name", "") == "web-ui"),
+        (
+            index
+            for index, item in enumerate(app.router.routes)
+            if getattr(item, "name", "") == "web-ui"
+        ),
         len(app.router.routes),
     )
     app.router.routes.insert(static_index, route)
@@ -274,6 +278,8 @@ def create_app(
                     await task
             from raiker.storage.sqlite import invalidate_workspace_connections
 
+            app.state.managed_llama_runtime.stop()
+
             invalidate_workspace_connections(app.state.workspace_root)
 
     app = FastAPI(
@@ -290,11 +296,15 @@ def create_app(
     # no worker waiting the nudge is simply a set flag nobody reads, which costs
     # nothing and keeps the resolve path free of "is the host running?" branches.
     app.state.scheduler_wakeup = SchedulerWakeup()
+    from raiker.models.local_runtime import ManagedLlamaRuntime
+
+    app.state.managed_llama_runtime = ManagedLlamaRuntime()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
     # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
     # and load the connector vault key-file into the environment when the env var
     # is unset. The vault key remains fail-closed if neither is present.
     from raiker.auth.app_key import ensure_app_key
+
     ensure_app_key(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
@@ -344,7 +354,9 @@ def create_app(
     if ui_dir is not None:
         ui_path = Path(ui_dir)
         if ui_path.is_dir() and (ui_path / "index.html").is_file():
-            app.mount("/", StaticCacheMiddleware(StaticFiles(directory=ui_path, html=True)), name="web-ui")
+            app.mount(
+                "/", StaticCacheMiddleware(StaticFiles(directory=ui_path, html=True)), name="web-ui"
+            )
     for instance_name in _stored_instance_names(app.state.workspace_root):
         workspace = app.state.workspace_root / ".raiker" / "instances" / instance_name
         if workspace.is_dir():

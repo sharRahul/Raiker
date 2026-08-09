@@ -105,3 +105,14 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 | Slice P | The historical Phase 3 readiness record remains metadata-only. Current SSH, Daytona, and bounded container profiles have real executors and stay unavailable until an owner configures and selects one; other remote/cloud types remain fail-closed. |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. This document distinguishes metadata-only, dry-run-only, contract-only, readiness-only, implemented-read-only, and test-only surfaces from executable capabilities.
+
+
+## Universal model readiness and acquisition
+
+Universal model readiness is `implemented_verified`: a fresh selection grants
+no send authority until exact, fresh evidence exists, and the shared gate is
+used by Workbench, Chat, Build, Tasks, and Schedule. Approved-root GGUF indexing,
+managed llama.cpp deployment, Ollama pulls, and immutable Hugging Face GGUF
+downloads are implemented. Optional Safetensors conversion is
+`implemented_policy_gated` by explicit owner confirmation and the isolated
+container boundary.

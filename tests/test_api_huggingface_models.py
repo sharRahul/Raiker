@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 import raiker.api.routes_models as model_routes
@@ -43,7 +44,9 @@ def test_hugging_face_token_is_saved_but_never_returned(tmp_path: Path) -> None:
     assert secret.encode() not in database.read_bytes()
 
 
-def test_download_uses_a_collision_free_revision_snapshot(tmp_path: Path, monkeypatch) -> None:
+def test_download_uses_a_collision_free_revision_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     client, headers, _workspace = _client(tmp_path)
     root = tmp_path / "models"
     root.mkdir()
@@ -62,10 +65,16 @@ def test_download_uses_a_collision_free_revision_snapshot(tmp_path: Path, monkey
     )
 
     class FakeService:
-        def variants(self, repo_id: str, **_kwargs):
+        def variants(self, repo_id: str, **_kwargs: object) -> list[HfVariant]:
             return [variant]
 
-        def download(self, repo_id: str, selected: HfVariant, destination: Path, **_kwargs):
+        def download(
+            self,
+            repo_id: str,
+            selected: HfVariant,
+            destination: Path,
+            **_kwargs: object,
+        ) -> Path:
             destination.mkdir(parents=True)
             (destination / "config.json").write_text("{}", encoding="utf-8")
             (destination / "model.safetensors").write_bytes(b"safe")

@@ -107,11 +107,10 @@ First run uses **owner bootstrap** to create your local **owner principal** — 
 username and password held on this machine. There is no cloud account. Every
 request thereafter resolves an **acting-principal**.
 
-> **Connect a model before you send your first message.** A fresh workspace
-> presents Ollama's `gemma4:31b-cloud` as the default, whether or not Ollama is
-> installed; on a machine without it the first turn fails with a bare
-> `model_unavailable` reason code. Tracked as BUG-69 in
-> [to be fixed](docs/plans/TO_BE_FIXED.md).
+> **Model setup is part of first run.** A fresh workspace opens the setup flow.
+> The Ollama default is only a preference until its exact endpoint and model
+> pass readiness; every model-backed action stays disabled meanwhile and links
+> to **Models** instead of sending a turn that cannot run.
 
 To connect a hosted model, open **Models**, press **Connect** on the provider,
 and paste your API key. That is the whole flow — see
@@ -205,8 +204,9 @@ Highlights, each verified against a live instance:
   boundary.
 - **Models** — local, home-lab, hosted, and advanced providers; live provider
   catalogues; an encrypted per-instance credential vault; a user-owned fallback
-  sequence with no silent hosted fallback; and per-provider token and API-cost
-  accounting with each figure's source named.
+  sequence with no silent hosted fallback; first-run setup; approved-root GGUF
+  discovery; managed llama.cpp; revision-pinned Hugging Face downloads; and
+  per-provider token and API-cost accounting with each figure's source named.
 - **Extensions** — governed service connectors and Model Context Protocol
   servers you can build, connect, monitor, and contain, plus **Skills**:
   `SKILL.md` documents and `*.skill` bundles you upload, import from a
@@ -214,7 +214,7 @@ Highlights, each verified against a live instance:
   delete. A skill adds instructions only — it grants no capability and opens
   no gate.
 - **Observability** — an append-only audit log, metadata-only checkpoints, and
-  an honest readiness report derived from stored state, never a probe.
+  exact-model readiness evidence with bounded live probes and expiry.
 
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer to 1023 px, and the full sidebar at 1024 px and above.

@@ -813,7 +813,7 @@ git commit -m "feat: build model setup and acquisition UI"
 - Consumes: all previous tasks.
 - Produces: reproducible live evidence, closed BUG-69 documentation, pushed green `main`.
 
-- [ ] **Step 1: Write live specs before final UI adjustments**
+- [x] **Step 1: Write live specs before final UI adjustments**
 
 ```ts
 test("BUG-69 blocks every model-backed surface until exact readiness", async ({ page }) => {
@@ -828,28 +828,28 @@ test("BUG-69 blocks every model-backed surface until exact readiness", async ({ 
 });
 ```
 
-- [ ] **Step 2: Run focused offline and mocked e2e verification**
+- [x] **Step 2: Run focused offline and mocked e2e verification**
 
 Run: `python -m pytest tests/test_model_readiness.py tests/test_api_model_readiness.py tests/test_model_readiness_guards.py tests/test_model_setup_state.py tests/test_model_local_operations.py tests/test_model_library.py tests/test_huggingface_models.py tests/test_model_conversion.py -q`
 
 Run: `npm --prefix apps/web run test:e2e:mocked -- --grep "BUG-69"`
 Expected: all pass before using live credentials.
 
-- [ ] **Step 3: Start one real service and run live provider/local acquisition flows**
+- [x] **Step 3: Start one real service and run live provider/local acquisition flows**
 
 Start `raiker-web` against a fresh temporary workspace with the required hosted-provider policy and egress allowlist. Enter Anthropic and OpenRouter credentials only through Models UI; test each exact model. Detect local Ollama `gemma4:31b-cloud`. Stop Ollama and verify readiness invalidation, then restart it. Add an approved small GGUF folder and deploy through managed llama.cpp. Download a small permissively licensed Hugging Face GGUF by pinned revision; run the supported Safetensors conversion fixture in the isolated worker.
 
 Use the Playwright CLI workflow: snapshot before every referenced interaction, resnapshot after navigation/modal changes, and store screenshots under `docs/plans/screenshots/working/`.
 
-- [ ] **Step 4: Review screenshots and fix every issue found test-first**
+- [x] **Step 4: Review screenshots and fix every issue found test-first**
 
 Capture the visual acceptance set from the design at 1440, 1024, 768, and 375 pixels in light/dark themes. For each discovered defect, add a failing unit/e2e regression, implement the smallest fix, rerun the focused test, and record it as FIXED in `TO_BE_FIXED.md`; if external state makes it impossible in this run, add a fully structured open BUG entry.
 
-- [ ] **Step 5: Update documentation in existing formats**
+- [x] **Step 5: Update documentation in existing formats**
 
 Mark BUG-69 fixed only after all completion criteria pass. Document configured-versus-ready semantics, installer legal boundary, approved-root discovery, GGUF deployment, Hugging Face licensing/gating, conversion isolation, exact commands, provider evidence, screenshot filenames, and residual limits. Remove stale claims that the shipped Ollama preference is set up without a probe.
 
-- [ ] **Step 6: Run the complete local quality gate**
+- [x] **Step 6: Run the complete local quality gate**
 
 Run: `python -m pytest -q`
 

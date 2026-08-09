@@ -53,6 +53,7 @@
   ];
 
   function selectTab(next: string) {
+    tab = next;
     window.location.hash = `#/models?tab=${encodeURIComponent(next)}`;
   }
 

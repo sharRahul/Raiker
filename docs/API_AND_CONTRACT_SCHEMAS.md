@@ -163,3 +163,16 @@ approval requirements. Approval resolution remains metadata-only unless a
 supported action enters its separately governed execution path.
 
 See [contracts](CONTRACTS.md) and [commands](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md).
+
+
+## Model readiness and acquisition API
+
+`GET /api/model-readiness` returns persisted, expiring exact-model evidence;
+`POST /api/model-readiness/check` performs the owner-triggered check.
+`GET/PUT /api/model-setup` records first-run progress. Model operations expose
+preview/list/start/cancel/retry/cleanup records. Local-library roots, rescans and
+deployments are under `/api/model-library`; Ollama pulls use `/api/ollama/pull`;
+Hugging Face search, immutable variants and confirmed downloads use
+`/api/hugging-face`; conversion preview/start uses `/api/model-conversion`.
+Credentials and tokens are write-only, paths are redacted in operation views,
+and every mutating route requires an authenticated human owner.

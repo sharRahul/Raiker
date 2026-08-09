@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import pytest
 from cryptography.fernet import Fernet
@@ -11,7 +12,7 @@ ENV = "RAIKER_CONNECTOR_VAULT_KEY"
 
 
 def test_provisioning_one_workspace_does_not_leak_its_key_into_process_env(
-    tmp_path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv(ENV, raising=False)
 

@@ -1,9 +1,13 @@
-import { render, screen } from "@testing-library/svelte";
+import { cleanup, render, screen } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { stubFetch } from "../../test-helpers";
 import DownloadsPanel from "./DownloadsPanel.svelte";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("DownloadsPanel", () => {
   it("keeps failed operations visible with an explicit retry", async () => {
@@ -34,5 +38,13 @@ describe("DownloadsPanel", () => {
     expect(await screen.findByText("org/model@abc")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
     expect(screen.getByText(/hugging face download failed/i)).toBeTruthy();
+  });
+
+  it("refreshes background operation state while the panel is mounted", async () => {
+    vi.useFakeTimers();
+    const fetch = stubFetch({ "GET /api/model-operations": { items: [] } });
+    render(DownloadsPanel);
+    await vi.advanceTimersByTimeAsync(1_100);
+    expect(fetch.mock.calls.length).toBeGreaterThanOrEqual(2);
   });
 });

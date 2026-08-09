@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +27,7 @@ from raiker.models.conversion import ConversionRefused, ModelConversionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
+from raiker.models.local_runtime import ManagedLlamaRuntime
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
 from raiker.models.setup import ModelSetupState
@@ -296,9 +299,59 @@ def rescan_model_library(
     return {"ok": True, "models": [model.to_dict() for model in models]}
 
 
+def _run_local_deployment(
+    workspace: Path,
+    owner: str,
+    operation_id: str,
+    model_path: Path,
+    approved_roots: tuple[Path, ...],
+    runtime: ManagedLlamaRuntime,
+) -> None:
+    operations = ModelOperationService(SQLiteStore(workspace))
+    try:
+        operations.running(owner, operation_id, phase="starting_llama_cpp")
+        executable = shutil.which("llama-server")
+        if executable is None:
+            raise RuntimeError("llama_server_missing")
+        runtime.start(
+            model_path,
+            executable=Path(executable),
+            port=8080,
+            approved_roots=approved_roots,
+        )
+        deadline = time.monotonic() + 30
+        with httpx.Client(timeout=2.0, trust_env=False) as client:
+            while time.monotonic() < deadline:
+                try:
+                    health = client.get("http://127.0.0.1:8080/health")
+                    models = client.get("http://127.0.0.1:8080/v1/models")
+                    ids = [str(item.get("id")) for item in models.json().get("data", [])]
+                    if health.is_success and models.is_success and "local-gguf" in ids:
+                        break
+                except (httpx.HTTPError, ValueError):
+                    pass
+                time.sleep(0.2)
+            else:
+                raise RuntimeError("llama_server_not_ready")
+        store = SQLiteStore(workspace)
+        store.save_configured_model(owner, "raiker-local-llama-cpp", "local-gguf")
+        store.invalidate_model_readiness(
+            owner,
+            "raiker-local-llama-cpp",
+            reason_code="local_runtime_deployed",
+        )
+        operations.complete(owner, operation_id)
+    except Exception:  # noqa: BLE001 - durable operation exposes only a bounded code
+        runtime.stop()
+        operations.fail(owner, operation_id, code="local_model_deploy_failed")
+
+
 @router.post("/api/model-library/{model_id:path}/deploy")
 def deploy_local_model(
-    model_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+    model_id: str,
+    background: BackgroundTasks,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     session, principal = auth_data
     _require_human(principal)
@@ -312,7 +365,7 @@ def deploy_local_model(
     )
     if model is None or not model.complete:
         raise HTTPException(status_code=409, detail={"reason_code": "local_model_not_deployable"})
-    return (
+    operation = (
         _operation_service(request)
         .start(
             session.principal_id,
@@ -322,6 +375,17 @@ def deploy_local_model(
         )
         .to_dict()
     )
+    roots = tuple(Path(path) for path in _library_service(request).roots(session.principal_id))
+    background.add_task(
+        _run_local_deployment,
+        Path(request.app.state.workspace_root),
+        session.principal_id,
+        operation["operation_id"],
+        Path(model.primary_path),
+        roots,
+        request.app.state.managed_llama_runtime,
+    )
+    return operation
 
 
 @router.put("/api/hugging-face/credential")

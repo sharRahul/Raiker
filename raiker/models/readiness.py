@@ -150,7 +150,7 @@ def _endpoint_fingerprint(provider: str, endpoint: str) -> str:
 
 
 class ProviderCatalogueProbe:
-    """Non-billable exact-model probe through the provider catalogue endpoint."""
+    """Exact-model catalogue probe plus a bounded hosted execution preflight."""
 
     def __init__(self, store: Any) -> None:
         self.store = store
@@ -215,14 +215,10 @@ class ProviderCatalogueProbe:
         registry = ModelProfileRegistry.load()
         profile = registry.resolve_profile_id(key.profile_id)
         label = _provider_label(profile.provider)
-        connection = get_model_connection(
-            self.store, key.owner_principal_id, key.profile_id
-        )
+        connection = get_model_connection(self.store, key.owner_principal_id, key.profile_id)
         router = ModelRouter(
             registry,
-            runtime_policy=provider_runtime_policy_from_gates(
-                self.store, key.owner_principal_id
-            ),
+            runtime_policy=provider_runtime_policy_from_gates(self.store, key.owner_principal_id),
             connection_resolver=lambda profile_id: (
                 connection if profile_id == key.profile_id else None
             ),
@@ -329,6 +325,72 @@ class ProviderCatalogueProbe:
                 f"Install or select {key.model}, then check again.",
                 provider=profile.provider,
             )
+        if not profile.local_only:
+            try:
+                await router.aprobe_model(effective)
+            except ProviderAuthenticationError:
+                return self._result(
+                    key,
+                    ModelReadinessState.AUTHENTICATION_FAILED,
+                    f"{label} rejected the saved credential during execution.",
+                    "provider_authentication_failed",
+                    "Update the provider credential and check again.",
+                    provider=profile.provider,
+                )
+            except ProviderModelNotFoundError:
+                return self._result(
+                    key,
+                    ModelReadinessState.MODEL_MISSING,
+                    f"{label} lists {key.model}, but cannot execute it.",
+                    "provider_model_missing",
+                    "Choose a currently executable model, then check again.",
+                    provider=profile.provider,
+                )
+            except ProviderRateLimitError:
+                return self._result(
+                    key,
+                    ModelReadinessState.UNREACHABLE,
+                    f"{label} temporarily refused the execution check.",
+                    "provider_rate_limited",
+                    "Wait briefly, then check again.",
+                    provider=profile.provider,
+                )
+            except (ProviderConnectionError, ProviderTimeoutError):
+                return self._result(
+                    key,
+                    ModelReadinessState.UNREACHABLE,
+                    f"{label} cannot execute {key.model} with the current account.",
+                    "provider_execution_refused",
+                    "Review the provider credential, access, and billing, then check again.",
+                    provider=profile.provider,
+                )
+            except ProviderUnsupportedCapabilityError:
+                return self._result(
+                    key,
+                    ModelReadinessState.UNSUPPORTED,
+                    f"{label} does not support an execution readiness check.",
+                    "provider_execution_probe_unsupported",
+                    "Choose a provider that supports chat completions.",
+                    provider=profile.provider,
+                )
+            except ProviderResponseValidationError:
+                return self._result(
+                    key,
+                    ModelReadinessState.UNREACHABLE,
+                    f"{label} returned an invalid execution response.",
+                    "provider_execution_invalid",
+                    "Check the endpoint and model compatibility.",
+                    provider=profile.provider,
+                )
+            except Exception:  # noqa: BLE001 - public result remains classified
+                return self._result(
+                    key,
+                    ModelReadinessState.UNREACHABLE,
+                    f"{label} could not complete the execution check.",
+                    "provider_execution_probe_failed",
+                    "Check the provider account and try again.",
+                    provider=profile.provider,
+                )
         return self._result(
             key,
             ModelReadinessState.READY,

@@ -206,3 +206,12 @@ These three executors are the first capabilities with real runtime execution. Th
 - T9: Ordinary approval resolution silently executing more than was reviewed → mitigated by `raiker/approvals/execution.py::EXECUTABLE_ON_APPROVAL`, an explicit two-member frozenset (`file_write_execution`, `patch_apply_execution`). `POST /api/approvals/{id}/resolve` relays only those, never a `critical` approval, and only while both the relay's gate and the target capability's gate are enabled; everything else keeps metadata-only resolution. Widening the set is an edit to that frozenset, guarded by `tests/test_security_regression_ui.py::TestApprovalExecutionIsNarrow`.
 
 **Acceptance:** `tests/test_vertical_slice_e2e.py` (8 tests) covers happy path (file write, patch apply, approval relay) and all negative cases (deny, disabled gate, missing executor, unknown approval, AI principal). `tests/test_approval_relay_general.py` covers the A1–A4 relay defenses (TOCTOU hash mismatch, TTL expiry/capture, generalized dispatch to non-file capabilities and Tier-2 shell, execution-time re-governance of a disabled target gate, atomic single-execution, relay-of-relay refusal, posture snapshot on `approval_executed`, revoked-session denial) and `tests/test_api_approvals.py::test_expired_approval_rejected` covers TTL on the API resolution path. `tests/test_approval_execution_wiring.py` covers the API resolution path end to end: an approved write reaching disk, patch apply, the pre-image checkpoint, both gates returning resolution to metadata-only, critical staying on its own lifecycle, immutable intent, and the protected-path and outside-workspace refusals.
+
+
+## Model supply threats added for BUG-69
+
+| Boundary | Threat | Control |
+|---|---|---|
+| Selection to provider execution | Stale selection, changed endpoint, or catalogue-only account access | Exact tuple binding, expiry, invalidation, catalogue plus bounded hosted execution preflight |
+| Local discovery to filesystem | Unapproved paths, symlink escapes, malformed GGUF | Owner-approved roots, no symlink traversal, bounded header parser, complete-shard validation |
+| Hub weights to runtime | Mutable revisions, gated licences, poisoned weights or converters | Immutable commit, explicit licence/gating review, collision-safe snapshot, GGUF-first policy, digest-pinned networkless conversion |

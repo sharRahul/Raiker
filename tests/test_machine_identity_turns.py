@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from datetime import datetime
 from pathlib import Path
 
@@ -54,7 +54,8 @@ def _envelope() -> PromptEnvelope:
 
 @pytest.mark.anyio
 async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_terminal_turn(
-    tmp_path: Path, mark_model_ready,
+    tmp_path: Path,
+    mark_model_ready: Callable[..., None],
 ) -> None:
     workspace = _workspace(tmp_path)
     mark_model_ready(workspace)
@@ -104,7 +105,7 @@ async def test_gateway_passes_machine_identity_to_runtime_and_deactivates_termin
 
 @pytest.mark.anyio
 async def test_gateway_deactivates_identity_when_runtime_raises(
-    tmp_path: Path, mark_model_ready
+    tmp_path: Path, mark_model_ready: Callable[..., None]
 ) -> None:
     workspace = _workspace(tmp_path)
     mark_model_ready(workspace)
@@ -129,7 +130,7 @@ async def test_gateway_deactivates_identity_when_runtime_raises(
 
 @pytest.mark.anyio
 async def test_gateway_deactivates_identity_when_stream_consumer_closes(
-    tmp_path: Path, mark_model_ready
+    tmp_path: Path, mark_model_ready: Callable[..., None]
 ) -> None:
     workspace = _workspace(tmp_path)
     mark_model_ready(workspace)
@@ -244,9 +245,7 @@ def test_broker_refuses_missing_identity_before_action_policy_hooks_or_tools(
         "review",
         lambda _action: pytest.fail("policy reviewed an unauthenticated action"),
     )
-    action = ToolAction(
-        new_id("act_"), "list_directory", {"path": "."}, "medium", False
-    )
+    action = ToolAction(new_id("act_"), "list_directory", {"path": "."}, "medium", False)
 
     result, decision = broker.execute(
         action, session_id="sess_1", turn_id="turn_1", machine_identity=None
@@ -323,9 +322,7 @@ def test_broker_rejects_identity_bound_to_another_turn(tmp_path: Path) -> None:
         turn_id="turn_other",
         role_ids=("assistant",),
     )
-    action = ToolAction(
-        new_id("act_"), "list_directory", {"path": "."}, "medium", False
-    )
+    action = ToolAction(new_id("act_"), "list_directory", {"path": "."}, "medium", False)
 
     result, decision = broker.execute(
         action,

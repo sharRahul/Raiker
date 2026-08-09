@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 import raiker.api.routes_models as model_routes
@@ -53,7 +54,7 @@ def test_start_requires_explicit_confirmation(tmp_path: Path) -> None:
 
 
 def test_ollama_pull_is_confirmed_and_queued_for_the_loopback_worker(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     client, headers = _client(tmp_path)
     called: list[str] = []

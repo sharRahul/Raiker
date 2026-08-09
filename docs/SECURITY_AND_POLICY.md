@@ -79,3 +79,16 @@ and stdout. The bridge contains no dynamic import, shell, connector, credential,
 or arbitrary-command dispatch. Missing runtimes, disallowed images, unsupported
 tools, malformed responses, and cleanup failures are explicit and never cause a
 host fallback.
+
+
+## Model supply and readiness controls
+
+Readiness fails closed and is exact-model scoped. Hosted checks make a bounded
+one-token request only after explicit owner setup; errors are classified without
+returning provider bodies or credentials. Local discovery has no ambient disk
+search: the owner approves each absolute root, scans are bounded, and symlink
+escapes are ignored. Hub downloads use immutable revisions, expose licence and
+gating before confirmation, never place tokens on argv or in returned URLs, and
+write collision-safe snapshots. Conversion accepts Safetensors only and runs
+without network in a digest-pinned container with read-only source, separate
+output, dropped privileges and resource limits.

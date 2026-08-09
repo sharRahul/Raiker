@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -15,11 +16,13 @@ class FakeHub:
         self.gated = gated
         self.download_calls: list[dict[str, object]] = []
 
-    def search(self, query: str, *, limit: int, token: str | None):
+    def search(self, query: str, *, limit: int, token: str | None) -> list[SimpleNamespace]:
         assert limit <= 50
         return [SimpleNamespace(id="owner/repo", downloads=12, likes=3, gated=self.gated)]
 
-    def model_info(self, repo_id: str, *, revision: str | None, token: str | None):
+    def model_info(
+        self, repo_id: str, *, revision: str | None, token: str | None
+    ) -> SimpleNamespace:
         assert repo_id == "owner/repo"
         if self.gated:
             raise HubGatedError(f"access denied for token {token}")
@@ -37,7 +40,7 @@ class FakeHub:
             ],
         )
 
-    def snapshot_download(self, **kwargs: object):
+    def snapshot_download(self, **kwargs: object) -> Any:
         self.download_calls.append(kwargs)
         if kwargs.get("dry_run"):
             return [
@@ -105,7 +108,7 @@ def test_safetensors_snapshot_is_offered_for_safe_local_conversion(tmp_path: Pat
     hub = FakeHub()
     original = hub.model_info
 
-    def model_info(repo_id: str, *, revision: str | None, token: str | None):
+    def model_info(repo_id: str, *, revision: str | None, token: str | None) -> SimpleNamespace:
         info = original(repo_id, revision=revision, token=token)
         info.siblings = [
             SimpleNamespace(rfilename="config.json", size=100),

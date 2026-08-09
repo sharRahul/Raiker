@@ -72,7 +72,7 @@ Open `http://127.0.0.1:8765`.
 > the owner was never persisted. Assert on the heading, or on the presence of a
 > **Confirm password** field.
 
-### 2.7 ❌ The first message a new user sends — BUG-69
+### 2.7 Historical failure: the first message a new user sent — BUG-69
 
 On a machine with no Ollama installed — the common case — a brand-new owner who
 registers and immediately types a message receives, as the entire reply:
@@ -88,7 +88,7 @@ without checking that Ollama is reachable. Filed as **BUG-69**.
 `BUG-r0808-05-models-claims-one-provider-set-up.png`,
 `BUG-r0808-05-first-turn-raw-reason-code.png`.
 
-**Until BUG-69 is fixed, connect a provider (§4) before sending anything.**
+**Closed 2026-08-09.** See §19 for the replacement first-run and readiness flow.
 
 ---
 
@@ -166,8 +166,9 @@ Pin each of the ten catalogue models in turn and send one live turn against it.
 
 Select the Ollama profile for one turn on a machine with no Ollama.
 
-**Result:** the turn fails with the bare `model_unavailable:
-provider_error_unclassified` — same defect as §2.7, **BUG-69**.
+**Historical 2026-08-08 result:** the turn failed with the bare
+`model_unavailable: provider_error_unclassified`. The current build disables
+the action and names the missing runtime/model before dispatch; see §19.
 `r0808-19-unconfigured-local-provider-turn.png`.
 
 ### 4.7 The other Models tabs
@@ -651,7 +652,7 @@ the trigger. `r0808-80-*`, `r0808-81-*`.
 | Does the network capability work? | **No** — enabling Web fetch breaks every turn that uses it (**BUG-72**) |
 | Can you see what the agent plans to do? | **Yes** — a live `update_plan` checklist above the transcript |
 | Can the agent search without flooding the conversation? | **Yes** — `spawn_subagent` returns findings only |
-| Does a first run just work? | **No** — on a machine without Ollama the first message fails with a raw reason code (**BUG-69**) |
+| Does a first run just work? | **Yes** — setup is prompted; without a ready model, actions stay disabled with a Models link (**BUG-69 closed 2026-08-09**) |
 
 ---
 
@@ -665,7 +666,40 @@ export RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com'
 
 Then work §2 → §16 in order. Two practical notes for whoever runs it next:
 
-* **Connect a provider before sending anything** (BUG-69), or the first turn dies
-  on the absent Ollama default.
+* Complete or skip the first-run setup, then verify that no model-backed action
+  enables until the exact selection passes readiness (§19).
 * **Probe conversation memory with verbatim repetition**, not a codeword
   (§5.5) — the codeword phrasing produces false failures.
+
+
+## 19. BUG-69 closure round — 2026-08-09
+
+Run against a fresh isolated workspace and the production web build. Provider
+credentials were entered through Models only and are absent from screenshots,
+source, and logs committed to the repository.
+
+1. Register a fresh owner. Confirm the model setup prompt opens.
+2. Skip setup, visit Workbench, Chat, Build, Tasks, and Schedule, and confirm
+   each model-backed primary action is disabled with a Models link.
+3. In Models, select local Ollama `gemma4:31b-cloud` and run **Check**. Confirm
+   exact-model Ready. A direct bounded generation returned the requested marker.
+4. Connect OpenRouter through the UI, select `openai/gpt-4o-mini`, and confirm
+   catalogue plus one-token execution readiness. A real governed turn reached
+   the approval boundary and executed no command.
+5. Connect Anthropic through the UI and select `claude-opus-4-8`. The live
+   catalogue authenticated, but the account rejected execution for insufficient
+   credit. Confirm the readiness result names current-account execution, links
+   remediation, preserves the draft, and keeps Send disabled.
+6. Add one exact local folder under **Local library**, rescan, and confirm its
+   GGUF name, llama architecture, Q4_K_M quantization, and Deploy action.
+7. Search Hugging Face for a GGUF repository. Confirm immutable revision,
+   licence, gated status, size, format, and Q4_K_M choices are visible before
+   download confirmation. Download the tiny permissive TinyStories GGUF into an
+   approved root, deploy it, and wait for the newest Activity row to reach
+   `complete`.
+
+**Result: ✅ BUG-69 closed.** No raw provider reason code became the first
+assistant reply. Screenshots: `208-BUG-69-first-run-model-setup-live.png` through
+`214-BUG-69-huggingface-download-deploy-live.png`. The Anthropic refusal is an
+expected external account state and proved the new fail-closed execution
+preflight; OpenRouter and Ollama supplied successful execution evidence.

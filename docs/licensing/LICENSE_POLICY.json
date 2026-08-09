@@ -30,6 +30,11 @@
   ],
   "exceptions": [
     {
+      "component": "tqdm",
+      "license": "MPL-2.0 AND MIT",
+      "reason": "Unmodified transitive runtime dependency of huggingface_hub; MPL-2.0 is file-level, its notices remain in the dependency distribution, and no tqdm source is copied or modified by Raiker."
+    },
+    {
       "component": "certifi",
       "license": "MPL-2.0",
       "reason": "Unmodified transitive CA bundle; MPL-2.0 is file-level and no certifi source is copied into Raiker."

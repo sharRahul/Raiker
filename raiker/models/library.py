@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import os
 import re
 from dataclasses import asdict, dataclass
@@ -27,7 +28,8 @@ class LocalModel:
     size_bytes: int
     indexed_at: str
 
-    def to_dict(self) -> dict[str, Any]: return asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 class ModelLibraryService:
@@ -76,9 +78,15 @@ class ModelLibraryService:
         for path in files:
             match = _SHARD.match(path.name)
             key = match.group("base") if match else str(path.relative_to(root))
-            groups.setdefault(key, []).append((path, int(match.group("part")) if match else 1, int(match.group("total")) if match else 1))
+            groups.setdefault(key, []).append(
+                (
+                    path,
+                    int(match.group("part")) if match else 1,
+                    int(match.group("total")) if match else 1,
+                )
+            )
         result: list[LocalModel] = []
-        for key, shards in groups.items():
+        for _key, shards in groups.items():
             shards.sort(key=lambda item: item[1])
             expected = shards[0][2]
             try:
@@ -86,12 +94,27 @@ class ModelLibraryService:
             except (OSError, ValueError):
                 continue
             paths = [item[0] for item in shards]
-            result.append(LocalModel(
-                owner_principal_id=owner, root_path=str(root), model_id=f"{root.name}/{key}",
-                name=metadata.name, architecture=metadata.architecture,
-                quantization=metadata.quantization, primary_path=str(paths[0].resolve()),
-                shard_count=len(paths), expected_shards=expected,
-                complete=len(paths) == expected and {item[1] for item in shards} == set(range(1, expected + 1)),
-                size_bytes=sum(path.stat().st_size for path in paths), indexed_at=utc_now(),
-            ))
+            model_id = (
+                "mdl_"
+                + hashlib.sha256(str(paths[0].resolve()).casefold().encode("utf-8")).hexdigest()[
+                    :24
+                ]
+            )
+            result.append(
+                LocalModel(
+                    owner_principal_id=owner,
+                    root_path=str(root),
+                    model_id=model_id,
+                    name=metadata.name,
+                    architecture=metadata.architecture,
+                    quantization=metadata.quantization,
+                    primary_path=str(paths[0].resolve()),
+                    shard_count=len(paths),
+                    expected_shards=expected,
+                    complete=len(paths) == expected
+                    and {item[1] for item in shards} == set(range(1, expected + 1)),
+                    size_bytes=sum(path.stat().st_size for path in paths),
+                    indexed_at=utc_now(),
+                )
+            )
         return result

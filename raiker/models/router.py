@@ -69,7 +69,9 @@ class ModelRouter:
         self.reasoning: ReasoningOptions | None = None
 
     def _factory(self, profile: ModelProfile) -> ModelProviderFactory:
-        connection = self.connection_resolver(profile.profile_id) if self.connection_resolver else None
+        connection = (
+            self.connection_resolver(profile.profile_id) if self.connection_resolver else None
+        )
         return ModelProviderFactory(policy=self.runtime_policy, connection=connection)
 
     def _profile(self, provider: str, model: str) -> ModelProfile:
@@ -133,6 +135,27 @@ class ModelRouter:
         finally:
             await model_provider.aclose()
 
+    async def aprobe_model(self, profile: ModelProfile) -> None:
+        """Run the smallest real completion that proves a hosted model can execute.
+
+        Catalogue membership alone does not prove billing/access is usable. This
+        preflight is only called by an explicit owner readiness check and asks for
+        one output token with no tools, cache write, reasoning, or response schema.
+        """
+        model_provider = self._factory(profile).create(profile)
+        request = ModelRequest(
+            profile.profile_id,
+            model_provider.provider,
+            model_provider.model,
+            [ModelMessage("user", ".")],
+            max_tokens=1,
+            stream=False,
+        )
+        try:
+            await model_provider.chat(request)
+        finally:
+            await model_provider.aclose()
+
     async def astream(
         self,
         provider: str,
@@ -174,9 +197,7 @@ class ModelRouter:
             raise ProviderConfigurationError("embedding_model_not_configured")
         try:
             return await model_provider.embed(
-                EmbeddingRequest(
-                    profile.profile_id, model_provider.provider, embedding_model, text
-                )
+                EmbeddingRequest(profile.profile_id, model_provider.provider, embedding_model, text)
             )
         finally:
             await model_provider.aclose()

@@ -7,8 +7,10 @@ label: it changes no gate, no policy, and no visibility — a task session is
 still fully readable in Sessions and reachable from Tasks. It only lets a list
 of *conversations* mean conversations.
 """
+
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -98,13 +100,11 @@ class TestOriginOverTheApi:
         return client
 
     def test_a_task_session_is_listed_but_not_as_a_chat(
-        self, workspace: Path, mark_model_ready
+        self, workspace: Path, mark_model_ready: Callable[..., None]
     ) -> None:
         mark_model_ready(workspace)
         client = self._client(workspace)
-        created = client.post(
-            "/api/tasks", json={"title": "Nightly sweep", "description": "Sweep"}
-        )
+        created = client.post("/api/tasks", json={"title": "Nightly sweep", "description": "Sweep"})
         assert created.status_code == 201, created.text
 
         everything = client.get("/api/sessions").json()

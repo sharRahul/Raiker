@@ -15,6 +15,7 @@ import base64
 import io
 import json
 import zipfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -54,7 +55,9 @@ def make_pdf(text: str) -> bytes:
         b"/Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
     ]
     stream = b"BT /F1 24 Tf 72 720 Td (" + text.encode("latin-1") + b") Tj ET"
-    objects.append(b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream")
+    objects.append(
+        b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream"
+    )
     objects.append(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
     pdf = bytearray(b"%PDF-1.4\n")
     offsets: list[int] = []
@@ -328,7 +331,10 @@ class TestDocumentAttachmentGathering:
             store, filename="notes.txt", media_type="text/plain", data=TXT_BYTES
         )
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "document", "attachment_id": stored.attachment_id}],
         )
         items = [i for i in bundle.items if i.source.source_type == "attachment"]
@@ -343,7 +349,10 @@ class TestDocumentAttachmentGathering:
 
     def test_unknown_document_reported_honestly(self, tmp_path: Path) -> None:
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "document", "attachment_id": "att_missing"}],
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
@@ -351,7 +360,10 @@ class TestDocumentAttachmentGathering:
 
     def test_missing_attachment_id_reported_honestly(self, tmp_path: Path) -> None:
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "document"}],
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
@@ -363,7 +375,10 @@ class TestDocumentAttachmentGathering:
             store, filename="doc.pdf", media_type=PDF_MEDIA_TYPE, data=PDF_BYTES
         )
         bundle = ContextGatherer().gather(
-            workspace_root=tmp_path, session_id="s", turn_id="t", prompt_text="hi",
+            workspace_root=tmp_path,
+            session_id="s",
+            turn_id="t",
+            prompt_text="hi",
             attachments=[{"type": "document", "attachment_id": stored.attachment_id}],
         )
         item = [i for i in bundle.items if i.source.source_type == "attachment"][0]
@@ -421,7 +436,10 @@ class TestUploadApi:
         self, client: TestClient, owner_token: str, workspace: Path
     ) -> None:
         resp = self._upload(
-            client, owner_token, filename="doc.pdf", media_type=PDF_MEDIA_TYPE,
+            client,
+            owner_token,
+            filename="doc.pdf",
+            media_type=PDF_MEDIA_TYPE,
             data_base64=base64.b64encode(PDF_BYTES).decode(),
         )
         assert resp.status_code == 200
@@ -437,11 +455,12 @@ class TestUploadApi:
         assert resp.status_code == 400
         assert "unsupported_media_type" in json.dumps(resp.json())
 
-    def test_upload_rejects_corrupt_pdf(
-        self, client: TestClient, owner_token: str
-    ) -> None:
+    def test_upload_rejects_corrupt_pdf(self, client: TestClient, owner_token: str) -> None:
         resp = self._upload(
-            client, owner_token, filename="bad.pdf", media_type=PDF_MEDIA_TYPE,
+            client,
+            owner_token,
+            filename="bad.pdf",
+            media_type=PDF_MEDIA_TYPE,
             data_base64=base64.b64encode(b"not a pdf").decode(),
         )
         assert resp.status_code == 400
@@ -450,14 +469,16 @@ class TestUploadApi:
     def test_upload_rejects_binary_mislabelled_as_text(
         self, client: TestClient, owner_token: str
     ) -> None:
-        resp = self._upload(
-            client, owner_token, data_base64=base64.b64encode(b"a\x00b").decode()
-        )
+        resp = self._upload(client, owner_token, data_base64=base64.b64encode(b"a\x00b").decode())
         assert resp.status_code == 400
         assert "content_does_not_match_media_type" in json.dumps(resp.json())
 
     def test_prompt_accepts_document_attachment_reference(
-        self, client: TestClient, owner_token: str, workspace: Path, mark_model_ready
+        self,
+        client: TestClient,
+        owner_token: str,
+        workspace: Path,
+        mark_model_ready: Callable[..., None],
     ) -> None:
         mark_model_ready(workspace)
         upload = self._upload(client, owner_token)

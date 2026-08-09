@@ -177,3 +177,11 @@ Every new feature must answer:
 8. Can it spawn agents/tasks?
 9. What events does it emit?
 10. What tests prove it is safe?
+
+
+## Model acquisition additions
+
+| Risk class | Controls |
+|---|---|
+| Model supply chain | Immutable Hugging Face revisions, licence/gating review, GGUF-first download, approved destinations, digest-pinned isolated conversion, bounded GGUF parsing |
+| Unbounded consumption | Expiring exact readiness; one-token owner-triggered hosted preflight; durable operation progress; conversion CPU, memory, PID, time and output bounds |

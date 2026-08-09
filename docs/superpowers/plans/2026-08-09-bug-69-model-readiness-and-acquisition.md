@@ -472,7 +472,7 @@ git commit -m "feat: add resumable model setup"
 - Produces: `InstallPlan(runtime, source_url, argv, requires_elevation, terms_url, redistribution)`.
 - Produces: `/api/model-operations` read/start/cancel/retry/cleanup endpoints.
 
-- [ ] **Step 1: Write failing authorization, source, lifecycle, and restart tests**
+- [x] **Step 1: Write failing authorization, source, lifecycle, and restart tests**
 
 ```python
 def test_lm_studio_desktop_is_never_downloaded_or_redistributed(tmp_path: Path) -> None:
@@ -487,12 +487,12 @@ def test_agent_principal_cannot_start_install(client, machine_headers):
     assert response.json()["detail"]["reason_code"] == "human_principal_required"
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_model_local_operations.py tests/test_runtime_installers.py tests/test_api_model_operations.py -q`
 Expected: modules/endpoints are missing.
 
-- [ ] **Step 3: Add migration `RAIKER-1044-model-operations` and reviewed adapters**
+- [x] **Step 3: Add migration `RAIKER-1044-model-operations` and reviewed adapters**
 
 The job state is `queued|running|waiting_for_owner|cancel_requested|cancelled|failed|complete`; store phase, progress bytes/percent, redacted source/destination, bounded error, timestamps, and owner. Ollama uses official HTTPS installer/download endpoints and verifies available signature/checksum. LM Studio desktop returns an open-vendor action; llmster invokes only the official published installer after confirmation. llama.cpp uses official releases or a supported package manager. Never pass tokens on argv.
 
@@ -521,12 +521,12 @@ class ModelOperationService:
         return cancelled
 ```
 
-- [ ] **Step 4: Verify GREEN, redaction, and abandoned-job recovery**
+- [x] **Step 4: Verify GREEN, redaction, and abandoned-job recovery**
 
 Run: `python -m pytest tests/test_model_local_operations.py tests/test_runtime_installers.py tests/test_api_model_operations.py tests/test_api_security.py -q`
 Expected: all pass; restart marks unowned child processes failed and resumable downloads queued only when supported.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/models/local_operations.py raiker/models/runtime_installers.py raiker/storage/migrations.py raiker/storage/sqlite.py raiker/api/schemas.py raiker/api/routes_models.py tests/test_model_local_operations.py tests/test_runtime_installers.py tests/test_api_model_operations.py

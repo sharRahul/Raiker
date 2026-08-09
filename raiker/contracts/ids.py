@@ -21,6 +21,8 @@ _PREFIXES = {
     "cost_",
     # Administrator context-capacity registry history row.
     "mcap_",
+    # Owner-confirmed local runtime/model install, download, conversion, or deployment.
+    "mop_",
     "appr_",
     "memcand_",
     "ver_",

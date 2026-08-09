@@ -2477,6 +2477,30 @@ FROM account_credentials;
 """
 
 
+MODEL_OPERATIONS_MIGRATION_ID = "RAIKER-1044-model-operations"
+MODEL_OPERATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS model_operations (
+  operation_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  target TEXT NOT NULL,
+  state TEXT NOT NULL,
+  phase TEXT NOT NULL,
+  progress_bytes INTEGER NOT NULL DEFAULT 0,
+  total_bytes INTEGER,
+  progress_percent INTEGER,
+  source_url TEXT,
+  destination TEXT,
+  error_code TEXT,
+  error_detail TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_model_operations_owner_time
+  ON model_operations(owner_principal_id, created_at DESC);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

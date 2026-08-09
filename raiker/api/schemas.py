@@ -184,6 +184,16 @@ class ModelSetupUpdateRequest(BaseModel):
     selected_model: str | None = None
 
 
+class ModelOperationRequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    kind: Literal["install", "download", "convert", "deploy", "pull"]
+    target: str
+    confirmed: bool = False
+    source_url: str | None = None
+    destination: str | None = None
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

@@ -52,6 +52,7 @@ from raiker.contracts.models import (
     UserRoleAssignment,
     VectorRecord,
 )
+from raiker.models.local_operations import ModelOperation
 from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
 from raiker.models.setup import ModelSetupState
@@ -153,6 +154,8 @@ from raiker.storage.migrations import (
     MODEL_CAPACITY_CONTROL_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
     MODEL_FALLBACK_SEQUENCE_SQL,
+    MODEL_OPERATIONS_MIGRATION_ID,
+    MODEL_OPERATIONS_SQL,
     MODEL_PRICE_REGISTRY_MIGRATION_ID,
     MODEL_PRICE_REGISTRY_SQL,
     MODEL_READINESS_MIGRATION_ID,
@@ -945,6 +948,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_SETUP_STATE_MIGRATION_ID,
                 MODEL_SETUP_STATE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_OPERATIONS_MIGRATION_ID,
+                MODEL_OPERATIONS_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -5190,6 +5198,67 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if row is None:
             return ModelSetupState(owner_principal_id=owner_principal_id)
         return ModelSetupState(**dict(row))
+
+    def save_model_operation(self, operation: ModelOperation) -> ModelOperation:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO model_operations
+                (operation_id, owner_principal_id, kind, target, state, phase,
+                 progress_bytes, total_bytes, progress_percent, source_url, destination,
+                 error_code, error_detail, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                tuple(operation.to_dict().values()),
+            )
+        return operation
+
+    def list_model_operations(self, owner_principal_id: str) -> list[ModelOperation]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM model_operations WHERE owner_principal_id = ? ORDER BY created_at DESC",
+                (owner_principal_id,),
+            ).fetchall()
+        return [ModelOperation(**dict(row)) for row in rows]
+
+    def require_model_operation(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
+                (owner_principal_id, operation_id),
+            ).fetchone()
+        if row is None:
+            raise KeyError("model_operation_not_found")
+        return ModelOperation(**dict(row))
+
+    def update_model_operation(self, operation_id: str, **updates: Any) -> None:
+        allowed = {"state", "phase", "progress_bytes", "total_bytes", "progress_percent", "error_code", "error_detail"}
+        fields = {key: value for key, value in updates.items() if key in allowed}
+        if not fields:
+            return
+        fields["updated_at"] = utc_now()
+        assignments = ", ".join(f"{key} = ?" for key in fields)
+        with self.connect() as connection:
+            connection.execute(
+                f"UPDATE model_operations SET {assignments} WHERE operation_id = ?",  # noqa: S608 -- allowlisted column names only
+                (*fields.values(), operation_id),
+            )
+
+    def fail_running_model_operations(self) -> int:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE model_operations SET state = 'failed', phase = 'recovery',
+                error_code = 'host_restarted', error_detail = 'The host stopped before this operation completed.',
+                updated_at = ? WHERE state IN ('running', 'cancel_requested')""",
+                (utc_now(),),
+            )
+        return cursor.rowcount
+
+    def delete_model_operation(self, owner_principal_id: str, operation_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM model_operations WHERE owner_principal_id = ? AND operation_id = ?",
+                (owner_principal_id, operation_id),
+            )
+        return cursor.rowcount == 1
 
     def save_model_setup_state(self, state: ModelSetupState) -> ModelSetupState:
         now = utc_now()

@@ -336,19 +336,214 @@ download, or removes an original model.
 
 ## User experience
 
-Models gains consistent **Providers**, **On this device**, and **Hugging Face** setup
-entry points while retaining the current provider cards and pricing/routing controls.
+### Visual direction
 
-- Provider cards distinguish `Preferred`, `Configured`, and `Ready`.
-- The setup meter counts ready providers only.
-- Every model picker shows a readiness badge and keeps unready choices visible with a
-  repair action.
-- Downloads and conversions have progress, pause/cancel where supported, retry, disk
-  accounting, and a persistent operation history.
-- Local libraries show their approved root, source application, deployment runtime, and
-  whether use is in place, linked, copied, or imported.
-- All dialogs preserve keyboard focus, have screen-reader status announcements, work at
-  existing responsive breakpoints, and support light/dark/system themes.
+The change extends Raiker's current restrained control-deck language rather than adding
+a separate marketplace aesthetic. Existing white cards, pale teal selection outlines,
+compact status chips, serif page statements, and slate page background remain. Teal
+means selected or ready, amber means owner action is required, red is reserved for a
+failed or unsafe operation, and grey means unavailable or not checked. Colour is always
+paired with an icon and text.
+
+Readiness is the primary visual fact. Provider branding and model names remain
+recognisable, but no logo, selected outline, or default label can visually overpower an
+unready status. The words `Preferred`, `Configured`, and `Ready` are never treated as
+synonyms.
+
+### Models information architecture
+
+The existing Models header and tab strip remain. The tabs become:
+
+- **Providers** — connect hosted providers and install, start, or test local runtimes;
+- **Local library** — approved folders, discovered GGUF files, validation, and deploy;
+- **Hugging Face** — search, variants, download, and conversion;
+- **Downloads** — active and historic install/download/conversion jobs;
+- **Routing**, **Pricing**, and **Posture** — the existing controls, unchanged in
+  purpose.
+
+At desktop width the strip scrolls horizontally only if required. At tablet and mobile
+width it becomes a labelled overflow menu after the active tab; it never wraps into two
+ambiguous rows.
+
+The top setup card becomes an honest readiness summary:
+
+- large value: `0 models ready`, `1 model ready`, or the exact plural;
+- secondary counts: configured, checking, and needs attention;
+- primary action when empty: **Set up a model**;
+- active-job summary when an install/download/conversion is running; and
+- a compact **Check all configured** action that performs only allowed non-billable
+  probes.
+
+The Global model card keeps its current position. Its picker displays the exact model,
+provider, and readiness chip. An unready selection remains visible, with **Repair** in
+place of any implication that it can run work.
+
+### Provider cards
+
+The current local/hosted/advanced grouping and horizontal provider-card rhythm remain.
+Each card has four stable regions:
+
+1. provider identity, exact selected model, and local/hosted disclosure;
+2. readiness line with status icon, plain-language explanation, and last check time;
+3. compact facts such as API cost, privacy boundary, context, and connection state; and
+4. one primary action plus secondary **Test** and **Details** actions.
+
+The primary action is state-specific: **Connect**, **Install**, **Start**, **Pull
+model**, **Choose model**, **Repair**, or **Use this model**. A selected but stopped
+Ollama card reads `Preferred · Runtime stopped`, not `Connected`. Testing one provider
+shows progress and results only on that card, preserving the provider-local feedback
+behavior established by FIXED-93.
+
+### Shared model picker and submission state
+
+One shared picker is used by Workbench, Chat, Build, Tasks, schedules, and background
+agents. Its closed state contains provider icon, concise model name, and one status dot
+with accessible text. The menu groups choices under **Ready** and **Needs setup**.
+Ready rows can be selected. Needs-setup rows expose **Set up** or **Check again** and do
+not masquerade as runnable selections.
+
+When no exact model is ready:
+
+- the composer or task form remains editable;
+- the primary action is visibly disabled, not merely intercepted after activation;
+- an inline amber readiness strip appears immediately above the action row with
+  `No model is ready` and **Set up models**;
+- hover/focus help explains why the action is disabled; and
+- the same shared dialog opens from the strip, picker repair action, or a stale server
+  response.
+
+The dialog is titled **Set up a model to continue**. It names the selected provider and
+failure when one exists, offers **Set up models** as the primary action and **Check
+again** as the secondary action, and states that the current draft is preserved. It
+does not discard attachments, change tabs, or close on a failed probe. Raw reason codes
+are confined to a collapsed **Technical details** disclosure with a correlation ID.
+
+Workbench preserves its current Chat/Build/Create task/Schedule tabs. Switching tabs
+does not repeat the readiness warning; the shared strip remains in the card and the
+selected tab supplies the destination when setup completes. Build keeps the model chip
+in its composer rail. Tasks keeps the picker above the full-width creation action. Chat
+and Schedule follow the same spatial pattern so readiness is learned once.
+
+### First-run setup flow
+
+After first-owner registration, setup uses a focused step page inside the existing
+Raiker shell rather than an unrelated full-screen installer. The left navigation is
+visible but de-emphasised; leaving the flow records progress and does not imply setup
+completed.
+
+The flow has a compact progress header and five screens:
+
+1. **Choose how Raiker thinks** — Local, Hosted, or I already have model files, with
+   short privacy/cost/storage comparisons.
+2. **Choose a provider** — detected runtimes first, then install/connect choices.
+3. **Choose a model** — installed models, provider catalogue, local discovery, or
+   Hugging Face variants depending on the path.
+4. **Review and prepare** — licence/source, disk and memory fit, connection or install
+   details, and explicit consent.
+5. **Ready** — exact provider/model, completed readiness evidence, and **Open
+   Workbench**.
+
+The footer always exposes **Back** and the context-specific primary action. **Skip for
+now** is a quiet secondary action with copy explaining that model-backed controls stay
+disabled. Long-running installation or download moves into the durable Downloads tray;
+the owner may continue browsing and return without losing progress.
+
+### Local library
+
+The Local library page begins with source cards for detected Ollama, LM Studio, llama.cpp,
+Hugging Face cache, supported third-party libraries, and owner-added folders. Detected
+but unapproved paths reveal the application and proposed root only after owner
+authentication and offer **Review folder**; no scan begins from card appearance alone.
+
+Approved sources feed a filterable table/card list with model name, architecture,
+parameters, quantization, size, source, validation, and deployment. Split models appear
+as one logical row. Incomplete shards and missing projector files appear as one finding
+with the missing pieces named.
+
+Selecting a model opens a side panel with bounded metadata and three deliberate actions:
+**Run in place** (recommended), **Import into LM Studio**, and **Import into Ollama**.
+The deployment review compares additional disk use, runtime requirement, context limit,
+and whether files are used in place, linked, or copied. File paths are shown only to the
+owner and wrap safely without widening the panel.
+
+### Hugging Face discovery and variants
+
+The Hugging Face tab uses a search-first layout with direct repository URL entry. Search
+results are compact cards showing repository, model family, parameters, licence,
+download trend only when supplied by the API, available GGUF badge, gated badge, and
+best known device-fit summary. The page does not imitate Hugging Face branding beyond a
+small source mark.
+
+Opening a result uses a wide detail panel rather than navigating away. Its header pins
+repository and revision. The default **Existing GGUF** section presents a comparison
+table with one row per complete variant or shard set:
+
+- quantization and precision;
+- download and cached bytes;
+- estimated RAM/VRAM and disk;
+- context and modality facts when known;
+- fit state (`Fits`, `May fit`, `Does not fit`, or `Unknown`); and
+- one radio selection.
+
+Q4_K_M is marked **Recommended balance** only when it exists and fits; no quantization
+is fabricated. **Convert locally** is a secondary section shown only when no suitable
+GGUF exists and the pinned toolchain supports the architecture. It explains the larger
+source download, temporary space, expected output choices, time uncertainty, and the
+no-repository-code boundary.
+
+A sticky review footer shows destination, intended runtime, total new disk use, licence
+acknowledgement state, and **Download** or **Download and use**. Gated models replace the
+action with **Request access on Hugging Face** until authorized access is detected.
+
+### Downloads and long-running operations
+
+Install, pull, download, import, conversion, and validation share one durable operation
+component. A compact tray appears above the global bottom edge while work is active and
+links to the Downloads tab. It shows operation name, phase, bytes or step progress,
+estimated remaining time only when the backend can support it, and **Cancel**.
+
+The Downloads tab groups **Active**, **Needs attention**, and **Completed** jobs. Each
+row expands into source, destination, exact revision/version, phase history, disk use,
+and bounded logs. A cancelled or failed job offers **Retry** and an explicit **Remove
+partial files** action; partial files are never deleted merely because a dialog closes.
+Completed conversion retains provenance from source revision through output fingerprint
+and deployment.
+
+### Responsive and accessible behavior
+
+- At 1440 and 1024 pixels, provider and model detail use the existing content width and
+  side-panel pattern; no control overlaps the top-bar stop control.
+- At 768 pixels, provider actions move below their facts and comparison tables gain a
+  labelled horizontal-scroll region.
+- At 375 pixels, cards become single-column, the detail panel becomes a full-height
+  sheet, the review footer remains above the browser edge, and primary actions stay at
+  least 44 pixels high.
+- Status changes use an `aria-live="polite"` region; terminal failure uses assertive
+  announcement only once.
+- Progress is expressed as text plus a native/ARIA progress value. Indeterminate work
+  says which phase is running rather than animating without meaning.
+- Dialog focus is trapped, returns to its trigger, supports Escape when cancellation is
+  safe, and requires the visible cancel action when an owner decision is needed.
+- Every icon-only action has an accessible name, every status meets contrast targets,
+  and reduced-motion preference removes non-essential progress animation.
+- Light, dark, and system themes use existing semantic tokens; no raw colour literal is
+  introduced for readiness in a feature component.
+
+### Visual acceptance set
+
+Screenshot review covers, at minimum:
+
+- first-run choice and ready screens;
+- Models with zero ready providers and with Anthropic, OpenRouter, Ollama, and LM Studio
+  states;
+- the shared no-model strip/dialog in Workbench, Chat, Build, Task, Schedule, and
+  background-agent variants;
+- Local library source approval, validated GGUF, incomplete GGUF, and deployment review;
+- Hugging Face results, variant comparison, gated access, conversion review, active
+  download, conversion failure, and completed deployment;
+- stopped-runtime invalidation after a previously ready selection; and
+- 1440, 1024, 768, and 375 pixel layouts in light and dark themes for the highest-density
+  Models and Hugging Face states.
 
 ## Security, privacy, and legal boundaries
 

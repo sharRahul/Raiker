@@ -9,6 +9,7 @@
   import FileInspector from "../components/FileInspector.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
@@ -51,6 +52,7 @@
     sourcesForTurn,
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
+  import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
   interface ChatTurn {
     id: number;
@@ -142,6 +144,7 @@
   const activeProfile = $derived(
     profiles.find((p) => p.profile_id === modelProfile && (!model || p.model === model)) ?? selectedProfile,
   );
+  const modelReadiness = $derived(readinessForSelection(activeProfile));
   const reasoningEfforts = $derived(
     activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
       ? (activeProfile.reasoning_effort_values ?? [])
@@ -593,7 +596,7 @@
 
   async function submit() {
     const text = promptText.trim();
-    if (text === "" || streaming || attachStore.uploading) return;
+    if (text === "" || !modelReadiness.ready || streaming || attachStore.uploading) return;
     const sentAttachments = attachStore.take();
     turns = [
       ...turns,
@@ -668,6 +671,14 @@
         },
       );
     } catch (e) {
+      if (e instanceof ApiError && e.reasonCode === "model_not_ready") {
+        turns = turns.filter((candidate) => candidate !== turn);
+        promptText = text;
+        attachStore.set(sentAttachments);
+        await refreshModels();
+        openModelSetup(activeProfile);
+        return;
+      }
       turn.error =
         e instanceof ApiError ? `Stream failed (${e.status}).` : "Could not reach the local runtime.";
     } finally {
@@ -1346,6 +1357,7 @@
   >
     <div class="composer-card">
       <ComposerChips store={attachStore} disabled={streaming} />
+      <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
       <SkillLinkNotice text={promptText} />
 
       <label for="prompt-input" class="sr-only">Prompt</label>
@@ -1448,7 +1460,7 @@
           <button
             type="submit"
             class="btn btn-primary send"
-            disabled={streaming || attachStore.uploading || promptText.trim() === ""}
+            disabled={streaming || attachStore.uploading || promptText.trim() === "" || !modelReadiness.ready}
             aria-label={streaming ? "Running" : "Send"}
           >
             <Icon name="send" size={15} />

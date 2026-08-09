@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -14,6 +15,7 @@ import ChatView from "./ChatView.svelte";
 afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
+  resetModels();
 });
 
 const projects = {
@@ -35,8 +37,9 @@ const projects = {
 };
 
 function routes() {
+  const ready = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
   return {
-    "GET /api/models": { profiles: [], chat_profiles: [] },
+    "GET /api/models": { profiles: [ready], chat_profiles: [ready] },
     "GET /api/tasks": [],
     "PUT /api/sessions/session-chat/project": { ok: true, session_id: "session-chat", project_id: "project-1" },
   };
@@ -48,6 +51,8 @@ const REASONING_PROFILE = {
   model: "claude-sonnet",
   selected: true,
   configured: true,
+  ready: true,
+  readiness_state: "ready",
   supports_reasoning: true,
   supports_reasoning_effort: true,
   reasoning_effort_values: ["low", "high"],
@@ -59,6 +64,8 @@ const NON_REASONING_PROFILE = {
   model: "gemma4:31b-cloud",
   selected: true,
   configured: true,
+  ready: true,
+  readiness_state: "ready",
   supports_reasoning: false,
   supports_reasoning_effort: false,
   reasoning_effort_values: [],
@@ -105,7 +112,7 @@ describe("ChatView composer parity", () => {
     ]);
   });
 
-  it("shows Not selected and omits effort from the prompt when no supported model is active", async () => {
+  it("shows Not selected and blocks the prompt when no model is active", async () => {
     stubFetch({
       ...routes(),
       "GET /api/models": { profiles: [], chat_profiles: [] },
@@ -118,9 +125,9 @@ describe("ChatView composer parity", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
     expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
-    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
-    expect(streamPromptMock.mock.calls[0][0]).not.toHaveProperty("reasoning_effort");
+    expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+    expect(screen.getByText("No model is set up.")).toBeInTheDocument();
+    expect(streamPromptMock).not.toHaveBeenCalled();
   });
 
   it("sends an effort only for the active exact supported profile", async () => {

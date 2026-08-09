@@ -39,6 +39,8 @@ const LOCAL_PROFILE = {
   off_machine: false,
   selected: true,
   configured: true,
+  ready: true,
+  readiness_state: "ready",
 };
 
 function routes(overrides: Record<string, unknown> = {}) {
@@ -69,6 +71,17 @@ function routes(overrides: Record<string, unknown> = {}) {
 }
 
 describe("WorkbenchView", () => {
+  it("preserves the draft and disables every handoff when the selected model is unready", async () => {
+    stubFetch(routes({
+      "GET /api/models": { profiles: [{ ...LOCAL_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }] },
+    }));
+    render(WorkbenchView);
+    const draft = screen.getByLabelText(/what would you like raiker to do/i);
+    await fireEvent.input(draft, { target: { value: "keep this draft" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /start build/i })).toBeDisabled());
+    expect(await screen.findByText("Ollama is not reachable.")).toBeInTheDocument();
+    expect(draft).toHaveValue("keep this draft");
+  });
   it("counts each actionable runtime configuration gap once", async () => {
     stubFetch(routes({
       "GET /api/diagnostics": {
@@ -126,7 +139,7 @@ describe("WorkbenchView", () => {
     stubFetch(routes({ "GET /api/models": { profiles: [] } }));
     render(WorkbenchView);
     await waitFor(() =>
-      expect(screen.getByText(/a model is required before work can start/i)).toBeInTheDocument(),
+      expect(screen.getByText(/no model is set up/i)).toBeInTheDocument(),
     );
   });
 

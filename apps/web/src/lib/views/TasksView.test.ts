@@ -2,18 +2,32 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import TasksView from "./TasksView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
-afterEach(() => vi.unstubAllGlobals());
+afterEach(() => { vi.unstubAllGlobals(); resetModels(); });
+
+const READY_MODEL = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
 
 describe("TasksView", () => {
+  it("preserves task fields and disables all cadences when the model is unready", async () => {
+    const stopped = { profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." };
+    stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [stopped], chat_profiles: [stopped] } });
+    render(TasksView);
+    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Keep title" } });
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Keep instructions" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Create task" })).toBeDisabled());
+    expect(screen.getByText("Ollama is not reachable.")).toBeInTheDocument();
+    expect(screen.getByLabelText("Task title")).toHaveValue("Keep title");
+    expect(screen.getByLabelText("Instructions")).toHaveValue("Keep instructions");
+  });
   it("creates an immediate task with its own configured model pair", async () => {
     const fetchMock = stubFetch({
       "GET /api/tasks": [],
       "GET /api/models": {
         profiles: [],
         chat_profiles: [
-          { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true },
-          { profile_id: "anthropic", provider: "anthropic", model: "opus", selected: false, configured: true },
+          { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true, ready: true, readiness_state: "ready" },
+          { profile_id: "anthropic", provider: "anthropic", model: "opus", selected: false, configured: true, ready: true, readiness_state: "ready" },
         ],
       },
       "POST /api/tasks": {},
@@ -44,7 +58,7 @@ describe("TasksView", () => {
       scheduled_at: "2026-08-02T10:00:00Z",
       attachments: [{ type: "path", path: "docs/source.md" }],
     };
-    const fetchMock = stubFetch({ "GET /api/tasks": [task], "POST /api/tasks": task });
+    const fetchMock = stubFetch({ "GET /api/tasks": [task], "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] }, "POST /api/tasks": task });
     render(TasksView);
     await screen.findByRole("heading", { name: "Review source" });
 
@@ -66,7 +80,7 @@ describe("TasksView", () => {
 
   it("lets a schedule retain an exact configured model", async () => {
     stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [], chat_profiles: [
-      { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true },
+      { profile_id: "anthropic", provider: "anthropic", model: "haiku", selected: true, configured: true, ready: true, readiness_state: "ready" },
     ] } });
     render(TasksView);
     await screen.findByText("No work queued");
@@ -78,8 +92,7 @@ describe("TasksView", () => {
   it("shows a route-level loading state while tasks are fetched", async () => {
     stubFetchPending();
     render(TasksView);
-    const status = await screen.findByRole("status");
-    expect(status).toHaveTextContent(/loading tasks/i);
+    expect(await screen.findByText(/loading tasks/i)).toBeInTheDocument();
   });
 
   it("shows a route-level error state when the task list cannot load", async () => {
@@ -108,6 +121,7 @@ describe("TasksView", () => {
   it("creates a daily routine with its saved schedule", async () => {
     const fetchMock = stubFetch({
       "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
       "POST /api/tasks": {
         task_id: "task_1",
         session_id: "sess_inbox",

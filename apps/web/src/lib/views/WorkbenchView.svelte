@@ -28,10 +28,12 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import StatTile from "../components/StatTile.svelte";
   import { relativeTime } from "../format";
   import { isActiveTask } from "../statusMaps";
   import { chatProfiles, refreshModels } from "../models.svelte";
+  import { readinessForSelection } from "../modelReadiness.svelte";
 
   let sessions = $state<SessionSummary[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
@@ -84,6 +86,7 @@
   const effectiveModel = $derived(
     profiles.find((profile) => profile.profile_id === chosenProfile && profile.model === chosenModel) ?? selectedProfile,
   );
+  const modelReadiness = $derived(readinessForSelection(effectiveModel));
   const named = $derived((sessions ?? []).filter((s) => (s.title ?? "").trim() !== ""));
   const hasActivity = $derived(named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0);
   const runtimeIssues = $derived(
@@ -125,7 +128,7 @@
   function startWork(event: SubmitEvent) {
     event.preventDefault();
     const text = draft.trim();
-    if (text === "" || effectiveModel === null || attachStore.uploading) return;
+    if (text === "" || !modelReadiness.ready || effectiveModel === null || attachStore.uploading) return;
     const attachments = attachStore.take();
     if (workMode === "task" || workMode === "schedule") {
       window.location.hash = "#/tasks";
@@ -215,14 +218,14 @@
           <div class="scope-fact"><span class="field-label">Project</span><p>{activeProject?.name ?? "No project"}</p></div>
           <div><span class="field-label">Model</span>{#if workMode === "chat"}<ModelPicker {profiles} {selectedProfile} bind:profileId={chatProfile} bind:model={chatModel} />{:else if workMode === "build"}<ModelPicker {profiles} {selectedProfile} bind:profileId={buildProfile} bind:model={buildModel} />{:else if workMode === "task"}<ModelPicker {profiles} {selectedProfile} bind:profileId={taskProfile} bind:model={taskModel} />{:else}<ModelPicker {profiles} {selectedProfile} bind:profileId={scheduleProfile} bind:model={scheduleModel} />{/if}</div>
         </div>
-        {#if effectiveModel === null}<p class="model-error" role="alert"><strong>A model is required before work can start.</strong> <a href="#/models">Choose a model</a> or ask an administrator.</p>{/if}
+        <ModelReadinessStrip readiness={modelReadiness} draftPreserved={draft.trim() !== ""} />
         <details class="governed"><summary><Icon name="shield" size={14} /> Governed execution</summary><p>Raiker requests your approval before restricted external actions. Project boundaries and connected-tool policies still apply.</p></details>
         {#if attachOpen}
           <ComposerAttachPanel store={attachStore} idPrefix="workbench" />
         {/if}
         <div class="composer-actions">
           <ComposerAttach bind:this={attachControl} bind:open={attachOpen} />
-          <button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || effectiveModel === null || attachStore.uploading}><Icon name="send" size={15} /> {primaryLabel}</button>
+          <button class="btn btn-primary" type="submit" disabled={draft.trim() === "" || !modelReadiness.ready || attachStore.uploading}><Icon name="send" size={15} /> {primaryLabel}</button>
         </div>
         {#if handedOff}<p class="handoff" role="status">{workMode === "build" ? "Sent to Build. Review and start the governed build there." : workMode === "task" ? "Sent to Tasks. Review and create the task there." : workMode === "schedule" ? "Sent to Tasks. Review the schedule and create it there." : "Sent to Chat. The conversation and its governed turn continue there."}</p>{/if}
       </form>
@@ -367,7 +370,6 @@
   }
   .governed summary { display: flex; align-items: center; gap: .45rem; cursor: pointer; font-weight: 650; color: var(--text-1); }
   .governed p { margin: .5rem 0 0 1.25rem; }
-  .model-error { margin: 0; padding: .65rem .8rem; border-radius: var(--r-md); background: var(--danger-soft); color: var(--danger); font-size: .82rem; }
   .composer-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .handoff { margin: 0; color: var(--ok); font-size: 0.82rem; font-weight: 600; }
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }

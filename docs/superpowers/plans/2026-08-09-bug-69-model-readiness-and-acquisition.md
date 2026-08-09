@@ -246,7 +246,7 @@ Resolve omitted profile/model through the same principal model selection used by
 Run: `python -m pytest tests/test_model_readiness_guards.py tests/test_api_prompts.py tests/test_api_dashboard.py -q`
 Expected: all pass and rejected requests add no turn, task, attachment reference, or model usage row.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/api/routes_prompts.py raiker/api/routes_dashboard.py raiker/runtime/orchestrator.py tests/test_model_readiness_guards.py tests/test_api_prompts.py tests/test_api_dashboard.py
@@ -316,7 +316,7 @@ Mount one `ModelSetupDialog` in `App.svelte`; `ModelPicker` repair buttons updat
 Run: `npm --prefix apps/web test -- ModelPicker.test.ts ModelReadinessStrip.test.ts ModelSetupDialog.test.ts && npm --prefix apps/web run check`
 Expected: all pass without Svelte accessibility warnings.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/lib/apiTypes.ts apps/web/src/lib/api.ts apps/web/src/lib/models.svelte.ts apps/web/src/lib/modelReadiness.svelte.ts apps/web/src/lib/components/ModelPicker.svelte apps/web/src/lib/components/ModelPicker.test.ts apps/web/src/lib/components/ModelReadinessStrip.svelte apps/web/src/lib/components/ModelReadinessStrip.test.ts apps/web/src/lib/components/ModelSetupDialog.svelte apps/web/src/lib/components/ModelSetupDialog.test.ts apps/web/src/App.svelte
@@ -339,7 +339,7 @@ git commit -m "feat: add shared model readiness controls"
 - Consumes: Task 4 shared store/components.
 - Produces: identical disabled-state and draft-preservation behavior on every surface.
 
-- [ ] **Step 1: Write one failing readiness scenario per surface**
+- [x] **Step 1: Write one failing readiness scenario per surface**
 
 ```ts
 it.each(["Chat", "Build", "Create task", "Schedule"])("preserves the %s draft when no model is ready", async (mode) => {
@@ -352,12 +352,12 @@ it.each(["Chat", "Build", "Create task", "Schedule"])("preserves the %s draft wh
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `npm --prefix apps/web test -- WorkbenchView.test.ts ChatView.test.ts BuildView.test.ts TasksView.test.ts`
 Expected: actions remain enabled or no readiness strip appears.
 
-- [ ] **Step 3: Integrate one computed `canSubmit` rule and shared repair UI**
+- [x] **Step 3: Integrate one computed `canSubmit` rule and shared repair UI**
 
 Use `effectiveModel?.ready === true && !uploading && !streaming` in each surface. Preserve existing upload, stop/steer, repository, schedule-time, and approval constraints by combining them rather than replacing them. Handle a server `model_not_ready` response by refreshing readiness and opening the shared dialog without clearing draft/attachments.
 
@@ -369,12 +369,12 @@ Use `effectiveModel?.ready === true && !uploading && !streaming` in each surface
 <button type="submit" disabled={!modelReady || uploading || streaming}>{primaryLabel}</button>
 ```
 
-- [ ] **Step 4: Verify GREEN and composer parity**
+- [x] **Step 4: Verify GREEN and composer parity**
 
 Run: `npm --prefix apps/web test -- WorkbenchView.test.ts ChatView.test.ts ChatView.composerParity.test.ts BuildView.test.ts TasksView.test.ts`
 Expected: all pass for ready and unready profiles.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/lib/views/WorkbenchView.svelte apps/web/src/lib/views/WorkbenchView.test.ts apps/web/src/lib/views/ChatView.svelte apps/web/src/lib/views/ChatView.test.ts apps/web/src/lib/views/BuildView.svelte apps/web/src/lib/views/BuildView.test.ts apps/web/src/lib/views/TasksView.svelte apps/web/src/lib/views/TasksView.test.ts

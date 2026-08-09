@@ -5,6 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
@@ -15,6 +16,7 @@
   import { relativeTime } from "../format";
   import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
   import { chatProfiles, refreshModels } from "../models.svelte";
+  import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
   let tasks = $state<TaskView[] | null>(null);
@@ -33,6 +35,10 @@
   const attachStore = createAttachmentStore();
   const profiles = $derived(chatProfiles());
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
+  const activeProfile = $derived(
+    profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile,
+  );
+  const modelReadiness = $derived(readinessForSelection(activeProfile));
 
   // Reverse approval links. A task that is blocked should say so where you are
   // looking at the task, rather than making you go and find the queue. Matching
@@ -115,7 +121,7 @@
   }
 
   async function createTask() {
-    if (!title.trim() || !objective.trim() || attachStore.uploading || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
+    if (!title.trim() || !objective.trim() || !modelReadiness.ready || attachStore.uploading || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
     creating = true; notice = null;
     const attachments = wireAttachments(attachStore.take());
     try {
@@ -132,7 +138,13 @@
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
-    } catch (error) { notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task."; }
+    } catch (error) {
+      if (error instanceof ApiError && error.reasonCode === "model_not_ready") {
+        await refreshModels();
+        openModelSetup(activeProfile);
+        notice = "The selected model is not ready. Your task draft is preserved.";
+      } else notice = error instanceof ApiError ? `Could not save task (${error.status}).` : "Could not save task.";
+    }
     finally { creating = false; }
   }
 
@@ -217,8 +229,9 @@
     <ComposerChips store={attachStore} disabled={creating} />
     <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
-    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} /></div>
-    <button class="btn btn-primary" disabled={creating || attachStore.uploading || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
+    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={activeProfile?.context_window_tokens} source={activeProfile?.context_window_source} /></div>
+    <ModelReadinessStrip readiness={modelReadiness} draftPreserved={Boolean(title.trim() || objective.trim())} />
+    <button class="btn btn-primary" disabled={creating || attachStore.uploading || !modelReadiness.ready || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>
 
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}

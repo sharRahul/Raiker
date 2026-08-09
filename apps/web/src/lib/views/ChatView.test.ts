@@ -6,6 +6,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -18,12 +19,18 @@ import ChatView from "./ChatView.svelte";
 afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
+  resetModels();
 });
+
+const DEFAULT_READY_PROFILE = {
+  profile_id: "test-ready", provider: "ollama", model: "test-model",
+  selected: true, configured: true, ready: true, readiness_state: "ready",
+};
 
 const MODELS_ROUTE = {
   "GET /api/models": {
-    profiles: [],
-    chat_profiles: [],
+    profiles: [DEFAULT_READY_PROFILE],
+    chat_profiles: [DEFAULT_READY_PROFILE],
     current_profile_id: null,
     current_model: null,
     advisor_profile_id: null,
@@ -54,6 +61,18 @@ function finalResponse(message: string): AgentResponse {
 }
 
 describe("ChatView streaming transcript", () => {
+  it("preserves the prompt and disables Send when the selected model is unready", async () => {
+    stubFetch({
+      "GET /api/models": { ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>), profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }], chat_profiles: [{ profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }] },
+    });
+    render(ChatView);
+    const box = screen.getByRole("textbox", { name: /prompt/i });
+    await fireEvent.input(box, { target: { value: "keep this prompt" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
+    expect(screen.getByText("Ollama is not reachable.")).toBeInTheDocument();
+    expect(box).toHaveValue("keep this prompt");
+    expect(streamPromptMock).not.toHaveBeenCalled();
+  });
   it("copies a response without offering transcript exports", async () => {
     stubFetch(MODELS_ROUTE);
     const writeText = vi.fn().mockResolvedValue(undefined);
@@ -255,6 +274,8 @@ describe("ChatView streaming transcript", () => {
             prompt_cache_ttl: null,
             context_window_tokens: 131072,
             configured: true,
+            ready: true,
+            readiness_state: "ready",
           },
         ],
         chat_profiles: [
@@ -274,6 +295,8 @@ describe("ChatView streaming transcript", () => {
             prompt_cache_ttl: null,
             context_window_tokens: 131072,
             configured: true,
+            ready: true,
+            readiness_state: "ready",
           },
         ],
       },
@@ -332,6 +355,8 @@ describe("ChatView streaming transcript", () => {
             prompt_cache_ttl: null,
             context_window_tokens: 131072,
             configured: true,
+            ready: true,
+            readiness_state: "ready",
           },
         ],
         chat_profiles: [
@@ -351,6 +376,8 @@ describe("ChatView streaming transcript", () => {
             prompt_cache_ttl: null,
             context_window_tokens: 131072,
             configured: true,
+            ready: true,
+            readiness_state: "ready",
           },
         ],
       },
@@ -645,6 +672,8 @@ describe("ChatView streaming transcript", () => {
             prompt_cache_ttl: null,
             context_window_tokens: 1_000_000,
             configured: true,
+            ready: true,
+            readiness_state: "ready",
           },
         ],
       },

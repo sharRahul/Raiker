@@ -7,6 +7,7 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/sve
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
 import { makeGate, stubFetch, stubFetchPending } from "../test-helpers";
+import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -19,11 +20,17 @@ import BuildView from "./BuildView.svelte";
 afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
+  resetModels();
 });
 
+const DEFAULT_READY_PROFILE = {
+  profile_id: "test-ready", provider: "ollama", model: "test-model",
+  selected: true, configured: true, ready: true, readiness_state: "ready",
+};
+
 const MODELS = {
-  profiles: [],
-  chat_profiles: [],
+  profiles: [DEFAULT_READY_PROFILE],
+  chat_profiles: [DEFAULT_READY_PROFILE],
   current_profile_id: null,
   current_model: null,
   advisor_profile_id: null,
@@ -42,6 +49,8 @@ const REASONING_PROFILE = {
   model: "reasoning-model",
   selected: true,
   configured: true,
+  ready: true,
+  readiness_state: "ready",
   supports_reasoning: true,
   supports_reasoning_effort: true,
   reasoning_effort_values: ["medium", "high"],
@@ -135,6 +144,16 @@ function respondWith(message: string) {
 }
 
 describe("Build composer modes", () => {
+  it("preserves the change and disables Send when the exact model is unready", async () => {
+    const stopped = { ...REASONING_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "The local runtime is stopped.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start it, then check again." };
+    stubFetch(baseRoutes({ "GET /api/models": { ...MODELS, profiles: [stopped], chat_profiles: [stopped] } }));
+    render(BuildView);
+    const box = screen.getByLabelText("Describe the change");
+    await fireEvent.input(box, { target: { value: "keep this change" } });
+    await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
+    expect(screen.getByText("The local runtime is stopped.")).toBeInTheDocument();
+    expect(box).toHaveValue("keep this change");
+  });
   it("applies the mode to every write capability, not just the label", async () => {
     // The point of the control: choosing Plan sets the runtime's decision modes
     // to deny, so a write proposed anyway is blocked by the runtime.
@@ -269,7 +288,7 @@ describe("Build model picker", () => {
   });
 
   it("calls an unavailable choice Not selected", async () => {
-    stubFetch(baseRoutes());
+    stubFetch(baseRoutes({ "GET /api/models": { ...MODELS, profiles: [], chat_profiles: [] } }));
     render(BuildView);
 
     expect(await screen.findByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument();

@@ -26,6 +26,17 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
   };
 }
 
+export function readinessForSelection(profile: ModelProfile | null): ModelReadinessView {
+  if (profile) return readinessForProfile(profile);
+  return {
+    owner_principal_id: "", profile_id: "", model: "", endpoint_fingerprint: "",
+    state: "not_configured", checked_at: null, expires_at: null,
+    summary: "No model is set up.", reason_code: "model_not_configured",
+    remediation: "Open Models to connect a provider or set up a local model.",
+    evidence: {}, ready: false,
+  };
+}
+
 export function openModelSetup(
   profile: ModelProfile | null,
   readiness: ModelReadinessView | null = null,

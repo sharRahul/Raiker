@@ -19,6 +19,7 @@
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
+  import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
@@ -80,6 +81,7 @@
     sourcesForTurn,
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
+  import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
   let {
     projects = null,
@@ -306,6 +308,7 @@
       (profile) => profile.profile_id === modelProfile && (!model || profile.model === model),
     ) ?? selectedProfile,
   );
+  const modelReadiness = $derived(readinessForSelection(activeProfile));
   const reasoningEfforts = $derived(
     activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
       ? (activeProfile.reasoning_effort_values ?? [])
@@ -429,7 +432,7 @@
 
   async function submit() {
     const text = promptText.trim();
-    if (text === "" || streaming || attachStore.uploading) return;
+    if (text === "" || !modelReadiness.ready || streaming || attachStore.uploading) return;
     const preamble = repoPreamble(activeRepo);
     // The preamble is prepended here, not server-side, so the transcript shows
     // the exact text the turn received.
@@ -490,6 +493,14 @@
         },
       );
     } catch (error) {
+      if (error instanceof ApiError && error.reasonCode === "model_not_ready") {
+        turns = turns.filter((candidate) => candidate !== turn);
+        promptText = text;
+        attachStore.set(sentAttachments);
+        await refreshModels();
+        openModelSetup(activeProfile);
+        return;
+      }
       turn.error =
         error instanceof ApiError
           ? `The turn could not be streamed (${error.status}).`
@@ -1043,6 +1054,7 @@
     >
       <div class="composer-card">
         <ComposerChips store={attachStore} disabled={streaming} />
+        <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
         <SkillLinkNotice text={promptText} />
         <label for="build-prompt" class="sr-only">Describe the change</label>
         <div class="composer-upper">
@@ -1191,7 +1203,7 @@
             <button
               type="submit"
               class="btn btn-primary send"
-              disabled={streaming || attachStore.uploading || promptText.trim() === ""}
+              disabled={streaming || attachStore.uploading || promptText.trim() === "" || !modelReadiness.ready}
             >
               <Icon name={streaming ? "clock" : "send"} size={15} />
               {streaming ? "Working…" : "Send"}

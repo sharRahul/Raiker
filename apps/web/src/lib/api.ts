@@ -42,6 +42,7 @@ import type {
   MemoryHistoryEvent,
   MemorySettingsView,
   ModelPricingView,
+  ModelReadinessView,
   ModelCapacitiesView,
   ModelsView,
   PasswordRecoveryBeginResult,
@@ -315,6 +316,9 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  modelReadiness: () => request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
+  checkModelReadiness: (profile_id: string, model: string) =>
+    postJson<ModelReadinessView>("/api/model-readiness/check", { profile_id, model }),
   modelCapacities: () => request<ModelCapacitiesView>("/api/models/capacities"),
   refreshModelCapacities: (force = false) =>
     postJson<{ ok: boolean; profiles: Array<{ profile_id: string; status: string; reason_code: string | null }> }>(

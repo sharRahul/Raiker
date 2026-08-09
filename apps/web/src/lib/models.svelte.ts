@@ -30,6 +30,15 @@ export function allProfiles(): ModelProfile[] {
   return store.data ? store.data.profiles : [];
 }
 
+/** Exact profiles currently proven reachable; unknown is deliberately not ready. */
+export function readyProfiles(): ModelProfile[] {
+  return chatProfiles().filter((profile) => profile.ready === true);
+}
+
+export function selectedModelReadiness(): ModelProfile | null {
+  return allProfiles().find((profile) => profile.selected) ?? null;
+}
+
 /** Fetch /api/models and update the shared store. Safe to call from onMount. */
 export async function refreshModels(): Promise<void> {
   try {

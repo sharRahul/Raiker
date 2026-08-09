@@ -272,7 +272,7 @@ git commit -m "fix: guard all model backed work"
 - Produces: `readyProfiles()`, `selectedModelReadiness()`, `openModelSetup()`, and `refreshModelReadiness()`.
 - Produces: component props `readiness: ModelReadinessView | null`, `draftPreserved?: boolean`, and `onRetry?: () => Promise<void>`.
 
-- [ ] **Step 1: Write failing component behavior tests**
+- [x] **Step 1: Write failing component behavior tests**
 
 ```ts
 it("groups runnable choices and repair actions without selecting an unready model", async () => {
@@ -285,12 +285,12 @@ it("groups runnable choices and repair actions without selecting an unready mode
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `npm --prefix apps/web test -- ModelPicker.test.ts ModelReadinessStrip.test.ts ModelSetupDialog.test.ts`
 Expected: new modules/components and readiness fields are missing.
 
-- [ ] **Step 3: Implement shared reactive state and accessible components**
+- [x] **Step 3: Implement shared reactive state and accessible components**
 
 Add TypeScript unions matching Task 1 states. Keep all profiles in the shared store. `chatProfiles()` remains for compatibility, while `readyProfiles()` filters `profile.ready === true`. The strip emits no navigation by itself; the dialog primary action sets `window.location.hash = "#/models"`. The dialog traps focus, returns focus to its trigger, exposes technical details collapsed, and announces retry state.
 
@@ -311,7 +311,7 @@ export function openModelSetup(profile: ModelProfile | null): void {
 
 Mount one `ModelSetupDialog` in `App.svelte`; `ModelPicker` repair buttons update the shared dialog state instead of creating nested dialogs.
 
-- [ ] **Step 4: Verify GREEN, types, and accessibility assertions**
+- [x] **Step 4: Verify GREEN, types, and accessibility assertions**
 
 Run: `npm --prefix apps/web test -- ModelPicker.test.ts ModelReadinessStrip.test.ts ModelSetupDialog.test.ts && npm --prefix apps/web run check`
 Expected: all pass without Svelte accessibility warnings.

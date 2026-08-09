@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { describe, expect, it } from "vitest";
 import type { ModelProfile } from "../apiTypes";
+import { resetModelSetup, setupDialog } from "../modelReadiness.svelte";
 import ModelPicker from "./ModelPicker.svelte";
 
 const profiles: ModelProfile[] = [
@@ -80,5 +81,35 @@ describe("ModelPicker", () => {
     await fireEvent.click(screen.getByRole("menuitemradio", { name: /Sonnet 4.5/i }));
 
     expect(screen.getByRole("button", { name: /model for this turn: Sonnet 4.5/i })).toBeInTheDocument();
+  });
+
+  it("keeps an unready model out of selection and opens its repair action", async () => {
+    resetModelSetup();
+    const ready: ModelProfile = { ...profiles[0], ready: true, readiness_state: "ready" };
+    const stopped: ModelProfile = {
+      ...profiles[2],
+      provider: "ollama",
+      ready: false,
+      readiness_state: "runtime_stopped",
+      readiness_summary: "Ollama is not reachable.",
+      readiness_reason_code: "local_runtime_unreachable",
+      readiness_remediation: "Start Ollama, then check again.",
+    };
+    render(ModelPicker, {
+      profiles: [ready, stopped],
+      selectedProfile: ready,
+      profileId: ready.profile_id,
+      model: ready.model,
+    });
+
+    await fireEvent.click(screen.getByRole("button", { name: /model for this turn/i }));
+
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+    expect(screen.getByText("Needs setup")).toBeInTheDocument();
+    expect(screen.queryByRole("menuitemradio", { name: /GPT-4o Mini/i })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Set up Ollama" }));
+    expect(setupDialog.open).toBe(true);
+    expect(setupDialog.profile?.profile_id).toBe(stopped.profile_id);
+    expect(screen.getByRole("button", { name: /model for this turn: Haiku 4.5/i })).toBeInTheDocument();
   });
 });

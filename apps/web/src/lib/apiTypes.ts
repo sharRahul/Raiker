@@ -238,6 +238,35 @@ export interface ProviderHealth {
   detail: string;
 }
 
+export type ModelReadinessState =
+  | "not_configured"
+  | "checking"
+  | "ready"
+  | "runtime_missing"
+  | "runtime_stopped"
+  | "model_missing"
+  | "policy_blocked"
+  | "authentication_failed"
+  | "unreachable"
+  | "unsupported"
+  | "stale";
+
+/** Reachability of one exact owner/profile/model/endpoint tuple. */
+export interface ModelReadinessView {
+  owner_principal_id: string;
+  profile_id: string;
+  model: string;
+  endpoint_fingerprint: string;
+  state: ModelReadinessState;
+  checked_at: string | null;
+  expires_at: string | null;
+  summary: string;
+  reason_code: string;
+  remediation: string;
+  evidence: Record<string, unknown>;
+  ready: boolean;
+}
+
 export interface Diagnostics {
   runtime_mode: string;
   production_ready_local_single_user_runtime: boolean;
@@ -285,6 +314,13 @@ export interface ModelProfile {
   cost_currency?: string | null;
   price_source?: string | null;
   price_as_of?: string | null;
+  readiness_state?: ModelReadinessState;
+  readiness_summary?: string;
+  readiness_reason_code?: string;
+  readiness_remediation?: string;
+  readiness_checked_at?: string | null;
+  readiness_expires_at?: string | null;
+  ready?: boolean;
 }
 
 /** Token usage and API cost for one conversation. Every figure names its source. */
@@ -435,6 +471,7 @@ export interface ModelsView {
   remote_profile_count: number;
   fallback_sequence: string[];
   no_silent_hosted_fallback: boolean;
+  ready_provider_count?: number;
 }
 
 /** Read-only status of one governed service connector (web-app task 4). Every

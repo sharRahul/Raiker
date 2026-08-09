@@ -2,6 +2,7 @@
   import type { ModelProfile } from "../apiTypes";
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
+  import { openModelSetup, readinessForProfile } from "../modelReadiness.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
   import Icon from "./Icon.svelte";
 
@@ -37,6 +38,8 @@
     }
     return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
   });
+  const readyChoices = (items: ModelProfile[]) => items.filter((profile) => profile.ready !== false);
+  const setupChoices = (items: ModelProfile[]) => items.filter((profile) => profile.ready === false);
   const activeProfileId = $derived(profileId || value);
   const active = $derived(
     profiles.find(
@@ -51,6 +54,11 @@
     value = selectsDefault ? "" : profile.profile_id;
     profileId = selectsDefault ? "" : profile.profile_id;
     model = selectsDefault ? "" : profile.model;
+    open = false;
+  }
+
+  function repair(profile: ModelProfile) {
+    openModelSetup(profile, readinessForProfile(profile));
     open = false;
   }
 
@@ -90,7 +98,10 @@
             <ProviderLogo provider={group.provider} />
             <span>{providerName(group.provider)}</span>
           </div>
-          {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
+          {#if readyChoices(group.profiles).length > 0}
+            <div class="readiness-label"><span class="ready-dot"></span>Ready</div>
+          {/if}
+          {#each readyChoices(group.profiles) as profile (`${profile.profile_id}\u0000${profile.model}`)}
             <button
               type="button"
               class="model-choice"
@@ -103,6 +114,18 @@
               <span>{modelName(profile.model)}</span>
               {#if active?.profile_id === profile.profile_id && active?.model === profile.model}<Icon name="check" size={15} label="Selected model" />{/if}
             </button>
+          {/each}
+          {#if setupChoices(group.profiles).length > 0}
+            <div class="readiness-label setup-label">Needs setup</div>
+          {/if}
+          {#each setupChoices(group.profiles) as profile (`setup-${profile.profile_id}\u0000${profile.model}`)}
+            <div class="setup-choice">
+              <ProviderLogo provider={profile.provider} />
+              <span class="setup-model">{modelName(profile.model)}</span>
+              <button type="button" class="setup-action" onclick={() => repair(profile)}>
+                Set up {providerName(profile.provider)}
+              </button>
+            </div>
           {/each}
         </div>
       {/each}
@@ -122,9 +145,18 @@
   .model-provider-group + .model-provider-group { margin-top: .28rem; padding-top: .28rem; border-top: 1px solid var(--border); }
   .model-provider-header { display: flex; align-items: center; gap: .5rem; padding: .3rem .48rem .24rem; color: var(--text-1); font-size: .72rem; font-weight: 800; letter-spacing: .03em; }
   .model-provider-header :global(.provider-logo) { width: 1.05rem; height: 1.05rem; flex-basis: 1.05rem; }
+  .readiness-label { display: flex; align-items: center; gap: .35rem; padding: .2rem .48rem; color: var(--text-3); font-size: .65rem; font-weight: 750; letter-spacing: .04em; text-transform: uppercase; }
+  .ready-dot { width: .38rem; height: .38rem; border-radius: 50%; background: var(--success, #2f9e62); }
+  .setup-label { margin-top: .18rem; color: var(--warn-text, var(--text-2)); }
   .model-choice { width: 100%; display: grid; grid-template-columns: auto minmax(0, 1fr) 1rem; align-items: center; gap: .5rem; padding: .42rem .48rem; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--text-2); text-align: left; cursor: pointer; }
   .model-choice:hover:not(:disabled), .model-choice[aria-checked="true"] { background: var(--accent-soft); color: var(--text-1); }
   .model-choice:disabled { cursor: wait; }
   .model-choice > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .model-choice :global(.provider-logo) { width: 1.15rem; height: 1.15rem; flex-basis: 1.15rem; }
+  .setup-choice { display: grid; grid-template-columns: auto minmax(5rem, 1fr) auto; align-items: center; gap: .5rem; padding: .4rem .48rem; border-radius: var(--r-sm); background: var(--sunken); color: var(--text-2); }
+  .setup-choice + .setup-choice { margin-top: .18rem; }
+  .setup-choice :global(.provider-logo) { width: 1.15rem; height: 1.15rem; flex-basis: 1.15rem; }
+  .setup-model { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .setup-action { border: 1px solid var(--warn-border, var(--neutral-border)); border-radius: var(--r-pill); padding: .2rem .48rem; background: var(--surface); color: var(--text-1); font: inherit; font-size: .68rem; font-weight: 750; cursor: pointer; }
+  .setup-action:hover { border-color: var(--accent-border); background: var(--accent-soft); }
 </style>

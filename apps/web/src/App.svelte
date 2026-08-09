@@ -24,6 +24,7 @@
   import ObserveView from "./lib/views/ObserveView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
   import WorkbenchView from "./lib/views/WorkbenchView.svelte";
+  import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
 
   let current = $state(
     typeof window === "undefined" ? DEFAULT_ROUTE : routeFromHash(window.location.hash),
@@ -197,6 +198,7 @@
     </main>
   </div>
 </div>
+<ModelSetupDialog />
 {/if}
 
 <style>

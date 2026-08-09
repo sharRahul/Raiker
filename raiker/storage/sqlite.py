@@ -52,6 +52,7 @@ from raiker.contracts.models import (
     UserRoleAssignment,
     VectorRecord,
 )
+from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
 from raiker.storage.migrations import (
     AGENT_PLANS_MIGRATION_ID,
@@ -153,6 +154,8 @@ from raiker.storage.migrations import (
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_PRICE_REGISTRY_MIGRATION_ID,
     MODEL_PRICE_REGISTRY_SQL,
+    MODEL_READINESS_MIGRATION_ID,
+    MODEL_READINESS_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
     MODEL_USAGE_LEDGER_MIGRATION_ID,
@@ -929,6 +932,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MACHINE_ACTION_IDENTITY_SNAPSHOT_MIGRATION_ID,
                 MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_READINESS_MIGRATION_ID,
+                MODEL_READINESS_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -6355,6 +6363,133 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 DO UPDATE SET updated_at = excluded.updated_at""",
                 (principal_id, profile_id, model, now, now),
             )
+
+    def save_model_readiness(self, readiness: ModelReadiness) -> None:
+        """Persist redacted reachability evidence for one exact model target."""
+
+        def redact(value: Any) -> Any:
+            if isinstance(value, dict):
+                return {
+                    str(key): (
+                        "[redacted]"
+                        if any(
+                            marker in str(key).casefold()
+                            for marker in ("authorization", "api_key", "apikey", "secret", "token", "credential")
+                        )
+                        else redact(item)
+                    )
+                    for key, item in value.items()
+                }
+            if isinstance(value, list):
+                return [redact(item) for item in value]
+            return value
+
+        key = readiness.key
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO model_readiness
+                (owner_principal_id, profile_id, model, endpoint_fingerprint,
+                 state, checked_at, expires_at, summary, reason_code, remediation, evidence_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(owner_principal_id, profile_id, model, endpoint_fingerprint)
+                DO UPDATE SET state = excluded.state,
+                  checked_at = excluded.checked_at,
+                  expires_at = excluded.expires_at,
+                  summary = excluded.summary,
+                  reason_code = excluded.reason_code,
+                  remediation = excluded.remediation,
+                  evidence_json = excluded.evidence_json""",
+                (
+                    key.owner_principal_id,
+                    key.profile_id,
+                    key.model,
+                    key.endpoint_fingerprint,
+                    readiness.state.value,
+                    readiness.checked_at,
+                    readiness.expires_at,
+                    readiness.summary,
+                    readiness.reason_code,
+                    readiness.remediation,
+                    json.dumps(redact(readiness.evidence), sort_keys=True, separators=(",", ":")),
+                ),
+            )
+
+    @staticmethod
+    def _model_readiness_from_row(row: sqlite3.Row) -> ModelReadiness:
+        try:
+            evidence = json.loads(str(row["evidence_json"]))
+        except (TypeError, ValueError):
+            evidence = {}
+        return ModelReadiness(
+            key=ModelReadinessKey(
+                owner_principal_id=str(row["owner_principal_id"]),
+                profile_id=str(row["profile_id"]),
+                model=str(row["model"]),
+                endpoint_fingerprint=str(row["endpoint_fingerprint"]),
+            ),
+            state=ModelReadinessState(str(row["state"])),
+            checked_at=str(row["checked_at"]) if row["checked_at"] else None,
+            expires_at=str(row["expires_at"]) if row["expires_at"] else None,
+            summary=str(row["summary"]),
+            reason_code=str(row["reason_code"]),
+            remediation=str(row["remediation"]),
+            evidence=evidence if isinstance(evidence, dict) else {},
+        )
+
+    def load_model_readiness(self, key: ModelReadinessKey) -> ModelReadiness | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM model_readiness
+                WHERE owner_principal_id = ? AND profile_id = ? AND model = ?
+                  AND endpoint_fingerprint = ?""",
+                (
+                    key.owner_principal_id,
+                    key.profile_id,
+                    key.model,
+                    key.endpoint_fingerprint,
+                ),
+            ).fetchone()
+        return self._model_readiness_from_row(row) if row is not None else None
+
+    def list_model_readiness(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None = None,
+    ) -> list[ModelReadiness]:
+        query = "SELECT * FROM model_readiness WHERE owner_principal_id = ?"
+        params: list[str] = [owner_principal_id]
+        if profile_id is not None:
+            query += " AND profile_id = ?"
+            params.append(profile_id)
+        query += " ORDER BY profile_id, model, endpoint_fingerprint"
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [self._model_readiness_from_row(row) for row in rows]
+
+    def invalidate_model_readiness(
+        self,
+        owner_principal_id: str,
+        profile_id: str,
+        *,
+        reason_code: str = "readiness_invalidated",
+    ) -> int:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE model_readiness
+                SET state = ?, expires_at = ?, reason_code = ?,
+                    summary = ?, remediation = ?
+                WHERE owner_principal_id = ? AND profile_id = ?""",
+                (
+                    ModelReadinessState.STALE.value,
+                    utc_now(),
+                    reason_code,
+                    "This model connection must be checked again.",
+                    "Check this model again before sending.",
+                    owner_principal_id,
+                    profile_id,
+                ),
+            )
+        return int(cursor.rowcount)
 
     def list_configured_models(self, principal_id: str) -> list[tuple[str, str]]:
         with self.connect() as connection:

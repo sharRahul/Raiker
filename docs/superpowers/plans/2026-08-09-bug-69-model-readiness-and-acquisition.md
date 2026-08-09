@@ -57,7 +57,7 @@
 - Produces: `ModelReadinessState`, `ModelReadinessKey`, `ModelReadiness`, `ModelProbe`, and `ModelReadinessService`.
 - Produces: `SQLiteStore.save_model_readiness()`, `load_model_readiness()`, `invalidate_model_readiness()`, and `list_model_readiness()`.
 
-- [ ] **Step 1: Write failing state, storage, freshness, and invalidation tests**
+- [x] **Step 1: Write failing state, storage, freshness, and invalidation tests**
 
 ```python
 def test_ready_is_exact_to_owner_profile_model_and_endpoint(tmp_path: Path) -> None:
@@ -70,12 +70,12 @@ def test_ready_is_exact_to_owner_profile_model_and_endpoint(tmp_path: Path) -> N
     assert service.current("owner-a", "ollama-local-openai-compatible", "gemma4:31b-cloud", "endpoint-a").state is ModelReadinessState.STALE
 ```
 
-- [ ] **Step 2: Run the focused test and verify RED**
+- [x] **Step 2: Run the focused test and verify RED**
 
 Run: `python -m pytest tests/test_model_readiness.py -q`
 Expected: collection fails because `raiker.models.readiness` does not exist.
 
-- [ ] **Step 3: Add migration `RAIKER-1042-model-readiness` and minimal domain/service**
+- [x] **Step 3: Add migration `RAIKER-1042-model-readiness` and minimal domain/service**
 
 ```python
 class ModelReadinessState(StrEnum):
@@ -116,7 +116,7 @@ class ModelProbe(Protocol):
 
 Persist only redacted evidence JSON. Add unique key `(owner_principal_id, profile_id, model, endpoint_fingerprint)` and indexes for owner/profile and expiry.
 
-- [ ] **Step 4: Verify GREEN and migration compatibility**
+- [x] **Step 4: Verify GREEN and migration compatibility**
 
 Run: `python -m pytest tests/test_model_readiness.py tests/test_storage_migrations.py -q`
 Expected: all pass; legacy workspaces migrate without a readiness row.

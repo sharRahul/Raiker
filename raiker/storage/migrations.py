@@ -2429,6 +2429,32 @@ ALTER TABLE tool_actions ADD COLUMN machine_expires_at TEXT;
 """
 
 
+# BUG-69 -- short-lived, exact model reachability observations. Configuration
+# and selection are durable intent; these rows are only evidence that the exact
+# owner/profile/model/endpoint tuple was reachable recently.
+MODEL_READINESS_MIGRATION_ID = "RAIKER-1042-model-readiness"
+MODEL_READINESS_SQL = """
+CREATE TABLE IF NOT EXISTS model_readiness (
+  owner_principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  endpoint_fingerprint TEXT NOT NULL,
+  state TEXT NOT NULL,
+  checked_at TEXT,
+  expires_at TEXT,
+  summary TEXT NOT NULL DEFAULT '',
+  reason_code TEXT NOT NULL DEFAULT '',
+  remediation TEXT NOT NULL DEFAULT '',
+  evidence_json TEXT NOT NULL DEFAULT '{}',
+  PRIMARY KEY (owner_principal_id, profile_id, model, endpoint_fingerprint)
+);
+CREATE INDEX IF NOT EXISTS idx_model_readiness_owner_profile
+  ON model_readiness(owner_principal_id, profile_id);
+CREATE INDEX IF NOT EXISTS idx_model_readiness_expiry
+  ON model_readiness(expires_at);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

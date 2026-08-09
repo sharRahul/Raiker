@@ -232,6 +232,37 @@ class TestServerIssuedLocatorsSurvive:
         assert_no_secrets_in_body(redact_response_body({"pdf_url": self.PDF_URL}))
 
 
+class TestUnprefixedLocatorFieldsSurvive:
+    """The same failure for a field named ``path`` rather than ``*_path``.
+
+    ``/api/model-library`` reports each approved root as ``{"path": …}``, and no
+    suffix matches a bare name, so an owner who approved
+    ``/home/user/models/library`` got ``/[REDACTED_SECRET]`` back: a root they
+    could neither see nor remove, since removal is by path.
+    """
+
+    ROOT = "/home/user/.local/share/raiker/models/library/gguf"
+
+    def test_a_bare_path_field_survives(self) -> None:
+        body = {"roots": [{"path": self.ROOT}]}
+        assert redact_response_body(body) == body
+
+    def test_a_bare_url_field_survives(self) -> None:
+        body = {"url": "/instances/quarterly-review-2026-workspace/attachments/preview"}
+        assert redact_response_body(body) == body
+
+    def test_a_credential_in_a_bare_path_field_is_still_redacted(self) -> None:
+        body = {"path": "/var/keys/AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"}
+        redacted = redact_response_body(body)
+        assert redacted != body
+        assert "AAAABBBB" not in redacted["path"]
+
+    def test_a_secret_named_key_still_wins_over_the_bare_locator_rule(self) -> None:
+        assert redact_response_body({"token_path": "/var/keys/x"}) == {
+            "token_path": "***REDACTED***"
+        }
+
+
 class TestServerIssuedIdentifiersSurvive:
     """FIXED-14 — the same failure, one field family further along.
 

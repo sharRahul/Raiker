@@ -38,6 +38,10 @@ superseded guides, and screenshots are not maintained here.
 - [Runtime orchestration](RUNTIME_ORCHESTRATION_SPEC.md)
 - [Runtime executors](RUNTIME_EXECUTORS_SPEC.md)
 - [Security and policy](SECURITY_AND_POLICY.md)
+- [OWASP GenAI mapping](OWASP_GENAI_SECURITY_MAPPING.md): the LLM Top 10 (2025)
+  against documented and enforced controls.
+- [OWASP Agentic mapping](OWASP_AGENTIC_TOP10_MAPPING.md): the Agentic Top 10
+  (ASI01–ASI10, 2026), each row citing the code that proves it.
 - [Security threat models](threat-models/)
 - [Licensing policy](licensing/LICENSING_POLICY.md)
 - [Verification](VERIFICATION_PLAN.md)

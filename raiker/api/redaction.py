@@ -52,6 +52,15 @@ REDACTED_VALUE = "***REDACTED***"
 # (``sk-…``, ``ghp_…``, ``Bearer …``, ``token=…``, PEM blocks) is matched before
 # the fallback and applies here unchanged. Free-form text is untouched by this
 # and keeps the strict scan.
+#
+# The suffix list alone was not enough: a field can name a locator without a
+# prefix. ``/api/model-library`` reports each approved root as ``{"path": …}``,
+# and an unprefixed ``path`` ends with none of the suffixes below, so the roots
+# the owner had just approved came back as ``/[REDACTED_SECRET]`` — unusable in
+# the library pane and unremovable, since removal is by path. The same holds for
+# the ``path`` of an approval's artifact and of a prompt attachment. The bare
+# names carry exactly the same signal as the suffixed ones and are listed
+# alongside them.
 
 # Field-name suffixes whose values are locators. Deliberately a short, literal
 # list of families the API actually emits (``pdf_url``, ``events_path``,
@@ -59,7 +68,9 @@ REDACTED_VALUE = "***REDACTED***"
 # Checked *after* the secret-key sweep, so a key naming a credential is still
 # discarded whole even if it also ends in one of these.
 _LOCATOR_KEY_SUFFIXES = ("_url", "_urls", "_uri", "_path", "_paths", "_subpath")
-_LOCATOR_KEYS = frozenset({"subject"})
+# Whole field names whose values are locators — the unprefixed spellings of the
+# same families, which no suffix above matches.
+_LOCATOR_KEYS = frozenset({"subject", "path", "paths", "subpath", "url", "urls", "uri", "uris"})
 
 # Field names whose values are server-issued record identifiers. Same failure as
 # the locators above and the same cure: `sess_inbox_principal_user_<16 hex>` is

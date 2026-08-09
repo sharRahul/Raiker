@@ -204,6 +204,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-134 | High | Local library / redaction corrupted path-derived deployment IDs | Fixed (found in BUG-69 live download/deploy) |
 | FIXED-135 | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
 | FIXED-136 | High | Managed llama.cpp / graceful host shutdown could leave the child alive | Fixed (found in BUG-69 shutdown verification) |
+| FIXED-137 | High | API redaction / an unprefixed `path` field was destroyed | Fixed (found in GitHub CI after BUG-69) |
 | BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
 | BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
 | BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
@@ -5907,6 +5908,39 @@ component test uses fake time to prove a second fetch occurs, and screenshot
 sent terminate without waiting. Shutdown now waits up to five seconds, kills on
 timeout, waits for exit, and only then clears its state. The live test child was
 verified stopped after the service closed.
+
+---
+
+## FIXED-137 — Redaction destroyed an approved model library root
+
+**Status: fixed in this change.** Found in GitHub CI after BUG-69 landed:
+`tests/test_api_model_library.py::test_owner_adds_and_rescans_an_approved_library`
+failed on `main`.
+
+**Observed.** `GET /api/model-library` returned every approved root as:
+
+> `{"path": "/[REDACTED_SECRET]"}`
+
+**Root cause.** The same high-entropy fallback behind FIXED-11 and FIXED-14: any
+40+ character run of URL/base64 characters is redacted, and `/` is one of them,
+so a filesystem path trips it purely because its segments were joined. Locator
+fields are exempted by their key, but `is_locator_field` matched *suffixes*
+only — `_path`, `_url`, `_uri`. The model library reports a root as a bare
+`path`, which ends with none of them, so it kept the strict scan. The approvals
+route's artifact `path` and a prompt attachment's `path` had the same shape.
+
+**Impact.** The owner could add a library root and rescan it, but the roots list
+showed an unreadable placeholder, and removal is by path — so a root approved by
+mistake could not be withdrawn from the UI.
+
+**Fix.** `_LOCATOR_KEYS` now carries the unprefixed spellings — `path`, `paths`,
+`subpath`, `url`, `urls`, `uri`, `uris` — alongside the suffix list. Nothing
+else changes: the secret-key sweep still runs first, so `token_path` is still
+discarded whole, and every credential shape is still matched before the
+fallback, so a key embedded in a path is still its own over-length segment and
+is still redacted. Regression tests cover a bare `path` and `url` surviving, a
+credential inside a bare `path` still redacting, and the secret-key sweep still
+winning.
 
 ---
 

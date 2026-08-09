@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced. That broker path is reachable from the terminal client but not yet from Chat or Build — see [Known limits](#known-limits).
 
 ## Quick start
 
@@ -107,7 +107,11 @@ First run uses **owner bootstrap** to create your local **owner principal** — 
 username and password held on this machine. There is no cloud account. Every
 request thereafter resolves an **acting-principal**.
 
-To connect a hosted model, start the server with the provider's host allowlisted:
+> **Connect a model before you send your first message.** A fresh workspace
+> presents Ollama's `gemma4:31b-cloud` as the default, whether or not Ollama is
+> installed; on a machine without it the first turn fails with a bare
+> `model_unavailable` reason code. Tracked as BUG-69 in
+> [to be fixed](docs/plans/TO_BE_FIXED.md).
 
 To connect a hosted model, open **Models**, press **Connect** on the provider,
 and paste your API key. That is the whole flow — see
@@ -136,7 +140,7 @@ Controls that stand between an AI-proposed action and it happening:
 |---|---|---|
 | **Agent runtime** | Settings → Runtime configuration | Whether Raiker accepts new executions at all |
 | **Capability gate** | Permissions | Whether this capability exists for you at all |
-| **Decision mode** | Permissions, or the Chat composer | Ask / Allow / Auto / Deny before each action |
+| **Decision mode** | Permissions, or the Chat and Build composers | Ask / Allow / Auto / Deny before each action |
 | **Approval** | Approvals | A human decision on the specific proposed action |
 
 Opening a higher-risk gate is a governed step-up: a human `runtime_gate_manager`,
@@ -192,8 +196,10 @@ zero-trust verification is applied at every authority boundary.
 Highlights, each verified against a live instance:
 
 - **Chat** — streamed turns against local or hosted models, image and document
-  attachments, a recent-chat list with rename/pin/archive/move, and full-text
-  search across titles and message bodies.
+  attachments, sanitised Markdown rendering, source citations, a recent-chat
+  list with per-row delete and move-to-project, full-text search across titles
+  and message bodies, and one-click export of a conversation to HTML, Markdown
+  or PDF.
 - **Tasks** — four work types: run now, schedule once, daily routine, and a
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.
@@ -250,12 +256,33 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   `RAIKER_GITHUB_TOKEN` is set. Only HTTPS GitHub remotes are pushable, because
   that is the credential Raiker holds; it never forces and never deletes a
   branch. `github_write` then has a head to open a pull request against.
-- **The agent reaches the web only where you have allowed it, and cannot search
-  at all until you configure a provider.** `web_fetch` is gated by its own
-  capability, withholds by default at `ask`, and fetches nothing while
-  `RAIKER_WEB_EGRESS_ALLOWLIST` is empty. `web_search` answers the same gate,
-  but Raiker ships no search endpoint: it reports `web_search_not_configured`
-  until you point it at one.
+- **Web fetch is currently broken once you allow it.** `web_fetch` is gated by
+  its own capability and withholds by default at `ask`. Raising it to **Allow**
+  does not produce a fetched page: on the 2026-08-08 round every turn that
+  called the tool ended with `model_unavailable: provider_stream_failed`, with
+  no audit event and no server log line, for an allowlisted and a
+  non-allowlisted host alike. Tracked as **BUG-72**; leave the capability at
+  `ask` until it closes. `web_search` answers the same gate, but Raiker ships no
+  search endpoint: it reports `web_search_not_configured` until you point it at
+  one.
+- **Memory cannot be written from Chat or Build.** `memory_write` and
+  `memory_forget` are real, broker-governed actions, but they are not in the
+  model tool catalogue, so no turn can propose one however **Memory store** is
+  set: an agent is only ever offered the read-only `memory_get`, `memory_list`
+  and `memory_search`, and the runtime reports `read_only_review`. Tracked as
+  **BUG-71**. Until it closes, treat the Memory page as a viewer.
+- **Two governed surfaces disagree about how a decision mode is changed.**
+  Changing a capability's Ask/Allow/Auto/Deny from Permissions requires a
+  step-up: a recorded reason, and a threat-model acknowledgement where the
+  capability demands one. Build's **Plan / Edit / Auto** chips make the same
+  change to `file_write_execution`, `patch_apply_execution`, `shell_execution`
+  and `process_execution` with none of it, and the change is global and
+  persistent. Enforcement still fails safe — an approval is still raised — but
+  the authority record is thinner than it should be. Tracked as **BUG-70**.
+- **The context meter's input/output split reads `NaN`.** Used, capacity,
+  remaining, per-chat cost and provider all-time cost are all correct; the
+  per-direction token split is discarded by the API's secret-shaped-field
+  redactor and formatted as `NaN`. Tracked as **BUG-68**.
 - **The code map finds declarations, not every reference, and it is exact only
   for Python.** Turning on **Code map** lets Raiker index the repository Build
   points at, so the agent can ask where something is defined instead of guessing
@@ -267,7 +294,12 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   presenting a partial map as a complete one. There is no reference or
   call-graph search and no embeddings over the tree.
 - Automatic context compaction at 90 % and weekly quota display are specified
-  but not shipped. The view-only file inspector is shipped.
+  but not shipped. The view-only file inspector is shipped, and so are
+  conversation export (HTML / Markdown / PDF) and **Print / Save as PDF**.
+- **A resumed turn can, rarely, deny an execution that happened.** One
+  conversation on the 2026-08-08 round ended, durably, saying "No command was
+  executed" beneath the chip for the file the approval had just written. Three
+  targeted reproductions did not recur. Tracked as **BUG-73**.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current
@@ -276,10 +308,11 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
 
 Where one of these is tracked as work rather than a deliberate boundary, it is
 written up with a reproduction and a proposed fix in
-[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md). The entries that closed
-the older limits this section used to list are FIXED-34, FIXED-39, FIXED-90,
-FIXED-99, FIXED-101 and FIXED-109 there, and
-[ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
+[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md) — the 2026-08-08 round's
+findings are **BUG-68** through **BUG-73**. The entries that closed the older
+limits this section used to list are FIXED-34, FIXED-39, FIXED-90, FIXED-99,
+FIXED-101 and FIXED-109 there, and [ADD-02](docs/plans/TO_BE_ADDED.md) in the
+companion document.
 
 ## Documentation
 
@@ -288,7 +321,9 @@ FIXED-99, FIXED-101 and FIXED-109 there, and
 - **[Documentation index](docs/README.md)** — architecture, security model,
   commands, API contracts, capability status, verification.
 - **[Live manual test plan](docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — a
-  repeatable end-to-end plan and the recorded result of the last round.
+  repeatable end-to-end plan and the recorded result of the last round
+  (2026-08-08, hosted Anthropic, every catalogue model), with
+  [screenshots](docs/plans/screenshots) of what worked and what did not.
 - **[Security philosophy and policy](docs/SECURITY_AND_POLICY.md)** — read this
   before enabling any governed capability.
 

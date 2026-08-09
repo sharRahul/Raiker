@@ -1,20 +1,69 @@
 # Manual test evidence
 
 Browser screenshots captured while executing
-[the live manual test plan](../RAIKER_LIVE_MANUAL_TEST_PLAN.md) on
-**2026-07-26** against a running `raiker-web` (Chromium, hosted Anthropic
-`claude-haiku-4-5-20251001`), plus the focused B3 approval run on **2026-07-27**
-against a disposable local workspace.
-
-One exception, marked where it appears:
-`working/83-FIXED-06-chat-markdown-rendered.png` is a Chromium render of the
-shipped `Markdown.svelte` inside the chat bubble markup rather than a live model
-turn — it was captured in an environment with no provider credential.
+[the live manual test plan](../RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a
+running `raiker-web` in Chromium.
 
 | Folder | Contents |
 |---|---|
 | [`working/`](working) | Verified behaviour — every surface that did what it claims |
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
+
+## Rounds
+
+| Prefix | Round | Provider |
+|---|---|---|
+| `r0808-` | **2026-08-08**, the current full round | hosted Anthropic, all ten catalogue models |
+| `01`–`207`, `b*`, `c*`, `bug*`, `add-*`, `skills-*` | 2026-07-26 → 2026-08-04 | hosted Anthropic `claude-haiku-4-5-20251001`, local Ollama `gemma4:31b-cloud` |
+
+---
+
+## The 2026-08-08 round
+
+158 screenshots, prefix `r0808-`. Reading order:
+
+| Range | Covers |
+|---|---|
+| `01`–`02c` | First run, registration, reload behaviour, sign-in as an existing owner |
+| `03-route-*`, `03-tab-*` | All 14 routes and all 22 hub tabs, 0 console errors each |
+| `04`–`08` | Models: the Connect dialog, a real key, the live catalogue, pinning a model |
+| `09`–`19` | Chat: composer inventory, a live streamed turn, context memory, the context/cost popover, the model picker, the ten-model sweep, the unconfigured-provider path |
+| `20`–`26` | Permissions: 67 gates, search, an expanded row, the step-up dialog, 16 gates enabled, the deferred domains |
+| `27`–`38` | The approval lifecycle: proposal → inbox → detail with diff → execute → the file on disk → the resumed turn |
+| `39`–`43` | Conversation actions, Markdown → PDF, the PDF inspector, Export conversation in HTML / Markdown / PDF |
+| `44`–`47` | Attachments: the menu, a document reaching the model, an image described |
+| `48`–`49` | Chat search over titles and message text |
+| `50`–`53` | All four task types, created and run |
+| `54`–`59` | MCP: create, connect, discover, raise the decision mode, call the tool from Chat |
+| `60`–`64` | Build: the repository connector, code-map build, `code_map_search`, the mode chips |
+| `65`–`66` | Projects |
+| `69`–`72` | Memory and Knowledge Map, and the memory tools actually offered to a turn |
+| `73` | Observability's seven tabs on real data |
+| `74` | Settings' six tabs |
+| `75`–`79` | Theme cycle, notification centre, STOP switch, Host control |
+| `80`–`81` | Responsive layout at 375 / 768 / 1024 / 1440 px, and the drawer |
+| `82`–`83` | Extensions tabs (including the new Skills tab) and the Workbench |
+| `84`–`86` | Web fetch withheld at `ask`, the `update_plan` checklist, `spawn_subagent` |
+
+### not-working — the 2026-08-08 defects
+
+| File | Defect |
+|---|---|
+| `BUG-r0808-01-context-popover-NaN-io-tokens.png` | **BUG-68** — the context meter reads `NaN input · NaN output` |
+| `BUG-r0808-02-post-approval-answer-says-not-executed.png` | **BUG-73** — a resumed turn denies an execution that happened |
+| `BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png` | **BUG-70** — Build's Auto chip set File writes to Auto globally, with no step-up |
+| `BUG-r0808-04-memory-store-capability-has-no-executor.png` | **BUG-71** — "Memory store" can be enabled but nothing can ever write a memory |
+| `BUG-r0808-05-fresh-workspace-defaults-to-absent-ollama.png` | **BUG-69** — a pristine workspace presents an unreachable model as ready |
+| `BUG-r0808-05-models-claims-one-provider-set-up.png` | **BUG-69** — "1 of 10 providers set up" with nothing reachable |
+| `BUG-r0808-05-first-turn-raw-reason-code.png` | **BUG-69** — the first message ever sent fails with a bare reason code |
+| `BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png` | **BUG-72** — enabling Web fetch breaks every turn that uses it |
+
+No screenshot contains a credential: keys were entered into `type="password"`
+fields and the response-redaction layer never returns a stored value.
+
+---
+
+## Earlier rounds
 
 ## not-working
 

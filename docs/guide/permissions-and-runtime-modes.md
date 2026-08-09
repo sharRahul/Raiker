@@ -85,6 +85,23 @@ the machine actor separately from you, the owner.
 
 Expand a row for its description and current decision mode, then **Turn on**.
 
+Two caveats found on the 2026-08-08 round:
+
+- **Memory store and Memory forget cannot be reached from Chat or Build.** Both
+  can be enabled and set to any decision mode, and the Memory store row claims
+  it "persists durable memories through the governed broker" — which is true of
+  the broker and false of the agent. `memory_write` and `memory_forget` are not
+  in the tool catalogue a model sees, so no turn can propose one and no memory
+  record or proposal is ever created. Tracked as **BUG-71** — until it closes,
+  treat Memory as a read-only viewer.
+- **Build's Plan / Edit / Auto chips change decision modes without the step-up.**
+  Pressing one rewrites `file_write_execution`, `patch_apply_execution`,
+  `shell_execution` and `process_execution` globally and permanently, with no
+  reason and no acknowledgement recorded — the same change made here demands
+  both. Enforcement still fails safe (an approval is still raised), but if
+  Permissions shows a mode you do not remember choosing, a Build chip is the
+  likeliest cause. Tracked as **BUG-70**.
+
 ### The step-up dialog
 
 Higher-risk capabilities (shell, processes, network, web fetch, hosted models,
@@ -99,12 +116,15 @@ MCP) require all three of:
 
 ### Capabilities with no enable path
 
-Some capabilities show no **Turn on** at all: CCTV, finance, medical,
-pregnancy/baby, home security, and hardware operation. These are **deferred**,
+Some capabilities show no row at all: CCTV, finance, medical,
+pregnancy/baby, home security, and hardware operation (18 of the 67 gates are
+never rendered). These are **deferred**,
 not merely gated — no governed executor exists, so the runtime refuses to pretend
 one does. SSH remote and Daytona cloud execution instead require an
 owner-configured profile, their dedicated capability gate, and approval for each
-action.
+action; their **Remote execution** and **Cloud execution** rows *are* listed and
+*can* be turned on, and each says in the row that it has no executor and stays
+fail-closed.
 
 **Checkpoint restore** used to be listed here and is not deferred: it has had a
 real executor since Workstream B, and it was unenableable only because it had no

@@ -32,7 +32,11 @@ That is the whole flow. Behind it:
 | Generate a vault key in Settings first | The key is generated on first use at `0600`. Settings still owns viewing, rotating, and clearing it. |
 
 Then press **Choose model…** — Raiker asks the provider for its live catalogue —
-pick a model, and **Use model**.
+pick a model, and **Use model**. On 2026-08-08 Anthropic's catalogue returned ten
+models (Opus 5, Sonnet 5, Claude Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6, Opus
+4.6, Opus 4.5, Haiku 4.5, Sonnet 4.5); each was pinned in turn and each answered
+a live turn. Switching model is two clicks and takes effect on the next turn —
+the composer chip and the card both name the pinned model.
 
 ### What is still refused
 
@@ -77,6 +81,12 @@ API cost"*.
 
 Local providers show *"No API cost — runs on this machine"* instead of a bar.
 A provider you have not used yet says *"Not used yet"*.
+
+> **Read that counter carefully.** It counts a provider that is *configured*,
+> not one that is *reachable* — a fresh install reads "1 of 10 providers set up"
+> because the shipped Ollama default counts, even with no Ollama on the machine.
+> The provider card itself is honest and says **Not connected**. Tracked as
+> **BUG-69**.
 
 Prices come from the provider where one publishes them, from the list prices
 shipped in `config/model-profiles.json` otherwise, and from your own override

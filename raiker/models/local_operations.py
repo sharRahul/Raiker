@@ -52,11 +52,21 @@ class ModelOperationService:
             raise ValueError("unsupported_operation_kind")
         now = utc_now()
         operation = ModelOperation(
-            operation_id=new_id("mop_"), owner_principal_id=owner_principal_id,
-            kind=request.kind, target=request.target, state="queued", phase="queued",
-            progress_bytes=0, total_bytes=None, progress_percent=None,
-            source_url=_redact_source_url(request.source_url), destination=_redact_destination(request.destination),
-            error_code=None, error_detail=None, created_at=now, updated_at=now,
+            operation_id=new_id("mop_"),
+            owner_principal_id=owner_principal_id,
+            kind=request.kind,
+            target=request.target,
+            state="queued",
+            phase="queued",
+            progress_bytes=0,
+            total_bytes=None,
+            progress_percent=None,
+            source_url=_redact_source_url(request.source_url),
+            destination=_redact_destination(request.destination),
+            error_code=None,
+            error_detail=None,
+            created_at=now,
+            updated_at=now,
         )
         self.store.save_model_operation(operation)
         return operation
@@ -64,18 +74,66 @@ class ModelOperationService:
     def list(self, owner_principal_id: str) -> list[ModelOperation]:
         return self.store.list_model_operations(owner_principal_id)
 
+    def running(self, owner_principal_id: str, operation_id: str, *, phase: str) -> ModelOperation:
+        operation = self.store.require_model_operation(owner_principal_id, operation_id)
+        return self.store.save_model_operation(
+            replace(
+                operation,
+                state="running",
+                phase=phase,
+                updated_at=utc_now(),
+            )
+        )
+
+    def complete(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
+        operation = self.store.require_model_operation(owner_principal_id, operation_id)
+        total = operation.total_bytes
+        return self.store.save_model_operation(
+            replace(
+                operation,
+                state="complete",
+                phase="complete",
+                progress_bytes=total or operation.progress_bytes,
+                progress_percent=100,
+                updated_at=utc_now(),
+            )
+        )
+
+    def fail(self, owner_principal_id: str, operation_id: str, *, code: str) -> ModelOperation:
+        operation = self.store.require_model_operation(owner_principal_id, operation_id)
+        return self.store.save_model_operation(
+            replace(
+                operation,
+                state="failed",
+                phase="failed",
+                error_code=code,
+                error_detail=None,
+                updated_at=utc_now(),
+            )
+        )
+
     def cancel(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
         if operation.state in TERMINAL_STATES:
             return operation
-        return self.store.save_model_operation(replace(operation, state="cancel_requested", updated_at=utc_now()))
+        return self.store.save_model_operation(
+            replace(operation, state="cancel_requested", updated_at=utc_now())
+        )
 
     def retry(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
-        return self.store.save_model_operation(replace(
-            operation, state="queued", phase="queued", progress_bytes=0,
-            progress_percent=None, error_code=None, error_detail=None, updated_at=utc_now(),
-        ))
+        return self.store.save_model_operation(
+            replace(
+                operation,
+                state="queued",
+                phase="queued",
+                progress_bytes=0,
+                progress_percent=None,
+                error_code=None,
+                error_detail=None,
+                updated_at=utc_now(),
+            )
+        )
 
     def cleanup(self, owner_principal_id: str, operation_id: str) -> bool:
         operation = self.store.require_model_operation(owner_principal_id, operation_id)

@@ -623,7 +623,7 @@ git commit -m "feat: discover and deploy local gguf models"
 - Produces: `HfVariant(revision, files, quantization, total_bytes, cached_bytes, gated, license_id, complete)`.
 - Consumes: Task 7 operation jobs and Task 8 library registration.
 
-- [ ] **Step 1: Write failing variant, dry-run, gated, revision, and token-redaction tests**
+  - [x] **Step 1: Write failing variant, dry-run, gated, revision, and token-redaction tests**
 
 ```python
 def test_existing_complete_gguf_is_preferred_and_revision_pinned(fake_hub, tmp_path: Path) -> None:
@@ -635,12 +635,12 @@ def test_existing_complete_gguf_is_preferred_and_revision_pinned(fake_hub, tmp_p
     assert variants[0].quantization == "Q4_K_M"
 ```
 
-- [ ] **Step 2: Run and verify RED**
+  - [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_huggingface_models.py tests/test_api_huggingface_models.py -q`
 Expected: service/API do not exist.
 
-- [ ] **Step 3: Add official Hub client and owner-scoped API**
+  - [x] **Step 3: Add official Hub client and owner-scoped API**
 
 Add `huggingface_hub>=1.25,<2` to project dependencies. Use `HfApi` for metadata and `snapshot_download` with the full revision, selected-file patterns, and `dry_run=True` before starting a Task 7 job. Prefer complete GGUF variants; identify shard completeness from filenames. Store the token in the existing vault and pass it as an in-memory argument only. Gated access returns `gated_access_required` with the official repository URL.
 
@@ -655,12 +655,12 @@ dry_run = snapshot_download(
 return HfDownloadPreview.from_dry_run(repo_id, full_commit_sha, dry_run)
 ```
 
-- [ ] **Step 4: Verify GREEN, cache reuse, and secret scan**
+  - [x] **Step 4: Verify GREEN, cache reuse, and secret scan**
 
 Run: `python -m pytest tests/test_huggingface_models.py tests/test_api_huggingface_models.py tests/test_credential_security.py -q`
 Expected: all pass; token never appears in jobs, argv, exceptions, or API JSON.
 
-- [ ] **Step 5: Commit**
+  - [x] **Step 5: Commit**
 
 ```bash
 git add pyproject.toml raiker/models/huggingface.py raiker/api/schemas.py raiker/api/routes_models.py tests/test_huggingface_models.py tests/test_api_huggingface_models.py tests/test_credential_security.py

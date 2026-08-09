@@ -46,3 +46,22 @@ def test_verified_replacement_requires_stored_credential_metadata(tmp_path: Path
     assert row.status == "current"
     assert row.verified_at == "2026-07-01T00:00:00Z"
     assert store.list_credential_lifecycle("principal_other") == []
+
+
+def test_hugging_face_operation_metadata_cannot_persist_a_token(tmp_path: Path) -> None:
+    from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
+
+    store = _store(tmp_path)
+    operation = ModelOperationService(store).start(
+        "principal_owner",
+        ModelOperationRequest(
+            kind="download",
+            target="owner/repo@" + "a" * 40,
+            confirmed=True,
+            source_url="https://huggingface.co/owner/repo?token=hf_private",
+            destination=str(tmp_path / "model.gguf"),
+        ),
+    )
+
+    assert "token" not in (operation.source_url or "")
+    assert "hf_private" not in repr(operation)

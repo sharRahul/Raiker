@@ -200,6 +200,22 @@ class ModelLibraryRootRequest(BaseModel):
     path: str
 
 
+class HuggingFaceCredentialRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    token: str
+
+
+class HuggingFaceSelectionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    repo_id: str
+    revision: str
+    files: list[str]
+    destination: str | None = None
+    confirmed: bool = False
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

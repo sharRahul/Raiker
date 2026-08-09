@@ -8,11 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
+    ModelLibraryRootRequest,
     ModelOperationRequestBody,
     ModelReadinessCheckRequest,
     ModelSetupUpdateRequest,
 )
 from raiker.api.sessions import ApiSession
+from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
@@ -35,6 +37,10 @@ def _service(request: Request) -> ModelReadinessService:
 
 def _operation_service(request: Request) -> ModelOperationService:
     return ModelOperationService(SQLiteStore(request.app.state.workspace_root))  # type: ignore[attr-defined]
+
+
+def _library_service(request: Request) -> ModelLibraryService:
+    return ModelLibraryService(SQLiteStore(request.app.state.workspace_root))  # type: ignore[attr-defined]
 
 
 def _require_human(principal: Principal) -> None:
@@ -190,3 +196,47 @@ def retry_model_operation(operation_id: str, request: Request, auth_data: tuple[
 @router.delete("/api/model-operations/{operation_id}")
 def cleanup_model_operation(operation_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
     return _operation_action("cleanup", operation_id, request, auth_data)
+
+
+@router.get("/api/model-library")
+def get_model_library(request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    service = _library_service(request)
+    return {"roots": [{"path": path} for path in service.roots(session.principal_id)], "models": [model.to_dict() for model in service.list_models(session.principal_id)]}
+
+
+@router.post("/api/model-library/roots")
+def add_model_library_root(body: ModelLibraryRootRequest, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    try:
+        path = _library_service(request).add_root(session.principal_id, Path(body.path))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+    return {"ok": True, "path": path}
+
+
+@router.delete("/api/model-library/roots")
+def remove_model_library_root(body: ModelLibraryRootRequest, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    return {"ok": _library_service(request).remove_root(session.principal_id, Path(body.path))}
+
+
+@router.post("/api/model-library/rescan")
+def rescan_model_library(request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    models = _library_service(request).rescan(session.principal_id)
+    return {"ok": True, "models": [model.to_dict() for model in models]}
+
+
+@router.post("/api/model-library/{model_id:path}/deploy")
+def deploy_local_model(model_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    model = next((item for item in _library_service(request).list_models(session.principal_id) if item.model_id == model_id), None)
+    if model is None or not model.complete:
+        raise HTTPException(status_code=409, detail={"reason_code": "local_model_not_deployable"})
+    return _operation_service(request).start(session.principal_id, ModelOperationRequest(kind="deploy", target=model.model_id, confirmed=True, destination=model.primary_path)).to_dict()

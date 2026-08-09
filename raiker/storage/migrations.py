@@ -2501,6 +2501,34 @@ CREATE INDEX IF NOT EXISTS idx_model_operations_owner_time
 """
 
 
+MODEL_LIBRARY_MIGRATION_ID = "RAIKER-1045-model-library"
+MODEL_LIBRARY_SQL = """
+CREATE TABLE IF NOT EXISTS model_library_roots (
+  owner_principal_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, path)
+);
+CREATE TABLE IF NOT EXISTS local_models (
+  owner_principal_id TEXT NOT NULL,
+  root_path TEXT NOT NULL,
+  model_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  architecture TEXT NOT NULL,
+  quantization TEXT,
+  primary_path TEXT NOT NULL,
+  shard_count INTEGER NOT NULL,
+  expected_shards INTEGER NOT NULL,
+  complete INTEGER NOT NULL,
+  size_bytes INTEGER NOT NULL,
+  indexed_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, model_id)
+);
+CREATE INDEX IF NOT EXISTS idx_local_models_owner_name
+  ON local_models(owner_principal_id, name);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

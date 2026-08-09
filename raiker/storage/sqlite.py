@@ -52,6 +52,7 @@ from raiker.contracts.models import (
     UserRoleAssignment,
     VectorRecord,
 )
+from raiker.models.library import LocalModel
 from raiker.models.local_operations import ModelOperation
 from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
@@ -154,6 +155,8 @@ from raiker.storage.migrations import (
     MODEL_CAPACITY_CONTROL_SQL,
     MODEL_FALLBACK_SEQUENCE_MIGRATION_ID,
     MODEL_FALLBACK_SEQUENCE_SQL,
+    MODEL_LIBRARY_MIGRATION_ID,
+    MODEL_LIBRARY_SQL,
     MODEL_OPERATIONS_MIGRATION_ID,
     MODEL_OPERATIONS_SQL,
     MODEL_PRICE_REGISTRY_MIGRATION_ID,
@@ -953,6 +956,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_OPERATIONS_MIGRATION_ID,
                 MODEL_OPERATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_LIBRARY_MIGRATION_ID,
+                MODEL_LIBRARY_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -5210,6 +5218,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 tuple(operation.to_dict().values()),
             )
         return operation
+
+    def save_model_library_root(self, owner_principal_id: str, path: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR IGNORE INTO model_library_roots (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
+                (owner_principal_id, path, utc_now()),
+            )
+
+    def list_model_library_roots(self, owner_principal_id: str) -> list[str]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT path FROM model_library_roots WHERE owner_principal_id = ? ORDER BY path",
+                (owner_principal_id,),
+            ).fetchall()
+        return [str(row["path"]) for row in rows]
+
+    def delete_model_library_root(self, owner_principal_id: str, path: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM model_library_roots WHERE owner_principal_id = ? AND path = ?",
+                (owner_principal_id, path),
+            )
+            connection.execute(
+                "DELETE FROM local_models WHERE owner_principal_id = ? AND root_path = ?",
+                (owner_principal_id, path),
+            )
+        return cursor.rowcount == 1
+
+    def replace_local_models(self, owner_principal_id: str, models: list[LocalModel]) -> None:
+        with self.connect() as connection:
+            connection.execute("DELETE FROM local_models WHERE owner_principal_id = ?", (owner_principal_id,))
+            connection.executemany(
+                """INSERT INTO local_models
+                (owner_principal_id, root_path, model_id, name, architecture, quantization,
+                 primary_path, shard_count, expected_shards, complete, size_bytes, indexed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [(
+                    model.owner_principal_id, model.root_path, model.model_id, model.name,
+                    model.architecture, model.quantization, model.primary_path, model.shard_count,
+                    model.expected_shards, int(model.complete), model.size_bytes, model.indexed_at,
+                ) for model in models],
+            )
+
+    def list_local_models(self, owner_principal_id: str) -> list[LocalModel]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM local_models WHERE owner_principal_id = ? ORDER BY name, model_id",
+                (owner_principal_id,),
+            ).fetchall()
+        return [LocalModel(**(dict(row) | {"complete": bool(row["complete"])})) for row in rows]
 
     def list_model_operations(self, owner_principal_id: str) -> list[ModelOperation]:
         with self.connect() as connection:

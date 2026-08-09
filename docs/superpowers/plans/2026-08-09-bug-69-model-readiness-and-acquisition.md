@@ -552,7 +552,7 @@ git commit -m "feat: add governed model operations"
 - Produces: `ModelLibraryService.add_root/rescan/remove_root/list_models/deploy`.
 - Produces: `ManagedLlamaRuntime.start/stop/status` and exact readiness invalidation.
 
-- [ ] **Step 1: Write failing bounded-header, approved-root, shard, symlink, and lifecycle tests**
+- [x] **Step 1: Write failing bounded-header, approved-root, shard, symlink, and lifecycle tests**
 
 ```python
 def test_scan_never_follows_symlink_outside_approved_root(tmp_path: Path) -> None:
@@ -565,12 +565,12 @@ def test_scan_never_follows_symlink_outside_approved_root(tmp_path: Path) -> Non
     assert models == []
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_gguf_metadata.py tests/test_model_library.py tests/test_managed_llama_runtime.py tests/test_api_model_library.py -q`
 Expected: library/parser/runtime modules are missing.
 
-- [ ] **Step 3: Add migration `RAIKER-1045-model-library` and minimal adapters**
+- [x] **Step 3: Add migration `RAIKER-1045-model-library` and minimal adapters**
 
 Read GGUF magic/version/KV metadata without tensor bytes; reject absurd lengths before allocation. Group `*-00001-of-N.gguf` shards and `mmproj*.gguf`. Store encrypted canonical path, bounded fingerprint, source, metadata, validation, and deployment. Inventory adapters use Ollama `/api/tags`, `lms ls --json`/REST, documented caches, and owner-approved folders. Managed llama.cpp binds `127.0.0.1` on a free port, launches an explicit file or `--models-dir`, captures bounded logs, and marks ready only after `/health` plus exact catalogue confirmation.
 
@@ -595,12 +595,12 @@ def read_gguf_metadata(path: Path, *, max_header_bytes: int = 8_388_608) -> Gguf
         return read_bounded_metadata(stream, max_header_bytes=max_header_bytes)
 ```
 
-- [ ] **Step 4: Verify GREEN including runtime crash invalidation**
+- [x] **Step 4: Verify GREEN including runtime crash invalidation**
 
 Run: `python -m pytest tests/test_gguf_metadata.py tests/test_model_library.py tests/test_managed_llama_runtime.py tests/test_api_model_library.py -q`
 Expected: all pass; original files are unchanged and a stopped process invalidates readiness.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/models/gguf.py raiker/models/library.py raiker/models/local_runtime.py raiker/storage/migrations.py raiker/storage/sqlite.py raiker/api/routes_models.py tests/test_gguf_metadata.py tests/test_model_library.py tests/test_managed_llama_runtime.py tests/test_api_model_library.py

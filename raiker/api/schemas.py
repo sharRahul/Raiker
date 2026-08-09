@@ -194,6 +194,12 @@ class ModelOperationRequestBody(BaseModel):
     destination: str | None = None
 
 
+class ModelLibraryRootRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    path: str
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

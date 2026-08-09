@@ -174,6 +174,16 @@ class ModelReadinessCheckRequest(BaseModel):
     model: str
 
 
+class ModelSetupUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    status: Literal["required", "in_progress", "skipped", "complete"]
+    step: Literal["choose_path", "provider", "model", "review", "ready"]
+    path: Literal["provider", "ollama", "lm_studio", "local_gguf", "hugging_face"] | None = None
+    selected_profile_id: str | None = None
+    selected_model: str | None = None
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

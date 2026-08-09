@@ -6,9 +6,10 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
-from raiker.api.schemas import ModelReadinessCheckRequest
+from raiker.api.schemas import ModelReadinessCheckRequest, ModelSetupUpdateRequest
 from raiker.api.sessions import ApiSession
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
+from raiker.models.setup import ModelSetupState
 from raiker.runtime.authority.models import Principal
 from raiker.storage.sqlite import SQLiteStore
 
@@ -56,3 +57,36 @@ async def check_model_readiness(
             detail={"reason_code": "unknown_model_profile"},
         ) from exc
     return readiness.to_dict()
+
+
+@router.get("/api/model-setup")
+def get_model_setup(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    return SQLiteStore(request.app.state.workspace_root).load_model_setup_state(  # type: ignore[attr-defined]
+        session.principal_id
+    ).to_dict()
+
+
+@router.put("/api/model-setup")
+def update_model_setup(
+    body: ModelSetupUpdateRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    current = store.load_model_setup_state(session.principal_id)
+    return store.save_model_setup_state(
+        ModelSetupState(
+            owner_principal_id=session.principal_id,
+            status=body.status,
+            step=body.step,
+            path=body.path,
+            selected_profile_id=body.selected_profile_id,
+            selected_model=body.selected_model,
+            created_at=current.created_at,
+        )
+    ).to_dict()

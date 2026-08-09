@@ -54,6 +54,7 @@ from raiker.contracts.models import (
 )
 from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
+from raiker.models.setup import ModelSetupState
 from raiker.storage.migrations import (
     AGENT_PLANS_MIGRATION_ID,
     AGENT_PLANS_SQL,
@@ -158,6 +159,8 @@ from raiker.storage.migrations import (
     MODEL_READINESS_SQL,
     MODEL_SESSION_RESOLVED_MODEL_MIGRATION_ID,
     MODEL_SESSION_RESOLVED_MODEL_SQL,
+    MODEL_SETUP_STATE_MIGRATION_ID,
+    MODEL_SETUP_STATE_SQL,
     MODEL_USAGE_LEDGER_MIGRATION_ID,
     MODEL_USAGE_LEDGER_SQL,
     OWNED_CONTEXT_DATA_MIGRATION_ID,
@@ -937,6 +940,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_READINESS_MIGRATION_ID,
                 MODEL_READINESS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_SETUP_STATE_MIGRATION_ID,
+                MODEL_SETUP_STATE_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -5172,6 +5180,41 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 (state.session_id, state.profile_id, state.model, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
             )
+
+    def load_model_setup_state(self, owner_principal_id: str) -> ModelSetupState:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM model_setup_state WHERE owner_principal_id = ?",
+                (owner_principal_id,),
+            ).fetchone()
+        if row is None:
+            return ModelSetupState(owner_principal_id=owner_principal_id)
+        return ModelSetupState(**dict(row))
+
+    def save_model_setup_state(self, state: ModelSetupState) -> ModelSetupState:
+        now = utc_now()
+        created_at = state.created_at or now
+        saved = ModelSetupState(
+            owner_principal_id=state.owner_principal_id,
+            status=state.status,
+            step=state.step,
+            path=state.path,
+            selected_profile_id=state.selected_profile_id,
+            selected_model=state.selected_model,
+            created_at=created_at,
+            updated_at=now,
+        )
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO model_setup_state
+                (owner_principal_id, status, step, path, selected_profile_id, selected_model, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    saved.owner_principal_id, saved.status, saved.step, saved.path,
+                    saved.selected_profile_id, saved.selected_model, saved.created_at, saved.updated_at,
+                ),
+            )
+        return saved
 
     def insert_managed_policy(self, rule: ManagedPolicyRule) -> None:
         with self.connect() as connection:

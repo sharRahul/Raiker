@@ -70,6 +70,7 @@ function rawRoute(hash: string): string {
 
 export function routeFromHash(hash: string): string {
   const raw = rawRoute(hash);
+  if (raw === "model-setup") return raw;
   if (NAV_ITEMS.some((item) => item.id === raw)) return raw;
   return ROUTE_ALIASES[raw]?.route ?? DEFAULT_ROUTE;
 }

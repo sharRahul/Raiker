@@ -99,6 +99,7 @@ export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
   "GET /api/runtime-mode": RUNTIME_MODE,
   "GET /api/diagnostics": DIAGNOSTICS,
   "GET /api/projects": { projects: [], active_project_id: null },
+  "GET /api/model-setup": { owner_principal_id: "prin_owner", status: "complete", step: "ready", path: null, selected_profile_id: null, selected_model: null, created_at: null, updated_at: null },
   "GET /api/models": {
     profiles: [],
     current_profile_id: null,

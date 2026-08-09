@@ -399,7 +399,7 @@ git commit -m "fix: disable work until a model is ready"
 - Produces: `GET /api/model-setup`, `PUT /api/model-setup`, `ModelSetupState(step, status, path, selected_profile_id, selected_model)`.
 - Consumes: Tasks 2 and 4 readiness APIs/components.
 
-- [ ] **Step 1: Write failing first-owner, skip, resume, and existing-owner tests**
+- [x] **Step 1: Write failing first-owner, skip, resume, and existing-owner tests**
 
 ```python
 def test_first_owner_starts_setup_and_skip_is_resumable(client, registered_owner_headers):
@@ -410,12 +410,12 @@ def test_first_owner_starts_setup_and_skip_is_resumable(client, registered_owner
     assert client.get("/api/model-setup", headers=registered_owner_headers).json()["step"] == "choose_path"
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_model_setup_state.py -q && npm --prefix apps/web test -- ModelSetupView.test.ts App.test.ts`
 Expected: setup API/view are missing.
 
-- [ ] **Step 3: Add migration `RAIKER-1043-model-setup-state` and five-screen view**
+- [x] **Step 3: Add migration `RAIKER-1043-model-setup-state` and five-screen view**
 
 Persist per owner: `status` (`required|in_progress|skipped|complete`), `step`, `path`, selected pair, and timestamps. `App.svelte` routes a newly registered owner with no ready model to `#/model-setup`; ordinary login respects the saved route. The view implements Choose how / Provider / Model / Review / Ready and uses the same provider, library, and operation components added in later tasks through stable slots.
 
@@ -442,12 +442,12 @@ async def update_model_setup(body: ModelSetupUpdateRequest, request: Request, au
     return _setup(request).update(auth_data[0].principal_id, body).to_dict()
 ```
 
-- [ ] **Step 4: Verify GREEN and navigation behavior**
+- [x] **Step 4: Verify GREEN and navigation behavior**
 
 Run: `python -m pytest tests/test_model_setup_state.py -q && npm --prefix apps/web test -- ModelSetupView.test.ts App.test.ts nav.test.ts`
 Expected: all pass; Skip explains disabled model-backed controls.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/storage/migrations.py raiker/storage/sqlite.py raiker/api/schemas.py raiker/api/routes_models.py apps/web/src/lib/views/ModelSetupView.svelte apps/web/src/App.svelte apps/web/src/lib/nav.ts tests/test_model_setup_state.py apps/web/src/lib/views/ModelSetupView.test.ts apps/web/src/App.test.ts

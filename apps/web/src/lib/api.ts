@@ -43,6 +43,7 @@ import type {
   MemorySettingsView,
   ModelPricingView,
   ModelReadinessView,
+  ModelSetupState,
   ModelCapacitiesView,
   ModelsView,
   PasswordRecoveryBeginResult,
@@ -319,6 +320,11 @@ export const api = {
   modelReadiness: () => request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
   checkModelReadiness: (profile_id: string, model: string) =>
     postJson<ModelReadinessView>("/api/model-readiness/check", { profile_id, model }),
+  modelSetup: () => request<ModelSetupState>("/api/model-setup"),
+  updateModelSetup: (body: Omit<ModelSetupState, "owner_principal_id" | "created_at" | "updated_at">) =>
+    request<ModelSetupState>("/api/model-setup", {
+      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    }),
   modelCapacities: () => request<ModelCapacitiesView>("/api/models/capacities"),
   refreshModelCapacities: (force = false) =>
     postJson<{ ok: boolean; profiles: Array<{ profile_id: string; status: string; reason_code: string | null }> }>(

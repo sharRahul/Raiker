@@ -2455,6 +2455,28 @@ CREATE INDEX IF NOT EXISTS idx_model_readiness_expiry
 """
 
 
+# BUG-69 -- resumable first-owner model setup. Existing accounts are backfilled
+# complete when the migration lands; an account registered after migration has
+# no row and therefore starts in the required state.
+MODEL_SETUP_STATE_MIGRATION_ID = "RAIKER-1043-model-setup-state"
+MODEL_SETUP_STATE_SQL = """
+CREATE TABLE IF NOT EXISTS model_setup_state (
+  owner_principal_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  step TEXT NOT NULL,
+  path TEXT,
+  selected_profile_id TEXT,
+  selected_model TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO model_setup_state
+  (owner_principal_id, status, step, path, selected_profile_id, selected_model, created_at, updated_at)
+SELECT principal_id, 'complete', 'ready', NULL, NULL, NULL, created_at, updated_at
+FROM account_credentials;
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

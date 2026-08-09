@@ -24,6 +24,7 @@
   import ObserveView from "./lib/views/ObserveView.svelte";
   import SettingsView from "./lib/views/SettingsView.svelte";
   import WorkbenchView from "./lib/views/WorkbenchView.svelte";
+  import ModelSetupView from "./lib/views/ModelSetupView.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
 
   let current = $state(
@@ -79,12 +80,17 @@
 
   async function bootstrap() {
     try {
-      const [, , projectsList] = await Promise.all([
+      const [, , projectsList, setup] = await Promise.all([
         api.runtimeMode(),
         api.diagnostics(),
         api.projects(),
+        api.modelSetup(),
       ]);
       projects = projectsList;
+      if (setup.status === "required" || setup.status === "in_progress") {
+        window.location.hash = "#/model-setup";
+        current = "model-setup";
+      }
       authState = "ready";
       // Preferences are presentation only, so a failed read never locks the
       // workspace: spacing/font/notifications apply, and the saved startup
@@ -145,7 +151,9 @@
       <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
       <ResponsivePage>
-        {#if chatVisited}
+        {#if current === "model-setup"}
+          <ModelSetupView />
+        {:else if chatVisited}
           <div hidden={current !== "new-chat"}>
             <ChatView
               sessionId={continuedSessionId}

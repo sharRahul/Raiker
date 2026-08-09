@@ -17,6 +17,16 @@ async function signIn() {
 }
 
 describe("App shell", () => {
+  it("routes a first owner into resumable model setup", async () => {
+    stubFetch({
+      ...BOOTSTRAP_ROUTES,
+      "GET /api/model-setup": { owner_principal_id: "prin_owner", status: "required", step: "choose_path", path: null, selected_profile_id: null, selected_model: null, created_at: null, updated_at: null },
+    });
+    render(App);
+    await signIn();
+    expect(await screen.findByRole("heading", { name: "Choose how to run models" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/model-setup");
+  });
   it("signs in, then shows the runtime status and grouped navigation", async () => {
     stubFetch(BOOTSTRAP_ROUTES);
     render(App);

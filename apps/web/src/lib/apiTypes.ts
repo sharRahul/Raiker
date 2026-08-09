@@ -267,6 +267,17 @@ export interface ModelReadinessView {
   ready: boolean;
 }
 
+export interface ModelSetupState {
+  owner_principal_id: string;
+  status: "required" | "in_progress" | "skipped" | "complete";
+  step: "choose_path" | "provider" | "model" | "review" | "ready";
+  path: "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
+  selected_profile_id: string | null;
+  selected_model: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface Diagnostics {
   runtime_mode: string;
   production_ready_local_single_user_runtime: boolean;

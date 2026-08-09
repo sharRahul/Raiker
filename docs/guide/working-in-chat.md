@@ -8,17 +8,20 @@ event traces deliberately stay out of the transcript — they live in **Sessions
 
 ## The composer
 
-| Control | What it does |
-|---|---|
-| **+ → Image…** | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
-| **+ → Document…** | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
-| **New chat** | Start a fresh conversation. Disabled while the current chat is still empty. |
-| **⋯ (Conversation actions)** | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
-| **Planning** | `auto`, `Always plan`, `Never plan` |
-| **Model** | Only *configured* profiles. No free-text model ids. |
-| **Context** | Opens a read-only popover. It never compacts the conversation. |
-| **Project or folder** | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
-| **Approval** | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
+| Control | `aria-label` | What it does |
+|---|---|---|
+| **Attach → Image…** | `Add attachment` | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
+| **Attach → Document…** | `Add attachment` | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
+| **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
+| **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
+| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. |
+| **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
+| **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
+| **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
+| **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
+
+There is **no** planning chip and **no** voice-input control in the shipped
+composer; earlier drafts of this guide listed both.
 
 `Enter` sends, `Shift+Enter` adds a line.
 
@@ -235,7 +238,7 @@ counts only — how many messages and how many characters — never the transcri
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-04, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-08, these
 are the edges a Chat user can still hit:
 
 - **An approved network or process action is recorded, not run.** Approving a
@@ -249,12 +252,27 @@ are the edges a Chat user can still hit:
   the batch requires approval, the batch is walked one call at a time and pauses
   there; nothing behind the pause is lost, but a turn proposing three edits is
   three decisions.
-- **The agent reaches the web only where you have allowed it, and cannot search
-  at all until you configure a provider.** `web_fetch` is off by default,
-  withholds at its default `ask` decision mode, and fetches nothing while
-  `RAIKER_WEB_EGRESS_ALLOWLIST` is empty. `web_search` answers the same gate but
-  has no endpoint shipped with Raiker: it reports `web_search_not_configured`
-  until you point it at one.
+- **Web fetch is broken once you allow it.** `web_fetch` is off by default and
+  withholds at its default `ask` decision mode. Raising it to **Allow** does not
+  get you a fetched page: on the 2026-08-08 round every turn that called the
+  tool ended with `model_unavailable: provider_stream_failed`, for an
+  allowlisted and a non-allowlisted host alike. Leave it at `ask` until
+  **BUG-72** closes. `web_search` answers the same gate but has no endpoint
+  shipped with Raiker: it reports `web_search_not_configured` until you point it
+  at one.
+- **The context popover's input/output split reads `NaN`.** Everything else in
+  it — used, capacity, remaining, this chat's cost, the provider all-time cost,
+  and the four price components — is correct and provider-reported. **BUG-68**.
+- **Rarely, a resumed turn denies an execution that happened.** After an
+  approval executes, the conversation normally resumes and summarises what it
+  did. One conversation on the 2026-08-08 round instead ended, durably, with
+  *"Approval required for local action. No command was executed."* directly
+  beneath the chip for the file that had just been written. If you see it, trust
+  the file chip and the Approvals record, not the sentence. **BUG-73**.
+- **Memory cannot be written from a conversation.** Turning on **Memory store**
+  does not give a turn a way to save anything: `memory_write` is a real
+  broker-governed action but is not in the tool catalogue a model sees, so only
+  `memory_get`, `memory_list` and `memory_search` are ever offered. **BUG-71**.
 - **Asking for a task in Chat gets you an approval, not a task.** See
   [Tasks and projects](tasks-and-projects.md) → Known limits.
 - **An exported conversation carries citation numbers it cannot explain.** The

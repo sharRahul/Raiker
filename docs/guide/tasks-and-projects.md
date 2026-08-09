@@ -86,7 +86,7 @@ Two things decide whether that happens, and both are yours:
 
 ## Known limits
 
-As of 2026-08-04, one edge remains here:
+As of 2026-08-08, one edge remains here:
 
 - **A task created by approving a proposal starts on its own.** A task with no
   explicit time is work requested now, so approving a **Create task** proposal

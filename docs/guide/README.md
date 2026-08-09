@@ -1,7 +1,8 @@
 # Raiker user guide
 
 Task-shaped instructions for running Raiker's local web dashboard. Everything
-here was executed against a live instance on 2026-08-04 — see
+here was re-executed against a live instance on **2026-08-08**, against hosted
+Anthropic with every model in its catalogue — see
 [the live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) for the
 evidence and [To be fixed](../plans/TO_BE_FIXED.md) for what does not work yet.
 
@@ -20,9 +21,14 @@ For architecture, contracts, and the security model, start at
 
 ## The one thing to understand first
 
-Raiker **fails closed**. On a fresh account every one of its 62 capability
-gates is off and no model provider is reachable. Nothing is broken — you have
+Raiker **fails closed**. On a fresh account every one of its 67 capability
+gates is off and no model provider is *reachable*. Nothing is broken — you have
 not opened anything yet.
+
+A fresh install does show a model in the composer — Ollama's
+`gemma4:31b-cloud` — but that is a **preference, not a connection**. If Ollama
+is not running on this machine, your first message will fail with a
+`model_unavailable` reason code. Connect a provider first (BUG-69).
 
 **Configuring something is permission for it.** Connecting a provider in
 **Models** is the whole of the first step: that act authorises the endpoint you

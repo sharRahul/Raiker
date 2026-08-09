@@ -28,6 +28,8 @@ itself. They remain below because they can still appear for a provider you have
 | `openrouter_requires_https` | OpenRouter needs HTTPS | Remove or fix the custom endpoint |
 | `unknown_provider:<name>` | Unrecognised provider in a profile | Fix the profile in `config/model-profiles.json` |
 | `test_provider_not_available` | Raiker ships no mock provider | Pick a real backend |
+| `model_unavailable: provider_error_unclassified` | The selected profile could not be reached and the adapter could not classify why. On a fresh install this almost always means the default Ollama profile with no Ollama running | Models → connect a provider and **Choose model…**. Tracked as **BUG-69** — the message should name the provider and the fix, and does not yet |
+| `model_unavailable: provider_stream_failed` | The provider stream ended in an error the adapter wrapped into one code. Reproducibly emitted by any turn that calls `web_fetch` while Web fetch is at **Allow** | If the turn used `web_fetch`, set Web fetch back to `ask` — **BUG-72**. Otherwise retry; the underlying error is not currently logged |
 
 **How egress is decided.** Configuring a provider authorises that profile's own
 endpoint — that host, and nothing else. There is no blanket opening, and no

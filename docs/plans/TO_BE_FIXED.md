@@ -199,6 +199,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
 | FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
 | FIXED-132 | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
+| BUG-68 | Medium | Chat / Build — context meter reads `NaN input · NaN output` | Open (found in the 2026-08-08 live round) |
+| BUG-69 | High | First run / the first message fails with a raw reason code | Open (found in the 2026-08-08 live round) |
+| BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
+| BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
+| BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
+| BUG-73 | Medium | Chat / a resumed turn can deny an execution that happened | Open, intermittent (found in the 2026-08-08 live round) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5492,18 +5498,355 @@ addition to the ordinary local check.
 
 ---
 
+## BUG-68 — The context meter reads `NaN input · NaN output`
+
+**Status: open. Found on 2026-08-08 executing §5.5 of the live manual test plan
+against hosted Anthropic `claude-sonnet-4-5-20250929`.**
+
+**Observed.** The Chat context popover renders correct totals and then a line of
+nonsense beneath them:
+
+```
+Context window                       0.35%
+706 tokens used
+of 200,000 available
+199,294 tokens remaining
+NaN input · NaN output
+Reported by anthropic · Capacity reported by runtime
+```
+
+Every other figure in the panel — used, capacity, remaining, this-chat cost,
+provider all-time cost, and all four price components — is right. Only the
+per-direction split is `NaN`.
+
+**Reproduction.** Connect Anthropic, run any turn in Chat, open **Context
+window** in the composer. Identical in Build.
+
+**Root cause.** `GET /api/sessions/<id>/context-usage` returns:
+
+```json
+"session_input_tokens": "***REDACTED***",
+"session_output_tokens": "***REDACTED***"
+```
+
+`raiker/api/redaction.py` discards any field whose key matches
+`SECRET_PATTERNS`, and `"token"` is one of those patterns. The exemption for
+counts is an allowlist — `NON_SECRET_TOKEN_COUNT_KEYS` in
+`raiker/events/export.py:35` — and it lists `input_tokens` and `output_tokens`
+but **not** the two `session_`-prefixed names the context contract actually
+emits (`raiker/control/dashboard.py:3818`). The browser then calls
+`number.format("***REDACTED***")`
+(`apps/web/src/lib/components/ContextMeterPopover.svelte:105`), which is `NaN`.
+
+This is the same failure FIXED-02 closed for `context_window_tokens`, reopened
+by two field names added afterwards that the allowlist was never extended to
+cover.
+
+**Proposed fix.** Add `session_input_tokens` and `session_output_tokens` to
+`NON_SECRET_TOKEN_COUNT_KEYS`, and add a contract test that asserts every
+integer field on `ContextUsageView` survives `redact_response_body` — so the
+next count field added cannot silently become `NaN` again.
+
+**UI when closed.** The line reads e.g. `624 input · 82 output`.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`.
+
+---
+
+## BUG-69 — A new user's first message fails with a raw reason code
+
+**Status: open. Found on 2026-08-08 on a pristine workspace. Regression surface
+introduced by FIXED-116.**
+
+**Observed.** On a brand-new workspace, an owner who registers and immediately
+types a message gets, as the entire reply:
+
+```
+model_unavailable: provider_error_unclassified
+```
+
+No explanation, no named provider, no remedy, no link to Models. It is the first
+thing Raiker ever says to that person.
+
+**Reproduction.**
+
+1. `raiker-web --workspace <empty dir> --port 8766 --no-browser` on a machine
+   with no Ollama installed (the common case).
+2. Register the owner.
+3. Type `Say OK.` in Chat and press Enter.
+
+**Root cause.** FIXED-116 deliberately made `ollama-local-openai-compatible`
+with model `gemma4:31b-cloud` the sole native default, and projects it as the
+selected model before the owner chooses anything. That is correct as a
+*preference*, but nothing checks whether Ollama is actually reachable. Three
+surfaces then state a readiness that does not exist:
+
+* the Workbench and Chat composers show **Gemma 4:31B Cloud** as the model,
+* Models says **1 of 10 providers set up**,
+* the Ollama card's only hint is the body copy "Run Ollama locally, then choose
+  one of its installed models" — while the card itself reads *Not connected*.
+
+The turn then dies inside the provider adapter and the unclassified error is
+rendered verbatim into the transcript.
+
+**Proposed fix.** Three separate outcomes, all required:
+
+1. A default that is only a *preference* must not be counted as a provider that
+   is *set up*. The "N of 10 providers set up" counter, and the composer's
+   ready-state, should reflect a reachable provider.
+2. `provider_error_unclassified` must never reach a transcript. A local provider
+   that cannot be reached should say so in the owner's words — which provider,
+   that it is not running on this machine, and the one control that fixes it —
+   exactly as FIXED-05/BUG-05 did for the Connect dialog.
+3. On a first run with no reachable provider, Chat should route the owner to
+   Models before they can send, rather than letting the first turn fail.
+
+**UI when closed.** A fresh install either answers, or explains in a sentence
+why it cannot and where to go. It never prints a reason code.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-05-fresh-workspace-defaults-to-absent-ollama.png`,
+`BUG-r0808-05-models-claims-one-provider-set-up.png`,
+`BUG-r0808-05-first-turn-raw-reason-code.png`.
+
+---
+
+## BUG-70 — Build's mode chips rewrite global decision modes with no step-up
+
+**Status: open. Found on 2026-08-08 while exercising Build's Plan / Edit / Auto
+control.**
+
+**Observed.** Pressing **Auto** in the Build composer issues, with no dialog and
+no confirmation:
+
+```
+POST /api/capability-modes/file_write_execution/auto   200
+POST /api/capability-modes/patch_apply_execution/auto  200
+POST /api/capability-modes/shell_execution/auto        200
+POST /api/capability-modes/process_execution/auto      200
+```
+
+Permissions afterwards shows **File writes → Auto** (`aria-pressed="true"`), and
+the change is global: it persists across Chat, Tasks, and every later session
+until something else changes it.
+
+Making the *identical* change from the Permissions page requires a step-up
+dialog — "Set File writes to Auto", the acting principal named, a **required**
+reason, and a threat-model acknowledgement where the capability demands one —
+with **Confirm change** disabled until they are supplied.
+
+**Reproduction.** Permissions → note File writes is *Ask*. Build → press
+**Auto**. Permissions → File writes is now *Auto*, with no recorded reason.
+
+**What is *not* wrong.** The runtime still fails safe: with the mode at `auto` a
+Chat `write_file` was still held for approval and no file was written. The
+defect is in the authority record, not in the enforcement.
+
+**Root cause.** `POST /api/capability-modes/<cap>/<mode>` is reachable without
+the step-up ceremony the Permissions page applies to the same transition. Build
+calls it directly, four times, from a chip that is presented as a per-turn
+posture rather than as a change to the owner's standing permissions.
+
+**Proposed fix.** Either (a) route Build's chips through the same step-up so the
+reason and acknowledgement are recorded, or (b) make the chips a genuinely
+turn-scoped override that never touches the stored decision modes. Whichever is
+chosen, the chip must state which it is. A control that silently edits four
+high-risk permissions is not a mode selector.
+
+**UI when closed.** Pressing a Build mode chip either says what standing
+permissions it is about to change and asks, or changes none.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`.
+
+---
+
+## BUG-71 — Memory can never be written from Chat or Build
+
+**Status: open. Found on 2026-08-08 executing the memory scenarios.**
+
+**Observed.** Permissions lists **Memory store** with the description *"Persist
+durable memories through the governed broker."* and all four decision modes. It
+was turned on (`memory_write_execution` → `enabled_runtime`) and set to
+**Allow**. Asked to save a durable fact, the agent answered:
+
+> Here are the exact names of every memory-related tool available to me:
+> `memory_get`, `memory_list`, `memory_search`. Unfortunately, none of these
+> tools can save or write memories. All three are read-only. … the current mode
+> is `read_only`.
+
+After ~30 governed turns, `GET /api/memory` and `GET /api/memory/proposals` are
+both `[]`, and the Memory page still reads *0 Approved · 0 Pending review* under
+the promise "When Raiker identifies a useful preference or durable fact, it will
+propose it for review."
+
+**Root cause.** Not a missing executor — the broker has real ones:
+`raiker/tools/broker.py:1422` routes `memory_write` to
+`memory_service.write_from_action` and `memory_forget` to
+`forget_from_action`, both fully governed. The gap is one layer up:
+
+* **`memory_write` and `memory_forget` are absent from the model tool
+  catalogue.** `_TOOL_DESCRIPTIONS` / `_TOOL_RISK` in
+  `raiker/models/tool_call_validation.py` expose 39 tools, of which the only
+  memory entries are `memory_search`, `memory_list` and `memory_get`. A turn
+  therefore cannot propose a write at all, whatever the gate says.
+* **`governed_memory_status` hard-codes the read-only posture.**
+  `raiker/memory/candidates.py:36` returns
+  `{"durable_writes_enabled": False, "mode": "read_only_review"}` as a literal,
+  which is what the model reports back to the owner.
+
+So the capability is genuinely broker-governed — reachable from the CLI, which
+does call `memory_forget` (`raiker/cli/commands.py:1557`) — and simultaneously
+unreachable from the two surfaces the Permissions row is displayed on.
+
+**Why this is a defect and not a deferral.** Raiker already knows how to be
+honest about a capability an agent cannot reach: **Remote execution** reads
+*"No executor; remote command execution stays fail-closed."* **Memory store**
+says the opposite of what a Chat user will experience. An owner can turn it on,
+set it to Allow, wait, and never learn that no turn can act on it.
+
+**Proposed fix.** Either add `memory_write` / `memory_forget` to the model tool
+catalogue behind their existing gates and let `governed_memory_status` reflect
+the real gate state — or, if agent-proposed memory writes are deliberately
+deferred, say so on the capability row and stop the Memory page promising
+proposals it cannot produce. A capability whose row and whose behaviour disagree
+is the thing to fix, whichever way it is resolved.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`,
+`screenshots/working/r0808-72-memory-tools-available.png`.
+
+---
+
+## BUG-72 — Enabling Web fetch makes every turn that uses it fail
+
+**Status: open. Found on 2026-08-08 executing the network-capability
+scenarios. Reproduced 4 / 4.**
+
+**Observed.** With `web_fetch` at `enabled_runtime` and decision mode **Allow**,
+every turn that calls it returns, as the whole answer:
+
+```
+model_unavailable: provider_stream_failed
+```
+
+The turn is lost. It happens for an allowlisted host (`https://api.anthropic.com/`)
+and a non-allowlisted one (`https://example.com`) alike, so it is not the egress
+allowlist refusing the fetch.
+
+The same prompt with the mode left at **Ask** completes normally — the model
+narrates that the call was withheld. So the failure appears only when the tool
+is actually permitted to run.
+
+**Reproduction.** Permissions → **Web fetch** → Turn on → **Allow**. Chat →
+*"Use web_fetch to read https://example.com and quote its main heading
+exactly."*
+
+**What makes it worse than a failed tool call.**
+
+* **Nothing is audited.** `GET /api/events` holds no `tool_call` record for the
+  attempt — the only web_fetch-related events in the log are from the *withheld*
+  run at Ask.
+* **Nothing is logged.** The server log has no error, traceback, or warning for
+  the failed turn.
+* **The message blames the model.** `model_unavailable` tells the owner their
+  provider is down. Anthropic answered fine on the turn before and the turn
+  after.
+
+**Root cause (partial).** `provider_stream_failed` is the mapped code for
+`ProviderStreamError` (`raiker/models/exceptions.py:72`), raised from the
+Anthropic adapter's stream loop
+(`raiker/models/providers/anthropic_messages.py:442-456`), which wraps *any*
+exception type into that one code. The web_fetch tool result is what differs
+between the passing and failing runs, so the follow-up request carrying that
+result is the suspect. The wrapper is what hides which exception it actually was.
+
+**Proposed fix.** Two parts:
+
+1. Make the failure diagnosable: `ProviderStreamError` must carry, and the
+   runtime must log, the underlying exception type and the provider's own
+   response status/body, and the turn must record an audit event for a tool call
+   it attempted.
+2. Then fix the web_fetch round-trip itself. A tool that cannot survive its own
+   result reaching the model is not shipped; if it cannot be fixed now, the
+   capability must state that it is not usable rather than offering a switch
+   that breaks the next turn.
+
+**UI when closed.** With Web fetch on, the turn quotes the page. If the fetch is
+refused, the refusal names the capability and the host — it never claims the
+model is unavailable.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png`,
+`screenshots/working/r0808-84-web-fetch-withheld-at-ask.png` (the passing Ask case).
+
+---
+
+## BUG-73 — A conversation can end saying the approved action was not executed
+
+**Status: open, intermittent (observed once; three targeted reproductions did
+not recur). Found on 2026-08-08.**
+
+**Observed.** A Chat turn proposed `write_file live-round.md`. The approval was
+reviewed and **Approve and execute once** reported *"Executed once — wrote
+live-round.md. The previous contents were checkpointed."* The file is on disk
+with the reviewed contents, and the conversation carries the `live-round.md ·
+MD · 303 B` chip that opens it in the inspector.
+
+The conversation's final assistant bubble nonetheless reads:
+
+> Approval required for local action. No command was executed.
+
+That state is durable: reopening the conversation any time later still shows it.
+
+**Reproduction.** Not reliably reproduced. The one occurrence followed
+approving from the Approvals page and then navigating to the conversation while
+the automatic resume was still in flight, without pressing **Continue the turn**.
+Three deliberate attempts to recreate it — with and without a follow-up
+instruction in the prompt, and with a navigation away mid-resume — all resumed
+correctly and ended with an accurate summary of the write.
+
+**Why it matters anyway.** The transcript is the record a person reads. A
+governed action that executed, was checkpointed, and changed the filesystem must
+never be described in that record as not executed — and the failure survives a
+reload, so nothing corrects it.
+
+**Suspected root cause.** The pre-approval tool-result narration
+("Approval required for local action. No command was executed.") is persisted as
+the turn's response, and the resumed turn does not always replace it. A race
+between the automatic resume and the client re-subscribing to the session is the
+likeliest trigger.
+
+**Proposed fix.** Make the pre-approval narration a runtime notice tied to the
+paused state rather than a stored assistant response, so a resume replaces it by
+construction; and add an invariant test that a session whose approval resolved
+`executed` can never close with a response asserting no execution.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-02-post-approval-answer-says-not-executed.png`.
+
+---
+
 ## Verified working (no action needed)
 
-Recorded so the fixes above are read against the right baseline: first-run
-bootstrap; all 15 routes and 10 hub tabs with **0 console errors**; owner
-sign-in; vault key generate/save with elevated re-auth; capability gates
-(62 listed, four decision modes, step-up enforced, 42 deferred domains offering
-no enable path); runtime-mode activation; hosted-provider connection, live
-provider model catalogue, and model selection; a real streamed Anthropic turn;
-recent-chat list with row menu; chat search over titles and message text;
-sessions, checkpoints, audit log, diagnostics, notifications, work-in-action;
-all four task types (immediate, scheduled, daily routine, background agent) with
-nesting, priority, and stop; project creation and session assignment; document
-and image attachment upload reaching the model; MCP server create/connect/
-monitor; theme toggle across all views; notification centre; STOP switch;
-and adaptive navigation at 375/768/1024/1440 px with no horizontal overflow.
+Recorded so the fixes above are read against the right baseline. Re-verified end
+to end on **2026-08-08** against hosted Anthropic (see
+[the live manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) for the full round):
+
+first-run bootstrap and owner sign-in; **all 14 routes and 22 hub tabs with 0
+console errors**; connecting a hosted provider from the web app and pinning a
+model from the live catalogue; **all ten Anthropic models answering a live turn**;
+a real streamed turn with sanitised Markdown (headings, lists, GFM tables,
+fenced code); conversation memory within a chat and isolation between chats;
+per-chat and provider all-time cost; recent-chat list; chat search over titles
+and message text; the four task types (immediate, scheduled, daily routine,
+background agent) with parent nesting, priority, counters and stop; the approval
+lifecycle end to end — proposal, unified diff, **Approve and execute once**, the
+file on disk, and the resumed turn; the file inspector for a generated Markdown
+file and for a generated PDF; **Export conversation… in HTML, Markdown and PDF**
+plus **Print / Save as PDF**; markdown → PDF through `create_document`; document
+and image attachments reaching the model with source citations; MCP server
+create / connect / discover / **call from Chat** under the owner's decision mode,
+with the result marked untrusted; Build repository connect, code-map build and
+`code_map_search`; `update_plan` checklists and `spawn_subagent`; capability
+step-up (reason required, Confirm disabled until supplied); the deferred domains
+CCTV, finance, medical and home security offering no row at all; Observability's
+seven tabs on real data; Settings' six tabs; theme cycling system → light → dark;
+the notification centre and Mark all read; the STOP switch; and adaptive
+navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
+`aria-expanded`, and focus returned to the trigger.

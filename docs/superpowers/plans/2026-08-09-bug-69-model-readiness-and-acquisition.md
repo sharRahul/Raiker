@@ -121,7 +121,7 @@ Persist only redacted evidence JSON. Add unique key `(owner_principal_id, profil
 Run: `python -m pytest tests/test_model_readiness.py tests/test_storage_migrations.py -q`
 Expected: all pass; legacy workspaces migrate without a readiness row.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add raiker/models/readiness.py raiker/storage/migrations.py raiker/storage/sqlite.py tests/test_model_readiness.py
@@ -145,7 +145,7 @@ git commit -m "feat: add exact model readiness state"
 - Produces: `GET /api/model-readiness`, `POST /api/model-readiness/check`, and readiness fields on `ModelProfileView`.
 - Produces: `ModelReadinessService.require_ready(owner, profile_id, model) -> ModelReadiness`.
 
-- [ ] **Step 1: Write failing API and configured-versus-ready tests**
+- [x] **Step 1: Write failing API and configured-versus-ready tests**
 
 ```python
 def test_native_default_is_preferred_but_not_ready(client: TestClient, owner_token: str) -> None:
@@ -162,12 +162,12 @@ def test_check_returns_plain_language_exact_model_result(client: TestClient, own
     assert "Ollama" in response.json()["summary"]
 ```
 
-- [ ] **Step 2: Run and verify RED**
+- [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_api_model_readiness.py tests/test_api_dashboard.py::TestDashboardAPI::test_models -q`
 Expected: readiness endpoints and response fields are missing.
 
-- [ ] **Step 3: Implement provider-aware probing and API serialization**
+- [x] **Step 3: Implement provider-aware probing and API serialization**
 
 Use provider catalogue/health calls already exposed by `ModelRouter.alist_models_for_profile()`. Normalize exceptions without provider response bodies. Add these exact fields to `ModelProfileView`: `readiness_state`, `readiness_summary`, `readiness_reason_code`, `readiness_checked_at`, `readiness_expires_at`, `readiness_remediation`, and `ready`. Add `ready_provider_count` to `ModelsView`.
 
@@ -184,7 +184,7 @@ async def check_model_readiness(body: ModelReadinessCheckRequest, request: Reque
 
 Invalidate readiness after connection, model-selection, pull/import, endpoint, or credential changes. Do not make a billable inference request.
 
-- [ ] **Step 4: Verify GREEN plus provider exception mapping**
+- [x] **Step 4: Verify GREEN plus provider exception mapping**
 
 Run: `python -m pytest tests/test_api_model_readiness.py tests/test_api_dashboard.py tests/test_api_model_selection.py -q`
 Expected: all pass; `provider_error_unclassified` never appears in API summaries.

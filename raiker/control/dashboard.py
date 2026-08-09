@@ -568,6 +568,13 @@ class ModelProfileView:
     context_window_tokens: int | None = None
     context_window_source: str | None = None
     configured: bool = False
+    readiness_state: str = "not_configured"
+    readiness_summary: str = "No readiness check exists for this exact model."
+    readiness_reason_code: str = "model_not_checked"
+    readiness_checked_at: str | None = None
+    readiness_expires_at: str | None = None
+    readiness_remediation: str = "Set up or check this model before sending."
+    ready: bool = False
     # Only a provider Raiker authenticates with an API key can accrue an API
     # bill, so only those carry cost. A local runtime reports `billable=False`
     # and the UI says "no API cost" rather than an unexplained blank.
@@ -722,6 +729,7 @@ class ModelsView:
     private_network_model_gate_state: str
     model_egress_allowlist_configured: bool
     remote_profile_count: int
+    ready_provider_count: int = 0
     # User-owned ordered model fallback sequence (profile ids). When the selected
     # provider is unavailable, the runtime walks this list in order; each candidate
     # is still gated by provider policy, so hosted access is never granted silently.
@@ -751,6 +759,7 @@ class ModelsView:
             "private_network_model_gate_state": self.private_network_model_gate_state,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
             "remote_profile_count": self.remote_profile_count,
+            "ready_provider_count": self.ready_provider_count,
             "fallback_sequence": list(self.fallback_sequence),
             "no_silent_hosted_fallback": self.no_silent_hosted_fallback,
         }
@@ -3258,6 +3267,7 @@ class DashboardService:
         private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE, acting_principal_id)
         advisor_gate = self.control.get_capability_gate("advisor_model_runtime", acting_principal_id)
         from raiker.models.connections import get_model_connection
+        from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
         from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
 
         # One ledger read for the whole page, grouped by provider, so each card
@@ -3266,6 +3276,10 @@ class DashboardService:
         if acting_principal_id:
             for row in ModelUsageLedger(self.store).provider_usage(acting_principal_id):
                 usage_by_provider.setdefault(row.provider, []).append(row)
+        readiness_service = ModelReadinessService(
+            self.store,
+            probe=ProviderCatalogueProbe(self.store),
+        )
 
         def _usage_fields(profile: Any) -> dict[str, Any]:
             rows = usage_by_provider.get(profile.provider, [])
@@ -3316,6 +3330,15 @@ class DashboardService:
             profile: Any, effective_model: str, *, selected: bool
         ) -> ModelProfileView:
             facts = self._resolve_facts(profile, effective_model, acting_principal_id)
+            readiness = (
+                readiness_service.current_selected(
+                    acting_principal_id,
+                    profile.profile_id,
+                    effective_model,
+                )
+                if acting_principal_id and effective_model and "<" not in effective_model
+                else None
+            )
             return ModelProfileView(
                 profile_id=profile.profile_id,
                 provider=profile.provider,
@@ -3346,6 +3369,23 @@ class DashboardService:
                 context_window_tokens=facts.context_window_tokens,
                 context_window_source=facts.context_window_source,
                 configured=effective_model != "<model>",
+                readiness_state=(readiness.state.value if readiness else "not_configured"),
+                readiness_summary=(
+                    readiness.summary
+                    if readiness
+                    else "Choose a concrete model before checking readiness."
+                ),
+                readiness_reason_code=(
+                    readiness.reason_code if readiness else "model_not_configured"
+                ),
+                readiness_checked_at=(readiness.checked_at if readiness else None),
+                readiness_expires_at=(readiness.expires_at if readiness else None),
+                readiness_remediation=(
+                    readiness.remediation
+                    if readiness
+                    else "Choose a model, then check the connection."
+                ),
+                ready=bool(readiness and readiness.ready),
                 supports_reasoning=bool(profile.raw.get("supports_reasoning", False)),
                 supports_reasoning_effort=bool(
                     profile.raw.get("supports_reasoning_effort", False)
@@ -3408,6 +3448,7 @@ class DashboardService:
                 os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
             ),
             remote_profile_count=sum(1 for p in profiles if p.off_machine),
+            ready_provider_count=sum(1 for p in profiles if p.ready),
             fallback_sequence=tuple(
                 self.store.load_principal_model_fallback_sequence(scoped_principal)
                 if scoped_principal else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
@@ -4394,6 +4435,11 @@ class DashboardService:
             self.store.save_principal_model_state(principal.principal_id, state)
         else:
             self.store.save_model_session_state(state)
+        self.store.invalidate_model_readiness(
+            principal.principal_id,
+            profile.profile_id,
+            reason_code="model_selection_changed",
+        )
         self._append_model_event(
             "model_profile_selected",
             {

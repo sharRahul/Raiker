@@ -167,6 +167,13 @@ class SetModelSelectionRequest(BaseModel):
     model: str | None = None
 
 
+class ModelReadinessCheckRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    profile_id: str
+    model: str
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

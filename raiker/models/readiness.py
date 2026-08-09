@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import os
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from enum import StrEnum
 from typing import Any, Protocol
+from urllib.parse import urlsplit, urlunsplit
 
 
 class ModelReadinessState(StrEnum):
@@ -78,9 +81,242 @@ class ModelReadinessStore(Protocol):
         reason_code: str = "readiness_invalidated",
     ) -> int: ...
 
+    def list_model_readiness(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None = None,
+    ) -> list[ModelReadiness]: ...
+
 
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def _provider_label(provider: str) -> str:
+    return {
+        "ollama": "Ollama",
+        "lm-studio": "LM Studio",
+        "llama.cpp": "llama.cpp",
+        "anthropic": "Anthropic",
+        "openrouter": "OpenRouter",
+        "openai": "OpenAI",
+        "gemini": "Gemini",
+        "huggingface": "Hugging Face",
+    }.get(provider, provider.replace("-", " ").title())
+
+
+def _effective_endpoint(profile: Any, connection: dict[str, str] | None) -> str:
+    if connection and connection.get("endpoint", "").strip():
+        return connection["endpoint"].strip()
+    endpoint_env = profile.raw.get("endpoint_env")
+    if isinstance(endpoint_env, str) and endpoint_env:
+        configured = os.environ.get(endpoint_env, "").strip()
+        if configured:
+            return configured
+    return str(profile.raw.get("endpoint") or profile.raw.get("base_url") or "").strip()
+
+
+def _endpoint_fingerprint(provider: str, endpoint: str) -> str:
+    parsed = urlsplit(endpoint.strip())
+    # Userinfo and fragments are never endpoint identity and must not survive in
+    # evidence. Host case and a trailing slash are semantically irrelevant.
+    host = (parsed.hostname or "").casefold()
+    if parsed.port:
+        host = f"{host}:{parsed.port}"
+    normalized = urlunsplit(
+        (parsed.scheme.casefold(), host, parsed.path.rstrip("/"), parsed.query, "")
+    )
+    return hashlib.sha256(f"{provider.casefold()}\0{normalized}".encode()).hexdigest()
+
+
+class ProviderCatalogueProbe:
+    """Non-billable exact-model probe through the provider catalogue endpoint."""
+
+    def __init__(self, store: Any) -> None:
+        self.store = store
+
+    def resolve_key(
+        self,
+        owner_principal_id: str,
+        profile_id: str,
+        model: str,
+    ) -> ModelReadinessKey:
+        from raiker.models.connections import get_model_connection
+        from raiker.models.registry import ModelProfileRegistry
+
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+        connection = get_model_connection(self.store, owner_principal_id, profile_id)
+        endpoint = _effective_endpoint(profile, connection)
+        return ModelReadinessKey(
+            owner_principal_id=owner_principal_id,
+            profile_id=profile_id,
+            model=model.strip(),
+            endpoint_fingerprint=_endpoint_fingerprint(profile.provider, endpoint),
+        )
+
+    def _result(
+        self,
+        key: ModelReadinessKey,
+        state: ModelReadinessState,
+        summary: str,
+        reason_code: str,
+        remediation: str,
+        *,
+        provider: str,
+    ) -> ModelReadiness:
+        return ModelReadiness(
+            key=key,
+            state=state,
+            checked_at=None,
+            expires_at=None,
+            summary=summary,
+            reason_code=reason_code,
+            remediation=remediation,
+            evidence={"provider": provider},
+        )
+
+    async def check(self, key: ModelReadinessKey) -> ModelReadiness:
+        from raiker.models.connections import get_model_connection
+        from raiker.models.exceptions import (
+            ProviderAuthenticationError,
+            ProviderConfigurationError,
+            ProviderConnectionError,
+            ProviderModelNotFoundError,
+            ProviderPolicyError,
+            ProviderRateLimitError,
+            ProviderResponseValidationError,
+            ProviderTimeoutError,
+            ProviderUnsupportedCapabilityError,
+        )
+        from raiker.models.policy_state import provider_runtime_policy_from_gates
+        from raiker.models.registry import ModelProfileRegistry, profile_with_model
+        from raiker.models.router import ModelRouter
+
+        registry = ModelProfileRegistry.load()
+        profile = registry.resolve_profile_id(key.profile_id)
+        label = _provider_label(profile.provider)
+        connection = get_model_connection(
+            self.store, key.owner_principal_id, key.profile_id
+        )
+        router = ModelRouter(
+            registry,
+            runtime_policy=provider_runtime_policy_from_gates(
+                self.store, key.owner_principal_id
+            ),
+            connection_resolver=lambda profile_id: (
+                connection if profile_id == key.profile_id else None
+            ),
+        )
+        effective = profile_with_model(profile, key.model)
+        try:
+            models = await router.alist_models_for_profile(effective)
+        except ProviderAuthenticationError:
+            return self._result(
+                key,
+                ModelReadinessState.AUTHENTICATION_FAILED,
+                f"{label} rejected the saved credential.",
+                "provider_authentication_failed",
+                "Update the provider credential and check again.",
+                provider=profile.provider,
+            )
+        except ProviderPolicyError:
+            return self._result(
+                key,
+                ModelReadinessState.POLICY_BLOCKED,
+                f"{label} is blocked by the current model policy.",
+                "provider_policy_blocked",
+                "Review the provider policy and check again.",
+                provider=profile.provider,
+            )
+        except ProviderConfigurationError:
+            state = (
+                ModelReadinessState.RUNTIME_MISSING
+                if profile.local_only
+                else ModelReadinessState.NOT_CONFIGURED
+            )
+            return self._result(
+                key,
+                state,
+                f"{label} is not fully configured.",
+                "local_runtime_missing" if profile.local_only else "provider_not_configured",
+                f"Set up {label} and check again.",
+                provider=profile.provider,
+            )
+        except ProviderModelNotFoundError:
+            return self._result(
+                key,
+                ModelReadinessState.MODEL_MISSING,
+                f"{label} cannot find {key.model}.",
+                "local_model_missing" if profile.local_only else "provider_model_missing",
+                f"Install or select {key.model}, then check again.",
+                provider=profile.provider,
+            )
+        except ProviderUnsupportedCapabilityError:
+            return self._result(
+                key,
+                ModelReadinessState.UNSUPPORTED,
+                f"{label} does not support model catalogue checks.",
+                "model_catalogue_unsupported",
+                "Choose a supported provider runtime.",
+                provider=profile.provider,
+            )
+        except (ProviderConnectionError, ProviderTimeoutError):
+            return self._result(
+                key,
+                (
+                    ModelReadinessState.RUNTIME_STOPPED
+                    if profile.local_only
+                    else ModelReadinessState.UNREACHABLE
+                ),
+                f"{label} is not reachable.",
+                "local_runtime_unreachable" if profile.local_only else "provider_unreachable",
+                f"Start or reconnect {label}, then check again.",
+                provider=profile.provider,
+            )
+        except ProviderRateLimitError:
+            return self._result(
+                key,
+                ModelReadinessState.UNREACHABLE,
+                f"{label} temporarily refused the catalogue check.",
+                "provider_rate_limited",
+                "Wait briefly, then check again.",
+                provider=profile.provider,
+            )
+        except ProviderResponseValidationError:
+            return self._result(
+                key,
+                ModelReadinessState.UNREACHABLE,
+                f"{label} returned an invalid model catalogue.",
+                "provider_catalogue_invalid",
+                "Check the endpoint and runtime version.",
+                provider=profile.provider,
+            )
+        except Exception:  # noqa: BLE001 - API output is deliberately classified
+            return self._result(
+                key,
+                ModelReadinessState.UNREACHABLE,
+                f"{label} could not complete the model check.",
+                "provider_probe_failed",
+                "Check the provider connection and try again.",
+                provider=profile.provider,
+            )
+        if not any(item.id == key.model for item in models):
+            return self._result(
+                key,
+                ModelReadinessState.MODEL_MISSING,
+                f"{label} is reachable, but {key.model} is not available.",
+                "local_model_missing" if profile.local_only else "provider_model_missing",
+                f"Install or select {key.model}, then check again.",
+                provider=profile.provider,
+            )
+        return self._result(
+            key,
+            ModelReadinessState.READY,
+            f"{label} can reach {key.model}.",
+            "model_ready",
+            "",
+            provider=profile.provider,
+        )
 
 
 class ModelReadinessService:
@@ -177,4 +413,43 @@ class ModelReadinessService:
             owner_principal_id,
             profile_id,
             reason_code=reason_code,
+        )
+
+    def _selected_key(
+        self,
+        owner_principal_id: str,
+        profile_id: str,
+        model: str,
+    ) -> ModelReadinessKey:
+        resolver = getattr(self.probe, "resolve_key", None)
+        if resolver is None:
+            raise TypeError("model_probe_cannot_resolve_endpoint")
+        return resolver(owner_principal_id, profile_id, model)
+
+    async def check_selected(
+        self,
+        owner_principal_id: str,
+        profile_id: str,
+        model: str,
+    ) -> ModelReadiness:
+        key = self._selected_key(owner_principal_id, profile_id, model)
+        return await self.check(
+            key.owner_principal_id,
+            key.profile_id,
+            key.model,
+            key.endpoint_fingerprint,
+        )
+
+    def current_selected(
+        self,
+        owner_principal_id: str,
+        profile_id: str,
+        model: str,
+    ) -> ModelReadiness:
+        key = self._selected_key(owner_principal_id, profile_id, model)
+        return self.current(
+            key.owner_principal_id,
+            key.profile_id,
+            key.model,
+            key.endpoint_fingerprint,
         )

@@ -1618,6 +1618,9 @@ async def set_model_connection(
     }
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
+        store.invalidate_model_readiness(
+            session.principal_id, profile_id, reason_code="connection_changed"
+        )
         return {"ok": True, "connection_configured": False}
     # The vault key encrypts what we are about to store. It is a local
     # encryption key, not a secret the owner has to invent, so requiring them to
@@ -1637,6 +1640,9 @@ async def set_model_connection(
         raise HTTPException(status_code=503, detail={"reason_code": str(exc)}) from exc
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=403, detail={"reason_code": str(exc)}) from exc
+    store.invalidate_model_readiness(
+        session.principal_id, profile_id, reason_code="connection_changed"
+    )
     return {"ok": True, "connection_configured": True}
 
 

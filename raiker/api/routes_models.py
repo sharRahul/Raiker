@@ -4,18 +4,20 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     HuggingFaceCredentialRequest,
     HuggingFaceSelectionRequest,
+    ModelConversionRequestBody,
     ModelLibraryRootRequest,
     ModelOperationRequestBody,
     ModelReadinessCheckRequest,
     ModelSetupUpdateRequest,
 )
 from raiker.api.sessions import ApiSession
+from raiker.models.conversion import ConversionRefused, ModelConversionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
@@ -482,3 +484,88 @@ def download_hugging_face_model(
                 "operation_id": operation.operation_id,
             },
         ) from exc
+
+
+def _require_approved_conversion_paths(
+    request: Request, owner: str, source: Path, output: Path
+) -> None:
+    roots = [Path(root).resolve() for root in _library_service(request).roots(owner)]
+    source = source.resolve()
+    output = output.resolve()
+    if not any(source == root or root in source.parents for root in roots):
+        raise HTTPException(status_code=422, detail={"reason_code": "source_not_in_model_library"})
+    if not any(output == root or root in output.parents for root in roots):
+        raise HTTPException(status_code=422, detail={"reason_code": "output_not_in_model_library"})
+
+
+@router.post("/api/model-conversion/preview")
+def preview_model_conversion(
+    body: ModelConversionRequestBody,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    source, output = Path(body.source), Path(body.output)
+    _require_approved_conversion_paths(request, session.principal_id, source, output)
+    try:
+        return (
+            ModelConversionService()
+            .preview(source, output, body.revision, body.quantization)
+            .to_dict()
+        )
+    except ConversionRefused as exc:
+        raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+
+
+def _run_model_conversion(
+    workspace: Path, owner: str, operation_id: str, body: ModelConversionRequestBody
+) -> None:
+    operations = ModelOperationService(SQLiteStore(workspace))
+    try:
+        operations.running(owner, operation_id, phase="converting")
+        service = ModelConversionService()
+        preview = service.preview(
+            Path(body.source), Path(body.output), body.revision, body.quantization
+        )
+        service.convert(preview)
+        operations.complete(owner, operation_id)
+        ModelLibraryService(SQLiteStore(workspace)).rescan(owner)
+    except Exception:
+        operations.fail(owner, operation_id, code="model_conversion_failed")
+
+
+@router.post("/api/model-conversion")
+def start_model_conversion(
+    body: ModelConversionRequestBody,
+    background: BackgroundTasks,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    if not body.confirmed:
+        raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
+    source, output = Path(body.source), Path(body.output)
+    _require_approved_conversion_paths(request, session.principal_id, source, output)
+    try:
+        ModelConversionService().preview(source, output, body.revision, body.quantization)
+    except ConversionRefused as exc:
+        raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+    operation = _operation_service(request).start(
+        session.principal_id,
+        ModelOperationRequest(
+            kind="convert",
+            target=f"{source.name}@{body.revision}",
+            confirmed=True,
+            destination=str(output),
+        ),
+    )
+    background.add_task(
+        _run_model_conversion,
+        Path(request.app.state.workspace_root),
+        session.principal_id,
+        operation.operation_id,
+        body,
+    )
+    return operation.to_dict()

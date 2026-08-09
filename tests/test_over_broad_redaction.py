@@ -115,7 +115,9 @@ class TestTheAssertionGuardMatchesTheMiddleware:
     def test_the_guard_accepts_what_the_middleware_emits(self) -> None:
         # Redaction is idempotent, so a body that has already passed through the
         # middleware never trips the guard on its own markers.
-        redacted = redact_response_body({"answer": "mail bob@example.com or use sk-ant-AAAABBBBCCCCDDDD"})
+        redacted = redact_response_body(
+            {"answer": "mail bob@example.com or use sk-ant-AAAABBBBCCCCDDDD"}
+        )
         assert_no_secrets_in_body(redacted)
         assert redact_response_body(redacted) == redacted
 
@@ -270,3 +272,16 @@ class TestServerIssuedIdentifiersSurvive:
 
     def test_the_guard_accepts_what_the_middleware_emits_for_identifiers(self) -> None:
         assert_no_secrets_in_body(redact_response_body({"session_id": self.INBOX}))
+
+
+def test_commit_revisions_and_digests_survive_only_in_named_fields() -> None:
+    revision = "d" * 40
+    digest = "a" * 64
+    assert redact_response_body({"revision": revision, "toolchain_digest": digest}) == {
+        "revision": revision,
+        "toolchain_digest": digest,
+    }
+    assert redact_response_body({"answer": revision}) != {"answer": revision}
+    assert redact_response_body({"revision": "sk-ant-AAAABBBBCCCCDDDD"}) != {
+        "revision": "sk-ant-AAAABBBBCCCCDDDD"
+    }

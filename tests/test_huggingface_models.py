@@ -99,3 +99,32 @@ def test_download_refuses_unpinned_or_incomplete_selection(tmp_path: Path) -> No
 
     with pytest.raises(ValueError, match="incomplete_hugging_face_variant"):
         service.dry_run("owner/repo", variants[-1])
+
+
+def test_safetensors_snapshot_is_offered_for_safe_local_conversion(tmp_path: Path) -> None:
+    hub = FakeHub()
+    original = hub.model_info
+
+    def model_info(repo_id: str, *, revision: str | None, token: str | None):
+        info = original(repo_id, revision=revision, token=token)
+        info.siblings = [
+            SimpleNamespace(rfilename="config.json", size=100),
+            SimpleNamespace(rfilename="tokenizer.json", size=200),
+            SimpleNamespace(rfilename="model-00001-of-00002.safetensors", size=300),
+            SimpleNamespace(rfilename="model-00002-of-00002.safetensors", size=400),
+            SimpleNamespace(rfilename="pytorch_model.bin", size=500),
+        ]
+        return info
+
+    hub.model_info = model_info  # type: ignore[method-assign]
+
+    variant = HuggingFaceService(hub, cache_dir=tmp_path / "hf").variants("owner/repo")[0]
+
+    assert variant.format == "safetensors"
+    assert variant.complete is True
+    assert variant.files == (
+        "config.json",
+        "model-00001-of-00002.safetensors",
+        "model-00002-of-00002.safetensors",
+        "tokenizer.json",
+    )

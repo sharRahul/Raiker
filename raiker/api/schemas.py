@@ -216,6 +216,16 @@ class HuggingFaceSelectionRequest(BaseModel):
     confirmed: bool = False
 
 
+class ModelConversionRequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    source: str
+    output: str
+    revision: str
+    quantization: Literal["Q4_K_M", "Q5_K_M", "Q6_K", "Q8_0"]
+    confirmed: bool = False
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

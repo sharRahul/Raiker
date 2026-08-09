@@ -68,6 +68,8 @@ _LOCATOR_KEYS = frozenset({"subject"})
 # link to, or stop work in. Checked *after* the secret-key sweep, so a key that
 # names a credential is still discarded whole.
 _IDENTIFIER_KEY_SUFFIXES = ("_id", "_ids")
+_DIGEST_KEYS = frozenset({"revision", "sha", "commit_sha", "digest", "fingerprint"})
+_DIGEST_KEY_SUFFIXES = ("_revision", "_sha", "_digest", "_fingerprint")
 
 
 def is_locator_field(key: str) -> bool:
@@ -82,7 +84,14 @@ def is_identifier_field(key: str) -> bool:
     return lower.endswith(_IDENTIFIER_KEY_SUFFIXES)
 
 
-def _redact_value(value: Any, *, locator: bool = False, identifier: bool = False) -> Any:
+def is_digest_field(key: str) -> bool:
+    lower = key.lower()
+    return lower in _DIGEST_KEYS or lower.endswith(_DIGEST_KEY_SUFFIXES)
+
+
+def _redact_value(
+    value: Any, *, locator: bool = False, identifier: bool = False, digest: bool = False
+) -> Any:
     if isinstance(value, dict):
         # A token *count* is an integer, never a credential. Without this the
         # models contract returned `context_window_tokens: "***REDACTED***"` and
@@ -94,7 +103,10 @@ def _redact_value(value: Any, *, locator: bool = False, identifier: bool = False
                 else REDACTED_VALUE
                 if _is_secret_key(k)
                 else _redact_value(
-                    v, locator=is_locator_field(k), identifier=is_identifier_field(k)
+                    v,
+                    locator=is_locator_field(k),
+                    identifier=is_identifier_field(k),
+                    digest=is_digest_field(k),
                 )
             )
             for k, v in value.items()
@@ -102,10 +114,13 @@ def _redact_value(value: Any, *, locator: bool = False, identifier: bool = False
     if isinstance(value, list):
         # A list under a locator key (``attachment_urls``) is a list of locators;
         # one under an id key (``task_ids``) is a list of ids.
-        return [_redact_value(item, locator=locator, identifier=identifier) for item in value]
+        return [
+            _redact_value(item, locator=locator, identifier=identifier, digest=digest)
+            for item in value
+        ]
     if isinstance(value, str):
         redacted, _changed = redact_text(
-            value, locator_value=locator, identifier_value=identifier
+            value, locator_value=locator, identifier_value=identifier, digest_value=digest
         )
         return redacted
     return value
@@ -121,7 +136,12 @@ def assert_no_secrets_in_body(body: Any) -> None:
 
 
 def _check_no_secrets(
-    value: Any, path: str = "$", *, locator: bool = False, identifier: bool = False
+    value: Any,
+    path: str = "$",
+    *,
+    locator: bool = False,
+    identifier: bool = False,
+    digest: bool = False,
 ) -> None:
     # Mirrors _redact_value exactly, so the guard proves what the middleware
     # emits rather than a stricter rule the middleware never applied.
@@ -136,13 +156,16 @@ def _check_no_secrets(
                 f"{path}.{k}",
                 locator=is_locator_field(k),
                 identifier=is_identifier_field(k),
+                digest=is_digest_field(k),
             )
     elif isinstance(value, list):
         for i, item in enumerate(value):
-            _check_no_secrets(item, f"{path}[{i}]", locator=locator, identifier=identifier)
+            _check_no_secrets(
+                item, f"{path}[{i}]", locator=locator, identifier=identifier, digest=digest
+            )
     elif isinstance(value, str):
         redacted, changed = redact_text(
-            value, locator_value=locator, identifier_value=identifier
+            value, locator_value=locator, identifier_value=identifier, digest_value=digest
         )
         if changed:
             raise AssertionError(f"Secret-like string at {path}: {value[:80]}")

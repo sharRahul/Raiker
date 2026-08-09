@@ -85,6 +85,7 @@ def _redact_spoken_credential(match: re.Match[str]) -> str:
         return match.group(0)
     return REDACTED_SECRET
 
+
 # Ordered (pattern, replacement) pairs. Private keys and known token shapes are matched
 # before the broad high-entropy fallback so they get specific placeholders. Each pattern is
 # deterministic and never raises on unusual input.
@@ -130,7 +131,12 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
     ),
     # Bank/card-like numbers
     (re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"), "[REDACTED_CARD]"),
-    (re.compile(r"\b(?:account|iban|bic|swift|routing)\s*[:=#]?\s*['\"]?[A-Z0-9]{8,}\b", re.IGNORECASE), "[REDACTED_ACCOUNT]"),
+    (
+        re.compile(
+            r"\b(?:account|iban|bic|swift|routing)\s*[:=#]?\s*['\"]?[A-Z0-9]{8,}\b", re.IGNORECASE
+        ),
+        "[REDACTED_ACCOUNT]",
+    ),
     # Medical identifiers (NHS/SSN-like patterns)
     (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), "[REDACTED_ID]"),
     # High-entropy fallback for long opaque strings (kept last so specific shapes
@@ -154,8 +160,24 @@ _IDENTIFIER_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str
 )
 
 
+def _redact_high_entropy_in_digest(match: re.Match[str]) -> str:
+    value = match.group(0)
+    if re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", value):
+        return value
+    return _redact_high_entropy(match)
+
+
+_DIGEST_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
+    _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_digest),)
+)
+
+
 def redact_text(
-    text: str, *, locator_value: bool = False, identifier_value: bool = False
+    text: str,
+    *,
+    locator_value: bool = False,
+    identifier_value: bool = False,
+    digest_value: bool = False,
 ) -> tuple[str, bool]:
     """Mask obvious secrets/tokens/emails/private keys in ``text``.
 
@@ -177,6 +199,8 @@ def redact_text(
         patterns = _LOCATOR_PATTERNS
     elif identifier_value:
         patterns = _IDENTIFIER_PATTERNS
+    elif digest_value:
+        patterns = _DIGEST_PATTERNS
     redacted = text
     for pattern, replacement in patterns:
         redacted = pattern.sub(replacement, redacted)

@@ -1,11 +1,25 @@
 from __future__ import annotations
 
+import os
+
 import pytest
 from cryptography.fernet import Fernet
 
 from raiker.auth import vault_key_file as vkf
 
 ENV = "RAIKER_CONNECTOR_VAULT_KEY"
+
+
+def test_provisioning_one_workspace_does_not_leak_its_key_into_process_env(
+    tmp_path, monkeypatch
+) -> None:
+    monkeypatch.delenv(ENV, raising=False)
+
+    generated = vkf.ensure_vault_key(tmp_path / "one")
+
+    assert vkf.read_vault_key(tmp_path / "one") == generated
+    assert ENV not in os.environ
+    assert vkf.vault_status(tmp_path / "two") == "missing"
 
 
 def test_write_read_roundtrip(tmp_path) -> None:  # type: ignore[no-untyped-def]

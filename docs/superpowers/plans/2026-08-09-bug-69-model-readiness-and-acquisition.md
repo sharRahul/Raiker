@@ -682,7 +682,7 @@ git commit -m "feat: download hugging face gguf models"
 - Produces: `ModelConversionService.preview/start/cancel/cleanup`.
 - Consumes: Task 9 immutable source snapshot and Task 8 deployment.
 
-- [ ] **Step 1: Write failing supported/unsupported, no-code, no-network, and disk tests**
+  - [x] **Step 1: Write failing supported/unsupported, no-code, no-network, and disk tests**
 
 ```python
 def test_conversion_rejects_repository_code_and_pickle_weights(tmp_path: Path) -> None:
@@ -693,21 +693,21 @@ def test_conversion_rejects_repository_code_and_pickle_weights(tmp_path: Path) -
         ModelConversionService(toolchain=fake_toolchain()).preview(repo, "Q4_K_M")
 ```
 
-- [ ] **Step 2: Run and verify RED**
+  - [x] **Step 2: Run and verify RED**
 
 Run: `python -m pytest tests/test_model_conversion.py tests/test_model_conversion_isolation.py tests/test_api_model_conversion.py -q`
 Expected: conversion module/endpoints are missing.
 
-- [ ] **Step 3: Implement pinned command plans and isolated worker boundary**
+  - [x] **Step 3: Implement pinned command plans and isolated worker boundary**
 
 Resolve the llama.cpp toolchain to an exact reviewed release/digest. Permit only its declared architecture list. Build argv as arrays, never shell strings: `convert_hf_to_gguf.py <snapshot> --outfile <bf16.gguf> --outtype bf16`, then `llama-quantize <bf16.gguf> <output.gguf> Q4_K_M`. Run with network disabled, read-only source, one writable output, empty credential environment, bounded CPU/memory/time/output, and no workspace mount. Validate output through Task 8 parser before registration. Cleanup requires a separate owner action.
 
-- [ ] **Step 4: Verify GREEN and provenance chain**
+  - [x] **Step 4: Verify GREEN and provenance chain**
 
 Run: `python -m pytest tests/test_model_conversion.py tests/test_model_conversion_isolation.py tests/test_api_model_conversion.py -q`
 Expected: all pass; output record names exact HF revision, toolchain digest, quantization, and fingerprint.
 
-- [ ] **Step 5: Commit**
+  - [x] **Step 5: Commit**
 
 ```bash
 git add raiker/models/conversion.py raiker/models/local_operations.py raiker/api/routes_models.py tests/test_model_conversion.py tests/test_model_conversion_isolation.py tests/test_api_model_conversion.py

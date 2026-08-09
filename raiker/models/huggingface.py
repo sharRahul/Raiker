@@ -7,6 +7,9 @@ from typing import Any, Protocol
 
 _FULL_REVISION = re.compile(r"^[0-9a-f]{40}$", re.IGNORECASE)
 _SHARD = re.compile(r"^(?P<base>.+)-(?P<part>\d{5})-of-(?P<total>\d{5})\.gguf$", re.IGNORECASE)
+_SAFETENSOR_SHARD = re.compile(
+    r"^(?P<base>.+)-(?P<part>\d{5})-of-(?P<total>\d{5})\.safetensors$", re.IGNORECASE
+)
 _QUANTIZATION = re.compile(
     r"(?:^|[-_.])(IQ\d(?:_[A-Z0-9]+)*|Q\d(?:_[A-Z0-9]+)*)(?:[-_.]|$)", re.IGNORECASE
 )
@@ -198,9 +201,35 @@ class HuggingFaceService:
                     complete,
                 )
             )
+        safetensor_files = [
+            (name, size) for name, size in files if name.lower().endswith(".safetensors")
+        ]
+        if safetensor_files:
+            supporting = [(name, size) for name, size in files if _is_conversion_support_file(name)]
+            selected = sorted(safetensor_files + supporting, key=lambda item: item[0])
+            variants.append(
+                HfVariant(
+                    str(info.id),
+                    sha,
+                    tuple(name for name, _size in selected),
+                    "safetensors",
+                    None,
+                    sum(size for _name, size in selected),
+                    0,
+                    gated,
+                    license_id,
+                    _safetensor_files_complete([name for name, _size in safetensor_files])
+                    and any(name == "config.json" for name, _size in supporting),
+                )
+            )
         return sorted(
             variants,
-            key=lambda item: (not item.complete, _quant_rank(item.quantization), item.total_bytes),
+            key=lambda item: (
+                not item.complete,
+                item.format != "gguf",
+                _quant_rank(item.quantization),
+                item.total_bytes,
+            ),
         )
 
     def dry_run(
@@ -281,3 +310,33 @@ def _quantization(filename: str) -> str | None:
 def _quant_rank(value: str | None) -> int:
     preferred = {"Q4_K_M": 0, "Q5_K_M": 1, "Q8_0": 2}
     return preferred.get(value or "", 10)
+
+
+def _is_conversion_support_file(filename: str) -> bool:
+    name = Path(filename).name.lower()
+    exact = {
+        "config.json",
+        "generation_config.json",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "special_tokens_map.json",
+        "added_tokens.json",
+        "merges.txt",
+        "vocab.json",
+        "vocab.txt",
+        "model.safetensors.index.json",
+    }
+    return name in exact or name.endswith(".model")
+
+
+def _safetensor_files_complete(filenames: list[str]) -> bool:
+    matches = [_SAFETENSOR_SHARD.match(name) for name in filenames]
+    shard_matches = [match for match in matches if match is not None]
+    if not shard_matches:
+        return len(filenames) == 1
+    if len(shard_matches) != len(filenames):
+        return False
+    expected = int(shard_matches[0].group("total"))
+    return len(shard_matches) == expected and {
+        int(match.group("part")) for match in shard_matches
+    } == set(range(1, expected + 1))

@@ -76,7 +76,6 @@ def ensure_vault_key(workspace_root: str | Path) -> str:
         return existing
     generated = Fernet.generate_key().decode("ascii")
     write_vault_key(workspace_root, generated)
-    load_vault_key_into_env(workspace_root)
     return generated
 
 

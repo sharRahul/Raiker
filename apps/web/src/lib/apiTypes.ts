@@ -271,11 +271,121 @@ export interface ModelSetupState {
   owner_principal_id: string;
   status: "required" | "in_progress" | "skipped" | "complete";
   step: "choose_path" | "provider" | "model" | "review" | "ready";
-  path: "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
+  path:
+    "provider" | "ollama" | "lm_studio" | "local_gguf" | "hugging_face" | null;
   selected_profile_id: string | null;
   selected_model: string | null;
   created_at: string | null;
   updated_at: string | null;
+}
+
+export interface ModelOperation {
+  operation_id: string;
+  owner_principal_id: string;
+  kind: "install" | "download" | "convert" | "deploy" | "pull";
+  target: string;
+  state:
+    | "queued"
+    | "running"
+    | "cancel_requested"
+    | "cancelled"
+    | "failed"
+    | "complete";
+  phase: string;
+  progress_bytes: number;
+  total_bytes: number | null;
+  progress_percent: number | null;
+  source_url: string | null;
+  destination: string | null;
+  error_code: string | null;
+  error_detail: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface RuntimeInstallPlan {
+  runtime: string;
+  action: string;
+  source_url: string;
+  argv: string[];
+  requires_elevation: boolean;
+  terms_url: string;
+  redistribution: boolean;
+}
+
+export interface LocalModel {
+  owner_principal_id: string;
+  root_path: string;
+  model_id: string;
+  name: string;
+  architecture: string;
+  quantization: string | null;
+  primary_path: string;
+  shard_count: number;
+  expected_shards: number;
+  complete: boolean;
+  size_bytes: number;
+  indexed_at: string;
+}
+
+export interface ModelLibraryView {
+  roots: Array<{ path: string }>;
+  models: LocalModel[];
+}
+
+export interface HuggingFaceSearchResult {
+  repo_id: string;
+  downloads: number;
+  likes: number;
+  gated: boolean;
+}
+
+export interface HuggingFaceVariant {
+  repo_id: string;
+  revision: string;
+  files: string[];
+  format: "gguf" | "safetensors";
+  quantization: string | null;
+  total_bytes: number;
+  cached_bytes: number;
+  gated: boolean;
+  license_id: string | null;
+  complete: boolean;
+}
+
+export interface HuggingFaceDownloadPreview {
+  repo_id: string;
+  revision: string;
+  files: string[];
+  total_bytes: number;
+  cached_bytes: number;
+  download_bytes: number;
+}
+
+export type HuggingFaceDownloadResult = ModelOperation & {
+  snapshot_path: string;
+  conversion_output_path: string;
+};
+
+export interface ModelConversionPreview {
+  source: string;
+  output: string;
+  revision: string;
+  architecture: string;
+  quantization: string;
+  source_bytes: number;
+  required_free_bytes: number;
+  toolchain_image: string;
+  isolation: {
+    network: false;
+    source_read_only: true;
+    credential_environment: string[];
+    workspace_mounted: false;
+    max_memory_bytes: number;
+    max_cpu_count: number;
+    max_processes: number;
+    timeout_seconds: number;
+  };
 }
 
 export interface Diagnostics {
@@ -733,7 +843,13 @@ export interface ExtensionView {
 
 export interface ExtensionsOverview {
   extensions: ExtensionView[];
-  counts: { total: number; installed: number; connected: number; enabled: number; usable: number };
+  counts: {
+    total: number;
+    installed: number;
+    connected: number;
+    enabled: number;
+    usable: number;
+  };
   vault_configured: boolean;
   connector_egress_allowlist_configured: boolean;
   deferred: Array<{ kind: string; status: string; detail: string }>;
@@ -901,7 +1017,8 @@ export interface ApprovalDetailView {
   // `connector_write`; it was missing here, so the union claimed a shape the
   // backend does not only produce. `git_change` is B11's: a commit's file list
   // and diff, or the two refs a branch moves between.
-  preview_kind: "file_diff" | "patch" | "git_change" | "connector_request" | "arguments";
+  preview_kind:
+    "file_diff" | "patch" | "git_change" | "connector_request" | "arguments";
   metadata_only_notice: string;
   // Server-computed: does pressing Approve actually perform this action?
   executes_on_approval: boolean;
@@ -1003,7 +1120,8 @@ export interface AgentResponse {
 }
 
 // raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
-export type StreamKind = "lifecycle" | "text_delta" | "tool" | "final" | "error";
+export type StreamKind =
+  "lifecycle" | "text_delta" | "tool" | "final" | "error";
 
 export interface StreamEvent {
   kind: StreamKind;
@@ -1184,7 +1302,8 @@ export interface TurnSourcesView {
 // GET /api/sessions/{id}/turns/{turn}/sources/{source}/excerpt — the source view
 // above plus the resolved passage, in the same shape (and with the same honest
 // statuses) as SourceExcerptView.
-export type TurnSourceExcerptView = TurnSourceView & SourceExcerptView & { ok: boolean };
+export type TurnSourceExcerptView = TurnSourceView &
+  SourceExcerptView & { ok: boolean };
 
 // GET /api/sessions/{id}/attachments — metadata only, so a reloaded chat can
 // redraw the attachment chips its transcript does not persist.
@@ -1295,7 +1414,12 @@ export interface BrainSourceResult {
 export interface BrainSourceBrowse {
   path: string;
   parent: string | null;
-  children: Array<{ name: string; path: string; kind: "folder" | "file"; size_bytes: number | null }>;
+  children: Array<{
+    name: string;
+    path: string;
+    kind: "folder" | "file";
+    size_bytes: number | null;
+  }>;
   truncated: boolean;
   resolution_method: "stored_coordinates" | "matching_text" | "";
 }
@@ -1328,11 +1452,17 @@ export interface ExecutionEnvironment {
     reserved_cost: number;
     committed_cost: number;
     remaining_cost: number | null;
-    reconciliation_status: "not_started" | "reserved" | "reconciled" | "provider_unavailable";
+    reconciliation_status:
+      "not_started" | "reserved" | "reconciled" | "provider_unavailable";
     history: Array<{
       event_id: string;
       action_id: string;
-      event_type: "reserved" | "reconciled" | "released" | "provider_snapshot" | "provider_unavailable";
+      event_type:
+        | "reserved"
+        | "reconciled"
+        | "released"
+        | "provider_snapshot"
+        | "provider_unavailable";
       amount: number;
       provider_reference: string | null;
       reason: string | null;
@@ -1365,13 +1495,26 @@ export interface ModelCapacityEntry {
   endpoint_identity: string;
   context_window_tokens: number | null;
   source: string | null;
-  history: Array<{ capacity_id: string; context_window_tokens: number | null; action: string; reason: string | null; recorded_by: string; recorded_at: string }>;
+  history: Array<{
+    capacity_id: string;
+    context_window_tokens: number | null;
+    action: string;
+    reason: string | null;
+    recorded_by: string;
+    recorded_at: string;
+  }>;
 }
 
 export interface ModelCapacitiesView {
   ok: boolean;
   entries: ModelCapacityEntry[];
-  sync: Array<{ profile_id: string; last_refresh_at: string | null; next_refresh_at: string; status: string; reason_code: string | null }>;
+  sync: Array<{
+    profile_id: string;
+    last_refresh_at: string | null;
+    next_refresh_at: string;
+    status: string;
+    reason_code: string | null;
+  }>;
   refresh_due: boolean;
   cadence_hours: number;
   can_override: boolean;

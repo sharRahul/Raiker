@@ -1,0 +1,210 @@
+<script lang="ts">
+  import { api } from "../../api";
+  import type { RuntimeInstallPlan } from "../../apiTypes";
+  let model = $state("gemma4:31b-cloud");
+  let busy = $state<string | null>(null);
+  let message = $state<string | null>(null);
+  let error = $state<string | null>(null);
+  async function openInstaller(runtime: string) {
+    busy = runtime;
+    error = null;
+    try {
+      const plan = (await api.previewModelOperation(
+        "install",
+        runtime,
+      )) as RuntimeInstallPlan;
+      if (!plan.source_url.startsWith("https://"))
+        throw new Error("unsafe source");
+      window.open(plan.source_url, "_blank", "noopener,noreferrer");
+      message = `Opened the official ${runtime === "ollama" ? "Ollama" : "LM Studio"} download. Return here after installation.`;
+    } catch {
+      error = "Could not open the reviewed vendor download.";
+    } finally {
+      busy = null;
+    }
+  }
+  async function pull() {
+    if (!model.trim()) return;
+    if (
+      !window.confirm(
+        `Pull ${model.trim()} from Ollama? The model may use substantial disk space.`,
+      )
+    )
+      return;
+    busy = "pull";
+    error = null;
+    try {
+      await api.pullOllamaModel(model.trim());
+      message = "Ollama pull started. Follow it in Activity.";
+    } catch {
+      error = "Could not start the Ollama pull. Check that Ollama is running.";
+    } finally {
+      busy = null;
+    }
+  }
+</script>
+
+<section class="runtime-setup" aria-labelledby="runtime-setup-title">
+  <header>
+    <div>
+      <p class="eyebrow">Local runtime setup</p>
+      <h2 id="runtime-setup-title">Install, connect, or pull</h2>
+    </div>
+    <p>
+      Installers always come from the vendor. Raiker never bundles them or
+      accepts their terms for you.
+    </p>
+  </header>
+  <div class="runtime-grid">
+    <article>
+      <div class="runtime-head">
+        <span class="runtime-logo">O</span>
+        <div>
+          <h3>Ollama</h3>
+          <p>Simple local model service for Windows, macOS, and Linux.</p>
+        </div>
+      </div>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void openInstaller("ollama")}
+        disabled={busy !== null}
+        >{busy === "ollama" ? "Opening…" : "Open official installer"}</button
+      >
+      <div class="pull-row">
+        <label
+          ><span>Model to pull</span><input
+            bind:value={model}
+            aria-label="Ollama model to pull"
+          /></label
+        ><button
+          class="btn btn-sm"
+          type="button"
+          onclick={() => void pull()}
+          disabled={busy !== null || !model.trim()}
+          >{busy === "pull" ? "Starting…" : "Pull model"}</button
+        >
+      </div>
+    </article>
+    <article>
+      <div class="runtime-head">
+        <span class="runtime-logo lm">LM</span>
+        <div>
+          <h3>LM Studio</h3>
+          <p>Desktop model browser with a local OpenAI-compatible server.</p>
+        </div>
+      </div>
+      <button
+        class="btn btn-ghost btn-sm"
+        type="button"
+        onclick={() => void openInstaller("lm-studio-desktop")}
+        disabled={busy !== null}
+        >{busy === "lm-studio-desktop"
+          ? "Opening…"
+          : "Open official download"}</button
+      ><a href="#/models?tab=library"
+        >Use models LM Studio already downloaded →</a
+      >
+    </article>
+  </div>
+  {#if message}<p class="message" role="status">{message}</p>{/if}{#if error}<p
+      class="error"
+      role="alert"
+    >
+      {error}
+    </p>{/if}
+</section>
+
+<style>
+  .runtime-setup {
+    --text-muted: var(--text-2);
+    display: grid;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .runtime-setup > header {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+  }
+  .runtime-setup header h2 {
+    margin: 2px 0;
+  }
+  .runtime-setup header > p {
+    max-width: 52ch;
+    margin: 0;
+    color: var(--text-muted);
+  }
+  .runtime-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .runtime-grid article {
+    display: grid;
+    gap: 14px;
+    border: 1px solid var(--border);
+    border-radius: 13px;
+    padding: 17px;
+    background: var(--surface);
+  }
+  .runtime-head {
+    display: flex;
+    gap: 12px;
+  }
+  .runtime-head h3,
+  .runtime-head p {
+    margin: 0;
+  }
+  .runtime-head p {
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+  .runtime-logo {
+    display: grid;
+    place-items: center;
+    width: 38px;
+    height: 38px;
+    border-radius: 9px;
+    background: #171717;
+    color: white;
+    font-weight: 850;
+  }
+  .runtime-logo.lm {
+    background: #164e63;
+    font-size: 0.72rem;
+  }
+  .pull-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+    gap: 8px;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+  .pull-row label {
+    display: grid;
+    gap: 5px;
+    font-size: 0.78rem;
+    font-weight: 650;
+  }
+  .runtime-grid a {
+    font-size: 0.8rem;
+    color: var(--accent);
+    text-decoration: none;
+  }
+  .message {
+    color: var(--success, #15803d);
+    margin: 0;
+  }
+  @media (max-width: 760px) {
+    .runtime-grid {
+      grid-template-columns: 1fr;
+    }
+    .runtime-setup > header {
+      align-items: start;
+      flex-direction: column;
+    }
+  }
+</style>

@@ -738,7 +738,7 @@ git commit -m "feat: convert hugging face models safely"
 - Consumes: Tasks 2 and 7–10 APIs.
 - Produces: approved Models tab architecture and persistent operation tray.
 
-- [ ] **Step 1: Write failing navigation and primary-flow component tests**
+  - [x] **Step 1: Write failing navigation and primary-flow component tests**
 
 ```ts
 it("shows zero ready providers and offers setup instead of claiming Ollama is set up", async () => {
@@ -757,12 +757,12 @@ it("prefers a fitting existing GGUF over conversion", async () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify RED**
+  - [x] **Step 2: Run and verify RED**
 
 Run: `npm --prefix apps/web test -- ModelsView.test.ts ProvidersPanel.test.ts LocalLibraryPanel.test.ts HuggingFacePanel.test.ts DownloadsPanel.test.ts ModelOperationTray.test.ts`
 Expected: panels/types/API methods are missing.
 
-- [ ] **Step 3: Implement the approved UI decomposition**
+  - [x] **Step 3: Implement the approved UI decomposition**
 
 Move provider markup from `ModelsView.svelte` into `ProvidersPanel` without changing existing Routing/Pricing/Posture behavior. Add Local library, Hugging Face, Downloads tabs with overflow behavior. Implement variant table, fit states, licence/gated review, source approval, deploy side panel, install review, job groups, cancellation, retry, and explicit partial cleanup. Mount `ModelOperationTray` once in `App.svelte`. Use semantic theme tokens only.
 
@@ -774,12 +774,12 @@ Move provider markup from `ModelsView.svelte` into `ProvidersPanel` without chan
 {:else}<ExistingModelsPanel tab={activeTab} {models} />{/if}
 ```
 
-- [ ] **Step 4: Verify GREEN, checks, lint, and production build**
+  - [x] **Step 4: Verify GREEN, checks, lint, and production build**
 
 Run: `npm --prefix apps/web test -- ModelsView.test.ts ProvidersPanel.test.ts LocalLibraryPanel.test.ts HuggingFacePanel.test.ts DownloadsPanel.test.ts ModelOperationTray.test.ts && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
 Expected: all pass with no accessibility or TypeScript warnings.
 
-- [ ] **Step 5: Commit**
+  - [x] **Step 5: Commit**
 
 ```bash
 git add apps/web/src/lib/apiTypes.ts apps/web/src/lib/api.ts apps/web/src/lib/views/ModelsView.svelte apps/web/src/lib/views/models apps/web/src/lib/components/ModelOperationTray.svelte apps/web/src/lib/components/ModelOperationTray.test.ts apps/web/src/App.svelte

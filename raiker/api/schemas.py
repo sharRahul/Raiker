@@ -226,6 +226,13 @@ class ModelConversionRequestBody(BaseModel):
     confirmed: bool = False
 
 
+class OllamaPullRequestBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    model: str
+    confirmed: bool = False
+
+
 class ExportSessionRequest(BaseModel):
     """Which rendering of a conversation transcript to produce (BUG-22).
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
 
+import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
@@ -15,6 +18,7 @@ from raiker.api.schemas import (
     ModelOperationRequestBody,
     ModelReadinessCheckRequest,
     ModelSetupUpdateRequest,
+    OllamaPullRequestBody,
 )
 from raiker.api.sessions import ApiSession
 from raiker.models.conversion import ConversionRefused, ModelConversionService
@@ -29,6 +33,7 @@ from raiker.runtime.connector_ecosystem import ConnectorVault
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
+_OLLAMA_MODEL = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$")
 
 
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
@@ -445,17 +450,35 @@ def download_hugging_face_model(
     _require_human(principal)
     if not body.confirmed or not body.destination:
         raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
-    destination = Path(body.destination).resolve()
+    library_root = Path(body.destination).resolve()
     roots = [Path(root).resolve() for root in _library_service(request).roots(session.principal_id)]
-    if not any(destination == root or root in destination.parents for root in roots):
+    if library_root not in roots:
         raise HTTPException(
             status_code=422, detail={"reason_code": "destination_not_in_model_library"}
         )
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", body.repo_id):
+        raise HTTPException(
+            status_code=422, detail={"reason_code": "invalid_hugging_face_repository"}
+        )
+    if not re.fullmatch(r"[0-9a-fA-F]{40}", body.revision):
+        raise HTTPException(
+            status_code=422, detail={"reason_code": "hugging_face_revision_not_immutable"}
+        )
+    destination = (
+        library_root
+        / ".raiker-hf"
+        / body.repo_id.replace("/", "--")
+        / body.revision[0:10].lower()
+        / body.revision[10:20].lower()
+        / body.revision[20:30].lower()
+        / body.revision[30:40].lower()
+    ).resolve()
+    conversion_output = (library_root / "converted").resolve()
     operation = _operation_service(request).start(
         session.principal_id,
         ModelOperationRequest(
             kind="download",
-            target=f"{body.repo_id}@{body.revision}",
+            target=f"{body.repo_id}@{body.revision[:12]}",
             confirmed=True,
             source_url=f"https://huggingface.co/{body.repo_id}",
             destination=str(destination),
@@ -472,7 +495,11 @@ def download_hugging_face_model(
             token=_hugging_face_token(request, session.principal_id),
         )
         _library_service(request).rescan(session.principal_id)
-        return operations.complete(session.principal_id, operation.operation_id).to_dict()
+        conversion_output.mkdir(parents=True, exist_ok=True)
+        result = operations.complete(session.principal_id, operation.operation_id).to_dict()
+        result["snapshot_path"] = str(destination)
+        result["conversion_output_path"] = str(conversion_output)
+        return result
     except Exception as exc:
         operations.fail(
             session.principal_id, operation.operation_id, code="hugging_face_download_failed"
@@ -567,5 +594,73 @@ def start_model_conversion(
         session.principal_id,
         operation.operation_id,
         body,
+    )
+    return operation.to_dict()
+
+
+async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, model: str) -> None:
+    operations = ModelOperationService(SQLiteStore(workspace))
+    try:
+        operations.running(owner, operation_id, phase="contacting_ollama")
+        timeout = httpx.Timeout(connect=10.0, read=None, write=30.0, pool=10.0)
+        async with (
+            httpx.AsyncClient(timeout=timeout, trust_env=False) as client,
+            client.stream(
+                "POST",
+                "http://127.0.0.1:11434/api/pull",
+                json={"model": model, "stream": True},
+            ) as response,
+        ):
+            response.raise_for_status()
+            async for line in response.aiter_lines():
+                if not line.strip():
+                    continue
+                payload = json.loads(line)
+                if payload.get("error"):
+                    raise RuntimeError("ollama_pull_rejected")
+                completed = int(payload.get("completed") or 0)
+                raw_total = payload.get("total")
+                total = int(raw_total) if raw_total is not None else None
+                operations.progress(
+                    owner,
+                    operation_id,
+                    completed_bytes=completed,
+                    total_bytes=total,
+                    phase=str(payload.get("status") or "pulling"),
+                )
+        operations.complete(owner, operation_id)
+        SQLiteStore(workspace).invalidate_model_readiness(
+            owner,
+            "ollama-local-openai-compatible",
+            reason_code="ollama_model_catalogue_changed",
+        )
+    except Exception:
+        operations.fail(owner, operation_id, code="ollama_pull_failed")
+
+
+@router.post("/api/ollama/pull")
+def pull_ollama_model(
+    body: OllamaPullRequestBody,
+    background: BackgroundTasks,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    model = body.model.strip()
+    if not body.confirmed:
+        raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
+    if not _OLLAMA_MODEL.fullmatch(model) or "//" in model:
+        raise HTTPException(status_code=422, detail={"reason_code": "invalid_ollama_model"})
+    operation = _operation_service(request).start(
+        session.principal_id,
+        ModelOperationRequest(kind="pull", target=model, confirmed=True),
+    )
+    background.add_task(
+        _pull_ollama_model,
+        Path(request.app.state.workspace_root),
+        session.principal_id,
+        operation.operation_id,
+        model,
     )
     return operation.to_dict()

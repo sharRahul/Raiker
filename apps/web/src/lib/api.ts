@@ -44,6 +44,14 @@ import type {
   ModelPricingView,
   ModelReadinessView,
   ModelSetupState,
+  ModelOperation,
+  RuntimeInstallPlan,
+  ModelLibraryView,
+  HuggingFaceSearchResult,
+  HuggingFaceVariant,
+  HuggingFaceDownloadPreview,
+  HuggingFaceDownloadResult,
+  ModelConversionPreview,
   ModelCapacitiesView,
   ModelsView,
   PasswordRecoveryBeginResult,
@@ -116,13 +124,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       const body = await resp.json();
       const detail = body?.detail ?? body;
       reasonCode = detail?.reason_code ?? null;
-    } catch { /* non-JSON error response */ }
-    throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
+    } catch {
+      /* non-JSON error response */
+    }
+    throw new ApiError(
+      resp.status,
+      reasonCode,
+      `Request failed: ${resp.status} ${path}`,
+    );
   }
   return (await resp.json()) as T;
 }
 
-async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> {
+async function requestBlob(
+  path: string,
+  init: RequestInit = {},
+): Promise<Blob> {
   const headers = new Headers(init.headers);
   if (token !== null) {
     headers.set("Authorization", `Bearer ${token}`);
@@ -134,8 +151,14 @@ async function requestBlob(path: string, init: RequestInit = {}): Promise<Blob> 
       const body = await resp.json();
       const detail = body?.detail ?? body;
       reasonCode = detail?.reason_code ?? null;
-    } catch { /* non-JSON error response */ }
-    throw new ApiError(resp.status, reasonCode, `Request failed: ${resp.status} ${path}`);
+    } catch {
+      /* non-JSON error response */
+    }
+    throw new ApiError(
+      resp.status,
+      reasonCode,
+      `Request failed: ${resp.status} ${path}`,
+    );
   }
   return resp.blob();
 }
@@ -146,7 +169,10 @@ function instancePath(path: string): string {
   return match ? `${match[1]}${path}` : path;
 }
 
-function withQuery(path: string, params: Record<string, string | number | undefined>): string {
+function withQuery(
+  path: string,
+  params: Record<string, string | number | undefined>,
+): string {
   const q = new URLSearchParams();
   for (const [key, value] of Object.entries(params)) {
     if (value !== undefined && value !== "") q.set(key, String(value));
@@ -165,7 +191,9 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
 export async function connect(): Promise<AuthSession> {
-  const session = await postJson<AuthSession>("/api/auth/session", { as_principal: null });
+  const session = await postJson<AuthSession>("/api/auth/session", {
+    as_principal: null,
+  });
   setToken(session.token);
   return session;
 }
@@ -182,8 +210,16 @@ export function health(): Promise<{ status: string }> {
   return request<{ status: string }>("/api/health");
 }
 
-export function createInstance(name: string, username: string, password: string): Promise<InstanceLaunchResult> {
-  return postJson<InstanceLaunchResult>("/api/instances", { name, username, password });
+export function createInstance(
+  name: string,
+  username: string,
+  password: string,
+): Promise<InstanceLaunchResult> {
+  return postJson<InstanceLaunchResult>("/api/instances", {
+    name,
+    username,
+    password,
+  });
 }
 
 export interface LoginResult {
@@ -203,15 +239,28 @@ function adoptSession(result: LoginResult): LoginResult {
 
 export const auth = {
   register: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/register", { username, password }).then(adoptSession),
+    postJson<LoginResult>("/api/auth/register", { username, password }).then(
+      adoptSession,
+    ),
   login: (username: string, password: string) =>
-    postJson<LoginResult>("/api/auth/login", { username, password }).then(adoptSession),
+    postJson<LoginResult>("/api/auth/login", { username, password }).then(
+      adoptSession,
+    ),
   verifyMfa: (ticket: string, code: string) =>
-    postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(adoptSession),
-  bootstrapStatus: () => request<{ can_register: boolean }>("/api/auth/bootstrap-status"),
+    postJson<LoginResult>("/api/auth/mfa/verify", { ticket, code }).then(
+      adoptSession,
+    ),
+  bootstrapStatus: () =>
+    request<{ can_register: boolean }>("/api/auth/bootstrap-status"),
   beginPasswordRecovery: (username: string) =>
-    postJson<PasswordRecoveryBeginResult>("/api/auth/password-recovery/begin", { username }),
-  completePasswordRecovery: (ticket: string, code: string, newPassword: string) =>
+    postJson<PasswordRecoveryBeginResult>("/api/auth/password-recovery/begin", {
+      username,
+    }),
+  completePasswordRecovery: (
+    ticket: string,
+    code: string,
+    newPassword: string,
+  ) =>
     postJson<{ ok: boolean }>("/api/auth/password-recovery/complete", {
       ticket,
       code,
@@ -225,13 +274,18 @@ export const auth = {
     }
   },
   elevate: (password?: string, mfaCode?: string) =>
-    postJson<{ token: string }>("/api/auth/elevate", { password, mfa_code: mfaCode }),
+    postJson<{ token: string }>("/api/auth/elevate", {
+      password,
+      mfa_code: mfaCode,
+    }),
   enrollMfa: () =>
-    postJson<{ secret: string; provisioning_uri: string; backup_codes: string[] }>(
-      "/api/auth/mfa/enroll",
-      {},
-    ),
-  activateMfa: (code: string) => postJson<{ ok: boolean }>("/api/auth/mfa/activate", { code }),
+    postJson<{
+      secret: string;
+      provisioning_uri: string;
+      backup_codes: string[];
+    }>("/api/auth/mfa/enroll", {}),
+  activateMfa: (code: string) =>
+    postJson<{ ok: boolean }>("/api/auth/mfa/activate", { code }),
   changePassword: (oldPassword: string, newPassword: string) =>
     postJson<{ ok: boolean }>("/api/auth/password", {
       old_password: oldPassword,
@@ -250,8 +304,12 @@ export const auth = {
       }>
     >("/api/auth/sessions"),
   revokeDeviceSession: (sessionId: string) =>
-    postJson<{ ok: boolean }>(`/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`, {}),
-  deleteAccount: () => request<{ ok: boolean }>("/api/account", { method: "DELETE" }),
+    postJson<{ ok: boolean }>(
+      `/api/auth/sessions/${encodeURIComponent(sessionId)}/revoke`,
+      {},
+    ),
+  deleteAccount: () =>
+    request<{ ok: boolean }>("/api/account", { method: "DELETE" }),
 };
 
 export interface SettingsView {
@@ -262,13 +320,19 @@ export interface SettingsView {
 export const api = {
   // ── Local-account settings, vault key, MFA status ──
   settings: () => request<SettingsView>("/api/settings"),
-  composerApprovalMode: () => request<ComposerApprovalModeSettings>("/api/settings/composer-approval-mode"),
+  composerApprovalMode: () =>
+    request<ComposerApprovalModeSettings>(
+      "/api/settings/composer-approval-mode",
+    ),
   setComposerApprovalMode: (mode: ApprovalMode) =>
-    request<ComposerApprovalModeSettings>("/api/settings/composer-approval-mode", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ approval_mode: mode }),
-    }),
+    request<ComposerApprovalModeSettings>(
+      "/api/settings/composer-approval-mode",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approval_mode: mode }),
+      },
+    ),
   putSettings: (settings: Record<string, unknown>) =>
     request<{ settings: Record<string, unknown> }>("/api/settings", {
       method: "PUT",
@@ -290,51 +354,200 @@ export const api = {
 
   // ── Read-only governed views ──
   sessionContextUsage: (sessionId: string) =>
-    request<ContextUsage>(`/api/sessions/${encodeURIComponent(sessionId)}/context-usage`),
+    request<ContextUsage>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/context-usage`,
+    ),
   // B6 — the agent's standing plan for one conversation, so a reload or a
   // second tab picks the checklist back up instead of starting blank.
   sessionPlan: (sessionId: string) =>
     request<AgentPlan>(`/api/sessions/${encodeURIComponent(sessionId)}/plan`),
   capabilityGates: () => request<CapabilityGate[]>("/api/capability-gates"),
   capabilityGate: (capability: string) =>
-    request<CapabilityGate>(`/api/capability-gates/${encodeURIComponent(capability)}`),
+    request<CapabilityGate>(
+      `/api/capability-gates/${encodeURIComponent(capability)}`,
+    ),
   runtimeMode: () => request<RuntimeMode>("/api/runtime-mode"),
   // ── Host lifecycle (BUG-40) ──
   // The menu-bar control's contract: what state the host is in, what background
   // work is in flight, and the four actions the distribution design requires.
   // Quit and Restart report waiting work first and only stop once confirmed.
   host: () => request<HostStatusView>("/api/host"),
-  pauseHost: (reason?: string) => postJson<HostActionResult>("/api/host/pause", { reason: reason ?? null }),
+  pauseHost: (reason?: string) =>
+    postJson<HostActionResult>("/api/host/pause", { reason: reason ?? null }),
   resumeHost: () => postJson<HostActionResult>("/api/host/resume", {}),
-  quitHost: (confirm = false) => postJson<HostActionResult>("/api/host/quit", { confirm }),
-  restartHost: (confirm = false) => postJson<HostActionResult>("/api/host/restart", { confirm }),
+  quitHost: (confirm = false) =>
+    postJson<HostActionResult>("/api/host/quit", { confirm }),
+  restartHost: (confirm = false) =>
+    postJson<HostActionResult>("/api/host/restart", { confirm }),
   // ── Install provenance and the signed update channel (BUG-44) ──
   // The read is local only: opening the panel must never be a way to cause an
   // outbound request. The check is the one that asks, and only when the owner
   // has pinned a channel.
   hostUpdate: () => request<UpdateStatusView>("/api/host/update"),
-  checkHostUpdate: () => postJson<UpdateCheckResult>("/api/host/update/check", {}),
+  checkHostUpdate: () =>
+    postJson<UpdateCheckResult>("/api/host/update/check", {}),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
-  modelReadiness: () => request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
+  modelReadiness: () =>
+    request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
   checkModelReadiness: (profile_id: string, model: string) =>
-    postJson<ModelReadinessView>("/api/model-readiness/check", { profile_id, model }),
+    postJson<ModelReadinessView>("/api/model-readiness/check", {
+      profile_id,
+      model,
+    }),
   modelSetup: () => request<ModelSetupState>("/api/model-setup"),
-  updateModelSetup: (body: Omit<ModelSetupState, "owner_principal_id" | "created_at" | "updated_at">) =>
+  updateModelSetup: (
+    body: Omit<
+      ModelSetupState,
+      "owner_principal_id" | "created_at" | "updated_at"
+    >,
+  ) =>
     request<ModelSetupState>("/api/model-setup", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+  modelLibrary: () => request<ModelLibraryView>("/api/model-library"),
+  addModelLibraryRoot: (path: string) =>
+    postJson<{ ok: boolean; path: string }>("/api/model-library/roots", {
+      path,
+    }),
+  removeModelLibraryRoot: (path: string) =>
+    request<{ ok: boolean }>("/api/model-library/roots", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ path }),
+    }),
+  rescanModelLibrary: () =>
+    postJson<{ ok: boolean; models: ModelLibraryView["models"] }>(
+      "/api/model-library/rescan",
+      {},
+    ),
+  deployLocalModel: (modelId: string) =>
+    postJson<ModelOperation>(
+      `/api/model-library/${encodeURIComponent(modelId)}/deploy`,
+      {},
+    ),
+  modelOperations: () =>
+    request<{ items: ModelOperation[] }>("/api/model-operations"),
+  previewModelOperation: (kind: ModelOperation["kind"], target: string) =>
+    postJson<
+      | RuntimeInstallPlan
+      | { kind: string; target: string; action: string; confirmed: false }
+    >("/api/model-operations/preview", { kind, target, confirmed: false }),
+  pullOllamaModel: (model: string) =>
+    postJson<ModelOperation>("/api/ollama/pull", { model, confirmed: true }),
+  cancelModelOperation: (operationId: string) =>
+    postJson<ModelOperation>(
+      `/api/model-operations/${encodeURIComponent(operationId)}/cancel`,
+      {},
+    ),
+  retryModelOperation: (operationId: string) =>
+    postJson<ModelOperation>(
+      `/api/model-operations/${encodeURIComponent(operationId)}/retry`,
+      {},
+    ),
+  cleanupModelOperation: (operationId: string) =>
+    request<{ ok: boolean }>(
+      `/api/model-operations/${encodeURIComponent(operationId)}`,
+      { method: "DELETE" },
+    ),
+  saveHuggingFaceCredential: (token: string) =>
+    request<{ configured: boolean }>("/api/hugging-face/credential", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }),
+  searchHuggingFace: (query: string) =>
+    request<{ items: HuggingFaceSearchResult[] }>(
+      withQuery("/api/hugging-face/search", { query }),
+    ),
+  huggingFaceVariants: (repoId: string) => {
+    const [owner, repository] = repoId.split("/", 2);
+    return request<{ items: HuggingFaceVariant[] }>(
+      `/api/hugging-face/${encodeURIComponent(owner)}/${encodeURIComponent(repository)}/variants`,
+    );
+  },
+  previewHuggingFaceDownload: (
+    variant: HuggingFaceVariant,
+    destination?: string,
+  ) =>
+    postJson<HuggingFaceDownloadPreview>("/api/hugging-face/download/preview", {
+      repo_id: variant.repo_id,
+      revision: variant.revision,
+      files: variant.files,
+      destination: destination || null,
+      confirmed: false,
+    }),
+  downloadHuggingFaceModel: (
+    variant: HuggingFaceVariant,
+    destination: string,
+  ) =>
+    postJson<HuggingFaceDownloadResult>("/api/hugging-face/download", {
+      repo_id: variant.repo_id,
+      revision: variant.revision,
+      files: variant.files,
+      destination,
+      confirmed: true,
+    }),
+  previewModelConversion: (
+    source: string,
+    output: string,
+    revision: string,
+    quantization: string,
+  ) =>
+    postJson<ModelConversionPreview>("/api/model-conversion/preview", {
+      source,
+      output,
+      revision,
+      quantization,
+      confirmed: false,
+    }),
+  startModelConversion: (
+    source: string,
+    output: string,
+    revision: string,
+    quantization: string,
+  ) =>
+    postJson<ModelOperation>("/api/model-conversion", {
+      source,
+      output,
+      revision,
+      quantization,
+      confirmed: true,
     }),
   modelCapacities: () => request<ModelCapacitiesView>("/api/models/capacities"),
   refreshModelCapacities: (force = false) =>
-    postJson<{ ok: boolean; profiles: Array<{ profile_id: string; status: string; reason_code: string | null }> }>(
-      withQuery("/api/models/capacities/refresh", { force: force ? "true" : undefined }), {},
+    postJson<{
+      ok: boolean;
+      profiles: Array<{
+        profile_id: string;
+        status: string;
+        reason_code: string | null;
+      }>;
+    }>(
+      withQuery("/api/models/capacities/refresh", {
+        force: force ? "true" : undefined,
+      }),
+      {},
     ),
-  setModelCapacity: (profileId: string, model: string, tokens: number | null, reason: string) =>
-    request<{ ok: boolean; profile_id: string; model: string; tokens: number | null }>(
-      `/api/models/${encodeURIComponent(profileId)}/capacity`,
-      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model, tokens, reason }) },
-    ),
+  setModelCapacity: (
+    profileId: string,
+    model: string,
+    tokens: number | null,
+    reason: string,
+  ) =>
+    request<{
+      ok: boolean;
+      profile_id: string;
+      model: string;
+      tokens: number | null;
+    }>(`/api/models/${encodeURIComponent(profileId)}/capacity`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model, tokens, reason }),
+    }),
   // Read-only status of governed service connectors (never reaches the network;
   // never exposes a credential value). Enabling one is done via the capability
   // gate + decision-mode control plane, not here.
@@ -358,32 +571,52 @@ export const api = {
       {},
     ),
   renameMcpServer: (serverId: string, name: string) =>
-    request<{ ok: boolean; name: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
-    }),
+    request<{ ok: boolean; name: string }>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      },
+    ),
   deleteMcpServer: (serverId: string) =>
     request<{ ok: boolean; server_id: string }>(
       `/api/mcp/servers/${encodeURIComponent(serverId)}`,
       { method: "DELETE" },
     ),
-  createRemoteMcpServer: (name: string, endpoint_url: string, auth_ref: string | null) =>
+  createRemoteMcpServer: (
+    name: string,
+    endpoint_url: string,
+    auth_ref: string | null,
+  ) =>
     postJson<{ ok: boolean; server_id: string | null; name: string | null }>(
       "/api/mcp/servers/remote",
       { name, endpoint_url, auth_ref },
     ),
   mcpSessions: (serverId: string) =>
-    request<McpSession[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`),
+    request<McpSession[]>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}/sessions`,
+    ),
   mcpFindings: (serverId: string) =>
-    request<McpFinding[]>(`/api/mcp/servers/${encodeURIComponent(serverId)}/findings`),
+    request<McpFinding[]>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}/findings`,
+    ),
   pauseMcpServer: (serverId: string) =>
-    postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/pause`, {}),
+    postJson<{ ok: boolean; monitor_state: string }>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}/pause`,
+      {},
+    ),
   resumeMcpServer: (serverId: string) =>
-    postJson<{ ok: boolean; monitor_state: string }>(`/api/mcp/servers/${encodeURIComponent(serverId)}/resume`, {}),
+    postJson<{ ok: boolean; monitor_state: string }>(
+      `/api/mcp/servers/${encodeURIComponent(serverId)}/resume`,
+      {},
+    ),
   notifications: () => request<Notification[]>("/api/notifications"),
   markNotificationRead: (id: string) =>
-    postJson<{ ok: boolean }>(`/api/notifications/${encodeURIComponent(id)}/read`, {}),
+    postJson<{ ok: boolean }>(
+      `/api/notifications/${encodeURIComponent(id)}/read`,
+      {},
+    ),
   standingGrants: (includeInactive = true) =>
     request<{ ok: boolean; grants: StandingGrant[] }>(
       `/api/standing-grants?include_inactive=${includeInactive ? "true" : "false"}`,
@@ -395,19 +628,28 @@ export const api = {
     scope_pattern?: string;
     reason?: string;
     ttl_days?: number;
-  }) => postJson<{ ok: boolean; grant: StandingGrant }>("/api/standing-grants", body),
+  }) =>
+    postJson<{ ok: boolean; grant: StandingGrant }>(
+      "/api/standing-grants",
+      body,
+    ),
   revokeStandingGrant: (grantId: string) =>
     postJson<{ ok: boolean; grant_id: string }>(
       `/api/standing-grants/${encodeURIComponent(grantId)}/revoke`,
       {},
     ),
-  securityCredentials: () => request<CredentialLifecycle[]>("/api/security/credentials"),
+  securityCredentials: () =>
+    request<CredentialLifecycle[]>("/api/security/credentials"),
   securityFindings: () => request<McpFinding[]>("/api/security/findings"),
   securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
   verifySecurityCredential: (provider: string) =>
-    postJson<CredentialLifecycle>(`/api/security/credentials/${encodeURIComponent(provider)}/verify`, {}),
+    postJson<CredentialLifecycle>(
+      `/api/security/credentials/${encodeURIComponent(provider)}/verify`,
+      {},
+    ),
   scanSecurity: () => postJson<McpFinding[]>("/api/security/scan", {}),
-  checkSecurityHealth: () => postJson<SecurityHealth[]>("/api/security/health-check", {}),
+  checkSecurityHealth: () =>
+    postJson<SecurityHealth[]>("/api/security/health-check", {}),
   checkPasswordBreach: (password: string, enabled: boolean) =>
     postJson<McpFinding[]>("/api/security/breach-check", { password, enabled }),
   connectorStore: () => request<ConnectorStoreView>("/api/connector-store"),
@@ -439,7 +681,10 @@ export const api = {
       `/api/connector-store/${encodeURIComponent(connectorId)}/enabled?enabled=${enabled}`,
       { method: "PUT" },
     ),
-  registerConnectorManifest: (connectorId: string, manifest: Record<string, unknown>) =>
+  registerConnectorManifest: (
+    connectorId: string,
+    manifest: Record<string, unknown>,
+  ) =>
     postJson<{ ok: boolean; operations: unknown[] }>(
       `/api/connector-store/${encodeURIComponent(connectorId)}/manifest`,
       { manifest },
@@ -448,7 +693,14 @@ export const api = {
     postJson<{
       status: "available" | "unavailable";
       reason_code?: string;
-      matches: Array<{ offset: number; length: number; message: string; replacements: string[]; rule_id: string; category: string }>;
+      matches: Array<{
+        offset: number;
+        length: number;
+        message: string;
+        replacements: string[];
+        rule_id: string;
+        category: string;
+      }>;
     }>("/api/language/check", { text, language: "en-US" }),
   // On-demand listing of the models a provider serves (user-initiated; provider
   // policy is enforced server-side before any network contact).
@@ -460,41 +712,56 @@ export const api = {
   // model a local model may consult through the governed consult_advisor tool.
   // Gate-manager only, enforced server-side; selecting an advisor grants nothing.
   setModelAdvisor: (profile_id: string | null) =>
-    request<{ ok: boolean; advisor_profile_id: string | null }>("/api/model-advisor", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id }),
-    }),
+    request<{ ok: boolean; advisor_profile_id: string | null }>(
+      "/api/model-advisor",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id }),
+      },
+    ),
   // Persist the operator's model selection (human gate-manager only, enforced
   // server-side; placeholder profiles require a concrete model).
   selectModel: (profile_id: string, model?: string) =>
-    request<{ ok: boolean; profile_id: string; model: string }>("/api/model-selection", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_id, model: model || null }),
-    }),
+    request<{ ok: boolean; profile_id: string; model: string }>(
+      "/api/model-selection",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id, model: model || null }),
+      },
+    ),
   saveModelConnection: (profileId: string, endpoint: string, apiKey: string) =>
     request<{ ok: boolean; connection_configured: boolean }>(
       `/api/models/${encodeURIComponent(profileId)}/connection`,
       {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ endpoint: endpoint || null, api_key: apiKey || null }),
+        body: JSON.stringify({
+          endpoint: endpoint || null,
+          api_key: apiKey || null,
+        }),
       },
     ),
   // Persist the user-owned ordered model fallback sequence (human gate-manager only,
   // enforced server-side). Returns the cleaned/de-duplicated sequence.
   setModelFallback: (profile_ids: string[]) =>
-    request<{ ok: boolean; fallback_sequence: string[] }>("/api/model-fallback", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ profile_ids }),
-    }),
+    request<{ ok: boolean; fallback_sequence: string[] }>(
+      "/api/model-fallback",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_ids }),
+      },
+    ),
   // Upload one image (base64) into the governed attachment store. Validation
   // is fail-closed server-side (media-type allowlist, 5 MB cap, magic-byte
   // sniff); the response is metadata only.
-  uploadAttachment: (body: { filename: string; media_type: string; data_base64: string }) =>
-    postJson<UploadedAttachment>("/api/attachments", body),
+  uploadAttachment: (body: {
+    filename: string;
+    media_type: string;
+    data_base64: string;
+  }) => postJson<UploadedAttachment>("/api/attachments", body),
   // ── File inspector (view-only, session-scoped) ──
   // The preview is authorized by the session that carried the attachment, so
   // these paths 404 for a file this conversation never had. Nothing here
@@ -513,11 +780,14 @@ export const api = {
     format: "html" | "markdown" | "pdf",
     filename: string,
   ): Promise<void> => {
-    const blob = await requestBlob(`/api/sessions/${encodeURIComponent(sessionId)}/export`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ format }),
-    });
+    const blob = await requestBlob(
+      `/api/sessions/${encodeURIComponent(sessionId)}/export`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ format }),
+      },
+    );
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -528,7 +798,10 @@ export const api = {
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>
-    postJson<{ ok: boolean; changes_written: number }>("/api/models/pricing/refresh", {}),
+    postJson<{ ok: boolean; changes_written: number }>(
+      "/api/models/pricing/refresh",
+      {},
+    ),
   setModelPrice: (
     profileId: string,
     body: {
@@ -542,11 +815,14 @@ export const api = {
       reason?: string | null;
     },
   ) =>
-    request<{ ok: boolean }>(`/api/models/${encodeURIComponent(profileId)}/price`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    }),
+    request<{ ok: boolean }>(
+      `/api/models/${encodeURIComponent(profileId)}/price`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    ),
   sessionAttachments: (sessionId: string) =>
     request<SessionAttachmentsView>(
       `/api/sessions/${encodeURIComponent(sessionId)}/attachments`,
@@ -568,7 +844,10 @@ export const api = {
   // <a download> cannot send one. The server always answers
   // application/octet-stream, so nothing downloaded is ever handed to the
   // browser as something it will run.
-  attachmentDownload: (sessionId: string, attachmentId: string): Promise<Blob> =>
+  attachmentDownload: (
+    sessionId: string,
+    attachmentId: string,
+  ): Promise<Blob> =>
     requestBlob(
       `/api/sessions/${encodeURIComponent(sessionId)}/attachments/${encodeURIComponent(attachmentId)}/download`,
     ),
@@ -581,13 +860,20 @@ export const api = {
   // C6 — what the turns in this conversation actually read. Labels and
   // locators only; the material behind a chip is fetched when it is opened.
   sessionSources: (sessionId: string) =>
-    request<TurnSourcesView>(`/api/sessions/${encodeURIComponent(sessionId)}/sources`),
+    request<TurnSourcesView>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/sources`,
+    ),
   // C4 — one cited source, opened at the passage the turn used. Resolution is
   // re-run now, so a changed or unreadable source says so instead of showing a
   // passage that is no longer there.
   // `quote` is the answer sentence an inline marker terminated, when there is
   // one: it locates the run inside a source the turn read whole.
-  turnSourceExcerpt: (sessionId: string, turnId: string, sourceId: string, quote = "") =>
+  turnSourceExcerpt: (
+    sessionId: string,
+    turnId: string,
+    sourceId: string,
+    quote = "",
+  ) =>
     request<TurnSourceExcerptView>(
       withQuery(
         `/api/sessions/${encodeURIComponent(sessionId)}/turns/${encodeURIComponent(turnId)}` +
@@ -598,60 +884,110 @@ export const api = {
   // BUG-27 — the passage a memory was drawn from. Every non-resolvable case
   // comes back as a named status rather than an error.
   memorySource: (memoryId: string) =>
-    request<SourceExcerptView>(`/api/memory/${encodeURIComponent(memoryId)}/source`),
-  events: (params: { session_id?: string; turn_id?: string; event_type?: string; limit?: number } = {}) =>
-    request<EventEntry[]>(withQuery("/api/events", params)),
+    request<SourceExcerptView>(
+      `/api/memory/${encodeURIComponent(memoryId)}/source`,
+    ),
+  events: (
+    params: {
+      session_id?: string;
+      turn_id?: string;
+      event_type?: string;
+      limit?: number;
+    } = {},
+  ) => request<EventEntry[]>(withQuery("/api/events", params)),
   brain: () => request<BrainView>("/api/brain"),
-  addBrainSource: (path: string) => postJson<BrainSourceResult>("/api/brain/sources", { path }),
+  addBrainSource: (path: string) =>
+    postJson<BrainSourceResult>("/api/brain/sources", { path }),
   browseBrainSources: (path = ".") =>
-    request<BrainSourceBrowse>(withQuery("/api/brain/sources/browse", { path })),
+    request<BrainSourceBrowse>(
+      withQuery("/api/brain/sources/browse", { path }),
+    ),
   reviewBrainSource: (path: string) =>
     postJson<BrainSourceReview>("/api/brain/sources/review", { path }),
-  brainPreferences: () => request<{ settings: Record<string, unknown> }>("/api/brain/settings"),
+  brainPreferences: () =>
+    request<{ settings: Record<string, unknown> }>("/api/brain/settings"),
   saveBrainPreferences: (settings: Record<string, unknown>) =>
-    request<{ ok: boolean; settings: Record<string, unknown>; updated_at: string }>("/api/brain/settings", {
+    request<{
+      ok: boolean;
+      settings: Record<string, unknown>;
+      updated_at: string;
+    }>("/api/brain/settings", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     }),
   removeBrainSource: (path: string) =>
-    request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), { method: "DELETE" }),
-  executionEnvironments: () => request<ExecutionEnvironmentsView>("/api/execution-environments"),
-  configureExecutionEnvironment: (body: {
-    profile_id?: string; kind: "ssh" | "daytona" | "container"; name: string; config: Record<string, unknown>; enabled: boolean;
-  }) => request<{ ok: boolean; profile_id: string }>("/api/execution-environments/configure", {
-    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
-  }),
-  selectExecutionEnvironment: (profile_id: string) =>
-    request<{ ok: boolean; selected_profile_id: string }>("/api/execution-environments/selection", {
-      method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ profile_id }),
+    request<BrainSourceResult>(withQuery("/api/brain/sources", { path }), {
+      method: "DELETE",
     }),
+  executionEnvironments: () =>
+    request<ExecutionEnvironmentsView>("/api/execution-environments"),
+  configureExecutionEnvironment: (body: {
+    profile_id?: string;
+    kind: "ssh" | "daytona" | "container";
+    name: string;
+    config: Record<string, unknown>;
+    enabled: boolean;
+  }) =>
+    request<{ ok: boolean; profile_id: string }>(
+      "/api/execution-environments/configure",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      },
+    ),
+  selectExecutionEnvironment: (profile_id: string) =>
+    request<{ ok: boolean; selected_profile_id: string }>(
+      "/api/execution-environments/selection",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ profile_id }),
+      },
+    ),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(
-      withQuery("/api/checkpoints", { session_id: sessionId, project_id: projectId }),
+      withQuery("/api/checkpoints", {
+        session_id: sessionId,
+        project_id: projectId,
+      }),
     ),
-  checkpoint: (id: string) => request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
+  checkpoint: (id: string) =>
+    request<Checkpoint>(`/api/checkpoints/${encodeURIComponent(id)}`),
   // Preflight only. Reading a plan performs no restore; executing one still
   // goes through the governed approval path.
   checkpointRestorePlan: (id: string) =>
-    request<RestorePlan>(`/api/checkpoints/${encodeURIComponent(id)}/restore-plan`),
+    request<RestorePlan>(
+      `/api/checkpoints/${encodeURIComponent(id)}/restore-plan`,
+    ),
   // ── Installed skills (Extensions → Skills) ───────────────────────────
   // A skill is instruction text the owner installs; it grants no capability and
   // runs nothing. `verifySkillUrl` reads a linked document and reports what it
   // is without storing it, so Chat and Build can offer an informed import.
-  skills: () => request<{ skills: SkillView[] }>("/api/skills").then((body) => body.skills),
+  skills: () =>
+    request<{ skills: SkillView[] }>("/api/skills").then((body) => body.skills),
   uploadSkill: (filename: string, data_base64: string) =>
     postJson<SkillMutationResult>("/api/skills", { filename, data_base64 }),
-  verifySkillUrl: (url: string) => postJson<SkillVerification>("/api/skills/verify", { url }),
-  importSkillUrl: (url: string) => postJson<SkillMutationResult>("/api/skills/import", { url }),
+  verifySkillUrl: (url: string) =>
+    postJson<SkillVerification>("/api/skills/verify", { url }),
+  importSkillUrl: (url: string) =>
+    postJson<SkillMutationResult>("/api/skills/import", { url }),
   buildSkill: (name: string, description: string, body: string) =>
-    postJson<SkillMutationResult>("/api/skills/build", { name, description, body }),
-  renameSkill: (id: string, name: string) =>
-    request<{ ok: boolean; skill_id: string; name: string }>(`/api/skills/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name }),
+    postJson<SkillMutationResult>("/api/skills/build", {
+      name,
+      description,
+      body,
     }),
+  renameSkill: (id: string, name: string) =>
+    request<{ ok: boolean; skill_id: string; name: string }>(
+      `/api/skills/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      },
+    ),
   setSkillActive: (id: string, active: boolean) =>
     request<{ ok: boolean; skill_id: string; active: boolean }>(
       `/api/skills/${encodeURIComponent(id)}/active`,
@@ -664,14 +1000,18 @@ export const api = {
   downloadSkill: (id: string) =>
     requestBlob(`/api/skills/${encodeURIComponent(id)}/download`),
   deleteSkill: (id: string) =>
-    request<{ ok: boolean; skill_id: string }>(`/api/skills/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-    }),
+    request<{ ok: boolean; skill_id: string }>(
+      `/api/skills/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+      },
+    ),
 
   extensions: () => request<ExtensionsOverview>("/api/extensions"),
   projectFiles: (id: string) =>
     request<ProjectFilesView>(`/api/projects/${encodeURIComponent(id)}/files`),
-  diagnosticsExport: () => request<DiagnosticsExport>("/api/diagnostics/export"),
+  diagnosticsExport: () =>
+    request<DiagnosticsExport>("/api/diagnostics/export"),
   // `origin: "chat"` narrows the list to conversations the owner typed. Task
   // runs live in a server-owned session that is still listed in Sessions; it is
   // only "recent chats" that must mean chats (BUG-10).
@@ -683,7 +1023,8 @@ export const api = {
         origin,
       }),
     ),
-  searchChats: (q: string) => request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
+  searchChats: (q: string) =>
+    request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
   // ── Reliable memory controls (backlog item 3) ────────────────────────
   // User-facing surface over the existing governed memory store. List carries
@@ -695,27 +1036,51 @@ export const api = {
   memoryProposals: () => request<MemoryProposal[]>("/api/memory/proposals"),
   decideMemoryProposal: (
     id: string,
-    body: { decision: "approved" | "rejected"; edited_text?: string; reason?: string; expected_decision: string },
-  ) => postJson<{ ok: boolean; candidate_id: string; decision: string; memory_id?: string }>(
-    `/api/memory/proposals/${encodeURIComponent(id)}/decision`, body,
-  ),
+    body: {
+      decision: "approved" | "rejected";
+      edited_text?: string;
+      reason?: string;
+      expected_decision: string;
+    },
+  ) =>
+    postJson<{
+      ok: boolean;
+      candidate_id: string;
+      decision: string;
+      memory_id?: string;
+    }>(`/api/memory/proposals/${encodeURIComponent(id)}/decision`, body),
   memoryHistory: (id: string) =>
     request<{ ok: boolean; memory_id: string; events: MemoryHistoryEvent[] }>(
       `/api/memory/${encodeURIComponent(id)}/history`,
     ),
-  changeMemoryScope: (id: string, scope: string, expectedUpdatedAt: string | null, reason: string) =>
-    request<{ ok: boolean; memory_id: string; scope: string; updated_at: string }>(
-      `/api/memory/${encodeURIComponent(id)}/scope`,
-      {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scope, expected_updated_at: expectedUpdatedAt, reason }),
-      },
-    ),
+  changeMemoryScope: (
+    id: string,
+    scope: string,
+    expectedUpdatedAt: string | null,
+    reason: string,
+  ) =>
+    request<{
+      ok: boolean;
+      memory_id: string;
+      scope: string;
+      updated_at: string;
+    }>(`/api/memory/${encodeURIComponent(id)}/scope`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        scope,
+        expected_updated_at: expectedUpdatedAt,
+        reason,
+      }),
+    }),
   previewMemoryPurge: (id: string) =>
-    request<{ ok: boolean; memory_id: string; artifacts: string[]; backup_disposition: string; requires_confirmation: string }>(
-      `/api/memory/${encodeURIComponent(id)}/purge-preview`,
-    ),
+    request<{
+      ok: boolean;
+      memory_id: string;
+      artifacts: string[];
+      backup_disposition: string;
+      requires_confirmation: string;
+    }>(`/api/memory/${encodeURIComponent(id)}/purge-preview`),
   purgeMemory: (id: string) =>
     request<{ ok: boolean; memory_id: string; purged: boolean }>(
       `/api/memory/${encodeURIComponent(id)}/purge`,
@@ -731,11 +1096,14 @@ export const api = {
       },
     ),
   editMemory: (id: string, text: string) =>
-    request<{ ok: boolean; memory_id: string }>(`/api/memory/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
-    }),
+    request<{ ok: boolean; memory_id: string }>(
+      `/api/memory/${encodeURIComponent(id)}`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      },
+    ),
   setMemorySearchEnabled: (id: string, enabled: boolean) =>
     request<{ ok: boolean; memory_id: string; search_enabled: boolean }>(
       `/api/memory/${encodeURIComponent(id)}/search`,
@@ -755,8 +1123,12 @@ export const api = {
       },
     ),
   exportMemories: () =>
-    request<{ ok: boolean; memories: MemoryControlView[] }>("/api/memory/export"),
-  importMemories: (memories: Array<Partial<MemoryControlView> & { text: string }>) =>
+    request<{ ok: boolean; memories: MemoryControlView[] }>(
+      "/api/memory/export",
+    ),
+  importMemories: (
+    memories: Array<Partial<MemoryControlView> & { text: string }>,
+  ) =>
     request<{ ok: boolean; count: number }>("/api/memory/import", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -782,21 +1154,34 @@ export const api = {
   // brokered `github_read` tool under the connector_github_runtime gate.
   codeRepos: () => request<CodeReposView>("/api/code/repos"),
   connectLocalRepo: (path: string) =>
-    postJson<{ ok: boolean; repo_id: string; local_subpath: string }>("/api/code/repos", {
-      kind: "local",
-      path,
-    }),
-  connectGithubRepo: (owner: string, repo: string, branch?: string) =>
-    postJson<{ ok: boolean; repo_id: string; label: string; branch: string | null }>(
+    postJson<{ ok: boolean; repo_id: string; local_subpath: string }>(
       "/api/code/repos",
-      { kind: "github", owner, repo, branch: branch || null },
+      {
+        kind: "local",
+        path,
+      },
     ),
-  selectCodeRepo: (repo_id: string | null) =>
-    request<{ ok: boolean; selected_repo_id: string | null }>("/api/code/repos/selection", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ repo_id }),
+  connectGithubRepo: (owner: string, repo: string, branch?: string) =>
+    postJson<{
+      ok: boolean;
+      repo_id: string;
+      label: string;
+      branch: string | null;
+    }>("/api/code/repos", {
+      kind: "github",
+      owner,
+      repo,
+      branch: branch || null,
     }),
+  selectCodeRepo: (repo_id: string | null) =>
+    request<{ ok: boolean; selected_repo_id: string | null }>(
+      "/api/code/repos/selection",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repo_id }),
+      },
+    ),
   disconnectCodeRepo: (repoId: string) =>
     request<{ ok: boolean; repo_id: string }>(
       `/api/code/repos/${encodeURIComponent(repoId)}`,
@@ -808,14 +1193,17 @@ export const api = {
   // `code_map_indexing` capability turned off.
   codeMap: () => request<CodeMapStatus>("/api/code/map"),
   rebuildCodeMap: () =>
-    postJson<{ ok: boolean; status: string; file_count: number; symbol_count: number }>(
-      "/api/code/map/rebuild",
-      {},
-    ),
+    postJson<{
+      ok: boolean;
+      status: string;
+      file_count: number;
+      symbol_count: number;
+    }>("/api/code/map/rebuild", {}),
 
   // ── Projects (organizing scopes; creating/selecting one grants nothing) ──
   projects: () => request<ProjectsList>("/api/projects"),
-  project: (id: string) => request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
+  project: (id: string) =>
+    request<ProjectDetail>(`/api/projects/${encodeURIComponent(id)}`),
   exportProject: async (id: string): Promise<void> => {
     const path = `/api/projects/${encodeURIComponent(id)}/export`;
     const blob = await requestBlob(path, { method: "POST" });
@@ -829,28 +1217,44 @@ export const api = {
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
   createProject: (name: string) =>
-    postJson<{ ok: boolean; project_id: string; name: string; root_subpath: string }>(
-      "/api/projects",
-      { name },
-    ),
+    postJson<{
+      ok: boolean;
+      project_id: string;
+      name: string;
+      root_subpath: string;
+    }>("/api/projects", { name }),
   // Set (or clear, with null) the active project; new sessions are stamped with it.
   selectProject: (project_id: string | null) =>
-    request<{ ok: boolean; active_project_id: string | null }>("/api/projects/selection", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project_id }),
-    }),
+    request<{ ok: boolean; active_project_id: string | null }>(
+      "/api/projects/selection",
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ project_id }),
+      },
+    ),
   deleteProject: (id: string, confirmed = false) =>
     request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}`, {
       method: "DELETE",
       headers: confirmed ? { "X-Project-Delete-Confirm": id } : undefined,
     }),
-  saveProjectContext: (id: string, context: { instructions: string; attachment_ids: string[]; memory_enabled: boolean; memory_mode: "inherit" | "enabled" | "disabled" }) =>
-    request<{ ok: boolean }>(`/api/projects/${encodeURIComponent(id)}/context`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(context),
-    }),
+  saveProjectContext: (
+    id: string,
+    context: {
+      instructions: string;
+      attachment_ids: string[];
+      memory_enabled: boolean;
+      memory_mode: "inherit" | "enabled" | "disabled";
+    },
+  ) =>
+    request<{ ok: boolean }>(
+      `/api/projects/${encodeURIComponent(id)}/context`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(context),
+      },
+    ),
   // Nested projects/folders: tree, move, archive
   projectTree: () => request<ProjectTreeNode[]>("/api/projects/tree"),
   moveProject: (id: string, parent_id: string | null) =>
@@ -867,19 +1271,26 @@ export const api = {
       `/api/projects/${encodeURIComponent(id)}/archive`,
       { method: "PUT" },
     ),
-  session: (id: string) => request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
+  session: (id: string) =>
+    request<SessionDetail>(`/api/sessions/${encodeURIComponent(id)}`),
   renameSession: (id: string, title: string) =>
     request<{ ok: boolean; session_id: string; title: string }>(
       `/api/sessions/${encodeURIComponent(id)}/rename`,
-      { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ title }) },
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      },
     ),
   archiveSession: (id: string) =>
     request<{ ok: boolean; session_id: string; archived: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}/archive`, { method: "PUT" },
+      `/api/sessions/${encodeURIComponent(id)}/archive`,
+      { method: "PUT" },
     ),
   unarchiveSession: (id: string) =>
     request<{ ok: boolean; session_id: string; archived: boolean }>(
-      `/api/sessions/${encodeURIComponent(id)}/unarchive`, { method: "PUT" },
+      `/api/sessions/${encodeURIComponent(id)}/unarchive`,
+      { method: "PUT" },
     ),
   // Pin (or unpin) a session. Organizing label only — grants nothing.
   setSessionPinned: (id: string, pinned: boolean) =>
@@ -934,11 +1345,13 @@ export const api = {
         body: JSON.stringify({ project_id }),
       },
     ),
-  turn: (id: string) => request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
+  turn: (id: string) =>
+    request<TurnDetail>(`/api/turns/${encodeURIComponent(id)}`),
   // `project_id` scopes the list to one project's schedules (project-scoped
   // schedules); omitting it lists every task visible to the account.
-  tasks: (params: { session_id?: string; status?: string; project_id?: string } = {}) =>
-    request<TaskView[]>(withQuery("/api/tasks", params)),
+  tasks: (
+    params: { session_id?: string; status?: string; project_id?: string } = {},
+  ) => request<TaskView[]>(withQuery("/api/tasks", params)),
   createTask: (body: {
     title: string;
     description: string;
@@ -956,32 +1369,50 @@ export const api = {
   // scheduler does this on its own tick; this is the owner's retry for when
   // automatic continuation could not proceed, and it runs the same path.
   resumeTask: (taskId: string) =>
-    postJson<{ ok: boolean; reason_code: string | null; task_status: string; summary: string }>(
-      `/api/tasks/${encodeURIComponent(taskId)}/resume`,
-      {},
-    ),
+    postJson<{
+      ok: boolean;
+      reason_code: string | null;
+      task_status: string;
+      summary: string;
+    }>(`/api/tasks/${encodeURIComponent(taskId)}/resume`, {}),
 
   // ── Prompts / interrupts ──
   // Non-streaming prompt submit; returns the final governed AgentResponse.
-  submitPrompt: (body: PromptRequestBody) => postJson<AgentResponse>("/api/prompts", body),
+  submitPrompt: (body: PromptRequestBody) =>
+    postJson<AgentResponse>("/api/prompts", body),
   // Issue a governed safe-boundary interrupt for one task or all active tasks in a session.
-  interrupt: (body: InterruptRequestBody) => postJson<InterruptResult>("/api/interrupts", body),
+  interrupt: (body: InterruptRequestBody) =>
+    postJson<InterruptResult>("/api/interrupts", body),
 
   // ── Approvals (resolution is metadata-only: records a decision, never executes) ──
   approvals: (statusFilter = "pending") =>
-    request<ApprovalView[]>(withQuery("/api/approvals", { status_filter: statusFilter })),
-  approval: (id: string) => request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
+    request<ApprovalView[]>(
+      withQuery("/api/approvals", { status_filter: statusFilter }),
+    ),
+  approval: (id: string) =>
+    request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
   resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
-    postJson<ResolveApprovalResult>(`/api/approvals/${encodeURIComponent(id)}/resolve`, body),
+    postJson<ResolveApprovalResult>(
+      `/api/approvals/${encodeURIComponent(id)}/resolve`,
+      body,
+    ),
   // B2 — non-streaming continuation of a turn that was parked for this approval.
   resumeAfterApproval: (id: string) =>
-    postJson<AgentResponse>(`/api/approvals/${encodeURIComponent(id)}/resume`, {}),
+    postJson<AgentResponse>(
+      `/api/approvals/${encodeURIComponent(id)}/resume`,
+      {},
+    ),
   // BUG-24 — parked turns this account may continue right now, whoever resolved
   // the approval and wherever they resolved it. Ids only; polling changes
   // nothing, and the server still enforces exactly-once resumption.
   resumableTurns: (sessionId?: string) =>
-    request<ResumableTurnsView>(withQuery("/api/approvals/resumable", { session_id: sessionId })),
-  resolveCriticalApproval: (id: string, body: { approve: boolean; reason: string }) =>
+    request<ResumableTurnsView>(
+      withQuery("/api/approvals/resumable", { session_id: sessionId }),
+    ),
+  resolveCriticalApproval: (
+    id: string,
+    body: { approve: boolean; reason: string },
+  ) =>
     postJson<ResolveCriticalApprovalResult>(
       `/api/approvals/${encodeURIComponent(id)}/resolve-critical`,
       body,
@@ -990,7 +1421,10 @@ export const api = {
   // ── Runtime mutations. These reuse the existing governed control routes; the UI adds no
   // authority. Every call is enforced server-side by RuntimeAuthority. ──
   activateRuntimeMode: (mode_name: string, reason: string) =>
-    postJson<{ ok: boolean }>("/api/runtime-mode/activate", { mode_name, reason }),
+    postJson<{ ok: boolean }>("/api/runtime-mode/activate", {
+      mode_name,
+      reason,
+    }),
   disableRuntimeMode: (reason: string) =>
     postJson<{ ok: boolean }>("/api/runtime-mode/disable", { reason }),
   setCapabilityState: (
@@ -1017,8 +1451,14 @@ export const api = {
 
   // ── Per-capability decision modes (ask | allow | auto | deny) ──
   capabilityDecisionMode: (capability: string) =>
-    request<CapabilityDecisionMode>(`/api/capability-modes/${encodeURIComponent(capability)}`),
-  setCapabilityDecisionMode: (capability: string, mode: "ask" | "allow" | "auto" | "deny", reason: string) =>
+    request<CapabilityDecisionMode>(
+      `/api/capability-modes/${encodeURIComponent(capability)}`,
+    ),
+  setCapabilityDecisionMode: (
+    capability: string,
+    mode: "ask" | "allow" | "auto" | "deny",
+    reason: string,
+  ) =>
     postJson<{ ok: boolean; capability: string; decision_mode: string }>(
       `/api/capability-modes/${encodeURIComponent(capability)}/${mode}`,
       { reason },
@@ -1039,7 +1479,12 @@ export async function streamPrompt(
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  return streamSse("/api/prompts/stream", JSON.stringify(body), onEvent, signal);
+  return streamSse(
+    "/api/prompts/stream",
+    JSON.stringify(body),
+    onEvent,
+    signal,
+  );
 }
 
 /**
@@ -1084,7 +1529,11 @@ async function streamSse(
     signal,
   });
   if (!resp.ok || resp.body === null) {
-    throw new ApiError(resp.status, null, `Stream failed: ${resp.status} ${url}`);
+    throw new ApiError(
+      resp.status,
+      null,
+      `Stream failed: ${resp.status} ${url}`,
+    );
   }
   const reader = resp.body.getReader();
   const decoder = new TextDecoder();
@@ -1104,7 +1553,10 @@ async function streamSse(
 }
 
 /** Parse complete `data:` SSE records out of `buffer`, returning the unconsumed remainder. */
-function drainSseBuffer(buffer: string, onEvent: (event: StreamEvent) => void): string {
+function drainSseBuffer(
+  buffer: string,
+  onEvent: (event: StreamEvent) => void,
+): string {
   let rest = buffer;
   let sep = rest.indexOf("\n\n");
   while (sep !== -1) {

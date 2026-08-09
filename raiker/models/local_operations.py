@@ -85,6 +85,31 @@ class ModelOperationService:
             )
         )
 
+    def progress(
+        self,
+        owner_principal_id: str,
+        operation_id: str,
+        *,
+        completed_bytes: int,
+        total_bytes: int | None,
+        phase: str,
+    ) -> ModelOperation:
+        operation = self.store.require_model_operation(owner_principal_id, operation_id)
+        completed = max(0, completed_bytes)
+        total = max(completed, total_bytes) if total_bytes is not None else None
+        percent = min(99, int(completed * 100 / total)) if total else None
+        return self.store.save_model_operation(
+            replace(
+                operation,
+                state="running",
+                phase=phase,
+                progress_bytes=completed,
+                total_bytes=total,
+                progress_percent=percent,
+                updated_at=utc_now(),
+            )
+        )
+
     def complete(self, owner_principal_id: str, operation_id: str) -> ModelOperation:
         operation = self.store.require_model_operation(owner_principal_id, operation_id)
         total = operation.total_bytes

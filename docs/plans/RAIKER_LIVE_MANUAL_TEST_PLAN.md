@@ -10,7 +10,9 @@
 > Screenshots for this round are prefixed `r0808-` in
 > [`screenshots/working/`](screenshots/working), and the defects it found are
 > `BUG-r0808-*` in [`screenshots/not-working/`](screenshots/not-working) and
-> **BUG-68 … BUG-73** in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+> **BUG-68 … BUG-73** in [`TO_BE_FIXED.md`](TO_BE_FIXED.md), all four of which
+> are closed there as **FIXED-154** … **FIXED-157** and re-verified live on
+> **2026-08-10** (screenshots prefixed `r0810-`).
 >
 > Earlier rounds (2026-07-26 hosted Anthropic, 2026-07-28 and 2026-08-01 local
 > Ollama, 2026-08-04 source citations) are preserved where their evidence is
@@ -262,14 +264,14 @@ Memory within a conversation, isolation between conversations.
 
 ### 5.6 Can you see how many tokens remain, and what they cost?
 
-**Mostly.** The popover reads, against a live Anthropic turn:
+**Yes.** The popover reads, against a live Anthropic turn:
 
 ```
 Context window                             0.35%
 706 tokens used
 of 200,000 available
 199,294 tokens remaining
-NaN input · NaN output              ← ❌ BUG-68
+624 input · 82 output                      ← ✅ FIXED-154 (was BUG-68)
 Reported by anthropic · Capacity reported by runtime
 This chat                                $0.0008
 anthropic, all time                      $0.0033
@@ -278,13 +280,18 @@ claude-haiku-4-5-20251001 — list price, as of 2026-07
 ```
 
 Verified working: capacity from the provider's own window, used tokens from the
-provider's reported prompt count, per-chat and provider all-time cost, and all
-four price components. The identical control is in the Build composer.
+provider's reported prompt count, the per-direction split, per-chat and provider
+all-time cost, and all four price components. The identical control is in the
+Build composer.
 
-❌ **BUG-68** — the per-direction split renders `NaN input · NaN output`, because
-the API redactor discards `session_input_tokens` / `session_output_tokens` as
-secret-shaped and the browser formats the string `"***REDACTED***"`.
-`not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`.
+✅ **FIXED-154** (was **BUG-68**) — the split rendered `NaN input · NaN output`
+on 2026-08-08 because the API redactor discarded `session_input_tokens` /
+`session_output_tokens` as secret-shaped and the browser formatted the string
+`"***REDACTED***"`. Both names are now on the count allowlist, and a contract
+test asserts every integer field on `ContextUsageView` survives redaction, so the
+next count added cannot repeat it. Re-verified live on 2026-08-10:
+`working/r0810-bug68-context-meter-real-io-counts.png`
+(before: `not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`).
 
 ### 5.7 Markdown rendering
 
@@ -393,19 +400,24 @@ these two "offer no enable path".
 
 `r0808-25-deferred-*.png`, `r0808-26-remote-execution-attempt.png`.
 
-### 6.9 ❌ Memory can never be written from Chat or Build — BUG-71
+### 6.9 ✅ Memory can be written from Chat and Build — FIXED-156 (was BUG-71)
 
-`memory_write_execution` can be enabled and set to **Allow**, and its row claims
-*"Persist durable memories through the governed broker."* No write tool is ever
-offered: the agent reports only `memory_get`, `memory_list`, `memory_search`,
-and "the current mode is read_only". The broker *does* hold real executors for
-`memory_write` and `memory_forget` (`raiker/tools/broker.py:1422`) — they are
-simply absent from the model tool catalogue in
-`raiker/models/tool_call_validation.py`, and `governed_memory_status`
-(`raiker/memory/candidates.py:36`) hard-codes `durable_writes_enabled: False`.
-After ~30 governed turns, `/api/memory` and `/api/memory/proposals` are both
-empty. Compare **Remote execution**, which states plainly that no turn can reach
-it. `not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`.
+On 2026-08-08 `memory_write_execution` could be enabled and set to **Allow**
+while no write tool was ever offered: the agent reported only `memory_get`,
+`memory_list`, `memory_search`, and "the current mode is read_only". The broker
+already held real executors; the tools were absent from the model catalogue and
+`governed_memory_status` hard-coded `durable_writes_enabled: False`.
+
+Re-run 2026-08-10: both tools are in the catalogue, `governed_memory_status`
+reads the live gate and decision mode, and an approved write really stores the
+record. With the gate **off** — the shipped default — the Memory page says so
+directly (*"Memory store is off, so no conversation can propose something to
+remember"*) with **Turn on Memory store →**, instead of promising proposals it
+cannot produce. With it on, a Chat turn proposes the exact text and the owner
+decides. `working/r0810-bug71-memory-says-the-gate-is-off.png`,
+`working/r0810-bug71-memory-says-the-gate-is-on.png`,
+`working/r0810-bug71-chat-proposes-a-memory-write.png`
+(before: `not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`).
 
 ---
 
@@ -423,13 +435,20 @@ it. `not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`.
 | 7.8 | Approve, then just reopen the conversation | The turn auto-resumes without pressing Continue and ends with an accurate summary | ✅ 3 / 4 runs, `r0808-38-post-approval-continuation-ok.png` |
 | 7.9 | Filters Pending / Approved / Executed / Denied, sort by risk / recency | All present and switchable | ✅ `r0808-31-approvals-filter-*.png` |
 
-### 7.10 ❌ A resumed turn that denies the execution — BUG-73
+### 7.10 ✅ A parked turn states its state, never a denial — FIXED-157 (was BUG-73)
 
-One conversation in this round ended, durably, with the assistant bubble
-*"Approval required for local action. No command was executed."* directly beneath
-the `live-round.md` chip for the file that **was** written. Three targeted
-reproductions did not recur. Filed as intermittent **BUG-73**.
-`not-working/BUG-r0808-02-post-approval-answer-says-not-executed.png`.
+One conversation in the 2026-08-08 round ended, durably, with the assistant
+bubble *"Approval required for local action. No command was executed."* directly
+beneath the `live-round.md` chip for the file that **was** written. Three
+targeted reproductions did not recur, so it was filed as intermittent.
+
+Re-run 2026-08-10: the sentence is gone from the product. A parked turn reads
+*"Waiting for your decision. Nothing has run yet."* — a statement about the
+pause rather than a verdict on execution — and that notice is never persisted as
+the turn's answer, so a resume writes the real one over an empty row instead of
+racing to overwrite a false one. Reloading a parked conversation shows the
+parked approval, not a denial. `working/r0810-bug73-parked-turn-states-its-state.png`
+(before: `not-working/BUG-r0808-02-post-approval-answer-says-not-executed.png`).
 
 ### 7.11 Earlier rounds still carry the wider approval evidence
 
@@ -480,9 +499,9 @@ Task runs are tagged `origin=task` and do **not** appear in RECENT CHATS
 > 2026-08-04 round recorded. A freshly connected repository reads *"Code map · .
 > Not indexed yet."* and requires **Build index**.
 
-### 9.7 ❌ The Plan / Edit / Auto chips — BUG-70
+### 9.7 ✅ The Plan / Edit / Auto chips — FIXED-155 (was BUG-70)
 
-Pressing **Auto** fires four unconfirmed writes:
+On 2026-08-08, pressing **Auto** fired four unconfirmed writes:
 
 ```
 POST /api/capability-modes/file_write_execution/auto   200
@@ -491,16 +510,27 @@ POST /api/capability-modes/shell_execution/auto        200
 POST /api/capability-modes/process_execution/auto      200
 ```
 
-Permissions then shows **File writes → Auto**, globally and permanently, with no
-step-up, no reason and no acknowledgement — while the identical change made from
-the Permissions page demands all three. Plan sets the same four to `deny`, Edit
-to `ask`.
+Permissions then showed **File writes → Auto**, globally and permanently, with no
+step-up, no reason and no acknowledgement — while the identical change from the
+Permissions page demanded all three.
 
-The runtime still fails safe (a Chat `write_file` under `auto` was still held for
-approval and wrote nothing), so this is a defect in the *authority record*, not
-in enforcement. Filed as **BUG-70**.
-`not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`,
-`r0808-64-build-modes.png`.
+Re-run 2026-08-10, with the network panel open across a full Plan → Edit → Auto
+cycle: **zero** requests to `/api/capability-modes/`, and all four capabilities
+still standing exactly where they were. The mode is now the conversation's own
+posture, sent with each prompt and applied to that turn; Plan's hint reads
+*"…for this turn only … Your standing permissions are not changed."*, and Auto
+reports what the owner's standing permissions actually allow —
+*"Every write capability is set to Ask, so every change will still be proposed to
+you."* — with **Change in Permissions →** beside it.
+
+It is a posture, not a suggestion: a Build turn in **Plan** asked to
+`write_file plan-mode-probe.md` produced no approval at all, because the call is
+refused by the runtime under `denied_by_turn_posture`.
+`working/r0810-bug70-build-auto-changes-nothing-standing.png`,
+`working/r0810-bug70-permissions-unchanged.png`,
+`working/r0810-bug70-plan-mode-refuses-the-write.png`
+(before: `not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`,
+`r0808-64-build-modes.png`).
 
 ---
 
@@ -644,12 +674,12 @@ the trigger. `r0808-80-*`, `r0808-81-*`.
 | Does a new chat create a chat on the left? | **Yes** — RECENT CHATS, with a two-item row menu (Delete chat, Move to project…) |
 | Is the chat searchable? | **Yes** — titles and message text, including text that only appeared in an attachment's answer |
 | Do multiple chats in one session remember the context? | **Yes** — verbatim recall inside a chat, isolation between chats |
-| Can you see how many tokens remain? | **Yes** — used / capacity / remaining / % / cost, all provider-reported. The input-vs-output split is broken (**BUG-68**) |
+| Can you see how many tokens remain? | **Yes** — used / capacity / remaining / % / cost / the input-vs-output split, all provider-reported (the split was **BUG-68**, closed as **FIXED-154**) |
 | Can you generate a Markdown file and view it in the sidebar? | **Yes** — the turn carries a file chip that opens the right-hand File preview |
 | Can you convert Markdown to PDF in one click? | **Yes** — `•••` → Print / Save as PDF, or Export conversation… → PDF, or ask the agent to `create_document` |
 | Do the different task types work? | **Yes** — all four create, schedule, run and report |
 | Does the MCP server work? | **Yes** — create, connect, discover, and call from Chat once the decision mode allows it; output arrives marked untrusted |
-| Do Permissions / Capabilities work? | **Yes** — 67 gates, four decision modes, step-up with a required reason. Two caveats: **BUG-71** (Memory store has no executor) and **BUG-70** (Build's chips change modes without the step-up) |
+| Do Permissions / Capabilities work? | **Yes** — 67 gates, four decision modes, step-up with a required reason. The two 2026-08-08 caveats are closed: **FIXED-156** (Memory store is reachable from Chat and Build) and **FIXED-155** (Build's chips are a per-turn posture and change nothing standing) |
 | Does the network capability work? | **Yes** — once Web fetch is enabled and set to **Allow**, a turn fetches the page and quotes it; a non-allowlisted host is refused by name (**BUG-72 closed 2026-08-10**) |
 | Can you see what the agent plans to do? | **Yes** — a live `update_plan` checklist above the transcript |
 | Can the agent search without flooding the conversation? | **Yes** — `spawn_subagent` returns findings only |

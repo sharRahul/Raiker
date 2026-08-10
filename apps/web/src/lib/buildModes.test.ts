@@ -4,27 +4,30 @@ import {
   BUILD_WRITE_CAPABILITIES,
   buildMode,
   DEFAULT_BUILD_MODE,
-  modeFromDecisionModes,
   nextBuildMode,
   repoPreamble,
+  standingPostureNote,
+  turnCapabilityModes,
 } from "./buildModes";
 
 describe("build composer modes", () => {
-  it("maps each mode to the posture the runtime will actually enforce", () => {
-    // The mode names are a promise about decision modes, not a tone of voice.
-    // Plan denies writes outright, Edit turns each one into a decision, and Auto
-    // hands the risk floor to the runtime.
-    expect(buildMode("plan").decisionMode).toBe("deny");
+  it("maps each mode to the turn-scoped posture the runtime will enforce", () => {
+    // The mode names are a promise about what this turn may do, not a tone of
+    // voice. Plan refuses writes for the turn, Edit turns each one into a
+    // decision, and Auto adds no restriction of its own.
+    expect(buildMode("plan").turnMode).toBe("deny");
     expect(buildMode("plan").planningMode).toBe("always");
-    expect(buildMode("edit").decisionMode).toBe("ask");
-    expect(buildMode("auto").decisionMode).toBe("auto");
+    expect(buildMode("edit").turnMode).toBe("ask");
+    expect(buildMode("auto").turnMode).toBeNull();
   });
 
-  it("never maps a mode to a permissive `allow`", () => {
-    // `allow` would run medium and high risk actions unprompted. No composer
-    // mode may reach it — Auto stops at the deterministic risk floor.
+  it("never lets a mode loosen anything", () => {
+    // BUG-70 — the chips used to POST four standing decision-mode changes with
+    // no step-up. A turn-scoped posture may only ever tighten, so no mode may
+    // carry `allow` or `auto`: those loosen, and loosening is a change to
+    // standing authority that belongs to the Permissions step-up.
     for (const mode of BUILD_MODES) {
-      expect(mode.decisionMode).not.toBe("allow");
+      expect(mode.turnMode === null || mode.turnMode === "ask" || mode.turnMode === "deny").toBe(true);
     }
   });
 
@@ -49,27 +52,64 @@ describe("build composer modes", () => {
     expect(nextBuildMode("edit")).toBe("auto");
     expect(nextBuildMode("auto")).toBe("plan");
   });
+});
 
-  it("reads the live posture back from the capability decision modes", () => {
-    const uniform = Object.fromEntries(BUILD_WRITE_CAPABILITIES.map((c) => [c, "deny"]));
-    expect(modeFromDecisionModes(uniform)).toBe("plan");
+describe("the map a mode sends with its turn", () => {
+  it("covers every write capability for a tightening mode", () => {
+    expect(turnCapabilityModes("plan")).toEqual({
+      file_write_execution: "deny",
+      patch_apply_execution: "deny",
+      shell_execution: "deny",
+      process_execution: "deny",
+    });
+    expect(turnCapabilityModes("edit")).toEqual({
+      file_write_execution: "ask",
+      patch_apply_execution: "ask",
+      shell_execution: "ask",
+      process_execution: "ask",
+    });
   });
 
-  it("reports null rather than guessing when the capabilities disagree", () => {
-    // Someone set permissions individually in Permissions. Showing "Edit" over a
-    // half-denied posture would misdescribe what the runtime will do.
-    const mixed = Object.fromEntries(BUILD_WRITE_CAPABILITIES.map((c) => [c, "ask"]));
-    mixed[BUILD_WRITE_CAPABILITIES[0]] = "deny";
-    expect(modeFromDecisionModes(mixed)).toBeNull();
+  it("sends nothing at all for Auto", () => {
+    // This is the whole of BUG-70's fix on the wire: Auto asks for no override,
+    // so the turn runs under the owner's standing permissions and the chip
+    // changes nothing.
+    expect(turnCapabilityModes("auto")).toEqual({});
+  });
+});
+
+describe("what Auto amounts to under the owner's standing permissions", () => {
+  const all = (mode: string) =>
+    Object.fromEntries(BUILD_WRITE_CAPABILITIES.map((c) => [c, mode]));
+
+  it("says nothing for the modes that carry their own posture", () => {
+    expect(standingPostureNote("plan", all("ask"))).toBeNull();
+    expect(standingPostureNote("edit", all("ask"))).toBeNull();
   });
 
-  it("reports null when a capability's mode is missing entirely", () => {
-    expect(modeFromDecisionModes({ file_write_execution: "ask" })).toBeNull();
+  it("tells the owner when every write still asks", () => {
+    // The old chip would have silently set all four to `auto` here. The new one
+    // reports the truth instead of manufacturing it.
+    expect(standingPostureNote("auto", all("ask"))).toContain("still be proposed");
   });
 
-  it("reports null for a decision mode no composer mode represents", () => {
-    const permissive = Object.fromEntries(BUILD_WRITE_CAPABILITIES.map((c) => [c, "allow"]));
-    expect(modeFromDecisionModes(permissive)).toBeNull();
+  it("tells the owner when every write is denied", () => {
+    expect(standingPostureNote("auto", all("deny"))).toContain("change nothing");
+  });
+
+  it("counts the partially-tightened case rather than rounding it", () => {
+    const mixed = all("auto");
+    mixed[BUILD_WRITE_CAPABILITIES[0]] = "ask";
+    expect(standingPostureNote("auto", mixed)).toContain("1 of 4");
+  });
+
+  it("confirms an actually permissive posture", () => {
+    expect(standingPostureNote("auto", all("auto"))).toContain("low-risk changes run unprompted");
+  });
+
+  it("admits it could not read them rather than assuming the happy answer", () => {
+    expect(standingPostureNote("auto", null)).toContain("could not read");
+    expect(standingPostureNote("auto", { file_write_execution: "auto" })).toContain("could not read");
   });
 });
 

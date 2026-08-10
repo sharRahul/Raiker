@@ -42,6 +42,14 @@ NON_SECRET_TOKEN_COUNT_KEYS = frozenset(
         "max_tokens",
         "output_tokens",
         "prompt_tokens",
+        # BUG-68 — the context contract's per-direction split. FIXED-02 closed
+        # this class of failure for `context_window_tokens`; these two names were
+        # added to `ContextUsageView` afterwards and the allowlist was never
+        # extended, so the popover formatted "***REDACTED***" as `NaN input ·
+        # NaN output`. A contract test now asserts every integer field on that
+        # view survives redaction, so the next count added cannot repeat it.
+        "session_input_tokens",
+        "session_output_tokens",
         "total_tokens",
         "used_tokens",
     }

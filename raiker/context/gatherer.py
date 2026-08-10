@@ -901,11 +901,19 @@ class ContextGatherer:
 
     def _memory_status(self, root: Path, store: SQLiteStore, owner_principal_id: str | None) -> ContextItem:
         candidates = store.list_memory_candidates(owner_principal_id=owner_principal_id)
-        governed = governed_memory_status(candidates)
+        # BUG-71 — read the live gate and decision mode rather than a literal.
+        # This item is what the model quotes when a user asks whether it can
+        # remember something, so a hard-coded "read_only" made it contradict the
+        # owner's own Permissions page.
+        governed = governed_memory_status(
+            candidates, store=store, principal_id=owner_principal_id
+        )
         semantic = semantic_memory_status(len(candidates))
         lines = [
             f"mode: {governed['mode']}",
             f"durable_writes_enabled: {governed['durable_writes_enabled']}",
+            f"memory_write_decision_mode: {governed['write_decision_mode']}",
+            f"memory_forget_decision_mode: {governed['forget_decision_mode']}",
             f"candidate_count: {governed['candidate_count']}",
             f"semantic_writes_enabled: {semantic['semantic_writes_enabled']}",
             f"vector_writes_enabled: {semantic['vector_writes_enabled']}",
@@ -920,7 +928,7 @@ class ContextGatherer:
             content="\n".join(lines),
             metadata={
                 "candidate_count": governed["candidate_count"],
-                "durable_writes_enabled": False,
+                "durable_writes_enabled": governed["durable_writes_enabled"],
                 "semantic_writes_enabled": False,
             },
         )

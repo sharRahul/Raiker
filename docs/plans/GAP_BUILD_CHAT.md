@@ -426,9 +426,11 @@ read-side `memory_search`, `memory_list`, and `memory_get` tools are model-visib
 without approval. Context gathering runs owner-scoped hybrid retrieval and adds
 bounded, attributed metadata for old Chat and Build sessions and Projects,
 including archived work; approved memory text is labelled untrusted. Incognito
-is an absolute opt-out. Durable writes retain the existing privacy posture: the
-model proposes a candidate and the owner accepts it rather than Raiker silently
-remembering.
+is an absolute opt-out. Durable writes retain the existing privacy posture, and
+FIXED-156 made them reachable: `memory_write` and `memory_forget` are now
+model-visible behind their own gates, so the model proposes the exact text and
+the owner accepts it rather than Raiker silently remembering — or, with the gate
+off, nothing can be proposed and every surface says so.
 
 ### Tier 1 — working with the owner's material
 

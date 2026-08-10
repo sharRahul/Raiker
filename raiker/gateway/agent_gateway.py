@@ -7,6 +7,8 @@ from raiker.channels.registry import ConnectorRegistry
 from raiker.checkpoints.service import CheckpointService
 from raiker.contracts.models import (
     DEFAULT_MAX_TOOL_CALLS,
+    LEGACY_PARKED_FOR_APPROVAL_NOTICE,
+    PARKED_FOR_APPROVAL_NOTICE,
     AgentResponse,
     ClientMetadata,
     ContractValidationError,
@@ -342,6 +344,33 @@ class AgentGateway:
             role_ids=("assistant",),
         )
 
+    @staticmethod
+    def _persisted_summary(response: AgentResponse) -> str:
+        """The reply this turn stores in its transcript row (BUG-73).
+
+        A turn parked on an approval has no answer yet — it has a *state*. The
+        pre-approval notice ("Approval required for local action. No command was
+        executed.") used to be stored as though it were the answer, and the
+        resume was the only thing that ever replaced it. One live round ended
+        with that sentence sitting, durably, beneath the chip for the file the
+        approval had just written: the write happened, was checkpointed, and
+        changed the filesystem, and reopening the conversation showed the denial
+        again.
+
+        Nothing about a race can produce that now, because the false claim is
+        never written. An interrupted resume leaves the turn with no stored
+        answer and its parked approval still showing — which is what actually
+        happened — and the resume writes the real one over an empty row. The old
+        wording is refused alongside the new one so a workspace written before
+        this change cannot re-persist it on a resume either.
+        """
+        if response.message in {
+            PARKED_FOR_APPROVAL_NOTICE,
+            LEGACY_PARKED_FOR_APPROVAL_NOTICE,
+        }:
+            return ""
+        return response.message[:TURN_SUMMARY_MAX_CHARS]
+
     def _finalize_turn(
         self, prompt_envelope: PromptEnvelope, response: AgentResponse
     ) -> AgentResponse:
@@ -382,7 +411,9 @@ class AgentGateway:
         # lost most of every answer. The bound stays generous but finite — a turn
         # row is a transcript entry, not an unbounded blob.
         self.sessions.close_turn(
-            prompt_envelope.turn_id, response.status, response.message[:TURN_SUMMARY_MAX_CHARS]
+            prompt_envelope.turn_id,
+            response.status,
+            self._persisted_summary(response),
         )
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
@@ -546,6 +577,11 @@ class AgentGateway:
                     else None
                 ),
                 max_tool_calls=int(options_raw.get("max_tool_calls", DEFAULT_MAX_TOOL_CALLS)),
+                capability_modes=(
+                    dict(options_raw["capability_modes"])
+                    if isinstance(options_raw.get("capability_modes"), dict)
+                    else {}
+                ),
             ),
         )
         # ADD-02 — the rest of the batch this decision unblocked, in the order the

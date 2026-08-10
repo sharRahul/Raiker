@@ -58,9 +58,10 @@
     BUILD_WRITE_CAPABILITIES,
     buildMode,
     DEFAULT_BUILD_MODE,
-    modeFromDecisionModes,
     nextBuildMode,
     repoPreamble,
+    standingPostureNote,
+    turnCapabilityModes,
     type BuildMode,
   } from "../buildModes";
   import { humanize, relativeTime } from "../format";
@@ -100,7 +101,12 @@
   } = $props();
 
   $effect(() => {
-    if (visible) void loadRepos();
+    if (!visible) return;
+    void loadRepos();
+    // The standing write permissions are what the Auto chip reports on, and a
+    // visit to Permissions is exactly when they change — so they are re-read on
+    // return rather than held as they stood when Build first mounted.
+    void readStandingModes();
   });
 
   interface BuildTurn {
@@ -235,21 +241,21 @@
   let promptEl: HTMLTextAreaElement | undefined = $state();
 
   // ── Posture ──────────────────────────────────────────────────────────
-  // `mode` is what the composer shows; `appliedMode` is what the runtime last
-  // confirmed. They differ only while a change is in flight or after one was
-  // refused, so the composer never claims a posture the server did not accept.
+  // BUG-70 — the mode is this conversation's own posture and nothing more. It
+  // rides with each prompt as `capability_modes` and is applied to that turn;
+  // it never writes the owner's standing decision modes, so pressing a chip has
+  // no effect on Chat, Tasks, or any later session. There is therefore nothing
+  // to "apply" and nothing that can be refused: the composer shows the mode it
+  // will send.
   let mode = $state<BuildMode>(DEFAULT_BUILD_MODE);
-  let appliedMode = $state<BuildMode | null>(null);
-  // How much is known about the live posture. Kept separate from `appliedMode`
-  // so the page stays quiet while the first read is in flight instead of
-  // flashing "permissions are set individually" at everyone on load.
-  let posture = $state<"loading" | "matched" | "mixed" | "unreadable">("loading");
-  let modeBusy = $state(false);
-  let modeError = $state<string | null>(null);
+  // The owner's standing write permissions, read only so the composer can say
+  // what Auto will actually amount to. Never written from this page.
+  let standingModes = $state<Record<string, string> | null>(null);
   let modeTooltipOpen = $state(false);
   const modeSpec = $derived(buildMode(mode));
+  const standingNote = $derived(standingPostureNote(mode, standingModes));
   const modeTooltip =
-    "Plan produces a structured plan with no file changes. Edit applies precise, context-anchored changes. Auto plans, then executes eligible changes with background monitoring.";
+    "Plan researches and proposes without writing anything. Edit turns every change into a decision you accept or reject. Auto adds no restriction of its own and follows the permissions you set in Permissions. All three apply to this conversation's turns only — none of them changes your standing permissions.";
 
   // ── Repository ───────────────────────────────────────────────────────
   let repos = $state<CodeReposView | null>(null);
@@ -326,7 +332,7 @@
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
-    void syncModeFromRuntime();
+    void readStandingModes();
     const onCompose = (event: Event) => {
       const detail = (event as CustomEvent<{
         text: string;
@@ -356,11 +362,11 @@
   }
 
   /**
-   * Read the live decision modes and show the mode they actually represent. If
-   * the capabilities disagree (someone set them individually in Permissions),
-   * nothing is claimed — the composer says the posture is mixed.
+   * Read the owner's standing write permissions — read-only, so the Auto chip
+   * can state what it will actually amount to rather than promising unprompted
+   * execution the owner never granted. Nothing on this page writes them.
    */
-  async function syncModeFromRuntime() {
+  async function readStandingModes() {
     try {
       const gates = await api.capabilityGates();
       const observed: Record<string, string> = {};
@@ -369,50 +375,26 @@
           observed[gate.capability] = gate.decision_mode;
         }
       }
-      const detected = modeFromDecisionModes(observed);
-      appliedMode = detected;
-      posture = detected === null ? "mixed" : "matched";
-      if (detected !== null) mode = detected;
+      standingModes = observed;
     } catch {
-      appliedMode = null;
-      posture = "unreadable";
+      standingModes = null;
     }
   }
 
-  async function setMode(next: BuildMode) {
-    if (modeBusy || next === mode) return;
-    const previous = mode;
+  function setMode(next: BuildMode) {
+    // Local, instant, and free of consequence beyond this conversation's turns.
     mode = next;
-    modeBusy = true;
-    modeError = null;
-    const spec = buildMode(next);
-    try {
-      for (const capability of BUILD_WRITE_CAPABILITIES) {
-        await api.setCapabilityDecisionMode(
-          capability,
-          spec.decisionMode,
-          `Build workspace mode: ${spec.label}`,
-        );
-      }
-      appliedMode = next;
-    } catch (error) {
-      // Fail visibly rather than showing a posture the runtime did not accept.
-      mode = previous;
-      modeError =
-        error instanceof ApiError && error.status === 403
-          ? "Changing the mode needs the runtime gate-manager role. The previous mode is still in effect."
-          : "The runtime did not accept that mode. The previous mode is still in effect.";
-      await syncModeFromRuntime();
-    } finally {
-      modeBusy = false;
-    }
+    // Auto is the one mode whose hint depends on the owner's standing
+    // permissions, so an earlier read that failed is retried when it is picked
+    // rather than leaving "could not read" on screen for the rest of the session.
+    if (next === "auto" && standingModes === null) void readStandingModes();
   }
 
   function onKeydown(event: KeyboardEvent) {
     // Shift+Tab cycles Plan → Edit → Auto without leaving the prompt.
     if (event.key === "Tab" && event.shiftKey) {
       event.preventDefault();
-      void setMode(nextBuildMode(mode));
+      setMode(nextBuildMode(mode));
       return;
     }
     if (event.key === "Enter" && !event.shiftKey) {
@@ -469,6 +451,10 @@
           model: model || undefined,
           ...(reasoningEfforts.includes(reasoningEffort) ? { reasoning_effort: reasoningEffort } : {}),
           planning_mode: buildMode(sentMode).planningMode ?? undefined,
+          // BUG-70 — the mode travels with the turn instead of being written
+          // into the owner's standing permissions. Auto sends nothing, which is
+          // how "follow your standing permissions" is expressed on the wire.
+          capability_modes: turnCapabilityModes(sentMode),
           // A local repository rides the turn as a real workspace-path
           // attachment, resolved and bounded server-side like any other — now
           // alongside whatever the composer is carrying, in the same shape the
@@ -967,7 +953,9 @@
                 ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
               {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null}
-              <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
+              <!-- BUG-73 — see ChatView: a parked turn reports its state, never a
+                   claim about whether anything ran. -->
+              <div class="answer"><p class="bubble-text muted">{turn.response.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p></div>
             {/if}
 
             <!-- C6 — everything this turn actually read, under the answer that
@@ -1101,21 +1089,17 @@
           </div>
         </div>
 
-        {#if modeError !== null}<p class="error" role="alert">{modeError}</p>{/if}
-        {#if modeError === null}
-          {#if appliedMode !== null && appliedMode !== mode}
-            <p class="line-notice" role="status">Applying {modeSpec.label}…</p>
-          {:else if posture === "mixed"}
-            <p class="line-notice">
-              Write permissions are set individually right now, so this mode describes what will be applied when you
-              pick it — not what is in effect.
-            </p>
-          {:else if posture === "unreadable"}
-            <p class="line-notice">
-              Raiker could not read the current write permissions, so this mode describes what will be applied when you
-              pick it — not what is in effect.
-            </p>
-          {/if}
+        <!-- BUG-70 — what this mode does, stated where it is chosen. The chip no
+             longer edits standing permissions, so the sentence has to say whose
+             posture it is; for Auto it also reports what the owner's standing
+             permissions actually allow, rather than promising unprompted
+             execution they never granted. -->
+        <p class="line-notice mode-detail">{modeSpec.detail}</p>
+        {#if standingNote !== null}
+          <p class="line-notice" role="status">
+            {standingNote}
+            <a href="#/capabilities">Change in Permissions →</a>
+          </p>
         {/if}
 
         {#if attachOpen}
@@ -1139,7 +1123,7 @@
                   type="button"
                   class="mode-option"
                   aria-pressed={mode === option.id}
-                  disabled={modeBusy || streaming}
+                  disabled={streaming}
                   title={option.summary}
                   onclick={() => setMode(option.id)}
                 >

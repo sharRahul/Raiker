@@ -259,19 +259,11 @@ are the edges a Chat user can still hit:
   outside `RAIKER_WEB_EGRESS_ALLOWLIST` is refused by name. `web_search` answers
   the same gate but has no endpoint shipped with Raiker: it reports
   `web_search_not_configured` until you point it at one.
-- **The context popover's input/output split reads `NaN`.** Everything else in
-  it — used, capacity, remaining, this chat's cost, the provider all-time cost,
-  and the four price components — is correct and provider-reported. **BUG-68**.
-- **Rarely, a resumed turn denies an execution that happened.** After an
-  approval executes, the conversation normally resumes and summarises what it
-  did. One conversation on the 2026-08-08 round instead ended, durably, with
-  *"Approval required for local action. No command was executed."* directly
-  beneath the chip for the file that had just been written. If you see it, trust
-  the file chip and the Approvals record, not the sentence. **BUG-73**.
-- **Memory cannot be written from a conversation.** Turning on **Memory store**
-  does not give a turn a way to save anything: `memory_write` is a real
-  broker-governed action but is not in the tool catalogue a model sees, so only
-  `memory_get`, `memory_list` and `memory_search` are ever offered. **BUG-71**.
+- **Remembering something is a decision, and it starts off.** With **Memory
+  store** turned on in Permissions, a turn can propose a durable fact or
+  preference to keep; you see the exact sentence before you approve, and
+  approving really stores it. Until you turn the capability on, no conversation
+  can propose one — the Memory page states which of the two you are in.
 - **Asking for a task in Chat gets you an approval, not a task.** See
   [Tasks and projects](tasks-and-projects.md) → Known limits.
 - **An exported conversation carries citation numbers it cannot explain.** The

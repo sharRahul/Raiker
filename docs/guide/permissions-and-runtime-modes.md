@@ -85,22 +85,22 @@ the machine actor separately from you, the owner.
 
 Expand a row for its description and current decision mode, then **Turn on**.
 
-Two caveats found on the 2026-08-08 round:
+Two things worth knowing about how these rows behave elsewhere:
 
-- **Memory store and Memory forget cannot be reached from Chat or Build.** Both
-  can be enabled and set to any decision mode, and the Memory store row claims
-  it "persists durable memories through the governed broker" — which is true of
-  the broker and false of the agent. `memory_write` and `memory_forget` are not
-  in the tool catalogue a model sees, so no turn can propose one and no memory
-  record or proposal is ever created. Tracked as **BUG-71** — until it closes,
-  treat Memory as a read-only viewer.
-- **Build's Plan / Edit / Auto chips change decision modes without the step-up.**
-  Pressing one rewrites `file_write_execution`, `patch_apply_execution`,
-  `shell_execution` and `process_execution` globally and permanently, with no
-  reason and no acknowledgement recorded — the same change made here demands
-  both. Enforcement still fails safe (an approval is still raised), but if
-  Permissions shows a mode you do not remember choosing, a Build chip is the
-  likeliest cause. Tracked as **BUG-70**.
+- **Memory store and Memory forget are reachable from Chat and Build.** With the
+  gate on, a turn can propose remembering a durable fact or deleting a stored
+  one; you see the exact text before deciding, approving really stores or
+  removes the record, and text that looks like a credential is refused before
+  you are asked. With the gate off — the shipped default — no turn can propose
+  either, and the Memory page says so rather than promising proposals it cannot
+  produce.
+- **Build's Plan / Edit / Auto chips do not change anything on this page.** They
+  are the posture of one conversation, sent with each prompt and applied to that
+  turn: Plan refuses file writes, patches and commands, Edit turns each one into
+  a decision. A turn may only ever tighten itself, so **Auto** adds no
+  restriction of its own and does exactly as much as the modes here already
+  allow — which the Build composer states. Widening a permission happens here,
+  under the step-up.
 
 ### The step-up dialog
 

@@ -99,6 +99,56 @@ class AdvisorService:
             return self._store.load_principal_model_advisor(self._principal_id)
         return self._store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
 
+    def pinned_model(self, profile_id: str) -> str | None:
+        """The owner's most recent pinned model for *profile_id*, if any (BUG-82).
+
+        Mirrors ``ModelReadinessService._configured_model``: the pin for a
+        profile that is not the currently selected one lives in the
+        configured-model table, and reading it is what makes a hosted advisor
+        chosen in the UI actually resolvable.
+        """
+        if not self._principal_id:
+            return None
+        try:
+            pairs = self._store.list_configured_models(self._principal_id)
+        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
+            return None
+        for candidate_profile, candidate_model in reversed(list(pairs or [])):
+            if candidate_profile == profile_id and candidate_model:
+                return str(candidate_model)
+        return None
+
+    def resolved_advisor(self) -> tuple[str, str] | None:
+        """``(profile_id, model)`` the next consult would actually call, or None.
+
+        Exposed so readiness can be recorded and shown for the *exact* model the
+        advisor would use — the thing BUG-82 found had no probe, no state, no
+        chip, and no entry in ``GET /api/model-readiness``.
+        """
+        profile_id = self.advisor_profile_id()
+        if not profile_id:
+            return None
+        try:
+            from raiker.models.registry import ModelProfileRegistry
+
+            profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001 — a stale/unknown persisted id resolves nothing
+            return None
+        model = profile.model
+        scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
+        state = (
+            self._store.load_principal_model_state(self._principal_id)
+            if scoped and self._principal_id
+            else self._store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+        )
+        if state is not None and state.profile_id == profile.profile_id and state.model:
+            model = state.model
+        if not model or "<" in model:
+            model = self.pinned_model(profile.profile_id) or ""
+        if not model or "<" in model:
+            return None
+        return profile.profile_id, model
+
     # ── Consult ──────────────────────────────────────────────────────────
     def consult(self, question: str, *, enforce_modes: bool = True) -> dict[str, Any]:
         """Run one governed advisor consult; returns a tool-result-shaped dict.
@@ -164,6 +214,17 @@ class AdvisorService:
             state = self._store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         if state is not None and state.profile_id == profile.profile_id and state.model:
             profile = profile_with_model(profile, state.model)
+        # BUG-82 — the same defect FIXED-139 closed for the chat chain. The
+        # single `ModelSessionState` only ever names the *currently selected*
+        # profile, so a hosted advisor the owner pinned through Models → Routing
+        # resolved to the profile's `<model>` placeholder and every consult was
+        # refused `advisor_model_unresolved` — even though the owner had pinned
+        # one. The pin for any other profile lives in the configured-model table,
+        # which is what the chat chain reads and what this now reads too.
+        if not profile.model or "<" in profile.model:
+            pinned = self.pinned_model(profile.profile_id)
+            if pinned:
+                profile = profile_with_model(profile, pinned)
         if not profile.model or "<" in profile.model:
             return _denied(
                 f"advisor_model_unresolved:{profile_id}",

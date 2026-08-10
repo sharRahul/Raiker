@@ -69,6 +69,15 @@ _TOOL_RISK: dict[str, tuple[str, bool]] = {
     "memory_search": ("medium", False),
     "memory_list": ("medium", False),
     "memory_get": ("medium", False),
+    # BUG-71 — durable memory mutation. The broker has had real, fully governed
+    # executors for both since Tier 1 (`memory_write_execution` /
+    # `memory_forget_execution` gates, checkpointed rows, credential-like text
+    # refused outright), and the CLI could reach them — but neither tool was in
+    # the model's catalogue, so no Chat or Build turn could propose one however
+    # the owner set **Memory store**. They carry the same band as `create_task`:
+    # local, owner-scoped, reversible, and a decision the owner sees.
+    "memory_write": ("high", True),
+    "memory_forget": ("high", True),
     # An installed skill is the owner's own instruction document, already
     # validated on install and readable only for the owner who installed it.
     "skill_load": ("medium", False),
@@ -139,6 +148,8 @@ _REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     "memory_search": ("query",),
     "memory_list": (),
     "memory_get": ("memory_id",),
+    "memory_write": ("text",),
+    "memory_forget": ("memory_id",),
     "skill_load": ("name",),
     "create_task": ("title",),
     # The active session is trusted broker context, never a model argument.
@@ -246,6 +257,10 @@ _OPTIONAL_ARGS: dict[str, tuple[str, ...]] = {
     # `files` list the no-argument call returns.
     "skill_load": ("file",),
     "spawn_subagent": ("name",),
+    # `scope` and `memory_type` default to "project"; `tags` is a free list the
+    # memory store validates. None of them widen what the write may say — the
+    # sensitivity classifier still refuses credential-like text.
+    "memory_write": ("scope", "memory_type", "tags"),
     "web_search": ("max_results",),
     "code_map_search": ("max_results",),
     "git_branch": ("base",),
@@ -367,6 +382,21 @@ _TOOL_DESCRIPTIONS: dict[str, str] = {
     "memory_search": "Search approved owner memory across chats and projects.",
     "memory_list": "List approved owner memory records, optionally by scope.",
     "memory_get": "Read one approved owner memory record by memory_id.",
+    "memory_write": (
+        "Remember one durable fact or preference the user has asked you to keep, or "
+        "that will clearly matter in later conversations. Requires text (one short, "
+        "self-contained statement); optional scope (\"project\" or \"global\"), "
+        "memory_type and tags. This is a governed write: the owner sees exactly what "
+        "would be stored and decides, and text that looks like a credential or secret "
+        "is refused outright. Do not use it for anything only relevant to this "
+        "conversation — the transcript already holds that."
+    ),
+    "memory_forget": (
+        "Delete one stored memory record by memory_id, for when the user asks you to "
+        "forget something or a stored fact is now wrong. Requires memory_id — get it "
+        "from memory_search or memory_list first. Governed like memory_write: the "
+        "owner sees which record would go and decides."
+    ),
     "skill_load": (
         "Read the full instructions of one installed, active skill by name. Call this "
         "when a listed skill applies to the request, then follow what it says. The "

@@ -12,6 +12,7 @@ from typing import Any
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.models import ContextBundle
 from raiker.contracts.models import (
+    PARKED_FOR_APPROVAL_NOTICE,
     AgentResponse,
     PolicyDecision,
     PromptEnvelope,
@@ -390,6 +391,10 @@ class RuntimeOrchestrator:
                     "model": envelope.options.model,
                     "reasoning_effort": envelope.options.reasoning_effort,
                     "max_tool_calls": envelope.options.max_tool_calls,
+                    # BUG-70 — the turn's own posture rides with it, so a turn
+                    # parked in Plan mode resumes in Plan mode rather than
+                    # picking up whatever the standing modes say hours later.
+                    "capability_modes": dict(envelope.options.capability_modes),
                 }),
                 "client_json": json.dumps({
                     "type": envelope.client.type,
@@ -1417,6 +1422,7 @@ class RuntimeOrchestrator:
             machine_identity=identity,
             client=envelope.client,
             approval_mode=envelope.options.approval_mode,
+            turn_capability_modes=envelope.options.capability_modes,
         )
 
     async def _arun_agent_loop(
@@ -1508,7 +1514,7 @@ class RuntimeOrchestrator:
                     queue_position=queue_position,
                     queue_total=queue_total,
                 )
-                message = "Approval required for local action. No command was executed."
+                message = PARKED_FOR_APPROVAL_NOTICE
                 break
             if queued_decision.decision == "deny":
                 # ADD-02's rule: a denial skips its own call, it does not abandon
@@ -1885,7 +1891,7 @@ class RuntimeOrchestrator:
                     queue_position=boundary_index + 1,
                     queue_total=len(actions),
                 )
-                message = "Approval required for local action. No command was executed."
+                message = PARKED_FOR_APPROVAL_NOTICE
                 break
 
             self._state(machine, envelope, "EXECUTING")

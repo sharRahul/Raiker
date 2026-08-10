@@ -764,6 +764,19 @@ class ModelsView:
     # provider policy at call time.
     advisor_profile_id: str | None = None
     advisor_model_gate_state: str = "unknown"
+    # BUG-82 — the advisor is a second model this runtime calls, chosen in the
+    # same UI as the chat model and, until now, never readiness-checked: no
+    # probe, no state, no chip, and no row in `GET /api/model-readiness`. An
+    # owner could pin an advisor whose provider had no credential, no credit or
+    # no running runtime and see nothing wrong until a consult failed mid-turn.
+    # These four report the exact model a consult would call and what the last
+    # check of *that* model found, so the selector can carry the same chip and
+    # repair sentence a provider card does.
+    advisor_model: str | None = None
+    advisor_readiness_state: str = "not_configured"
+    advisor_readiness_summary: str | None = None
+    advisor_readiness_remediation: str | None = None
+    advisor_readiness_checked_at: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -773,6 +786,11 @@ class ModelsView:
             "current_model": self.current_model,
             "advisor_profile_id": self.advisor_profile_id,
             "advisor_model_gate_state": self.advisor_model_gate_state,
+            "advisor_model": self.advisor_model,
+            "advisor_readiness_state": self.advisor_readiness_state,
+            "advisor_readiness_summary": self.advisor_readiness_summary,
+            "advisor_readiness_remediation": self.advisor_readiness_remediation,
+            "advisor_readiness_checked_at": self.advisor_readiness_checked_at,
             "hosted_model_gate_state": self.hosted_model_gate_state,
             "private_network_model_gate_state": self.private_network_model_gate_state,
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
@@ -3692,7 +3710,52 @@ class DashboardService:
                 if scoped_principal else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
             ),
             advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
+            **self._advisor_readiness_fields(readiness_service, acting_principal_id),
         )
+
+    def _advisor_readiness_fields(
+        self, readiness_service: Any, acting_principal_id: str | None
+    ) -> dict[str, Any]:
+        """Readiness for the exact model a consult would call (BUG-82).
+
+        Resolved through the same per-profile pin the chat chain uses, so a
+        hosted advisor chosen in Models → Routing is the model reported on —
+        rather than the profile's `<model>` placeholder, which is what made the
+        consult refuse `advisor_model_unresolved` for owners who had pinned one.
+        """
+        from raiker.runtime.advisor import AdvisorService
+
+        blank = {
+            "advisor_model": None,
+            "advisor_readiness_state": "not_configured",
+            "advisor_readiness_summary": None,
+            "advisor_readiness_remediation": None,
+            "advisor_readiness_checked_at": None,
+        }
+        if not acting_principal_id:
+            return blank
+        try:
+            resolved = AdvisorService(
+                self.workspace_root, self.store, principal_id=acting_principal_id
+            ).resolved_advisor()
+        except Exception:  # noqa: BLE001 — an unreadable advisor reports "none chosen"
+            return blank
+        if resolved is None:
+            return blank
+        profile_id, model = resolved
+        try:
+            readiness = readiness_service.current_selected(
+                acting_principal_id, profile_id, model
+            )
+        except Exception:  # noqa: BLE001 — an unresolvable endpoint is "not checked"
+            return {**blank, "advisor_model": model}
+        return {
+            "advisor_model": model,
+            "advisor_readiness_state": readiness.state.value,
+            "advisor_readiness_summary": readiness.summary,
+            "advisor_readiness_remediation": readiness.remediation,
+            "advisor_readiness_checked_at": readiness.checked_at,
+        }
 
     # ── Connections (governed service connectors — web-app task 4) ───────
     def get_connections(self, acting_principal_id: str | None = None) -> ConnectionsView:

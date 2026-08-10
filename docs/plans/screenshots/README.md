@@ -13,8 +13,32 @@ running `raiker-web` in Chromium.
 
 | Prefix | Round | Provider |
 |---|---|---|
-| `r0808-` | **2026-08-08**, the current full round | hosted Anthropic, all ten catalogue models |
+| `r0810-` | **2026-08-10**, closing the 2026-08-08 round's four open defects plus BUG-82 | hosted Anthropic `claude-haiku-4-5-20251001` |
+| `r0808-` | **2026-08-08**, the last full round | hosted Anthropic, all ten catalogue models |
 | `01`–`207`, `b*`, `c*`, `bug*`, `add-*`, `skills-*` | 2026-07-26 → 2026-08-04 | hosted Anthropic `claude-haiku-4-5-20251001`, local Ollama `gemma4:31b-cloud` |
+
+---
+
+## The 2026-08-10 round
+
+Ten screenshots, prefix `r0810-`, captured by
+[`apps/web/e2e/bug-68-71-73-82-live.spec.ts`](../../../apps/web/e2e/bug-68-71-73-82-live.spec.ts)
+against a fresh workspace. Each one is the "after" for a defect the 2026-08-08
+round left open; the "before" is named beside it in
+[To be fixed](../TO_BE_FIXED.md).
+
+| File | Shows |
+|---|---|
+| `r0810-bug68-context-meter-real-io-counts.png` | FIXED-154 — the context popover reading `326 input · 5 output` where it read `NaN input · NaN output` |
+| `r0810-bug70-build-auto-changes-nothing-standing.png` | FIXED-155 — **Auto** selected, reporting what the owner's standing permissions actually allow, with **Change in Permissions →** |
+| `r0810-bug70-permissions-unchanged.png` | FIXED-155 — Permissions after a full Plan → Edit → Auto cycle, every capability still where it was |
+| `r0810-bug70-plan-mode-refuses-the-write.png` | FIXED-155 — a Build turn in **Plan** asked to write a file, refused by the runtime with no approval raised |
+| `r0810-bug71-memory-says-the-gate-is-off.png` | FIXED-156 — Memory stating the gate is off instead of promising proposals it cannot produce |
+| `r0810-bug71-memory-says-the-gate-is-on.png` | FIXED-156 — the same page once **Memory store** is enabled |
+| `r0810-bug71-chat-proposes-a-memory-write.png` | FIXED-156 — a Chat turn proposing `memory_write`, and FIXED-157's parked-state wording in the same bubble |
+| `r0810-bug73-approval-waiting.png` | FIXED-157 — the approval the parked turn is waiting on |
+| `r0810-bug73-parked-turn-states-its-state.png` | FIXED-157 — the parked conversation after a reload, with no claim that nothing ran |
+| `r0810-bug82-advisor-readiness.png` | FIXED-158 — the advisor selector carrying a readiness chip, the exact model, and **Check advisor** |
 
 ---
 

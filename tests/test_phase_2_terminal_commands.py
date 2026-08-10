@@ -180,15 +180,21 @@ class TestTerminalCommands:
             '/memory-store "project note"', workspace_root=str(tmp_path)
         )
         assert "status: approval_required" in store_output
-        assert "does not execute the action" in store_output
+        # BUG-71 — the proposal is still a decision, but resolving it now really
+        # writes the record, so the sentence has to say so. Asserting the old
+        # "does not execute the action" wording would be asserting the defect.
+        assert "Approving stores this exact text as a durable project memory, once." in store_output
         with SQLiteStore(tmp_path).connect() as connection:
             active = connection.execute(
                 "SELECT COUNT(*) AS count FROM turn_machine_identities WHERE is_active = 1"
             ).fetchone()
         assert active is not None and active["count"] == 0
-        assert handle_slash_command("/memory-forget mem_missing", workspace_root=str(tmp_path)).startswith(
-            "Memory forget:\n  status: approval_required"
-        )
+        # BUG-71 / FIXED-112 — a forget naming a record that does not exist is a
+        # refusal with a named reason, not a decision. Asking someone to approve
+        # deleting nothing is the class of proposal FIXED-112 stopped raising.
+        missing = handle_slash_command("/memory-forget mem_missing", workspace_root=str(tmp_path))
+        assert missing.startswith("Memory forget:\n  status: failed")
+        assert "memory_not_found" in missing
 
     def test_principal_create_requires_owner(self, tmp_path: Path) -> None:
         result = handle_slash_command(

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar
 
@@ -465,6 +466,59 @@ def _one_of(value: str, allowed: set[str], field_name: str) -> None:
         raise ContractValidationError(f"invalid_{field_name}:{value}")
 
 
+# BUG-73 — the sentence a turn shows *while* it is parked on an approval.
+#
+# It used to be persisted as that turn's assistant response, which is how one
+# conversation ended, durably, reading "Approval required for local action. No
+# command was executed." beneath the chip for the file the approval had just
+# written. The write had happened, was checkpointed, and had changed the
+# filesystem; the transcript said otherwise, and a reload did not correct it.
+#
+# Two things changed. It now *reads* as a state rather than as a verdict on
+# execution, and it is no longer stored as an answer at all: `close_turn` refuses
+# to persist it (see `AgentGateway._persisted_summary`), so a resume replaces it
+# by construction and an interrupted resume leaves the parked state showing
+# rather than a false claim. Naming both here is what lets the persistence layer
+# recognise the notice wherever it was produced — including the old wording,
+# which a workspace written before this change can still be carrying.
+PARKED_FOR_APPROVAL_NOTICE = "Waiting for your decision. Nothing has run yet."
+LEGACY_PARKED_FOR_APPROVAL_NOTICE = (
+    "Approval required for local action. No command was executed."
+)
+
+
+# BUG-70 — the only decision modes a *turn* may name for itself. Both tighten:
+# `ask` turns an unprompted run into a decision, `deny` refuses the call
+# outright. `allow` and `auto` are absent on purpose — they loosen, and loosening
+# is a change to standing authority that belongs to the Permissions step-up, not
+# to a composer chip.
+TURN_TIGHTENING_MODES = {"ask", "deny"}
+
+
+def validated_turn_capability_modes(value: Mapping[str, str] | None) -> dict[str, str]:
+    """Normalise and validate a turn-scoped capability posture.
+
+    Rejects an unknown capability and any mode that is not one of
+    :data:`TURN_TIGHTENING_MODES`, so an over-permissive value cannot ride in on
+    a prompt body and be silently ignored somewhere downstream — it fails the
+    envelope, which is where a caller can see it.
+    """
+    if not value:
+        return {}
+    if not isinstance(value, Mapping):
+        raise ContractValidationError("invalid_capability_modes")
+    from raiker.phase_gates import ALL_CAPABILITIES
+
+    cleaned: dict[str, str] = {}
+    for capability, mode in value.items():
+        if not isinstance(capability, str) or capability not in ALL_CAPABILITIES:
+            raise ContractValidationError(f"unknown_capability:{capability}")
+        if not isinstance(mode, str) or mode not in TURN_TIGHTENING_MODES:
+            raise ContractValidationError(f"invalid_turn_capability_mode:{mode}")
+        cleaned[capability] = mode
+    return cleaned
+
+
 def normalize_approval_mode(value: str) -> str:
     normalized = _LEGACY_APPROVAL_MODE_ALIASES.get(value, value)
     _one_of(normalized, APPROVAL_MODES, "approval_mode")
@@ -525,10 +579,26 @@ class PromptOptions:
     # by the runtime and never mutates the persisted model selection.
     reasoning_effort: str | None = None
     max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS
+    # BUG-70 — a **turn-scoped** capability posture, and deliberately a
+    # one-directional one. Build's Plan / Edit / Auto chips used to POST four
+    # `/api/capability-modes/<cap>/<mode>` changes, which rewrote the owner's
+    # *standing* permissions — globally, permanently, and without the step-up
+    # (recorded reason, threat-model acknowledgement) the Permissions page
+    # demands for the identical transition. A control presented as a per-turn
+    # posture must not be a silent edit of four high-risk permissions.
+    #
+    # So a turn may only ever *tighten* itself: `ask` and `deny` are the only
+    # accepted values, and the standing mode still governs everything this map
+    # does not name. A turn can therefore never grant itself authority the owner
+    # has not already given it, which is why this needs no ceremony of its own.
+    capability_modes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _one_of(self.planning_mode, PLANNING_MODES, "planning_mode")
         object.__setattr__(self, "approval_mode", normalize_approval_mode(self.approval_mode))
+        object.__setattr__(
+            self, "capability_modes", validated_turn_capability_modes(self.capability_modes)
+        )
         if self.reasoning_effort is not None and (
             not isinstance(self.reasoning_effort, str) or not self.reasoning_effort
         ):

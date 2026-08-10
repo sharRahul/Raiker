@@ -587,6 +587,15 @@ export interface ModelsView {
   current_model: string | null;
   advisor_profile_id: string | null;
   advisor_model_gate_state: string;
+  // BUG-82 — readiness for the exact model a consult would call. The advisor is
+  // a second model this runtime runs, and it used to have no probe, no state and
+  // no chip: an owner could pin one with no credential, no credit or no running
+  // runtime and learn about it only when a consult failed mid-turn.
+  advisor_model?: string | null;
+  advisor_readiness_state?: ModelReadinessState;
+  advisor_readiness_summary?: string | null;
+  advisor_readiness_remediation?: string | null;
+  advisor_readiness_checked_at?: string | null;
   hosted_model_gate_state: string;
   private_network_model_gate_state: string;
   model_egress_allowlist_configured: boolean;
@@ -1191,6 +1200,10 @@ export interface PromptRequestBody {
   model?: string;
   reasoning_effort?: string;
   max_tool_calls?: number;
+  // BUG-70 — a turn-scoped capability posture (Build's Plan / Edit chips). The
+  // server accepts only the tightening modes `ask` and `deny`, and applies them
+  // to this turn alone; the owner's standing decision modes are untouched.
+  capability_modes?: Record<string, string>;
   attachments?: PromptAttachment[];
 }
 

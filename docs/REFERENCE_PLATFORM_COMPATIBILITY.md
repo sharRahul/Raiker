@@ -129,7 +129,7 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Reasoning-effort control | Codex `model_reasoning_effort`; Claude Code thinking levels | `reasoning_effort` validated against the exact profile's declared values | ✅ |
 | Local runtime install / connect | Codex `--oss` (Ollama) | Vendor-sourced install plans for Ollama, LM Studio, llama.cpp; never bundled | ✅ beyond |
 | Model acquisition (pull / download / convert) | Codex pulls via Ollama | Ollama pull, revision-pinned Hugging Face GGUF download, isolated Safetensors→GGUF conversion | ✅ beyond |
-| Readiness of a secondary / auxiliary model | Claude Code `ANTHROPIC_SMALL_FAST_MODEL` | Advisor model is configured but never readiness-checked or surfaced | ❌ BUG-82 |
+| Readiness of a secondary / auxiliary model | Claude Code `ANTHROPIC_SMALL_FAST_MODEL` | Advisor model resolves through the same per-profile pin as the chat chain, carries a readiness observation under its own exact key, and shows the chip, the exact model and **Check advisor** beside the selector (FIXED-158) | ✅ |
 | Continuous / background revalidation | ChatGPT and Claude Code re-check per request | Fixed five-minute TTL, owner-triggered re-check only | 🟡 BUG-83 |
 | Single-provider live acceptance run | n/a | The BUG-69 live spec hard-requires two provider keys | 🟡 BUG-84 |
 
@@ -286,8 +286,11 @@ linking) and provenance.
 | Update / correct / forget | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Self-hosted/local-first deployment | `docs/ARCHITECTURE.md` (local-first, SQLite-backed) |
 
-Raiker difference: memory writes are **candidate-first and governance-gated**, and durable
-semantic/vector writes are currently disabled (`raiker/memory/readiness.py`).
+Raiker difference: memory writes are **candidate-first and governance-gated**. A turn proposes
+`memory_write` / `memory_forget` with the exact text, the owner sees it and decides, and
+credential-like text is refused before the decision is offered (FIXED-156). The gate ships off,
+and every surface says which of the two states it is in rather than promising proposals it
+cannot produce. Durable semantic/vector writes remain disabled (`raiker/memory/readiness.py`).
 
 ---
 

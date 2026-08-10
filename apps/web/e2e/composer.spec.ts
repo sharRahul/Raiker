@@ -115,7 +115,9 @@ test("Settings presents one section rail rather than a wall of fields", async ({
 });
 
 test("Models names providers in plain language and offers a real model list", async ({ page }) => {
-  await page.goto("http://raiker.test/#/models");
+  // The fixture profile is a hosted Anthropic account, so its card lives on the
+  // Hosted tab; Local holds the runtimes that run on this machine.
+  await page.goto("http://raiker.test/#/models?tab=hosted");
   await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);

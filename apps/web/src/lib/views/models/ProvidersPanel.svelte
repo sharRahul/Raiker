@@ -102,8 +102,8 @@
         >{busy === "lm-studio-desktop"
           ? "Opening…"
           : "Open official download"}</button
-      ><a href="#/models?tab=library"
-        >Use models LM Studio already downloaded →</a
+      ><a href="#local-library"
+        >Use models LM Studio already downloaded ↓</a
       >
     </article>
   </div>

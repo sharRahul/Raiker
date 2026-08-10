@@ -42,7 +42,7 @@
 - `apps/web/src/lib/views/models/LocalLibraryPanel.svelte`: sources, discovered models, and deployment review.
 - `apps/web/src/lib/views/models/HuggingFacePanel.svelte`: search, variant comparison, download and conversion review.
 - `apps/web/src/lib/views/models/DownloadsPanel.svelte`: durable job history and cleanup controls.
-- `apps/web/src/lib/views/models/ExistingModelsPanel.svelte`: unchanged Routing, Pricing, and Posture content extracted from the current Models view.
+- Routing, Pricing, and Posture stay inline in `ModelsView.svelte`; the `ExistingModelsPanel.svelte` wrapper this line once named became a pass-through around `LocalLibraryPanel` and was deleted in Task 14.
 
 ---
 
@@ -1005,6 +1005,91 @@ git add raiker/models apps/web/src apps/web/src/lib/views/ModelsView.test.ts tes
 git commit -m "fix: classify quota exhaustion and judge the whole model chain"
 ```
 
+### Task 14: Split the Models page by where a model comes from
+
+**Files:**
+- Modify: `apps/web/src/lib/nav.ts`
+- Modify: `apps/web/src/lib/views/ModelsView.svelte`
+- Modify: `apps/web/src/lib/views/models/ProvidersPanel.svelte`
+- Modify: `apps/web/src/lib/views/models/LocalLibraryPanel.svelte`
+- Modify: `apps/web/src/lib/views/models/HuggingFacePanel.svelte`
+- Modify: `apps/web/src/lib/views/ModelSetupView.svelte`
+- Modify: `apps/web/src/lib/components/ModelOperationTray.svelte`
+- Modify: `apps/web/src/lib/components/ModelCapacityBadge.svelte`
+- Delete: `apps/web/src/lib/views/models/ExistingModelsPanel.svelte`
+- Test: `apps/web/src/lib/nav.test.ts`
+- Test: `apps/web/src/lib/views/ModelsView.test.ts`
+- Test: `apps/web/e2e/composer.spec.ts`, `apps/web/e2e/bug-69-*.spec.ts`, `apps/web/e2e/bug-44-47-live.spec.ts`
+
+**Interfaces:**
+- Consumes: Tasks 8–11 panels.
+- Produces: `HUB_TABS.models = [local, hosted, huggingface, activity, routing, pricing, posture]` and `HUB_TAB_ALIASES`.
+
+Task 11 shipped the acquisition panels but left them behind one **Providers**
+tab holding local runtimes, hosted accounts, advanced routers, and vendor
+installers, with the GGUF index on a separate **Library** tab. Obtaining a model
+that runs on this machine and signing in to somebody else's are different jobs;
+each now owns a tab, and the local library moves next to the runtime that will
+serve it. Revised IA in `docs/superpowers/specs/2026-08-09-model-readiness-onboarding-and-acquisition-design.md`.
+
+- [x] **Step 1: Write failing navigation and panel-isolation tests**
+
+```ts
+it("resolves every Models panel from a deep link", () => {
+  expect(tabFromHash("#/models?tab=huggingface")).toBe("huggingface");
+  expect(tabFromHash("#/models?tab=activity")).toBe("activity");
+});
+
+it("keeps hosted accounts off the Local tab", async () => {
+  render(ModelsView, { tab: "local" });
+  expect(await screen.findByText("On this device")).toBeInTheDocument();
+  expect(screen.queryByText("Your hosted providers")).not.toBeInTheDocument();
+});
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `npm --prefix apps/web test -- nav.test.ts ModelsView.test.ts`
+Expected: `HUB_TABS.models` has no `huggingface`/`activity` entry, and one
+Providers panel still renders every section.
+
+- [x] **Step 3: Register the panels, split the sections, and lift the page-level cards**
+
+`HUB_TABS.models` gains every panel it actually has; `HUB_TAB_ALIASES` maps the
+superseded ids so bookmarks and older links keep working. `TAB_SECTIONS` decides
+which provider groups a tab owns, the readiness summary and Global model card
+move above the tab strip, `LocalLibraryPanel` renders under the Local tab, and
+the `ExistingModelsPanel` pass-through wrapper is deleted.
+
+```ts
+const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
+  local: ["Local"],
+  hosted: ["Hosted", "Advanced"],
+};
+```
+
+- [x] **Step 4: Verify GREEN, the full local gate, and the mocked suite**
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+
+Run: `npm --prefix apps/web run test:e2e:mocked`
+Expected: all pass; every spec that deep-links into Models names a current tab.
+
+- [x] **Step 5: Verify live, including the four superseded ids**
+
+All seven panels resolve from a deep link; `providers` and `library` land on
+Local, `discover` on Hugging Face, `downloads` on Activity; clicking a tab writes
+the canonical hash. No horizontal page overflow at 1440, 1024, 768, or 375
+pixels, and the console is clean in light and dark themes. Evidence:
+`docs/plans/screenshots/working/bug69-models-tab-*.png`.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add apps/web/src apps/web/e2e docs
+git commit -m "feat: split Models by where a model comes from"
+```
+
 ## Plan self-review mapping
 
 - Readiness domain, all states, exact binding, freshness, invalidation: Tasks 1–3.
@@ -1016,3 +1101,4 @@ git commit -m "fix: classify quota exhaustion and judge the whole model chain"
 - Safetensors-only isolated conversion and quantization: Task 10 and Task 11.
 - Three-provider live testing, local GGUF/Hugging Face evidence, docs, push, green CI: Task 12.
 - Reference-platform parity for the readiness control set, billing/quota state, chain-aware gating: Task 13.
+- Models information architecture split by model origin, and every panel reachable by deep link: Task 14.

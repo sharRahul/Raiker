@@ -78,7 +78,7 @@
 </script>
 
 <div class="library-layout">
-  <section class="library-intro card">
+  <section class="library-intro card" id="local-library">
     <div>
       <p class="eyebrow">Local model library</p>
       <h2>Use models already on this device</h2>

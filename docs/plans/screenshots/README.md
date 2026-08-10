@@ -246,3 +246,15 @@ succeeds and every inference call is refused for billing.
 |---|---|
 | `bug69-models-quota-readiness-live.png` | FIXED-138 and FIXED-140 — the card reads **No credit** after Test ran the exact-model readiness check, the headline reads **0 models ready · 1 of 10 connected**, and every other card carries its own state chip |
 | `bug69-chat-quota-readiness-live.png` | The same verdict on the Chat surface: the billing sentence, the draft preserved, and Send disabled |
+
+## Models information architecture — 2026-08-09
+
+The Models page split by where a model comes from, replacing the single
+Providers scroll. Same live workspace as the round above.
+
+| File | Records |
+|---|---|
+| `bug69-models-tab-local-live.png` | The Local tab: readiness and the global default above the strip, then runtime install/pull, the on-device runtimes, and the GGUF library |
+| `bug69-models-tab-hosted-live.png` | The Hosted tab: provider accounts and advanced routers only, with no local runtime or installer in sight |
+| `bug69-models-tab-huggingface-live.png` | The Hugging Face tab: search-first download and conversion |
+| `bug69-models-tab-local-375-live.png` | The Local tab at 375 pixels — the strip and panel stay above the fold, no horizontal page overflow |

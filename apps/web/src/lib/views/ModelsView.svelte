@@ -22,7 +22,7 @@
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
   import { setModels } from "../models.svelte";
-  import ExistingModelsPanel from "./models/ExistingModelsPanel.svelte";
+  import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
   import DownloadsPanel from "./models/DownloadsPanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
@@ -33,7 +33,7 @@
   // popover's "Configure →" links straight to #/models?tab=pricing.
   let {
     onchanged,
-    tab = "providers",
+    tab = "local",
   }: { onchanged?: () => void; tab?: string } = $props();
 
   /**
@@ -41,16 +41,32 @@
    * lives in. Everything on this page used to be one long scroll, which meant
    * an owner looking for a rate scrolled past provider cards, and an owner
    * connecting a provider scrolled past the fallback list.
+   *
+   * "Providers" then became its own long scroll for the same reason: it held
+   * local runtimes, hosted accounts, advanced routers, vendor installers, and
+   * the GGUF library at once. Obtaining a model that runs on this machine and
+   * signing in to somebody else's are different jobs with different vocabulary,
+   * different risks, and almost no shared controls, so they are separate tabs.
+   * Local is first because Raiker prefers local backends.
    */
   const TABS = [
-    { id: "providers", label: "Providers" },
-    { id: "library", label: "Library" },
-    { id: "discover", label: "Discover" },
-    { id: "downloads", label: "Activity" },
+    { id: "local", label: "Local" },
+    { id: "hosted", label: "Hosted" },
+    { id: "huggingface", label: "Hugging Face" },
+    { id: "activity", label: "Activity" },
     { id: "routing", label: "Routing" },
     { id: "pricing", label: "Pricing" },
     { id: "posture", label: "Posture" },
   ];
+
+  // Which provider sections each tab owns. The three groups already existed as
+  // headings inside one scroll; the split promotes them to destinations.
+  const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
+    local: ["Local"],
+    hosted: ["Hosted", "Advanced"],
+  };
+  const visibleSections = $derived(TAB_SECTIONS[tab] ?? []);
+  const showsProviderCards = $derived(visibleSections.length > 0);
 
   function selectTab(next: string) {
     tab = next;
@@ -515,7 +531,6 @@
     return profile.requires_network ? "Hosted" : "Local";
   }
 
-  const sections = ["Local", "Hosted", "Advanced"] as const;
   const configuredProfiles = $derived(
     (models?.profiles ?? []).filter(
       (p) => p.connection_configured || p.selected,
@@ -712,6 +727,70 @@
   </button>
 </div>
 
+<!-- Readiness and the global default describe the page, not one panel, so
+     they sit above the strip: an owner on Pricing or Posture can still see
+     whether anything can run and change what runs by default. -->
+{#if models !== null && models.profiles.length > 0}
+  <section
+    class="setup-overview card"
+    aria-labelledby="model-setup-title"
+  >
+    <div>
+      <p class="eyebrow">Model setup</p>
+      <h2 id="model-setup-title">Choose where Raiker thinks</h2>
+      <p class="sub">
+        Each connection belongs only to this Raiker instance. One ready
+        provider is enough to work.
+      </p>
+    </div>
+    <div class="setup-meter" aria-live="polite">
+      <strong>{readyCount} models ready</strong>
+      <span class="of"
+        >{configuredProfiles.length} of {models.profiles.length} connected</span
+      >
+      {#if totalSpend > 0}
+        <p class="total-spend">
+          {formatCost(String(totalSpend), spendCurrency)} total API cost
+        </p>
+      {/if}
+    </div>
+  </section>
+
+  <section
+    class="global-model-card card"
+    aria-labelledby="global-model-title"
+  >
+    <div class="global-model-copy">
+      <p class="eyebrow">Default</p>
+      <h2 id="global-model-title">Global model</h2>
+      <p class="sub">
+        Used whenever a surface does not choose its own model, including
+        each scheduled run when it begins.
+      </p>
+    </div>
+    <label class="global-model-field">
+      <span>Global model</span>
+      <small>Choose any configured provider and exact model.</small>
+      <select
+        aria-label="Global model"
+        value={globalChoice}
+        onchange={(event) => void selectGlobal(event.currentTarget.value)}
+        disabled={selecting}
+      >
+        <option value="" disabled>Choose a global model</option>
+        {#each globalChoices as profile (`${profile.profile_id}\u0000${profile.model}`)}
+          <option
+            value={JSON.stringify([profile.profile_id, profile.model])}
+            >{providerName(profile.provider)} — {modelName(
+              profile.model,
+            )}</option
+          >
+        {/each}
+      </select>
+    </label>
+  </section>
+{/if}
+
 <TabStrip
   tabs={TABS}
   selected={tab}
@@ -724,44 +803,51 @@
 {:else if models === null}
   <PageState state="loading" title="Loading models…" />
 {:else}
-  {#if tab === "library"}<div
+  {#if tab === "huggingface"}<div
       class="panel"
       role="tabpanel"
-      id="panel-library"
-      aria-labelledby="tab-library"
+      id="panel-huggingface"
+      aria-labelledby="tab-huggingface"
     >
-      <ExistingModelsPanel />
-    </div>{/if}
-  {#if tab === "discover"}<div
-      class="panel"
-      role="tabpanel"
-      id="panel-discover"
-      aria-labelledby="tab-discover"
-    >
+      <p class="tab-lead">
+        Search the Hub, compare variants, and download an exact revision. When
+        no ready-made GGUF fits, convert supported Safetensors locally — the
+        conversion runs offline in a bounded worker and never executes
+        repository code.
+      </p>
       <HuggingFacePanel />
     </div>{/if}
-  {#if tab === "downloads"}<div
+  {#if tab === "activity"}<div
       class="panel"
       role="tabpanel"
-      id="panel-downloads"
-      aria-labelledby="tab-downloads"
+      id="panel-activity"
+      aria-labelledby="tab-activity"
     >
+      <p class="tab-lead">
+        Installs, pulls, downloads, conversions, and deployments — running and
+        historic. Every job names its source and destination.
+      </p>
       <DownloadsPanel />
     </div>{/if}
-  {#if tab === "providers"}
+  {#if showsProviderCards}
     <div
       class="panel"
       role="tabpanel"
-      id="panel-providers"
-      aria-labelledby="tab-providers"
+      id={`panel-${tab}`}
+      aria-labelledby={`tab-${tab}`}
     >
       <p class="tab-lead">
-        Connect a provider and choose the exact model that serves your work. You
-        can also choose per prompt in Chat, or in the terminal client (<code
-          >/model use …</code
-        >).
+        {#if tab === "local"}
+          Models that run on this machine. Install or start a runtime, pull a
+          model, or index GGUF files you already have — nothing here leaves
+          this device.
+        {:else}
+          Accounts you hold with a model provider, and custom endpoints or
+          routers you run yourself. You can also choose per prompt in Chat, or
+          in the terminal client (<code>/model use …</code>).
+        {/if}
       </p>
-      <ProvidersPanel />
+      {#if tab === "local"}<ProvidersPanel />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
           <EmptyState
@@ -771,66 +857,8 @@
           />
         </div>
       {:else}
-        <section
-          class="setup-overview card"
-          aria-labelledby="model-setup-title"
-        >
-          <div>
-            <p class="eyebrow">Model setup</p>
-            <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-            <p class="sub">
-              Each connection belongs only to this Raiker instance. One ready
-              provider is enough to work.
-            </p>
-          </div>
-          <div class="setup-meter" aria-live="polite">
-            <strong>{readyCount} models ready</strong>
-            <span class="of"
-              >{configuredProfiles.length} of {models.profiles.length} connected</span
-            >
-            {#if totalSpend > 0}
-              <p class="total-spend">
-                {formatCost(String(totalSpend), spendCurrency)} total API cost
-              </p>
-            {/if}
-          </div>
-        </section>
 
-        <section
-          class="global-model-card card"
-          aria-labelledby="global-model-title"
-        >
-          <div class="global-model-copy">
-            <p class="eyebrow">Default</p>
-            <h2 id="global-model-title">Global model</h2>
-            <p class="sub">
-              Used whenever a surface does not choose its own model, including
-              each scheduled run when it begins.
-            </p>
-          </div>
-          <label class="global-model-field">
-            <span>Global model</span>
-            <small>Choose any configured provider and exact model.</small>
-            <select
-              aria-label="Global model"
-              value={globalChoice}
-              onchange={(event) => void selectGlobal(event.currentTarget.value)}
-              disabled={selecting}
-            >
-              <option value="" disabled>Choose a global model</option>
-              {#each globalChoices as profile (`${profile.profile_id}\u0000${profile.model}`)}
-                <option
-                  value={JSON.stringify([profile.profile_id, profile.model])}
-                  >{providerName(profile.provider)} — {modelName(
-                    profile.model,
-                  )}</option
-                >
-              {/each}
-            </select>
-          </label>
-        </section>
-
-        {#each sections as section}
+        {#each visibleSections as section}
           {@const sectionProfiles = profilesFor(section)}
           {#if sectionProfiles.length}
             <section
@@ -1254,6 +1282,10 @@
           <p class="error" role="alert">{selectError}</p>
         {/if}
       {/if}
+      <!-- Building a local model finishes here: a runtime above, and the GGUF
+           files this machine already holds below. Splitting them across two
+           tabs made the owner navigate mid-task. -->
+      {#if tab === "local"}<LocalLibraryPanel />{/if}
     </div>
   {/if}
 
@@ -2383,6 +2415,19 @@
     }
     .local-row {
       flex-direction: column;
+    }
+    /* These two cards sit above the tab strip so every panel can see readiness
+       and change the default. Stacked on a phone that pushed the tabs below the
+       fold, so the explanatory copy — which the headline and the labelled
+       select already carry — is dropped rather than the controls. */
+    .setup-overview .sub,
+    .global-model-card .sub,
+    .global-model-field small {
+      display: none;
+    }
+    .setup-overview,
+    .global-model-card {
+      gap: 8px;
     }
   }
 </style>

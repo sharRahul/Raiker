@@ -39,9 +39,19 @@ export const DEFAULT_ROUTE = "home";
  */
 export const HUB_TABS: Record<string, string[]> = {
   // Models is organised by what you came to do, not by which table the data
-  // lives in: connect and choose a provider, decide what serves a turn when the
-  // first choice cannot, see what it costs, or read the off-machine posture.
-  models: ["providers", "routing", "pricing", "posture"],
+  // lives in: obtain a model that runs on this machine, sign in to somebody
+  // else's, fetch or convert one from the Hub, watch that work, decide what
+  // serves a turn when the first choice cannot, see what it costs, or read the
+  // off-machine posture.
+  models: [
+    "local",
+    "hosted",
+    "huggingface",
+    "activity",
+    "routing",
+    "pricing",
+    "posture",
+  ],
   extensions: ["connectors", "mcp", "skills", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
   settings: ["general", "notification", "personalisation", "security", "account", "runtime"],
@@ -62,6 +72,25 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
   sessions: { route: "observe", tab: "sessions" },
+};
+
+/**
+ * Tab ids a hub used to have, mapped to the panel that now owns their content.
+ *
+ * A tab id travels: it sits in bookmarks, in links other views emit, and in
+ * e2e specs. Renaming one without a mapping does not fail loudly — the request
+ * simply misses `HUB_TABS` and falls through to the hub's first panel, which
+ * looks like a working link to the wrong place.
+ */
+const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
+  // The single "Providers" scroll became Local and Hosted; "Library" was the
+  // local GGUF index, now part of Local; "Discover" was the Hub search.
+  models: {
+    providers: "local",
+    library: "local",
+    discover: "huggingface",
+    downloads: "activity",
+  },
 };
 
 function rawRoute(hash: string): string {
@@ -87,6 +116,8 @@ export function tabFromHash(hash: string): string | null {
   if (tabs === undefined) return null;
   const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("tab");
   if (requested !== null && tabs.includes(requested)) return requested;
+  const supersededBy = requested === null ? undefined : HUB_TAB_ALIASES[route]?.[requested];
+  if (supersededBy !== undefined && tabs.includes(supersededBy)) return supersededBy;
   const aliased = ROUTE_ALIASES[raw];
   if (aliased !== undefined && aliased.route === route) return aliased.tab;
   return tabs[0];

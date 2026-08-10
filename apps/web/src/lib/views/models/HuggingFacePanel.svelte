@@ -302,7 +302,7 @@
         type="button"
         disabled={!destination || preview === null}
         onclick={() => void download()}>Confirm download</button
-      >{#if !destination}<a href="#/models?tab=library"
+      >{#if !destination}<a href="#/models?tab=local"
           >Approve a model folder first →</a
         >{/if}
     </section>{/if}

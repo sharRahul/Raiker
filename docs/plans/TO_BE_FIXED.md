@@ -208,6 +208,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-138 | High | Model readiness / an empty account balance was reported as an unreachable provider | Fixed (found in the BUG-69 parity review) |
 | FIXED-139 | High | Model readiness / the gate ignored the fallback chain the runtime actually tries | Fixed (found in the BUG-69 parity review) |
 | FIXED-140 | High | Models UI / the page counted saved credentials as "set up" and Test proved nothing | Fixed (found in the BUG-69 parity review) |
+| FIXED-141 | Medium | Models navigation / three tabs were unreachable by deep link and silently opened Providers | Fixed (found while splitting the Models page) |
 | BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
 | BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
 | BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
@@ -6380,5 +6381,39 @@ account earns.
 **UI when closed.** No UI change. `npm --prefix apps/web run test:e2e:live` with
 a single provider key produces a complete, honest evidence run for that
 provider.
+
+---
+## FIXED-141 — Three Models tabs were unreachable by deep link
+
+**Status: fixed while splitting the Models page by model origin (Task 14).**
+Found on 2026-08-09 driving the tab strip in a browser.
+
+**Observed.** `#/models?tab=library`, `?tab=discover`, and `?tab=downloads` all
+opened **Providers**. Clicking the tabs worked, so the panels looked fine; only
+the links into them were broken:
+
+| Link | Emitted by | Landed on |
+|---|---|---|
+| `#/models?tab=library` | "Use models LM Studio already downloaded →" | Providers |
+| `#/models?tab=library` | Hugging Face download destination | Providers |
+| `#/models?tab=discover` | ModelSetupView "Continue in Models" | Providers |
+| `#/models?tab=downloads` | Operation tray "View downloads" | Providers |
+
+Three BUG-69 live specs navigated the same way and were therefore asserting
+against the Providers panel while appearing to test Library and Discover.
+
+**Root cause.** `HUB_TABS.models` in `apps/web/src/lib/nav.ts` still listed the
+pre-BUG-69 four (`providers`, `routing`, `pricing`, `posture`). `tabFromHash`
+falls back to a hub's first tab for an unrecognised id — the correct behaviour
+for a typo, and silent for a tab that genuinely exists but was never registered.
+Nothing failed loudly: the panel rendered, just the wrong one.
+
+**Fix.** Every Models panel is registered. A new `HUB_TAB_ALIASES` maps
+superseded ids onto their replacements (`providers`/`library` → `local`,
+`discover` → `huggingface`, `downloads` → `activity`) so bookmarks and older
+builds keep working, and every internal link now emits a canonical id.
+
+**Evidence.** Two nav tests covering all seven panels and all four aliases, plus
+a live sweep of eleven deep links.
 
 ---

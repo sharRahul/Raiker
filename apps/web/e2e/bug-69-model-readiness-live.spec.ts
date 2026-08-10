@@ -162,9 +162,9 @@ test("BUG-69 first-run, universal readiness gate, and three live providers", asy
     fullPage: true,
   });
 
-  await page.goto(`${BASE}/#/models`);
-  await expect(page.getByRole("tab", { name: "Library" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Discover" })).toBeVisible();
+  await page.goto(`${BASE}/#/models?tab=hosted`);
+  await expect(page.getByRole("tab", { name: "Local" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "Hugging Face" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Activity" })).toBeVisible();
   await connectProvider(page, "Anthropic", "Anthropic API key", ANTHROPIC_KEY);
   await connectProvider(
@@ -178,7 +178,7 @@ test("BUG-69 first-run, universal readiness gate, and three live providers", asy
     fullPage: true,
   });
 
-  await page.goto(`${BASE}/#/models`);
+  await page.goto(`${BASE}/#/models?tab=local`);
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });
   await chooseModel(ollama, "gemma4:31b-cloud");
   await runReadyTurn(page, "Ollama", "BUG69 OLLAMA LIVE", false);
@@ -187,7 +187,7 @@ test("BUG-69 first-run, universal readiness gate, and three live providers", asy
     fullPage: true,
   });
 
-  await page.goto(`${BASE}/#/models`);
+  await page.goto(`${BASE}/#/models?tab=hosted`);
   await chooseModel(
     page.locator("article.provider-card").filter({ hasText: "Anthropic" }),
     "claude-opus-4-8",
@@ -198,7 +198,7 @@ test("BUG-69 first-run, universal readiness gate, and three live providers", asy
     fullPage: true,
   });
 
-  await page.goto(`${BASE}/#/models`);
+  await page.goto(`${BASE}/#/models?tab=hosted`);
   const openrouter = page
     .locator("article.provider-card")
     .filter({ hasText: "OpenRouter" });

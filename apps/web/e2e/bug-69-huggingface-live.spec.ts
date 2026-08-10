@@ -35,12 +35,12 @@ test("BUG-69 live Hub search presents immutable GGUF-first choices", async ({
   page,
 }) => {
   test.setTimeout(180_000);
-  await page.goto(`${BASE}/#/models?tab=discover`);
+  await page.goto(`${BASE}/#/models?tab=huggingface`);
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
     await unlock(page);
-    await page.goto(`${BASE}/#/models?tab=discover`);
+    await page.goto(`${BASE}/#/models?tab=huggingface`);
   }
-  await page.getByRole("tab", { name: "Discover" }).click();
+  await page.getByRole("tab", { name: "Hugging Face" }).click();
   await page.getByLabel("Search Hugging Face models").fill("Qwen2.5 0.5B GGUF");
   await page.getByRole("button", { name: "Search models" }).click();
   await page
@@ -61,14 +61,14 @@ test("BUG-69 downloads a selected immutable GGUF into an approved library", asyn
 }) => {
   test.setTimeout(240_000);
   mkdirSync(DOWNLOAD_ROOT, { recursive: true });
-  await page.goto(`${BASE}/#/models?tab=library`);
+  await page.goto(`${BASE}/#/models?tab=local`);
   await unlock(page);
-  await page.goto(`${BASE}/#/models?tab=library`);
-  await page.getByRole("tab", { name: "Library" }).click();
+  await page.goto(`${BASE}/#/models?tab=local`);
+  await page.getByRole("tab", { name: "Local" }).click();
   await page.getByLabel("Absolute model folder").fill(DOWNLOAD_ROOT);
   await page.getByRole("button", { name: "Add and scan" }).click();
 
-  await page.getByRole("tab", { name: "Discover" }).click();
+  await page.getByRole("tab", { name: "Hugging Face" }).click();
   await page
     .getByLabel("Search Hugging Face models")
     .fill("tensorblock TinyStories-656K GGUF");
@@ -85,7 +85,7 @@ test("BUG-69 downloads a selected immutable GGUF into an approved library", asyn
   await expect(
     page.getByText("GGUF downloaded and indexed in your local library."),
   ).toBeVisible({ timeout: 180_000 });
-  await page.getByRole("tab", { name: "Library" }).click();
+  await page.getByRole("tab", { name: "Local" }).click();
   const modelCard = page.locator("article.model-card").filter({
     hasText: /TinyStories 656K/i,
   });

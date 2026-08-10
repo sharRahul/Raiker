@@ -227,6 +227,12 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | BUG-85 | Low | Live tests / the BUG-47 scenario expects two Models tabs on screen at once | Open (found while fixing FIXED-143) |
+| FIXED-145 | Low | Web / the first-run screen was titled "Workbench" | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-146 | Low | Knowledge Map / the count pill contradicted the empty state | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-147 | Medium | Knowledge Map / the graph ignored a system dark preference | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-148 | Low | Models / "1 models ready" | Fixed (found in the 2026-08-10 visual sweep) |
+| BUG-86 | **Critical** | Storage / SQLCipher runs out of locked memory and locks the owner out | Open (found in the 2026-08-10 visual sweep) |
+| BUG-87 | Medium | Observability / the audit log shows nothing though governed events were recorded | Open (found in the 2026-08-10 visual sweep) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -6536,6 +6542,163 @@ weakened, so the entry records the gap instead of a spec that passes by
 asserting less.
 
 **UI when closed.** No UI change.
+
+---
+## FIXED-145 — The first-run screen was titled "Workbench"
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep, in the
+same screenshot as FIXED-144.**
+
+**Observed.** The first-run "Choose how to run models" screen carried the topbar
+title **Workbench** and its hint, *"Resume governed work and see what needs
+attention"* — on a machine with no work to resume.
+
+**Root cause.** `navItem()` in `apps/web/src/lib/nav.ts` ends
+`?? NAV_ITEMS[0]`, which is correct for a typo'd route and wrong for a route
+that genuinely exists but has deliberately no sidebar entry. `model-setup` is
+the only such route today.
+
+**Fix.** An `OFF_NAV_ITEMS` list gives an off-nav route its own label and hint —
+*"Set up models · Choose how Raiker runs models before your first turn"* —
+without putting it in the sidebar. A nav test asserts both halves: the title is
+its own, and the route is still absent from `NAV_ITEMS`.
+
+---
+## FIXED-146 — The Knowledge Map's count pill contradicted its own empty state
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** On a workspace with nothing recorded, the graph showed
+*"Build your knowledge graph — Add sources… Relationships will appear
+automatically"* while the pill in the same corner read **"3 nodes · 2
+relationships"**.
+
+**Root cause.** A workspace with at most one real node is given an instructional
+starter graph — three placeholder nodes and two placeholder edges, flagged
+`is_real: false`. The overlay tested the *raw* node count; the pill counted the
+*rendered* nodes, placeholders included. Two conditions describing the same
+state, disagreeing — the failure mode this document keeps recording.
+
+**Fix.** One `showingStarter` derived value now decides all three things that
+depend on it: whether the starter graph is built, whether the overlay shows, and
+what the pill says. While it is showing the pill reads **"Starter view ·
+nothing recorded yet"**, so the two agree by construction.
+
+---
+## FIXED-147 — The Knowledge Map ignored a system dark preference
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** With the theme left on **System** and the OS set to dark, every
+route rendered dark except the Knowledge Map, whose canvas, pill, controls and
+empty-state copy stayed on the light palette inside an otherwise dark shell.
+
+**Root cause.** `apps/web/src/app.css` defines the dark tokens for both the
+explicit attribute *and* `@media (prefers-color-scheme: dark)` under
+`:root:not([data-theme])`. `BrainView.svelte` does not use those tokens for its
+canvas — it hard-codes a light palette and overrides it under
+`:global(:root[data-theme="dark"])` only. "System" deliberately removes the
+`data-theme` attribute (`lib/theme.ts`), so on the default setting the override
+never matched.
+
+**Fix.** The dark override block is now also applied inside
+`@media (prefers-color-scheme: dark)` for `:root:not([data-theme="light"])`, so
+the three states the rest of the app supports — explicit light, explicit dark,
+and system — all reach the Knowledge Map. Verified by screenshot in system-dark
+and explicit-light.
+
+---
+## FIXED-148 — "1 models ready"
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** The Models page headline read **"1 models ready"** — the number
+most owners will ever see there, since one ready provider is enough to work and
+the page says so two lines above.
+
+**Fix.** The count is pluralised. It is small, and it is on the first screen a
+new owner reaches after setup.
+
+---
+## BUG-86 — SQLCipher runs out of locked memory and locks the owner out
+
+**Status: open. Found on 2026-08-10 during the visual sweep, on Linux.
+Reproduced twice.**
+
+**Observed.** After a few minutes of ordinary navigation the sign-in screen
+began answering every attempt with
+
+> Runtime verification failed. The workspace remains locked.
+
+while the status strip at the bottom of the same screen read **"Runtime
+operational"**. The server was healthy: `GET /api/health` answered 200
+throughout, and later requests in the same log succeeded.
+
+**Root cause (partial).** The server log carries eleven occurrences of:
+
+```
+File "raiker/api/auth.py", line 16, in __init__
+    self._session_store = ApiSessionStore(self._workspace_root)
+File "raiker/storage/sqlite.py", line 467, in connect
+    connection.execute("SELECT 1")
+MemoryError
+2026-08-10 08:54:01.636: ERROR CORE sqlite3Codec: identified deferred error condition: 0
+```
+
+The host had **15 GB free**, so this is not memory exhaustion — it is SQLCipher
+failing to obtain *locked* pages for a key. `ulimit -l` on the run was 8 MB.
+`SQLiteStore.connect()` caches one connection per
+`(workspace_root, thread_ident)`, and the API dispatches its synchronous
+handlers across anyio's worker-thread pool, so a new worker thread mints another
+key-bearing connection. The population grows with concurrency until the
+process's locked-memory allowance is spent, and the first thing to fail is
+authentication — which happens on **every** request.
+
+This is the same family as BUG-46, which recorded it on Windows; it is not
+Windows-specific.
+
+**Required fix.** Bound the number of key-bearing connections independently of
+how many threads the server happens to use, rather than per thread — and decide
+explicitly, in the open, what Raiker does when the platform cannot lock the
+pages it wants: fail closed and say why, or run with
+`cipher_memory_security` off and record that it did. Whichever is chosen, the
+owner must not be told the runtime cannot be verified while the same screen says
+it is operational.
+
+**UI when closed.** Sign-in never fails for a reason unrelated to the
+credential. If the store genuinely cannot be opened, the screen names that —
+not "verification failed" — and the status strip agrees with it.
+
+---
+## BUG-87 — The audit log shows nothing though governed events were recorded
+
+**Status: open. Found on 2026-08-10 during the visual sweep.**
+
+**Observed.** After signing in, connecting an Anthropic credential, pinning a
+model and running its readiness check, **Observability → Audit log** showed
+*"No events match — Adjust the filters or run a turn first"* with no filters
+set, and **Overview → What changed?** showed *"No events recorded yet."*
+
+Events had been recorded. `.raiker/events/terminal-local.jsonl` holds
+`model_profile_selected` for the exact profile and model that were pinned, and
+`.raiker/events/authz.jsonl` holds `principal_resolved`.
+
+**Root cause (not determined).** `GET /api/events`
+(`raiker/api/routes_dashboard.py`) passes `user_id` into `service.list_events`.
+The recorded events carry `session_id: "terminal-local"` and `"authz"`, which is
+not a per-user conversation, so a user-scoped query plausibly excludes them.
+Whether that scoping is deliberate was not established, and it should be:
+connecting a credential and changing a pinned model are exactly the governed
+steps an owner opens this page to confirm.
+
+**Required fix.** Decide what the audit log is scoped to and make the page say
+it. If account-scoped events belong there, show them; if the page is
+deliberately conversation-scoped, its own copy — *"every governed step the
+runtime took, in full detail"* — must stop claiming otherwise.
+
+**UI when closed.** Connecting a provider, pinning a model and running a
+readiness check are each visible in the audit log immediately after they happen,
+or the page states which class of event it does not carry.
 
 ---
 ## FIXED-141 — Three Models tabs were unreachable by deep link

@@ -144,6 +144,13 @@
     }
     return values;
   });
+  // The instructional graph a brand-new workspace is given: three placeholder
+  // nodes and two placeholder edges that stand in for records nobody has made
+  // yet. One derived flag decides both the overlay that says the graph is empty
+  // and what the count pill claims, because they used to disagree — the pill
+  // counted the placeholders as workspace records and read "3 nodes · 2
+  // relationships" directly above "Build your knowledge graph".
+  const showingStarter = $derived(rawNodes.length <= 1 && search === "" && graphMode === "global");
   const sourceRoots = $derived(rawNodes.filter((node) => ["file", "folder"].includes(node.node_type) && node.status === "selected"));
   const summary = $derived([
     ["Records", rawNodes.length], ["Relationships", rawEdges.length],
@@ -188,7 +195,7 @@
     });
     if (!showOrphans) nodes = nodes.filter((node) => (degrees.get(node.node_id) ?? 0) > 0);
     let edges = rawEdges.filter((edge) => nodes.some((node) => node.node_id === edge.source) && nodes.some((node) => node.node_id === edge.target));
-    if (rawNodes.length <= 1 && search === "" && graphMode === "global") {
+    if (showingStarter) {
       const principal = nodes[0] ?? { node_id: "starter:user", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: false };
       nodes = [principal, { node_id: "starter:workspace", node_type: "workspace", label: "Workspace", status: "active", detail: "Your governed workspace", progress_percent: null, is_real: false }, { node_id: "starter:add", node_type: "source", label: "Add first source", status: "instruction", detail: "Instructional prompt", progress_percent: null, is_real: false }];
       edges = [{ source: principal.node_id, target: "starter:workspace", relationship: "owns", is_active: false }, { source: "starter:workspace", target: "starter:add", relationship: "instruction", is_active: false }];
@@ -355,11 +362,11 @@
         </g>
       </svg>
 
-      {#if rawNodes.length <= 1 && search === ""}
+      {#if showingStarter}
         <div class="empty-copy"><strong>Build your knowledge graph</strong><span>Add sources, complete conversations, approve memories, or create tasks. Relationships will appear automatically.</span></div>
       {/if}
 
-      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}><span>{renderedNodes.length} nodes</span><i></i><span>{renderedLinks.length} relationships</span><span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
+      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if showingStarter}<span>Starter view</span><i></i><span>nothing recorded yet</span>{:else}<span>{renderedNodes.length} nodes</span><i></i><span>{renderedLinks.length} relationships</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
       {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
@@ -474,6 +481,26 @@
   :global(:root[data-theme="dark"]) .summary-popover p { color:var(--text-2); } :global(:root[data-theme="dark"]) .summary-popover p b,:global(:root[data-theme="dark"]) summary { color:var(--text-1); }
   :global(:root[data-theme="dark"]) .panel-title { border-color:var(--border); background:var(--raised); } :global(:root[data-theme="dark"]) details { border-color:var(--border); } :global(:root[data-theme="dark"]) .panel-search,:global(:root[data-theme="dark"]) .group-form { border-color:var(--border); background:var(--sunken); } :global(:root[data-theme="dark"]) .panel-search input,:global(:root[data-theme="dark"]) .group-form input { color:var(--text-1); }
   :global(:root[data-theme="dark"]) .check-row,:global(:root[data-theme="dark"]) .range-row,:global(:root[data-theme="dark"]) .motion-options label,:global(:root[data-theme="dark"]) .inspector > p { color:var(--text-2); } :global(:root[data-theme="dark"]) .group-row b,:global(:root[data-theme="dark"]) .relationship b { color:var(--text-1); }
+
+  /* The same overrides for the viewer who never chose a theme. The palette
+     above is the light one, and the block above it is keyed on the explicit
+     `data-theme="dark"` attribute — which "system" deliberately does not set
+     (see `lib/theme.ts`). Without this the Knowledge Map stayed light inside
+     an otherwise dark app on every machine set to follow the OS. */
+  @media (prefers-color-scheme: dark) {
+    :global(:root:not([data-theme="light"])) .knowledge-shell { background:var(--bg); color:var(--text-1); }
+    :global(:root:not([data-theme="light"])) .graph-toolbar { border-color:var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); }
+    :global(:root:not([data-theme="light"])) .title-block h2 { color:var(--text-1); } :global(:root:not([data-theme="light"])) .eyebrow { color:var(--text-2); }
+    :global(:root:not([data-theme="light"])) .search,:global(:root:not([data-theme="light"])) .icon-button { border-color:var(--border-strong); background:var(--surface); color:var(--text-2); } :global(:root:not([data-theme="light"])) .search input { color:var(--text-1); }
+    :global(:root:not([data-theme="light"])) .mode-switch { border-color:var(--border-strong); background:var(--sunken); } :global(:root:not([data-theme="light"])) .mode-switch button.active { background:var(--accent-soft); color:var(--accent-strong); }
+    :global(:root:not([data-theme="light"])) .graph-workspace { background:radial-gradient(circle at 50% 45%, #18272a 0%, var(--surface) 45%, var(--bg) 100%); } :global(:root:not([data-theme="light"])) .vignette { background:radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,.35) 100%); }
+    :global(:root:not([data-theme="light"])) line { stroke:rgba(154,167,180,.25); } :global(:root:not([data-theme="light"])) line.highlighted { stroke:var(--accent); } :global(:root:not([data-theme="light"])) .node-label { fill:var(--text-1); stroke:var(--surface); }
+    :global(:root:not([data-theme="light"])) .empty-copy span { color:var(--text-2); }
+    :global(:root:not([data-theme="light"])) .summary-pill,:global(:root:not([data-theme="light"])) .viewport-controls,:global(:root:not([data-theme="light"])) .graph-meta,:global(:root:not([data-theme="light"])) .depth-control,:global(:root:not([data-theme="light"])) .summary-popover,:global(:root:not([data-theme="light"])) .settings-panel,:global(:root:not([data-theme="light"])) .inspector { border-color:var(--border-strong); background:color-mix(in srgb, var(--surface) 94%, transparent); color:var(--text-2); box-shadow:var(--shadow-2); }
+    :global(:root:not([data-theme="light"])) .summary-popover p { color:var(--text-2); } :global(:root:not([data-theme="light"])) .summary-popover p b,:global(:root:not([data-theme="light"])) summary { color:var(--text-1); }
+    :global(:root:not([data-theme="light"])) .panel-title { border-color:var(--border); background:var(--raised); } :global(:root:not([data-theme="light"])) details { border-color:var(--border); } :global(:root:not([data-theme="light"])) .panel-search,:global(:root:not([data-theme="light"])) .group-form { border-color:var(--border); background:var(--sunken); } :global(:root:not([data-theme="light"])) .panel-search input,:global(:root:not([data-theme="light"])) .group-form input { color:var(--text-1); }
+    :global(:root:not([data-theme="light"])) .check-row,:global(:root:not([data-theme="light"])) .range-row,:global(:root:not([data-theme="light"])) .motion-options label,:global(:root:not([data-theme="light"])) .inspector > p { color:var(--text-2); } :global(:root:not([data-theme="light"])) .group-row b,:global(:root:not([data-theme="light"])) .relationship b { color:var(--text-1); }
+  }
   :global(:root[data-theme="dark"]) .source-modal { border-color:var(--border-strong); background:var(--raised); color:var(--text-1); } :global(:root[data-theme="dark"]) .source-modal > p,:global(:root[data-theme="dark"]) .source-modal form label { color:var(--text-2); } :global(:root[data-theme="dark"]) .source-modal form input { border-color:var(--border-strong); background:var(--sunken); color:var(--text-1); }
   :global(:root[data-theme="dark"]) .context-menu { border-color:var(--border-strong); background:var(--raised); } :global(:root[data-theme="dark"]) .context-menu button { color:var(--text-1); } :global(:root[data-theme="dark"]) .context-menu button:hover { background:var(--accent-soft); }
   @media (prefers-reduced-motion: reduce) { .particle { display:none; } }

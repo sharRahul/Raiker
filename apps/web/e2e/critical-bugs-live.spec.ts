@@ -77,7 +77,7 @@ test("FIXED-150 — the lock screen's strip and its message describe the same st
     await expect(probe.getByText("Runtime operational")).toBeVisible({ timeout: 30_000 });
     await expect(probe.getByRole("button", { name: /unlock|sign in|Create a User Account/i }).first())
       .toBeEnabled();
-    await probe.screenshot({ path: join(SHOTS, "201-FIXED-150-store-healthy-live.png") });
+    await probe.screenshot({ path: join(SHOTS, "215-FIXED-150-store-healthy-live.png") });
 
     // Unavailable: the same screen must not go on calling the runtime
     // operational. The server cannot be made to refuse locked pages on demand,
@@ -105,7 +105,7 @@ test("FIXED-150 — the lock screen's strip and its message describe the same st
     // No password can answer a store that will not open, so the form does not
     // invite one.
     await expect(probe.getByLabel("Username")).toBeDisabled();
-    await probe.screenshot({ path: join(SHOTS, "202-FIXED-150-store-unavailable-live.png") });
+    await probe.screenshot({ path: join(SHOTS, "216-FIXED-150-store-unavailable-live.png") });
   } finally {
     await probe.close();
   }
@@ -130,7 +130,7 @@ test("FIXED-151 — connecting a provider and pinning a model appear in the audi
   await expect(rows.first()).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("No events match")).toHaveCount(0);
   await expect(page.getByText(/every governed step in this account/i)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "203-FIXED-151-audit-log-live.png"), fullPage: true });
+  await page.screenshot({ path: join(SHOTS, "217-FIXED-151-audit-log-live.png"), fullPage: true });
 
   // Overview reads the same source, so it must agree with it.
   await page.goto(`${BASE}/#/observe?tab=overview`);
@@ -156,7 +156,7 @@ test("FIXED-152 — the Knowledge Map picker opens on named places, not the inst
   }
   // The database is a statement, not a folder to walk.
   await expect(dialog.getByRole("button", { name: /Raiker database/ })).toBeDisabled();
-  await page.screenshot({ path: join(SHOTS, "204-FIXED-152-knowledge-boundary-live.png") });
+  await page.screenshot({ path: join(SHOTS, "218-FIXED-152-knowledge-boundary-live.png") });
 
   // Both ways in from the computer are offered, and they say which is which.
   await expect(dialog.getByText(/Grant a folder/)).toBeVisible();
@@ -173,7 +173,7 @@ test("FIXED-152 — the Knowledge Map picker opens on named places, not the inst
     await dialog.getByRole("button", { name: /research\.md/ }).click();
     await dialog.getByRole("button", { name: "Review indexing plan" }).click();
     await expect(dialog.getByRole("heading", { name: "Indexing plan" })).toBeVisible({ timeout: 30_000 });
-    await page.screenshot({ path: join(SHOTS, "205-FIXED-152-granted-folder-live.png") });
+    await page.screenshot({ path: join(SHOTS, "219-FIXED-152-granted-folder-live.png") });
     await dialog.getByRole("button", { name: "Add reviewed source" }).click();
     await expect(dialog).toBeHidden({ timeout: 30_000 });
   } finally {
@@ -197,5 +197,5 @@ test("the six shipped skills install on first visit", async () => {
   }
   // The tab must not imply an authority the runtime does not enforce.
   await expect(page.getByText(/grants no capability/i)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "206-six-shipped-skills-live.png"), fullPage: true });
+  await page.screenshot({ path: join(SHOTS, "220-six-shipped-skills-live.png"), fullPage: true });
 });

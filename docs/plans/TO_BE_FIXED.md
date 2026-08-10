@@ -6706,8 +6706,8 @@ owner demanded memory security, the health view, and the cached handle whose
 key pages were reclaimed.
 
 **Evidence (live).** `apps/web/e2e/critical-bugs-live.spec.ts` against a running
-host: [`working/201-FIXED-150-store-healthy-live.png`](screenshots/working/201-FIXED-150-store-healthy-live.png)
-and [`working/202-FIXED-150-store-unavailable-live.png`](screenshots/working/202-FIXED-150-store-unavailable-live.png).
+host: [`working/215-FIXED-150-store-healthy-live.png`](screenshots/working/215-FIXED-150-store-healthy-live.png)
+and [`working/216-FIXED-150-store-unavailable-live.png`](screenshots/working/216-FIXED-150-store-unavailable-live.png).
 
 **UI when closed.** Sign-in never fails for a reason unrelated to the
 credential. When the store genuinely cannot be opened, the screen names that
@@ -6759,7 +6759,7 @@ still passes.
 
 **Evidence (live).** A real Anthropic credential entered through the product's
 own dialog, a model pinned and checked, then the page read straight afterwards:
-[`working/203-FIXED-151-audit-log-live.png`](screenshots/working/203-FIXED-151-audit-log-live.png).
+[`working/217-FIXED-151-audit-log-live.png`](screenshots/working/217-FIXED-151-audit-log-live.png).
 
 **UI when closed.** Connecting a provider, pinning a model and running a
 readiness check are each visible in the audit log immediately after they happen.
@@ -6818,9 +6818,9 @@ indexed, one owner's grant not being another's root, and the upload refusing to
 store without consent. `apps/web/src/lib/views/BrainView.test.ts` covers the
 same boundary in the dialog, including the tick that gates the copy.
 
-**Evidence (live).** [`working/204-FIXED-152-knowledge-boundary-live.png`](screenshots/working/204-FIXED-152-knowledge-boundary-live.png)
+**Evidence (live).** [`working/218-FIXED-152-knowledge-boundary-live.png`](screenshots/working/218-FIXED-152-knowledge-boundary-live.png)
 — the picker on a real host, and
-[`working/205-FIXED-152-granted-folder-live.png`](screenshots/working/205-FIXED-152-granted-folder-live.png)
+[`working/219-FIXED-152-granted-folder-live.png`](screenshots/working/219-FIXED-152-granted-folder-live.png)
 — a folder outside the workspace granted, browsed and reviewed without being
 copied.
 

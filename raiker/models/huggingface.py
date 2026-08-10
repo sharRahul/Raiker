@@ -17,6 +17,7 @@ _QUANTIZATION = re.compile(
 
 class HubClient(Protocol):
     def search(self, query: str, *, limit: int, token: str | None) -> Any: ...
+    def trending(self, *, limit: int, token: str | None) -> Any: ...
     def model_info(self, repo_id: str, *, revision: str | None, token: str | None) -> Any: ...
     def snapshot_download(self, **kwargs: Any) -> Any: ...
 
@@ -31,6 +32,13 @@ class OfficialHubClient:
     def search(self, query: str, *, limit: int, token: str | None) -> Any:
         return self._api.list_models(
             search=query, limit=limit, sort="downloads", token=token or False
+        )
+
+    def trending(self, *, limit: int, token: str | None) -> Any:
+        # `filter="gguf"` is the Hub's own library tag, so the starting list is
+        # already models Raiker can deploy without a conversion step.
+        return self._api.list_models(
+            filter="gguf", limit=limit, sort="downloads", token=token or False
         )
 
     def model_info(self, repo_id: str, *, revision: str | None, token: str | None) -> Any:
@@ -107,6 +115,18 @@ class HuggingFaceService:
         self.hub = hub or OfficialHubClient()
         self.cache_dir = cache_dir.resolve()
 
+    @staticmethod
+    def _results(rows: Any) -> list[HfSearchResult]:
+        return [
+            HfSearchResult(
+                repo_id=str(row.id),
+                downloads=int(getattr(row, "downloads", 0) or 0),
+                likes=int(getattr(row, "likes", 0) or 0),
+                gated=bool(getattr(row, "gated", False)),
+            )
+            for row in rows
+        ]
+
     def search(
         self, query: str, *, token: str | None = None, limit: int = 20
     ) -> list[HfSearchResult]:
@@ -115,16 +135,21 @@ class HuggingFaceService:
             raise ValueError("hugging_face_query_required")
         bounded = max(1, min(limit, 50))
         try:
-            rows = self.hub.search(query, limit=bounded, token=token)
-            return [
-                HfSearchResult(
-                    repo_id=str(row.id),
-                    downloads=int(getattr(row, "downloads", 0) or 0),
-                    likes=int(getattr(row, "likes", 0) or 0),
-                    gated=bool(getattr(row, "gated", False)),
-                )
-                for row in rows
-            ]
+            return self._results(self.hub.search(query, limit=bounded, token=token))
+        except Exception as exc:
+            raise HuggingFaceAccessError("hugging_face_unavailable", "models") from exc
+
+    def trending(self, *, token: str | None = None, limit: int = 12) -> list[HfSearchResult]:
+        """Most-downloaded GGUF repositories, for an owner with nothing typed yet.
+
+        The Hub cannot be browsed exhaustively, so the panel stays search-first.
+        This only replaces the empty box an owner sees before their first query
+        with somewhere to start, and it is the same read as a search — no
+        credential is required and nothing is downloaded.
+        """
+        bounded = max(1, min(limit, 50))
+        try:
+            return self._results(self.hub.trending(limit=bounded, token=token))
         except Exception as exc:
             raise HuggingFaceAccessError("hugging_face_unavailable", "models") from exc
 

@@ -177,7 +177,12 @@ the credential is valid, and only credit or a higher quota fixes it. The
 submission gate judges the whole resolved chain — the selected model followed by
 the owner's fallback sequence — and refuses with `model_not_ready` only when no
 entry in it is ready.
-`GET/PUT /api/model-setup` records first-run progress. Model operations expose
+`GET/PUT /api/model-setup` records first-run progress. `GET/PUT
+/api/surface-models` holds a default model per work surface (`chat`, `build`,
+`tasks`, `schedule`); an empty `profile_id` clears one, and the value is a
+preference that never grants readiness. `GET /api/hugging-face/trending` returns
+the most-downloaded GGUF repositories so the Hub surface opens with somewhere to
+start. Model operations expose
 preview/list/start/cancel/retry/cleanup records. Local-library roots, rescans and
 deployments are under `/api/model-library`; Ollama pulls use `/api/ollama/pull`;
 Hugging Face search, immutable variants and confirmed downloads use

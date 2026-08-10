@@ -396,6 +396,18 @@ export const api = {
       profile_id,
       model,
     }),
+  // Where each work surface's model picker starts. A preference only: the turn
+  // still names its exact profile and model, and readiness judges that pair.
+  surfaceModels: () =>
+    request<{ surfaces: Record<string, { profile_id: string; model: string }> }>(
+      "/api/surface-models",
+    ),
+  setSurfaceModel: (surface: string, profile_id: string, model: string) =>
+    request<{ ok: boolean }>("/api/surface-models", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ surface, profile_id, model }),
+    }),
   modelSetup: () => request<ModelSetupState>("/api/model-setup"),
   updateModelSetup: (
     body: Omit<
@@ -459,6 +471,8 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }),
+  trendingHuggingFace: () =>
+    request<{ items: HuggingFaceSearchResult[] }>("/api/hugging-face/trending"),
   searchHuggingFace: (query: string) =>
     request<{ items: HuggingFaceSearchResult[] }>(
       withQuery("/api/hugging-face/search", { query }),

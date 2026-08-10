@@ -67,7 +67,8 @@
     busy = true;
     try {
       await api.deployLocalModel(modelId);
-      notice = "Deployment queued. Track it in Activity.";
+      notice =
+        "Deployment queued. It joins any models already serving — track it in Activity.";
     } catch {
       error = "Could not queue deployment.";
     } finally {
@@ -86,6 +87,10 @@
         Raiker scans only folders you approve. It reads GGUF metadata without
         opening model code, follows no symlinks, and leaves original files where
         they are.
+      </p>
+      <p class="slot-note">
+        Up to four deployed models serve at once, each on its own local port, so
+        Chat, Build, Tasks and Schedule can each use a different one.
       </p>
     </div>
     <button class="btn btn-primary" type="button" onclick={scan} disabled={busy}
@@ -185,6 +190,10 @@
     --text-muted: var(--text-2);
     display: grid;
     gap: 18px;
+  }
+  .slot-note {
+    color: var(--text-3);
+    font-size: 0.78rem;
   }
   .library-intro {
     display: flex;

@@ -29,7 +29,7 @@
 - `raiker/models/runtime_installers.py`: reviewed Ollama, LM Studio/llmster, and llama.cpp install plans and execution adapters.
 - `raiker/models/library.py`: approved roots, provider inventory adapters, bounded GGUF metadata indexing, and deployment records.
 - `raiker/models/gguf.py`: bounded pure-Python GGUF header reader and shard/projector grouping.
-- `raiker/models/local_runtime.py`: managed loopback llama.cpp lifecycle and exact-model health.
+- `raiker/models/local_runtime.py`: managed loopback llama.cpp lifecycle and exact-model health, across four declared slots (Task 15).
 - `raiker/models/huggingface.py`: Hub search, repository/variant metadata, dry-run and revision-pinned downloads.
 - `raiker/models/conversion.py`: pinned llama.cpp conversion/quantization plan and isolated worker invocation.
 - `raiker/api/routes_models.py`: focused readiness, setup, operation, library, Hugging Face, and conversion API.
@@ -1090,6 +1090,100 @@ git add apps/web/src apps/web/e2e docs
 git commit -m "feat: split Models by where a model comes from"
 ```
 
+### Task 15: One model per surface, several local models at once, and a Hub starting point
+
+**Files:**
+- Create: `raiker/models/local_runtime.py` slots (`LocalSlot`, `LOCAL_SLOTS`, `slot_for_profile`)
+- Create: `apps/web/src/lib/surfaceModel.svelte.ts`
+- Modify: `config/model-profiles.json`, `raiker/storage/migrations.py`, `raiker/storage/sqlite.py`
+- Modify: `raiker/models/huggingface.py`, `raiker/api/routes_models.py`, `raiker/api/schemas.py`
+- Modify: `apps/web/src/lib/api.ts`, `components/ModelPicker.svelte`, `views/ChatView.svelte`, `views/BuildView.svelte`, `views/TasksView.svelte`, `views/models/HuggingFacePanel.svelte`, `views/models/LocalLibraryPanel.svelte`
+- Test: `tests/test_managed_llama_runtime.py`, `tests/test_surface_model_defaults.py`, `tests/test_huggingface_models.py`
+- Test: `apps/web/src/lib/surfaceModel.test.ts`, `views/ChatView.test.ts`, `views/models/HuggingFacePanel.test.ts`
+
+**Interfaces:**
+- Produces: migration `RAIKER-1046-surface-model-defaults`; `GET/PUT /api/surface-models`; `GET /api/hugging-face/trending`.
+- Produces: `raiker-local-llama-cpp-2|3|4` profiles on ports 8081-8083.
+
+Three limits found by walking the shipped product rather than the plan. The Hub
+panel opened on an empty search box, so an owner who did not already know a
+repository id had nowhere to start. Chat and Build shared one global default,
+because the per-turn picker was view state that reset on reload. And the managed
+llama.cpp runtime was a singleton, so deploying a second GGUF silently replaced
+the first — a local-only owner could never put Chat on a small model and Build
+on a large one.
+
+- [x] **Step 1: Write failing tests for all three**
+
+```python
+def test_two_models_serve_at_once_on_their_own_ports_and_aliases(tmp_path: Path) -> None:
+    runtime = _runtime(calls, (tmp_path,))
+    first = runtime.start(small, executable=Path("llama-server"))
+    second = runtime.start(large, executable=Path("llama-server"))
+    assert first.slot != second.slot
+    assert runtime.status(first.slot).running is True
+```
+
+```python
+def test_each_surface_keeps_its_own_default(workspace: Path) -> None:
+    store.save_surface_model_default("principal_owner", "chat", "ollama-local-openai-compatible", "gemma4:31b-cloud")
+    store.save_surface_model_default("principal_owner", "build", "anthropic-hosted", "claude-haiku-4-5-20251001")
+    assert store.load_surface_model_default("principal_owner", "tasks") is None
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `python -m pytest tests/test_managed_llama_runtime.py tests/test_surface_model_defaults.py tests/test_huggingface_models.py -q`
+
+Run: `npm --prefix apps/web test -- surfaceModel.test.ts HuggingFacePanel.test.ts`
+
+- [x] **Step 3: Slots, a surface preference, and a Hub starting point**
+
+The managed runtime keeps a bounded set of declared slots rather than one
+process. Declared, not allocated, so each slot is an ordinary shipped profile
+that appears in every picker, fallback sequence, task, and surface default with
+no dynamic registry and no new policy surface. Four is a judgement — each slot
+is a resident process holding weights — and a full pool refuses rather than
+evicting a model another surface may be mid-turn on.
+
+A surface default is a **preference**: it decides where a picker starts. The
+turn still names an exact profile and model, and the readiness gate judges that
+pair, so remembering a choice can never make an unproven model runnable. A
+partial choice is never written, because that would clear a default the owner
+did not ask to clear.
+
+`GET /api/hugging-face/trending` lists the most-downloaded GGUF repositories.
+The Hub cannot be browsed exhaustively, so the panel stays search-first; this
+only replaces the empty box before the first query, and an unreachable Hub falls
+back to that empty state rather than raising an alert nobody asked for.
+
+- [x] **Step 4: Verify GREEN and the full local gate**
+
+Run: `python -m pytest -q` · `ruff` · `mypy raiker apps tests`
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+
+- [x] **Step 5: Verify live**
+
+Four local slots appear as selectable models on the Local tab. Chat set to
+**Local GGUF 2** and Build to **Local GGUF 4**; after a full reload and a fresh
+sign-in each surface still opened on its own model — which is the point, since
+the bearer token lives in memory and the preference has to be server-side. The
+picker still refuses an unready slot. Console clean. Evidence:
+`docs/plans/screenshots/working/bug69-local-llama-slots-live.png` and
+`bug69-surface-default-build-live.png`.
+
+The trending list itself could not be verified live: this environment's egress
+proxy blocks `huggingface.co`. The unreachable-Hub path was exercised instead
+and degrades to the search-first empty state with no console error.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add raiker apps config docs tests
+git commit -m "feat: one model per surface and several local models at once"
+```
+
 ## Plan self-review mapping
 
 - Readiness domain, all states, exact binding, freshness, invalidation: Tasks 1–3.
@@ -1102,3 +1196,4 @@ git commit -m "feat: split Models by where a model comes from"
 - Three-provider live testing, local GGUF/Hugging Face evidence, docs, push, green CI: Task 12.
 - Reference-platform parity for the readiness control set, billing/quota state, chain-aware gating: Task 13.
 - Models information architecture split by model origin, and every panel reachable by deep link: Task 14.
+- A default model per surface, concurrent managed llama.cpp slots, and a Hub starting point: Task 15.

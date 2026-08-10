@@ -21,13 +21,14 @@ from raiker.api.schemas import (
     ModelReadinessCheckRequest,
     ModelSetupUpdateRequest,
     OllamaPullRequestBody,
+    SurfaceModelDefaultRequest,
 )
 from raiker.api.sessions import ApiSession
 from raiker.models.conversion import ConversionRefused, ModelConversionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
 from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
-from raiker.models.local_runtime import ManagedLlamaRuntime
+from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime, slot_for_profile
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
 from raiker.models.setup import ModelSetupState
@@ -108,6 +109,67 @@ async def check_model_readiness(
             detail={"reason_code": "unknown_model_profile"},
         ) from exc
     return readiness.to_dict()
+
+
+# The work surfaces that may hold their own default model. Chat and Build are
+# conversational surfaces; Tasks and Schedule capture the model onto the task
+# they create, so a scheduled run keeps the model chosen when it was scheduled.
+SURFACES = ("chat", "build", "tasks", "schedule")
+
+
+@router.get("/api/surface-models")
+def get_surface_models(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    return {
+        "surfaces": {
+            surface: {"profile_id": profile_id, "model": model}
+            for surface, profile_id, model in store.list_surface_model_defaults(
+                session.principal_id
+            )
+        }
+    }
+
+
+@router.put("/api/surface-models")
+def set_surface_model(
+    body: SurfaceModelDefaultRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Choose where one surface's model picker starts.
+
+    This is a preference. It never grants readiness: the turn a surface submits
+    still names its exact profile and model, and the gate judges that pair on
+    its own evidence.
+    """
+    session, principal = auth_data
+    _require_human(principal)
+    surface = body.surface.strip()
+    if surface not in SURFACES:
+        raise HTTPException(status_code=422, detail={"reason_code": "unknown_surface"})
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    profile_id = body.profile_id.strip()
+    if not profile_id:
+        store.clear_surface_model_default(session.principal_id, surface)
+        return {"ok": True, "surface": surface, "profile_id": "", "model": ""}
+    from raiker.models.registry import ModelProfileRegistry
+
+    try:
+        profile = ModelProfileRegistry.load().resolve_profile_id(profile_id)
+    except Exception as exc:  # noqa: BLE001 — an unknown profile fails closed
+        raise HTTPException(
+            status_code=422, detail={"reason_code": f"unknown_profile:{profile_id}"}
+        ) from exc
+    model = body.model.strip() or profile.model
+    if not model or "<" in model:
+        raise HTTPException(
+            status_code=422, detail={"reason_code": f"model_required_for_profile:{profile_id}"}
+        )
+    store.save_surface_model_default(session.principal_id, surface, profile.profile_id, model)
+    return {"ok": True, "surface": surface, "profile_id": profile.profile_id, "model": model}
 
 
 @router.get("/api/model-setup")
@@ -308,25 +370,31 @@ def _run_local_deployment(
     runtime: ManagedLlamaRuntime,
 ) -> None:
     operations = ModelOperationService(SQLiteStore(workspace))
+    started_slot: str | None = None
     try:
         operations.running(owner, operation_id, phase="starting_llama_cpp")
         executable = shutil.which("llama-server")
         if executable is None:
             raise RuntimeError("llama_server_missing")
-        runtime.start(
+        # Deploying a second model adds a server rather than replacing the
+        # first, so the slot — and therefore the port, the served name, and the
+        # profile the owner will select — is decided by the runtime.
+        started = runtime.start(
             model_path,
             executable=Path(executable),
-            port=8080,
             approved_roots=approved_roots,
         )
+        started_slot = started.slot
+        slot = slot_for_profile(started.slot) or LOCAL_SLOTS[0]
+        origin = f"http://127.0.0.1:{slot.port}"
         deadline = time.monotonic() + 30
         with httpx.Client(timeout=2.0, trust_env=False) as client:
             while time.monotonic() < deadline:
                 try:
-                    health = client.get("http://127.0.0.1:8080/health")
-                    models = client.get("http://127.0.0.1:8080/v1/models")
+                    health = client.get(f"{origin}/health")
+                    models = client.get(f"{origin}/v1/models")
                     ids = [str(item.get("id")) for item in models.json().get("data", [])]
-                    if health.is_success and models.is_success and "local-gguf" in ids:
+                    if health.is_success and models.is_success and slot.alias in ids:
                         break
                 except (httpx.HTTPError, ValueError):
                     pass
@@ -334,15 +402,19 @@ def _run_local_deployment(
             else:
                 raise RuntimeError("llama_server_not_ready")
         store = SQLiteStore(workspace)
-        store.save_configured_model(owner, "raiker-local-llama-cpp", "local-gguf")
+        store.save_configured_model(owner, slot.profile_id, slot.alias)
         store.invalidate_model_readiness(
             owner,
-            "raiker-local-llama-cpp",
+            slot.profile_id,
             reason_code="local_runtime_deployed",
         )
         operations.complete(owner, operation_id)
     except Exception:  # noqa: BLE001 - durable operation exposes only a bounded code
-        runtime.stop()
+        # Only this deployment's own slot is stopped. Another model already
+        # serving a surface must not be torn down by an unrelated failure, which
+        # is exactly what a bare `stop()` would now do.
+        if started_slot is not None:
+            runtime.stop(started_slot)
         operations.fail(owner, operation_id, code="local_model_deploy_failed")
 
 
@@ -419,6 +491,28 @@ def search_hugging_face(
         )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+    except HuggingFaceAccessError as exc:
+        raise HTTPException(
+            status_code=503, detail={"reason_code": exc.code, "repository_url": exc.repository_url}
+        ) from exc
+    return {"items": [item.to_dict() for item in items]}
+
+
+@router.get("/api/hugging-face/trending")
+def trending_hugging_face(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Most-downloaded GGUF repositories, so the panel opens with somewhere to start.
+
+    Registered before the `{owner}/{repository}` routes so `trending` is never
+    read as a repository owner.
+    """
+    session, principal = auth_data
+    _require_human(principal)
+    try:
+        items = _hugging_face_service(request).trending(
+            token=_hugging_face_token(request, session.principal_id)
+        )
     except HuggingFaceAccessError as exc:
         raise HTTPException(
             status_code=503, detail={"reason_code": exc.code, "repository_url": exc.repository_url}

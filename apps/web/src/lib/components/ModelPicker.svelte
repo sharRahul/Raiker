@@ -16,6 +16,7 @@
     profileId = $bindable(""),
     model = $bindable(""),
     disabled = false,
+    onchosen,
   }: {
     profiles: ModelProfile[];
     selectedProfile?: ModelProfile | null;
@@ -23,6 +24,13 @@
     profileId?: string;
     model?: string;
     disabled?: boolean;
+    /**
+     * A deliberate pick, so the surface can remember it. Not fired for the
+     * programmatic pre-selection a surface performs on mount, and not fired
+     * when the owner returns to the global default — that is the absence of a
+     * preference, not a new one.
+     */
+    onchosen?: (profileId: string, model: string) => void;
   } = $props();
 
   let open = $state(false);
@@ -70,6 +78,7 @@
     profileId = selectsDefault ? "" : profile.profile_id;
     model = selectsDefault ? "" : profile.model;
     open = false;
+    if (!selectsDefault) onchosen?.(profile.profile_id, profile.model);
   }
 
   function repair(profile: ModelProfile) {

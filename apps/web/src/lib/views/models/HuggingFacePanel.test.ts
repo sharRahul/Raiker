@@ -6,6 +6,36 @@ import HuggingFacePanel from "./HuggingFacePanel.svelte";
 afterEach(() => vi.unstubAllGlobals());
 
 describe("HuggingFacePanel", () => {
+  // The Hub cannot be browsed exhaustively, so the panel stays search-first —
+  // but opening it to an empty box left an owner who does not already know a
+  // repository id with nowhere to start.
+  it("opens on the most downloaded GGUF models instead of an empty box", async () => {
+    stubFetch({
+      "GET /api/hugging-face/trending": {
+        items: [
+          { repo_id: "org/popular-GGUF", downloads: 9001, likes: 42, gated: false },
+        ],
+      },
+    });
+    render(HuggingFacePanel);
+
+    expect(await screen.findByText("org/popular-GGUF")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Most downloaded GGUF models/),
+    ).toBeInTheDocument();
+  });
+
+  it("keeps the empty state usable when the Hub cannot be reached", async () => {
+    stubFetch({});
+    render(HuggingFacePanel);
+
+    expect(
+      await screen.findByText("Search the Hub catalogue"),
+    ).toBeInTheDocument();
+    // An unreachable Hub before the owner asked for anything is not an alert.
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
   it("searches and labels ready GGUF separately from conversion sources", async () => {
     stubFetch({
       "GET /api/hugging-face/search": {

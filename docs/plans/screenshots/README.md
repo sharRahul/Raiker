@@ -258,3 +258,10 @@ Providers scroll. Same live workspace as the round above.
 | `bug69-models-tab-hosted-live.png` | The Hosted tab: provider accounts and advanced routers only, with no local runtime or installer in sight |
 | `bug69-models-tab-huggingface-live.png` | The Hugging Face tab: search-first download and conversion |
 | `bug69-models-tab-local-375-live.png` | The Local tab at 375 pixels — the strip and panel stay above the fold, no horizontal page overflow |
+
+## Several local models and a model per surface — 2026-08-09
+
+| File | Records |
+|---|---|
+| `bug69-local-llama-slots-live.png` | The Local tab listing four managed llama.cpp slots as separate selectable models |
+| `bug69-surface-default-build-live.png` | Build holding its own model (Local GGUF 4) while Chat holds another (Local GGUF 2), after a reload and a fresh sign-in |

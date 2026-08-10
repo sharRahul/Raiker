@@ -174,6 +174,19 @@ class ModelReadinessCheckRequest(BaseModel):
     model: str
 
 
+class SurfaceModelDefaultRequest(BaseModel):
+    """Where one work surface's model picker should start.
+
+    An empty ``profile_id`` clears the surface, returning it to the global model.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    surface: str
+    profile_id: str = ""
+    model: str = ""
+
+
 class ModelSetupUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 

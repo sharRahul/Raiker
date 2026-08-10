@@ -73,6 +73,68 @@ describe("ChatView streaming transcript", () => {
     expect(box).toHaveValue("keep this prompt");
     expect(streamPromptMock).not.toHaveBeenCalled();
   });
+  // Chat and Build used to share one global default, so choosing a small local
+  // model for conversation also moved coding work onto it. Each surface now
+  // starts on the model it was last set to.
+  it("starts on the model Chat was last set to, not the global default", async () => {
+    const second = {
+      profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-haiku-4-5",
+      selected: false, configured: true, ready: true, readiness_state: "ready",
+    };
+    stubFetch({
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        profiles: [DEFAULT_READY_PROFILE, second],
+        chat_profiles: [DEFAULT_READY_PROFILE, second],
+      },
+      "GET /api/surface-models": {
+        surfaces: { chat: { profile_id: "anthropic-hosted", model: "claude-haiku-4-5" } },
+      },
+    });
+
+    render(ChatView);
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: /Model for this turn:/ }),
+      ).toHaveTextContent("Haiku 4.5"),
+    );
+  });
+
+  it("remembers the model picked in Chat as the Chat default", async () => {
+    const second = {
+      profile_id: "anthropic-hosted", provider: "anthropic", model: "claude-haiku-4-5",
+      selected: false, configured: true, ready: true, readiness_state: "ready",
+    };
+    const mock = stubFetch({
+      "GET /api/models": {
+        ...(MODELS_ROUTE["GET /api/models"] as Record<string, unknown>),
+        profiles: [DEFAULT_READY_PROFILE, second],
+        chat_profiles: [DEFAULT_READY_PROFILE, second],
+      },
+      "GET /api/surface-models": { surfaces: {} },
+      "PUT /api/surface-models": { ok: true },
+    });
+    render(ChatView);
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: /Model for this turn:/ }),
+    );
+    await fireEvent.click(await screen.findByRole("menuitemradio", { name: /Haiku 4.5/ }));
+
+    await waitFor(() => {
+      const put = mock.mock.calls.find(
+        ([, init]) => (init?.method ?? "GET").toUpperCase() === "PUT",
+      );
+      expect(put).toBeTruthy();
+      expect(JSON.parse(String(put?.[1]?.body))).toEqual({
+        surface: "chat",
+        profile_id: "anthropic-hosted",
+        model: "claude-haiku-4-5",
+      });
+    });
+  });
+
   it("copies a response without offering transcript exports", async () => {
     stubFetch(MODELS_ROUTE);
     const writeText = vi.fn().mockResolvedValue(undefined);

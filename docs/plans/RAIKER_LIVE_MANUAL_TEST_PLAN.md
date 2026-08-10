@@ -734,3 +734,51 @@ assistant reply. Screenshots: `208-BUG-69-first-run-model-setup-live.png` throug
 `214-BUG-69-huggingface-download-deploy-live.png`. The Anthropic refusal is an
 expected external account state and proved the new fail-closed execution
 preflight; OpenRouter and Ollama supplied successful execution evidence.
+
+## 20. Known-limits round — 2026-08-10
+
+Run against a fresh isolated workspace (`/tmp/raiker-live`), the production web
+build, and one hosted provider credential entered through Models only. The
+credential is absent from screenshots, source, and logs committed here.
+
+Automated as `apps/web/e2e/bug-74-84-known-limits-live.spec.ts` and
+`apps/web/e2e/containment-surface-live.spec.ts`, both re-runnable against an
+already-driven workspace.
+
+1. Register a fresh owner. Confirm the model setup prompt opens, then skip it.
+2. Visit every code-split destination — Search Chat, Memory, Approvals, Tasks,
+   Knowledge Map, Projects, Permissions, Models, Extensions, Observability,
+   Settings — and confirm each mounts with content and no console error.
+   *(FIXED-161.)*
+3. Extensions → Plugins. Confirm the workspace signing posture is stated in
+   words, names the two environment variables that would raise it, and says
+   installs are unaffected. *(FIXED-166.)*
+4. Settings → Security & sign-in → **Monitored capabilities**. Confirm the
+   section explains that every capability family is watched the same way
+   monitored MCP connections are, and that an empty workspace says so rather
+   than showing nothing. *(FIXED-163, FIXED-164.)*
+5. Settings → Runtime configuration → **How long a model check stays good for**.
+   Confirm the default reads 5, change it to 30, **Save changes**, navigate away
+   and back, and confirm 30 survives the round trip. *(FIXED-169.)*
+6. Models → Activity. Confirm the durable operations surface loads and states
+   that failed work is never silently retried. *(FIXED-162.)*
+7. Models → Hosted. Connect Anthropic through the UI, pin a model from the live
+   catalogue, and press **Test**. Confirm the card reaches
+   `Ready · confirmed just now` and names the exact model it reached.
+   *(FIXED-133, FIXED-169.)*
+8. Chat. Send one bounded prompt and confirm the model answers with the exact
+   requested marker. *(FIXED-133.)*
+9. Record three consecutive failures for one connector through the same
+   `CapabilityBreaker` the runtime uses (the command is in the spec's header —
+   a browser cannot make a healthy provider fail on demand). Reload Settings →
+   Security & sign-in and confirm the subject is listed as **paused** with its
+   stated reason, its failure count and its last failure code, that a matching
+   high-severity finding appears above it, and that **Resume** returns it to
+   active in one press. *(FIXED-163, FIXED-164.)*
+
+**Result: ✅ eleven entries closed** — FIXED-133 re-verified and FIXED-161
+through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
+`round0810-11-containment-resumed.png` in
+[`screenshots/working/`](screenshots/working). The production build reports no
+chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
+the largest route chunk is Models at 82 kB.

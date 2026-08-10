@@ -162,7 +162,7 @@
     {:else if active === "account"}
       <Account {settings} {save} {status} />
     {:else}
-      <Runtime {principal} />
+      <Runtime {principal} {settings} {save} />
     {/if}
   </div>
 </div>

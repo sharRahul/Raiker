@@ -49,5 +49,7 @@ superseded guides, and screenshots are not maintained here.
 - [Coverage and open gaps](FEATURE_COVERAGE_MATRIX.md)
 - [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md): a repeatable
   end-to-end browser plan, with the last round's recorded results and evidence.
-- [To be fixed](plans/TO_BE_FIXED.md): defects found by that plan, each with a
+- [To be fixed](plans/TO_BE_FIXED.md): the defects still open, each with a
   reproduction, root cause, and proposed fix.
+- [Fixed items](plans/FIXED_ITEMS.md): the same record for everything that has
+  been closed, kept separate so the open list answers one question.

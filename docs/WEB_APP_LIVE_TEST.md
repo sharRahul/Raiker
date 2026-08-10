@@ -417,3 +417,25 @@ Specs: `bug-69-model-readiness-live.spec.ts`,
 `bug-69-local-model-library-live.spec.ts`, and
 `bug-69-huggingface-live.spec.ts`. Screenshots 208–213 are indexed in
 `docs/plans/screenshots/README.md` (208–214).
+
+## Result — 2026-08-10 (known-limits round, FIXED-161 to FIXED-170)
+
+A fresh isolated workspace was exercised through the built SPA in real Chromium.
+The Anthropic credential was entered only through Models and is not in evidence.
+
+| Check | Result |
+|---|---|
+| Code-split routes | ✅ All eleven secondary destinations mount with content and no console error; the entry chunk is 237 kB (was 690 kB) and the build reports no size warning |
+| Plugin supply chain | ✅ Extensions → Plugins states the workspace signing posture in words and names the two variables that raise it; installs are unaffected |
+| Monitored capabilities | ✅ Settings → Security & sign-in lists containment for every capability family, not only MCP, and says so on an empty workspace rather than showing nothing |
+| Circuit breaker | ✅ Three consecutive connector failures contained the subject as `paused` with its reason, streak and last failure code, raised a matching high-severity finding, and **Resume** cleared it in one press |
+| Readiness window | ✅ The default reads 5 minutes, 30 survived Save changes and a navigation round trip, and the server resolved 30 for that owner |
+| Readiness chip | ✅ `Ready · confirmed just now`, naming the exact model the provider reached |
+| Model activity | ✅ Durable operations surface loads and states that failed work is never silently retried |
+| Live turn | ✅ Anthropic Haiku 4.5 answered with the exact requested marker |
+| Browser console | ✅ No application errors in either spec |
+
+Specs: `bug-74-84-known-limits-live.spec.ts` and
+`containment-surface-live.spec.ts`, both re-runnable against an already-driven
+workspace. Screenshots `round0810-01` to `round0810-11` in
+`docs/plans/screenshots/working/`.

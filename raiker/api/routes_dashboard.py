@@ -447,6 +447,41 @@ async def list_security_findings(
     return serialize_dto(_service(request).list_security_findings(auth_data[0].principal_id))
 
 
+@router.get("/api/security/containment")
+async def list_capability_containment(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Containment state for every monitored capability, not only MCP (BUG-77)."""
+    return _service(request).list_capability_containment(auth_data[0].principal_id)
+
+
+@router.post("/api/security/containment/{capability}/{subject_id}/{action}")
+async def set_capability_containment(
+    capability: str,
+    subject_id: str,
+    action: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """The owner's one-call pause, stop and resume for any monitored subject."""
+    try:
+        return _service(request).set_capability_containment(
+            auth_data[0].principal_id, capability, subject_id, action
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc)
+        ) from None
+
+
+@router.get("/api/plugins")
+async def list_plugins(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Installed plugins with the signature verification level each one earned (BUG-79)."""
+    return _service(request).list_plugins()
+
+
 @router.post("/api/security/scan")
 async def scan_security(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)

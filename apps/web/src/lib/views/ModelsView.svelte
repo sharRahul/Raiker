@@ -14,7 +14,7 @@
     ProviderModelList,
   } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
-  import { humanize, providerName } from "../format";
+  import { humanize, providerName, relativeTime } from "../format";
   import { formatCost, sourceNote, spendShares } from "../contextPresentation";
   import {
     providerErrorGuidance,
@@ -353,7 +353,15 @@
   function readinessChip(profile: ModelProfile): string | null {
     const state = profile.readiness_state;
     if (!state) return null;
-    return READINESS_CHIP[state] ?? null;
+    const label = READINESS_CHIP[state] ?? null;
+    if (label === null) return null;
+    // BUG-83 — a chip that says only "Ready" cannot be told apart from one that
+    // said "Ready" an hour ago. Naming when the check was last confirmed is what
+    // makes the expiry legible instead of surprising.
+    if (state === "ready" && profile.readiness_checked_at) {
+      return `${label} · confirmed ${relativeTime(profile.readiness_checked_at)}`;
+    }
+    return label;
   }
 
   async function openPicker(profileId: string) {

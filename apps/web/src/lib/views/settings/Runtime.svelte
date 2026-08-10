@@ -24,7 +24,24 @@
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
 
-  let { principal = "—" }: { principal?: string } = $props();
+  let {
+    principal = "—",
+    settings = {},
+    save = () => {},
+  }: {
+    principal?: string;
+    settings?: Record<string, unknown>;
+    save?: (patch: Record<string, unknown>) => void;
+  } = $props();
+
+  // BUG-83 — the readiness observation window used to be a hard-coded five
+  // minutes with no way to move it, so a long session traded a stale-ready
+  // window for a spurious-stale interruption and offered no control over
+  // either. The bounds are the server's: under a minute is a check on every
+  // keystroke, over two hours is not a check.
+  const readinessTtl = $derived(
+    Number(settings["models.readiness_ttl_minutes"] ?? 5),
+  );
   let mode = $state<RuntimeMode | null>(null);
   let loadError = $state<string | null>(null);
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -161,6 +178,38 @@
   {/if}
 </section>
 
+<section class="settings-card" aria-labelledby="model-readiness-heading">
+  <div class="card-heading">
+    <span class="eyebrow">Model readiness</span>
+    <h3 id="model-readiness-heading">How long a model check stays good for</h3>
+  </div>
+  <p class="description">
+    Raiker confirms the exact model can be reached before a surface will send. That confirmation
+    expires, and while a work surface is open Raiker quietly re-confirms the selected model
+    before it does — so a long session does not stop to ask. Connecting, switching model,
+    pulling, or changing an endpoint or credential still invalidates a check immediately,
+    whatever this is set to.
+  </p>
+  <label>
+    <span>Re-confirm after</span>
+    <small>Between 1 and 120 minutes. The default is 5.</small>
+    <input
+      type="number"
+      min="1"
+      max="120"
+      step="1"
+      value={readinessTtl}
+      onchange={(event) =>
+        save({
+          "models.readiness_ttl_minutes": Math.min(
+            120,
+            Math.max(1, Number(event.currentTarget.value) || 5),
+          ),
+        })}
+    />
+  </label>
+</section>
+
 <section class="settings-card environment-settings">
   <div class="card-heading"><span class="eyebrow">Execution targets</span><h3>Local, remote, and cloud environments</h3></div>
   <p class="description">Choose where Chat, Build, and scheduled work execute. Remote commands still require the remote/cloud capability gate and a per-command approval. Profiles store credential references, never credential values.</p>
@@ -235,6 +284,13 @@
 
 <style>
   .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .section-heading p, .description, .danger-zone p { color: var(--text-2); }
+  /* The readiness window is the one editable field in this section, so it needs
+     the same stacked label/hint/control shape the other settings sections use
+     rather than the browser's inline default. */
+  .settings-card label { display: grid; gap: .25rem; max-width: 22rem; margin-top: var(--space-3); }
+  .settings-card label > span { font-weight: 650; }
+  .settings-card label > small { color: var(--text-2); }
+  .settings-card label > input { min-height: 40px; padding: 0 .65rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); color: var(--text-1); font: inherit; }
   .settings-card, .danger-zone { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: clamp(1.25rem, 3vw, 2rem); }
   .environment-settings { margin-top:var(--space-5); } .environment-grid { display:grid; gap:var(--space-2); margin:var(--space-4) 0; } .environment-grid article { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-grid article.selected { border-color:var(--accent-border); background:var(--accent-soft); } .environment-grid article div { display:grid; gap:.2rem; } .environment-grid article span { color:var(--text-3); font-size:.75rem; text-transform:capitalize; } .environment-grid article .container-runtime { color:var(--text-2); font-family:var(--font-mono); text-transform:none; } .environment-grid article .boundary { width:fit-content; padding:.18rem .45rem; border-left:2px solid var(--accent); background:var(--sunken); color:var(--text-2); text-transform:none; } .environment-grid article small { color:var(--text-2); font-size:.72rem; text-transform:capitalize; } .environment-grid article .remediation { color:var(--warn); text-transform:none; } details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { min-height:40px; padding:0 .65rem; border:1px solid var(--border); border-radius:var(--r-md); background:var(--sunken); color:var(--text-1); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:.78rem; } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:.75rem; } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
   .status { color: var(--ok); font-size: .85rem; } .status.stopped { color: var(--warn); }

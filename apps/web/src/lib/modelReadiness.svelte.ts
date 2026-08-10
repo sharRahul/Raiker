@@ -77,3 +77,74 @@ export async function refreshModelReadiness(
   await refreshModels();
   return readiness;
 }
+
+/**
+ * Opportunistic background revalidation of the selected model (BUG-83).
+ *
+ * A readiness observation expires, and until this existed nothing re-checked
+ * it: a model that was ready five minutes ago became `stale` and the owner had
+ * to press a button before working again. That is the wrong trade in both
+ * directions during a long editing session.
+ *
+ * So while a work surface is open — and only while the tab is actually visible,
+ * because a background tab is not a session — Raiker re-confirms the selected
+ * model as its observation approaches expiry. This never *grants* readiness: it
+ * runs the same owner-triggered check the Models page runs, and the server's
+ * invalidation hooks (connection, selection, pull, endpoint, credential change)
+ * stay authoritative over any timer.
+ */
+const REVALIDATION_TICK_MS = 30_000;
+// Re-confirm once an observation is inside the last quarter of its own window,
+// so the check lands before the expiry rather than after it.
+const REFRESH_WITHIN_FRACTION = 0.25;
+
+let revalidationTimer: ReturnType<typeof setInterval> | undefined;
+let revalidationInFlight = false;
+
+function dueForRevalidation(profile: ModelProfile, now: number): boolean {
+  if (profile.readiness_state === "stale") return true;
+  if (profile.readiness_state !== "ready") return false;
+  const checkedAt = profile.readiness_checked_at;
+  const expiresAt = profile.readiness_expires_at;
+  if (!checkedAt || !expiresAt) return false;
+  const checked = Date.parse(checkedAt);
+  const expires = Date.parse(expiresAt);
+  if (Number.isNaN(checked) || Number.isNaN(expires) || expires <= checked) return false;
+  return now >= expires - (expires - checked) * REFRESH_WITHIN_FRACTION;
+}
+
+export async function revalidateSelectedModel(): Promise<void> {
+  if (revalidationInFlight) return;
+  if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
+  revalidationInFlight = true;
+  try {
+    const view = await api.models();
+    const selected =
+      view.profiles.find((profile) => profile.selected) ??
+      view.profiles.find((profile) => profile.profile_id === view.current_profile_id) ??
+      null;
+    if (selected === null || !selected.model) return;
+    if (!dueForRevalidation(selected, Date.now())) return;
+    await api.checkModelReadiness(selected.profile_id, selected.model);
+    await refreshModels();
+  } catch {
+    // A failed background check changes nothing: the stored observation and its
+    // expiry remain exactly what the last real check found.
+  } finally {
+    revalidationInFlight = false;
+  }
+}
+
+/** Start background revalidation; returns the stop function. */
+export function startReadinessRevalidation(): () => void {
+  if (revalidationTimer !== undefined) return stopReadinessRevalidation;
+  revalidationTimer = setInterval(() => void revalidateSelectedModel(), REVALIDATION_TICK_MS);
+  return stopReadinessRevalidation;
+}
+
+export function stopReadinessRevalidation(): void {
+  if (revalidationTimer !== undefined) {
+    clearInterval(revalidationTimer);
+    revalidationTimer = undefined;
+  }
+}

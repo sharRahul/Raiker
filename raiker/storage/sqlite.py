@@ -75,6 +75,8 @@ from raiker.storage.migrations import (
     CALENDAR_EVENTS_SQL,
     CAPABILITY_DECISION_MODE_MIGRATION_ID,
     CAPABILITY_DECISION_MODE_SQL,
+    CAPABILITY_MONITORING_MIGRATION_ID,
+    CAPABILITY_MONITORING_SQL,
     CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
     CHECKPOINT_CAPTURE_MANIFEST_SQL,
     CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
@@ -160,6 +162,8 @@ from raiker.storage.migrations import (
     MODEL_FALLBACK_SEQUENCE_SQL,
     MODEL_LIBRARY_MIGRATION_ID,
     MODEL_LIBRARY_SQL,
+    MODEL_OPERATION_PAYLOAD_MIGRATION_ID,
+    MODEL_OPERATION_PAYLOAD_SQL,
     MODEL_OPERATIONS_MIGRATION_ID,
     MODEL_OPERATIONS_SQL,
     MODEL_PRICE_REGISTRY_MIGRATION_ID,
@@ -1127,6 +1131,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
             self._apply_migration(CODE_MAP_MIGRATION_ID, CODE_MAP_SQL, connection)
             self._apply_migration(
+                CAPABILITY_MONITORING_MIGRATION_ID, CAPABILITY_MONITORING_SQL, connection
+            )
+            self._apply_migration(
                 MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
             )
             self._apply_migration(
@@ -1196,6 +1203,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_OPERATIONS_MIGRATION_ID,
                 MODEL_OPERATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MODEL_OPERATION_PAYLOAD_MIGRATION_ID,
+                MODEL_OPERATION_PAYLOAD_SQL,
                 connection,
             )
             self._apply_migration(
@@ -3161,6 +3173,165 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (principal_id,),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    # ── Capability-agnostic behaviour monitoring and containment (BUG-76/77) ──
+    # The generic sibling of the MCP monitor's storage: one redacted activity row
+    # per governed capability invocation, and one containment row per subject.
+    # Owner-scoped throughout — every read and write is keyed by `principal_id`,
+    # so one owner's monitor can never see or contain another owner's subject.
+
+    def insert_capability_activity(
+        self,
+        *,
+        principal_id: str,
+        capability: str,
+        subject_id: str,
+        operation: str = "",
+        hosts: list[str] | None = None,
+        tools: list[str] | None = None,
+        calls: int = 0,
+        bytes_in: int = 0,
+        bytes_out: int = 0,
+        error_count: int = 0,
+        outcome: str = "ok",
+        reason_code: str = "",
+        arg_sensitivity: str | None = None,
+        result_sensitivity: str | None = None,
+        observed_at: str | None = None,
+    ) -> str:
+        activity_id = new_id("cact_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO capability_activity_log
+                   (activity_id, principal_id, capability, subject_id, operation, hosts_json,
+                    tools_json, calls, bytes_in, bytes_out, error_count, outcome, reason_code,
+                    arg_sensitivity, result_sensitivity, observed_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    activity_id, principal_id, capability, subject_id, operation,
+                    json.dumps(sorted(hosts or [])), json.dumps(sorted(tools or [])),
+                    int(calls), int(bytes_in), int(bytes_out), int(error_count), outcome,
+                    reason_code, arg_sensitivity, result_sensitivity, observed_at or utc_now(),
+                ),
+            )
+        return activity_id
+
+    def list_capability_activity(
+        self, principal_id: str, capability: str, subject_id: str, *, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """Most-recent-first activity rows forming one subject's rolling baseline."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM capability_activity_log
+                   WHERE principal_id = ? AND capability = ? AND subject_id = ?
+                   ORDER BY observed_at DESC, rowid DESC LIMIT ?""",
+                (principal_id, capability, subject_id, int(limit)),
+            ).fetchall()
+        return [
+            {
+                **dict(row),
+                "hosts": json.loads(row["hosts_json"] or "[]"),
+                "tools": json.loads(row["tools_json"] or "[]"),
+            }
+            for row in rows
+        ]
+
+    def get_capability_containment(
+        self, principal_id: str, capability: str, subject_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM capability_containment
+                   WHERE principal_id = ? AND capability = ? AND subject_id = ?""",
+                (principal_id, capability, subject_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def list_capability_containment(
+        self, principal_id: str, *, capability: str | None = None
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM capability_containment WHERE principal_id = ?"
+        params: list[Any] = [principal_id]
+        if capability:
+            query += " AND capability = ?"
+            params.append(capability)
+        with self.connect() as connection:
+            rows = connection.execute(
+                query + " ORDER BY updated_at DESC", tuple(params)
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def set_capability_containment(
+        self,
+        principal_id: str,
+        capability: str,
+        subject_id: str,
+        *,
+        state: str,
+        label: str = "",
+        reason: str | None = None,
+        source: str = "owner",
+        finding_id: str | None = None,
+        failure_streak: int | None = None,
+        last_failure_code: str | None = None,
+        contained_at: str | None = None,
+        probe_after: str | None = None,
+    ) -> dict[str, Any]:
+        """Upsert one subject's containment row and return the stored result.
+
+        ``failure_streak``/``last_failure_code``/``probe_after`` are only written
+        when supplied, so a containment transition never silently resets the
+        breaker's own counters and a counter update never rewrites the owner's
+        stated reason.
+        """
+        now = utc_now()
+        existing = self.get_capability_containment(principal_id, capability, subject_id) or {}
+        row = {
+            "label": label or str(existing.get("label") or ""),
+            "state": state,
+            "reason": reason,
+            "source": source,
+            "finding_id": finding_id,
+            "failure_streak": (
+                int(failure_streak)
+                if failure_streak is not None
+                else int(existing.get("failure_streak") or 0)
+            ),
+            "last_failure_code": (
+                last_failure_code
+                if last_failure_code is not None
+                else str(existing.get("last_failure_code") or "")
+            ),
+            "contained_at": contained_at,
+            "probe_after": probe_after,
+        }
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO capability_containment
+                   (principal_id, capability, subject_id, label, state, reason, source,
+                    finding_id, failure_streak, last_failure_code, contained_at, probe_after,
+                    updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(principal_id, capability, subject_id) DO UPDATE SET
+                     label=excluded.label, state=excluded.state, reason=excluded.reason,
+                     source=excluded.source, finding_id=excluded.finding_id,
+                     failure_streak=excluded.failure_streak,
+                     last_failure_code=excluded.last_failure_code,
+                     contained_at=excluded.contained_at, probe_after=excluded.probe_after,
+                     updated_at=excluded.updated_at""",
+                (
+                    principal_id, capability, subject_id, row["label"], row["state"],
+                    row["reason"], row["source"], row["finding_id"], row["failure_streak"],
+                    row["last_failure_code"], row["contained_at"], row["probe_after"], now,
+                ),
+            )
+        return {
+            "principal_id": principal_id,
+            "capability": capability,
+            "subject_id": subject_id,
+            **row,
+            "updated_at": now,
+        }
 
     def delete_project(self, project_id: str) -> bool:
         with self.connect() as connection:
@@ -5509,9 +5680,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO model_operations
                 (operation_id, owner_principal_id, kind, target, state, phase,
                  progress_bytes, total_bytes, progress_percent, source_url, destination,
-                 error_code, error_detail, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                tuple(operation.to_dict().values()),
+                 error_code, error_detail, created_at, updated_at, payload_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                tuple(operation.to_row().values()),
             )
         return operation
 

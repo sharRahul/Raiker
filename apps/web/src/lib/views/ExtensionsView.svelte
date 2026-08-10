@@ -20,13 +20,34 @@
   import TabStrip from "../components/TabStrip.svelte";
   import Icon from "../components/Icon.svelte";
   import { api, ApiError } from "../api";
-  import type { ApprovalView, ExtensionView, ExtensionsOverview } from "../apiTypes";
+  import type {
+    ApprovalView,
+    ExtensionView,
+    ExtensionsOverview,
+    PluginsView,
+  } from "../apiTypes";
   import { relativeTime } from "../format";
   import { HUB_TABS } from "../nav";
 
   let { tab = "connectors" }: { tab?: string } = $props();
 
   let overview = $state<ExtensionsOverview | null>(null);
+  // BUG-79 — a manifest signature used to be a presence marker with nothing on
+  // screen to say so. This reads the installed records and this workspace's own
+  // signing posture, so `verified` and `present only` never look identical.
+  let plugins = $state<PluginsView | null>(null);
+  let pluginsError = $state<string | null>(null);
+
+  async function loadPlugins() {
+    try {
+      plugins = await api.plugins();
+      pluginsError = null;
+    } catch (error) {
+      plugins = null;
+      pluginsError =
+        error instanceof ApiError ? error.message : "Plugin records are unavailable.";
+    }
+  }
   let loadError = $state<string | null>(null);
   let selected = $state<ExtensionView | null>(null);
   let filter = $state<"all" | "usable" | "blocked">("all");
@@ -142,7 +163,10 @@
     try { approvals = await api.approvals(); } catch { approvals = []; }
   }
 
-  onMount(load);
+  onMount(() => {
+    void load();
+    void loadPlugins();
+  });
 </script>
 
 <TabStrip {tabs} selected={tab} onselect={selectTab} label="Extension categories" />
@@ -311,6 +335,50 @@
   </div>
 {:else if tab === "plugins"}
   <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">
+    <section class="card" data-testid="plugin-signing-posture">
+      <h2>Plugin supply chain</h2>
+      {#if plugins === null}
+        <p class="note">{pluginsError ?? "Reading plugin records…"}</p>
+      {:else}
+        <p
+          class="posture"
+          class:posture-warn={!plugins.signing.configured}
+        >{plugins.signing.summary}</p>
+        {#if plugins.signing.remediation}
+          <p class="note">{plugins.signing.remediation}</p>
+        {/if}
+        {#if plugins.plugins.length === 0}
+          <p class="note">
+            Nothing is installed, and no plugin code runs in this browser. The posture above is
+            what a plugin installed today would be verified against.
+          </p>
+        {:else}
+          <ul class="plugin-list">
+            {#each plugins.plugins as plugin (plugin.record_id)}
+              <li>
+                <div class="plugin-copy">
+                  <strong>{plugin.plugin_id}</strong>
+                  <span class="note">
+                    {plugin.version} · {plugin.trust_level} · {plugin.status}
+                  </span>
+                  <span class="note">{plugin.signature.explanation}</span>
+                  {#if plugin.signature.remediation}
+                    <span class="note">{plugin.signature.remediation}</span>
+                  {/if}
+                </div>
+                <span
+                  class="sig"
+                  class:sig-verified={plugin.signature.level === "verified"}
+                  class:sig-present={plugin.signature.level === "present_only"}
+                  class:sig-unsigned={plugin.signature.level === "unsigned"}
+                  title={plugin.signature.reason}
+                >{plugin.signature.label}</span>
+              </li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+    </section>
     <section class="card deferred">
       <h2>Plugin panels are not available yet</h2>
       <p>
@@ -318,7 +386,6 @@
         accessibility contract for it. Listing them early would suggest an authority the runtime does
         not enforce, so this tab stays empty on purpose.
       </p>
-      <p class="note">Nothing is installed, and no plugin code runs in this browser.</p>
     </section>
   </div>
 {:else}
@@ -336,6 +403,59 @@
 {/if}
 
 <style>
+  .plugin-list {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .plugin-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-md);
+  }
+  .plugin-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
+  }
+  .posture {
+    margin: 0;
+  }
+  .posture-warn {
+    color: var(--warn);
+  }
+  .sig {
+    font-size: 0.72rem;
+    font-weight: 750;
+    padding: 0.16rem 0.55rem;
+    border-radius: var(--r-pill);
+    border: 1px solid var(--neutral-border);
+    background: var(--neutral-soft);
+    color: var(--text-2);
+    white-space: nowrap;
+  }
+  .sig-verified {
+    border-color: var(--ok-border, var(--accent-border));
+    background: var(--ok-soft, var(--accent-soft));
+    color: var(--ok, var(--accent));
+  }
+  .sig-present {
+    border-color: var(--warn-border);
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .sig-unsigned {
+    border-color: var(--danger-border, var(--warn-border));
+    background: var(--danger-soft, var(--warn-soft));
+    color: var(--danger, var(--warn));
+  }
   .overview { margin-bottom: var(--space-5); }
   .overview-head {
     display: flex;

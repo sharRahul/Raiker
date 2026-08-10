@@ -1,6 +1,13 @@
 <script lang="ts">
   import { api, auth, getToken, setToken, ApiError } from "../../api";
-  import type { CredentialLifecycle, McpFinding, SecurityHealth, StandingGrant } from "../../apiTypes";
+  import type {
+    CapabilityContainmentView,
+    ContainedSubject,
+    CredentialLifecycle,
+    McpFinding,
+    SecurityHealth,
+    StandingGrant,
+  } from "../../apiTypes";
 
   // Security & Login settings section: Vault Key configuration (masked + reveal +
   // status pill + elevated re-auth to save) and MFA enrollment. Exercises the
@@ -47,6 +54,31 @@
   let credentials = $state<CredentialLifecycle[]>([]);
   let findings = $state<McpFinding[]>([]);
   let health = $state<SecurityHealth[]>([]);
+  // BUG-77 — containment used to exist for monitored MCP connections and nothing
+  // else. This is the same three facts for every capability family: what is
+  // contained, why, and the one control that clears it.
+  let containment = $state<CapabilityContainmentView | null>(null);
+  let containmentBusy = $state("");
+
+  async function loadContainment() {
+    try { containment = await api.capabilityContainment(); }
+    catch { containment = null; }
+  }
+
+  async function containSubject(
+    subject: ContainedSubject,
+    action: "pause" | "kill" | "resume",
+  ) {
+    containmentBusy = `${subject.capability}:${subject.subject_id}`;
+    try {
+      await api.setCapabilityContainment(subject.capability, subject.subject_id, action);
+      await loadContainment();
+    } catch {
+      notice = { kind: "error", text: "That containment change was refused. Reload and try again." };
+    } finally {
+      containmentBusy = "";
+    }
+  }
   let breachPassword = $state("");
   let breachOptIn = $state(false);
 
@@ -104,6 +136,7 @@
     await loadSessions();
     await loadGrants();
     try {
+      void loadContainment();
       [credentials, findings, health] = await Promise.all([
         api.securityCredentials(), api.securityFindings(), api.securityHealth(),
       ]);
@@ -374,6 +407,63 @@
     </button>
   </div>
 
+  <div class="field" data-testid="capability-containment">
+    <div class="field-head"><h3>Monitored capabilities</h3></div>
+    <p class="sub">
+      Connectors, plugins, subagents, providers, tools and local execution are watched the same
+      way monitored MCP connections are: repeated failures or a high-severity anomaly contain the
+      subject with a stated reason, and every state is yours to clear in one call.
+    </p>
+    {#if containment === null}
+      <p class="sub">Containment state is unavailable right now.</p>
+    {:else if containment.subjects.length === 0}
+      <p class="sub">
+        Nothing is contained, and nothing has failed often enough to be watched yet. Subjects
+        appear here the first time one is called.
+      </p>
+    {:else}
+      <ul class="containment">
+        {#each containment.subjects as subject (subject.capability + subject.subject_id)}
+          <li class:contained={subject.state !== "active"}>
+            <div class="containment-copy">
+              <strong>{subject.label}</strong>
+              <span class="sub">{subject.capability_label} · {subject.state}</span>
+              {#if subject.reason}<span class="sub">{subject.reason}</span>{/if}
+              {#if subject.failure_streak > 0}
+                <span class="sub">
+                  {subject.failure_streak} consecutive {subject.failure_streak === 1 ? "failure" : "failures"}{
+                    subject.last_failure_code ? ` (${subject.last_failure_code})` : ""
+                  }
+                </span>
+              {/if}
+            </div>
+            <div class="actions">
+              {#if subject.state === "active"}
+                <button
+                  class="btn btn-soft"
+                  disabled={containmentBusy === subject.capability + ":" + subject.subject_id}
+                  onclick={() => containSubject(subject, "pause")}
+                >Pause</button>
+                <button
+                  class="btn btn-soft"
+                  disabled={containmentBusy === subject.capability + ":" + subject.subject_id}
+                  onclick={() => containSubject(subject, "kill")}
+                >Stop</button>
+              {:else}
+                <button
+                  class="btn btn-soft"
+                  disabled={containmentBusy === subject.capability + ":" + subject.subject_id}
+                  onclick={() => containSubject(subject, "resume")}
+                >Resume</button>
+              {/if}
+            </div>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+    <div class="actions"><button class="btn btn-soft" onclick={loadContainment}>Refresh</button></div>
+  </div>
+
   <!-- Password reset -->
   <div class="field">
     <div class="field-head"><h3>Password</h3></div>
@@ -601,5 +691,32 @@
     align-items: center;
     gap: var(--space-3);
     margin-top: var(--space-2);
+  }
+  ul.containment {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  ul.containment li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+  }
+  ul.containment li.contained {
+    border-color: var(--warn-border);
+    background: var(--warn-soft);
+  }
+  .containment-copy {
+    display: grid;
+    gap: 0.1rem;
+    min-width: 0;
   }
 </style>

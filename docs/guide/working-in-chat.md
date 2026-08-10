@@ -238,7 +238,7 @@ counts only — how many messages and how many characters — never the transcri
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-08, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-10, these
 are the edges a Chat user can still hit:
 
 - **An approved network or process action is recorded, not run.** Approving a
@@ -269,6 +269,23 @@ are the edges a Chat user can still hit:
 - **An exported conversation carries citation numbers it cannot explain.** The
   transcript resolves `[s1]` against the turn's sources; an export carries the
   answer text only, so the numbers travel without the list they refer to.
+- **A tool that keeps failing stops being tried, and says so.** Three failures
+  in a row on the same tool or the same provider contain it: the next call is
+  refused with the reason and the failure count instead of being retried, and one
+  call a minute later is let through to see whether it has recovered. Nothing is
+  taken away permanently — Settings → Security & sign-in lists what is contained
+  and clears it in one press.
+- **A suspicious page is flagged, not withheld.** If a page, message or file this
+  turn read contains text shaped like an attempt to redirect Raiker, you get a
+  finding naming that exact source. The content is still used — as data, never as
+  instructions, which is what actually keeps it harmless — so treat the finding
+  as provenance rather than as a block.
+- **Send waits for a model check, and the check expires.** A surface will not
+  send until the exact model has passed a reachability check. That check is good
+  for five minutes by default (Settings → Runtime, 1–120 minutes), and while a
+  work surface is open Raiker re-confirms it quietly in the background before it
+  lapses. Changing model, endpoint or credential invalidates it immediately
+  whatever the window says.
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped.
 
@@ -277,7 +294,8 @@ Markdown rendering (**FIXED-06**), conversation export (**FIXED-12**, superseded
 by **FIXED-19** and **FIXED-54**), and — the one that mattered most — an
 approved file write really reaching the disk (**FIXED-08**). Where a limit above
 is tracked as work rather than a deliberate boundary, it has a reproduction and
-a proposed fix in [To be fixed](../plans/TO_BE_FIXED.md).
+a proposed fix in [To be fixed](../plans/TO_BE_FIXED.md); the closed ones keep
+their full record in [Fixed items](../plans/FIXED_ITEMS.md).
 
 ## Context and API cost
 

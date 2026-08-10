@@ -130,8 +130,8 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Local runtime install / connect | Codex `--oss` (Ollama) | Vendor-sourced install plans for Ollama, LM Studio, llama.cpp; never bundled | ✅ beyond |
 | Model acquisition (pull / download / convert) | Codex pulls via Ollama | Ollama pull, revision-pinned Hugging Face GGUF download, isolated Safetensors→GGUF conversion | ✅ beyond |
 | Readiness of a secondary / auxiliary model | Claude Code `ANTHROPIC_SMALL_FAST_MODEL` | Advisor model resolves through the same per-profile pin as the chat chain, carries a readiness observation under its own exact key, and shows the chip, the exact model and **Check advisor** beside the selector (FIXED-158) | ✅ |
-| Continuous / background revalidation | ChatGPT and Claude Code re-check per request | Fixed five-minute TTL, owner-triggered re-check only | 🟡 BUG-83 |
-| Single-provider live acceptance run | n/a | The BUG-69 live spec hard-requires two provider keys | 🟡 BUG-84 |
+| Continuous / background revalidation | ChatGPT and Claude Code re-check per request | Owner-set window (1–120 minutes, default 5) plus opportunistic background revalidation while a work surface is open; the invalidation hooks stay authoritative over the timer (FIXED-169) | ✅ |
+| Single-provider live acceptance run | n/a | Each provider leg is skipped when its key is absent; the run fails only with no key at all, and asserts the readiness state machine rather than one account's entitlement (FIXED-170) | ✅ |
 
 Raiker difference: readiness is **exact and pre-submission**. Every reference
 system above lets an owner select a model that cannot run and discovers the
@@ -139,6 +139,37 @@ problem when the request fails. Raiker binds readiness to the exact
 owner/profile/model/endpoint tuple, persists the observation with a short TTL,
 and refuses to create a turn, task, schedule, or background run until something
 in the resolved chain is proven ready.
+
+---
+
+## Resilience and containment control set
+
+Reviewed 2026-08-10 while closing BUG-76 through BUG-81, against the failure
+handling and component-containment controls of **Claude Cowork**, **Claude
+Code**, **ChatGPT**, **Codex**, **OpenClaw**, and **Hermes Agent**. Scope is only
+that control set: what each system does when a tool, a connector, a provider or a
+delegated agent starts failing or misbehaving, and what the owner can see and do
+about it. Nothing here is a claim about the rest of those products.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Reference behaviour (where it exists) | Raiker | Status |
+|---|---|---|---|
+| Per-turn tool-call bound | Claude Code and Codex bound a turn's tool calls | `PromptOptions.max_tool_calls`, enforced in the orchestrator loop | ✅ |
+| Provider retry with fallback | Claude Code `--fallback-model`; OpenClaw provider fallback | Ordered fallback chain, one transport re-attempt, each attempt evented | ✅ |
+| Circuit breaker on a repeatedly failing component | None — every reference system retries under a budget and reports the last error | Durable consecutive-failure state per tool and per provider, a threshold that contains the subject with a stated reason, a half-open probe after a cooldown, and refusal in between (FIXED-163) | ✅ beyond |
+| Behaviour baseline and anomaly rules per component | None | Five deterministic rules — new host, volume spike, tool-set swap, sensitive-data shape, error burst — over a rolling per-subject baseline, for connectors, plugins, subagents, providers, tools and local execution (FIXED-164) | ✅ beyond |
+| Owner-visible containment with a one-call resume | Claude Code and Codex let an owner disable a whole MCP server or tool in config | Per-subject `active` / `paused` / `killed`, each revocable in one press from Settings → Security & sign-in, with the reason and failure count on screen | ✅ beyond |
+| Delegated-agent result verification | None — Claude Code subagents and Codex sub-tasks return results in-process, unattested | Spawn-scoped Ed25519 attestation binding the result digest to the spawn, verified before the result becomes a turn source, recorded on the hash-chained event (FIXED-165) | ✅ beyond |
+| Extension signature verification | Claude Code and Codex verify MCP server transport but not manifest authorship; ChatGPT reviews connectors centrally | HMAC or Ed25519 manifest verification when a key is configured, and a first-class `verified` / `present only` / `unsigned` level stated on every installed plugin either way (FIXED-166) | ✅ beyond |
+| Prompt-injection signal on untrusted content | Claude Code, Codex and ChatGPT frame external content as data; none report a suspected attempt to the operator | The same framing, plus a deterministic advisory scanner that names the exact page or document in a finding and never blocks (FIXED-168) | ✅ beyond |
+| Resumable / cancellable model acquisition | Ollama and LM Studio resume and cancel downloads | Typed payload dispatch on retry, cooperative cancellation in every worker, and a separately confirmed partial-file deletion bounded to an approved root (FIXED-162) | ✅ |
+
+Raiker difference: containment is **per subject and owner-revocable**. The
+reference systems answer a misbehaving component with configuration — turn the
+server off, remove the tool — which is all-or-nothing and takes effect only on
+the next start. Raiker contains the exact subject at the moment it misbehaves,
+says why in the owner's words, and gives the state back in one press.
 
 ---
 

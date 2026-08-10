@@ -2354,6 +2354,104 @@ class DashboardService:
         )
         return self.list_security_findings(principal_id)
 
+    def list_capability_containment(self, principal_id: str) -> dict[str, Any]:
+        """Every monitored capability's containment state, in one owner-facing shape.
+
+        BUG-77 — the security surface used to list containment for exactly one
+        capability family. Monitored MCP connections keep their richer per-session
+        view; this is the same three facts (state, reason, the control that clears
+        it) for connectors, plugins, subagents, providers, tools and local
+        execution, so nothing is contained without being visible.
+        """
+        from raiker.security.containment import (
+            CAPABILITY_LABELS,
+            CapabilityContainment,
+        )
+
+        views = CapabilityContainment(self.store).list(principal_id)
+        return {
+            "subjects": [view.to_dict() for view in views],
+            "contained": sum(1 for view in views if view.contained),
+            "capabilities": [
+                {"id": capability, "label": label}
+                for capability, label in sorted(CAPABILITY_LABELS.items())
+            ],
+        }
+
+    def set_capability_containment(
+        self, principal_id: str, capability: str, subject_id: str, action: str
+    ) -> dict[str, Any]:
+        """Pause, stop or resume one monitored subject. Every state is revocable."""
+        from raiker.security.containment import CAPABILITY_LABELS, CapabilityContainment
+
+        if capability not in CAPABILITY_LABELS:
+            raise ValueError(f"unknown_capability:{capability}")
+        containment = CapabilityContainment(self.store)
+        if action == "pause":
+            view = containment.pause(
+                principal_id, capability, subject_id,
+                reason="Paused by you. It will not run until you resume it.",
+            )
+        elif action == "kill":
+            view = containment.kill(principal_id, capability, subject_id)
+        elif action == "resume":
+            view = containment.resume(principal_id, capability, subject_id)
+        else:
+            raise ValueError(f"unknown_containment_action:{action}")
+        return view.to_dict()
+
+    def list_plugins(self) -> dict[str, Any]:
+        """Installed plugin records plus this workspace's signing posture (BUG-79).
+
+        A plugin's signature is reported at the level it actually earned —
+        ``verified``, ``present_only`` or ``unsigned`` — rather than as a boolean
+        that reads the same whether an author was checked or not.
+        """
+        from raiker.plugins.verify import (
+            LEVEL_PRESENT_ONLY,
+            LEVEL_UNSIGNED,
+            LEVEL_VERIFIED,
+            signature_verification,
+            signing_posture,
+        )
+
+        posture = signing_posture()
+        plugins: list[dict[str, Any]] = []
+        for row in self.store.list_plugin_install_records():
+            signature = str(row.get("signature") or "")
+            manifest = {
+                "id": row.get("plugin_id"),
+                "version": row.get("version"),
+                "supply_chain": {
+                    "checksum": row.get("checksum"),
+                    "signature": signature or None,
+                },
+            }
+            verification = signature_verification(manifest)
+            # The stored record cannot be re-signed after the fact, so an install
+            # made while a key was configured is reported at the level it earned
+            # then; without a key today the honest answer is the weaker one.
+            level = (
+                LEVEL_VERIFIED
+                if verification.level == LEVEL_VERIFIED
+                else (LEVEL_PRESENT_ONLY if signature else LEVEL_UNSIGNED)
+            )
+            plugins.append(
+                {
+                    "record_id": row.get("record_id"),
+                    "plugin_id": row.get("plugin_id"),
+                    "version": row.get("version"),
+                    "trust_level": row.get("trust_level"),
+                    "status": row.get("status"),
+                    "source_url": row.get("source_url"),
+                    "installed_at": row.get("installed_at"),
+                    "installed_by": row.get("installed_by"),
+                    "checksum_present": bool(row.get("checksum")),
+                    "signature": {**verification.to_dict(), "level": level},
+                }
+            )
+        return {"plugins": plugins, "signing": posture}
+
     def list_security_findings(self, principal_id: str) -> list[SecurityFindingView]:
         return [
             SecurityFindingView(

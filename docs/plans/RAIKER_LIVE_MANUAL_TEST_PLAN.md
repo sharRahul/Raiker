@@ -425,7 +425,7 @@ decides. `working/r0810-bug71-memory-says-the-gate-is-off.png`,
 
 | # | Step | Expected | Result |
 |---|---|---|---|
-| 7.1 | Ask Chat to `write_file` a report | Reply "Waiting for approval · Approval required. The action was not executed. Resolving it continues this turn." plus a **Review approval** link | ✅ `r0808-27-chat-write-file-request.png` |
+| 7.1 | Ask Chat to `write_file` a report | Reply "Waiting for approval · Approval required. Nothing has run yet. Resolving it continues this turn." plus a **Review approval** link | ✅ `r0808-27-chat-write-file-request.png` (the wording was tightened with FIXED-157) |
 | 7.2 | **Review approval** | Navigates to the Approvals inbox (not straight to the detail — one more click is needed) | ✅ `r0808-37-review-approval-link-target.png` |
 | 7.3 | Approvals → Pending | Row: Write file / proposed by `Raiker agent · turn_…` / File writes / high / pending | ✅ `r0808-28-approvals-pending.png` |
 | 7.4 | **Review** | Detail with capability, risk, session link, expiry, proposer identity chip, and the **proposed unified diff** | ✅ `r0808-29-approval-detail.png` |

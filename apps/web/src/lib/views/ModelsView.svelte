@@ -109,8 +109,16 @@
       advisorChoice = models.advisor_profile_id ?? "";
     } catch (e) {
       models = null;
+      // A 429 is the runtime's own request limiter, not a broken page — and
+      // "Unavailable (429)" tells an owner neither what happened nor that it
+      // clears by itself. Naming it is the same rule the rest of this page
+      // follows: say what is wrong and what fixes it.
       loadError =
-        e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+        e instanceof ApiError && e.status === 429
+          ? "Too many requests in the last minute. Raiker throttled this read; wait a moment and press Refresh."
+          : e instanceof ApiError
+            ? `Unavailable (${e.status})`
+            : "Unavailable";
     }
   }
 
@@ -307,14 +315,18 @@
           ? `${readiness.summary} ${readiness.remediation}`
           : readiness.summary;
         await load();
-      } catch {
-        message = `Raiker could not check ${providerName(profile.provider)}.`;
+      } catch (e) {
+        message = throttled(e)
+          ? THROTTLED
+          : `Raiker could not check ${providerName(profile.provider)}.`;
       }
     } else {
       try {
         message = testNote(profile, await api.providerModels(id));
-      } catch {
-        message = `Raiker could not reach ${providerName(profile.provider)}.`;
+      } catch (e) {
+        message = throttled(e)
+          ? THROTTLED
+          : `Raiker could not reach ${providerName(profile.provider)}.`;
       }
     }
     testing = without(testing, id);
@@ -401,6 +413,13 @@
     models !== null && advisorChoice !== (models.advisor_profile_id ?? ""),
   );
 
+  // FIXED-160 — the runtime's own request limiter is not a broken page, and
+  // "could not check" tells an owner neither what happened nor that it clears by
+  // itself. Every check on this page says so in the same words.
+  const THROTTLED =
+    "Too many requests in the last minute. Raiker throttled this check; wait a moment and try again.";
+  const throttled = (e: unknown) => e instanceof ApiError && e.status === 429;
+
   // BUG-82 — the advisor gets the same readiness chip and repair sentence a
   // provider card gets, because it is a second model this runtime really calls.
   let advisorChecking = $state(false);
@@ -422,8 +441,8 @@
         ? `${readiness.summary} ${readiness.remediation}`
         : readiness.summary;
       await load();
-    } catch {
-      advisorCheckNote = "Raiker could not check the advisor model.";
+    } catch (e) {
+      advisorCheckNote = throttled(e) ? THROTTLED : "Raiker could not check the advisor model.";
     } finally {
       advisorChecking = false;
     }

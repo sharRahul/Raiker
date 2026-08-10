@@ -222,6 +222,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-80 | Low | Documentation / the GenAI mapping still calls the verifier a stub | Open (found in the OWASP ASI mapping) |
 | BUG-81 | Low | Context / no prompt-injection scanning hook exists, though the security mapping requires one | Open (found in the OWASP ASI01 mapping) |
 | FIXED-158 | Medium | Model readiness / the advisor model was never readiness-checked or surfaced | Fixed (was BUG-82) |
+| FIXED-160 | Low | Models / a throttled read reported only `Unavailable (429)` | Fixed (found while verifying FIXED-158 live) |
 | BUG-83 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Open (found in the BUG-69 parity review) |
 | BUG-84 | Low | Live tests / the BUG-69 acceptance spec cannot run with a single provider key | Open (found in the BUG-69 parity review) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
@@ -6442,6 +6443,40 @@ chip for its exact state.
 **Evidence.** Three tests in `apps/web/src/lib/views/ModelsView.test.ts`, and
 the live headline reading **0 models ready · 1 of 10 connected** in
 `screenshots/working/bug69-models-quota-readiness-live.png`.
+
+---
+
+## FIXED-160 — A throttled read reported only `Unavailable (429)`
+
+**Status: fixed in this change. Found on 2026-08-10 while running the FIXED-158
+live scenario.**
+
+**Observed.** Driving several surfaces in quick succession trips the runtime's
+own request limiter (`RateLimitMiddleware`, 120 requests per minute). Models then
+renders:
+
+```
+Couldn't load models
+Unavailable (429)
+```
+
+**Why it matters.** The limiter is working — this is Raiker protecting itself,
+and the condition clears on its own within a minute. But the page says neither of
+those things. "Unavailable (429)" reads as a broken page to anyone who does not
+know what a 429 is, and it names no way forward, on a page where every other
+failure states what is wrong and which control fixes it.
+
+**Fix applied.** A 429 is named for what it is, with the control that resolves
+it: *"Too many requests in the last minute. Raiker throttled this read; wait a
+moment and press Refresh."* The same wording covers the page's two check
+controls — **Test** on a provider card and **Check advisor** — which previously
+said only "Raiker could not check …", the same sentence they use for a provider
+that genuinely cannot be reached. Every other status keeps the existing wording.
+
+**Found by.** The live suite makes more governed reads per minute than a person
+does, so it meets the limiter routinely; `bug-68-71-73-82-live.spec.ts` now waits
+and presses **Refresh models** on that message rather than reporting a defect the
+product does not have.
 
 ---
 

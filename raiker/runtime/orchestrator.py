@@ -466,20 +466,25 @@ class RuntimeOrchestrator:
             queue_position=queue_position,
             queue_total=queue_total,
         )
+        # BUG-73 — a pending decision is a state, so the card describes the
+        # state ("has not run") rather than passing a verdict on execution
+        # ("was not executed"). The two read the same while the card is up and
+        # very differently once it is resolved, which is the confusion the
+        # conversation-level wording caused.
         batched = queue_total > 1
         if resumable and batched:
             note = (
                 f"Approval required — decision {queue_position} of {queue_total} in this "
-                "batch. The action was not executed. Resolving it continues this turn "
+                "batch. Nothing has run yet. Resolving it continues this turn "
                 "with the calls still queued behind it."
             )
         elif resumable:
             note = (
-                "Approval required. The action was not executed. Resolving it "
+                "Approval required. Nothing has run yet. Resolving it "
                 "continues this turn."
             )
         else:
-            note = "Approval required. The action was not executed."
+            note = "Approval required. Nothing has run yet."
         return {
             "action_id": action.action_id,
             "approval_id": approval_id,

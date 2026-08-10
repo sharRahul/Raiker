@@ -49,6 +49,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { useHostedModel } from "./hosted-provider";
 
 const SOURCE = "http://127.0.0.1:8765";
 const PACKAGED = "http://127.0.0.1:8766";
@@ -92,18 +93,12 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  await page.goto(`${SOURCE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
-  await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
-  await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
-  await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 30_000 });
-
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 30_000 });
-  await catalogue.selectOption(MODEL);
-  await card.getByRole("button", { name: "Use model" }).click();
+  const card = await useHostedModel(page, SOURCE, {
+    provider: "Anthropic",
+    keyLabel: "Anthropic API key",
+    key: ANTHROPIC_KEY,
+    model: MODEL,
+  });
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({ timeout: 30_000 });
 
   await page.goto(`${SOURCE}/#/new-chat`);

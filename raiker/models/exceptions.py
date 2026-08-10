@@ -154,3 +154,117 @@ def provider_error_code(exc: BaseException) -> str:
         if code != "provider_error_redacted" and _REASON_CODE.match(code):
             return code
     return _PROVIDER_ERROR_CLASS_CODES.get(type(exc).__name__, UNCLASSIFIED_PROVIDER_ERROR)
+
+
+def stream_failure(exc: Exception) -> Exception:
+    """The exception a streaming adapter should raise for *exc* (BUG-72).
+
+    A stream adapter used to answer every failure with one code. Anything the
+    transport or the HTTP status had already classified — an expired key, an
+    exhausted balance, a rate limit, a closed connection — arrived at the owner
+    as ``provider_stream_failed``, which says only that a stream ended and sends
+    them to debug the wrong thing. So:
+
+    * an already-classified provider error is returned **unchanged**, keeping
+      the code its own layer chose;
+    * anything else is wrapped in :class:`ProviderStreamError` **carrying the
+      underlying exception type** — ``provider_stream_failed:TimeoutError`` —
+      so the class is still in the reason code rather than only in a traceback
+      nobody kept. The type name is class metadata, never provider text, so
+      this cannot carry a credential or a body fragment into an event.
+    """
+    if isinstance(exc, ModelProviderError):
+        return exc
+    return ProviderStreamError(f"provider_stream_failed:{type(exc).__name__}")
+
+
+# Owner-facing sentence per reason-code family, with the repair. A raw code as
+# the whole answer is the defect FIXED-01 removed from the Models page; a turn
+# that fails must not put one back in the transcript (BUG-72).
+_PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
+    (
+        "provider_auth_failed",
+        "the provider rejected the saved credential. Update the key on Models, then try again.",
+    ),
+    (
+        "provider_authentication_failed",
+        "the provider rejected the saved credential. Update the key on Models, then try again.",
+    ),
+    (
+        "provider_quota_exhausted",
+        "the provider accepted the credential but the account has no credit or quota left. "
+        "Add credit or raise the quota, then try again.",
+    ),
+    (
+        "provider_rate_limited",
+        "the provider is rate limiting this account right now. Wait a moment and try again.",
+    ),
+    (
+        "provider_timeout",
+        "the provider did not answer in time. Try again, or choose a different model on Models.",
+    ),
+    (
+        "model_not_found",
+        "the selected model does not exist on that provider. Choose a model on Models.",
+    ),
+    (
+        "provider_capability_unsupported",
+        "the selected model cannot do what this turn needed. "
+        "Choose a different model on Models.",
+    ),
+    (
+        "provider_misconfigured",
+        "the model profile is incomplete. Check the connection on Models.",
+    ),
+    (
+        "provider_policy_denied",
+        "the current model policy blocks that provider. Review it on Permissions.",
+    ),
+    (
+        "provider_invalid_response",
+        "the provider returned a response Raiker could not read. "
+        "Try again; if it repeats, choose a different model.",
+    ),
+    (
+        "provider_cancelled",
+        "the request was cancelled before the provider answered.",
+    ),
+    (
+        "provider_stream_failed",
+        "the connection to the provider ended before the answer did. Try again.",
+    ),
+    (
+        "provider_connection_failed",
+        "Raiker could not reach the provider. "
+        "Check the network and the egress allowlist, then try again.",
+    ),
+    (
+        "provider_unavailable",
+        "the provider is returning errors of its own. Try again shortly.",
+    ),
+    (
+        "provider_http_error",
+        "the provider refused the request. Run the readiness check on Models to see why.",
+    ),
+)
+
+
+def provider_error_sentence(code: str) -> str:
+    """One plain sentence explaining *code* and what to do about it."""
+    base = code.split(":", 1)[0]
+    for prefix, sentence in _PROVIDER_ERROR_SENTENCES:
+        if base == prefix:
+            return sentence
+    return "the provider did not complete the request. Run the readiness check on Models."
+
+
+def provider_failure_message(code: str) -> str:
+    """The turn-level answer shown when no provider could complete the turn.
+
+    Leads with what happened in the owner's language and keeps the machine code
+    where support and the audit trail can still read it.
+    """
+    return (
+        f"I could not finish that: {provider_error_sentence(code)} "
+        f"(model_unavailable: {code})"
+    )

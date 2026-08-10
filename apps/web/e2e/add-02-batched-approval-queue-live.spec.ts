@@ -21,6 +21,7 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
+import { hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -66,8 +67,7 @@ test.afterAll(async () => await context?.close());
 
 test("the batching model is connected through the product UI", async () => {
   test.setTimeout(180_000);
-  await page.goto(`${BASE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: "OpenAI-compatible" }).first();
+  const card = await hostedProviderCard(page, BASE, "OpenAI-compatible");
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByRole("button", { name: /Advanced: custom endpoint/ }).click();
   await page.getByPlaceholder("https://…").fill(STUB_ENDPOINT);

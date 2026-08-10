@@ -211,7 +211,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-141 | Medium | Models navigation / three tabs were unreachable by deep link and silently opened Providers | Fixed (found while splitting the Models page) |
 | BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
 | BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
-| BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
+| FIXED-142 | High | Runtime / a tool call that blocked the event loop killed its own turn | Fixed (was BUG-72) |
 | BUG-73 | Medium | Chat / a resumed turn can deny an execution that happened | Open, intermittent (found in the 2026-08-08 live round) |
 | BUG-74 | Low | Web build / the main production JavaScript chunk exceeds the 500 kB warning threshold | Open (found while closing BUG-69) |
 | BUG-75 | Medium | Model activity / retry, cancellation, and partial-file cleanup are record-only for some job types | Open (found while closing BUG-69) |
@@ -224,6 +224,15 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-82 | Medium | Model readiness / the advisor model is never readiness-checked or surfaced | Open (found in the BUG-69 parity review) |
 | BUG-83 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Open (found in the BUG-69 parity review) |
 | BUG-84 | Low | Live tests / the BUG-69 acceptance spec cannot run with a single provider key | Open (found in the BUG-69 parity review) |
+| FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
+| FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
+| BUG-85 | Low | Live tests / the BUG-47 scenario expects two Models tabs on screen at once | Open (found while fixing FIXED-143) |
+| FIXED-145 | Low | Web / the first-run screen was titled "Workbench" | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-146 | Low | Knowledge Map / the count pill contradicted the empty state | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-147 | Medium | Knowledge Map / the graph ignored a system dark preference | Fixed (found in the 2026-08-10 visual sweep) |
+| FIXED-148 | Low | Models / "1 models ready" | Fixed (found in the 2026-08-10 visual sweep) |
+| BUG-86 | **Critical** | Storage / SQLCipher runs out of locked memory and locks the owner out | Open (found in the 2026-08-10 visual sweep) |
+| BUG-87 | Medium | Observability / the audit log shows nothing though governed events were recorded | Open (found in the 2026-08-10 visual sweep) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -5759,66 +5768,117 @@ is the thing to fix, whichever way it is resolved.
 
 ---
 
-## BUG-72 — Enabling Web fetch makes every turn that uses it fail
+## FIXED-142 — Enabling Web fetch made every turn that used it fail
 
-**Status: open. Found on 2026-08-08 executing the network-capability
-scenarios. Reproduced 4 / 4.**
+**Status: fixed in this change. Was BUG-72, found on 2026-08-08 executing the
+network-capability scenarios, reproduced 4 / 4 on that host.**
 
 **Observed.** With `web_fetch` at `enabled_runtime` and decision mode **Allow**,
-every turn that calls it returns, as the whole answer:
+every turn that called it returned, as the whole answer:
 
 ```
 model_unavailable: provider_stream_failed
 ```
 
-The turn is lost. It happens for an allowlisted host (`https://api.anthropic.com/`)
-and a non-allowlisted one (`https://example.com`) alike, so it is not the egress
-allowlist refusing the fetch.
-
-The same prompt with the mode left at **Ask** completes normally — the model
-narrates that the call was withheld. So the failure appears only when the tool
-is actually permitted to run.
+The turn was lost. The same prompt with the mode left at **Ask** completed
+normally, so the failure appeared only when the tool was actually permitted to
+run. Nothing was logged, and the message blamed the model — Anthropic answered
+fine on the turn before and the turn after.
 
 **Reproduction.** Permissions → **Web fetch** → Turn on → **Allow**. Chat →
 *"Use web_fetch to read https://example.com and quote its main heading
 exactly."*
 
-**What makes it worse than a failed tool call.**
+**What this entry does and does not claim.** The 2026-08-10 verification round
+could **not** reproduce the symptom: on a host where the fetch completes in
+about a second, the same scenario answers correctly on the unfixed code. That is
+consistent with the root cause below rather than evidence against it — the
+failure is a race whose window is the length of the fetch. So the three defects
+below are stated as what they are: one that certainly caused it, and two that
+made it impossible to tell. All three are fixed, and all three are now held by
+tests rather than by a live run nobody can reproduce on demand.
 
-* **Nothing is audited.** `GET /api/events` holds no `tool_call` record for the
-  attempt — the only web_fetch-related events in the log are from the *withheld*
-  run at Ask.
-* **Nothing is logged.** The server log has no error, traceback, or warning for
-  the failed turn.
-* **The message blames the model.** `model_unavailable` tells the owner their
-  provider is down. Anthropic answered fine on the turn before and the turn
-  after.
+**Root cause 1 — a tool call ran on the event loop, and web_fetch is the
+longest-blocking tool there is.** `ToolBroker.execute` is synchronous, and so is
+every tool underneath it: `web_fetch` does a blocking `getaddrinfo` and then a
+blocking HTTPS GET with a **fifteen-second** cap
+(`raiker/runtime/web_access.py`). The orchestrator moved a call to a worker
+thread **only when the batch held more than one read-only call**
+(`raiker/runtime/orchestrator.py`, B4's parallel path); the ordinary single call
+— exactly what BUG-72's reproduction asks for — ran inline on the asyncio loop.
 
-**Root cause (partial).** `provider_stream_failed` is the mapped code for
-`ProviderStreamError` (`raiker/models/exceptions.py:72`), raised from the
-Anthropic adapter's stream loop
-(`raiker/models/providers/anthropic_messages.py:442-456`), which wraps *any*
-exception type into that one code. The web_fetch tool result is what differs
-between the passing and failing runs, so the follow-up request carrying that
-result is the suspect. The wrapper is what hides which exception it actually was.
+For the length of that fetch the whole ASGI process was frozen: no other request
+served, no Stop control polled, no SSE heartbeat, and — the failure that made
+this a defect — no chance for the provider client to process the close of the
+pooled keep-alive connection it was about to reuse. The next model request then
+went out on a socket the far end had already closed, `httpx` raised
+`RemoteProtocolError`, and the adapter turned that into `provider_stream_failed`.
+At **Ask** the tool returns without touching the network, which is precisely why
+that path never failed.
 
-**Proposed fix.** Two parts:
+**Root cause 2 — the adapter destroyed the reason.** Both streaming adapters
+ended with
 
-1. Make the failure diagnosable: `ProviderStreamError` must carry, and the
-   runtime must log, the underlying exception type and the provider's own
-   response status/body, and the turn must record an audit event for a tool call
-   it attempted.
-2. Then fix the web_fetch round-trip itself. A tool that cannot survive its own
-   result reaching the model is not shipped; if it cannot be fixed now, the
-   capability must state that it is not usable rather than offering a switch
-   that breaks the next turn.
+```python
+raise ProviderStreamError(type(exc).__name__) from exc
+```
 
-**UI when closed.** With Web fetch on, the turn quotes the page. If the fetch is
-refused, the refusal names the capability and the host — it never claims the
-model is unavailable.
+for every already-classified provider error, so an expired key, an exhausted
+balance, a rate limit and a dropped connection all reached the owner as one
+code that says only *a stream ended*.
 
-**Evidence.** `screenshots/not-working/BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png`,
-`screenshots/working/r0808-84-web-fetch-withheld-at-ask.png` (the passing Ask case).
+**Root cause 3 — nothing was written down.** There was no log line at all for a
+failed model call, and the turn's whole answer was a raw reason code.
+
+**Fix.**
+
+1. **No brokered tool ever occupies the event loop.** One
+   `RuntimeOrchestrator._aexecute_tool` now runs *every* call — lone, batched, or
+   drained from the approval queue — through `asyncio.to_thread`. Governance is
+   untouched; only where the blocking work happens changed.
+2. **A classified failure keeps its own code.** `stream_failure()` in
+   `raiker/models/exceptions.py` returns an already-classified provider error
+   unchanged and wraps only an unclassified one, carrying its exception *class*
+   in the code — `provider_stream_failed:RemoteProtocolError`. The class name is
+   metadata, never provider text, so this cannot carry a credential or a body
+   fragment into an event.
+3. **A transport failure is re-attempted once, on the same model.** A closed
+   connection, a timeout, a provider 5xx and an unclassified mid-stream
+   exception each earn exactly one immediate retry, recorded as
+   `model_request_retried`. A *decision* — a rejected key, an empty balance, a
+   missing model — earns none: asking again only spends the owner's quota to be
+   told the same thing. Nothing is retried once output has been streamed.
+4. **The failure is said in words, and written to the log.** The turn now
+   answers *"I could not finish that: the provider rejected the saved
+   credential. Update the key on Models, then try again. (model_unavailable:
+   provider_auth_failed:http_401)"* — the repair first, the machine code kept
+   for support and for the troubleshooting table. A partially streamed answer is
+   **kept** and the failure appended, rather than being replaced by a code. Every
+   failed model call also writes one `WARNING` naming the provider, the model,
+   the exception class and the safe reason code.
+
+**UI when closed.** With Web fetch on, the turn quotes the page. A refused fetch
+names the capability and the host and never claims the model is unavailable; a
+turn that genuinely cannot reach the provider says which failure it was and what
+to do about it.
+
+**Evidence.** `tests/test_bug_72_web_fetch_turn_survives.py` — fifteen tests
+across the three defects, including one that runs a blocking tool call and
+asserts a concurrently scheduled coroutine keeps ticking, which is the
+regression that would let root cause 1 back in.
+`apps/web/e2e/web-access-turn-control-live.spec.ts` passes 6 / 6 against a live
+Anthropic `claude-haiku-4-5-20251001`:
+`screenshots/working/b12-web-fetch-live-page.png` is the agent reading
+`https://pypi.org/project/httpx/` and quoting *"The next generation HTTP
+client."* with its source chip, and
+`screenshots/working/b12-web-fetch-egress-denied.png` is a non-allowlisted host
+refused by name.
+
+**Not verified live here.** OpenAI, OpenRouter and Ollama could not be exercised
+on the verification host: the sandbox network policy answers `openrouter.ai` and
+`api.openai.com` with a proxy 403, and no Ollama daemon was available. The
+OpenAI-compatible adapter — which is the path all three take — is covered by the
+unit tests above.
 
 ---
 
@@ -6381,6 +6441,264 @@ account earns.
 **UI when closed.** No UI change. `npm --prefix apps/web run test:e2e:live` with
 a single provider key produces a complete, honest evidence run for that
 provider.
+
+---
+## FIXED-143 — The live evidence suite could not reach a provider card at all
+
+**Status: fixed in this change. Found on 2026-08-10 running the B12/C7 spec to
+verify FIXED-142.**
+
+**Observed.** `apps/web/e2e/web-access-turn-control-live.spec.ts` failed on its
+first action, four minutes of timeout before a single assertion about web access
+ran:
+
+```
+locator.click: Timeout 30000ms exceeded.
+  waiting for locator('article.provider-card').filter({ hasText: 'Anthropic' })
+```
+
+Eighteen live specs opened `#/models` and reached straight for a provider card.
+
+**Root cause.** Three separate pieces of the product moved and the specs did
+not follow:
+
+| What moved | Landed as |
+|---|---|
+| FIXED-141 split Models into tabs and made **Local** the default | `#/models` renders no `article.provider-card` at all |
+| FIXED-133 added the first-run "Choose how to run models" sheet | modal over the workbench on every *load* of a new instance, so skipping it during sign-in does not survive the first navigation |
+| FIXED-133 added the readiness gate | **Send** stays disabled until the *exact* model has a check, so a spec that connected, pinned and typed sat on a disabled button |
+
+None of these is a defect on its own; each is a shipped improvement. The defect
+is that the live suite is the evidence behind every FIXED entry in this
+document, and it had stopped being able to produce any.
+
+**Fix.** One `apps/web/e2e/hosted-provider.ts` now owns all three steps, so the
+next change to any of them is one edit rather than eighteen:
+`openHostedProviders` navigates to the tab the cards are actually on and settles
+the first-run sheet by waiting for *either* the tab or the sheet — the sheet
+appears only after the bootstrap reads resolve, so polling for it immediately is
+what made a naive skip flaky; `useHostedModel` connects, pins the exact model,
+reloads so **Test** probes the pinned model rather than the profile the picker
+was opened with, and runs the readiness check; `refreshHostedReadiness` re-runs
+it for a scenario that starts after the record's five-minute TTL (BUG-83) has
+passed. Every affected spec now calls these instead of inlining a copy.
+
+**Evidence.** `apps/web/e2e/web-access-turn-control-live.spec.ts` passes 6 / 6
+against a live Anthropic host; the other seventeen specs are converted to the
+same helpers but were not run — they need credentials and hosts this
+verification round did not have.
+
+---
+## FIXED-144 — The first-run model sheet rendered the Settings page underneath it
+
+**Status: fixed in this change. Found on 2026-08-10 in a Playwright page
+snapshot taken while diagnosing FIXED-143.**
+
+**Observed.** On a brand-new instance the first-run "Choose how to run models"
+sheet rendered with the entire **Settings** page — section rail, language
+combobox, startup behaviour — stacked below it in the same scroll column.
+
+**Root cause.** `apps/web/src/App.svelte` routes through two sibling `{#if}`
+chains. The first handles `model-setup`; the second ends in the fallback
+`{:else if current !== "new-chat" && current !== "build"}` → `SettingsView`.
+`model-setup` was never named in that guard, so the fallback matched and
+Settings rendered as well. It is the ordinary cost of a fallback route: every
+branch handled elsewhere has to be repeated in its condition.
+
+**Fix.** The fallback now also excludes `model-setup`, with a comment stating
+why the list has to be kept in step.
+
+**UI when closed.** The first-run screen is the only thing on the page.
+
+**Evidence.** Verified in the live run of
+`apps/web/e2e/web-access-turn-control-live.spec.ts` against a fresh workspace:
+the page snapshot holds the setup region and nothing else.
+
+---
+## BUG-85 — The BUG-47 live scenario expects two Models tabs on screen at once
+
+**Status: open. Found on 2026-08-10 while fixing FIXED-143.**
+
+**Observed.** `apps/web/e2e/bug-44-47-live.spec.ts` opens
+`#/models?tab=local` and then asserts
+
+```ts
+await expect(anthropicCard.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+```
+
+Since FIXED-141 split the page, a hosted provider card cannot be on screen at
+the same time as the local rows, so the assertion cannot pass.
+
+**Impact.** BUG-47's scenario — *a provider's test result stays under that
+provider* — is unrunnable. The tab split makes the original cross-contamination
+structurally impossible for local-versus-hosted, so the scenario is not merely
+broken, it is aimed at a shape the product no longer has.
+
+**Required fix.** Re-aim it at what can still go wrong: two cards **on the same
+tab**. Test one hosted provider and assert the result appears under it and under
+no other hosted card, and separately that testing a local runtime leaves the
+Local rows' results distinct. It was deliberately left alone rather than
+weakened, so the entry records the gap instead of a spec that passes by
+asserting less.
+
+**UI when closed.** No UI change.
+
+---
+## FIXED-145 — The first-run screen was titled "Workbench"
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep, in the
+same screenshot as FIXED-144.**
+
+**Observed.** The first-run "Choose how to run models" screen carried the topbar
+title **Workbench** and its hint, *"Resume governed work and see what needs
+attention"* — on a machine with no work to resume.
+
+**Root cause.** `navItem()` in `apps/web/src/lib/nav.ts` ends
+`?? NAV_ITEMS[0]`, which is correct for a typo'd route and wrong for a route
+that genuinely exists but has deliberately no sidebar entry. `model-setup` is
+the only such route today.
+
+**Fix.** An `OFF_NAV_ITEMS` list gives an off-nav route its own label and hint —
+*"Set up models · Choose how Raiker runs models before your first turn"* —
+without putting it in the sidebar. A nav test asserts both halves: the title is
+its own, and the route is still absent from `NAV_ITEMS`.
+
+---
+## FIXED-146 — The Knowledge Map's count pill contradicted its own empty state
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** On a workspace with nothing recorded, the graph showed
+*"Build your knowledge graph — Add sources… Relationships will appear
+automatically"* while the pill in the same corner read **"3 nodes · 2
+relationships"**.
+
+**Root cause.** A workspace with at most one real node is given an instructional
+starter graph — three placeholder nodes and two placeholder edges, flagged
+`is_real: false`. The overlay tested the *raw* node count; the pill counted the
+*rendered* nodes, placeholders included. Two conditions describing the same
+state, disagreeing — the failure mode this document keeps recording.
+
+**Fix.** One `showingStarter` derived value now decides all three things that
+depend on it: whether the starter graph is built, whether the overlay shows, and
+what the pill says. While it is showing the pill reads **"Starter view ·
+nothing recorded yet"**, so the two agree by construction.
+
+---
+## FIXED-147 — The Knowledge Map ignored a system dark preference
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** With the theme left on **System** and the OS set to dark, every
+route rendered dark except the Knowledge Map, whose canvas, pill, controls and
+empty-state copy stayed on the light palette inside an otherwise dark shell.
+
+**Root cause.** `apps/web/src/app.css` defines the dark tokens for both the
+explicit attribute *and* `@media (prefers-color-scheme: dark)` under
+`:root:not([data-theme])`. `BrainView.svelte` does not use those tokens for its
+canvas — it hard-codes a light palette and overrides it under
+`:global(:root[data-theme="dark"])` only. "System" deliberately removes the
+`data-theme` attribute (`lib/theme.ts`), so on the default setting the override
+never matched.
+
+**Fix.** The dark override block is now also applied inside
+`@media (prefers-color-scheme: dark)` for `:root:not([data-theme="light"])`, so
+the three states the rest of the app supports — explicit light, explicit dark,
+and system — all reach the Knowledge Map. Verified by screenshot in system-dark
+and explicit-light.
+
+---
+## FIXED-148 — "1 models ready"
+
+**Status: fixed in this change. Found on 2026-08-10 in the visual sweep.**
+
+**Observed.** The Models page headline read **"1 models ready"** — the number
+most owners will ever see there, since one ready provider is enough to work and
+the page says so two lines above.
+
+**Fix.** The count is pluralised. It is small, and it is on the first screen a
+new owner reaches after setup.
+
+---
+## BUG-86 — SQLCipher runs out of locked memory and locks the owner out
+
+**Status: open. Found on 2026-08-10 during the visual sweep, on Linux.
+Reproduced twice.**
+
+**Observed.** After a few minutes of ordinary navigation the sign-in screen
+began answering every attempt with
+
+> Runtime verification failed. The workspace remains locked.
+
+while the status strip at the bottom of the same screen read **"Runtime
+operational"**. The server was healthy: `GET /api/health` answered 200
+throughout, and later requests in the same log succeeded.
+
+**Root cause (partial).** The server log carries eleven occurrences of:
+
+```
+File "raiker/api/auth.py", line 16, in __init__
+    self._session_store = ApiSessionStore(self._workspace_root)
+File "raiker/storage/sqlite.py", line 467, in connect
+    connection.execute("SELECT 1")
+MemoryError
+2026-08-10 08:54:01.636: ERROR CORE sqlite3Codec: identified deferred error condition: 0
+```
+
+The host had **15 GB free**, so this is not memory exhaustion — it is SQLCipher
+failing to obtain *locked* pages for a key. `ulimit -l` on the run was 8 MB.
+`SQLiteStore.connect()` caches one connection per
+`(workspace_root, thread_ident)`, and the API dispatches its synchronous
+handlers across anyio's worker-thread pool, so a new worker thread mints another
+key-bearing connection. The population grows with concurrency until the
+process's locked-memory allowance is spent, and the first thing to fail is
+authentication — which happens on **every** request.
+
+This is the same family as BUG-46, which recorded it on Windows; it is not
+Windows-specific.
+
+**Required fix.** Bound the number of key-bearing connections independently of
+how many threads the server happens to use, rather than per thread — and decide
+explicitly, in the open, what Raiker does when the platform cannot lock the
+pages it wants: fail closed and say why, or run with
+`cipher_memory_security` off and record that it did. Whichever is chosen, the
+owner must not be told the runtime cannot be verified while the same screen says
+it is operational.
+
+**UI when closed.** Sign-in never fails for a reason unrelated to the
+credential. If the store genuinely cannot be opened, the screen names that —
+not "verification failed" — and the status strip agrees with it.
+
+---
+## BUG-87 — The audit log shows nothing though governed events were recorded
+
+**Status: open. Found on 2026-08-10 during the visual sweep.**
+
+**Observed.** After signing in, connecting an Anthropic credential, pinning a
+model and running its readiness check, **Observability → Audit log** showed
+*"No events match — Adjust the filters or run a turn first"* with no filters
+set, and **Overview → What changed?** showed *"No events recorded yet."*
+
+Events had been recorded. `.raiker/events/terminal-local.jsonl` holds
+`model_profile_selected` for the exact profile and model that were pinned, and
+`.raiker/events/authz.jsonl` holds `principal_resolved`.
+
+**Root cause (not determined).** `GET /api/events`
+(`raiker/api/routes_dashboard.py`) passes `user_id` into `service.list_events`.
+The recorded events carry `session_id: "terminal-local"` and `"authz"`, which is
+not a per-user conversation, so a user-scoped query plausibly excludes them.
+Whether that scoping is deliberate was not established, and it should be:
+connecting a credential and changing a pinned model are exactly the governed
+steps an owner opens this page to confirm.
+
+**Required fix.** Decide what the audit log is scoped to and make the page say
+it. If account-scoped events belong there, show them; if the page is
+deliberately conversation-scoped, its own copy — *"every governed step the
+runtime took, in full detail"* — must stop claiming otherwise.
+
+**UI when closed.** Connecting a provider, pinning a model and running a
+readiness check are each visible in the audit log immediately after they happen,
+or the page states which class of event it does not carry.
 
 ---
 ## FIXED-141 — Three Models tabs were unreachable by deep link

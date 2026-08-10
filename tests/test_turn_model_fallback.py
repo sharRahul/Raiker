@@ -200,7 +200,7 @@ class TestFallbackEngagement:
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
         assert response.finish_reason == "error"
-        assert response.text == "model_unavailable: provider_connection_failed"
+        assert "model_unavailable: provider_connection_failed" in response.text
 
     def test_no_fallback_configured_still_fails_closed(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
@@ -233,7 +233,7 @@ class TestFailureReasonIsSpecific:
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
         assert response.finish_reason == "error"
-        assert response.text == "model_unavailable: provider_auth_failed:http_401"
+        assert "model_unavailable: provider_auth_failed:http_401" in response.text
         assert "connection" not in response.text
 
     def test_missing_model_names_the_model_not_the_network(self, tmp_path: Path) -> None:
@@ -244,7 +244,7 @@ class TestFailureReasonIsSpecific:
 
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
-        assert response.text == "model_unavailable: model_not_found:local-gguf"
+        assert "model_unavailable: model_not_found:local-gguf" in response.text
 
     def test_rate_limit_is_reported_as_a_rate_limit(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
@@ -254,7 +254,7 @@ class TestFailureReasonIsSpecific:
 
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
-        assert response.text == "model_unavailable: provider_rate_limited"
+        assert "model_unavailable: provider_rate_limited" in response.text
 
     def test_prose_message_falls_back_to_the_class_code(self, tmp_path: Path) -> None:
         # A provider that raises prose rather than a code must not have that
@@ -266,7 +266,7 @@ class TestFailureReasonIsSpecific:
 
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
-        assert response.text == "model_unavailable: provider_connection_failed"
+        assert "model_unavailable: provider_connection_failed" in response.text
 
     def test_last_providers_reason_survives_the_fallback_chain(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)
@@ -280,7 +280,7 @@ class TestFailureReasonIsSpecific:
 
         gw.runtime.model_router.achat = fake_achat  # type: ignore[assignment]
         response = asyncio.run(gw.runtime._acall_model(_envelope(), []))
-        assert response.text == "model_unavailable: provider_auth_failed:http_401"
+        assert "model_unavailable: provider_auth_failed:http_401" in response.text
 
     def test_the_event_payload_carries_the_same_specific_code(self, tmp_path: Path) -> None:
         gw = _gateway(tmp_path)

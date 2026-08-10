@@ -744,7 +744,7 @@
       </p>
     </div>
     <div class="setup-meter" aria-live="polite">
-      <strong>{readyCount} models ready</strong>
+      <strong>{readyCount} {readyCount === 1 ? "model" : "models"} ready</strong>
       <span class="of"
         >{configuredProfiles.length} of {models.profiles.length} connected</span
       >

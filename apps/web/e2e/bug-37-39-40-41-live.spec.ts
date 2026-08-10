@@ -47,6 +47,7 @@
 import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
+import { useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -95,20 +96,12 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  await page.goto(`${BASE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
-  await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
-  await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
-  await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 30_000 });
-
-  // Connecting a provider does not choose a model — the profile ships as
-  // `<model>` until the owner picks one from the provider's own catalogue.
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 30_000 });
-  await catalogue.selectOption(MODEL);
-  await card.getByRole("button", { name: "Use model" }).click();
+  const card = await useHostedModel(page, BASE, {
+    provider: "Anthropic",
+    keyLabel: "Anthropic API key",
+    key: ANTHROPIC_KEY,
+    model: MODEL,
+  });
   // The card's own model line, not the option still sitting in the open picker.
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,

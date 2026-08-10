@@ -123,4 +123,23 @@ export function tabFromHash(hash: string): string | null {
   return tabs[0];
 }
 
-export function navItem(id: string): NavItem { return NAV_ITEMS.find((item) => item.id === id) ?? NAV_ITEMS[0]; }
+// Routes that own a page but deliberately have no sidebar entry. Without them
+// `navItem` falls back to the first nav item for anything it does not know, so
+// the first-run model setup screen was titled "Workbench" and carried the
+// Workbench hint — the other half of FIXED-144.
+const OFF_NAV_ITEMS: NavItem[] = [
+  {
+    id: "model-setup",
+    label: "Set up models",
+    icon: "models",
+    hint: "Choose how Raiker runs models before your first turn",
+  },
+];
+
+export function navItem(id: string): NavItem {
+  return (
+    NAV_ITEMS.find((item) => item.id === id) ??
+    OFF_NAV_ITEMS.find((item) => item.id === id) ??
+    NAV_ITEMS[0]
+  );
+}

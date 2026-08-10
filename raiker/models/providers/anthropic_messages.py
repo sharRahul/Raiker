@@ -30,6 +30,7 @@ from raiker.models.exceptions import (
     ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
     is_quota_exhausted,
+    stream_failure,
 )
 from raiker.models.health import ProviderHealth
 
@@ -455,19 +456,13 @@ class AsyncAnthropicMessagesProvider:
         except ProviderStreamError:
             raise
         except Exception as exc:
-            if isinstance(
-                exc,
-                (
-                    ProviderConnectionError,
-                    ProviderTimeoutError,
-                    ProviderAuthenticationError,
-                    ProviderRateLimitError,
-                    ProviderModelNotFoundError,
-                    ProviderUnsupportedCapabilityError,
-                ),
-            ):
-                raise ProviderStreamError(type(exc).__name__) from exc
-            raise
+            # BUG-72 — a failure the status mapper or the transport already
+            # classified keeps its own code; only an unclassified one becomes a
+            # stream failure, and it carries its exception type with it.
+            raised = stream_failure(exc)
+            if raised is exc:
+                raise
+            raise raised from exc
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
         raise ProviderUnsupportedCapabilityError("embeddings_unsupported")

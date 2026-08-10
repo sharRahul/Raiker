@@ -256,15 +256,13 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   `RAIKER_GITHUB_TOKEN` is set. Only HTTPS GitHub remotes are pushable, because
   that is the credential Raiker holds; it never forces and never deletes a
   branch. `github_write` then has a head to open a pull request against.
-- **Web fetch is currently broken once you allow it.** `web_fetch` is gated by
-  its own capability and withholds by default at `ask`. Raising it to **Allow**
-  does not produce a fetched page: on the 2026-08-08 round every turn that
-  called the tool ended with `model_unavailable: provider_stream_failed`, with
-  no audit event and no server log line, for an allowlisted and a
-  non-allowlisted host alike. Tracked as **BUG-72**; leave the capability at
-  `ask` until it closes. `web_search` answers the same gate, but Raiker ships no
-  search endpoint: it reports `web_search_not_configured` until you point it at
-  one.
+- **Web fetch takes two deliberate steps to turn on.** `web_fetch` is gated by
+  its own capability and withholds by default at `ask`, so a page is fetched
+  only once the owner has both enabled the gate and raised the decision mode to
+  **Allow** — and then only for a host on `RAIKER_WEB_EGRESS_ALLOWLIST`, which
+  is empty until you set it. `web_search` answers the same gate, but Raiker
+  ships no search endpoint: it reports `web_search_not_configured` until you
+  point it at one.
 - **Memory cannot be written from Chat or Build.** `memory_write` and
   `memory_forget` are real, broker-governed actions, but they are not in the
   model tool catalogue, so no turn can propose one however **Memory store** is

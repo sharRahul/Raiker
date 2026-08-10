@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { join } from "node:path";
+import { hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -32,7 +33,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
     ["Anthropic", "Anthropic API key", ANTHROPIC_KEY],
     ["OpenRouter", "OpenRouter API key", OPENROUTER_KEY],
   ] as const) {
-    const card = page.locator("article.provider-card").filter({ hasText: provider });
+    const card = await hostedProviderCard(page, BASE, provider);
     await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
     await page.getByLabel(label).fill(key);
     await page.locator(".signin-connect").click();

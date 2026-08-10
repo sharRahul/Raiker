@@ -217,7 +217,15 @@
               sessionId={continuedSessionId}
               projectId={activeProjectId}
             />
-          {:else if current !== "new-chat" && current !== "build"}
+            <!-- Settings is the fallback route, so every guard that renders
+                 something else above has to be repeated here. `model-setup` is
+                 handled by the first block, not this chain, so without naming
+                 it the first-run sheet rendered with the whole Settings page
+                 stacked underneath it. -->
+          {:else if
+            current !== "new-chat" &&
+            current !== "build" &&
+            current !== "model-setup"}
             <SettingsView {principal} tab={currentTab ?? "general"} />
           {/if}
         </ResponsivePage>

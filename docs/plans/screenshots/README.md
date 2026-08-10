@@ -56,7 +56,7 @@ running `raiker-web` in Chromium.
 | `BUG-r0808-05-fresh-workspace-defaults-to-absent-ollama.png` | **BUG-69** — a pristine workspace presents an unreachable model as ready |
 | `BUG-r0808-05-models-claims-one-provider-set-up.png` | **BUG-69** — "1 of 10 providers set up" with nothing reachable |
 | `BUG-r0808-05-first-turn-raw-reason-code.png` | **BUG-69** — the first message ever sent fails with a bare reason code |
-| `BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png` | **BUG-72** — enabling Web fetch breaks every turn that uses it |
+| `BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png` | **BUG-72** — enabling Web fetch broke every turn that used it. Closed by **FIXED-142**; kept as the record of the reported failure |
 
 No screenshot contains a credential: keys were entered into `type="password"`
 fields and the response-redaction layer never returns a stored value.
@@ -162,8 +162,11 @@ unchanged for the owner using it.
 | `bug-50-instance-creation-surface.png` | The login screen's instance form — the product surface behind the endpoint the run drives |
 | `bug-50-host-after-many-instances.png` | The same Workbench after 30 more instance workspaces: every route still rendering, 0 console errors, status resolved from the database the cache was evicting around |
 
-`b12-*` and `b17-*` are the live evidence for FIXED-101 and FIXED-102, captured
-on **2026-08-04** by
+`b12-*` and `b17-*` are the live evidence for FIXED-101 and FIXED-102, and were
+re-captured on **2026-08-10** as the evidence for FIXED-142 and FIXED-143 — the
+same six scenarios, run again once a tool call stopped occupying the event loop
+and once the spec could reach the provider cards again. Originally captured on
+**2026-08-04** by
 [`apps/web/e2e/web-access-turn-control-live.spec.ts`](../../../apps/web/e2e/web-access-turn-control-live.spec.ts)
 against a running `raiker-web` holding an owner-entered Anthropic credential and
 answering live `claude-haiku-4-5-20251001` turns. The page the agent reads is

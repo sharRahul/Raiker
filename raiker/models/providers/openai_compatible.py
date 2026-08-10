@@ -31,6 +31,7 @@ from raiker.models.exceptions import (
     ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
     is_quota_exhausted,
+    stream_failure,
 )
 from raiker.models.health import ProviderHealth
 from raiker.models.providers.llama_cpp_server import _parse_text_json_tool_calls, _parse_tool_calls
@@ -613,19 +614,13 @@ class AsyncOpenAICompatibleProvider:
         except ProviderStreamError:
             raise
         except Exception as exc:
-            if isinstance(
-                exc,
-                (
-                    ProviderConnectionError,
-                    ProviderTimeoutError,
-                    ProviderAuthenticationError,
-                    ProviderRateLimitError,
-                    ProviderModelNotFoundError,
-                    ProviderUnsupportedCapabilityError,
-                ),
-            ):
-                raise ProviderStreamError(type(exc).__name__) from exc
-            raise
+            # BUG-72 — see the same guard in the Anthropic adapter: a classified
+            # provider error keeps its own reason code instead of collapsing
+            # into one that names only the stream.
+            raised = stream_failure(exc)
+            if raised is exc:
+                raise
+            raise raised from exc
 
     async def embed(self, request: EmbeddingRequest) -> EmbeddingResponse:
         if not self.capabilities.supports_embeddings:

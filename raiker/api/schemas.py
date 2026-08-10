@@ -358,11 +358,31 @@ class SetSkillActiveRequest(BaseModel):
 
 
 class BrainSourceRequest(BaseModel):
-    """An explicit file or folder already placed inside this Raiker workspace."""
+    """One location inside the Knowledge Map's boundary.
+
+    Either a scoped source path (``<root_id>/<relative>``) for the source
+    endpoints, or an absolute folder path for the grant endpoint.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     path: str
+
+
+class BrainSourceUploadRequest(BaseModel):
+    """A file the owner chose from their computer, to be *copied* into Raiker.
+
+    ``store_copy`` is the permission, and it has no default: an upload duplicates
+    the file into the workspace, which is exactly the thing that must not happen
+    because a file picker was opened. A request without an explicit true is
+    refused rather than treated as consent.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    filename: str
+    content_base64: str
+    store_copy: bool
 
 
 class ConnectCodeRepoRequest(BaseModel):

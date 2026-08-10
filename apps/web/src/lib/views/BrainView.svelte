@@ -39,7 +39,10 @@
   let sourceOpen = $state(false);
   let inspectorOpen = $state(false);
   let sourcePath = $state("");
-  let sourceKind = $state<"folder" | "file">("folder");
+  let grantPath = $state("");
+  let uploadFile: File | null = null;
+  let uploadName = $state<string | null>(null);
+  let uploadConsent = $state(false);
   let sourceError = $state<string | null>(null);
   let sourceBusy = $state(false);
   let sourceBrowse = $state<BrainSourceBrowse | null>(null);
@@ -293,20 +296,25 @@
   function fitGraph() { transform = { x: 0, y: 0, k: 1 }; simulation?.alpha(0.18).restart(); }
   async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
+  // The picker opens on the *boundary*, never on a listing. Browsing starts
+  // from a root the owner already has — a project's files, what Raiker
+  // generated, approved memory, or a folder they granted — so there is no
+  // moment at which the dialog offers the whole installation to index.
   async function openSourcePicker() {
     sourceOpen = true; sourceError = null; sourceReview = null;
-    try { sourceBrowse = await api.browseBrainSources("."); } catch { sourceBrowse = null; }
+    sourcePath = ""; grantPath = ""; uploadConsent = false; uploadName = null;
+    try { sourceBrowse = await api.browseBrainSources(""); } catch { sourceBrowse = null; }
   }
   async function browseSource(path: string) {
     sourceBusy = true; sourceError = null; sourceReview = null;
     try { sourceBrowse = await api.browseBrainSources(path); sourcePath = sourceBrowse.path; }
-    catch { sourceError = "Could not browse this workspace folder."; }
+    catch { sourceError = "Could not open that folder. It may have been moved, or its access revoked."; }
     finally { sourceBusy = false; }
   }
   async function reviewSource() {
     if (!sourcePath.trim()) return; sourceBusy = true; sourceError = null;
     try { sourceReview = await api.reviewBrainSource(sourcePath.trim()); }
-    catch (error) { sourceError = error instanceof ApiError ? "Choose an existing file or folder inside this Raiker workspace." : "Could not add this source."; }
+    catch (error) { sourceError = error instanceof ApiError ? "Choose a file or folder inside one of the places listed above. Nothing outside them is readable." : "Could not add this source."; }
     finally { sourceBusy = false; }
   }
   async function addSource() {
@@ -315,6 +323,65 @@
     try { await api.addBrainSource(sourceReview.path); sourcePath = ""; sourceReview = null; sourceOpen = false; await load(); }
     catch { sourceError = "Could not add this reviewed source."; }
     finally { sourceBusy = false; }
+  }
+
+  // Granting a folder is how a file from the computer joins the graph *without*
+  // being copied: Raiker reads it where it is, and revoking the grant removes
+  // both the access and everything indexed under it.
+  async function grantFolder() {
+    const path = grantPath.trim();
+    if (!path) return;
+    sourceBusy = true; sourceError = null;
+    try {
+      const granted = await api.grantBrainSourceFolder(path);
+      grantPath = "";
+      await browseSource(granted.root_id);
+    } catch (error) {
+      sourceError = error instanceof ApiError
+        ? grantMessage(error.reasonCode)
+        : "Could not grant that folder.";
+    } finally { sourceBusy = false; }
+  }
+  function grantMessage(reason: string | null): string {
+    if (reason === "brain_grant_requires_absolute_path") return "Give the folder's full path, starting from the top of the drive.";
+    if (reason === "brain_grant_not_found") return "There is no folder at that path on this machine.";
+    if (reason === "brain_grant_not_a_directory") return "That path is a file. Grant the folder that holds it, then pick the file inside.";
+    if (reason === "brain_grant_is_runtime_directory") return "That is Raiker's own runtime folder. Its documents are already listed above.";
+    return "Could not grant that folder.";
+  }
+  async function revokeFolder(rootId: string) {
+    sourceBusy = true; sourceError = null;
+    try { await api.revokeBrainSourceFolder(rootId); sourceBrowse = await api.browseBrainSources(""); sourcePath = ""; sourceReview = null; await load(); }
+    catch { sourceError = "Could not revoke that folder."; }
+    finally { sourceBusy = false; }
+  }
+
+  // Uploading duplicates the file into the workspace, so it is behind an
+  // explicit consent — choosing a file is not agreeing to store it.
+  function pickUpload(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    uploadFile = input.files?.[0] ?? null;
+    uploadName = uploadFile?.name ?? null;
+    sourceError = null;
+  }
+  async function uploadCopy() {
+    if (!uploadFile || !uploadConsent) return;
+    sourceBusy = true; sourceError = null;
+    try {
+      const buffer = new Uint8Array(await uploadFile.arrayBuffer());
+      let binary = "";
+      for (const byte of buffer) binary += String.fromCharCode(byte);
+      await api.uploadBrainSourceFile(uploadFile.name, btoa(binary), true);
+      uploadFile = null; uploadName = null; uploadConsent = false;
+      sourceOpen = false;
+      await load();
+    } catch (error) {
+      sourceError = error instanceof ApiError && error.reasonCode === "brain_upload_unsupported_file_type"
+        ? "Raiker reads text documents and source files. That file type is not one of them."
+        : error instanceof ApiError && error.reasonCode === "brain_upload_too_large"
+          ? "That file is larger than 5 MB. Grant its folder instead, and Raiker will read it where it is."
+          : "Could not store that file.";
+    } finally { sourceBusy = false; }
   }
   async function removeSource(path: string) { try { await api.removeBrainSource(path); await load(); } catch { sourceError = "Could not remove this source."; } }
   function addGroup() { if (!groupName.trim() || !groupQuery.trim()) return; groups = [...groups, { name: groupName.trim(), query: groupQuery.trim(), color: groupColor }]; groupName = ""; groupQuery = ""; newGroupOpen = false; }
@@ -396,10 +463,52 @@
     </div>
   </section>
 
-  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Workspace boundary</span><h2 id="source-title">Review workspace source</h2><p>Browse incrementally, review what will be indexed, then confirm. Unsupported and oversized files are skipped; sources never become approved memory automatically.</p><div class="kind-toggle" role="group" aria-label="Source kind"><button aria-pressed={sourceKind === "folder"} class:active={sourceKind === "folder"} onclick={() => sourceKind = "folder"}>Folder</button><button aria-pressed={sourceKind === "file"} class:active={sourceKind === "file"} onclick={() => sourceKind = "file"}>File</button></div>
-    {#if sourceBrowse}<nav class="source-browser" aria-label="Workspace source browser">{#if sourceBrowse.parent}<button onclick={() => void browseSource(sourceBrowse!.parent ?? ".")}>← {sourceBrowse.parent}</button>{/if}{#each sourceBrowse.children as item}<button class:selected={sourcePath === item.path} onclick={() => { if (item.kind === "folder") void browseSource(item.path); else { sourcePath = item.path; sourceKind = "file"; sourceReview = null; } }}><span>{item.kind === "folder" ? "Folder" : "File"}</span><b>{item.name}</b></button>{/each}{#if sourceBrowse.truncated}<small>Showing the first 200 entries. Open a folder to continue.</small>{/if}</nav>{/if}
-    <form onsubmit={(event) => { event.preventDefault(); void reviewSource(); }}><label>Workspace-relative path<input bind:value={sourcePath} placeholder={sourceKind === "folder" ? "documents/research" : "notes/ideas.md"} aria-label="Workspace-relative path" oninput={() => sourceReview = null} /></label>{#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}<button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Reviewing…" : "Review indexing plan"}</button></form>
+  <!-- The picker names its own boundary before it lists anything. It opens on
+       the places Raiker holds an owner's work plus the folders they granted —
+       it never lists the workspace root, which is what made it offer Raiker's
+       whole installation as something to index. -->
+  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Knowledge boundary</span><h2 id="source-title">Add a source</h2><p>Raiker can read the places it keeps your work, and any folder you grant it. Nothing else on this computer is visible here. Review what would be indexed, then confirm — sources never become approved memory automatically.</p>
+    {#if sourceBrowse}
+      <nav class="source-browser" aria-label="Knowledge source browser">
+        {#if sourceBrowse.parent !== null || sourceBrowse.path}<button onclick={() => void browseSource(sourceBrowse!.parent ?? "")}>← {sourceBrowse.parent ? "Up one folder" : "All places"}</button>{/if}
+        {#if !sourceBrowse.path}
+          {#each sourceBrowse.roots as root (root.root_id)}
+            <button class="scope-root" class:disabled={!root.browsable} disabled={!root.browsable} onclick={() => { if (root.browsable) void browseSource(root.root_id); }}>
+              <span>{root.kind === "granted" ? "Granted folder" : root.kind === "database" ? "Already indexed" : "Raiker data"}</span>
+              <b>{root.label}</b>
+              <small>{root.detail}</small>
+            </button>
+            {#if root.kind === "granted"}<button class="revoke" onclick={() => void revokeFolder(root.root_id)} disabled={sourceBusy}>Revoke access to {root.label}</button>{/if}
+          {/each}
+        {:else}
+          {#each sourceBrowse.children as item (item.path)}<button class:selected={sourcePath === item.path} onclick={() => { if (item.kind === "folder") void browseSource(item.path); else { sourcePath = item.path; sourceReview = null; } }}><span>{item.kind === "folder" ? "Folder" : "File"}</span><b>{item.name}</b></button>{/each}
+          {#if sourceBrowse.children.length === 0}<small>This folder is empty.</small>{/if}
+          {#if sourceBrowse.truncated}<small>Showing the first 200 entries. Open a folder to continue.</small>{/if}
+        {/if}
+      </nav>
+    {/if}
+    {#if sourcePath}<form onsubmit={(event) => { event.preventDefault(); void reviewSource(); }}><label>Selected source<input bind:value={sourcePath} aria-label="Selected source" oninput={() => sourceReview = null} /></label><button class="primary" disabled={sourceBusy || !sourcePath.trim()}>{sourceBusy ? "Reviewing…" : "Review indexing plan"}</button></form>{/if}
+    {#if sourceError}<p class="error" role="alert">{sourceError}</p>{/if}
     {#if sourceReview}<section class="source-review" aria-label="Source indexing review"><h3>Indexing plan</h3><p><b>{sourceReview.supported_files}</b> supported files · <b>{sourceReview.total_bytes.toLocaleString()}</b> bytes · <b>{sourceReview.unsupported_files}</b> skipped</p>{#each sourceReview.warnings as warning}<p class="warning">{warning}</p>{/each}<button class="primary" disabled={sourceBusy} onclick={() => void addSource()}>Add reviewed source</button></section>{/if}
+
+    <!-- Two ways to bring in something from the computer, and the difference
+         between them is stated rather than implied: a grant is read in place,
+         an upload is a copy and needs the owner to say so. -->
+    <section class="from-computer" aria-labelledby="from-computer-h">
+      <h3 id="from-computer-h">From this computer</h3>
+      <form onsubmit={(event) => { event.preventDefault(); void grantFolder(); }}>
+        <label>Grant a folder — Raiker reads it where it is and copies nothing<input bind:value={grantPath} placeholder="/home/you/Documents/research" aria-label="Folder to grant" /></label>
+        <button disabled={sourceBusy || !grantPath.trim()}>{sourceBusy ? "Working…" : "Grant folder access"}</button>
+      </form>
+      <div class="upload">
+        <label for="brain-upload">Or add a single file. This <b>copies</b> it into your Raiker workspace.</label>
+        <input id="brain-upload" type="file" onchange={pickUpload} aria-label="File to copy into Raiker" />
+        {#if uploadName}
+          <label class="consent"><input type="checkbox" bind:checked={uploadConsent} /> Store a copy of <b>{uploadName}</b> in Raiker. Without this, the file is not stored.</label>
+          <button class="primary" disabled={sourceBusy || !uploadConsent} onclick={() => void uploadCopy()}>{sourceBusy ? "Storing…" : "Store the copy and add it"}</button>
+        {/if}
+      </div>
+    </section>
     {#if sourceRoots.length}<h3>Current sources</h3>{#each sourceRoots as source}<div class="current-source"><span>{source.detail}</span><button aria-label={`Remove ${source.detail} from graph`} onclick={() => void removeSource(source.detail ?? "")}>Remove</button></div>{/each}{/if}</dialog>{/if}
 
   {#if contextMenu}<div class="context-menu" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`} role="menu"><button onclick={() => centreNode(contextMenu!.node)}>Open local graph</button><button onclick={() => { selectedIds = [contextMenu!.node.node_id]; inspectorOpen = true; contextMenu = null; }}>Trace provenance</button><button onclick={() => contextMenu!.node.pinned ? unpin(contextMenu!.node) : (contextMenu!.node.fx = contextMenu!.node.x, contextMenu!.node.fy = contextMenu!.node.y, contextMenu!.node.pinned = true, contextMenu = null)}>{contextMenu.node.pinned ? "Unpin" : "Pin"}</button><button onclick={() => centreNode(contextMenu!.node)}>View neighbours</button></div>{/if}
@@ -437,8 +546,14 @@
   .motion-options { display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; } .motion-options label { display:flex; align-items:center; gap:3px; color:#939caf; font-size:.62rem; }
   .inspector { padding:18px; width:280px; bottom:14px; } .inspector .close,.source-modal .close { position:absolute; right:12px; top:9px; } .record-kicker { display:flex; align-items:center; gap:7px; color:#8892a5; text-transform:uppercase; letter-spacing:.11em; font-size:.6rem; } .inspector h3 { margin:10px 24px 4px 0; font-size:1.05rem; } .status-line { display:flex; gap:8px; color:#7f899e; font-size:.66rem; } .status-line span { padding:3px 6px; border:1px solid #ffffff12; border-radius:4px; } .inspector > p { color:#a5adbd; font-size:.73rem; line-height:1.55; } .inspector h4 { margin:20px 0 7px; color:#7f899e; text-transform:uppercase; letter-spacing:.1em; font-size:.62rem; }
   .relationship { display:grid; width:100%; gap:2px; padding:8px 0; border:0; border-bottom:1px solid #ffffff0e; background:transparent; text-align:left; cursor:pointer; } .relationship span { color:#687286; font-size:.6rem; } .relationship b { color:#cbd1dd; font-size:.72rem; } .inspector-actions { display:grid; gap:7px; margin-top:18px; } .inspector-actions button { border:1px solid #ffffff16; border-radius:6px; padding:7px; background:#ffffff08; color:#c2c9d6; cursor:pointer; }
-  .source-modal::backdrop { background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .kind-toggle { display:flex; width:max-content; margin:15px 0; padding:3px; border:1px solid #ffffff16; border-radius:7px; } .kind-toggle button { border:0; border-radius:5px; padding:6px 14px; background:transparent; color:#929bad; cursor:pointer; } .kind-toggle button.active { background:#343842; color:white; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
-  .source-browser { display:grid; max-height:190px; overflow:auto; margin:0 0 12px; border:1px solid #ffffff16; border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid #ffffff0d; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:#ffffff0c; } .source-browser button span { width:42px; color:#7f899e; font-size:.62rem; } .source-browser button b { font-size:.7rem; } .source-browser small { padding:8px; color:#7f899e; } .source-review { margin-top:12px; padding:12px; border:1px solid #ffffff16; border-radius:7px; background:#ffffff08; } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:.7rem; } .source-review .warning { color:#d89b45; }
+  .source-modal::backdrop { background:#08090dbb; backdrop-filter:blur(5px); } .source-modal { position:relative; width:min(480px, calc(100vw - 32px)); max-height:80vh; overflow:auto; padding:24px; border:1px solid #ffffff1c; border-radius:13px; background:#1c1e24; color:#eef0f6; box-shadow:0 25px 80px #000c; } .source-modal h2 { margin:6px 0; font-size:1.15rem; } .source-modal > p { color:#9ba4b6; font-size:.75rem; line-height:1.5; } .source-modal form label { display:grid; gap:6px; color:#a9b0bf; font-size:.7rem; } .source-modal form input { border:1px solid #ffffff18; border-radius:6px; padding:10px; background:#111216; color:white; } .primary { width:100%; margin-top:12px; border:0; border-radius:6px; padding:9px; background:#5c87c5; color:white; cursor:pointer; } .error { color:#ff8c98 !important; } .current-source { display:flex; justify-content:space-between; padding:7px 0; border-bottom:1px solid #ffffff0e; color:#aeb6c5; font-size:.7rem; } .current-source button { border:0; background:transparent; color:#ef7885; cursor:pointer; }
+  /* A root reads as a place, not a row: the label answers "where is this?" and
+     the detail answers "what is in it?" before anything is opened. */
+  .source-browser button.scope-root { display:grid; gap:2px; padding:9px; } .source-browser button.scope-root b { font-size:.76rem; } .source-browser button.scope-root small { padding:0; color:#8892a5; font-size:.65rem; line-height:1.45; } .source-browser button.scope-root span { width:auto; }
+  .source-browser button.disabled { cursor:default; opacity:.72; }
+  .source-browser button.revoke { justify-content:flex-end; padding:5px 9px 9px; color:#ef7885; font-size:.65rem; }
+  .from-computer { margin-top:16px; padding-top:14px; border-top:1px solid #ffffff14; } .from-computer h3 { margin:0 0 8px; font-size:.82rem; } .from-computer form button { width:100%; margin-top:8px; border:1px solid #ffffff1c; border-radius:6px; padding:8px; background:transparent; color:#cbd1dc; cursor:pointer; } .upload { margin-top:14px; display:grid; gap:8px; color:#a9b0bf; font-size:.7rem; } .upload input[type="file"] { color:#cbd1dc; font-size:.68rem; } .consent { display:flex !important; align-items:flex-start; gap:8px; line-height:1.45; }
+  .source-browser { display:grid; max-height:280px; overflow:auto; margin:0 0 12px; border:1px solid #ffffff16; border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid #ffffff0d; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:#ffffff0c; } .source-browser button span { width:42px; color:#7f899e; font-size:.62rem; } .source-browser button b { font-size:.7rem; } .source-browser small { padding:8px; color:#7f899e; } .source-review { margin-top:12px; padding:12px; border:1px solid #ffffff16; border-radius:7px; background:#ffffff08; } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:.7rem; } .source-review .warning { color:#d89b45; }
   .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid #ffffff20; border-radius:7px; background:#202229; box-shadow:0 14px 35px #000b; } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:#cbd1dc; text-align:left; cursor:pointer; font-size:.7rem; } .context-menu button:hover { background:#ffffff0c; }
 
   /* The graph keeps the Obsidian interaction model while using Raiker's
@@ -466,7 +581,8 @@
   .group-row b { color:#3d566b; } .group-row small { color:#7b8e9e; } .text-action { color:#087b77; }
   .group-form { border-color:#dce5e7; background:#f6f9f9; } .group-form input { border-color:#d4dfe1; } .group-form label,.motion-options label { color:#607689; }
   .inspector .record-kicker,.status-line,.inspector h4 { color:#6e8292; } .status-line span,.relationship,.inspector-actions button { border-color:#dde6e8; } .inspector > p { color:#607689; } .relationship span { color:#778b9b; } .relationship b { color:#29465d; } .inspector-actions button { background:#f2f7f7; color:#36566b; }
-  .source-modal::backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .kind-toggle { border-color:#cfdcde; } .kind-toggle button { color:#607689; } .kind-toggle button.active { background:#cce9e7; color:#0b716e; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
+  .source-modal::backdrop { background:#26415052; } .source-modal { border-color:#c8d5d8; background:#fff; color:#183047; box-shadow:0 25px 80px #38556b4d; } .source-modal > p,.source-modal form label { color:#607689; } .source-modal form input { border-color:#cad8da; background:#f8fbfb; color:#183047; } .primary { background:#178d88; } .current-source { border-color:#e0e8e9; color:#526b7e; }
+  .source-browser button.scope-root small { color:#607689; } .from-computer { border-color:#e0e8e9; } .from-computer form button { border-color:#cad8da; color:#36566b; } .upload { color:#607689; } .upload input[type="file"] { color:#36566b; }
   .source-browser { border-color:#d6e0e2; } .source-browser button { border-color:#e6edef; color:#36566b; } .source-browser button:hover,.source-browser button.selected,.source-review { background:#f0f7f7; } .source-review { border-color:#d6e0e2; }
   .context-menu { border-color:#cbd8da; background:#fff; box-shadow:0 14px 35px #38556b3d; } .context-menu button { color:#36566b; } .context-menu button:hover { background:#edf6f5; }
   :global(:root[data-theme="dark"]) .knowledge-shell { background:var(--bg); color:var(--text-1); }

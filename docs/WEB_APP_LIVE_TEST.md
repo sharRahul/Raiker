@@ -161,7 +161,7 @@ capability-gate + decision-mode control plane, gate-manager only.
 
 | Check | Result |
 |---|---|
-| `raiker-web` boots; `/api/health` 200 | ✅ |
+| `raiker-web` boots; `/api/health` 200 with `store: ok` | ✅ |
 | Owner session mint (`POST /api/auth/session`) | ✅ |
 | `GET /api/models` — `anthropic-hosted` selected, hosted gate `enabled_runtime`, fallback shows `raiker-local-llama-cpp`, cache `5m` | ✅ |
 | Streamed turn (`POST /api/prompts/stream`) returns a real answer | ✅ `"The capital of Japan is Tokyo. RAIKER_WEB_OK"` |

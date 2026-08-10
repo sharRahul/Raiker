@@ -7,7 +7,8 @@ from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.routing import Mount
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
@@ -36,9 +37,11 @@ from raiker.api.security import (
     SecurityHeadersMiddleware,
     StaticCacheMiddleware,
 )
+from raiker.control.knowledge_scope import MAX_KNOWLEDGE_UPLOAD_BYTES
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
+from raiker.storage.sqlite import StoreUnavailableError
 from raiker.tasks.wakeup import SchedulerWakeup
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
@@ -308,6 +311,21 @@ def create_app(
     ensure_app_key(app.state.workspace_root)
     if executor_registry is not None:
         app.state.executor_registry = executor_registry
+
+    # BUG-86 — a store that will not open is a named condition, not a generic
+    # failure. Without this the platform refusing SQLCipher's locked pages
+    # reached the client as a bare 500, and the lock screen could only say
+    # "verification failed" while its own status strip called the runtime
+    # operational. 503 plus a reason code lets both say the same true thing.
+    @app.exception_handler(StoreUnavailableError)
+    async def _store_unavailable(  # pyright: ignore[reportUnusedFunction]
+        _request: Request, exc: StoreUnavailableError
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"ok": False, "reason_code": exc.reason, "detail": exc.detail},
+        )
+
     app.add_middleware(RedactionMiddleware)
     # Transport hardening for single-user internet exposure. Added after
     # RedactionMiddleware so these wrap it (outermost = SecurityHeaders), and so
@@ -323,6 +341,9 @@ def create_app(
             # A skill upload is a base64 `*.skill` archive, capped far tighter
             # than an attachment (2 MB of bundle) but still above the default.
             "/api/skills": (MAX_SKILL_BUNDLE_BYTES * 4) // 3 + 4096,
+            # A Knowledge Map upload is one base64 text document, capped at the
+            # service's own 5 MB before it is written anywhere.
+            "/api/brain/sources/upload": (MAX_KNOWLEDGE_UPLOAD_BYTES * 4) // 3 + 4096,
         },
     )
     app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)

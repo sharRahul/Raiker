@@ -16,7 +16,12 @@ export function stubFetch(routes: Record<string, unknown>): ReturnType<typeof vi
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const path = url.split("?")[0];
     const method = (init?.method ?? "GET").toUpperCase();
-    const key = `${method} ${path}`;
+    // A route may be declared with its query string, so two calls to the same
+    // path can answer differently — browsing folder A and folder B, say. The
+    // exact key wins; the path-only key stays the default, so every existing
+    // route keeps matching whatever query it is called with.
+    const exactKey = `${method} ${url}`;
+    const key = exactKey in routes ? exactKey : `${method} ${path}`;
     if (key in routes) {
       const value = routes[key];
       return {

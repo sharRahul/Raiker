@@ -84,7 +84,8 @@ class TestListing:
         resp = client.get("/api/skills", headers=headers)
         assert resp.status_code == 200, resp.text
         names = {skill["name"] for skill in resp.json()["skills"]}
-        assert {"algorithm-creator", "mcp-builder", "skill-creator"} <= names
+        assert {"algorithm-creator", "code-review", "mcp-builder", "plugin-dev",
+                "security-review", "skill-creator"} <= names
 
     def test_the_stored_document_is_not_in_the_list(
         self, client: TestClient, headers: dict[str, str]

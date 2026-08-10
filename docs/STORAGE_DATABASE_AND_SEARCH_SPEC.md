@@ -47,6 +47,47 @@ Raiker uses a hybrid local storage model:
 
 SQLite is the default local database because it is portable, inspectable, local-first, embeddable, and suitable for personal workstation/home-lab usage.
 
+### Encryption at rest, and the locked-memory decision
+
+The database is SQLCipher-encrypted with a workspace key. SQLCipher can also
+lock the pages holding key material so they are never paged to disk
+(`PRAGMA cipher_memory_security`), and locking draws on a per-process allowance
+the operating system sets — 8 MB by default on the Linux host where FIXED-150
+was reproduced, a working-set quota on Windows.
+
+Raiker's decision, made explicitly rather than left to whatever SQLCipher was
+built with: **the pragma is set on every connection, and it is off unless the
+owner asks for it.** Two measured facts decide it.
+
+* **Cost.** Locking makes SQLCipher lock and wipe its buffers around every
+  operation. Opening a workspace and running two hundred reads takes **0.17 s**
+  with the pragma off and **1.14 s** with it on — about seven times, paid by
+  every turn, every task and every page load. SQLCipher itself defaults it off
+  in 4.x for this reason.
+* **Failure mode.** When the platform's allowance runs out the failure is not
+  slower work, it is `MemoryError` on *every* request — because authentication
+  opens the store. That is FIXED-150, and BUG-46 before it. A defence whose
+  failure mode is "nobody can sign in" is not a good default for a local-first
+  product.
+
+So Raiker does not lock key pages by default, and it **says so** rather than
+leaving the owner to guess: `GET /api/health` reports `cipher_memory_security`,
+`memory_security_reason`, and `memlock_allowance_bytes` — what this platform
+would actually have allowed (`-1` unlimited, `null` where it will not say).
+
+**An owner who wants the stronger posture says so.** With
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is forced on, and because that
+is their decision it is honoured exactly: a refused lock fails **closed** by name
+(`store_memory_lock_unavailable`, HTTP 503, naming the setting that asked for
+it) rather than surfacing as a bare `MemoryError` inside a request handler.
+
+**Key-bearing connections are bounded absolutely.** One keyed connection is
+cached per `(workspace, thread)`, evicted least-recently-used, under a
+per-thread limit (`RAIKER_SQLITE_CONNECTION_CACHE_LIMIT`, default 8) *and* an
+absolute process ceiling (`RAIKER_SQLITE_CONNECTION_CACHE_CEILING`, default 16).
+The ceiling is a count of connections, never a multiple of the server's thread
+count: it is what bounds the locked pages the process asks the platform for.
+
 ---
 
 ## What SQLite Stores

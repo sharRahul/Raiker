@@ -57,6 +57,8 @@ human authorizer, runtime authority, or other literal actor.
 | `skill_deactivated` | A skill was turned off; it stays stored and is withheld from every turn |
 | `skill_deleted` | A skill's stored document was removed from the workspace |
 | `skills_indexed` | A turn advertised the owner's active skills to the model (count and names only — bodies are loaded on demand by `skill_load`) |
+| `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |
+| `brain_source_folder_revoked` | That access was withdrawn; every source indexed under the folder is removed with it |
 | `checkpoint_created` | The gateway recorded a turn checkpoint |
 | `turn_closed` | The gateway finalised a turn |
 | `phase3.external_channels_notifications.readiness.metadata_defined` | External-channel readiness metadata was defined; runtime dispatch events are introduced only with a governed executor |

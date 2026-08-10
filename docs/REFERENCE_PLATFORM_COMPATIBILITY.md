@@ -309,6 +309,43 @@ phase-scheduled and **disabled** until governance, approval-preview, and retenti
 
 ---
 
+## Skills and extension-authoring control set
+
+Reviewed 2026-08-10 while shipping the built-in skills, against the
+skill/plugin/extension-authoring controls of **Claude Cowork**, **Claude Code**,
+**ChatGPT**, **Codex**, **OpenClaw**, and **Hermes Agent**. Scope is only how a
+system lets an owner add reusable instructions and extensions, decide when they
+apply, and bound what they may do. Nothing here is a claim about the rest of
+those products.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Reference behaviour (where it exists) | Raiker | Status |
+|---|---|---|---|
+| Skill document format | Claude Code / Cowork `SKILL.md` with `name` + `description` frontmatter | Identical; a skill written for either installs in the other | ✅ |
+| Bundled skill resources | `references/`, `scripts/`, `assets/` beside `SKILL.md` | Same layout, packed as a `*.skill` zip, validated before storage | ✅ |
+| Triggering | Description scanned each request | Same, for every active skill | ✅ |
+| Turning one off without losing it | Uninstall, or move it out of the directory | Deactivate: installed, withheld from every turn, one click back | ✅ beyond |
+| Where a skill may come from | Local file, marketplace, git URL | Upload, in-place authoring, or import from an allowlisted host, fetched through the sandbox egress boundary and validated first | ✅ |
+| What a skill may do | Instructions; some surfaces execute bundled scripts | Instructions only — Raiker never executes what a skill ships | ✅ beyond |
+| Authority a skill carries | Inherits the session's tool grants | None. A skill cannot open a gate or widen an approval | ✅ beyond |
+| Shipped skills | Claude Code plugins (code review, security review, plugin-dev, mcp-builder, skill-creator) | Six built in: algorithm-creator, code-review, mcp-builder, plugin-dev, security-review, skill-creator | ✅ |
+| Plugin manifest | Claude Code `plugin.json` | `raiker-plugin.json` with a required per-permission `reason` and `expected_effect` | ✅ beyond |
+| Permission change on update | Version bump | Version bump **plus** a permission diff whenever authority widens | ✅ beyond |
+| Enabling a plugin | Enabled on install | Install and enable are separate decisions; execution stays behind the gate for the component class | ✅ beyond |
+| Hooks | Claude Code hook events; OpenClaw gateway events | `docs/HOOKS_SPEC.md` event catalogue; a hook can block or annotate, never grant | 📘 specified |
+| MCP servers | stdio + streamable HTTP; HTTP+SSE deprecated | Same transports, owner-added, per-connection monitoring and re-consent on a surface change | ✅ |
+| Protocol revision covered | 2026-07-28 (stateless core, MRTR, cacheable lists) | `mcp-builder` ships the revision reference and the migration checklist | ✅ |
+| Self-created skills | Hermes proposes skills after successful tasks | Skill candidates recorded for owner review; never auto-installed | ✅ |
+
+Raiker difference: a skill is **instructions and nothing else**. Every other
+system on this list lets an extension carry, or inherit, some execution
+authority; in Raiker the authority is held entirely by the runtime's gates, so
+installing a skill is a low-risk, reversible act and reviewing one is a
+document review rather than a code review.
+
+---
+
 ## Rule For New References
 
 When Raiker adopts a concept from another platform, the docs must add concept name, Raiker behaviour, contract/schema, lifecycle, storage, security rules, events, tests, UI surface, and build phase.

@@ -9,6 +9,7 @@ before anything is written.
 from __future__ import annotations
 
 import io
+import re
 import zipfile
 from pathlib import Path
 
@@ -214,15 +215,21 @@ class TestShippedSkills:
         folders = sorted(p for p in BUILTIN_ROOT.iterdir() if p.is_dir())
         assert {p.name for p in folders} == {
             "algorithm-creator",
+            "code-review",
             "mcp-builder",
+            "plugin-dev",
+            "security-review",
             "skill-creator",
         }
         for folder in folders:
             package = read_skill_bundle(bundle_from_directory(folder))
             assert package.name == folder.name
             # The description is the whole triggering mechanism, so a shipped
-            # skill must say when to use it, in a user's own words.
-            assert "use th" in package.description.lower()
+            # skill must say when to use it, in a user's own words — "Use this
+            # whenever…", "Use it too when…", "Use whenever someone says…".
+            assert re.search(
+                r"\buse (this|it|these|whenever|when)\b", package.description.lower()
+            ), package.name
             assert len(package.description) > 200
 
     def test_bundled_files_are_linked_from_the_body(self) -> None:
@@ -288,7 +295,8 @@ class TestSkillsService:
     def test_built_in_skills_are_seeded_once(self, workspace: Path) -> None:
         service = SkillsService(workspace)
         names = {skill.name for skill in service.list_skills("principal_owner")}
-        assert {"algorithm-creator", "mcp-builder", "skill-creator"} <= names
+        assert {"algorithm-creator", "code-review", "mcp-builder", "plugin-dev",
+                "security-review", "skill-creator"} <= names
         before = len(service.list_skills("principal_owner"))
         assert len(service.list_skills("principal_owner")) == before
 

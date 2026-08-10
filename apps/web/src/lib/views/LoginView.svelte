@@ -32,10 +32,16 @@
   let instanceSetup = $state(false);
   let instanceName = $state("");
 
-  // Privacy-safe pre-auth reachability: /api/health returns only {status: ok}.
+  // Privacy-safe pre-auth reachability: /api/health names whether the server
+  // answers and whether its encrypted store opens, and nothing else.
   // null = probe not resolved yet — no state message is shown until real data
   // supports one.
   let runtimeReachable = $state<boolean | null>(null);
+  // BUG-86 — the store is a separate fact from reachability. A reachable server
+  // whose store will not open is why sign-in fails, so the strip and the error
+  // are both driven from this one value instead of contradicting each other.
+  let storeState = $state<"ok" | "unavailable" | null>(null);
+  let storeDetail = $state<string | null>(null);
 
   const isRegister = $derived(mode === "register");
   const isFirstRun = $derived(bootstrapAllowed && mode === "login" && !instanceSetup);
@@ -44,7 +50,10 @@
   // this combined intent so the copy and the action never disagree (FIX-01).
   const registerIntent = $derived(isRegister || isFirstRun);
   const isVerifying = $derived(runtimeState === "verifying");
-  const formDisabled = $derived(busy || isVerifying);
+  // A store that will not open cannot answer any credential, so the form is
+  // disabled rather than left to fail on every attempt for a reason that has
+  // nothing to do with what was typed (BUG-86).
+  const formDisabled = $derived(busy || isVerifying || storeState === "unavailable");
 
   // State-aware Raiker message. Every branch is backed by real data: the
   // health probe, the post-auth verification result, or the visible register
@@ -52,6 +61,12 @@
   // approval activity has no privacy-safe pre-auth source, so no "working" or
   // "attention" claims are made here.
   const hero = $derived.by(() => {
+    if (storeState === "unavailable") {
+      return {
+        title: "I cannot open my encrypted store.",
+        sub: "Nothing is wrong with your password — the workspace database will not open on this machine.",
+      };
+    }
     if (runtimeState === "verification_failed" || runtimeReachable === false) {
       return {
         title: "I cannot reach my runtime.",
@@ -80,17 +95,33 @@
 
   async function probeRuntime() {
     try {
-      await health();
+      const view = await health();
       runtimeReachable = true;
+      storeState = view.store === "unavailable" ? "unavailable" : "ok";
+      storeDetail = view.store === "unavailable" ? (view.detail ?? null) : null;
     } catch {
       runtimeReachable = false;
+      storeState = null;
+      storeDetail = null;
     }
   }
 
+  // One re-probe per entry into the failed state. Plain, not $state: the effect
+  // below writes storeState, so a reactive guard would re-enter itself.
+  let reprobedAfterFailure = false;
+
   // Move focus with the state so keyboard/screen-reader users follow the flow.
   $effect(() => {
+    if (runtimeState === "verification_failed" && !reprobedAfterFailure) {
+      // The mount-time answer predates the failure, and a store that stopped
+      // opening is the likeliest cause of it (BUG-86).
+      reprobedAfterFailure = true;
+      void probeRuntime();
+    }
     if (runtimeState === "verifying") {
       void tick().then(() => document.getElementById("runtime-verify")?.focus());
+    } else if (storeState === "unavailable") {
+      void tick().then(() => document.getElementById("store-unavailable")?.focus());
     } else if (runtimeState === "verification_failed") {
       void tick().then(() => document.getElementById("runtime-failed")?.focus());
     }
@@ -251,7 +282,15 @@
           Verifying runtime…
         </div>
       {/if}
-      {#if runtimeState === "verification_failed"}
+      {#if storeState === "unavailable"}
+        <!-- BUG-86 — when the store is what failed, say so. Telling an owner
+             that verification failed, next to a strip calling the runtime
+             operational, describes neither the cause nor the remedy. -->
+        <p class="error" role="alert" id="store-unavailable" tabindex="-1">
+          Raiker's encrypted store could not be opened, so the workspace stays
+          locked. {storeDetail ?? "The workspace database will not open on this machine."}
+        </p>
+      {:else if runtimeState === "verification_failed"}
         <p class="error" role="alert" id="runtime-failed" tabindex="-1">
           Runtime verification failed. The workspace remains locked.
         </p>
@@ -429,18 +468,20 @@
     <div class="status-item">
       <span
         class="status-dot"
-        class:ok={runtimeReachable === true}
-        class:bad={runtimeReachable === false}
+        class:ok={runtimeReachable === true && storeState === "ok"}
+        class:bad={runtimeReachable === false || storeState === "unavailable"}
         aria-hidden="true"
       ></span>
       <div class="status-text">
         <span class="status-label">System status</span>
         <span class="status-value">
-          {runtimeReachable === true
-            ? "Runtime operational"
-            : runtimeReachable === false
-              ? "Runtime unreachable"
-              : "Checking…"}
+          {runtimeReachable === false
+            ? "Runtime unreachable"
+            : storeState === "unavailable"
+              ? "Encrypted store unavailable"
+              : runtimeReachable === true
+                ? "Runtime operational"
+                : "Checking…"}
         </span>
       </div>
     </div>

@@ -211,17 +211,27 @@ Highlights, each verified against a live instance:
   servers you can build, connect, monitor, and contain, plus **Skills**:
   `SKILL.md` documents and `*.skill` bundles you upload, import from a
   verified GitHub link, build in place, activate or deactivate, download, and
-  delete. A skill adds instructions only — it grants no capability and opens
-  no gate.
-- **Observability** — an append-only audit log, metadata-only checkpoints, and
-  exact-model readiness evidence with bounded live probes and expiry.
+  delete. Six install on first visit — **algorithm-creator**, **code-review**,
+  **mcp-builder**, **plugin-dev**, **security-review** and **skill-creator**. A
+  skill adds instructions only — it grants no capability and opens no gate, and
+  Raiker never runs code a skill ships.
+- **Knowledge Map** — a force-directed graph of what Raiker actually holds. Its
+  source picker opens on named places, not on a file browser: your projects'
+  files, the files turns generated, approved memory, the encrypted database
+  (which already holds Chat, Build, Tasks, Schedules and your uploads), and any
+  folder you explicitly grant. A granted folder is read where it is; adding a
+  single file from your computer copies it, so it asks first.
+- **Observability** — an append-only, account-scoped audit log carrying your own
+  conversations *and* the governed steps taken outside them — connecting a
+  provider, pinning a model — plus metadata-only checkpoints and exact-model
+  readiness evidence with bounded live probes and expiry.
 
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-08:
+Raiker's documentation does not run ahead of its code. As of 2026-08-10:
 
 - **Approved network and process actions still do not run** — approval
   resolution executes file changes and patches, bounded local `shell` commands,
@@ -298,6 +308,17 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
   conversation on the 2026-08-08 round ended, durably, saying "No command was
   executed" beneath the chip for the file the approval had just written. Three
   targeted reproductions did not recur. Tracked as **BUG-73**.
+- **Key pages are not locked into RAM by default.** The workspace database is
+  SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
+  material so they never reach swap — and Raiker leaves that **off**, explicitly,
+  for two measured reasons: it costs about seven times on every store operation
+  (0.17 s versus 1.14 s for a bootstrap plus two hundred reads), and when the
+  platform's locked-memory allowance runs out the failure is not slow work but
+  `MemoryError` on every request, because authentication opens the store — the
+  lockout FIXED-150 records. Which posture you are on is not left to guesswork:
+  `GET /api/health` reports the setting, the reason, and the allowance this
+  machine would have given. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to demand
+  the stronger one; a refused lock then fails closed and names why.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current
@@ -307,10 +328,13 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-08:
 Where one of these is tracked as work rather than a deliberate boundary, it is
 written up with a reproduction and a proposed fix in
 [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md) — the 2026-08-08 round's
-findings are **BUG-68** through **BUG-73**. The entries that closed the older
-limits this section used to list are FIXED-34, FIXED-39, FIXED-90, FIXED-99,
-FIXED-101 and FIXED-109 there, and [ADD-02](docs/plans/TO_BE_ADDED.md) in the
-companion document.
+open findings are **BUG-68**, **BUG-70**, **BUG-71** and **BUG-73**. The
+2026-08-10 sweep's findings are closed there as **FIXED-149** through
+**FIXED-152**: the stale BUG-47 live scenario, the SQLCipher lockout, the audit
+log that showed nothing, and the Knowledge Map picker that browsed the whole
+installation. The entries that closed the older limits this section used to list
+are FIXED-34, FIXED-39, FIXED-90, FIXED-99, FIXED-101 and FIXED-109 there, and
+[ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
 ## Documentation
 

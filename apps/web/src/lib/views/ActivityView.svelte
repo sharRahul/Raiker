@@ -45,9 +45,14 @@
 </script>
 
 <div class="head-row">
+  <!-- BUG-87 — the scope is stated, because the page used to claim "every
+       governed step" while showing only conversation events, so connecting a
+       credential or pinning a model appeared nowhere. -->
   <p class="page-lead">
-    The append-only audit record — every governed step the runtime took, in full detail. This is
-    deliberately the deep-dive view; day-to-day work lives in Chat, Approvals, and Tasks.
+    The append-only audit record — every governed step in this account, in full detail: your own
+    conversations, and the runtime steps taken outside them, such as connecting a provider or
+    pinning a model. Other people's conversations are never shown here. This is deliberately the
+    deep-dive view; day-to-day work lives in Chat, Approvals, and Tasks.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
     <Icon name="refresh" size={15} />
@@ -115,7 +120,7 @@
               {#if ev.machine_identity}
                 <IdentityChip identity={ev.machine_identity} />
               {:else}
-                <span aria-label="No turn identity">â€”</span>
+                <span aria-label="No turn identity">—</span>
               {/if}
             </td>
             <td>

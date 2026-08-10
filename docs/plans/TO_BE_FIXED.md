@@ -226,13 +226,15 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-84 | Low | Live tests / the BUG-69 acceptance spec cannot run with a single provider key | Open (found in the BUG-69 parity review) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
-| BUG-85 | Low | Live tests / the BUG-47 scenario expects two Models tabs on screen at once | Open (found while fixing FIXED-143) |
+| FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
 | FIXED-145 | Low | Web / the first-run screen was titled "Workbench" | Fixed (found in the 2026-08-10 visual sweep) |
 | FIXED-146 | Low | Knowledge Map / the count pill contradicted the empty state | Fixed (found in the 2026-08-10 visual sweep) |
 | FIXED-147 | Medium | Knowledge Map / the graph ignored a system dark preference | Fixed (found in the 2026-08-10 visual sweep) |
 | FIXED-148 | Low | Models / "1 models ready" | Fixed (found in the 2026-08-10 visual sweep) |
-| BUG-86 | **Critical** | Storage / SQLCipher runs out of locked memory and locks the owner out | Open (found in the 2026-08-10 visual sweep) |
-| BUG-87 | Medium | Observability / the audit log shows nothing though governed events were recorded | Open (found in the 2026-08-10 visual sweep) |
+| FIXED-150 | **Critical** | Storage / SQLCipher ran out of locked memory and locked the owner out | Fixed (was BUG-86) |
+| FIXED-151 | Medium | Observability / the audit log showed nothing though governed events were recorded | Fixed (was BUG-87) |
+| FIXED-152 | High | Knowledge Map / the source picker browsed the whole Raiker installation | Fixed (reported 2026-08-10) |
+| FIXED-153 | Low | Observability / the audit log's turn-identity column rendered mojibake | Fixed (found while verifying FIXED-151) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -6515,35 +6517,44 @@ why the list has to be kept in step.
 the page snapshot holds the setup region and nothing else.
 
 ---
-## BUG-85 — The BUG-47 live scenario expects two Models tabs on screen at once
+## FIXED-149 — The BUG-47 live scenario expected two Models tabs on screen at once *(was BUG-85)*
 
-**Status: open. Found on 2026-08-10 while fixing FIXED-143.**
+**Status: fixed in this change. Found on 2026-08-10 while fixing FIXED-143.**
 
-**Observed.** `apps/web/e2e/bug-44-47-live.spec.ts` opens
-`#/models?tab=local` and then asserts
+**Observed.** `apps/web/e2e/bug-44-47-live.spec.ts` opened `#/models?tab=local`
+and then asserted
 
 ```ts
 await expect(anthropicCard.getByText("Connected")).toBeVisible({ timeout: 30_000 });
 ```
 
 Since FIXED-141 split the page, a hosted provider card cannot be on screen at
-the same time as the local rows, so the assertion cannot pass.
+the same time as the local rows, so the assertion could not pass.
 
-**Impact.** BUG-47's scenario — *a provider's test result stays under that
-provider* — is unrunnable. The tab split makes the original cross-contamination
-structurally impossible for local-versus-hosted, so the scenario is not merely
-broken, it is aimed at a shape the product no longer has.
+**Root cause.** The scenario was written against the pre-split Models page,
+where every provider lived in one scroll. The split did not break BUG-47's
+property; it moved where the property can be violated.
 
-**Required fix.** Re-aim it at what can still go wrong: two cards **on the same
-tab**. Test one hosted provider and assert the result appears under it and under
-no other hosted card, and separately that testing a local runtime leaves the
-Local rows' results distinct. It was deliberately left alone rather than
-weakened, so the entry records the gap instead of a spec that passes by
-asserting less.
+**Fix.** The scenario is re-aimed at the pairs that can still contaminate one
+another — two cards **on the same tab**:
+
+* on **Hosted**, Anthropic is tested and its result must be the only one on the
+  tab; a second hosted card is then tested and each card must hold exactly one
+  result, naming its own provider;
+* on **Local**, the same for two runtime rows.
+
+Weakening the assertions was rejected in favour of testing a property the
+product still has. Each message names its own provider, so a result under the
+wrong card contradicts the card it sits under — which is what makes the
+assertion mean something rather than merely counting elements.
+
+**Evidence.** `197-BUG-47-local-rows-keep-their-own-live.png` and
+`198-BUG-47-hosted-cards-keep-their-own-live.png`.
 
 **UI when closed.** No UI change.
 
 ---
+
 ## FIXED-145 — The first-run screen was titled "Workbench"
 
 **Status: fixed in this change. Found on 2026-08-10 in the visual sweep, in the
@@ -6620,10 +6631,10 @@ the page says so two lines above.
 new owner reaches after setup.
 
 ---
-## BUG-86 — SQLCipher runs out of locked memory and locks the owner out
+## FIXED-150 — SQLCipher ran out of locked memory and locked the owner out *(was BUG-86)*
 
-**Status: open. Found on 2026-08-10 during the visual sweep, on Linux.
-Reproduced twice.**
+**Status: fixed in this change. Found on 2026-08-10 during the visual sweep, on
+Linux. Reproduced twice.**
 
 **Observed.** After a few minutes of ordinary navigation the sign-in screen
 began answering every attempt with
@@ -6634,45 +6645,93 @@ while the status strip at the bottom of the same screen read **"Runtime
 operational"**. The server was healthy: `GET /api/health` answered 200
 throughout, and later requests in the same log succeeded.
 
-**Root cause (partial).** The server log carries eleven occurrences of:
+**Root cause.** Two independent defects, and a third that made them
+unreadable.
 
-```
-File "raiker/api/auth.py", line 16, in __init__
-    self._session_store = ApiSessionStore(self._workspace_root)
-File "raiker/storage/sqlite.py", line 467, in connect
-    connection.execute("SELECT 1")
-MemoryError
-2026-08-10 08:54:01.636: ERROR CORE sqlite3Codec: identified deferred error condition: 0
-```
+1. **The bound on key-bearing connections depended on the thread count.** The
+   process ceiling was expressed as *worker-threads-worth* of the per-thread
+   limit (`limit × 8`), so with the default limit the process would cache up to
+   64 keyed SQLCipher connections. Each holds key material the platform may be
+   asked to lock into RAM, and `ulimit -l` on the run was **8 MB**. The host had
+   15 GB free — this was never memory exhaustion, it was the *locked-memory
+   allowance* being spent. The server log carries eleven occurrences of
+   `MemoryError` out of `SQLiteStore.connect`, and because authentication opens
+   the store, the first thing to fail is every request.
 
-The host had **15 GB free**, so this is not memory exhaustion — it is SQLCipher
-failing to obtain *locked* pages for a key. `ulimit -l` on the run was 8 MB.
-`SQLiteStore.connect()` caches one connection per
-`(workspace_root, thread_ident)`, and the API dispatches its synchronous
-handlers across anyio's worker-thread pool, so a new worker thread mints another
-key-bearing connection. The population grows with concurrency until the
-process's locked-memory allowance is spent, and the first thing to fail is
-authentication — which happens on **every** request.
+2. **A cached connection that lost its key pages was returned, not replaced.**
+   `connect` probed a cached handle with `SELECT 1` and caught `sqlite3.Error`
+   only. In the field log that probe raised `MemoryError`, which escaped
+   `connect` entirely, so a worker that hit it failed every subsequent request.
 
-This is the same family as BUG-46, which recorded it on Windows; it is not
-Windows-specific.
+3. **`/api/health` never touched the store.** It answered `{"status": "ok"}`
+   unconditionally, which is why the strip could call the runtime operational
+   while every sign-in on the same screen failed.
 
-**Required fix.** Bound the number of key-bearing connections independently of
-how many threads the server happens to use, rather than per thread — and decide
-explicitly, in the open, what Raiker does when the platform cannot lock the
-pages it wants: fail closed and say why, or run with
-`cipher_memory_security` off and record that it did. Whichever is chosen, the
-owner must not be told the runtime cannot be verified while the same screen says
-it is operational.
+**Fix.**
+
+* **The ceiling is an absolute connection count** (`RAIKER_SQLITE_CONNECTION_CACHE_CEILING`,
+  default 16), never a multiple of the thread count. A thread's own allowance is
+  still the smaller of the per-thread limit and its share of the ceiling, so a
+  request threadpool cannot multiply the population.
+* **Memory security is set explicitly on every connection, and it is off unless
+  the owner asks for it.** This is the choice the entry asked for, made in the
+  open — and it was made twice, because the first answer was wrong. The first
+  attempt probed the platform's allowance and turned the pragma **on** wherever
+  it looked sufficient. That is defensible on paper and wrong in practice: it
+  made a bootstrap plus two hundred reads take **1.14 s instead of 0.17 s**,
+  about seven times. The symptom was the test suite: a CI job that normally
+  finishes in about eight minutes was past twenty and still running, and the
+  full suite locally took over an hour. It was caught by watching the CI job,
+  not by a test — no test asserts how long the suite takes.
+
+  The decision that ships weighs the two facts against each other. Locking costs
+  a multiple on every store operation, paid by every turn and every page load;
+  and when the allowance runs out the failure is not slow work but `MemoryError`
+  on *every* request, since authentication opens the store — this bug, and
+  BUG-46 before it. A defence whose failure mode is "nobody can sign in" is not
+  a default for a local-first product. So the pragma is set to **OFF**, before
+  the key, on every connection — set rather than inherited, so the posture never
+  depends on how SQLCipher was built — and Raiker **says which posture it is
+  on**: `/api/health` reports `cipher_memory_security`,
+  `memory_security_reason`, and `memlock_allowance_bytes`, the allowance this
+  machine would actually have given.
+
+  `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` is the owner's decision and is honoured
+  exactly: the pragma is forced on, and a refused lock fails **closed** by name
+  as `store_memory_lock_unavailable`, naming the setting that asked for it,
+  rather than surfacing as a bare `MemoryError`.
+* **A refusal is recoverable, then named.** On `MemoryError` the thread releases
+  every handle it may release — the connection population is the likeliest thing
+  to have exhausted the allowance — and retries once. Only then does it raise
+  `StoreUnavailableError`, which the API turns into a 503 carrying a reason
+  code.
+* **The store and the strip now read the same probe.** `/api/health` opens and
+  reads the store; `status` is `ok` only while both the server and the store
+  are. The lock screen shows **"Encrypted store unavailable"** in the strip and
+  says *"Raiker's encrypted store could not be opened, so the workspace stays
+  locked"* — naming the store and the machine, not "verification" — and
+  disables the credential form, because no password can answer a store that
+  will not open.
+
+**Evidence.** `tests/test_sqlcipher_memory_security.py` — the absolute ceiling,
+a six-thread pool staying under it, each branch of the policy decision, the
+pragma read back off a live connection in both postures, the fail-closed path
+when the owner demanded memory security, the health view, and the cached handle
+whose key pages were reclaimed.
+
+**Evidence (live).** `apps/web/e2e/critical-bugs-live.spec.ts` against a running
+host: [`working/215-FIXED-150-store-healthy-live.png`](screenshots/working/215-FIXED-150-store-healthy-live.png)
+and [`working/216-FIXED-150-store-unavailable-live.png`](screenshots/working/216-FIXED-150-store-unavailable-live.png).
 
 **UI when closed.** Sign-in never fails for a reason unrelated to the
-credential. If the store genuinely cannot be opened, the screen names that —
-not "verification failed" — and the status strip agrees with it.
+credential. When the store genuinely cannot be opened, the screen names that
+and the status strip agrees with it.
 
 ---
-## BUG-87 — The audit log shows nothing though governed events were recorded
 
-**Status: open. Found on 2026-08-10 during the visual sweep.**
+## FIXED-151 — The audit log showed nothing though governed events were recorded *(was BUG-87)*
+
+**Status: fixed in this change. Found on 2026-08-10 during the visual sweep.**
 
 **Observed.** After signing in, connecting an Anthropic credential, pinning a
 model and running its readiness check, **Observability → Audit log** showed
@@ -6683,24 +6742,130 @@ Events had been recorded. `.raiker/events/terminal-local.jsonl` holds
 `model_profile_selected` for the exact profile and model that were pinned, and
 `.raiker/events/authz.jsonl` holds `principal_resolved`.
 
-**Root cause (not determined).** `GET /api/events`
-(`raiker/api/routes_dashboard.py`) passes `user_id` into `service.list_events`.
-The recorded events carry `session_id: "terminal-local"` and `"authz"`, which is
-not a per-user conversation, so a user-scoped query plausibly excludes them.
-Whether that scoping is deliberate was not established, and it should be:
-connecting a credential and changing a pinned model are exactly the governed
-steps an owner opens this page to confirm.
+**Root cause.** `DashboardService.list_events` filtered every row against the
+set of session ids belonging to the signed-in owner. The governed steps an owner
+opens this page to confirm are not taken *inside* a conversation: connecting a
+credential, pinning a model and resolving a principal are recorded on runtime
+channels (`terminal-local`, `authz`) which are not sessions at all. Every one of
+them failed the filter.
 
-**Required fix.** Decide what the audit log is scoped to and make the page say
-it. If account-scoped events belong there, show them; if the page is
-deliberately conversation-scoped, its own copy — *"every governed step the
-runtime took, in full detail"* — must stop claiming otherwise.
+**The decision.** The audit log is **account-scoped**, not conversation-scoped.
+It carries the owner's own conversations *and* the runtime steps taken outside
+them. It does not carry another user's conversation.
+
+**Fix.** A row is visible when its `session_id` belongs to one of the owner's
+sessions, **or** when it belongs to no session record at all. The second clause
+cannot leak another account's conversation: their sessions *are* session
+records, so they fail it and stay filtered. `SQLiteStore.all_session_ids` exists
+for that one distinction and carries no ownership, so it is never used to decide
+what to show — only what is not a conversation in the first place.
+
+The page's own copy now states the scope rather than claiming "every governed
+step the runtime took": *"every governed step in this account… your own
+conversations, and the runtime steps taken outside them, such as connecting a
+provider or pinning a model. Other people's conversations are never shown
+here."*
+
+**Evidence.** `tests/test_accounts.py::test_governed_steps_outside_a_conversation_reach_the_audit_log`
+records both halves: the runtime-channel events appear, and the other account's
+conversation still does not. The pre-existing isolation test is unchanged and
+still passes.
+
+**Evidence (live).** A real Anthropic credential entered through the product's
+own dialog, a model pinned and checked, then the page read straight afterwards:
+[`working/217-FIXED-151-audit-log-live.png`](screenshots/working/217-FIXED-151-audit-log-live.png).
 
 **UI when closed.** Connecting a provider, pinning a model and running a
-readiness check are each visible in the audit log immediately after they happen,
-or the page states which class of event it does not carry.
+readiness check are each visible in the audit log immediately after they happen.
 
 ---
+
+## FIXED-152 — The Knowledge Map's source picker browsed the whole Raiker installation
+
+**Status: fixed in this change. Reported on 2026-08-10.**
+
+**Observed.** Knowledge Map → **+** opened a browser rooted at the workspace
+root and listed everything under it — Raiker's own source tree, `apps/`,
+`docs/`, `scripts/`, the lot — and offered any of it as something to index. The
+only way to add a file from the owner's computer was to place it in the
+workspace first, which duplicates it into Raiker whether or not the owner wanted
+a copy there.
+
+**Root cause.** `DashboardService.browse_brain_sources` resolved every request
+against `self.workspace_root` and listed its children, skipping only `.git`,
+`.raiker` and `node_modules`. "Inside the workspace" was the entire boundary,
+and the workspace is also where Raiker itself lives.
+
+**Fix.** A boundary with three parts, in `raiker/control/knowledge_scope.py`:
+
+1. **Raiker's own data** — each project's files, the files turns generated
+   (`.raiker/artifacts`), and approved memory (`.raiker/memory`). Chat, Build,
+   Tasks, Schedules and uploaded user files live in the encrypted database and
+   are already nodes in the graph, so the picker lists the **database** as a
+   root that says exactly that and is not browsable — an owner can see their
+   chats are covered instead of hunting for a way to add them.
+2. **Folders the owner explicitly granted** — any directory on the machine,
+   named by the owner, stored per owner, revocable. Revoking a grant also
+   removes every source indexed under it, because leaving them would keep
+   reading a folder the owner just closed.
+3. **Nothing else.** Addressing is `<root_id>/<relative>`, so there is no path
+   that means "the workspace" and no request that can ask for one. Resolution
+   happens **before** the containment check, so a `..` segment or a symlink
+   cannot leave the root it claims to be in.
+
+**Adding a file from the computer, without duplicating it.** Two routes, and the
+difference between them is stated in the dialog rather than implied:
+
+* **Grant the folder** — Raiker reads the file where it is and copies nothing.
+* **Add a single file** — this is an upload, so it *is* a copy. `store_copy` has
+  no default on the server: a request without an explicit true is refused as
+  `brain_upload_copy_not_authorised`. In the UI the button appears only behind a
+  tick that says the file will be stored in Raiker. Copies land in one named
+  place, `.raiker/artifacts/knowledge-uploads/`, so every copy the Knowledge Map
+  holds can be found and deleted.
+
+**Evidence.** `tests/test_knowledge_scope.py` — seventeen tests covering the
+picker opening on named places rather than a listing, the database being named
+rather than walked, the workspace root not being addressable, traversal and
+symlink escapes, grants being read in place, revocation removing what it
+indexed, one owner's grant not being another's root, and the upload refusing to
+store without consent. `apps/web/src/lib/views/BrainView.test.ts` covers the
+same boundary in the dialog, including the tick that gates the copy.
+
+**Evidence (live).** [`working/218-FIXED-152-knowledge-boundary-live.png`](screenshots/working/218-FIXED-152-knowledge-boundary-live.png)
+— the picker on a real host, and
+[`working/219-FIXED-152-granted-folder-live.png`](screenshots/working/219-FIXED-152-granted-folder-live.png)
+— a folder outside the workspace granted, browsed and reviewed without being
+copied.
+
+**UI when closed.** The **+** dialog opens on named places — the owner's
+projects, what Raiker generated, approved memory, the database, and any folder
+they granted. Nothing else on the machine is visible from it, and no file is
+copied into Raiker without the owner saying so.
+
+---
+## FIXED-153 — The audit log's turn-identity column rendered `â€"`
+
+**Status: fixed in this change. Found on 2026-08-10 while verifying FIXED-151.**
+
+**Observed.** With events finally reaching the page, every row's **Turn
+identity** cell read `â€"` where the neighbouring Risk and Summary cells read a
+proper em dash.
+
+**Root cause.** `apps/web/src/lib/views/ActivityView.svelte` held the literal
+bytes of a UTF-8 em dash decoded as latin-1 — `â€"` — written into the source at
+some point and never seen, because until FIXED-151 the table had no rows to
+render it in. It is the ordinary cost of a defect hidden behind another defect:
+fixing the first is what exposes the second.
+
+**Fix.** The character is an em dash again, matching the two columns beside it.
+A search of the whole tree found no other occurrence.
+
+**UI when closed.** Every "nothing here" cell in the audit-log row reads the
+same em dash.
+
+---
+
 ## FIXED-141 — Three Models tabs were unreachable by deep link
 
 **Status: fixed while splitting the Models page by model origin (Task 14).**

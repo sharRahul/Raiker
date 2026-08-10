@@ -1875,6 +1875,20 @@ CREATE TABLE IF NOT EXISTS brain_sources (
 CREATE INDEX IF NOT EXISTS idx_brain_sources_owner ON brain_sources(owner_principal_id, created_at);
 """
 
+BRAIN_SOURCE_GRANTS_MIGRATION_ID = "RAIKER-2079-brain-source-grants"
+BRAIN_SOURCE_GRANTS_SQL = """
+CREATE TABLE IF NOT EXISTS brain_source_grants (
+  owner_principal_id TEXT NOT NULL,
+  root_id TEXT NOT NULL,
+  path TEXT NOT NULL,
+  label TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, root_id)
+);
+CREATE INDEX IF NOT EXISTS idx_brain_source_grants_owner
+  ON brain_source_grants(owner_principal_id, created_at);
+"""
+
 BRAIN_PREFERENCES_MIGRATION_ID = "RAIKER-2030-brain-preferences"
 BRAIN_PREFERENCES_SQL = """
 CREATE TABLE IF NOT EXISTS brain_preferences (

@@ -45,7 +45,13 @@ class TestHealth:
     def test_health_returns_ok(self, client: TestClient) -> None:
         resp = client.get("/api/health")
         assert resp.status_code == 200
-        assert resp.json() == {"status": "ok"}
+        body = resp.json()
+        # BUG-86 — "ok" now means the server answers *and* its encrypted store
+        # opens, so the lock screen cannot call the runtime operational while
+        # every sign-in fails on a store that will not open.
+        assert body["status"] == "ok"
+        assert body["store"] == "ok"
+        assert body["cipher_memory_security"] in {"on", "off"}
 
 
 class TestUnauthenticated:

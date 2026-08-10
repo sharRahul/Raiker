@@ -1412,9 +1412,26 @@ export interface BrainSourceResult {
   path: string;
 }
 
+/**
+ * One place the Knowledge Map may look. There is deliberately no root for "the
+ * workspace": Raiker's own document areas and the folders the owner granted are
+ * the whole boundary, and the database appears as a root that names what it
+ * already holds rather than as a folder to walk.
+ */
+export interface BrainSourceRoot {
+  root_id: string;
+  label: string;
+  detail: string;
+  kind: "raiker" | "granted" | "database";
+  browsable: boolean;
+  /** Absolute path — only ever set for a folder the owner granted themselves. */
+  path: string | null;
+}
+
 export interface BrainSourceBrowse {
   path: string;
   parent: string | null;
+  roots: BrainSourceRoot[];
   children: Array<{
     name: string;
     path: string;
@@ -1422,7 +1439,7 @@ export interface BrainSourceBrowse {
     size_bytes: number | null;
   }>;
   truncated: boolean;
-  resolution_method: "stored_coordinates" | "matching_text" | "";
+  resolution_method?: "stored_coordinates" | "matching_text" | "";
 }
 
 export interface BrainSourceReview {

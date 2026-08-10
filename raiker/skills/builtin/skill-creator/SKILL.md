@@ -1,7 +1,7 @@
 ---
 name: skill-creator
 description: Write a new skill, or diagnose and improve an existing one, as a SKILL.md document Raiker can install. Use this whenever someone says "make a skill", "turn this into a skill", "write a SKILL.md", "package these instructions", "save this workflow so you do it every time", or asks to review a skill before installing it. Use it too when a skill misbehaves — it never triggers, it triggers on the wrong tasks, or it triggers and gets ignored — since all three are description or structure problems with specific fixes. Reach for this even when the request is phrased as "remember to always do X this way", because that is a skill.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Skill creator
@@ -173,3 +173,26 @@ turn — which is the fast way to test whether a skill is helping.
 
 Skills add instructions only. They grant no capability and never loosen a gate
 or an approval, so installing one is a low-risk, reversible act.
+
+### Across agent surfaces
+
+A `SKILL.md` written to this shape is portable: the same document installs as a
+Claude Code / Cowork skill, is readable as a Codex or ChatGPT instruction file,
+and works as a Hermes or OpenClaw agent capability document. What differs is
+what surrounds it, and the differences are worth knowing before you write
+platform-specific instructions into a skill body.
+
+| Control | Elsewhere | In Raiker |
+|---|---|---|
+| Format | `SKILL.md` with `name` + `description` frontmatter | Identical — a skill written for either installs in the other |
+| Bundling | Folder with `references/`, `scripts/`, `assets/` | Same layout, packed as a `*.skill` zip |
+| Triggering | Description scanned every request | Same, for every active skill |
+| Turning one off | Uninstall, or drop from the directory | Deactivate: installed, withheld from every turn, reversible in one click |
+| Where it can come from | Local file, marketplace, git | Upload, in-place authoring, or import from an allowlisted GitHub host, validated before storage |
+| What it may do | Instructions; some surfaces let a skill ship runnable scripts | Instructions only — Raiker never executes what a skill ships |
+| Authority | Inherits the session's tools | None. A skill cannot open a gate, and a skill that tries to is one to refuse |
+
+The last two rows are the ones that matter when porting a skill *into* Raiker: a
+skill whose procedure depends on running its own bundled script needs that step
+rewritten as an instruction to the agent, which then runs it through the normal,
+gated tool path.

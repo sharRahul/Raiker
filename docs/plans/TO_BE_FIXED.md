@@ -6679,8 +6679,10 @@ unreadable.
   attempt probed the platform's allowance and turned the pragma **on** wherever
   it looked sufficient. That is defensible on paper and wrong in practice: it
   made a bootstrap plus two hundred reads take **1.14 s instead of 0.17 s**,
-  about seven times, and it turned an 8-minute CI run into one still going after
-  two hours. It was caught by watching the CI job, not by a test.
+  about seven times. The symptom was the test suite: a CI job that normally
+  finishes in about eight minutes was past twenty and still running, and the
+  full suite locally took over an hour. It was caught by watching the CI job,
+  not by a test — no test asserts how long the suite takes.
 
   The decision that ships weighs the two facts against each other. Locking costs
   a multiple on every store operation, paid by every turn and every page load;

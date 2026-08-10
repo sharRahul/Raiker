@@ -737,3 +737,42 @@ def test_turn_and_event_reads_filter_other_account_session_ids(tmp_path) -> None
     dashboard = DashboardService(tmp_path)
     assert dashboard.get_turn("turn_b", user_id="user_a") is None
     assert dashboard.list_events(user_id="user_a") == []
+
+
+def test_governed_steps_outside_a_conversation_reach_the_audit_log(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """BUG-87 — the audit log is account-scoped, not conversation-scoped.
+
+    Connecting a credential and pinning a model are recorded on runtime
+    channels that are not sessions at all. Scoping on the owner's session set
+    alone hid every one of them, so the page an owner opens to confirm exactly
+    those steps read "No events match" with no filters set.
+    """
+    store = SQLiteStore(tmp_path)
+    now = utc_now()
+    store.insert_user(User("user_a", "A", None, True, now, now))
+    store.insert_user(User("user_b", "B", None, True, now, now))
+    store.create_session("sess_a", str(tmp_path), user_id="user_a")
+    store.create_session("sess_b", str(tmp_path), user_id="user_b")
+    writer = EventLogWriter(store)
+    for event in (
+        make_event(
+            session_id="terminal-local", turn_id=None, event_type="model_profile_selected",
+            actor="owner", payload={"profile_id": "anthropic"},
+        ),
+        make_event(
+            session_id="authz", turn_id=None, event_type="principal_resolved",
+            actor="runtime", payload={"principal_id": "p1"},
+        ),
+        make_event(
+            session_id="sess_b", turn_id=None, event_type="prompt_received",
+            actor="test", payload={"secret": "b"},
+        ),
+    ):
+        writer.append(event)
+
+    dashboard = DashboardService(tmp_path)
+    visible = {event.event_type for event in dashboard.list_events(user_id="user_a")}
+    assert visible == {"model_profile_selected", "principal_resolved"}
+    # The other account's conversation is still filtered: it is a session
+    # record, so the runtime-channel clause never reaches it.
+    assert "prompt_received" not in visible

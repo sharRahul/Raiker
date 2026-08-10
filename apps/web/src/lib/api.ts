@@ -9,6 +9,7 @@ import type {
   BrainView,
   BrainSourceResult,
   BrainSourceBrowse,
+  BrainSourceRoot,
   BrainSourceReview,
   CapabilityDecisionMode,
   CapabilityGate,
@@ -200,14 +201,26 @@ export async function connect(): Promise<AuthSession> {
 
 // ── Lock screen: local-account auth ─────────────────────────────────────────
 
+export type HealthView = {
+  status: string;
+  /** "ok" when the encrypted store opens and reads; "unavailable" otherwise. */
+  store?: string;
+  /** Stable code for an unavailable store, e.g. store_memory_lock_unavailable. */
+  reason?: string;
+  detail?: string;
+  cipher_memory_security?: string;
+};
+
 /**
  * Privacy-safe pre-auth reachability probe. `/api/health` is the only
- * unauthenticated read and returns nothing beyond `{status: "ok"}` — it backs
- * the lock screen's "I cannot reach my runtime." state without leaking any
- * workspace detail before authentication.
+ * unauthenticated read: it names whether the server answers and whether the
+ * encrypted store opens, and nothing else about the workspace. Both facts are
+ * needed pre-auth, because a store that will not open is exactly what makes
+ * every sign-in fail (BUG-86) — reporting only reachability let the lock
+ * screen call the runtime operational while refusing every attempt.
  */
-export function health(): Promise<{ status: string }> {
-  return request<{ status: string }>("/api/health");
+export function health(): Promise<HealthView> {
+  return request<HealthView>("/api/health");
 }
 
 export function createInstance(
@@ -912,9 +925,37 @@ export const api = {
   brain: () => request<BrainView>("/api/brain"),
   addBrainSource: (path: string) =>
     postJson<BrainSourceResult>("/api/brain/sources", { path }),
-  browseBrainSources: (path = ".") =>
+  /** An empty path answers with the roots themselves, not with a listing. */
+  browseBrainSources: (path = "") =>
     request<BrainSourceBrowse>(
       withQuery("/api/brain/sources/browse", { path }),
+    ),
+  brainSourceRoots: () =>
+    request<{ roots: BrainSourceRoot[] }>("/api/brain/sources/roots"),
+  /** Grant one folder on this computer. Read where it is; nothing is copied. */
+  grantBrainSourceFolder: (path: string) =>
+    postJson<{ ok: boolean; root_id: string; path: string }>(
+      "/api/brain/sources/grants",
+      { path },
+    ),
+  revokeBrainSourceFolder: (rootId: string) =>
+    request<{ ok: boolean; root_id: string }>(
+      withQuery("/api/brain/sources/grants", { root_id: rootId }),
+      { method: "DELETE" },
+    ),
+  /**
+   * Copy one file from the computer into the workspace. `storeCopy` is the
+   * owner's permission for the duplication and has no default on the server:
+   * choosing a file is not consent to store it.
+   */
+  uploadBrainSourceFile: (
+    filename: string,
+    contentBase64: string,
+    storeCopy: boolean,
+  ) =>
+    postJson<{ ok: boolean; path: string; stored_copy: boolean; byte_size: number }>(
+      "/api/brain/sources/upload",
+      { filename, content_base64: contentBase64, store_copy: storeCopy },
     ),
   reviewBrainSource: (path: string) =>
     postJson<BrainSourceReview>("/api/brain/sources/review", { path }),

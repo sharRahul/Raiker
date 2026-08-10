@@ -152,6 +152,53 @@ each carries its own contract:
 Every mutation appends a `skill_*` event carrying metadata only — name, source,
 checksum, sizes — never the document text.
 
+## Knowledge Map source API
+
+The graph's sources are addressed **within a named root**, as
+`<root_id>/<relative path>`. There is no path meaning "the workspace", which is
+what stops a request asking for one (FIXED-152).
+
+`GET /api/brain/sources/roots` — the boundary for this owner: each project's
+files, `generated-files`, `approved-memory`, the non-browsable
+`raiker-database` root (which states that Chat, Build, Tasks, Schedules and
+uploads are already in the graph), and every folder this owner granted. A
+granted root reports its absolute path so the owner can recognise it; Raiker's
+own roots are described, not disclosed.
+
+`GET /api/brain/sources/browse?path=` — an **empty** path answers with the roots
+and no children. A non-empty path lists inside one root. Resolution happens
+before containment, so a `..` segment or a symlink cannot leave the root it
+claims to be in; anything outside is `brain_source_outside_scope`, and the
+database root is `brain_source_root_not_browsable`.
+
+`POST /api/brain/sources/grants` takes an **absolute** directory path and
+records the owner granting it. The folder is read where it is — granting copies
+nothing. `brain_grant_requires_absolute_path`, `brain_grant_not_found`,
+`brain_grant_not_a_directory` and `brain_grant_is_runtime_directory` are the
+refusals. `DELETE /api/brain/sources/grants?root_id=` revokes it **and** removes
+every source recorded under it, because leaving them would keep reading a folder
+the owner just closed.
+
+`POST /api/brain/sources/upload` takes `{filename, content_base64, store_copy}`.
+It duplicates the file into the workspace, so `store_copy` has no default: a
+request without an explicit `true` is `brain_upload_copy_not_authorised` and
+nothing is written. Copies land in `.raiker/artifacts/knowledge-uploads/` under
+a name that never overwrites an existing one, capped at 5 MB
+(`brain_upload_too_large`) and limited to the text and source extensions the
+indexer reads (`brain_upload_unsupported_file_type`).
+
+`POST /api/brain/sources/review` returns the bounded indexing plan for a scoped
+path before it is added, and `POST|DELETE /api/brain/sources` add and remove
+one.
+
+`GET /api/health` is the only unauthenticated read. It reports liveness **and**
+whether the encrypted store opens: `status` is `ok` only when both hold, and
+`store`, `reason`, `detail`, `cipher_memory_security` and
+`memory_security_reason` say which is which. It answers `200` either way — the
+server is answering; it is the store that may be degraded — and a request that
+cannot open the store answers `503` with `store_memory_lock_unavailable`
+(FIXED-150).
+
 A persisted principal is resolved for each authenticated request. The durable
 `runtime_mode_state` (one runtime, `raiker_runtime`, whose `status` is `active`
 or `disabled`) and `capability_gate_state` records are the source of

@@ -522,8 +522,9 @@ is what permits a call, and the tool's output is untrusted data.
 
 ### 10.2 Skills — new since the last round
 
-The **Skills** tab was not covered by any earlier plan. It ships with **3 active
-skills** (`algorithm-creator`, `mcp-builder`, `skill-creator`), each with Deactivate / Rename /
+The **Skills** tab was not covered by any earlier plan. It ships with **6 active
+skills** (`algorithm-creator`, `code-review`, `mcp-builder`, `plugin-dev`,
+`security-review`, `skill-creator`), each with Deactivate / Rename /
 Download / Delete / Details, an All / Active / Inactive filter, and three ways to
 add one: **Upload** a `SKILL.md` or `.skill` bundle up to 2 MB, **Import from a
 link** (a GitHub raw URL, "fetched and verified first"), or **Build one**.

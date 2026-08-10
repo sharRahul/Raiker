@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import contextlib
 import difflib
 import json
@@ -11,10 +12,27 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from raiker.approval_previews import redact_secret_like_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
+from raiker.control.knowledge_scope import (
+    ARTIFACTS_ROOT_ID,
+    KNOWLEDGE_SOURCE_EXTENSIONS,
+    KNOWLEDGE_UPLOAD_DIR,
+    MAX_KNOWLEDGE_UPLOAD_BYTES,
+    MAX_SOURCE_PATH_CHARS,
+    RUNTIME_DIR_NAME,
+    SKIPPED_DIRECTORY_NAMES,
+    ScopeError,
+    ScopeRoot,
+    build_roots,
+    grant_root_id,
+    parent_scope_path,
+    resolve,
+    scope_path,
+)
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
@@ -969,55 +987,234 @@ class DashboardService:
         self.control = RuntimeControlService(self.workspace_root)
 
     def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
+        """Resolve one workspace-contained path, for the Build repository refs.
+
+        The Knowledge Map no longer uses this — it has its own, narrower
+        boundary in :mod:`raiker.control.knowledge_scope`. Referencing a
+        repository is a different act: the owner names a folder they already
+        keep in this workspace, and the containment check is against the
+        workspace itself.
+        """
         candidate = raw_path.strip()
-        if not candidate or len(candidate) > 512:
+        if not candidate or len(candidate) > MAX_SOURCE_PATH_CHARS:
             raise ValueError("invalid_brain_source_path")
         root = self.workspace_root.resolve()
         path = (root / candidate).resolve()
         if path != root and root not in path.parents:
             raise ValueError("brain_source_outside_workspace")
         relative = path.relative_to(root)
-        if any(part in {".git", ".raiker", "node_modules"} for part in relative.parts):
+        if any(part in {".git", RUNTIME_DIR_NAME, "node_modules"} for part in relative.parts):
             raise ValueError("brain_source_protected_path")
         if not path.exists():
             raise ValueError("brain_source_not_found")
         return relative.as_posix(), path
 
+    def _scope_roots(self, owner_principal_id: str | None) -> list[ScopeRoot]:
+        """The places the Knowledge Map may look for this owner.
+
+        Raiker's own document areas plus the folders this owner granted — never
+        the workspace root, which is what made the picker list Raiker's whole
+        installation and offer to index it.
+        """
+        # Scoped to this owner's projects, exactly as the Projects page is: a
+        # root list built from every project in the workspace would offer
+        # another account's folder as somewhere to browse.
+        user_id = (
+            self.store.principal_user_id(owner_principal_id) if owner_principal_id else None
+        )
+        projects = self.store.list_projects(user_id)
+        grants = (
+            self.store.list_brain_source_grants(owner_principal_id)
+            if owner_principal_id
+            else []
+        )
+        return build_roots(self.workspace_root.resolve(), projects, grants)
+
+    def _scoped_source(
+        self, raw_path: str, *, owner_principal_id: str | None
+    ) -> tuple[ScopeRoot, str, Path]:
+        try:
+            return resolve(self._scope_roots(owner_principal_id), raw_path)
+        except ScopeError as exc:
+            raise ValueError(exc.reason) from exc
+
+    def brain_source_roots(self, *, owner_principal_id: str) -> dict[str, Any]:
+        """What the picker opens on: the boundary itself, named."""
+        return {"roots": [root.to_dict() for root in self._scope_roots(owner_principal_id)]}
+
     def add_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
-        relative_path, _path = self._workspace_source(raw_path)
-        self.store.add_brain_source(owner_principal_id, relative_path)
-        return {"ok": True, "path": relative_path}
+        root, relative, _path = self._scoped_source(
+            raw_path, owner_principal_id=owner_principal_id
+        )
+        stored = scope_path(root, relative)
+        self.store.add_brain_source(owner_principal_id, stored)
+        return {"ok": True, "path": stored}
 
     def remove_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
         try:
-            relative_path, _path = self._workspace_source(raw_path)
+            root, relative, _path = self._scoped_source(
+                raw_path, owner_principal_id=owner_principal_id
+            )
+            stored = scope_path(root, relative)
         except ValueError:
-            relative_path = raw_path.strip()
-        self.store.remove_brain_source(owner_principal_id, relative_path)
-        return {"ok": True, "path": relative_path}
+            # A source recorded before this boundary existed, or one whose
+            # folder has since gone: removing it must still work, or the owner
+            # cannot clear a source they can see.
+            stored = raw_path.strip()
+        self.store.remove_brain_source(owner_principal_id, stored)
+        return {"ok": True, "path": stored}
 
-    def browse_brain_sources(self, raw_path: str = ".") -> dict[str, Any]:
-        """Browse one contained directory without exposing host filesystem paths."""
-        relative_path, path = self._workspace_source(raw_path or ".")
+    def grant_brain_source_folder(
+        self, raw_path: str, *, owner_principal_id: str
+    ) -> dict[str, Any]:
+        """Record the owner granting one folder on this machine.
+
+        The folder is read where it is. Nothing is copied into the workspace by
+        granting it, which is the difference between this and an upload.
+        """
+        candidate = (raw_path or "").strip()
+        if not candidate or len(candidate) > MAX_SOURCE_PATH_CHARS:
+            raise ValueError("invalid_brain_source_path")
+        path = Path(candidate).expanduser()
+        if not path.is_absolute():
+            raise ValueError("brain_grant_requires_absolute_path")
+        try:
+            resolved = path.resolve(strict=True)
+        except OSError as exc:
+            raise ValueError("brain_grant_not_found") from exc
+        if not resolved.is_dir():
+            raise ValueError("brain_grant_not_a_directory")
+        runtime_dir = (self.workspace_root / RUNTIME_DIR_NAME).resolve()
+        if resolved == runtime_dir or runtime_dir in resolved.parents:
+            # The runtime directory is Raiker's own machinery, and its documents
+            # are already offered as their own roots.
+            raise ValueError("brain_grant_is_runtime_directory")
+        root_id = grant_root_id(resolved)
+        self.store.add_brain_source_grant(
+            owner_principal_id, root_id, str(resolved), resolved.name or str(resolved)
+        )
+        self._record_brain_grant_event("brain_source_folder_granted", root_id, str(resolved))
+        return {"ok": True, "root_id": root_id, "path": str(resolved)}
+
+    def _record_brain_grant_event(self, event_type: str, root_id: str, path: str) -> None:
+        """Granting Raiker access to a folder is a governed step, so it is one
+        the audit log carries — with the path, because the owner needs to see
+        exactly what they opened and when."""
+        from raiker.events.types import make_event
+
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id="authz",
+                turn_id=None,
+                event_type=event_type,
+                actor="dashboard_service",
+                payload={"root_id": root_id, "path": path},
+            )
+        )
+
+    # A file picked from the owner's computer arrives as bytes, so adding it is
+    # necessarily a copy. That makes consent the whole design: `store_copy` has
+    # to be explicitly true, the copy lands in one named place the owner can
+    # find and delete, and the alternative — granting the folder and reading it
+    # where it is — is offered beside it in the dialog.
+    def upload_brain_source_file(
+        self, filename: str, content_base64: str, store_copy: bool, *, owner_principal_id: str
+    ) -> dict[str, Any]:
+        if not store_copy:
+            raise ValueError("brain_upload_copy_not_authorised")
+        name = Path((filename or "").strip()).name
+        if not name or name.startswith(".") or len(name) > 200:
+            raise ValueError("brain_upload_invalid_filename")
+        if Path(name).suffix.casefold() not in KNOWLEDGE_SOURCE_EXTENSIONS:
+            raise ValueError("brain_upload_unsupported_file_type")
+        try:
+            content = base64.b64decode(content_base64.encode("ascii"), validate=True)
+        except (ValueError, UnicodeEncodeError) as exc:
+            raise ValueError("brain_upload_invalid_content") from exc
+        if not content:
+            raise ValueError("brain_upload_empty")
+        if len(content) > MAX_KNOWLEDGE_UPLOAD_BYTES:
+            raise ValueError("brain_upload_too_large")
+        destination_dir = (
+            self.workspace_root / RUNTIME_DIR_NAME / "artifacts" / KNOWLEDGE_UPLOAD_DIR
+        ).resolve()
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / name
+        if destination.exists():
+            stem, suffix = Path(name).stem, Path(name).suffix
+            destination = destination_dir / f"{stem}-{uuid4().hex[:6]}{suffix}"
+        destination.write_bytes(content)
+        stored = f"{ARTIFACTS_ROOT_ID}/{KNOWLEDGE_UPLOAD_DIR}/{destination.name}"
+        self.store.add_brain_source(owner_principal_id, stored)
+        return {
+            "ok": True,
+            "path": stored,
+            "stored_copy": True,
+            "byte_size": len(content),
+        }
+
+    def revoke_brain_source_folder(
+        self, root_id: str, *, owner_principal_id: str
+    ) -> dict[str, Any]:
+        cleaned = (root_id or "").strip()
+        if not cleaned:
+            raise ValueError("invalid_brain_source_path")
+        revoked = next(
+            (
+                grant
+                for grant in self.store.list_brain_source_grants(owner_principal_id)
+                if str(grant.get("root_id")) == cleaned
+            ),
+            None,
+        )
+        self.store.remove_brain_source_grant(owner_principal_id, cleaned)
+        self._record_brain_grant_event(
+            "brain_source_folder_revoked", cleaned, str((revoked or {}).get("path", ""))
+        )
+        return {"ok": True, "root_id": cleaned}
+
+    def browse_brain_sources(
+        self, raw_path: str = "", *, owner_principal_id: str | None = None
+    ) -> dict[str, Any]:
+        """Browse one contained directory inside one root, and nothing above it."""
+        roots = self._scope_roots(owner_principal_id)
+        if not (raw_path or "").strip() or raw_path.strip() in {".", "/"}:
+            # There is no path meaning "the workspace", so the empty request
+            # answers with the boundary rather than with a listing.
+            return {
+                "path": "",
+                "parent": None,
+                "roots": [root.to_dict() for root in roots],
+                "children": [],
+                "truncated": False,
+            }
+        try:
+            root, relative, path = resolve(roots, raw_path)
+        except ScopeError as exc:
+            raise ValueError(exc.reason) from exc
         if not path.is_dir():
             raise ValueError("brain_source_not_a_directory")
-        children: list[dict[str, Any]] = []
         try:
-            values = sorted(path.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold()))
+            values = sorted(
+                path.iterdir(), key=lambda item: (not item.is_dir(), item.name.casefold())
+            )
         except OSError as exc:
             raise ValueError("brain_source_unreadable") from exc
-        root = self.workspace_root.resolve()
+        base = root.path.resolve() if root.path is not None else path
+        children: list[dict[str, Any]] = []
         for child in values[:200]:
             try:
-                if child.name in {".git", ".raiker", "node_modules"}:
+                if child.name in SKIPPED_DIRECTORY_NAMES or child.name.startswith("."):
                     continue
-                resolved = child.resolve()
-                if root not in resolved.parents and resolved != root:
+                resolved_child = child.resolve()
+                # Re-checked after resolution: a symlink inside a granted folder
+                # must not become a way out of it.
+                if base not in resolved_child.parents:
                     continue
                 children.append(
                     {
                         "name": child.name,
-                        "path": resolved.relative_to(root).as_posix(),
+                        "path": scope_path(root, resolved_child.relative_to(base).as_posix()),
                         "kind": "folder" if child.is_dir() else "file",
                         "size_bytes": child.stat().st_size if child.is_file() else None,
                     }
@@ -1025,20 +1222,21 @@ class DashboardService:
             except OSError:
                 continue
         return {
-            "path": relative_path,
-            "parent": None if path == root else path.parent.relative_to(root).as_posix() or ".",
+            "path": scope_path(root, relative),
+            "parent": parent_scope_path(root, relative),
+            "roots": [item.to_dict() for item in roots],
             "children": children,
             "truncated": len(values) > 200,
         }
 
-    def review_brain_source(self, raw_path: str) -> dict[str, Any]:
+    def review_brain_source(
+        self, raw_path: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any]:
         """Build a bounded, read-only indexing plan before a source is selected."""
-        relative_path, path = self._workspace_source(raw_path)
-        supported_extensions = {
-            ".md", ".txt", ".rst", ".py", ".ts", ".tsx", ".js", ".jsx", ".json",
-            ".toml", ".yaml", ".yml", ".html", ".css", ".scss", ".sql", ".go",
-            ".rs", ".java", ".cs", ".cpp", ".c", ".h", ".sh", ".ps1",
-        }
+        root, relative, path = self._scoped_source(
+            raw_path, owner_principal_id=owner_principal_id
+        )
+        relative_path = scope_path(root, relative)
         candidates = [path] if path.is_file() else path.rglob("*")
         supported = 0
         unsupported = 0
@@ -1046,26 +1244,32 @@ class DashboardService:
         scanned = 0
         examples: list[str] = []
         warnings: list[str] = []
-        root = self.workspace_root.resolve()
+        # Containment is judged against the root that was selected, not against
+        # the workspace: a granted folder lives outside the workspace entirely,
+        # and everything under it — and nothing above it — is in scope.
+        base = root.path.resolve() if root.path is not None else path
         for candidate in candidates:
             if scanned >= 5000:
                 warnings.append("More than 5,000 entries were found; review is capped and indexing will remain incremental.")
                 break
             try:
                 resolved = candidate.resolve()
-                if resolved != root and root not in resolved.parents:
+                if resolved != base and base not in resolved.parents:
                     continue
-                if not candidate.is_file() or any(part in {".git", ".raiker", "node_modules"} for part in candidate.parts):
+                if not candidate.is_file() or any(
+                    part in SKIPPED_DIRECTORY_NAMES or part.startswith(".")
+                    for part in candidate.relative_to(base).parts
+                ):
                     continue
                 size = candidate.stat().st_size
-            except OSError:
+            except (OSError, ValueError):
                 continue
             scanned += 1
-            if candidate.suffix.casefold() in supported_extensions and size <= 5 * 1024 * 1024:
+            if candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS and size <= 5 * 1024 * 1024:
                 supported += 1
                 total_bytes += size
                 if len(examples) < 8:
-                    examples.append(resolved.relative_to(root).as_posix())
+                    examples.append(scope_path(root, resolved.relative_to(base).as_posix()))
             else:
                 unsupported += 1
         if total_bytes > 100 * 1024 * 1024:
@@ -1723,12 +1927,17 @@ class DashboardService:
             node_id = f"backup:{backup['manifest_id']}"
             nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
-        root = self.workspace_root.resolve()
+        # Sources are addressed within the Knowledge Map's boundary, so a stored
+        # source that no longer resolves — its grant revoked, its folder gone —
+        # simply drops out of the graph rather than being drawn from a stale path.
+        roots = self._scope_roots(principal_id)
         for source in self.store.list_brain_sources(principal_id):
             try:
-                relative_path, path = self._workspace_source(source)
-            except ValueError:
+                source_root, relative, path = resolve(roots, source)
+            except ScopeError:
                 continue
+            relative_path = scope_path(source_root, relative)
+            base = source_root.path.resolve() if source_root.path is not None else path
             source_id = f"source:{relative_path}"
             source_type = "folder" if path.is_dir() else "file"
             nodes.append(BrainNodeView(source_id, source_type, path.name or relative_path, "selected", relative_path))
@@ -1739,7 +1948,9 @@ class DashboardService:
                 except OSError:
                     children = []
                 for child in children:
-                    child_path = child.resolve().relative_to(root).as_posix()
+                    child_path = scope_path(
+                        source_root, child.resolve().relative_to(base).as_posix()
+                    )
                     child_id = f"source:{child_path}"
                     child_type = "folder" if child.is_dir() else "file"
                     nodes.append(BrainNodeView(child_id, child_type, child.name, "available", child_path))
@@ -2825,7 +3036,25 @@ class DashboardService:
                 limit=10_000, user_id=user_id, include_archived=True
             )
         }
-        return [self._event_view(r) for r in rows if str(r.get("session_id")) in visible_session_ids]
+        # BUG-87 — the audit log is account-scoped, not conversation-scoped.
+        # Governed steps taken outside any conversation — connecting a
+        # credential, pinning a model, resolving a principal — are recorded on
+        # runtime channels (`terminal-local`, `authz`) that are not sessions at
+        # all. Filtering on the owner's session set alone dropped every one of
+        # them, so the page an owner opens to confirm those exact steps showed
+        # "No events match" with no filters set.
+        #
+        # A row is visible when it belongs to one of the owner's own sessions,
+        # or to no session record at all. The second clause cannot leak another
+        # user's conversation: their sessions are session records, so they fail
+        # it and stay filtered.
+        conversation_ids = self.store.all_session_ids()
+        return [
+            self._event_view(row)
+            for row in rows
+            if str(row.get("session_id")) in visible_session_ids
+            or str(row.get("session_id")) not in conversation_ids
+        ]
 
     def list_checkpoints(
         self, session_id: str | None = None, limit: int = 50, project_id: str | None = None, user_id: str | None = None

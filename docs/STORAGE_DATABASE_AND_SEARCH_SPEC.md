@@ -47,6 +47,39 @@ Raiker uses a hybrid local storage model:
 
 SQLite is the default local database because it is portable, inspectable, local-first, embeddable, and suitable for personal workstation/home-lab usage.
 
+### Encryption at rest, and the locked-memory decision
+
+The database is SQLCipher-encrypted with a workspace key. SQLCipher can also
+lock the pages holding key material so they are never paged to disk
+(`PRAGMA cipher_memory_security`), and locking draws on a per-process allowance
+the operating system sets — 8 MB by default on the Linux host where FIXED-150
+was reproduced, a working-set quota on Windows.
+
+Raiker's decision, made explicitly rather than left to the platform:
+
+* **Memory security is best effort and always explicit.** At startup Raiker
+  reads the locked-memory allowance and compares it with what its connection
+  ceiling could want. If the allowance covers it, the pragma is set **on**,
+  before the key. If it does not — or if the platform will not report an
+  allowance at all — the pragma is set **off**, and that is *recorded*: a
+  warning names the reason, and `GET /api/health` reports
+  `cipher_memory_security` and `memory_security_reason` on every probe.
+* **A workspace that opens beats key pages the platform was never going to
+  lock.** The alternative, failing closed by default, is the lockout FIXED-150
+  and BUG-46 both record — and it fails at *authentication*, so it takes the
+  whole product with it.
+* **An owner who wants the stronger posture says so.** With
+  `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is forced on and a refused
+  lock fails closed by name (`store_memory_lock_unavailable`, HTTP 503), rather
+  than surfacing as a bare `MemoryError` inside a request handler.
+
+**Key-bearing connections are bounded absolutely.** One keyed connection is
+cached per `(workspace, thread)`, evicted least-recently-used, under a
+per-thread limit (`RAIKER_SQLITE_CONNECTION_CACHE_LIMIT`, default 8) *and* an
+absolute process ceiling (`RAIKER_SQLITE_CONNECTION_CACHE_CEILING`, default 16).
+The ceiling is a count of connections, never a multiple of the server's thread
+count: it is what bounds the locked pages the process asks the platform for.
+
 ---
 
 ## What SQLite Stores

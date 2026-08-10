@@ -68,38 +68,79 @@ describe("BrainView", () => {
     expect(screen.getByText("Always alive")).toBeInTheDocument();
   });
 
-  it("browses and reviews a source before adding it", async () => {
+  it("opens on the boundary, browses one root, and reviews before adding", async () => {
     const fetchMock = stubFetch({
       "GET /api/brain": {
         generated_at: "2026-07-15T00:00:00Z", illustrative_motion_notice: "Visual motion only.",
         nodes: [{ node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true }], edges: [],
       },
       "GET /api/brain/settings": { settings: {} },
-      "GET /api/brain/sources/browse?path=.": {
-        path: ".", parent: null, truncated: false,
-        children: [{ name: "docs", path: "docs", kind: "folder", size_bytes: null }],
+      // The picker's first read is the boundary itself: named places, never a
+      // listing of the workspace (BUG-88).
+      "GET /api/brain/sources/browse": {
+        path: "", parent: null, truncated: false, children: [],
+        roots: [
+          { root_id: "generated-files", label: "Generated files", detail: "Documents Raiker produced.", kind: "raiker", browsable: true, path: null },
+          { root_id: "raiker-database", label: "Raiker database", detail: "Chat, Build, Tasks, Schedules and uploads are already in this graph.", kind: "database", browsable: false, path: null },
+        ],
       },
-      "GET /api/brain/sources/browse?path=docs": {
-        path: "docs", parent: ".", truncated: false,
-        children: [{ name: "notes.md", path: "docs/notes.md", kind: "file", size_bytes: 12 }],
+      "GET /api/brain/sources/browse?path=generated-files": {
+        path: "generated-files", parent: "", truncated: false, roots: [],
+        children: [{ name: "notes.md", path: "generated-files/notes.md", kind: "file", size_bytes: 12 }],
       },
       "POST /api/brain/sources/review": {
-        path: "docs", kind: "folder", supported_files: 1, unsupported_files: 0,
-        total_bytes: 12, examples: ["docs/notes.md"], warnings: [], review_cap: 5000,
+        path: "generated-files/notes.md", kind: "file", supported_files: 1, unsupported_files: 0,
+        total_bytes: 12, examples: ["generated-files/notes.md"], warnings: [], review_cap: 5000,
       },
-      "POST /api/brain/sources": { ok: true, path: "docs" },
+      "POST /api/brain/sources": { ok: true, path: "generated-files/notes.md" },
     });
     render(BrainView);
     await screen.findByRole("button", { name: "Add workspace source" });
     await fireEvent.click(screen.getByRole("button", { name: "Add workspace source" }));
-    expect(screen.getByRole("dialog", { name: "Review workspace source" }).tagName).toBe("DIALOG");
-    await fireEvent.input(screen.getByLabelText("Workspace-relative path"), { target: { value: "docs" } });
+    expect(screen.getByRole("dialog", { name: "Add a source" }).tagName).toBe("DIALOG");
+    // The database is listed so the owner can see it is covered, and is not
+    // offered as a folder to walk.
+    expect(screen.getByText("Raiker database")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Raiker database/ })).toBeDisabled();
+    await fireEvent.click(screen.getByRole("button", { name: /Generated files/ }));
+    await fireEvent.click(await screen.findByRole("button", { name: /notes\.md/ }));
     await fireEvent.click(screen.getByRole("button", { name: "Review indexing plan" }));
     expect(await screen.findByText("Indexing plan")).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Add reviewed source" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/brain/sources", expect.objectContaining({ method: "POST" }),
     ));
+  });
+
+  it("will not store a file from the computer until the owner says it may", async () => {
+    // Granting a folder reads it where it is; an upload duplicates the file
+    // into the workspace, so the copy is a separate, explicit decision.
+    stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-07-15T00:00:00Z", illustrative_motion_notice: "Visual motion only.",
+        nodes: [{ node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true }], edges: [],
+      },
+      "GET /api/brain/settings": { settings: {} },
+      "GET /api/brain/sources/browse": { path: "", parent: null, truncated: false, children: [], roots: [] },
+    });
+    render(BrainView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add workspace source" }));
+
+    // Reading in place is offered beside the copy, and says which it is.
+    expect(screen.getByLabelText(/Grant a folder/)).toBeInTheDocument();
+    expect(screen.getByText(/Or add a single file/)).toBeInTheDocument();
+
+    const picker = screen.getByLabelText("File to copy into Raiker") as HTMLInputElement;
+    const file = new File(["notes"], "notes.md", { type: "text/markdown" });
+    Object.defineProperty(picker, "files", { value: [file] });
+    await fireEvent.change(picker);
+
+    // Choosing a file is not consent: the store button exists only behind the
+    // tick, and is disabled until it is ticked.
+    const store = await screen.findByRole("button", { name: "Store the copy and add it" });
+    expect(store).toBeDisabled();
+    await fireEvent.click(screen.getByRole("checkbox"));
+    expect(store).toBeEnabled();
   });
 
   it("opens source review by keyboard and restores focus when it closes", async () => {
@@ -109,14 +150,14 @@ describe("BrainView", () => {
         nodes: [{ node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true }], edges: [],
       },
       "GET /api/brain/settings": { settings: {} },
-      "GET /api/brain/sources/browse?path=.": { path: ".", parent: null, truncated: false, children: [] },
+      "GET /api/brain/sources/browse": { path: "", parent: null, truncated: false, children: [], roots: [] },
     });
     render(BrainView);
     const trigger = await screen.findByRole("button", { name: "Add workspace source" });
     trigger.focus();
     await fireEvent.keyDown(trigger, { key: "Enter" });
     await fireEvent.click(trigger);
-    const dialog = screen.getByRole("dialog", { name: "Review workspace source" });
+    const dialog = screen.getByRole("dialog", { name: "Add a source" });
     await fireEvent(dialog, new Event("cancel", { cancelable: true }));
     await waitFor(() => expect(trigger).toHaveFocus());
   });

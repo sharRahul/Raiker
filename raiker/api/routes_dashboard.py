@@ -11,6 +11,7 @@ from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AuthSessionRequest,
     BrainSourceRequest,
+    BrainSourceUploadRequest,
     BreachCheckRequest,
     BulkDeleteSessionsRequest,
     ConnectCodeRepoRequest,
@@ -857,12 +858,88 @@ async def add_brain_source(
 @router.get("/api/brain/sources/browse")
 async def browse_brain_sources(
     request: Request,
-    path: str = ".",
+    path: str = "",
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    del auth_data
+    """Browse inside one root the owner may see, never the workspace at large.
+
+    An empty path answers with the roots themselves — Raiker's own document
+    areas and the folders this owner granted — because there is no path that
+    means "everything in the workspace".
+    """
     try:
-        return _service(request).browse_brain_sources(path)
+        return _service(request).browse_brain_sources(
+            path, owner_principal_id=auth_data[0].principal_id
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.get("/api/brain/sources/roots")
+async def list_brain_source_roots(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _service(request).brain_source_roots(owner_principal_id=auth_data[0].principal_id)
+
+
+@router.post("/api/brain/sources/grants")
+async def grant_brain_source_folder(
+    body: BrainSourceRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Grant the Knowledge Map one folder on this machine, read where it is."""
+    try:
+        return _service(request).grant_brain_source_folder(
+            body.path, owner_principal_id=auth_data[0].principal_id
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.delete("/api/brain/sources/grants")
+async def revoke_brain_source_folder(
+    root_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    try:
+        return _service(request).revoke_brain_source_folder(
+            root_id, owner_principal_id=auth_data[0].principal_id
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": str(exc)},
+        ) from exc
+
+
+@router.post("/api/brain/sources/upload")
+async def upload_brain_source_file(
+    body: BrainSourceUploadRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Copy one file from the owner's computer into the workspace, on consent.
+
+    Adding a file this way duplicates it into Raiker, so ``store_copy`` must be
+    explicitly true. Granting the folder instead reads it where it is and
+    copies nothing.
+    """
+    try:
+        return _service(request).upload_brain_source_file(
+            body.filename,
+            body.content_base64,
+            body.store_copy,
+            owner_principal_id=auth_data[0].principal_id,
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
@@ -876,9 +953,10 @@ async def review_brain_source(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
-    del auth_data
     try:
-        return _service(request).review_brain_source(body.path)
+        return _service(request).review_brain_source(
+            body.path, owner_principal_id=auth_data[0].principal_id
+        )
     except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

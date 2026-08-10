@@ -44,9 +44,16 @@ test("live Skills tab: shipped skills, upload, rename, deactivate, delete", asyn
   await signIn(page);
   await page.goto(`${BASE}/#/extensions?tab=skills`);
 
-  // The three skills Raiker ships install on first visit.
+  // The six skills Raiker ships install on first visit.
   await expect(page.getByRole("heading", { name: "Skills", level: 2 })).toBeVisible({ timeout: 20_000 });
-  for (const name of ["algorithm-creator", "mcp-builder", "skill-creator"]) {
+  for (const name of [
+    "algorithm-creator",
+    "code-review",
+    "mcp-builder",
+    "plugin-dev",
+    "security-review",
+    "skill-creator",
+  ]) {
     await expect(page.getByText(name, { exact: true })).toBeVisible();
   }
   // The tab must not imply an authority the runtime does not enforce.

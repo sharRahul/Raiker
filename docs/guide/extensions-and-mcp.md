@@ -153,9 +153,19 @@ ten documents.
 
 ### Shipped skills
 
-Three install on first visit: **algorithm-creator**, **mcp-builder**, and
-**skill-creator**. Delete or rename one and it stays gone — Raiker records that
-it was offered once and does not restore it.
+Six install on first visit:
+
+| Skill | What it is for |
+|---|---|
+| **algorithm-creator** | Designing and verifying an algorithm before writing it |
+| **code-review** | Reviewing a diff or a pull request, and reporting only findings worth acting on |
+| **mcp-builder** | Building, debugging, or migrating an MCP server, against the current protocol revision |
+| **plugin-dev** | Designing, building and validating a plugin, manifest included |
+| **security-review** | Auditing a change for exploitable defects, agent-surface classes included |
+| **skill-creator** | Writing a new skill, or diagnosing one that never triggers |
+
+Delete or rename one and it stays gone — Raiker records that it was offered once
+and does not restore it.
 
 ### Pasting a skill link into Chat or Build
 

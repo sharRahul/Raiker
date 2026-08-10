@@ -368,63 +368,92 @@ class TestReads:
         # waiting for a slot any more and must not be listed as pending work.
         assert not any(n["node_id"] == f"schedule:{task_id}" for n in body["nodes"])
 
-    def test_brain_source_is_explicit_and_workspace_contained(
+    def test_brain_source_is_explicit_and_inside_the_knowledge_boundary(
         self, bootstrapped_workspace: Path, client: TestClient
     ) -> None:
-        source = bootstrapped_workspace / "research"
-        source.mkdir()
-        (source / "notes.md").write_text("actual selected file", encoding="utf-8")
-        token = _token(client)
+        """BUG-88 — a source is addressed within a named root, never the workspace.
 
-        added = client.post(
-            "/api/brain/sources",
-            headers=_auth_headers(token),
-            json={"path": "research"},
-        )
-        assert added.status_code == 200, added.text
-        assert added.json() == {"ok": True, "path": "research"}
-        graph = client.get("/api/brain", headers=_auth_headers(token)).json()
-        assert any(
-            node["node_id"] == "source:research" and node["node_type"] == "folder"
-            for node in graph["nodes"]
-        )
-        assert any(
-            node["node_id"] == "source:research/notes.md" and node["node_type"] == "file"
-            for node in graph["nodes"]
-        )
+        The workspace at large is not addressable, so a folder sitting beside
+        the runtime directory is not something the graph can be pointed at.
+        """
+        stray = bootstrapped_workspace / "research"
+        stray.mkdir()
+        (stray / "notes.md").write_text("not in scope", encoding="utf-8")
+        generated = bootstrapped_workspace / ".raiker" / "artifacts" / "research"
+        generated.mkdir(parents=True, exist_ok=True)
+        (generated / "notes.md").write_text("actual selected file", encoding="utf-8")
+        token = _token(client)
 
         rejected = client.post(
             "/api/brain/sources",
             headers=_auth_headers(token),
-            json={"path": "../outside"},
+            json={"path": "research"},
         )
         assert rejected.status_code == 422
-        assert rejected.json()["detail"]["reason_code"] == "brain_source_outside_workspace"
+        assert rejected.json()["detail"]["reason_code"] == "brain_source_outside_scope"
+
+        added = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "generated-files/research"},
+        )
+        assert added.status_code == 200, added.text
+        assert added.json() == {"ok": True, "path": "generated-files/research"}
+        graph = client.get("/api/brain", headers=_auth_headers(token)).json()
+        assert any(
+            node["node_id"] == "source:generated-files/research"
+            and node["node_type"] == "folder"
+            for node in graph["nodes"]
+        )
+        assert any(
+            node["node_id"] == "source:generated-files/research/notes.md"
+            and node["node_type"] == "file"
+            for node in graph["nodes"]
+        )
+
+        escaping = client.post(
+            "/api/brain/sources",
+            headers=_auth_headers(token),
+            json={"path": "generated-files/../../outside"},
+        )
+        assert escaping.status_code == 422
+        assert escaping.json()["detail"]["reason_code"] == "brain_source_outside_scope"
 
     def test_brain_source_review_browse_and_preferences_persist(
         self, bootstrapped_workspace: Path, client: TestClient
     ) -> None:
-        source = bootstrapped_workspace / "large-review"
-        source.mkdir()
+        source = bootstrapped_workspace / ".raiker" / "artifacts" / "large-review"
+        source.mkdir(parents=True, exist_ok=True)
         (source / "notes.md").write_text("review me", encoding="utf-8")
         (source / "archive.bin").write_bytes(b"\x00\x01")
         token = _token(client)
         headers = _auth_headers(token)
 
-        browse = client.get("/api/brain/sources/browse?path=.", headers=headers)
+        # An empty path answers with the boundary, not with a listing.
+        opening = client.get("/api/brain/sources/browse", headers=headers)
+        assert opening.status_code == 200, opening.text
+        assert opening.json()["children"] == []
+        roots = {root["root_id"]: root for root in opening.json()["roots"]}
+        assert "generated-files" in roots
+        assert roots["raiker-database"]["browsable"] is False
+
+        browse = client.get(
+            "/api/brain/sources/browse?path=generated-files", headers=headers
+        )
         assert browse.status_code == 200, browse.text
-        assert any(item["path"] == "large-review" for item in browse.json()["children"])
-        assert not any(
-            item["name"] in {".git", ".raiker", "node_modules"}
+        assert any(
+            item["path"] == "generated-files/large-review"
             for item in browse.json()["children"]
         )
-        protected = client.post(
+        outside = client.post(
             "/api/brain/sources/review", headers=headers, json={"path": ".raiker"}
         )
-        assert protected.status_code == 422
-        assert protected.json()["detail"]["reason_code"] == "brain_source_protected_path"
+        assert outside.status_code == 422
+        assert outside.json()["detail"]["reason_code"] == "brain_source_outside_scope"
         review = client.post(
-            "/api/brain/sources/review", headers=headers, json={"path": "large-review"}
+            "/api/brain/sources/review",
+            headers=headers,
+            json={"path": "generated-files/large-review"},
         )
         assert review.status_code == 200, review.text
         assert review.json()["supported_files"] == 1

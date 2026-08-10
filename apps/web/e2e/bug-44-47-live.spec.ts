@@ -28,11 +28,13 @@
  *
  * What each part proves:
  *
- * * **BUG-47** — a local provider's test result lands under that provider's own
- *   row and nowhere else, while a connected hosted card keeps its independent
- *   status. Before the fix the view held one result string for the whole page,
- *   so testing Ollama printed its answer beneath Anthropic and OpenRouter and
- *   printed nothing beneath Ollama.
+ * * **BUG-47** — a provider's test result lands under the card or row that ran
+ *   it and nowhere else. Before the fix the view held one result string for the
+ *   whole page, so testing Ollama printed its answer beneath Anthropic and
+ *   OpenRouter and printed nothing beneath Ollama. Since FIXED-141 split Models
+ *   by model origin, the pairs that can still contaminate one another are the
+ *   ones sharing a tab, so the scenario now tests two hosted cards on Hosted
+ *   and two runtime rows on Local (BUG-85).
  * * **BUG-44** — the update panel reads provenance from the build rather than
  *   asserting it: a checkout says checkout and makes no request when checked, a
  *   real artifact reports its version, target and *unsigned* signing state, and
@@ -110,41 +112,70 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
     .toBeVisible({ timeout: 180_000 });
 });
 
-test("BUG-47 — a provider's test result stays under that provider", async () => {
+/**
+ * BUG-85 re-aimed this scenario. It used to open `#/models?tab=local` and wait
+ * for a *hosted* card's "Connected" badge on the same screen — impossible since
+ * FIXED-141 split the page by model origin, so the scenario could not run at
+ * all. The split also makes the original local-versus-hosted cross-contamination
+ * structurally impossible, so the property worth testing is the one that can
+ * still break: two cards **on the same tab** must keep their own results.
+ */
+test("BUG-47 — a provider's test result stays under that provider, on its own tab", async () => {
   test.setTimeout(180_000);
-  await page.goto(`${SOURCE}/#/models?tab=local`);
 
-  const ollamaRow = page.locator(".local-row").filter({ hasText: "Ollama" });
-  const anthropicCard = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
+  // ── Hosted: several cards, one grid, one tab ────────────────────────────
+  await page.goto(`${SOURCE}/#/models?tab=hosted`);
+  const hostedCards = page.locator("article.provider-card");
+  const anthropicCard = hostedCards.filter({ hasText: "Anthropic" });
   await expect(anthropicCard.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+  // The scenario is only meaningful with a neighbour to contaminate.
+  expect(await hostedCards.count()).toBeGreaterThan(1);
+  await expect(page.locator("[data-test-result]")).toHaveCount(0);
 
-  // Test the *local* provider. This is the reported reproduction: its answer
-  // used to appear beneath every connected hosted card and beneath nothing else.
-  await ollamaRow.getByRole("button", { name: "Test" }).click();
-  // The message names Ollama whether it answered or not, so a result appearing
-  // under the wrong card would now contradict the card it sits under.
-  const ollamaResult = page.locator("[data-test-result]").filter({ hasText: /^Ollama/ });
-  await expect(ollamaResult).toHaveCount(1, { timeout: 60_000 });
-  // It is inside the Ollama row, and the Anthropic card holds no result at all.
-  await expect(ollamaRow.locator("[data-test-result]")).toHaveCount(1);
-  await expect(anthropicCard.locator("[data-test-result]")).toHaveCount(0);
-
-  // Now test the hosted provider. Two independent results, each under its own
-  // card, neither overwriting nor duplicating the other.
   await anthropicCard.getByRole("button", { name: "Test" }).click();
-  const anthropicResult = anthropicCard.locator("[data-test-result]");
-  await expect(anthropicResult).toHaveCount(1, { timeout: 60_000 });
-  await expect(anthropicResult).toContainText(/Anthropic responded and exposed \d+ models?\./);
-  await expect(ollamaRow.locator("[data-test-result]")).toHaveCount(1);
-  await expect(page.locator("[data-test-result]")).toHaveCount(2);
+  await expect(anthropicCard.locator("[data-test-result]")).toHaveCount(1, { timeout: 60_000 });
+  // One result on the whole tab: under the card that ran it, under no other.
+  await expect(page.locator("[data-test-result]")).toHaveCount(1);
 
-  // Two shots, because the evidence is a *relationship* between two parts of a
-  // long page: the local row holding its own answer, and the hosted cards
-  // holding theirs and no one else's.
-  await ollamaRow.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: join(SHOTS, "197-BUG-47-local-result-under-ollama-live.png") });
+  // A second hosted card, so the two answers have to stay apart rather than
+  // one page-wide string being reprinted under everything connected.
+  const neighbour = hostedCards.filter({ hasNotText: "Anthropic" }).first();
+  const neighbourName = (await neighbour.getByRole("heading").first().innerText()).trim();
+  await neighbour.getByRole("button", { name: "Test" }).click();
+  await expect(neighbour.locator("[data-test-result]")).toHaveCount(1, { timeout: 60_000 });
+  await expect(page.locator("[data-test-result]")).toHaveCount(2);
+  await expect(anthropicCard.locator("[data-test-result]")).toHaveCount(1);
+  // Every message names its own provider, so a result under the wrong card
+  // would contradict the card it sits under.
+  await expect(neighbour.locator("[data-test-result]")).toContainText(neighbourName);
   await anthropicCard.scrollIntoViewIfNeeded();
   await page.screenshot({ path: join(SHOTS, "198-BUG-47-hosted-cards-keep-their-own-live.png") });
+
+  // ── Local: the same property among the Local rows ───────────────────────
+  await page.goto(`${SOURCE}/#/models?tab=local`);
+  const localRows = page.locator(".local-row");
+  await expect(localRows.first()).toBeVisible({ timeout: 30_000 });
+  expect(await localRows.count()).toBeGreaterThan(1);
+  await expect(page.locator("[data-test-result]")).toHaveCount(0);
+
+  const firstRow = localRows.nth(0);
+  const secondRow = localRows.nth(1);
+  const firstName = (await firstRow.getByRole("heading").first().innerText()).trim();
+  const secondName = (await secondRow.getByRole("heading").first().innerText()).trim();
+
+  await firstRow.getByRole("button", { name: "Test" }).click();
+  await expect(firstRow.locator("[data-test-result]")).toHaveCount(1, { timeout: 60_000 });
+  await expect(page.locator("[data-test-result]")).toHaveCount(1);
+  await expect(secondRow.locator("[data-test-result]")).toHaveCount(0);
+
+  await secondRow.getByRole("button", { name: "Test" }).click();
+  await expect(secondRow.locator("[data-test-result]")).toHaveCount(1, { timeout: 60_000 });
+  await expect(page.locator("[data-test-result]")).toHaveCount(2);
+  await expect(firstRow.locator("[data-test-result]")).toContainText(firstName);
+  await expect(secondRow.locator("[data-test-result]")).toContainText(secondName);
+
+  await firstRow.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: join(SHOTS, "197-BUG-47-local-rows-keep-their-own-live.png") });
 });
 
 test("BUG-44 — a source checkout says so, and checking makes no request", async () => {

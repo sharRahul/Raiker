@@ -225,6 +225,13 @@ EVENT_TYPES = {
     "skill_deactivated",
     "skill_deleted",
     "skills_indexed",
+    # The Knowledge Map's access to one folder on this machine was granted or
+    # withdrawn. The payload carries the path deliberately: what an owner opened
+    # to the graph, and when, is the whole substance of the record — and
+    # revoking removes every source indexed under it, which is a change the
+    # audit log has to be able to explain afterwards.
+    "brain_source_folder_granted",
+    "brain_source_folder_revoked",
     # A repository reference was connected to, or removed from, the Build
     # workspace: a workspace-contained local subpath, or a GitHub `owner/repo`
     # coordinate. The payload is the reference only — never a credential — and

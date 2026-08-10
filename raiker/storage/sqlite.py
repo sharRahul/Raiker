@@ -4,6 +4,7 @@ import atexit
 import contextlib
 import hashlib
 import json
+import logging
 import os
 import re
 import threading
@@ -66,6 +67,8 @@ from raiker.storage.migrations import (
     ATTACHMENT_STORE_SQL,
     BRAIN_PREFERENCES_MIGRATION_ID,
     BRAIN_PREFERENCES_SQL,
+    BRAIN_SOURCE_GRANTS_MIGRATION_ID,
+    BRAIN_SOURCE_GRANTS_SQL,
     BRAIN_SOURCES_MIGRATION_ID,
     BRAIN_SOURCES_SQL,
     CALENDAR_EVENTS_MIGRATION_ID,
@@ -330,17 +333,40 @@ from raiker.storage.migrations import (
 # gives itself is therefore the per-thread limit **or** the process ceiling shared
 # between the threads currently holding connections, whichever is smaller — a real
 # process-wide bound that still never touches another thread's handle.
+#
+# BUG-86 — the ceiling used to be expressed as *worker-threads-worth* of the
+# per-thread limit (eight of them), so the real bound was the per-thread limit
+# multiplied by a thread count the store does not control. Every keyed connection
+# holds SQLCipher key material, and on a platform that locks those pages the
+# population is spent against a locked-memory allowance measured in a few
+# megabytes. The ceiling is therefore an absolute number of key-bearing
+# connections: what the process may hold, whatever the server's threadpool does.
 _CONNECTION_CACHE_LIMIT_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_LIMIT"
 _DEFAULT_CONNECTION_CACHE_LIMIT = 8
-# The process ceiling, in worker-threads-worth of connections: eight threads each
-# holding the full per-thread limit is the most this process will cache.
-_CONNECTION_CACHE_CEILING_FACTOR = 8
+_CONNECTION_CACHE_CEILING_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_CEILING"
+_DEFAULT_CONNECTION_CACHE_CEILING = 16
 _CONNECTIONS: OrderedDict[tuple[Path, int], sqlite3.Connection] = OrderedDict()
 _CONNECTIONS_LOCK = threading.RLock()
 # Schema/FTS bootstrap uses multiple statements and must not race another store
 # instance in this process. SQLite's busy timeout cannot resolve two deferred
 # transactions that both try to upgrade to writers.
 _BOOTSTRAP_LOCK = threading.RLock()
+_LOG = logging.getLogger(__name__)
+
+
+class StoreUnavailableError(RuntimeError):
+    """The encrypted store could not be opened. ``reason`` is a stable code.
+
+    Raised instead of letting a platform-level failure — a locked-memory
+    allowance the process cannot satisfy, most of all — surface as a bare
+    ``MemoryError`` from inside a request handler. Callers turn it into a named
+    condition the owner can act on rather than a generic failure.
+    """
+
+    def __init__(self, reason: str, detail: str = "") -> None:
+        super().__init__(detail or reason)
+        self.reason = reason
+        self.detail = detail or reason
 
 
 def connection_cache_limit() -> int:
@@ -355,14 +381,157 @@ def connection_cache_limit() -> int:
 
 
 def connection_cache_ceiling() -> int:
-    """The most keyed connections this process will cache across all threads."""
-    return connection_cache_limit() * _CONNECTION_CACHE_CEILING_FACTOR
+    """The most keyed connections this process will cache, across all threads.
+
+    An absolute count, never a multiple of the thread count: it is what bounds
+    the locked pages SQLCipher asks the platform for.
+    """
+    raw = os.environ.get(_CONNECTION_CACHE_CEILING_ENV, "").strip()
+    declared = _DEFAULT_CONNECTION_CACHE_CEILING
+    if raw:
+        with contextlib.suppress(ValueError):
+            parsed = int(raw)
+            if parsed > 0:
+                declared = parsed
+    # A ceiling under the per-thread limit would be self-contradictory; the
+    # per-thread limit is what one thread may hold, so it is the floor here.
+    return max(connection_cache_limit(), declared)
 
 
 def cached_connection_count() -> int:
     """Cached connections held by this process, across every worker thread."""
     with _CONNECTIONS_LOCK:
         return len(_CONNECTIONS)
+
+
+# ── SQLCipher memory security (BUG-86, BUG-46) ───────────────────────────────
+#
+# SQLCipher can lock the pages that hold key material so they are never paged to
+# disk. Locking draws on a per-process allowance the operating system sets, and
+# that allowance is small by default — 8 MB on the Linux host where BUG-86 was
+# reproduced, a working-set quota on Windows. When it is spent, opening a keyed
+# connection fails with ``MemoryError`` and *every* request fails with it,
+# because authentication opens the store.
+#
+# The decision, stated rather than left implicit: memory security is best effort
+# and always explicit. Raiker asks the platform what it will allow, turns the
+# pragma on when the allowance covers the connections it may cache, and turns it
+# **off and records that it did** when it does not — a workspace that opens is
+# worth more than key pages that cannot be locked anyway. An owner who needs the
+# stronger posture sets ``RAIKER_SQLCIPHER_MEMORY_SECURITY=on``; that forces the
+# pragma on and turns a lock failure into a named fail-closed condition instead
+# of a bare ``MemoryError``.
+_MEMORY_SECURITY_ENV = "RAIKER_SQLCIPHER_MEMORY_SECURITY"
+# What one keyed connection is assumed to want locked. SQLCipher locks its key,
+# key-derivation scratch space and page buffers; 512 KB per connection is a
+# deliberately generous estimate, so the probe errs towards turning the pragma
+# off rather than towards the lockout this bug records.
+_MEMORY_LOCK_PER_CONNECTION_BYTES = 512 * 1024
+_MEMORY_SECURITY_LOCK = threading.Lock()
+_MEMORY_SECURITY: tuple[bool, str] | None = None
+
+
+def _memlock_allowance_bytes() -> int | None:
+    """The process's locked-memory allowance, or ``None`` where unreadable.
+
+    ``-1`` from ``getrlimit`` means unlimited and is reported as such by
+    returning a value above any budget.
+    """
+    try:
+        import resource  # noqa: PLC0415 - POSIX only, imported where it is used
+    except ImportError:
+        return None
+    try:
+        soft, _hard = resource.getrlimit(resource.RLIMIT_MEMLOCK)
+    except (AttributeError, OSError, ValueError):
+        return None
+    if soft < 0:
+        return None if soft != -1 else 1 << 62
+    return int(soft)
+
+
+def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
+    """``(enabled, reason)`` for ``PRAGMA cipher_memory_security``.
+
+    Resolved once per process and reported verbatim on the health endpoint, so
+    the posture Raiker is actually running under is readable rather than
+    guessed. ``refresh`` re-resolves it, which only tests need.
+    """
+    global _MEMORY_SECURITY
+    with _MEMORY_SECURITY_LOCK:
+        if _MEMORY_SECURITY is not None and not refresh:
+            return _MEMORY_SECURITY
+        declared = os.environ.get(_MEMORY_SECURITY_ENV, "").strip().casefold()
+        if declared in {"on", "1", "true", "yes"}:
+            resolved = (True, "requested_on")
+        elif declared in {"off", "0", "false", "no"}:
+            resolved = (False, "requested_off")
+        else:
+            allowance = _memlock_allowance_bytes()
+            budget = connection_cache_ceiling() * _MEMORY_LOCK_PER_CONNECTION_BYTES
+            if allowance is None:
+                # An allowance the platform will not report is not an allowance
+                # to spend. Windows is the case in point, and BUG-46 recorded
+                # this same lockout there.
+                resolved = (False, "memlock_allowance_unreadable")
+            elif allowance >= budget:
+                resolved = (True, "memlock_allowance_sufficient")
+            else:
+                resolved = (False, f"memlock_allowance_below_budget:{allowance}:{budget}")
+        _MEMORY_SECURITY = resolved
+        if not resolved[0]:
+            # Recorded, not silent: running without locked key pages is a real
+            # posture change and the owner is entitled to see that it happened.
+            _LOG.warning(
+                "SQLCipher memory security is off (%s); workspace key pages are "
+                "not locked into RAM on this machine.",
+                resolved[1],
+            )
+        return resolved
+
+
+def memory_security_posture() -> dict[str, Any]:
+    """What the health endpoint and the security posture page both read."""
+    enabled, reason = resolve_memory_security()
+    return {
+        "cipher_memory_security": "on" if enabled else "off",
+        # Deliberately not "reason": the store's own reason travels beside this
+        # one on the health view, and two keys of the same name would let the
+        # posture overwrite the failure — the kind of quiet contradiction this
+        # bug is about.
+        "memory_security_reason": reason,
+        "connection_ceiling": connection_cache_ceiling(),
+    }
+
+
+def store_health(workspace_root: str | Path) -> dict[str, Any]:
+    """Whether the encrypted store can actually be opened and read, right now.
+
+    BUG-86 — the health probe used to answer "ok" without touching the store,
+    so the lock screen could report the runtime operational in the same breath
+    as refusing every sign-in. This is the one probe both statements read.
+    """
+    posture = memory_security_posture()
+    try:
+        SQLiteStore(workspace_root).connect().execute("SELECT 1")
+    except StoreUnavailableError as exc:
+        return {"store": "unavailable", "reason": exc.reason, "detail": exc.detail, **posture}
+    except MemoryError:
+        return {
+            "store": "unavailable",
+            "reason": "store_memory_lock_unavailable",
+            "detail": "This machine would not lock the memory pages SQLCipher holds "
+            "the workspace key in.",
+            **posture,
+        }
+    except Exception as exc:  # noqa: BLE001 - any open failure is one condition here
+        return {
+            "store": "unavailable",
+            "reason": "store_open_failed",
+            "detail": type(exc).__name__,
+            **posture,
+        }
+    return {"store": "ok", "reason": "", "detail": "", **posture}
 
 
 def _evictable_locked(owner: int) -> list[sqlite3.Connection]:
@@ -384,6 +553,19 @@ def _evictable_locked(owner: int) -> list[sqlite3.Connection]:
     for key in mine[: max(len(mine) - allowance, 0)]:
         evicted.append(_CONNECTIONS.pop(key))
     return evicted
+
+
+def _releasable_locked(owner: int) -> list[sqlite3.Connection]:
+    """Every handle this thread is allowed to close, under memory pressure.
+
+    Its own — it holds none of them mid-query, since it is here — plus any
+    belonging to a thread that has exited. Another live worker's handle is
+    still never touched: closing one would be a use-after-close in that worker.
+    Called with ``_CONNECTIONS_LOCK`` held.
+    """
+    live = {thread.ident for thread in threading.enumerate() if thread.ident is not None}
+    doomed = [key for key in _CONNECTIONS if key[1] == owner or key[1] not in live]
+    return [_CONNECTIONS.pop(key) for key in doomed]
 
 
 def invalidate_workspace_connections(workspace_root: str | Path) -> None:
@@ -457,6 +639,27 @@ class SQLiteStore:
         with _BOOTSTRAP_LOCK:
             self.bootstrap()
 
+    def _open_keyed(self) -> sqlite3.Connection:
+        """Open one keyed connection under the resolved memory-security policy."""
+        connection = sqlite3.connect(str(self.db_path), timeout=5.0, check_same_thread=False)
+        try:
+            memory_security, _reason = resolve_memory_security()
+            # Set before the key: the pragma governs how the key material about
+            # to be derived is held, so afterwards would be too late.
+            connection.execute(
+                f"PRAGMA cipher_memory_security = {'ON' if memory_security else 'OFF'}"
+            )
+            key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
+            connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 5000")
+        except BaseException:
+            with contextlib.suppress(Exception):
+                connection.close()
+            raise
+        return connection
+
     def connect(self) -> sqlite3.Connection:
         owner = threading.get_ident()
         cache_key = (self.paths.workspace_root, owner)
@@ -467,16 +670,21 @@ class SQLiteStore:
                     connection.execute("SELECT 1")
                     _CONNECTIONS.move_to_end(cache_key)
                     return connection
-                except sqlite3.Error:
+                except (sqlite3.Error, MemoryError):
+                    # A cached handle whose key pages the platform has taken
+                    # back answers this probe with MemoryError, not sqlite3.
+                    # Either way it is unusable and is replaced, not returned.
                     _CONNECTIONS.pop(cache_key, None)
-            connection = sqlite3.connect(
-                str(self.db_path), timeout=5.0, check_same_thread=False
-            )
-            key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
-            connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
-            connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
-            connection.execute("PRAGMA busy_timeout = 5000")
+                    with contextlib.suppress(Exception):
+                        connection.close()
+            try:
+                connection = self._open_keyed()
+            except MemoryError as exc:
+                # The platform refused the locked pages SQLCipher asked for. Give
+                # back everything this thread may release and try once more; if
+                # the policy was Raiker's own choice rather than the owner's,
+                # fall back to running without memory security and record it.
+                connection = self._reopen_after_memory_error(exc)
             # A fresh key, so this appends: the newest connection is the most
             # recently used one and the last thing eviction would reach for.
             _CONNECTIONS[cache_key] = connection
@@ -485,6 +693,29 @@ class SQLiteStore:
             with contextlib.suppress(Exception):
                 stale.close()
         return connection
+
+    def _reopen_after_memory_error(self, error: MemoryError) -> sqlite3.Connection:
+        """Recover a keyed connection after a locked-memory refusal, or fail named.
+
+        Called with ``_CONNECTIONS_LOCK`` held.
+        """
+        global _MEMORY_SECURITY
+        for stale in _releasable_locked(threading.get_ident()):
+            with contextlib.suppress(Exception):
+                stale.close()
+        with contextlib.suppress(MemoryError, sqlite3.Error):
+            return self._open_keyed()
+        enabled, reason = resolve_memory_security()
+        if enabled and reason != "requested_on":
+            with _MEMORY_SECURITY_LOCK:
+                _MEMORY_SECURITY = (False, "memlock_refused_by_platform")
+            with contextlib.suppress(MemoryError, sqlite3.Error):
+                return self._open_keyed()
+        raise StoreUnavailableError(
+            "store_memory_lock_unavailable",
+            "This machine would not lock the memory pages SQLCipher holds the "
+            "workspace key in.",
+        ) from error
 
     def bootstrap(self) -> None:
         self.paths.ensure()
@@ -770,6 +1001,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 PRINCIPAL_CONTROL_SCOPE_MIGRATION_ID, PRINCIPAL_CONTROL_SCOPE_SQL, connection
             )
             self._apply_migration(BRAIN_SOURCES_MIGRATION_ID, BRAIN_SOURCES_SQL, connection)
+            self._apply_migration(
+                BRAIN_SOURCE_GRANTS_MIGRATION_ID, BRAIN_SOURCE_GRANTS_SQL, connection
+            )
             self._apply_migration(
                 BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection
             )
@@ -1257,6 +1491,45 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 "INSERT OR IGNORE INTO brain_sources (owner_principal_id, path, created_at) VALUES (?, ?, ?)",
                 (owner_principal_id, path, utc_now()),
+            )
+
+    # ── Knowledge Map folder grants ─────────────────────────────────────
+    # A grant is the owner naming a folder on this machine that the Knowledge
+    # Map may read *where it is*. It is stored so it can be shown back and
+    # revoked; nothing is copied into the workspace by recording one.
+
+    def list_brain_source_grants(self, owner_principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT root_id, path, label, created_at FROM brain_source_grants "
+                "WHERE owner_principal_id = ? ORDER BY created_at, path",
+                (owner_principal_id,),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def add_brain_source_grant(
+        self, owner_principal_id: str, root_id: str, path: str, label: str
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "INSERT OR REPLACE INTO brain_source_grants "
+                "(owner_principal_id, root_id, path, label, created_at) VALUES (?, ?, ?, ?, ?)",
+                (owner_principal_id, root_id, path, label, utc_now()),
+            )
+
+    def remove_brain_source_grant(self, owner_principal_id: str, root_id: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM brain_source_grants WHERE owner_principal_id = ? AND root_id = ?",
+                (owner_principal_id, root_id),
+            )
+            # Revoking the grant revokes what was indexed under it: leaving the
+            # sources behind would keep reading a folder the owner just said
+            # Raiker may not read.
+            connection.execute(
+                "DELETE FROM brain_sources WHERE owner_principal_id = ? "
+                "AND (path = ? OR path LIKE ?)",
+                (owner_principal_id, root_id, f"{root_id}/%"),
             )
 
     def load_brain_preferences(self, owner_principal_id: str) -> dict[str, Any]:
@@ -4504,6 +4777,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def all_session_ids(self) -> set[str]:
+        """Every conversation session id in this workspace, whoever owns it.
+
+        Read by the audit log (BUG-87) to tell a runtime channel — an event
+        recorded outside any conversation — from another user's conversation.
+        It carries no ownership, so it is never used to decide what to *show*,
+        only what is not a conversation in the first place.
+        """
+        with self.connect() as connection:
+            rows = connection.execute("SELECT session_id FROM sessions").fetchall()
+        return {str(row["session_id"]) for row in rows}
 
     def count_events(self, session_id: str | None = None) -> int:
         query = "SELECT COUNT(*) AS cnt FROM events_index"

@@ -406,11 +406,13 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   },
   memory_write_execution: {
     label: "Memory store",
-    description: "Persist durable memories through the governed broker.",
+    description:
+      "Let a turn propose a durable fact or preference to remember. You see the exact text before it is stored, and text that looks like a credential is refused outright.",
   },
   memory_forget_execution: {
     label: "Memory forget",
-    description: "Delete durable memories through the governed broker.",
+    description:
+      "Let a turn propose deleting one stored memory. You see which record would go before you decide.",
   },
   task_management_runtime: {
     label: "Task creation",

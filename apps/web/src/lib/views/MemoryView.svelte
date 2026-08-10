@@ -3,8 +3,9 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, SourceExcerptView } from "../apiTypes";
+  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
+  import { memoryWritePosture } from "../memoryPosture";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -27,11 +28,18 @@
   let proposalDraft = $state("");
   let historyById = $state<Record<string, MemoryHistoryEvent[]>>({});
 
+  // BUG-71 — the two facts that decide whether this page may promise proposals
+  // at all. Read alongside the memories so the promise and the gate can never
+  // disagree; a failed read says so rather than assuming the happy answer.
+  let gates = $state<CapabilityGate[] | null>(null);
+  const posture = $derived(memoryWritePosture(gates));
+
   async function load() {
     loadError = null;
     try {
       [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]);
       try { proposals = await api.memoryProposals(); } catch { proposals = []; }
+      try { gates = await api.capabilityGates(); } catch { gates = null; }
     }
     catch (e) { memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable"; }
   }
@@ -178,6 +186,12 @@
 
 <header class="page-intro"><div><h2>Memory</h2><p>Review and control the approved information Raiker can reuse.</p></div><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
+<section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
+  <Icon name={posture.kind === "proposes" ? "check" : "info"} size={16} />
+  <p>{posture.headline}</p>
+  {#if posture.action}<a class="posture-action" href="#/capabilities">{posture.action} →</a>{/if}
+</section>
+
 {#if settings}
   <section class="control-card">
     <div><h3>Incognito session</h3><p>Do not use approved memories in new conversations and tasks. Stored memories are not deleted.</p></div>
@@ -218,7 +232,7 @@
   {/if}
 
   <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
-    {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><p>When Raiker identifies a useful preference or durable fact, it will propose it for review. Nothing becomes reusable memory until it is approved.</p><a href="#/approvals">Learn how governed review works</a></div>
+    {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><p>{posture.headline}</p><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
     {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size={12} /> Pinned</span>{/if}</div>
@@ -246,6 +260,17 @@
 <style>
   .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .page-intro h2,.control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
+  /* BUG-71 — the posture strip states what this page can actually promise. It
+     sits above everything else because it changes the meaning of the counts
+     below it: "0 Pending review" reads very differently when nothing is able
+     to propose. */
+  .posture-card { display:flex; align-items:flex-start; gap:var(--space-2); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface-2); }
+  .posture-card p { margin:0; color:var(--text-2); flex:1; }
+  .posture-card :global(svg) { flex:none; margin-top:.1rem; color:var(--text-3); }
+  .posture-proposes { border-color:var(--ok-border,var(--border)); }
+  .posture-proposes :global(svg) { color:var(--ok,var(--text-3)); }
+  .posture-denied :global(svg),.posture-unknown :global(svg) { color:var(--warn,var(--text-3)); }
+  .posture-action { flex:none; white-space:nowrap; font-weight:600; }
   .switch { min-width:76px; min-height:44px; display:flex; align-items:center; gap:.45rem; border:1px solid var(--border-strong); border-radius:var(--r-pill); padding:.25rem .55rem .25rem .3rem; background:var(--sunken); color:var(--text-2); cursor:pointer; } .switch span { width:1.65rem; height:1.65rem; border-radius:50%; background:var(--text-3); } .switch.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent-border); } .switch.on span { background:var(--accent); }
   .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:1.2rem; } .summary span { color:var(--text-3); font-size:.75rem; }
   .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .filters select,.search { min-height:42px; border:1px solid var(--border); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); } .filters select { padding:0 .65rem; } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.82rem; }

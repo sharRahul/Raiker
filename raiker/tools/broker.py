@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -716,6 +716,62 @@ class ToolBroker:
                 )
             except FilesystemSafetyError as exc:
                 return {"status": "failed", "error": {"type": str(exc)}}
+        # BUG-71 — a memory decision is a decision about *text*. The owner has to
+        # read the exact sentence that would be kept (or the record that would
+        # go) before approving, so the preview carries it rather than only the
+        # tool's name.
+        if action.tool_name == "memory_write":
+            text = str(action.arguments.get("text", "")).strip()
+            if not text:
+                return {"status": "failed", "error": {"type": "empty_text"}}
+            from raiker.memory.policy import (
+                MemorySensitivity,
+                classify_memory_sensitivity,
+            )
+
+            sensitivity = classify_memory_sensitivity(text)
+            if sensitivity in {
+                MemorySensitivity.CREDENTIAL_LIKE,
+                MemorySensitivity.SECRET_LIKE,
+            }:
+                # Refused before the owner is asked: approving a credential into
+                # durable storage is not a decision Raiker offers.
+                return {
+                    "status": "failed",
+                    "error": {
+                        "type": "secret_or_credential_like_memory_blocked",
+                        "sensitivity": sensitivity.value,
+                    },
+                }
+            return {
+                "status": "success",
+                "text": str(self._redact_value(text)),
+                "scope": str(action.arguments.get("scope", "project")),
+                "memory_type": str(action.arguments.get("memory_type", "project")),
+                "sensitivity": sensitivity.value,
+            }
+        if action.tool_name == "memory_forget":
+            memory_id = str(action.arguments.get("memory_id", "")).strip()
+            if not memory_id:
+                return {"status": "failed", "error": {"type": "missing_memory_id"}}
+            from raiker.memory.store import get_memory
+
+            try:
+                existing = get_memory(
+                    memory_id,
+                    workspace_root=self.workspace_root,
+                    owner_principal_id=self.owner_scope or self.principal_id,
+                )
+            except Exception:  # noqa: BLE001 — an unreadable record is "not found"
+                existing = None
+            if existing is None:
+                return {"status": "failed", "error": {"type": "memory_not_found"}}
+            return {
+                "status": "success",
+                "memory_id": memory_id,
+                "text": str(self._redact_value(existing.text)),
+                "scope": existing.scope,
+            }
         return None
 
     def _expected_effect(self, action: ToolAction, connector_write: bool) -> str:
@@ -749,6 +805,16 @@ class ToolBroker:
                     )
                 if action.tool_name == "assign_session_project":
                     return "Approving moves this conversation into the named project, once."
+                # BUG-71 — memory writes nothing to the filesystem, so the file
+                # sentence below would have named a path that does not exist.
+                if action.tool_name == "memory_write":
+                    scope = str(action.arguments.get("scope", "project"))
+                    return (
+                        f"Approving stores this exact text as a durable {scope} memory, "
+                        "once. You can remove it later from Memory."
+                    )
+                if action.tool_name == "memory_forget":
+                    return "Approving deletes this exact memory record, once."
                 # B11 — none of the three writes a path, and the file sentence
                 # below would have named one that does not exist. Each says the
                 # thing it actually changes.
@@ -856,6 +922,59 @@ class ToolBroker:
             reasons=["hook_denied", *reasons],
             requires_user_approval=False,
             risk_level="blocked",
+            timestamp=utc_now(),
+        )
+
+    @staticmethod
+    def _turn_capability_mode(
+        action: ToolAction, turn_capability_modes: Mapping[str, str] | None
+    ) -> str | None:
+        """The posture this *turn* set for the capability behind ``action``.
+
+        Returns None when the turn named no posture for it, which is the common
+        case: a turn-scoped map covers only the capabilities the surface's mode
+        is about, and everything else keeps the owner's standing decision mode
+        untouched.
+        """
+        if not turn_capability_modes:
+            return None
+        from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+
+        capability = CAPABILITY_GATE_MAP.get(action.tool_name)
+        if capability is None:
+            return None
+        mode = turn_capability_modes.get(capability)
+        # Only the two tightening modes are honoured here. The envelope already
+        # rejects anything else; this is the second, independent refusal so a
+        # caller that reaches the broker directly cannot loosen a turn either.
+        return mode if mode in {"ask", "deny"} else None
+
+    def _turn_posture_deny_decision(
+        self, action: ToolAction, base: PolicyDecision
+    ) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="deny",
+            # Named distinctly from `denied_by_decision_mode` so an audit reader
+            # can tell "the owner denied this capability" from "this turn was
+            # running in a mode that writes nothing".
+            reasons=["denied_by_turn_posture", *base.reasons],
+            requires_user_approval=False,
+            risk_level="blocked",
+            timestamp=utc_now(),
+        )
+
+    def _turn_posture_ask_decision(
+        self, action: ToolAction, base: PolicyDecision
+    ) -> PolicyDecision:
+        return PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="needs_approval",
+            reasons=["turn_posture_requires_approval", *base.reasons],
+            requires_user_approval=True,
+            risk_level="high",
             timestamp=utc_now(),
         )
 
@@ -1114,6 +1233,7 @@ class ToolBroker:
         machine_identity: TrustedTurnIdentity | None = None,
         client: ClientMetadata | None = None,
         approval_mode: str = "manual",
+        turn_capability_modes: Mapping[str, str] | None = None,
     ) -> tuple[ToolResult, PolicyDecision]:
         now = utc_now()
         if machine_identity is None:
@@ -1208,6 +1328,21 @@ class ToolBroker:
                 and decision.decision == "allow"
             ):
                 decision = self._hook_ask_decision(action, decision)
+        # BUG-70 — the turn's own posture, applied after policy and only ever in
+        # the tightening direction. This is what Build's Plan and Edit chips now
+        # do instead of rewriting four standing permissions: Plan denies the
+        # write capabilities for *this turn*, Edit forces each one to a decision,
+        # and neither touches what the owner set in Permissions.
+        turn_mode = self._turn_capability_mode(action, turn_capability_modes)
+        if turn_mode == "deny" and decision.decision != "deny":
+            decision = self._turn_posture_deny_decision(action, decision)
+        elif turn_mode == "ask":
+            if decision.decision == "allow":
+                decision = self._turn_posture_ask_decision(action, decision)
+            # An `ask` the owner set for this turn is a request to *see* the
+            # decision, so the unattended approval modes must not swallow it —
+            # including when policy had already routed the call to approval.
+            approval_mode = "manual"
         self._event(
             session_id=session_id,
             turn_id=turn_id,

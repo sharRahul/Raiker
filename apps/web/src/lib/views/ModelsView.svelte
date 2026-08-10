@@ -109,8 +109,16 @@
       advisorChoice = models.advisor_profile_id ?? "";
     } catch (e) {
       models = null;
+      // A 429 is the runtime's own request limiter, not a broken page — and
+      // "Unavailable (429)" tells an owner neither what happened nor that it
+      // clears by itself. Naming it is the same rule the rest of this page
+      // follows: say what is wrong and what fixes it.
       loadError =
-        e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+        e instanceof ApiError && e.status === 429
+          ? "Too many requests in the last minute. Raiker throttled this read; wait a moment and press Refresh."
+          : e instanceof ApiError
+            ? `Unavailable (${e.status})`
+            : "Unavailable";
     }
   }
 
@@ -307,14 +315,18 @@
           ? `${readiness.summary} ${readiness.remediation}`
           : readiness.summary;
         await load();
-      } catch {
-        message = `Raiker could not check ${providerName(profile.provider)}.`;
+      } catch (e) {
+        message = throttled(e)
+          ? THROTTLED
+          : `Raiker could not check ${providerName(profile.provider)}.`;
       }
     } else {
       try {
         message = testNote(profile, await api.providerModels(id));
-      } catch {
-        message = `Raiker could not reach ${providerName(profile.provider)}.`;
+      } catch (e) {
+        message = throttled(e)
+          ? THROTTLED
+          : `Raiker could not reach ${providerName(profile.provider)}.`;
       }
     }
     testing = without(testing, id);
@@ -401,10 +413,46 @@
     models !== null && advisorChoice !== (models.advisor_profile_id ?? ""),
   );
 
+  // FIXED-160 — the runtime's own request limiter is not a broken page, and
+  // "could not check" tells an owner neither what happened nor that it clears by
+  // itself. Every check on this page says so in the same words.
+  const THROTTLED =
+    "Too many requests in the last minute. Raiker throttled this check; wait a moment and try again.";
+  const throttled = (e: unknown) => e instanceof ApiError && e.status === 429;
+
+  // BUG-82 — the advisor gets the same readiness chip and repair sentence a
+  // provider card gets, because it is a second model this runtime really calls.
+  let advisorChecking = $state(false);
+  let advisorCheckNote = $state<string | null>(null);
+  const advisorChip = $derived(
+    models?.advisor_profile_id ? (READINESS_CHIP[models.advisor_readiness_state ?? ""] ?? null) : null,
+  );
+
+  async function checkAdvisor() {
+    if (models === null || !models.advisor_profile_id || !models.advisor_model) return;
+    advisorChecking = true;
+    advisorCheckNote = null;
+    try {
+      const readiness = await api.checkModelReadiness(
+        models.advisor_profile_id,
+        models.advisor_model,
+      );
+      advisorCheckNote = readiness.remediation
+        ? `${readiness.summary} ${readiness.remediation}`
+        : readiness.summary;
+      await load();
+    } catch (e) {
+      advisorCheckNote = throttled(e) ? THROTTLED : "Raiker could not check the advisor model.";
+    } finally {
+      advisorChecking = false;
+    }
+  }
+
   async function saveAdvisor() {
     advisorSaving = true;
     advisorError = null;
     advisorSaved = false;
+    advisorCheckNote = null;
     try {
       const result = await api.setModelAdvisor(advisorChoice || null);
       if (models !== null) {
@@ -412,6 +460,9 @@
       }
       advisorChoice = result.advisor_profile_id ?? "";
       advisorSaved = true;
+      // A new choice has its own readiness; re-read so the chip describes the
+      // model now selected rather than the one it replaced.
+      await load();
     } catch (e) {
       advisorError =
         e instanceof ApiError
@@ -1423,6 +1474,39 @@
             <span class="ok-note">Saved.</span>
           {/if}
         </div>
+        <!-- BUG-82 — what the last check of the *exact* advisor model found, and
+             the one control that repairs it. Without this an owner could pin an
+             advisor with no credential, no credit or no running runtime and see
+             nothing wrong until a consult failed mid-turn. -->
+        {#if models?.advisor_profile_id}
+          <div class="advisor-readiness">
+            {#if advisorChip}
+              <span
+                class="chip"
+                class:chip-ok={models.advisor_readiness_state === "ready"}
+                class:chip-warn={models.advisor_readiness_state !== "ready"}
+                data-testid="advisor-readiness-chip"
+                title={models.advisor_readiness_summary ?? undefined}>{advisorChip}</span
+              >
+            {/if}
+            <span class="advisor-model-name">{modelName(models.advisor_model ?? "")}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={checkAdvisor}
+              disabled={advisorChecking || !models.advisor_model}
+            >
+              {advisorChecking ? "Checking…" : "Check advisor"}
+            </button>
+          </div>
+          {#if advisorCheckNote}
+            <p class="sub" role="status">{advisorCheckNote}</p>
+          {:else if models.advisor_readiness_state !== "ready" && models.advisor_readiness_remediation}
+            <p class="sub" role="status">
+              {models.advisor_readiness_summary} {models.advisor_readiness_remediation}
+            </p>
+          {/if}
+        {/if}
       </section>
     </div>
   {/if}
@@ -2363,6 +2447,21 @@
     align-items: center;
     gap: 0.6rem;
     flex-wrap: wrap;
+  }
+  /* BUG-82 — the advisor's readiness sits directly under its selector, in the
+     same chip vocabulary a provider card uses, so the two models this runtime
+     runs are reported the same way. */
+  .advisor-readiness {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    margin-top: 0.6rem;
+  }
+  .advisor-model-name {
+    font-family: var(--font-mono, monospace);
+    font-size: 0.82rem;
+    color: var(--text-2);
   }
   .advisor-row select {
     padding: 0.35rem 0.5rem;

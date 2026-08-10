@@ -420,3 +420,108 @@ class TestModelAdvisorApi:
             headers=self._auth(owner_token),
         )
         assert resp.status_code == 422
+
+
+class TestAdvisorReadiness:
+    """BUG-82 — the advisor is a second model, and it must be checkable.
+
+    It is chosen in the same UI as the chat model and was never readiness-checked:
+    no probe, no state, no chip, no row in ``GET /api/model-readiness``. Worse, it
+    resolved its model the way the chat chain did *before* FIXED-139 — from the
+    single ``ModelSessionState`` only — so a hosted advisor the owner pinned
+    through the UI resolved to the profile's ``<model>`` placeholder and every
+    consult was refused ``advisor_model_unresolved``.
+    """
+
+    @staticmethod
+    def _pin_advisor(store: SQLiteStore, profile_id: str, model: str) -> None:
+        # A credential-backed owner, which is the shape a web-app user has and
+        # the scope the advisor selector writes into.
+        store.upsert_account(
+            "principal_owner", "owner", "hash", "argon2id", utc_now(), utc_now()
+        )
+        store.save_principal_model_advisor("principal_owner", profile_id)
+        store.save_configured_model("principal_owner", profile_id, model)
+
+    def test_a_pinned_hosted_advisor_resolves_to_the_pinned_model(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        # The exact reproduction: the advisor profile ships `<model>`, the owner
+        # pinned a concrete one in Models → Routing, and the selected *chat*
+        # model is a different profile entirely.
+        profile_id, model = _hosted_profile_with_placeholder()
+        self._pin_advisor(store, profile_id, model)
+        service = AdvisorService(workspace, store, principal_id="principal_owner")
+
+        assert service.resolved_advisor() == (profile_id, model)
+
+    def test_an_unpinned_placeholder_advisor_still_resolves_to_nothing(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        # Fail-closed is unchanged: with no pin there is no concrete model, and
+        # inventing one would be worse than refusing.
+        profile_id, _model = _hosted_profile_with_placeholder()
+        store.upsert_account(
+            "principal_owner", "owner", "hash", "argon2id", utc_now(), utc_now()
+        )
+        store.save_principal_model_advisor("principal_owner", profile_id)
+        service = AdvisorService(workspace, store, principal_id="principal_owner")
+
+        assert service.resolved_advisor() is None
+
+    def test_no_advisor_chosen_resolves_to_nothing(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        service = AdvisorService(workspace, store, principal_id="principal_owner")
+        assert service.resolved_advisor() is None
+
+    def test_the_consult_uses_the_pinned_model_rather_than_refusing(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        profile_id, model = _hosted_profile_with_placeholder()
+        self._pin_advisor(store, profile_id, model)
+        seen: dict[str, str] = {}
+
+        def consult(provider: str, called_model: str, question: str) -> str:
+            seen["model"] = called_model
+            return "The advisor's answer."
+
+        result = AdvisorService(
+            workspace, store, consult_fn=consult, principal_id="principal_owner"
+        ).consult("What should I do?", enforce_modes=False)
+
+        assert result["status"] == "success", result
+        assert seen["model"] == model
+
+    def test_the_models_view_reports_the_advisor_readiness(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        profile_id, model = _hosted_profile_with_placeholder()
+        self._pin_advisor(store, profile_id, model)
+
+        view = DashboardService(workspace).get_models("principal_owner").to_dict()
+
+        assert view["advisor_profile_id"] == profile_id
+        assert view["advisor_model"] == model
+        # Never checked yet, and the view says exactly that rather than leaving
+        # the selector silent — which is the state BUG-82 was reported in.
+        assert view["advisor_readiness_state"] == "not_configured"
+        assert view["advisor_readiness_remediation"]
+
+    def test_the_models_view_reports_nothing_when_no_advisor_is_chosen(
+        self, workspace: Path
+    ) -> None:
+        view = DashboardService(workspace).get_models("principal_owner").to_dict()
+        assert view["advisor_profile_id"] is None
+        assert view["advisor_model"] is None
+        assert view["advisor_readiness_state"] == "not_configured"
+
+
+def _hosted_profile_with_placeholder() -> tuple[str, str]:
+    """A shipped hosted profile whose model is the `<model>` placeholder."""
+    from raiker.models.registry import ModelProfileRegistry
+
+    for profile in ModelProfileRegistry.load().list_profiles():
+        if "<" in profile.model and not bool(profile.raw.get("test_only", False)):
+            return profile.profile_id, "some-concrete-model-1"
+    raise AssertionError("the shipped registry must contain a placeholder profile")

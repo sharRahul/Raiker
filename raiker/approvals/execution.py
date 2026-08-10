@@ -75,6 +75,15 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     # nothing would be the defect this list exists to prevent.
     "git_push_execution",
     "connector_github_runtime",
+    # BUG-71 — durable memory. A memory row is local, owner-scoped and
+    # individually reversible (`memory_forget` removes exactly the record the
+    # owner is looking at), which is the same argument that put a task row and a
+    # project label here. Leaving them out would have reproduced the defect this
+    # list exists to prevent one layer up: the model can now propose a write, the
+    # owner would be shown what it says and approve it, and nothing would be
+    # remembered.
+    "memory_write_execution",
+    "memory_forget_execution",
 })
 
 

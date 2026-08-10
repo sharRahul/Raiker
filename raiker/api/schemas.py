@@ -568,6 +568,11 @@ class PromptRequest:
     # declared capabilities and does not persist it as a global selection.
     reasoning_effort: str | None = None
     max_tool_calls: int | None = None
+    # BUG-70 — a turn-scoped capability posture (Build's Plan / Edit chips).
+    # Only `ask` and `deny` are accepted, so the turn can tighten itself and can
+    # never grant itself authority; the owner's standing decision modes are not
+    # touched. Validated in PromptOptions, which is where an invalid value fails.
+    capability_modes: dict[str, str] | None = None
     # Optional attachments for this prompt:
     #   {"type": "path", "path": "<workspace-relative path>"} — resolved through
     #     the workspace-scoped filesystem layer (outside the workspace fails

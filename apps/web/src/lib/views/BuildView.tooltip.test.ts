@@ -24,14 +24,17 @@ describe("BuildView mode tooltip", () => {
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     await fireEvent.mouseEnter(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan produces a structured plan with no file changes/i);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/edit applies precise, context-anchored changes/i);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/auto plans, then executes eligible changes with background monitoring/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan researches and proposes without writing anything/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/edit turns every change into a decision/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/auto adds no restriction of its own/i);
+    // BUG-70 — the tooltip has to say whose posture this is, because the chips
+    // used to change the owner's standing permissions without asking.
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/none of them changes your standing permissions/i);
 
     await fireEvent.mouseLeave(help);
     expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
 
     await fireEvent.focus(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan produces a structured plan with no file changes/i);
+    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan researches and proposes without writing anything/i);
   });
 });

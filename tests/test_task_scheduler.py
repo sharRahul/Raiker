@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.models import PARKED_FOR_APPROVAL_NOTICE
 from raiker.events.writer import EventLogWriter
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -155,7 +156,7 @@ def test_a_run_parked_on_an_approval_is_blocked_not_failed(tmp_path: Path, monke
     async def needs_approval(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         return SimpleNamespace(
             status="needs_approval",
-            message="Approval required for local action. No command was executed.",
+            message=PARKED_FOR_APPROVAL_NOTICE,
         )
 
     monkeypatch.setattr("raiker.tasks.scheduler.AgentGateway.submit_prompt_async", needs_approval)
@@ -163,7 +164,7 @@ def test_a_run_parked_on_an_approval_is_blocked_not_failed(tmp_path: Path, monke
 
     saved = store.load_task(task.task_id)
     assert saved is not None and saved.status == "waiting_for_approval"
-    assert saved.summary is not None and "Approval required" in saved.summary
+    assert saved.summary == PARKED_FOR_APPROVAL_NOTICE
     # The work is unfinished, so it is not stamped as having ended.
     assert saved.completed_at is None
     types = [row["event_type"] for row in store.list_event_index(session_id=session_id)]

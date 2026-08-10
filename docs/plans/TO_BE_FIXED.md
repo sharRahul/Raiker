@@ -171,7 +171,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-60 | Low | Chat / a withheld call is narrated by the model, not disclosed | Open (found while verifying FIXED-103) |
 | FIXED-105 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Fixed (was BUG-61) |
 | FIXED-106 | Medium | Tasks / an approved task is really created | Fixed (was BUG-62) |
-| BUG-63 | Low | Web / a composer permission control ships unused | Open (found while verifying FIXED-105) |
+| FIXED-159 | Low | Web / a composer permission control shipped unused | Fixed (was BUG-63, closed with FIXED-155) |
 | BUG-64 | Low | Chat / a task the agent creates is queued for a run nobody asked for | Open (found while verifying FIXED-106) |
 | FIXED-107 | High | Chat / Build — source citations and the passage used | Fixed (was C6 and the last of C4) |
 | FIXED-108 | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
@@ -199,7 +199,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
 | FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
 | FIXED-132 | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
-| BUG-68 | Medium | Chat / Build — context meter reads `NaN input · NaN output` | Open (found in the 2026-08-08 live round) |
+| FIXED-154 | Medium | Chat / Build — context meter read `NaN input · NaN output` | Fixed (was BUG-68) |
 | FIXED-133 | High | First run / universal exact-model readiness and setup (BUG-69) | Fixed (2026-08-09 live round) |
 | FIXED-134 | High | Local library / redaction corrupted path-derived deployment IDs | Fixed (found in BUG-69 live download/deploy) |
 | FIXED-135 | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
@@ -209,10 +209,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-139 | High | Model readiness / the gate ignored the fallback chain the runtime actually tries | Fixed (found in the BUG-69 parity review) |
 | FIXED-140 | High | Models UI / the page counted saved credentials as "set up" and Test proved nothing | Fixed (found in the BUG-69 parity review) |
 | FIXED-141 | Medium | Models navigation / three tabs were unreachable by deep link and silently opened Providers | Fixed (found while splitting the Models page) |
-| BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
-| BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
+| FIXED-155 | Medium | Build / mode chips rewrote global decision modes with no step-up | Fixed (was BUG-70) |
+| FIXED-156 | Medium | Memory / a gated capability no turn could ever reach | Fixed (was BUG-71) |
 | FIXED-142 | High | Runtime / a tool call that blocked the event loop killed its own turn | Fixed (was BUG-72) |
-| BUG-73 | Medium | Chat / a resumed turn can deny an execution that happened | Open, intermittent (found in the 2026-08-08 live round) |
+| FIXED-157 | Medium | Chat / a resumed turn could deny an execution that happened | Fixed (was BUG-73) |
 | BUG-74 | Low | Web build / the main production JavaScript chunk exceeds the 500 kB warning threshold | Open (found while closing BUG-69) |
 | BUG-75 | Medium | Model activity / retry, cancellation, and partial-file cleanup are record-only for some job types | Open (found while closing BUG-69) |
 | BUG-76 | Medium | Runtime / no circuit breaker: a failing tool or provider is retried until its budget runs out, every turn | Open (found in the OWASP ASI08 mapping) |
@@ -221,7 +221,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-79 | Medium | Plugins / a manifest signature is a presence marker by default and the owner is never told | Open (found in the OWASP ASI04 mapping) |
 | BUG-80 | Low | Documentation / the GenAI mapping still calls the verifier a stub | Open (found in the OWASP ASI mapping) |
 | BUG-81 | Low | Context / no prompt-injection scanning hook exists, though the security mapping requires one | Open (found in the OWASP ASI01 mapping) |
-| BUG-82 | Medium | Model readiness / the advisor model is never readiness-checked or surfaced | Open (found in the BUG-69 parity review) |
+| FIXED-158 | Medium | Model readiness / the advisor model was never readiness-checked or surfaced | Fixed (was BUG-82) |
+| FIXED-160 | Low | Models / a throttled read reported only `Unavailable (429)` | Fixed (found while verifying FIXED-158 live) |
 | BUG-83 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Open (found in the BUG-69 parity review) |
 | BUG-84 | Low | Live tests / the BUG-69 acceptance spec cannot run with a single provider key | Open (found in the BUG-69 parity review) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
@@ -4442,7 +4443,7 @@ against the running product found five more:
 | Page | Said | Actually |
 |---|---|---|
 | `permissions-and-runtime-modes.md` | Five runtime modes, activated in *Settings → General*, as a ceiling over every gate | One runtime (**FIXED-63**). Settings → **Runtime configuration** states what is running; the only control is Disable/Enable |
-| `permissions-and-runtime-modes.md` | Chat has a **Permissions** control offering *Ask every time* / *Approve safe actions* / *Custom permissions…* | No composer renders it — see **BUG-63** |
+| `permissions-and-runtime-modes.md` | Chat has a **Permissions** control offering *Ask every time* / *Approve safe actions* / *Custom permissions…* | No composer rendered it; the component is deleted — see **FIXED-159** |
 | `getting-started.md` | Sidebar: **Sessions** under Work, **Brain** under Knowledge | Sessions is a tab inside Observability; Brain is the **Knowledge Map** |
 | `extensions-and-mcp.md` | *"Current limit (BUG-12): a connected server's tools are not offered to the model in Chat"* | Callable since **FIXED-17**, and the page states gate *and* decision mode since **FIXED-96** |
 | `troubleshooting.md` | Rows pointing at BUG-03, BUG-06, a runtime-mode picker, and *Settings → Security & Login* | All four shipped or renamed; the section is now *Security & sign-in* and one runtime |
@@ -4580,9 +4581,10 @@ in **Tasks**, and the inbox that took the decision links straight to it.
 
 ---
 
-## BUG-63 — A composer permission control ships and is rendered by nothing
+## FIXED-159 — A composer permission control shipped and was rendered by nothing
 
-**Status: open; found while verifying FIXED-105.**
+**Status: fixed in this change, alongside FIXED-155. Was BUG-63, found while
+verifying FIXED-105.**
 
 **Observed.** `apps/web/src/lib/components/PermissionModeControl.svelte` offers
 *Permissions: ask* / *Permissions: safe auto* / *Custom permissions…* and writes
@@ -4597,11 +4599,16 @@ owner cannot find, and a bulk permission mutation one import away from shipping
 unreviewed. It is also how the guide came to describe a control that was never
 on screen, which is the same class of defect as BUG-61 itself.
 
-**Required fix.** Delete it, or mount it and hold it to the same governed
-step-up path a bulk decision-mode change deserves. Do not leave a third state.
+**Fix applied — deleted.** It is the same defect as FIXED-155, one size larger:
+a composer control that rewrote decision modes with none of the ceremony the
+Permissions page requires, except that this one rewrote *every* capability in a
+single selection. Removing the four-capability version while leaving a bulk one
+an `import` away would have left the defect in the tree, so it went with it. The
+governed path for changing a decision mode is the Permissions page, and the
+composer's posture is now per-turn and tightening-only.
 
-**UI when closed.** Either the control is reachable and governed, or the tree
-does not carry a permission mutation nothing can call.
+**UI when closed.** The tree carries no permission mutation nothing can call,
+and no composer writes standing decision modes.
 
 ---
 
@@ -5528,10 +5535,12 @@ addition to the ordinary local check.
 
 ---
 
-## BUG-68 — The context meter reads `NaN input · NaN output`
+## FIXED-154 — The context meter read `NaN input · NaN output`
 
-**Status: open. Found on 2026-08-08 executing §5.5 of the live manual test plan
-against hosted Anthropic `claude-sonnet-4-5-20250929`.**
+**Status: fixed in this change. Was BUG-68, found on 2026-08-08 executing §5.5
+of the live manual test plan against hosted Anthropic
+`claude-sonnet-4-5-20250929`, and closed live on 2026-08-10 against hosted
+Anthropic `claude-haiku-4-5-20251001`.**
 
 **Observed.** The Chat context popover renders correct totals and then a line of
 nonsense beneath them:
@@ -5572,14 +5581,25 @@ This is the same failure FIXED-02 closed for `context_window_tokens`, reopened
 by two field names added afterwards that the allowlist was never extended to
 cover.
 
-**Proposed fix.** Add `session_input_tokens` and `session_output_tokens` to
-`NON_SECRET_TOKEN_COUNT_KEYS`, and add a contract test that asserts every
-integer field on `ContextUsageView` survives `redact_response_body` — so the
-next count field added cannot silently become `NaN` again.
+**Fix applied.** `session_input_tokens` and `session_output_tokens` are on
+`NON_SECRET_TOKEN_COUNT_KEYS` (`raiker/events/export.py`), under the exemption's
+existing rule: an exact key name from the set **and** a non-boolean integer
+value. A string or a boolean under either name is still redacted, so a
+credential can never ride out under a count-shaped key.
+
+Naming the two fields would have fixed the symptom and left the class open — it
+is the second time a count added after FIXED-02 was not added to the allowlist.
+So the regression is now held by the *contract* rather than by the two names:
+`tests/test_token_count_redaction.py` builds a fully populated
+`ContextUsageView`, runs it through `redact_response_body`, and asserts that
+**every integer field on it** survives. A count added to that view in future
+either survives redaction or fails this test on the day it is added.
 
 **UI when closed.** The line reads e.g. `624 input · 82 output`.
 
-**Evidence.** `screenshots/not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`.
+**Evidence.** `screenshots/not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`
+(before) and [`working/r0810-bug68-context-meter-real-io-counts.png`](screenshots/working/r0810-bug68-context-meter-real-io-counts.png)
+(after, live).
 
 ---
 
@@ -5665,10 +5685,10 @@ managed llama.cpp deployment. See the BUG-69 section in
 
 ---
 
-## BUG-70 — Build's mode chips rewrite global decision modes with no step-up
+## FIXED-155 — Build's mode chips rewrote global decision modes with no step-up
 
-**Status: open. Found on 2026-08-08 while exercising Build's Plan / Edit / Auto
-control.**
+**Status: fixed in this change. Was BUG-70, found on 2026-08-08 while exercising
+Build's Plan / Edit / Auto control, and closed live on 2026-08-10.**
 
 **Observed.** Pressing **Auto** in the Build composer issues, with no dialog and
 no confirmation:
@@ -5701,22 +5721,54 @@ the step-up ceremony the Permissions page applies to the same transition. Build
 calls it directly, four times, from a chip that is presented as a per-turn
 posture rather than as a change to the owner's standing permissions.
 
-**Proposed fix.** Either (a) route Build's chips through the same step-up so the
-reason and acknowledgement are recorded, or (b) make the chips a genuinely
-turn-scoped override that never touches the stored decision modes. Whichever is
-chosen, the chip must state which it is. A control that silently edits four
-high-risk permissions is not a mode selector.
+**Fix applied — option (b), and the chip says so.** The mode is now the
+*conversation's* posture and nothing else. It rides with each prompt as a new
+`capability_modes` map on `PromptOptions`, is applied to that turn by the
+broker, and is persisted with a parked turn so a resume keeps the posture it was
+sent under rather than picking up whatever the standing modes say hours later.
+No composer writes `/api/capability-modes/` any more.
 
-**UI when closed.** Pressing a Build mode chip either says what standing
-permissions it is about to change and asks, or changes none.
+What makes that safe is that the map may only ever **tighten**. `ask` and `deny`
+are the only values the envelope accepts (`validated_turn_capability_modes`);
+`allow` and `auto` are refused with a named reason, because loosening is a change
+to standing authority and belongs to the Permissions step-up. The broker refuses
+them a second time, independently, so a caller reaching it directly cannot widen
+a turn either. A `deny` posture refuses the call under its own reason code —
+`denied_by_turn_posture`, kept distinct from `denied_by_decision_mode` so an
+audit reader can tell "the owner denied this capability" from "this turn writes
+nothing" — and an `ask` posture also forces `approval_mode` back to `manual`, so
+a turn that asked to see its decisions cannot have them executed underneath it
+by the unattended modes.
 
-**Evidence.** `screenshots/not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`.
+That leaves **Auto** doing exactly as much as the owner already allowed. Silently
+promising more would be the same lie in the other direction, so the composer
+reads the standing modes (read-only) and states what it found: *"Every write
+capability is set to Ask, so every change will still be proposed to you."* —
+with **Change in Permissions →** beside it, which is where the ceremony lives.
+
+**Found and closed with it.** `PermissionModeControl.svelte` — **BUG-63**, a
+composer control that rewrote the decision mode of *every* capability in one
+selection and was imported by nothing — is deleted. Leaving a bulk permission
+mutation one import away while removing the four-capability one would have kept
+the defect in the tree.
+
+**UI when closed.** Pressing a Build mode chip changes no standing permission,
+says the posture applies to this conversation's turns only, and — for Auto —
+names what the owner's standing permissions actually allow.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`
+(before); [`working/r0810-bug70-build-auto-changes-nothing-standing.png`](screenshots/working/r0810-bug70-build-auto-changes-nothing-standing.png),
+[`working/r0810-bug70-permissions-unchanged.png`](screenshots/working/r0810-bug70-permissions-unchanged.png)
+and [`working/r0810-bug70-plan-mode-refuses-the-write.png`](screenshots/working/r0810-bug70-plan-mode-refuses-the-write.png)
+(after, live). Held by `tests/test_turn_capability_posture.py` and
+`apps/web/src/lib/buildModes.test.ts`.
 
 ---
 
-## BUG-71 — Memory can never be written from Chat or Build
+## FIXED-156 — Memory could never be written from Chat or Build
 
-**Status: open. Found on 2026-08-08 executing the memory scenarios.**
+**Status: fixed in this change. Was BUG-71, found on 2026-08-08 executing the
+memory scenarios, and closed live on 2026-08-10.**
 
 **Observed.** Permissions lists **Memory store** with the description *"Persist
 durable memories through the governed broker."* and all four decision modes. It
@@ -5758,15 +5810,50 @@ honest about a capability an agent cannot reach: **Remote execution** reads
 says the opposite of what a Chat user will experience. An owner can turn it on,
 set it to Allow, wait, and never learn that no turn can act on it.
 
-**Proposed fix.** Either add `memory_write` / `memory_forget` to the model tool
-catalogue behind their existing gates and let `governed_memory_status` reflect
-the real gate state — or, if agent-proposed memory writes are deliberately
-deferred, say so on the capability row and stop the Memory page promising
-proposals it cannot produce. A capability whose row and whose behaviour disagree
-is the thing to fix, whichever way it is resolved.
+**Fix applied — the capability is real, so it is the surfaces that were wrong.**
+Both halves are closed:
 
-**Evidence.** `screenshots/not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`,
-`screenshots/working/r0808-72-memory-tools-available.png`.
+* **`memory_write` and `memory_forget` are in the model tool catalogue**
+  (`raiker/models/tool_call_validation.py`), in the same band as `create_task`:
+  high risk, approval-bound, local, owner-scoped and reversible. Both were
+  already mapped to their own capability gates and already had real executors;
+  what was missing was any way for a turn to propose one.
+* **`governed_memory_status` reads the gate instead of asserting a literal**
+  (`raiker/memory/candidates.py`). It now reports the live gate state and
+  decision mode for `memory_write_execution` and `memory_forget_execution`, and
+  distinguishes the three cases the literal collapsed: `read_only_review` (the
+  gate is off), `denied_by_decision_mode` (on, and the owner denied it), and
+  `governed_write` / `governed_write_review` (on, and a write is reachable).
+  That is the string the model quotes back when a user asks whether it can
+  remember something, which is why it contradicted the owner's own Permissions
+  page.
+
+Two things had to follow, or the fix would have stopped one layer short of the
+owner again:
+
+* **An approved memory write really writes.** `memory_write_execution` and
+  `memory_forget_execution` are on `EXECUTABLE_ON_APPROVAL` — the same argument
+  that put a task row and a project label there (local, reversible,
+  owner-scoped). Without them the model could propose, the owner could approve,
+  and nothing would be remembered.
+* **The decision is about text, so the owner sees the text.** The approval
+  preview carries the exact sentence that would be stored (or the record that
+  would go), and credential-like text is refused *before* anyone is asked to
+  approve it rather than after. A forget naming a record that does not exist is
+  a refusal with a named reason, not a decision — the class FIXED-112 stopped
+  raising.
+
+The Memory page no longer promises what it cannot produce: a posture strip reads
+the gate and says either "Memory store is off, so no conversation can propose
+something to remember" with **Turn on Memory store →**, or what it will do now
+that it is on. The capability rows say what the owner will actually experience
+rather than naming the broker.
+
+**Evidence.** `screenshots/not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`
+(before); [`working/r0810-bug71-memory-says-the-gate-is-off.png`](screenshots/working/r0810-bug71-memory-says-the-gate-is-off.png),
+[`working/r0810-bug71-memory-says-the-gate-is-on.png`](screenshots/working/r0810-bug71-memory-says-the-gate-is-on.png)
+and [`working/r0810-bug71-chat-proposes-a-memory-write.png`](screenshots/working/r0810-bug71-chat-proposes-a-memory-write.png)
+(after, live). Held by `tests/test_memory_write_path.py`.
 
 ---
 
@@ -5884,10 +5971,11 @@ unit tests above.
 
 ---
 
-## BUG-73 — A conversation can end saying the approved action was not executed
+## FIXED-157 — A conversation could end saying the approved action was not executed
 
-**Status: open, intermittent (observed once; three targeted reproductions did
-not recur). Found on 2026-08-08.**
+**Status: fixed in this change. Was BUG-73, found on 2026-08-08 — intermittent
+(observed once; three targeted reproductions did not recur) — and closed on
+2026-08-10 by removing the race rather than by trying to win it.**
 
 **Observed.** A Chat turn proposed `write_file live-round.md`. The approval was
 reviewed and **Approve and execute once** reported *"Executed once — wrote
@@ -6358,10 +6446,44 @@ the live headline reading **0 models ready · 1 of 10 connected** in
 
 ---
 
-## BUG-82 — The advisor model is never readiness-checked
+## FIXED-160 — A throttled read reported only `Unavailable (429)`
 
-**Status: open. Found on 2026-08-09 in the BUG-69 reference-platform parity
-review.**
+**Status: fixed in this change. Found on 2026-08-10 while running the FIXED-158
+live scenario.**
+
+**Observed.** Driving several surfaces in quick succession trips the runtime's
+own request limiter (`RateLimitMiddleware`, 120 requests per minute). Models then
+renders:
+
+```
+Couldn't load models
+Unavailable (429)
+```
+
+**Why it matters.** The limiter is working — this is Raiker protecting itself,
+and the condition clears on its own within a minute. But the page says neither of
+those things. "Unavailable (429)" reads as a broken page to anyone who does not
+know what a 429 is, and it names no way forward, on a page where every other
+failure states what is wrong and which control fixes it.
+
+**Fix applied.** A 429 is named for what it is, with the control that resolves
+it: *"Too many requests in the last minute. Raiker throttled this read; wait a
+moment and press Refresh."* The same wording covers the page's two check
+controls — **Test** on a provider card and **Check advisor** — which previously
+said only "Raiker could not check …", the same sentence they use for a provider
+that genuinely cannot be reached. Every other status keeps the existing wording.
+
+**Found by.** The live suite makes more governed reads per minute than a person
+does, so it meets the limiter routinely; `bug-68-71-73-82-live.spec.ts` now waits
+and presses **Refresh models** on that message rather than reporting a defect the
+product does not have.
+
+---
+
+## FIXED-158 — The advisor model was never readiness-checked
+
+**Status: fixed in this change. Was BUG-82, found on 2026-08-09 in the BUG-69
+reference-platform parity review, and closed live on 2026-08-10.**
 
 **Observed.** Raiker runs a second model besides the chat model: the advisor
 (`raiker/runtime/advisor.py`, Models → Routing → Advisor model). It is chosen in
@@ -6383,14 +6505,37 @@ in FIXED-139 — it does not read `principal_configured_models`, so a hosted
 advisor pinned through the UI resolves to `<model>` and is refused with
 `advisor_model_unresolved` even when the owner did pin one.
 
-**Required fix.** Resolve the advisor model through the same per-profile pin the
-chat chain now uses, record a readiness observation for it under its own exact
-key, and surface it beside the advisor selector. Keep the fail-closed consult
-path unchanged.
+**Fix applied.** Three parts, in the order the defect bites:
+
+* **The advisor resolves the way the chat chain does.**
+  `AdvisorService.pinned_model` reads `principal_configured_models`, so a hosted
+  advisor pinned through Models → Routing resolves to the model the owner
+  actually chose. This was the same defect FIXED-139 closed for the chat chain:
+  the single `ModelSessionState` only ever names the *currently selected*
+  profile, so an advisor on any other profile fell back to its `<model>`
+  placeholder and every consult was refused `advisor_model_unresolved` — even
+  for an owner who had pinned one.
+* **It has a readiness observation of its own.** `resolved_advisor()` returns the
+  exact `(profile, model)` a consult would call, and the Models contract carries
+  that model's readiness state, summary, remediation and check time under its own
+  key. It is the same `ModelReadinessService` record a provider card reads, so
+  the two models this runtime runs are judged by the same evidence.
+* **The selector says so.** Models → Routing now shows the advisor's readiness
+  chip, the exact model beside it, a **Check advisor** control, and — when the
+  last check did not find it ready — the summary and the repair sentence. This
+  is the parity item the review named: Claude Code surfaces its auxiliary model
+  in the same status output as the primary, and Raiker now does too.
+
+The fail-closed consult path is unchanged: the gate, the decision mode (default
+`ask`, which withholds), the provider policy and the untrusted-data framing all
+apply exactly as before. Readiness is reporting, not authority.
 
 **UI when closed.** The Advisor model selector shows the same readiness chip and
 repair sentence as a provider card, and a hosted advisor pinned in the UI is
 actually reachable.
+
+**Evidence.** [`working/r0810-bug82-advisor-readiness.png`](screenshots/working/r0810-bug82-advisor-readiness.png)
+(live). Held by the `TestAdvisorReadiness` suite in `tests/test_advisor_model.py`.
 
 ---
 

@@ -9,7 +9,7 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and strict non-allow blocking, role revoke governed, and capability gate per action are enforced. That broker path is reachable from the terminal client but not yet from Chat or Build — see [Known limits](#known-limits).
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and a turn can now propose one from Chat and Build as well as from the terminal client — you see the exact text and decide, and approving really stores or removes the record. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -273,24 +273,23 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
   is empty until you set it. `web_search` answers the same gate, but Raiker
   ships no search endpoint: it reports `web_search_not_configured` until you
   point it at one.
-- **Memory cannot be written from Chat or Build.** `memory_write` and
-  `memory_forget` are real, broker-governed actions, but they are not in the
-  model tool catalogue, so no turn can propose one however **Memory store** is
-  set: an agent is only ever offered the read-only `memory_get`, `memory_list`
-  and `memory_search`, and the runtime reports `read_only_review`. Tracked as
-  **BUG-71**. Until it closes, treat the Memory page as a viewer.
-- **Two governed surfaces disagree about how a decision mode is changed.**
-  Changing a capability's Ask/Allow/Auto/Deny from Permissions requires a
-  step-up: a recorded reason, and a threat-model acknowledgement where the
-  capability demands one. Build's **Plan / Edit / Auto** chips make the same
-  change to `file_write_execution`, `patch_apply_execution`, `shell_execution`
-  and `process_execution` with none of it, and the change is global and
-  persistent. Enforcement still fails safe — an approval is still raised — but
-  the authority record is thinner than it should be. Tracked as **BUG-70**.
-- **The context meter's input/output split reads `NaN`.** Used, capacity,
-  remaining, per-chat cost and provider all-time cost are all correct; the
-  per-direction token split is discarded by the API's secret-shaped-field
-  redactor and formatted as `NaN`. Tracked as **BUG-68**.
+- **Remembering something is a decision, and Memory store starts off.**
+  `memory_write` and `memory_forget` are offered to the model, but like every
+  acting capability they answer to their own gate, which ships **off**. With it
+  on, a turn proposes the exact sentence it wants to keep and you approve or
+  reject it; approving really stores it, and text that looks like a credential
+  is refused before you are asked. The Memory page states which of those you are
+  in rather than promising proposals a disabled gate cannot produce.
+- **A composer mode tightens the turn; it never widens your permissions.**
+  Build's **Plan / Edit / Auto** chips are this conversation's posture, sent with
+  each prompt and applied to that turn: Plan refuses file writes, patches and
+  commands outright, Edit turns each one into a decision, and both leave your
+  standing permissions untouched. A turn may only ever tighten itself — `allow`
+  and `auto` are refused by the prompt contract — so **Auto** adds no restriction
+  of its own and does exactly as much as you already allowed, which the composer
+  states rather than implies. Widening a permission still happens on Permissions,
+  under the step-up: a recorded reason, and a threat-model acknowledgement where
+  the capability demands one.
 - **The code map finds declarations, not every reference, and it is exact only
   for Python.** Turning on **Code map** lets Raiker index the repository Build
   points at, so the agent can ask where something is defined instead of guessing
@@ -304,10 +303,6 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped. The view-only file inspector is shipped, and so are
   conversation export (HTML / Markdown / PDF) and **Print / Save as PDF**.
-- **A resumed turn can, rarely, deny an execution that happened.** One
-  conversation on the 2026-08-08 round ended, durably, saying "No command was
-  executed" beneath the chip for the file the approval had just written. Three
-  targeted reproductions did not recur. Tracked as **BUG-73**.
 - **Key pages are not locked into RAM by default.** The workspace database is
   SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
   material so they never reach swap — and Raiker leaves that **off**, explicitly,
@@ -327,13 +322,19 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
 
 Where one of these is tracked as work rather than a deliberate boundary, it is
 written up with a reproduction and a proposed fix in
-[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md) — the 2026-08-08 round's
-open findings are **BUG-68**, **BUG-70**, **BUG-71** and **BUG-73**. The
-2026-08-10 sweep's findings are closed there as **FIXED-149** through
-**FIXED-152**: the stale BUG-47 live scenario, the SQLCipher lockout, the audit
-log that showed nothing, and the Knowledge Map picker that browsed the whole
-installation. The entries that closed the older limits this section used to list
-are FIXED-34, FIXED-39, FIXED-90, FIXED-99, FIXED-101 and FIXED-109 there, and
+[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md). The 2026-08-08 round's
+four open findings are all closed there — **FIXED-154** (the context meter's
+`NaN input · NaN output`), **FIXED-155** (Build's mode chips rewriting standing
+permissions), **FIXED-156** (memory unreachable from Chat and Build) and
+**FIXED-157** (a resumed turn denying an execution that happened) — together
+with **FIXED-158**, which gives the advisor model the readiness check and chip
+the chat model already had, and **FIXED-159**, the unused composer permission
+control that went with FIXED-155. The 2026-08-10 sweep's findings are closed as
+**FIXED-149** through **FIXED-153**: the stale BUG-47 live scenario, the
+SQLCipher lockout, the audit log that showed nothing, the Knowledge Map picker
+that browsed the whole installation, and the audit log's mojibake column. The
+entries that closed the older limits this section used to list are FIXED-34,
+FIXED-39, FIXED-90, FIXED-99, FIXED-101 and FIXED-109 there, and
 [ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
 ## Documentation

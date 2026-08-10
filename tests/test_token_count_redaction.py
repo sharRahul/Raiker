@@ -10,6 +10,7 @@ the audit record too.
 from __future__ import annotations
 
 from raiker.api.redaction import assert_no_secrets_in_body, redact_response_body
+from raiker.control.dashboard import ContextUsageView
 from raiker.events.export import redact_event_payload
 
 
@@ -53,3 +54,60 @@ class TestTokenCountRedaction:
         except AssertionError:
             return
         raise AssertionError("a credential-shaped key must still fail the assertion")
+
+
+class TestContextUsageContractSurvivesRedaction:
+    """BUG-68 — every count on the context contract must reach the browser.
+
+    The popover formats these fields with ``Intl.NumberFormat``. A field the
+    redactor replaces with ``"***REDACTED***"`` therefore renders as ``NaN``,
+    which is exactly how ``session_input_tokens`` / ``session_output_tokens``
+    surfaced. Asserting the *whole* contract rather than the two names that
+    failed means the next count added to ``ContextUsageView`` is covered the day
+    it is added.
+    """
+
+    @staticmethod
+    def _populated_view() -> ContextUsageView:
+        return ContextUsageView(
+            session_id="sess_1",
+            profile_id="anthropic-hosted",
+            provider="anthropic",
+            model="claude-sonnet-4-5-20250929",
+            used_tokens=706,
+            context_window_tokens=200_000,
+            context_window_source="runtime",
+            usage_source="provider",
+            billable=True,
+            session_cost="0.0031",
+            provider_total_cost="0.0412",
+            currency="USD",
+            price_source="config",
+            price_as_of="2026-01-01",
+            session_turns=3,
+            session_input_tokens=624,
+            session_output_tokens=82,
+            price_input_per_mtok="3.00",
+            price_output_per_mtok="15.00",
+            price_cache_write_per_mtok="3.75",
+            price_cache_read_per_mtok="0.30",
+            price_effective_from="2026-01-01",
+        )
+
+    def test_every_integer_field_survives_redact_response_body(self) -> None:
+        body = self._populated_view().to_dict()
+        redacted = redact_response_body(body)
+        integer_fields = {
+            name: value for name, value in body.items() if isinstance(value, int) and not isinstance(value, bool)
+        }
+        assert integer_fields, "the fixture must carry the contract's integer fields"
+        for name, value in integer_fields.items():
+            assert redacted[name] == value, f"{name} was redacted and would render as NaN"
+
+    def test_the_two_names_that_regressed_are_named_explicitly(self) -> None:
+        # Kept as its own assertion so a future refactor of the fixture cannot
+        # quietly stop covering the pair BUG-68 was reported for.
+        body = self._populated_view().to_dict()
+        redacted = redact_response_body(body)
+        assert redacted["session_input_tokens"] == 624
+        assert redacted["session_output_tokens"] == 82

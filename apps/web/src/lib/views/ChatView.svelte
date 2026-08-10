@@ -1080,7 +1080,7 @@
           {#if answerText(turn) !== ""}
             <p class="bubble-text answer">{answerText(turn)}</p>
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
-            <p class="bubble-text answer muted">(No answer text was returned.)</p>
+            <p class="bubble-text answer muted">{turn.response?.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p>
           {/if}
 
           {#if turn.error !== null}
@@ -1204,7 +1204,12 @@
               ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null}
-            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
+            <!-- BUG-73 — a turn parked on a decision has no answer yet; it has a
+                 state, and the approval card below says which. It used to store
+                 "No command was executed." as though that were the answer, which
+                 is how one conversation ended up denying, durably, a write that
+                 had happened. -->
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">{turn.response.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p></div>
           {/if}
 
           <!-- C6 — everything this turn actually read, under the answer that

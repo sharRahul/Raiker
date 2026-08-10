@@ -2,18 +2,28 @@
  * Build-workspace composer modes: Plan, Edit, Auto.
  *
  * The three modes are not a mood the interface sets on itself — each one is a
- * concrete, server-enforced posture built from two existing governed controls:
+ * concrete, server-enforced posture. What changed in BUG-70 is *whose* posture
+ * it is.
  *
- *  1. the per-turn `planning_mode` sent with the prompt, and
- *  2. the standing per-capability **decision mode** for the capabilities that a
- *     coding turn actually acts through (`ask` | `auto` | `deny`).
+ * These chips used to POST four `/api/capability-modes/<cap>/<mode>` changes,
+ * which rewrote the owner's **standing** permissions: globally, permanently, and
+ * without the step-up — a recorded reason, and a threat-model acknowledgement
+ * where the capability demands one — that the Permissions page requires for the
+ * identical transition. Pressing **Auto** in a composer is not consent to change
+ * what every future Chat, Task and Build session may do.
  *
- * That means a mode is honest by construction: switching to Plan does not merely
- * ask the model to behave, it sets the write capabilities to `deny`, so a write
- * proposed anyway is blocked by the runtime rather than by good intentions.
- * Nothing here grants authority — `ask` and `deny` only ever tighten behaviour,
- * and `auto` still refuses anything above the low-risk floor (medium/high ask,
- * critical always requires a human).
+ * So a mode is now built from two per-turn controls only:
+ *
+ *  1. the `planning_mode` sent with the prompt, and
+ *  2. a `capability_modes` map sent with the same prompt, which the runtime
+ *     applies to *that turn* and to nothing else.
+ *
+ * That map may only ever tighten — `ask` and `deny` are the only values the
+ * envelope accepts — so a chip can never grant the turn authority the owner has
+ * not already given it. **Auto** therefore sends no override at all: it defers
+ * to the owner's standing permissions, and the composer says so rather than
+ * quietly widening them. Changing standing permissions stays where the ceremony
+ * lives, on the Permissions page.
  */
 
 export type BuildMode = "plan" | "edit" | "auto";
@@ -31,7 +41,12 @@ export const BUILD_WRITE_CAPABILITIES = [
   "process_execution",
 ] as const;
 
-export type BuildDecisionMode = "ask" | "auto" | "deny";
+/**
+ * The modes a *turn* may name for itself. Both tighten; `allow` and `auto` are
+ * absent by construction, because loosening is a change to standing authority.
+ * `null` means "send no override" — the turn runs under whatever the owner set.
+ */
+export type BuildTurnMode = "ask" | "deny" | null;
 
 export interface BuildModeSpec {
   id: BuildMode;
@@ -40,8 +55,12 @@ export interface BuildModeSpec {
   summary: string;
   /** What the runtime will actually do — shown as the composer's hint line. */
   detail: string;
-  /** Standing decision mode applied to every capability in BUILD_WRITE_CAPABILITIES. */
-  decisionMode: BuildDecisionMode;
+  /**
+   * Turn-scoped decision mode applied to every capability in
+   * BUILD_WRITE_CAPABILITIES, or null to send no override and run under the
+   * owner's standing permissions.
+   */
+  turnMode: BuildTurnMode;
   /** Per-turn planning option, or null to leave the backend default alone. */
   planningMode: "always" | "never_safe_only" | null;
 }
@@ -52,8 +71,8 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
     label: "Plan",
     summary: "Research and propose. No changes.",
     detail:
-      "Raiker plans the work and writes nothing: file writes, patches, and commands are set to deny, so a change proposed anyway is blocked by the runtime.",
-    decisionMode: "deny",
+      "Raiker plans the work and writes nothing: for this turn only, file writes, patches and commands are refused by the runtime, so a change proposed anyway is blocked rather than trusted. Your standing permissions are not changed.",
+    turnMode: "deny",
     planningMode: "always",
   },
   {
@@ -61,17 +80,17 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
     label: "Edit",
     summary: "Propose each change and wait for you.",
     detail:
-      "Every file write, patch, and command becomes a decision you accept or reject. Accepting records your decision — Raiker never treats a recorded decision as permission it already had.",
-    decisionMode: "ask",
+      "Every file write, patch and command becomes a decision you accept or reject, for this turn only. Accepting records your decision — Raiker never treats a recorded decision as permission it already had, and your standing permissions are not changed.",
+    turnMode: "ask",
     planningMode: null,
   },
   {
     id: "auto",
     label: "Auto",
-    summary: "Let Raiker decide, within the safe floor.",
+    summary: "Follow your standing permissions.",
     detail:
-      "Low-risk changes run unprompted; medium and high risk still ask, and critical actions always require a human. The floor is enforced by the runtime, not by this page.",
-    decisionMode: "auto",
+      "This turn adds no restriction of its own and runs under the permissions you set in Permissions. Where you allowed a capability to run unprompted it runs; where you left it at Ask it still asks. This chip changes nothing standing — raise a permission on the Permissions page, where the change is recorded with your reason.",
+    turnMode: null,
     planningMode: null,
   },
 ];
@@ -92,20 +111,49 @@ export function nextBuildMode(current: BuildMode): BuildMode {
 }
 
 /**
- * The mode a set of live decision modes already represents, or null when the
- * capabilities disagree with each other (someone set them individually in
- * Permissions). Null is reported rather than guessed: showing "Edit" over a
- * half-denied posture would be a lie about what the runtime will do.
+ * The `capability_modes` map to send with a prompt in this mode. Empty for Auto,
+ * which deliberately sends no override.
  */
-export function modeFromDecisionModes(modes: Record<string, string>): BuildMode | null {
+export function turnCapabilityModes(id: BuildMode): Record<string, string> {
+  const mode = buildMode(id).turnMode;
+  if (mode === null) return {};
+  return Object.fromEntries(BUILD_WRITE_CAPABILITIES.map((capability) => [capability, mode]));
+}
+
+/**
+ * What the owner's standing permissions mean for the mode they just picked, in
+ * one sentence — or null when there is nothing worth saying.
+ *
+ * This is the honesty half of BUG-70's fix. The chips no longer edit standing
+ * permissions, which means **Auto** does exactly as much as the owner already
+ * allowed and no more. Saying "low-risk changes run unprompted" over a set of
+ * capabilities still at Ask would be the same lie the old chip told, just in the
+ * other direction, so the composer reports what it actually found.
+ */
+export function standingPostureNote(
+  id: BuildMode,
+  modes: Record<string, string> | null,
+): string | null {
+  if (id !== "auto") return null;
+  if (modes === null) return "Raiker could not read your standing permissions for this turn.";
   const observed = BUILD_WRITE_CAPABILITIES.map((capability) => modes[capability]).filter(
     (mode): mode is string => mode !== undefined,
   );
-  if (observed.length !== BUILD_WRITE_CAPABILITIES.length) return null;
-  const unique = new Set(observed);
-  if (unique.size !== 1) return null;
-  const [only] = unique;
-  return BUILD_MODES.find((mode) => mode.decisionMode === only)?.id ?? null;
+  if (observed.length !== BUILD_WRITE_CAPABILITIES.length) {
+    return "Raiker could not read your standing permissions for this turn.";
+  }
+  const asking = observed.filter((mode) => mode === "ask").length;
+  const denied = observed.filter((mode) => mode === "deny").length;
+  if (denied === observed.length) {
+    return "Every write capability is set to Deny, so this turn will change nothing.";
+  }
+  if (asking === observed.length) {
+    return "Every write capability is set to Ask, so every change will still be proposed to you.";
+  }
+  if (asking > 0 || denied > 0) {
+    return `${asking + denied} of ${observed.length} write capabilities are still set to Ask or Deny, so some changes will be proposed rather than run.`;
+  }
+  return "Your standing permissions let low-risk changes run unprompted; medium and higher still ask.";
 }
 
 /**

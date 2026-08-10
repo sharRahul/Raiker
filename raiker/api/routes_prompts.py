@@ -140,6 +140,7 @@ def _build_envelope(
         max_tool_calls=(
             body.max_tool_calls if body.max_tool_calls is not None else DEFAULT_MAX_TOOL_CALLS
         ),
+        capability_modes=body.capability_modes or {},
     )
     client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)
     return PromptEnvelope(

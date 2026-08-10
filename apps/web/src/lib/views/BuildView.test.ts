@@ -1,12 +1,13 @@
 // Behaviour coverage for the Build workspace. The claims worth guarding are the
 // ones a user acts on: the composer mode must change what the runtime enforces
-// (not just the label), a connected repository must actually ride the turn, a
-// chat must reach the project it was filed under, and background work must be
-// reachable and dismissible.
+// for this conversation's turns — and, since BUG-70, must change *nothing*
+// standing — a connected repository must actually ride the turn, a chat must
+// reach the project it was filed under, and background work must be reachable
+// and dismissible.
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
-import { makeGate, stubFetch, stubFetchPending } from "../test-helpers";
+import { makeGate, stubFetch } from "../test-helpers";
 import { resetModels } from "../models.svelte";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
@@ -154,89 +155,108 @@ describe("Build composer modes", () => {
     expect(screen.getByText("The local runtime is stopped.")).toBeInTheDocument();
     expect(box).toHaveValue("keep this change");
   });
-  it("applies the mode to every write capability, not just the label", async () => {
-    // The point of the control: choosing Plan sets the runtime's decision modes
-    // to deny, so a write proposed anyway is blocked by the runtime.
-    const fetchMock = stubFetch({
-      ...baseRoutes(),
-      "POST /api/capability-modes/file_write_execution/deny": { ok: true },
-      "POST /api/capability-modes/patch_apply_execution/deny": { ok: true },
-      "POST /api/capability-modes/shell_execution/deny": { ok: true },
-      "POST /api/capability-modes/process_execution/deny": { ok: true },
-    });
+  it("changes no standing permission when a mode is picked", async () => {
+    // BUG-70 — the whole defect. Pressing a chip used to POST four
+    // `/api/capability-modes/<cap>/<mode>` changes: global, permanent, and
+    // without the step-up the Permissions page demands for the same transition.
+    // The mode is now this conversation's posture, so nothing standing is
+    // written at all.
+    const fetchMock = stubFetch(baseRoutes());
+    render(BuildView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
+    expect(await screen.findByRole("button", { name: "Plan" })).toHaveAttribute("aria-pressed", "true");
+
+    const written = fetchMock.mock.calls
+      .map(([url]) => String(url))
+      .filter((url) => url.includes("/api/capability-modes/"));
+    expect(written).toEqual([]);
+  });
+
+  it("selects Auto without a dialog and without touching anything standing", async () => {
+    // Auto was the sharpest case: it set four high-risk permissions to `auto`
+    // with no confirmation. It now sends no override at all.
+    const fetchMock = stubFetch(baseRoutes());
+    render(BuildView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+
+    expect(await screen.findByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true");
+    expect(
+      fetchMock.mock.calls.map(([url]) => String(url)).filter((u) => u.includes("/api/capability-modes/")),
+    ).toEqual([]);
+  });
+
+  it("tells the owner what Auto actually amounts to under their permissions", async () => {
+    // With every write still at Ask, "low-risk changes run unprompted" would be
+    // the same lie the old chip told — just in the other direction.
+    stubFetch(baseRoutes({ "GET /api/capability-gates": gates("ask") }));
+    render(BuildView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+
+    expect(await screen.findByText(/still be proposed/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /change in permissions/i })).toBeInTheDocument();
+  });
+
+  it("says it could not read the standing permissions rather than assuming them", async () => {
+    stubFetch(baseRoutes({ "GET /api/capability-gates": undefined }));
+    render(BuildView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+
+    expect(await screen.findByText(/could not read your standing permissions/i)).toBeInTheDocument();
+  });
+
+  it("states that the mode applies to this conversation only", async () => {
+    stubFetch(baseRoutes());
     render(BuildView);
 
     await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
 
-    await waitFor(() => {
-      const denied = fetchMock.mock.calls
-        .map(([url]) => String(url))
-        .filter((url) => url.includes("/api/capability-modes/") && url.endsWith("/deny"));
-      expect(denied).toHaveLength(WRITE_CAPABILITIES.length);
-    });
-    expect(await screen.findByRole("button", { name: "Plan" })).toHaveAttribute("aria-pressed", "true");
+    expect(await screen.findByText(/for this turn only/i)).toBeInTheDocument();
+    expect(screen.getByText(/standing permissions are not changed/i)).toBeInTheDocument();
   });
 
-  it("reverts the shown mode when the runtime refuses the change", async () => {
-    // Showing "Auto" over a posture the server rejected would be a lie about
-    // what the agent may do next.
+  it("sends the mode as a turn-scoped posture with the prompt", async () => {
     stubFetch(baseRoutes());
+    respondWith("Here is the plan.");
     render(BuildView);
-    await screen.findByRole("button", { name: "Edit" });
 
-    await fireEvent.click(screen.getByRole("button", { name: "Auto" }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
+    await fireEvent.input(screen.getByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(/did not accept that mode|gate-manager/i);
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Edit" })).toHaveAttribute("aria-pressed", "true");
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      capability_modes: {
+        file_write_execution: "deny",
+        patch_apply_execution: "deny",
+        shell_execution: "deny",
+        process_execution: "deny",
+      },
     });
   });
 
-  it("adopts the posture already set on the runtime", async () => {
-    stubFetch(baseRoutes({ "GET /api/capability-gates": gates("deny") }));
+  it("sends no posture at all in Auto", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Done.");
     render(BuildView);
 
-    await waitFor(() => {
-      expect(screen.getByRole("button", { name: "Plan" })).toHaveAttribute("aria-pressed", "true");
+    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+    await fireEvent.input(screen.getByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
     });
-  });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
-  it("says the posture is set individually rather than claiming a mode", async () => {
-    const mixed = gates("ask");
-    mixed[0] = makeGate({ capability: WRITE_CAPABILITIES[0], decision_mode: "deny" });
-    stubFetch(baseRoutes({ "GET /api/capability-gates": mixed }));
-    render(BuildView);
-
-    expect(await screen.findByText(/set individually right now/i)).toBeInTheDocument();
-  });
-
-  it("says the posture could not be read rather than implying the mode is in effect", async () => {
-    // A failed read is not the same as a mixed posture, and neither is the same
-    // as "Edit is active" — the composer must not claim the last one.
-    stubFetch(baseRoutes({ "GET /api/capability-gates": undefined }));
-    render(BuildView);
-
-    expect(await screen.findByText(/could not read the current write permissions/i)).toBeInTheDocument();
-  });
-
-  it("stays quiet about the posture while the first read is in flight", async () => {
-    // Flashing "permissions are set individually" at everyone on load would
-    // describe a state that is merely unknown yet.
-    stubFetchPending();
-    render(BuildView);
-
-    expect(screen.queryByText(/set individually right now/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/could not read the current write permissions/i)).not.toBeInTheDocument();
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0].capability_modes).toEqual({});
   });
 
   it("sends the turn with the planning option the mode carries", async () => {
-    stubFetch({
-      ...baseRoutes(),
-      "POST /api/capability-modes/file_write_execution/deny": { ok: true },
-      "POST /api/capability-modes/patch_apply_execution/deny": { ok: true },
-      "POST /api/capability-modes/shell_execution/deny": { ok: true },
-      "POST /api/capability-modes/process_execution/deny": { ok: true },
-    });
+    stubFetch(baseRoutes());
     respondWith("Here is the plan.");
     render(BuildView);
 

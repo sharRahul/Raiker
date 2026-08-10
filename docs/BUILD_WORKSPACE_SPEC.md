@@ -27,17 +27,17 @@ sandbox or security boundaries, restricted command policy, or critical holds.
 
 ## The three modes
 
-The composer's mode picker is the centre of the page. Each mode is a concrete
-posture assembled from two governed controls: the per-turn `planning_mode` sent
-with the prompt, and the standing **decision mode** on the capabilities a coding
-turn acts through (`file_write_execution`, `patch_apply_execution`,
+The composer's mode picker is the centre of the page. Each mode is a concrete,
+**turn-scoped** posture assembled from two per-turn controls sent with the
+prompt: `planning_mode`, and a `capability_modes` map covering the capabilities a
+coding turn acts through (`file_write_execution`, `patch_apply_execution`,
 `shell_execution`, `process_execution`).
 
-| Mode | Decision mode applied | Planning | What the runtime does |
+| Mode | Turn posture sent | Planning | What the runtime does |
 |---|---|---|---|
-| **Plan** | `deny` | `always` | Research and propose only. A write proposed anyway is blocked by the runtime, not by prompt wording. |
-| **Edit** | `ask` | default | Every file write, patch, and command becomes a pending approval you accept or reject. |
-| **Auto** | `auto` | default | Only low-risk actions run unprompted; medium and high still ask, and critical always requires a human. |
+| **Plan** | `deny` on the four | `always` | Research and propose only. A write proposed anyway is refused by the runtime under `denied_by_turn_posture`, not by prompt wording. |
+| **Edit** | `ask` on the four | default | Every file write, patch, and command becomes a pending approval you accept or reject, and the unattended approval modes cannot swallow it. |
+| **Auto** | none | default | The turn adds no restriction of its own and runs under the owner's standing permissions. |
 
 Mode help is available on hover and keyboard focus, rather than occupying
 permanent composer space. This keeps the explanation accessible without
@@ -45,19 +45,24 @@ competing with the project scope, approval policy, model, and action controls.
 
 Notes that keep the mapping honest:
 
-- No mode reaches the permissive `allow` decision mode. `Auto` stops at the
-  deterministic risk floor described in
-  [decision modes](DECISION_MODES_SPEC.md); `ask` and `deny` only ever tighten
-  behaviour.
-- Read capabilities are deliberately excluded from the set a mode changes, so
+- **A mode may only tighten.** `ask` and `deny` are the only values a turn may
+  name for itself; the prompt contract refuses `allow` and `auto`, and the broker
+  refuses them again independently. A turn can therefore never grant itself
+  authority the owner has not already given it, which is why no ceremony is
+  required to select one (BUG-70 / FIXED-155).
+- **A mode changes no standing permission.** The chips issue no
+  `/api/capability-modes/` write at all. Widening a capability stays on the
+  Permissions page, under the step-up — a recorded reason, and a threat-model
+  acknowledgement where the capability demands one.
+- **Auto therefore does exactly as much as the owner already allowed**, so the
+  composer reads the standing modes (read-only) and states what it found rather
+  than implying unprompted execution: *"Every write capability is set to Ask, so
+  every change will still be proposed to you."*, with **Change in Permissions →**.
+- Read capabilities are deliberately excluded from the set a mode covers, so
   Plan stays useful — it removes the ability to act, not the ability to look.
-- Setting a decision mode is a **human `runtime_gate_manager`** operation,
-  enforced server-side. If the runtime refuses the change, the composer reverts
-  to the previous mode and says so rather than displaying a posture that is not
-  in effect.
-- On open, the page reads the live decision modes back. If the four capabilities
-  disagree with each other (they were set individually in Permissions), no mode
-  is claimed — the composer states that permissions are set individually.
+- The posture is persisted with a turn parked on an approval, so a resume
+  continues under the posture it was sent with rather than under whatever the
+  standing modes say by then.
 - `Shift+Tab` cycles Plan → Edit → Auto without leaving the prompt.
 
 Accepting a proposed change from the transcript uses the ordinary approval

@@ -418,11 +418,13 @@ def _short_sha(value: object) -> str:
 def handle_memory(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
     candidates = store.list_memory_candidates()
-    status = governed_memory_status(candidates)
+    status = governed_memory_status(candidates, store=store)
     lines = [
         "Memory status:",
         f"mode: {status['mode']}",
         f"durable_writes_enabled: {status['durable_writes_enabled']}",
+        f"write_decision_mode: {status['write_decision_mode']}",
+        f"forget_decision_mode: {status['forget_decision_mode']}",
         f"candidate_count: {status['candidate_count']}",
     ]
     for candidate in candidates[:10]:

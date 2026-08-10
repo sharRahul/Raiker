@@ -30,6 +30,15 @@ class ProviderRateLimitError(ModelProviderError):
     pass
 
 
+class ProviderQuotaExhaustedError(ModelProviderError):
+    """The account is reachable and authenticated but has nothing left to spend.
+
+    Distinct from a rate limit (waiting fixes that) and from an authentication
+    failure (a new key fixes that). Only adding credit or raising the account's
+    quota fixes this, so it must not be reported as either.
+    """
+
+
 class ProviderModelNotFoundError(ModelProviderError):
     pass
 
@@ -64,6 +73,7 @@ _PROVIDER_ERROR_CLASS_CODES: dict[str, str] = {
     "ProviderAuthenticationError": "provider_auth_failed",
     "ProviderTimeoutError": "provider_timeout",
     "ProviderRateLimitError": "provider_rate_limited",
+    "ProviderQuotaExhaustedError": "provider_quota_exhausted",
     "ProviderModelNotFoundError": "model_not_found",
     "ProviderConnectionError": "provider_connection_failed",
     "ProviderConfigurationError": "provider_misconfigured",
@@ -75,6 +85,46 @@ _PROVIDER_ERROR_CLASS_CODES: dict[str, str] = {
 }
 
 UNCLASSIFIED_PROVIDER_ERROR = "provider_error_unclassified"
+
+# Statuses a provider may use to say "your account cannot pay for this". The
+# status alone is never enough — 400 and 429 are also ordinary failures — so a
+# marker below has to appear in the body as well, except for 402, whose whole
+# meaning is Payment Required.
+_QUOTA_STATUSES = frozenset({400, 402, 403, 429})
+
+# Deliberately specific. A bare "quota" would swallow Gemini's per-minute rate
+# limit ("Quota exceeded for quota metric …"), which a retry does fix, so only
+# wording that names money or a spent allowance counts.
+_QUOTA_MARKERS: tuple[str, ...] = (
+    "insufficient_quota",
+    "insufficient quota",
+    "exceeded your current quota",
+    "credit balance",
+    "purchase credits",
+    "insufficient credits",
+    "not enough credits",
+    "billing details",
+    "billing_hard_limit_reached",
+    "plans & billing",
+    "plans and billing",
+    "payment required",
+)
+
+
+def is_quota_exhausted(status: int, body: str) -> bool:
+    """True when this response means the account is out of credit or quota.
+
+    ``body`` is read only to classify; nothing from it is ever kept. The caller
+    raises a fixed reason code, so a provider that puts an account identifier or
+    an email address in its billing message cannot carry it into an event, an
+    API response, or the readiness record.
+    """
+    if status not in _QUOTA_STATUSES:
+        return False
+    if status == 402:
+        return True
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _QUOTA_MARKERS)
 
 # A reason code is a snake_case identifier with an optional ``:detail`` suffix,
 # e.g. ``provider_auth_failed:http_401``. Provider messages that are prose

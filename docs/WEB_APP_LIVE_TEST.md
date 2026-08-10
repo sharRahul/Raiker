@@ -14,6 +14,30 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-08-09 (BUG-69 reference-platform parity review, hosted Anthropic Haiku 4.5)
+
+Fresh temporary workspace, owner registered through the browser, one Anthropic
+key entered **only** through the Models connect dialog. The key holds no credit,
+which makes it an exact fixture for the billing state added in this round: the
+catalogue call succeeds and every inference call returns HTTP 400
+`credit_balance_too_low`. Token generation was therefore **not** exercised; every
+other link in the readiness chain was.
+
+| Check | Result |
+|---|---|
+| First run routes a new owner to `#/model-setup` | ✅ `Choose how to run models`, resumable, Skip explains the consequence |
+| Workbench / Chat / Tasks refuse to submit with no ready model | ✅ primary action disabled, draft preserved |
+| Connect dialog stores the key; value never rendered back | ✅ card shows `Connected`, no credential in the DOM |
+| Live catalogue from the real provider | ✅ 10 Anthropic models listed, `claude-haiku-4-5-20251001` pinned |
+| **Test** on the provider card runs the exact-model readiness check | ✅ FIXED-140 — was a catalogue listing that proved nothing |
+| An empty account balance is its own state, not "unreachable" | ✅ FIXED-138 — card chip **No credit**, remediation names credit and quota |
+| Models headline counts proven readiness | ✅ FIXED-140 — **0 models ready · 1 of 10 connected**, was "1 of 10 providers set up" |
+| Chat repeats the same verdict and keeps the draft | ✅ Send stays disabled, sentence identical to the card |
+| Browser console errors | ✅ 0 |
+
+Evidence: [`plans/screenshots/working/bug69-models-quota-readiness-live.png`](plans/screenshots/working/bug69-models-quota-readiness-live.png)
+and [`bug69-chat-quota-readiness-live.png`](plans/screenshots/working/bug69-chat-quota-readiness-live.png).
+
 ## Result — 2026-07-11 (Task 4: Gmail read-only connector, hosted Anthropic Haiku 4.5)
 
 Second read connector, replicating the GitHub reference slice. Verified against

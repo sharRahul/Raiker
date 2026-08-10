@@ -105,6 +105,57 @@ describe("ModelsView state grammar", () => {
     );
   });
 
+  // BUG-69 — the headline counted providers with a saved credential and called
+  // them "set up". A saved key is not a working model: on 2026-08-09 a live run
+  // showed "1 of 10 providers set up" on this page while Chat, correctly, said
+  // "No readiness check exists for this exact model" and refused to send.
+  it("counts models proven ready, not providers holding a credential", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic",
+      provider: "anthropic",
+      model: "opus",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+      readiness_state: "not_configured",
+    });
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView);
+
+    expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+    expect(screen.queryByText("providers set up")).not.toBeInTheDocument();
+  });
+
+  it("shows each provider's exact readiness state, not just its connection", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic",
+      provider: "anthropic",
+      model: "opus",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+      readiness_state: "quota_exhausted",
+      readiness_summary:
+        "Anthropic accepted the credential but the account has no credit or quota left.",
+    });
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView);
+
+    expect(await screen.findByText("No credit")).toBeInTheDocument();
+  });
+
   // A "selected" chip on the provider card read as "only this provider is
   // selected", i.e. that the others had been turned off. They had not — every
   // configured provider stays usable, and a per-chat picker can still choose
@@ -323,6 +374,60 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     await fireEvent.click(screen.getAllByText("Select")[0]);
 
     await waitFor(() => expect(onchanged).toHaveBeenCalled());
+  });
+
+  // BUG-69 — "Test" listed the catalogue and reported "Anthropic responded and
+  // exposed 10 models", which reads as "this works". It proved nothing about
+  // the pinned model and wrote no readiness observation, so every surface
+  // stayed blocked while the page said success. The obvious control has to be
+  // the authoritative one.
+  it("runs the exact-model readiness check from the provider card's Test action", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+      "POST /api/model-readiness/check": {
+        state: "quota_exhausted",
+        ready: false,
+        reason_code: "provider_quota_exhausted",
+        summary:
+          "Anthropic accepted the credential but the account has no credit or quota left.",
+        remediation: "Add credit or raise the quota, then check again.",
+      },
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Test")).toBeTruthy());
+
+    await fireEvent.click(screen.getByText("Test"));
+
+    await waitFor(() => {
+      const post = mock.mock.calls.find(
+        (c) =>
+          (c[1]?.method ?? "GET").toUpperCase() === "POST" &&
+          String(c[0]).includes("/api/model-readiness/check"),
+      );
+      expect(post).toBeTruthy();
+      expect(JSON.parse(post![1]!.body as string)).toEqual({
+        profile_id: "anthropic-hosted",
+        model: "claude-haiku-4-5-20251001",
+      });
+    });
+    // The verdict and its repair, not "responded and exposed 10 models".
+    expect(
+      await screen.findByText(
+        "Anthropic accepted the credential but the account has no credit or quota left. Add credit or raise the quota, then check again.",
+      ),
+    ).toBeInTheDocument();
   });
 
   it("lists the provider's models on demand and selects one", async () => {
@@ -682,12 +787,12 @@ describe("ModelsView provider test feedback", () => {
   it("shows one provider's result only under that provider", async () => {
     stubFetch({
       "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+      "POST /api/model-readiness/check": {
+        state: "ready",
+        ready: true,
+        reason_code: "model_ready",
+        summary: "Ollama can reach gemma4:31b-cloud.",
+        remediation: "",
       },
     });
     render(ModelsView);
@@ -696,7 +801,7 @@ describe("ModelsView provider test feedback", () => {
     expect(tests).toHaveLength(2);
     await fireEvent.click(tests[0]);
 
-    const message = "Ollama responded and exposed 9 models.";
+    const message = "Ollama can reach gemma4:31b-cloud.";
     await waitFor(() => expect(screen.getAllByText(message)).toHaveLength(1));
     // Attached to Ollama, and nowhere near Anthropic's card.
     const result = screen.getByText(message);
@@ -715,19 +820,12 @@ describe("ModelsView provider test feedback", () => {
   it("keeps each provider's result independent when both are tested", async () => {
     stubFetch({
       "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["a"],
-      },
-      "GET /api/models/anthropic-hosted/provider-models": {
-        profile_id: "anthropic-hosted",
-        provider: "anthropic",
-        status: "available",
-        reason_code: null,
-        models: ["claude-haiku-4-5-20251001", "claude-opus-4-5"],
+      "POST /api/model-readiness/check": {
+        state: "ready",
+        ready: true,
+        reason_code: "model_ready",
+        summary: "The exact model is reachable.",
+        remediation: "",
       },
     });
     render(ModelsView);
@@ -735,27 +833,25 @@ describe("ModelsView provider test feedback", () => {
     const tests = await screen.findAllByRole("button", { name: "Test" });
     await fireEvent.click(tests[0]);
     await waitFor(() =>
-      expect(
-        screen.getByText("Ollama responded and exposed 1 model."),
-      ).toBeTruthy(),
+      expect(screen.getAllByText("The exact model is reachable.")).toHaveLength(
+        1,
+      ),
     );
     await fireEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
-    await waitFor(() =>
-      expect(
-        screen.getByText("Anthropic responded and exposed 2 models."),
-      ).toBeTruthy(),
-    );
 
-    // Testing the second provider does not overwrite or duplicate the first.
+    // Testing the second provider does not overwrite the first: two results
+    // stand, each attributed to the card whose Test produced it.
+    await waitFor(() =>
+      expect(screen.getAllByText("The exact model is reachable.")).toHaveLength(
+        2,
+      ),
+    );
     expect(
-      screen.getAllByText("Ollama responded and exposed 1 model."),
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByText("Anthropic responded and exposed 2 models."),
-    ).toHaveLength(1);
-    expect(
-      screen.getByText("Anthropic responded and exposed 2 models."),
-    ).toHaveAttribute("data-test-result", "anthropic-hosted");
+      screen
+        .getAllByText("The exact model is reachable.")
+        .map((node) => node.getAttribute("data-test-result"))
+        .sort(),
+    ).toEqual(["anthropic-hosted", "ollama-local-openai-compatible"]);
   });
 
   it("names the provider it could not reach, so a failure is attributable too", async () => {
@@ -768,10 +864,10 @@ describe("ModelsView provider test feedback", () => {
     await fireEvent.click(tests[1]);
     await waitFor(() =>
       expect(
-        screen.getByText("Raiker could not reach Anthropic."),
+        screen.getByText("Raiker could not check Anthropic."),
       ).toBeTruthy(),
     );
-    expect(screen.queryByText("Raiker could not reach Ollama.")).toBeNull();
+    expect(screen.queryByText("Raiker could not check Ollama.")).toBeNull();
   });
 
   it("names the provider in an unreachable answer, not only in a successful one", async () => {
@@ -779,12 +875,12 @@ describe("ModelsView provider test feedback", () => {
     // unnoticed: nothing in the sentence contradicted the card above it.
     stubFetch({
       "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "unavailable",
-        reason_code: "provider_unreachable",
-        models: [],
+      "POST /api/model-readiness/check": {
+        state: "runtime_stopped",
+        ready: false,
+        reason_code: "local_runtime_unreachable",
+        summary: "Ollama is not reachable.",
+        remediation: "Start or reconnect Ollama, then check again.",
       },
     });
     render(ModelsView);
@@ -792,7 +888,7 @@ describe("ModelsView provider test feedback", () => {
     await fireEvent.click(
       (await screen.findAllByRole("button", { name: "Test" }))[0],
     );
-    const result = await screen.findByText(/^Ollama could not be reached\./);
+    const result = await screen.findByText(/^Ollama is not reachable\./);
     expect(result).toHaveAttribute(
       "data-test-result",
       "ollama-local-openai-compatible",

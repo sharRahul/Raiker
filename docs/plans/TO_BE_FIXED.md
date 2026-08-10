@@ -205,6 +205,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | FIXED-135 | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
 | FIXED-136 | High | Managed llama.cpp / graceful host shutdown could leave the child alive | Fixed (found in BUG-69 shutdown verification) |
 | FIXED-137 | High | API redaction / an unprefixed `path` field was destroyed | Fixed (found in GitHub CI after BUG-69) |
+| FIXED-138 | High | Model readiness / an empty account balance was reported as an unreachable provider | Fixed (found in the BUG-69 parity review) |
+| FIXED-139 | High | Model readiness / the gate ignored the fallback chain the runtime actually tries | Fixed (found in the BUG-69 parity review) |
+| FIXED-140 | High | Models UI / the page counted saved credentials as "set up" and Test proved nothing | Fixed (found in the BUG-69 parity review) |
 | BUG-70 | Medium | Build / mode chips rewrite global decision modes with no step-up | Open (found in the 2026-08-08 live round) |
 | BUG-71 | Medium | Memory / a gated capability no turn can ever reach | Open (found in the 2026-08-08 live round) |
 | BUG-72 | High | Network / enabling Web fetch breaks every turn that uses it | Open (found in the 2026-08-08 live round) |
@@ -217,6 +220,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | BUG-79 | Medium | Plugins / a manifest signature is a presence marker by default and the owner is never told | Open (found in the OWASP ASI04 mapping) |
 | BUG-80 | Low | Documentation / the GenAI mapping still calls the verifier a stub | Open (found in the OWASP ASI mapping) |
 | BUG-81 | Low | Context / no prompt-injection scanning hook exists, though the security mapping requires one | Open (found in the OWASP ASI01 mapping) |
+| BUG-82 | Medium | Model readiness / the advisor model is never readiness-checked or surfaced | Open (found in the BUG-69 parity review) |
+| BUG-83 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Open (found in the BUG-69 parity review) |
+| BUG-84 | Low | Live tests / the BUG-69 acceptance spec cannot run with a single provider key | Open (found in the BUG-69 parity review) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
 
@@ -6197,5 +6203,182 @@ defence is not one.
 **UI when closed.** A turn whose context included suspicious external content
 shows a finding naming the source document or URL, and the finding survives in
 the audit trail whether or not the model acted on it.
+
+---
+## FIXED-138 — Billing exhaustion was reported as an unreachable provider
+
+**Status: fixed in the BUG-69 reference-platform parity review (Task 13).**
+Found on 2026-08-09 driving the Models UI with a real Anthropic key that has no
+credit.
+
+**Observed.** The catalogue call succeeded and listed ten models, then the
+execution preflight failed and the readiness state became `unreachable` with
+`provider_execution_refused`. The provider was reachable and the credential was
+valid; only the account balance was empty.
+
+**Root cause.** `_map_status` in both `raiker/models/providers/anthropic_messages.py`
+and `raiker/models/providers/openai_compatible.py` classified on the HTTP status
+alone. Anthropic answers an empty balance with HTTP 400 on a valid key, so it
+fell through to `ProviderConnectionError("provider_http_error:http_400")`;
+OpenAI's `insufficient_quota` arrives as 429 and became a rate limit, which a
+retry appears to be able to fix and cannot.
+
+**Fix.** `is_quota_exhausted(status, body)` in `raiker/models/exceptions.py`
+classifies 402 unconditionally and 400/403/429 when the body names money or a
+spent allowance. Bare `quota` is deliberately not a marker — it would swallow a
+per-minute rate limit. The body is read only to classify; the raised code is
+fixed (`provider_quota_exhausted:http_<status>`), so no provider prose reaches
+an event, an API response, or the readiness record. Readiness gained
+`ModelReadinessState.QUOTA_EXHAUSTED`, and the repair sentence now names credit
+and quota instead of the network.
+
+**Evidence.** `tests/test_model_quota_readiness.py`, and the live card reading
+**No credit** in `screenshots/working/bug69-models-quota-readiness-live.png`.
+
+---
+
+## FIXED-139 — The readiness gate ignored the fallback chain the runtime uses
+
+**Status: fixed in the BUG-69 reference-platform parity review (Task 13).**
+
+**Observed.** `ModelReadinessService.require_ready()` judged only the primary
+model. `RuntimeOrchestrator._provider_chain` builds the primary *plus the
+owner's ordered fallback sequence* and really does try each in turn, so the gate
+refused work a configured, ready fallback could serve, and admitted work whose
+fallbacks had never been probed.
+
+**Root cause, second layer.** The fallback chain was already inert for every
+hosted provider. `AgentGateway._resolve_profile_for_turn` resolved a profile's
+model from the single `ModelSessionState`, which names one profile only. Every
+hosted profile ships a `<model>` placeholder, and the owner's pin for any
+*other* profile lives in `principal_configured_models`, which was never read —
+so each hosted fallback entry resolved to `<model>` and was dropped.
+
+**Fix.** `resolve_chain()` resolves the same chain the orchestrator builds and
+`require_ready()` admits the turn when any entry is ready, with the primary
+keeping priority and a refusal still reporting the primary. Both the readiness
+service and the gateway now fall back to the per-profile pinned model, and both
+read the owner-scoped fallback sequence before the terminal one so a
+CLI-bootstrapped owner's sequence is not silently ignored.
+
+**Evidence.** `tests/test_model_readiness_fallback_chain.py`.
+
+---
+
+## FIXED-140 — Models claimed providers were "set up" and Test proved nothing
+
+**Status: fixed in the BUG-69 reference-platform parity review (Task 13).**
+
+**Observed.** In one live session the Models page announced **"1 of 10 providers
+set up"** while Chat, correctly, said "No readiness check exists for this exact
+model" and refused to send. Clicking **Test** on the same card reported
+"Anthropic responded and exposed 10 models." — which reads as success — and
+still left every work surface blocked.
+
+**Root cause.** `readyCount` in `apps/web/src/lib/views/ModelsView.svelte` was
+`configuredProfiles.length`: profiles with a saved connection, not profiles
+proven ready. The server-side `ready_provider_count` and the per-profile
+`readiness_state` were already in the payload and unused. `testConnection()`
+called `GET …/provider-models`, a catalogue listing that writes no readiness
+observation and says nothing about the pinned model.
+
+**Fix.** The headline reads `ready_provider_count` and says "N models ready",
+with connection count kept as the secondary figure it always was. Test runs
+`POST /api/model-readiness/check` for the pinned model, reports that verdict and
+its remediation, and refreshes the page; profiles with no model pinned keep the
+catalogue note, the only honest answer available for them. Each card carries a
+chip for its exact state.
+
+**Evidence.** Three tests in `apps/web/src/lib/views/ModelsView.test.ts`, and
+the live headline reading **0 models ready · 1 of 10 connected** in
+`screenshots/working/bug69-models-quota-readiness-live.png`.
+
+---
+
+## BUG-82 — The advisor model is never readiness-checked
+
+**Status: open. Found on 2026-08-09 in the BUG-69 reference-platform parity
+review.**
+
+**Observed.** Raiker runs a second model besides the chat model: the advisor
+(`raiker/runtime/advisor.py`, Models → Routing → Advisor model). It is chosen in
+the same UI as the chat model but never appears in readiness — no probe, no
+state, no chip, and no entry in `GET /api/model-readiness`.
+
+**Impact.** An owner can pin an advisor whose provider has no credential, no
+credit, or no running runtime and see nothing wrong until a consult fails
+mid-turn. The consult itself does fail closed with a reason code, so this
+degrades one tool rather than breaking the turn — which is exactly why it stays
+invisible. It is also the one place Raiker sits behind the reference set: Claude
+Code surfaces its auxiliary model (`ANTHROPIC_SMALL_FAST_MODEL`) in the same
+status output as the primary.
+
+**Root cause.** `AdvisorRuntime.consult()` resolves the advisor profile from the
+registry and the single `ModelSessionState` and calls it directly. It never goes
+through `ModelReadinessService`, and — the same defect fixed for the chat chain
+in FIXED-139 — it does not read `principal_configured_models`, so a hosted
+advisor pinned through the UI resolves to `<model>` and is refused with
+`advisor_model_unresolved` even when the owner did pin one.
+
+**Required fix.** Resolve the advisor model through the same per-profile pin the
+chat chain now uses, record a readiness observation for it under its own exact
+key, and surface it beside the advisor selector. Keep the fail-closed consult
+path unchanged.
+
+**UI when closed.** The Advisor model selector shows the same readiness chip and
+repair sentence as a provider card, and a hosted advisor pinned in the UI is
+actually reachable.
+
+---
+
+## BUG-83 — Readiness has one fixed TTL and no background revalidation
+
+**Status: open. Found on 2026-08-09 in the BUG-69 reference-platform parity
+review.**
+
+**Observed.** `ModelReadinessService` expires an observation after a hard-coded
+five minutes (`ttl: timedelta = timedelta(minutes=5)`). Nothing re-checks in the
+background, so a model that was ready five minutes ago becomes `stale` and the
+owner must press a button before working again, while a model that stopped
+thirty seconds ago still reads ready until the window lapses.
+
+**Impact.** Both directions are wrong for a long editing session. The reference
+set revalidates continuously — ChatGPT and Claude Code learn about a lost model
+on the next request rather than on a timer — so Raiker trades a stale-ready
+window for a spurious-stale interruption and offers no control over either.
+
+**Required fix.** Make the TTL a persisted owner setting with a sane default,
+revalidate the selected model opportunistically in the background while a work
+surface is open, and keep the invalidation hooks (connection, selection, pull,
+endpoint, credential change) authoritative over any timer.
+
+**UI when closed.** A long session does not spontaneously disable Send, and the
+readiness chip names when it was last confirmed.
+
+---
+
+## BUG-84 — The BUG-69 live acceptance spec cannot run with one provider key
+
+**Status: open. Found on 2026-08-09 while re-running the BUG-69 live evidence.**
+
+**Observed.** `apps/web/e2e/bug-69-model-readiness-live.spec.ts` opens with
+`expect(OPENROUTER_KEY, "set RAIKER_LIVE_OPENROUTER_KEY").not.toBe("")`, so the
+whole spec fails immediately unless both an Anthropic and an OpenRouter key are
+present. It also asserts a specific non-ready outcome for `claude-opus-4-8`,
+which is a property of the account that ran it, not of the product.
+
+**Impact.** The documented way to reproduce BUG-69's evidence is unrunnable for
+anyone holding one credential, which is the common case. The 2026-08-09 parity
+round had to drive the same flow through an ad-hoc script instead.
+
+**Required fix.** Skip each provider leg when its key is absent, fail only when
+no provider key is set at all, and assert the readiness *state machine* rather
+than one account's entitlement — a provider that answers the catalogue and
+refuses execution must produce a classified non-ready state, whichever one the
+account earns.
+
+**UI when closed.** No UI change. `npm --prefix apps/web run test:e2e:live` with
+a single provider key produces a complete, honest evidence run for that
+provider.
 
 ---

@@ -269,6 +269,14 @@
     }
   }
 
+  // BUG-69 — Test is the obvious control on this page, so it has to answer the
+  // question the owner is actually asking: can this model run? A catalogue
+  // listing does not answer it. A live run on 2026-08-09 reported "Anthropic
+  // responded and exposed 10 models" while readiness stayed unchecked and every
+  // work surface stayed blocked. When a concrete model is pinned, Test now runs
+  // the exact-model readiness check and reports (and records) that verdict;
+  // profiles with no model pinned still get the catalogue reachability note,
+  // which is the only honest answer available for them.
   async function testConnection(profile: ModelProfile) {
     const id = profile.profile_id;
     testing = { ...testing, [id]: true };
@@ -276,13 +284,48 @@
     // that card's state and is not this test's to discard.
     testResults = without(testResults, id);
     let message: string;
-    try {
-      message = testNote(profile, await api.providerModels(id));
-    } catch {
-      message = `Raiker could not reach ${providerName(profile.provider)}.`;
+    if (profile.model && profile.model !== "<model>") {
+      try {
+        const readiness = await api.checkModelReadiness(id, profile.model);
+        message = readiness.remediation
+          ? `${readiness.summary} ${readiness.remediation}`
+          : readiness.summary;
+        await load();
+      } catch {
+        message = `Raiker could not check ${providerName(profile.provider)}.`;
+      }
+    } else {
+      try {
+        message = testNote(profile, await api.providerModels(id));
+      } catch {
+        message = `Raiker could not reach ${providerName(profile.provider)}.`;
+      }
     }
     testing = without(testing, id);
     testResults = { ...testResults, [id]: message };
+  }
+
+  // A short chip label for the exact readiness state, so a card says what a
+  // check actually found instead of only whether a credential is stored.
+  const READINESS_CHIP: Record<string, string> = {
+    ready: "Ready",
+    checking: "Checking…",
+    not_configured: "Not checked",
+    stale: "Check expired",
+    runtime_missing: "Runtime missing",
+    runtime_stopped: "Runtime stopped",
+    model_missing: "Model missing",
+    policy_blocked: "Policy blocked",
+    authentication_failed: "Key rejected",
+    quota_exhausted: "No credit",
+    unreachable: "Unreachable",
+    unsupported: "Unsupported",
+  };
+
+  function readinessChip(profile: ModelProfile): string | null {
+    const state = profile.readiness_state;
+    if (!state) return null;
+    return READINESS_CHIP[state] ?? null;
   }
 
   async function openPicker(profileId: string) {
@@ -481,7 +524,16 @@
   // A percentage of "all shipped profiles" was a meaningless denominator — a
   // user who connects the one provider they intend to use is finished, not 10%
   // finished. The honest headline is how many providers are actually ready.
-  const readyCount = $derived(configuredProfiles.length);
+  //
+  // BUG-69 — and "ready" has to mean ready. Counting saved connections put
+  // "1 of 10 providers set up" on this page in the same session where Chat
+  // said "No readiness check exists for this exact model" and refused to send.
+  // The server already counts proven observations; this reads that number and
+  // only falls back to counting `ready` profiles if the field is absent.
+  const readyCount = $derived(
+    models?.ready_provider_count ??
+      (models?.profiles ?? []).filter((p) => p.ready === true).length,
+  );
 
   // Each provider's bar is its share of total spend across every provider, so
   // it needs no configured budget to mean something. Providers with no cost
@@ -731,15 +783,11 @@
               provider is enough to work.
             </p>
           </div>
-          <div
-            class="setup-meter"
-            aria-label={`${readyCount} of ${models.profiles.length} providers set up`}
-          >
-            <strong
-              >{readyCount}
-              <span class="of">of {models.profiles.length}</span></strong
+          <div class="setup-meter" aria-live="polite">
+            <strong>{readyCount} models ready</strong>
+            <span class="of"
+              >{configuredProfiles.length} of {models.profiles.length} connected</span
             >
-            <span>providers set up</span>
             {#if totalSpend > 0}
               <p class="total-spend">
                 {formatCost(String(totalSpend), spendCurrency)} total API cost
@@ -844,6 +892,13 @@
                             >{/if}
                           {#if p.connection_configured}<span
                               class="chip chip-ok">Connection saved</span
+                            >{/if}
+                          {#if readinessChip(p)}<span
+                              class="chip"
+                              class:chip-ok={p.ready === true}
+                              class:chip-warn={p.ready !== true}
+                              title={p.readiness_summary ?? undefined}
+                              >{readinessChip(p)}</span
                             >{/if}
                           {#if p.prompt_cache_ttl}<span
                               class="chip chip-ok"
@@ -999,6 +1054,13 @@
                         {/if}
                       </p>
                       <div class="chips">
+                        {#if readinessChip(p)}<span
+                            class="chip"
+                            class:chip-ok={p.ready === true}
+                            class:chip-warn={p.ready !== true}
+                            title={p.readiness_summary ?? undefined}
+                            >{readinessChip(p)}</span
+                          >{/if}
                         {#if p.requires_network}<span class="chip chip-warn"
                             >Needs network</span
                           >{/if}
@@ -1695,11 +1757,6 @@
   .setup-meter strong {
     display: block;
     font-size: 1.35rem;
-  }
-  .setup-meter strong .of {
-    color: var(--text-3);
-    font-size: 0.9rem;
-    font-weight: 500;
   }
   .setup-meter span {
     color: var(--text-3);

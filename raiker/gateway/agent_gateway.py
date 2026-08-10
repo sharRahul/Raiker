@@ -169,6 +169,13 @@ class AgentGateway:
         )
         if state is not None and state.profile_id == profile.profile_id and state.model:
             effective_model = state.model
+        if not effective_model or "<" in effective_model:
+            # The session state names one profile only, so every *other* profile
+            # the owner pinned a model for — every fallback entry, in practice —
+            # keeps its choice in the configured-model table. Without this read
+            # the whole fallback sequence silently drops hosted providers, all of
+            # which ship a `<model>` placeholder.
+            effective_model = self._configured_model(profile.profile_id) or effective_model
         if model:
             effective_model = model
         if not effective_model or "<" in effective_model:
@@ -182,6 +189,17 @@ class AgentGateway:
             self.model_registry.register(profile_with_model(profile, effective_model))
         return (profile.provider, effective_model)
 
+    def _configured_model(self, profile_id: str) -> str | None:
+        """The owner's most recent pinned model for one profile, if any."""
+        try:
+            pairs = self.store.list_configured_models(self.tool_broker.principal_id)
+        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
+            return None
+        for candidate_profile, candidate_model in reversed(list(pairs or [])):
+            if candidate_profile == profile_id and candidate_model:
+                return str(candidate_model)
+        return None
+
     def _resolve_fallback_chain(self) -> list[tuple[str, str]]:
         """Resolve the user-owned ordered fallback sequence to ``(provider, model)`` pairs.
 
@@ -193,11 +211,13 @@ class AgentGateway:
         the model router when each candidate is actually tried.
         """
         chain: list[tuple[str, str]] = []
-        fallback_ids = (
-            self.store.load_principal_model_fallback_sequence(self.tool_broker.principal_id)
-            if self.store.get_account(self.tool_broker.principal_id) is not None
-            else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
-        )
+        # Owner-scoped first, terminal only when the owner saved none. Keying off
+        # an account row instead would ignore the sequence a CLI-bootstrapped
+        # owner saved against their own principal, and the readiness gate reads
+        # the chain the same way — the two must not disagree.
+        fallback_ids = self.store.load_principal_model_fallback_sequence(
+            self.tool_broker.principal_id
+        ) or self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
         for profile_id in fallback_ids:
             resolved = self._resolve_profile_for_turn(profile_id)
             if resolved is not None and resolved not in chain:

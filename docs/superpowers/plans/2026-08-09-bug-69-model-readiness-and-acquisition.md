@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Exact readiness, not a configured model name, controls Workbench, Chat, Build, Tasks, Schedule, and background-agent submission.
+- Exact readiness, not a configured model name, controls Workbench, Chat, Build, Tasks, Schedule, and background-agent submission. Readiness is judged over the chain the runtime will actually try — the selected model followed by the owner's fallback sequence — so the gate and the orchestrator can never disagree about what is runnable (Task 13).
+- Every non-ready answer names a repair the owner can perform. An exhausted account, a rejected credential, and an unreachable provider are three different states because they have three different repairs (Task 13).
 - Preserve the owner-authoritative, monitored, fail-closed posture in `docs/SECURITY_AND_POLICY.md`.
 - Never silently install software, download weights, accept licences, move/copy models, execute repository code, enable `trust_remote_code`, or fall back to a hosted provider.
 - Do not redistribute LM Studio. Ollama installation retrieves the official installer at runtime only after explicit owner consent.
@@ -23,7 +24,7 @@
 
 ## File structure
 
-- `raiker/models/readiness.py`: readiness states, probe protocol, exact-key cache, invalidation, and submission guard.
+- `raiker/models/readiness.py`: readiness states, probe protocol, exact-key cache, invalidation, chain resolution, and submission guard.
 - `raiker/models/local_operations.py`: human-only durable install/download/import/conversion job lifecycle.
 - `raiker/models/runtime_installers.py`: reviewed Ollama, LM Studio/llmster, and llama.cpp install plans and execution adapters.
 - `raiker/models/library.py`: approved roots, provider inventory adapters, bounded GGUF metadata indexing, and deployment records.
@@ -87,6 +88,7 @@ class ModelReadinessState(StrEnum):
     MODEL_MISSING = "model_missing"
     POLICY_BLOCKED = "policy_blocked"
     AUTHENTICATION_FAILED = "authentication_failed"
+    QUOTA_EXHAUSTED = "quota_exhausted"  # added in Task 13
     UNREACHABLE = "unreachable"
     UNSUPPORTED = "unsupported"
     STALE = "stale"
@@ -883,6 +885,126 @@ Run: `gh run list --branch main --commit "$(git rev-parse HEAD)" --limit 20`
 
 For every non-green workflow, inspect with `gh run view <run-id> --log-failed`, reproduce locally, add a regression where applicable, fix, commit, push, and monitor the new head. Completion requires every required workflow for the final pushed commit to report success.
 
+> Still open. FIXED-137 in `docs/plans/TO_BE_FIXED.md` records one CI failure found and fixed after BUG-69 landed on `main`; this step stays unchecked until a full run on the final head is confirmed green.
+
+### Task 13: Reference-platform parity review of the readiness control set
+
+**Files:**
+- Modify: `raiker/models/exceptions.py`
+- Modify: `raiker/models/providers/anthropic_messages.py`
+- Modify: `raiker/models/providers/openai_compatible.py`
+- Modify: `raiker/models/readiness.py`
+- Modify: `raiker/gateway/agent_gateway.py`
+- Modify: `apps/web/src/lib/apiTypes.ts`
+- Modify: `apps/web/src/lib/views/ModelsView.svelte`
+- Modify: `docs/REFERENCE_PLATFORM_COMPATIBILITY.md`
+- Test: `tests/test_model_quota_readiness.py`
+- Test: `tests/test_model_readiness_fallback_chain.py`
+- Test: `apps/web/src/lib/views/ModelsView.test.ts`
+
+**Interfaces:**
+- Consumes: Tasks 1–12.
+- Produces: `ProviderQuotaExhaustedError`, `is_quota_exhausted()`, `ModelReadinessState.QUOTA_EXHAUSTED`.
+- Produces: `ModelReadinessService.resolve_chain()` and chain-aware `require_ready()`.
+
+Reviewed against the model-selection and model-readiness control set of Claude
+Cowork, Claude Code, ChatGPT, Codex, OpenClaw, and Hermes Agent. Full mapping in
+`docs/REFERENCE_PLATFORM_COMPATIBILITY.md` → "Model readiness and acquisition
+control set". Three parity defects were found live and fixed here; the residual
+gaps are BUG-82 to BUG-84 in `docs/plans/TO_BE_FIXED.md`.
+
+- [x] **Step 1: Write failing quota, chain, and Models-headline tests**
+
+```python
+def test_anthropic_credit_balance_400_is_quota_not_a_connection_error() -> None:
+    provider = _anthropic(lambda _: httpx.Response(400, json=CREDIT_BALANCE_TOO_LOW))
+    with pytest.raises(ProviderQuotaExhaustedError, match="provider_quota_exhausted"):
+        asyncio.run(provider.chat(_chat("claude-haiku-4-5-20251001")))
+```
+
+```ts
+it("counts models proven ready, not providers holding a credential", async () => {
+  render(ModelsView);
+  expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+  expect(screen.queryByText("providers set up")).not.toBeInTheDocument();
+});
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `python -m pytest tests/test_model_quota_readiness.py tests/test_model_readiness_fallback_chain.py -q`
+
+Run: `npm --prefix apps/web test -- ModelsView.test.ts`
+Expected: `ProviderQuotaExhaustedError` and `resolve_chain` do not exist; the
+Models headline still counts saved connections.
+
+- [x] **Step 3: Classify billing failures, judge the whole chain, and stop claiming readiness the page never checked**
+
+Billing exhaustion is its own state. Anthropic answers an empty balance with
+HTTP 400 on a valid key and OpenAI with `insufficient_quota` on 429, so status
+alone sent owners to rotate a working credential or to debug a healthy network.
+`is_quota_exhausted(status, body)` reads the error body only to classify;
+the raised code is fixed (`provider_quota_exhausted:http_<status>`) so no
+provider prose reaches an event, an API response, or a readiness record. Bare
+`quota` is deliberately not a marker — it would swallow a per-minute rate limit
+that a retry does fix.
+
+`require_ready()` now resolves the same chain `RuntimeOrchestrator._provider_chain`
+builds: the primary followed by the owner's fallback sequence. A ready primary
+still wins, a refusal still reports the primary, and the resolution reads the
+per-profile pinned model so a hosted fallback shipping a `<model>` placeholder
+is no longer silently dropped from the chain the runtime will actually try.
+
+The Models headline reads `ready_provider_count`, the Test action on a provider
+card runs the exact-model readiness check instead of a catalogue listing, and
+each card carries a chip for its exact state.
+
+```python
+def require_ready(self, owner_principal_id, profile_id, model) -> ModelReadiness:
+    chain = self.resolve_chain(owner_principal_id, profile_id, model)
+    for readiness in chain:
+        if readiness.ready:
+            return readiness
+    raise ModelNotReady(chain[0])
+```
+
+- [x] **Step 4: Verify GREEN and the full local gate**
+
+Run: `python -m pytest -q`
+
+Run: `python -m ruff check . && python -m mypy raiker apps tests`
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+Expected: all pass; no existing readiness, guard, or provider contract test changes meaning.
+
+- [x] **Step 5: Re-verify live through the UI with a real credential**
+
+A fresh workspace, an Anthropic key entered only through the Models connect
+dialog, `claude-haiku-4-5-20251001` pinned from the live catalogue of ten
+models. The key carries no credit, which makes it an exact fixture for the new
+state: the catalogue call succeeds and every inference call returns HTTP 400
+`credit_balance_too_low`.
+
+Observed after the fix: the card reads **No credit**, Test reports "Anthropic
+accepted the credential but the account has no credit or quota left. Add credit
+or raise the quota on your Anthropic account, then check again.", the headline
+reads **0 models ready · 1 of 10 connected**, Chat shows the same sentence and
+keeps Send disabled with the draft preserved, and the browser console is clean.
+Evidence: `docs/plans/screenshots/working/bug69-models-quota-readiness-live.png`
+and `bug69-chat-quota-readiness-live.png`.
+
+A generative turn could not be completed in this round because the credential
+has no credit. Catalogue listing, credential storage, exact-model probing, state
+classification, cross-surface gating, and repair guidance were all exercised
+against the real provider; token generation was not.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add raiker/models apps/web/src apps/web/src/lib/views/ModelsView.test.ts tests docs
+git commit -m "fix: classify quota exhaustion and judge the whole model chain"
+```
+
 ## Plan self-review mapping
 
 - Readiness domain, all states, exact binding, freshness, invalidation: Tasks 1–3.
@@ -893,3 +1015,4 @@ For every non-green workflow, inspect with `gh run view <run-id> --log-failed`, 
 - Hugging Face search, licences, gating, GGUF-first download: Tasks 9 and 11.
 - Safetensors-only isolated conversion and quantization: Task 10 and Task 11.
 - Three-provider live testing, local GGUF/Hugging Face evidence, docs, push, green CI: Task 12.
+- Reference-platform parity for the readiness control set, billing/quota state, chain-aware gating: Task 13.

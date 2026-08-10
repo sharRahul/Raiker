@@ -247,6 +247,7 @@ export type ModelReadinessState =
   | "model_missing"
   | "policy_blocked"
   | "authentication_failed"
+  | "quota_exhausted"
   | "unreachable"
   | "unsupported"
   | "stale";

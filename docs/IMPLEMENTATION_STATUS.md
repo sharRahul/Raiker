@@ -116,3 +116,9 @@ managed llama.cpp deployment, Ollama pulls, and immutable Hugging Face GGUF
 downloads are implemented. Optional Safetensors conversion is
 `implemented_policy_gated` by explicit owner confirmation and the isolated
 container boundary.
+
+The gate judges the resolved chain — the selected model followed by the owner's
+fallback sequence — and an exhausted account is its own state
+(`quota_exhausted`), separate from an unreachable provider and a rejected
+credential. The advisor model is **not** covered by readiness (BUG-82), and
+revalidation is a fixed five-minute TTL with no background refresh (BUG-83).

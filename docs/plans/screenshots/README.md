@@ -233,3 +233,16 @@ value.
 | `212-BUG-69-local-library-live.png` | Approved-root GGUF discovery with name, architecture, quantization, and Deploy |
 | `213-BUG-69-huggingface-catalogue-live.png` | Live Hub results with immutable revision, licence, format, size, and GGUF variant choices |
 | `214-BUG-69-huggingface-download-deploy-live.png` | A tiny immutable Hub GGUF downloaded into an approved root and the newest managed llama.cpp deployment completed |
+
+## BUG-69 reference-platform parity review — 2026-08-09
+
+A second live round on a fresh workspace, driving the Models UI with a real
+Anthropic key entered only through the connect dialog. Both images were reviewed
+at rendered resolution and contain no credential value. The key holds no credit,
+which is what makes it an exact fixture for `quota_exhausted`: the catalogue call
+succeeds and every inference call is refused for billing.
+
+| File | Records |
+|---|---|
+| `bug69-models-quota-readiness-live.png` | FIXED-138 and FIXED-140 — the card reads **No credit** after Test ran the exact-model readiness check, the headline reads **0 models ready · 1 of 10 connected**, and every other card carries its own state chip |
+| `bug69-chat-quota-readiness-live.png` | The same verdict on the Chat surface: the billing sentence, the draft preserved, and Send disabled |

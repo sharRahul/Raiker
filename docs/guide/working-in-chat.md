@@ -252,14 +252,13 @@ are the edges a Chat user can still hit:
   the batch requires approval, the batch is walked one call at a time and pauses
   there; nothing behind the pause is lost, but a turn proposing three edits is
   three decisions.
-- **Web fetch is broken once you allow it.** `web_fetch` is off by default and
-  withholds at its default `ask` decision mode. Raising it to **Allow** does not
-  get you a fetched page: on the 2026-08-08 round every turn that called the
-  tool ended with `model_unavailable: provider_stream_failed`, for an
-  allowlisted and a non-allowlisted host alike. Leave it at `ask` until
-  **BUG-72** closes. `web_search` answers the same gate but has no endpoint
-  shipped with Raiker: it reports `web_search_not_configured` until you point it
-  at one.
+- **Web fetch is off until you turn it on, twice.** `web_fetch` is disabled by
+  default and still withholds at its default `ask` decision mode, so reaching
+  the open internet takes both the capability gate and a raised decision mode.
+  Once it is at **Allow**, a turn fetches the page and quotes it, and a host
+  outside `RAIKER_WEB_EGRESS_ALLOWLIST` is refused by name. `web_search` answers
+  the same gate but has no endpoint shipped with Raiker: it reports
+  `web_search_not_configured` until you point it at one.
 - **The context popover's input/output split reads `NaN`.** Everything else in
   it — used, capacity, remaining, this chat's cost, the provider all-time cost,
   and the four price components — is correct and provider-reported. **BUG-68**.

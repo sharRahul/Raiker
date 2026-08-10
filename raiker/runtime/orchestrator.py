@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import json
+import logging
 import time
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
@@ -35,6 +36,7 @@ from raiker.models.exceptions import (
     ModelProviderError,
     ProviderPolicyError,
     provider_error_code,
+    provider_failure_message,
 )
 from raiker.models.factory import capabilities_from_profile
 from raiker.models.router import ModelRouter
@@ -60,6 +62,77 @@ from raiker.verification.verifier import Verifier
 # cheap indexed read a second: fast enough that Stop feels immediate, rare
 # enough that it costs nothing across a long answer.
 _STOP_POLL_SECONDS = 1.0
+
+_LOGGER = logging.getLogger("raiker.runtime.orchestrator")
+
+
+def _log_provider_failure(
+    provider: str,
+    model: str,
+    exc: BaseException,
+    code: str,
+    *,
+    streaming: bool,
+) -> None:
+    """Put a failed model call in the server log (BUG-72).
+
+    A turn that died left no trace anywhere an operator would look: the audit
+    event is written for the *owner*, and there was no log line at all — so
+    "which exception was that?" had no answer after the fact. What goes out is
+    the same vetted material the event carries: the provider, the model, the
+    exception *class*, and the safe reason code. The exception's message is
+    deliberately not logged; a provider is free to put a key fragment or a
+    request body in it, and the code already says what happened.
+    """
+    _LOGGER.warning(
+        "model request failed: provider=%s model=%s streaming=%s error_class=%s reason=%s",
+        provider,
+        model,
+        streaming,
+        type(exc).__name__,
+        code,
+    )
+
+
+# Reason codes that mean "the request never reached a decision" — a closed or
+# refused connection, a timeout, a provider 5xx, or a stream that ended in an
+# exception nobody classified. One immediate re-attempt on the *same* model is
+# the right answer to all of them and to none of the others: an expired key, an
+# empty balance, a missing model and a rejected request are all decisions, and
+# asking again just spends the owner's quota to be told the same thing (BUG-72).
+_TRANSPORT_FAILURE_CODES = (
+    "provider_connection_failed",
+    "provider_timeout",
+    "provider_unavailable",
+)
+
+
+def _is_transport_failure(code: str) -> bool:
+    base = code.split(":", 1)[0]
+    if base in _TRANSPORT_FAILURE_CODES:
+        return True
+    # `provider_stream_failed` bare is a provider-declared stream error, which is
+    # a decision. `provider_stream_failed:<Type>` is an unclassified exception
+    # mid-stream — the shape a dropped connection takes.
+    return base == "provider_stream_failed" and ":" in code
+
+
+def _attempt_plan(
+    chain: list[tuple[str, str]],
+) -> list[tuple[int, str, str, bool]]:
+    """Each candidate, followed by one retry slot the caller may decline.
+
+    Returns ``(fallback_rank, provider, model, is_retry)``. The retry slot is
+    consumed only when the preceding attempt failed in transport; otherwise the
+    caller skips it, so a healthy chain and a chain that fails on a *decision*
+    both make exactly as many provider calls as they did before.
+    """
+    plan: list[tuple[int, str, str, bool]] = []
+    for rank, (provider, model) in enumerate(chain):
+        plan.append((rank, provider, model, False))
+        plan.append((rank, provider, model, True))
+    return plan
+
 
 _SYSTEM_PROMPT = (
     "You are Raiker, a local-first coding agent. Use the provided tools to inspect and change "
@@ -828,8 +901,22 @@ class RuntimeOrchestrator:
         # The last provider's own reason code, so a turn that runs out of
         # providers reports why rather than a generic "connection failed".
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
-        for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
-            if rank > 0:
+        # BUG-72 — a transport failure earns one immediate re-attempt on the same
+        # model before the chain falls through to the next one. `retry_armed` is
+        # set only by the failure handler below, so the extra slot costs nothing
+        # on a healthy turn or on a turn the provider actually decided.
+        retry_armed = False
+        for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
+            if is_retry and not retry_armed:
+                continue
+            retry_armed = False
+            if is_retry:
+                self._event(
+                    envelope,
+                    "model_request_retried",
+                    {"provider": provider, "model": model, "reason": last_error_code},
+                )
+            elif rank > 0:
                 self._event(
                     envelope,
                     "model_fallback_engaged",
@@ -867,6 +954,8 @@ class RuntimeOrchestrator:
                         "safe_error_code": last_error_code,
                     },
                 )
+                _log_provider_failure(provider, model, exc, last_error_code, streaming=False)
+                retry_armed = not is_retry and _is_transport_failure(last_error_code)
                 continue
             usage = summarize_model_usage(response.usage)
             self._event(
@@ -883,7 +972,7 @@ class RuntimeOrchestrator:
             self._record_usage(envelope, provider, model, usage)
             return response
         return ModelResponse(
-            text=f"model_unavailable: {last_error_code}", finish_reason="error"
+            text=provider_failure_message(last_error_code), finish_reason="error"
         )
 
     @staticmethod
@@ -936,8 +1025,22 @@ class RuntimeOrchestrator:
         another provider's response into the same transcript.
         """
         last_error_code = UNCLASSIFIED_PROVIDER_ERROR
-        for rank, (provider, model) in enumerate(self._provider_chain(envelope)):
-            if rank > 0:
+        # BUG-72 — a transport failure earns one immediate re-attempt on the same
+        # model before the chain falls through to the next one. `retry_armed` is
+        # set only by the failure handler below, so the extra slot costs nothing
+        # on a healthy turn or on a turn the provider actually decided.
+        retry_armed = False
+        for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
+            if is_retry and not retry_armed:
+                continue
+            retry_armed = False
+            if is_retry:
+                self._event(
+                    envelope,
+                    "model_request_retried",
+                    {"provider": provider, "model": model, "reason": last_error_code},
+                )
+            elif rank > 0:
                 self._event(
                     envelope,
                     "model_fallback_engaged",
@@ -1016,14 +1119,26 @@ class RuntimeOrchestrator:
                         "partial_output_exposed": output_committed,
                     },
                 )
+                _log_provider_failure(provider, model, exc, last_error_code, streaming=True)
                 for lifecycle in self._drain_sink():
                     yield lifecycle
                 if output_committed:
+                    # BUG-72 — the owner watched this text arrive; replacing it
+                    # with a reason code deletes work in front of them. Keep what
+                    # the model said and say plainly that the rest was lost.
                     yield ModelResponse(
-                        text="model_unavailable: provider_stream_failed_after_partial_output",
+                        text=(
+                            "".join(text_parts).rstrip()
+                            + "\n\n"
+                            + provider_failure_message(last_error_code)
+                        ).strip(),
                         finish_reason="error",
                     )
                     return
+                # Only a turn that has shown nothing may be re-attempted: the
+                # deltas already on screen cannot be un-said, so a retry would
+                # answer the same question twice in the same message.
+                retry_armed = not is_retry and _is_transport_failure(last_error_code)
                 continue
 
             response = ModelResponse(
@@ -1051,7 +1166,7 @@ class RuntimeOrchestrator:
             return
 
         yield ModelResponse(
-            text=f"model_unavailable: {last_error_code}", finish_reason="error"
+            text=provider_failure_message(last_error_code), finish_reason="error"
         )
 
     async def astream_handle(
@@ -1280,6 +1395,30 @@ class RuntimeOrchestrator:
         finally:
             self._sink = None
 
+    async def _aexecute_tool(
+        self,
+        action: ToolAction,
+        envelope: PromptEnvelope,
+        identity: TrustedTurnIdentity | None,
+    ) -> tuple[ToolResult, PolicyDecision]:
+        """Broker one tool call without occupying the event loop (BUG-72).
+
+        Every path that runs a tool inside a turn goes through here, so the
+        guarantee is the same for a lone call, a parallel read batch, and a call
+        drained from the approval queue: the broker — policy, gates, hooks,
+        checkpoints, the executor itself — runs on a worker thread. Governance
+        is unchanged; only *where* the blocking work happens is.
+        """
+        return await asyncio.to_thread(
+            self.tool_broker.execute,
+            action,
+            session_id=envelope.session_id,
+            turn_id=envelope.turn_id,
+            machine_identity=identity,
+            client=envelope.client,
+            approval_mode=envelope.options.approval_mode,
+        )
+
     async def _arun_agent_loop(
         self,
         envelope: PromptEnvelope,
@@ -1345,13 +1484,8 @@ class RuntimeOrchestrator:
                 for pending in self._drain_sink():
                     yield pending
                 continue
-            queued_result, queued_decision = self.tool_broker.execute(
-                action,
-                session_id=envelope.session_id,
-                turn_id=envelope.turn_id,
-                machine_identity=identity,
-                client=envelope.client,
-                approval_mode=envelope.options.approval_mode,
+            queued_result, queued_decision = await self._aexecute_tool(
+                action, envelope, identity
             )
             self._state(machine, envelope, "POLICY_REVIEWED")
             if queued_decision.decision == "needs_approval":
@@ -1503,7 +1637,9 @@ class RuntimeOrchestrator:
                 break
             if response.finish_reason == "error":
                 status = "failed"
-                message = response.text or f"model_unavailable: {UNCLASSIFIED_PROVIDER_ERROR}"
+                message = response.text or provider_failure_message(
+                    UNCLASSIFIED_PROVIDER_ERROR
+                )
                 break
             if not response.tool_calls:
                 final_text = response.text
@@ -1541,23 +1677,20 @@ class RuntimeOrchestrator:
             # claims. The model receives one assistant message followed by one
             # result for every call id, as provider tool protocols require.
             read_only = all(not action.requires_approval for action in actions)
-            async def execute_one(
-                action: ToolAction, *, parallel: bool = read_only and len(actions) > 1
-            ) -> tuple[ToolResult, PolicyDecision]:
-                if parallel:
-                    return await asyncio.to_thread(
-                        self.tool_broker.execute, action,
-                        session_id=envelope.session_id, turn_id=envelope.turn_id,
-                        machine_identity=identity,
-                        client=envelope.client,
-                        approval_mode=envelope.options.approval_mode,
-                    )
-                return self.tool_broker.execute(
-                    action, session_id=envelope.session_id, turn_id=envelope.turn_id,
-                    machine_identity=identity,
-                    client=envelope.client,
-                    approval_mode=envelope.options.approval_mode,
-                )
+            async def execute_one(action: ToolAction) -> tuple[ToolResult, PolicyDecision]:
+                # BUG-72 — always off the event loop, never only when the batch
+                # happens to hold more than one call. `ToolBroker.execute` is
+                # synchronous and every tool underneath it is too: a `web_fetch`
+                # is a blocking DNS lookup plus an HTTPS GET with a 15-second
+                # cap, a connector read is an outbound request, a container tool
+                # is a cold start. Running any of those inline froze the whole
+                # ASGI process for their duration — no other request served, no
+                # stop control polled, and, the failure that made this a defect,
+                # no chance for the provider client to notice its pooled
+                # connection had been closed. The next model request then went
+                # out on a dead socket and the turn died as
+                # `model_unavailable: provider_stream_failed`.
+                return await self._aexecute_tool(action, envelope, identity)
             if read_only and len(actions) > 1:
                 executions = list(
                     await asyncio.gather(*(execute_one(action) for action in actions))

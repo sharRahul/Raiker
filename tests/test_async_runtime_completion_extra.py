@@ -101,7 +101,7 @@ def test_provider_failure_emits_failed_event_without_prompt(tmp_path: Path) -> N
     # The provider's own reason code survives to the user-facing message: a
     # failed turn says *why* it failed rather than collapsing every cause into
     # one generic "connection failed".
-    assert response.message == "model_unavailable: provider_unreachable"
+    assert "model_unavailable: provider_unreachable" in response.message
     events = _event_payloads(tmp_path)
     model_events = [e for e in events if e["event_type"].startswith("model_request_")]
     assert any(e["event_type"] == "model_request_failed" for e in model_events)

@@ -27,6 +27,12 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
 
+import {
+  dismissFirstRunModelSetup,
+  refreshHostedReadiness,
+  useHostedModel,
+} from "./hosted-provider";
+
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = "Web-access-turn-control-1!";
@@ -57,6 +63,8 @@ async function signIn(target: Page) {
   } else {
     await target.getByRole("button", { name: /unlock|sign in/i }).click();
   }
+  // A brand-new instance opens the first-run model sheet over the workbench.
+  await dismissFirstRunModelSetup(target);
   await expect(target.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 30_000 });
 }
 
@@ -122,18 +130,12 @@ test("the provider key is added through the UI and a real turn answers", async (
   test.setTimeout(240_000);
   expect(ANTHROPIC_KEY, "set RAIKER_LIVE_ANTHROPIC_KEY").not.toBe("");
 
-  await page.goto(`${BASE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
-  await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
-  await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
-  await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
-
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption(MODEL);
-  await card.getByRole("button", { name: "Use model" }).click();
+  const card = await useHostedModel(page, BASE, {
+    provider: "Anthropic",
+    keyLabel: "Anthropic API key",
+    key: ANTHROPIC_KEY,
+    model: MODEL,
+  });
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });
@@ -148,6 +150,7 @@ test("the provider key is added through the UI and a real turn answers", async (
 
 test("B12/C7 — a web read is withheld with its reason before the owner enables it", async () => {
   test.setTimeout(300_000);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
@@ -177,6 +180,7 @@ test("B12/C7 — once enabled and allowed, the agent reads a real page", async (
   await allowCapability("Web fetch", "B12/C7 live verification");
   await page.screenshot({ path: join(SHOTS, "b12-web-fetch-capability.png"), fullPage: true });
 
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
@@ -197,6 +201,7 @@ test("B12/C7 — once enabled and allowed, the agent reads a real page", async (
 
 test("B12/C7 — a host outside the owner's allowlist is still refused", async () => {
   test.setTimeout(300_000);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
@@ -216,6 +221,7 @@ test("B12/C7 — a host outside the owner's allowlist is still refused", async (
 
 test("B17/C13 — the owner steers a running turn, and its words reach the model", async () => {
   test.setTimeout(300_000);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
@@ -246,6 +252,7 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
 
 test("B17/C13 — the owner stops a running turn, and it ends as stopped", async () => {
   test.setTimeout(300_000);
+  await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });

@@ -174,6 +174,11 @@ EVENT_TYPES = {
     "model_health_check_completed",
     "model_provider_rejected_by_policy",
     "model_fallback_engaged",
+    # BUG-72 — one re-attempt on the same model after a transport failure. It is
+    # its own type rather than a second `model_request_started`, so the audit
+    # trail distinguishes "the turn asked twice" from "the turn asked twice
+    # because the first attempt never reached the provider".
+    "model_request_retried",
     "model_profile_selected",
     "model_capabilities_inspected",
     "reasoning_setting_changed",

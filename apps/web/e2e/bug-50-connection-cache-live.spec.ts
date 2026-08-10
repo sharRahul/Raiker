@@ -46,6 +46,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -207,8 +208,7 @@ test("a real hosted turn still answers on the host that served them", async () =
   test.setTimeout(300_000);
   test.skip(ANTHROPIC_KEY === "", "no RAIKER_LIVE_ANTHROPIC_KEY for a hosted turn");
 
-  await page.goto(`${BASE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
+  const card = await hostedProviderCard(page, BASE, "Anthropic");
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
   await page.locator(".signin-connect").click();

@@ -546,7 +546,7 @@ say why (§3). `r0808-82-extensions-*.png`.
 | # | Step | Expected | Result |
 |---|---|---|---|
 | 11.1 | With **Web fetch** at `ask`, ask Chat to fetch a page | The call is withheld | ⚠ withheld, but **narrated by the model**, not disclosed by the runtime, and no approval is raised — re-confirms the open **BUG-60**. `r0808-84-web-fetch-withheld-at-ask.png` |
-| 11.2 | Set **Web fetch** to **Allow** and ask again | The page is fetched and quoted | ❌ **BUG-72** — the turn dies with `model_unavailable: provider_stream_failed`, 4 / 4 attempts, for both an allowlisted and a non-allowlisted host. No audit event, no server log line. `not-working/BUG-r0808-06-web-fetch-turn-fails-with-raw-reason-code.png` |
+| 11.2 | Set **Web fetch** to **Allow** and ask again | The page is fetched and quoted | ✅ re-run 2026-08-10 after **FIXED-142**: the turn fetches `https://pypi.org/project/httpx/` and quotes it with a source chip; a non-allowlisted host is still refused by name. `working/b12-web-fetch-live-page.png`, `working/b12-web-fetch-egress-denied.png` |
 
 ---
 
@@ -649,7 +649,7 @@ the trigger. `r0808-80-*`, `r0808-81-*`.
 | Do the different task types work? | **Yes** — all four create, schedule, run and report |
 | Does the MCP server work? | **Yes** — create, connect, discover, and call from Chat once the decision mode allows it; output arrives marked untrusted |
 | Do Permissions / Capabilities work? | **Yes** — 67 gates, four decision modes, step-up with a required reason. Two caveats: **BUG-71** (Memory store has no executor) and **BUG-70** (Build's chips change modes without the step-up) |
-| Does the network capability work? | **No** — enabling Web fetch breaks every turn that uses it (**BUG-72**) |
+| Does the network capability work? | **Yes** — once Web fetch is enabled and set to **Allow**, a turn fetches the page and quotes it; a non-allowlisted host is refused by name (**BUG-72 closed 2026-08-10**) |
 | Can you see what the agent plans to do? | **Yes** — a live `update_plan` checklist above the transcript |
 | Can the agent search without flooding the conversation? | **Yes** — `spawn_subagent` returns findings only |
 | Does a first run just work? | **Yes** — setup is prompted; without a ready model, actions stay disabled with a Models link (**BUG-69 closed 2026-08-09**) |

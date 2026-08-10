@@ -1,5 +1,6 @@
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
+import { hostedProviderCard } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
@@ -13,8 +14,7 @@ let context: BrowserContext;
 let page: Page;
 
 async function connectProvider(provider: string, keyLabel: string, key: string): Promise<Locator> {
-  await page.goto(`${BASE}/#/models`);
-  const card = page.locator("article.provider-card").filter({ hasText: provider });
+  const card = await hostedProviderCard(page, BASE, provider);
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel(keyLabel).fill(key);
   await page.locator(".signin-connect").click();

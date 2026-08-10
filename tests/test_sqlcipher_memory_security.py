@@ -83,61 +83,63 @@ def test_a_threadpool_stays_under_the_declared_ceiling(
     close_cached_connections()
 
 
-def test_memory_security_is_resolved_explicitly_and_reported(
+def test_memory_security_is_off_unless_the_owner_asks_for_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Whichever way the decision goes, it is stated rather than implicit."""
+    """The decision is stated, and the default is the cheap, openable one.
+
+    Locking key pages costs roughly seven times on every store operation, and
+    when the platform's allowance runs out the failure is a total lockout at
+    sign-in rather than slow work — which is exactly BUG-86. So Raiker does not
+    lock by default, says which posture it is on, and honours an owner who asks
+    for the other one.
+    """
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
+    assert resolve_memory_security(refresh=True) == (
+        False,
+        "default_off_cost_and_lockout_risk",
+    )
+
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
     assert resolve_memory_security(refresh=True) == (True, "requested_on")
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     assert resolve_memory_security(refresh=True) == (False, "requested_off")
 
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
-    monkeypatch.setattr(sqlite_module, "_memlock_allowance_bytes", lambda: 8 * 1024 * 1024)
-    monkeypatch.setenv("RAIKER_SQLITE_CONNECTION_CACHE_CEILING", "1024")
-    enabled, reason = resolve_memory_security(refresh=True)
-    assert enabled is False
-    assert reason.startswith("memlock_allowance_below_budget:")
-
-    monkeypatch.setattr(sqlite_module, "_memlock_allowance_bytes", lambda: 1 << 40)
-    assert resolve_memory_security(refresh=True) == (True, "memlock_allowance_sufficient")
-
-    # A platform that will not report an allowance is not one to spend against:
-    # Windows is the case BUG-46 recorded, with the same lockout.
-    monkeypatch.setattr(sqlite_module, "_memlock_allowance_bytes", lambda: None)
-    assert resolve_memory_security(refresh=True) == (False, "memlock_allowance_unreadable")
-
+    resolve_memory_security(refresh=True)
     posture = memory_security_posture()
     assert posture["cipher_memory_security"] == "off"
-    assert posture["memory_security_reason"] == "memlock_allowance_unreadable"
+    assert posture["memory_security_reason"] == "default_off_cost_and_lockout_risk"
+    # The allowance is reported so an owner deciding whether to turn it on can
+    # see what this platform would actually give them. -1 is unlimited; None is
+    # a platform that will not say.
+    assert "memlock_allowance_bytes" in posture
     resolve_memory_security(refresh=True)
 
 
-def test_a_refused_lock_falls_back_and_records_it_when_raiker_chose_the_policy(
+def test_the_pragma_is_set_explicitly_and_defaults_to_off(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Raiker's own choice yields to a workspace that opens — and says so."""
+    """Set on every connection, so the posture never depends on the build.
+
+    Read back from the connection rather than timed: the cost is real — 0.17 s
+    against 1.14 s for a bootstrap plus two hundred reads — but a stopwatch is
+    not a property a test should rest on.
+    """
     close_cached_connections()
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
-    monkeypatch.setattr(sqlite_module, "_memlock_allowance_bytes", lambda: 1 << 40)
-    assert resolve_memory_security(refresh=True) == (True, "memlock_allowance_sufficient")
-
-    real_open = SQLiteStore._open_keyed
-    refusals = 0
-
-    def refusing_open(self: SQLiteStore) -> Any:
-        nonlocal refusals
-        if resolve_memory_security()[0]:
-            refusals += 1
-            raise MemoryError("cannot allocate locked pages")
-        return real_open(self)
-
-    monkeypatch.setattr(SQLiteStore, "_open_keyed", refusing_open)
+    resolve_memory_security(refresh=True)
     store = SQLiteStore(tmp_path)
-    assert store.table_names()
-    assert refusals >= 1
-    assert resolve_memory_security() == (False, "memlock_refused_by_platform")
+    assert str(store.connect().execute("PRAGMA cipher_memory_security").fetchone()[0]) == "0"
+
     close_cached_connections()
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
+    resolve_memory_security(refresh=True)
+    locked = SQLiteStore(tmp_path)
+    assert str(locked.connect().execute("PRAGMA cipher_memory_security").fetchone()[0]) == "1"
+
+    close_cached_connections()
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
     resolve_memory_security(refresh=True)
 
 
@@ -156,8 +158,10 @@ def test_a_refused_lock_fails_closed_by_name_when_the_owner_demanded_it(
     with pytest.raises(StoreUnavailableError) as raised:
         SQLiteStore(tmp_path)
     assert raised.value.reason == "store_memory_lock_unavailable"
-    # The message names the machine and what it refused, not "verification".
+    # The message names the machine, what it refused, and the setting that
+    # asked for it — not "verification".
     assert "lock the memory pages" in raised.value.detail
+    assert "RAIKER_SQLCIPHER_MEMORY_SECURITY=on" in raised.value.detail
     close_cached_connections()
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
     resolve_memory_security(refresh=True)

@@ -55,23 +55,31 @@ lock the pages holding key material so they are never paged to disk
 the operating system sets — 8 MB by default on the Linux host where FIXED-150
 was reproduced, a working-set quota on Windows.
 
-Raiker's decision, made explicitly rather than left to the platform:
+Raiker's decision, made explicitly rather than left to whatever SQLCipher was
+built with: **the pragma is set on every connection, and it is off unless the
+owner asks for it.** Two measured facts decide it.
 
-* **Memory security is best effort and always explicit.** At startup Raiker
-  reads the locked-memory allowance and compares it with what its connection
-  ceiling could want. If the allowance covers it, the pragma is set **on**,
-  before the key. If it does not — or if the platform will not report an
-  allowance at all — the pragma is set **off**, and that is *recorded*: a
-  warning names the reason, and `GET /api/health` reports
-  `cipher_memory_security` and `memory_security_reason` on every probe.
-* **A workspace that opens beats key pages the platform was never going to
-  lock.** The alternative, failing closed by default, is the lockout FIXED-150
-  and BUG-46 both record — and it fails at *authentication*, so it takes the
-  whole product with it.
-* **An owner who wants the stronger posture says so.** With
-  `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is forced on and a refused
-  lock fails closed by name (`store_memory_lock_unavailable`, HTTP 503), rather
-  than surfacing as a bare `MemoryError` inside a request handler.
+* **Cost.** Locking makes SQLCipher lock and wipe its buffers around every
+  operation. Opening a workspace and running two hundred reads takes **0.17 s**
+  with the pragma off and **1.14 s** with it on — about seven times, paid by
+  every turn, every task and every page load. SQLCipher itself defaults it off
+  in 4.x for this reason.
+* **Failure mode.** When the platform's allowance runs out the failure is not
+  slower work, it is `MemoryError` on *every* request — because authentication
+  opens the store. That is FIXED-150, and BUG-46 before it. A defence whose
+  failure mode is "nobody can sign in" is not a good default for a local-first
+  product.
+
+So Raiker does not lock key pages by default, and it **says so** rather than
+leaving the owner to guess: `GET /api/health` reports `cipher_memory_security`,
+`memory_security_reason`, and `memlock_allowance_bytes` — what this platform
+would actually have allowed (`-1` unlimited, `null` where it will not say).
+
+**An owner who wants the stronger posture says so.** With
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=on` the pragma is forced on, and because that
+is their decision it is honoured exactly: a refused lock fails **closed** by name
+(`store_memory_lock_unavailable`, HTTP 503, naming the setting that asked for
+it) rather than surfacing as a bare `MemoryError` inside a request handler.
 
 **Key-bearing connections are bounded absolutely.** One keyed connection is
 cached per `(workspace, thread)`, evicted least-recently-used, under a

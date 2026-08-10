@@ -308,16 +308,17 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
   conversation on the 2026-08-08 round ended, durably, saying "No command was
   executed" beneath the chip for the file the approval had just written. Three
   targeted reproductions did not recur. Tracked as **BUG-73**.
-- **Key pages are not always locked into RAM.** The workspace database is
-  SQLCipher-encrypted. SQLCipher can also lock the pages holding key material so
-  they never reach swap, and that draws on a per-process allowance the operating
-  system sets — commonly 8 MB on Linux, a working-set quota on Windows. Raiker
-  probes the allowance and turns the pragma on when it covers what it may cache;
-  when it does not, it runs with the pragma **off and says so**, in the log and
-  on `GET /api/health`. A workspace that opens beats key pages the platform was
-  never going to lock — the alternative is a lockout at sign-in, which is what
-  FIXED-150 records. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to demand the
-  stronger posture; a refused lock then fails closed and names why.
+- **Key pages are not locked into RAM by default.** The workspace database is
+  SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
+  material so they never reach swap — and Raiker leaves that **off**, explicitly,
+  for two measured reasons: it costs about seven times on every store operation
+  (0.17 s versus 1.14 s for a bootstrap plus two hundred reads), and when the
+  platform's locked-memory allowance runs out the failure is not slow work but
+  `MemoryError` on every request, because authentication opens the store — the
+  lockout FIXED-150 records. Which posture you are on is not left to guesswork:
+  `GET /api/health` reports the setting, the reason, and the allowance this
+  machine would have given. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to demand
+  the stronger one; a refused lock then fails closed and names why.
 - **Shipped list prices are unverified defaults.** `config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current

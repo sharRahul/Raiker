@@ -413,29 +413,35 @@ def cached_connection_count() -> int:
 # connection fails with ``MemoryError`` and *every* request fails with it,
 # because authentication opens the store.
 #
-# The decision, stated rather than left implicit: memory security is best effort
-# and always explicit. Raiker asks the platform what it will allow, turns the
-# pragma on when the allowance covers the connections it may cache, and turns it
-# **off and records that it did** when it does not — a workspace that opens is
-# worth more than key pages that cannot be locked anyway. An owner who needs the
-# stronger posture sets ``RAIKER_SQLCIPHER_MEMORY_SECURITY=on``; that forces the
-# pragma on and turns a lock failure into a named fail-closed condition instead
-# of a bare ``MemoryError``.
+# The decision, stated rather than left implicit: **the pragma is set on every
+# connection, and it is off unless the owner asks for it.** Two facts decide it,
+# and both were measured rather than assumed:
+#
+# * **Cost.** Memory security makes SQLCipher lock and wipe its buffers around
+#   every operation. Opening a workspace and running two hundred reads takes
+#   0.17 s with it off and 1.14 s with it on — about seven times. SQLCipher
+#   itself defaults it off in 4.x for this reason.
+# * **Failure mode.** When the platform's locked-memory allowance runs out the
+#   failure is not degraded performance, it is `MemoryError` on *every* request,
+#   because authentication opens the store. That is BUG-86, and BUG-46 before it.
+#
+# So Raiker does not lock key pages by default, and says so rather than leaving
+# it to whatever SQLCipher was built with: `GET /api/health` reports the setting,
+# the reason, and the allowance the platform would have given. An owner who wants
+# the stronger posture sets ``RAIKER_SQLCIPHER_MEMORY_SECURITY=on``, and because
+# that is their decision it is honoured exactly — a refused lock then fails
+# **closed**, by name, instead of surfacing as a bare ``MemoryError``.
 _MEMORY_SECURITY_ENV = "RAIKER_SQLCIPHER_MEMORY_SECURITY"
-# What one keyed connection is assumed to want locked. SQLCipher locks its key,
-# key-derivation scratch space and page buffers; 512 KB per connection is a
-# deliberately generous estimate, so the probe errs towards turning the pragma
-# off rather than towards the lockout this bug records.
-_MEMORY_LOCK_PER_CONNECTION_BYTES = 512 * 1024
 _MEMORY_SECURITY_LOCK = threading.Lock()
 _MEMORY_SECURITY: tuple[bool, str] | None = None
 
 
-def _memlock_allowance_bytes() -> int | None:
+def memlock_allowance_bytes() -> int | None:
     """The process's locked-memory allowance, or ``None`` where unreadable.
 
-    ``-1`` from ``getrlimit`` means unlimited and is reported as such by
-    returning a value above any budget.
+    Reported so an owner deciding whether to turn memory security on can see
+    what the platform would actually give them. ``-1`` from ``getrlimit`` means
+    unlimited. Windows reports nothing here, which is itself worth showing.
     """
     try:
         import resource  # noqa: PLC0415 - POSIX only, imported where it is used
@@ -446,16 +452,18 @@ def _memlock_allowance_bytes() -> int | None:
     except (AttributeError, OSError, ValueError):
         return None
     if soft < 0:
-        return None if soft != -1 else 1 << 62
+        return -1 if soft == -1 else None
     return int(soft)
 
 
 def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
     """``(enabled, reason)`` for ``PRAGMA cipher_memory_security``.
 
-    Resolved once per process and reported verbatim on the health endpoint, so
-    the posture Raiker is actually running under is readable rather than
-    guessed. ``refresh`` re-resolves it, which only tests need.
+    Off unless the owner asks for it, for the two reasons in the note above:
+    locking costs roughly seven times on every store operation, and when the
+    platform's allowance runs out the failure is a total lockout rather than
+    slow work. Resolved once per process and reported verbatim on the health
+    endpoint. ``refresh`` re-resolves it, which only tests need.
     """
     global _MEMORY_SECURITY
     with _MEMORY_SECURITY_LOCK:
@@ -467,25 +475,16 @@ def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
         elif declared in {"off", "0", "false", "no"}:
             resolved = (False, "requested_off")
         else:
-            allowance = _memlock_allowance_bytes()
-            budget = connection_cache_ceiling() * _MEMORY_LOCK_PER_CONNECTION_BYTES
-            if allowance is None:
-                # An allowance the platform will not report is not an allowance
-                # to spend. Windows is the case in point, and BUG-46 recorded
-                # this same lockout there.
-                resolved = (False, "memlock_allowance_unreadable")
-            elif allowance >= budget:
-                resolved = (True, "memlock_allowance_sufficient")
-            else:
-                resolved = (False, f"memlock_allowance_below_budget:{allowance}:{budget}")
+            resolved = (False, "default_off_cost_and_lockout_risk")
         _MEMORY_SECURITY = resolved
         if not resolved[0]:
             # Recorded, not silent: running without locked key pages is a real
-            # posture change and the owner is entitled to see that it happened.
-            _LOG.warning(
+            # posture, and the owner is entitled to see which one they are on.
+            _LOG.info(
                 "SQLCipher memory security is off (%s); workspace key pages are "
-                "not locked into RAM on this machine.",
+                "not locked into RAM. Set %s=on to change that.",
                 resolved[1],
+                _MEMORY_SECURITY_ENV,
             )
         return resolved
 
@@ -500,6 +499,8 @@ def memory_security_posture() -> dict[str, Any]:
         # posture overwrite the failure — the kind of quiet contradiction this
         # bug is about.
         "memory_security_reason": reason,
+        # -1 means unlimited; null means the platform would not say.
+        "memlock_allowance_bytes": memlock_allowance_bytes(),
         "connection_ceiling": connection_cache_ceiling(),
     }
 
@@ -520,8 +521,8 @@ def store_health(workspace_root: str | Path) -> dict[str, Any]:
         return {
             "store": "unavailable",
             "reason": "store_memory_lock_unavailable",
-            "detail": "This machine would not lock the memory pages SQLCipher holds "
-            "the workspace key in.",
+            "detail": "This machine would not give SQLCipher the memory it needs to "
+            "open the workspace database.",
             **posture,
         }
     except Exception as exc:  # noqa: BLE001 - any open failure is one condition here
@@ -695,27 +696,30 @@ class SQLiteStore:
         return connection
 
     def _reopen_after_memory_error(self, error: MemoryError) -> sqlite3.Connection:
-        """Recover a keyed connection after a locked-memory refusal, or fail named.
+        """Recover a keyed connection after a memory refusal, or fail named.
 
-        Called with ``_CONNECTIONS_LOCK`` held.
+        Give back every handle this thread may release — the population of
+        key-bearing connections is the thing most likely to have exhausted the
+        allowance — and try once more. If it still refuses, the condition is
+        named rather than left as a bare ``MemoryError`` escaping a request
+        handler. Called with ``_CONNECTIONS_LOCK`` held.
         """
-        global _MEMORY_SECURITY
         for stale in _releasable_locked(threading.get_ident()):
             with contextlib.suppress(Exception):
                 stale.close()
         with contextlib.suppress(MemoryError, sqlite3.Error):
             return self._open_keyed()
-        enabled, reason = resolve_memory_security()
-        if enabled and reason != "requested_on":
-            with _MEMORY_SECURITY_LOCK:
-                _MEMORY_SECURITY = (False, "memlock_refused_by_platform")
-            with contextlib.suppress(MemoryError, sqlite3.Error):
-                return self._open_keyed()
-        raise StoreUnavailableError(
-            "store_memory_lock_unavailable",
+        enabled, _reason = resolve_memory_security()
+        detail = (
             "This machine would not lock the memory pages SQLCipher holds the "
-            "workspace key in.",
-        ) from error
+            "workspace key in. Memory security is on because "
+            f"{_MEMORY_SECURITY_ENV}=on was set; unset it to run without locked "
+            "key pages."
+            if enabled
+            else "This machine would not give SQLCipher the memory it needs to "
+            "open the workspace database."
+        )
+        raise StoreUnavailableError("store_memory_lock_unavailable", detail) from error
 
     def bootstrap(self) -> None:
         self.paths.ensure()

@@ -6673,24 +6673,36 @@ unreadable.
   default 16), never a multiple of the thread count. A thread's own allowance is
   still the smaller of the per-thread limit and its share of the ceiling, so a
   request threadpool cannot multiply the population.
-* **Memory security is resolved explicitly, and the decision is stated.** This
-  is the choice the entry asked for, made in the open: Raiker probes the
-  platform's locked-memory allowance and sets
-  `PRAGMA cipher_memory_security` **before** the key. If the allowance covers
-  the connections it may cache, the pragma is on; if it does not — or if the
-  platform will not report one, which is the Windows case BUG-46 recorded — the
-  pragma is **off, and that is recorded**: a warning names the reason, and
-  `/api/health` reports `cipher_memory_security` and
-  `memory_security_reason` on every probe. A workspace that opens is worth more
-  than key pages the platform was never going to lock. An owner who needs the
-  stronger posture sets `RAIKER_SQLCIPHER_MEMORY_SECURITY=on`; that is their
-  decision, so it is honoured — a refused lock then fails **closed**, by name,
-  as `store_memory_lock_unavailable` rather than as a bare `MemoryError`.
+* **Memory security is set explicitly on every connection, and it is off unless
+  the owner asks for it.** This is the choice the entry asked for, made in the
+  open — and it was made twice, because the first answer was wrong. The first
+  attempt probed the platform's allowance and turned the pragma **on** wherever
+  it looked sufficient. That is defensible on paper and wrong in practice: it
+  made a bootstrap plus two hundred reads take **1.14 s instead of 0.17 s**,
+  about seven times, and it turned an 8-minute CI run into one still going after
+  two hours. It was caught by watching the CI job, not by a test.
+
+  The decision that ships weighs the two facts against each other. Locking costs
+  a multiple on every store operation, paid by every turn and every page load;
+  and when the allowance runs out the failure is not slow work but `MemoryError`
+  on *every* request, since authentication opens the store — this bug, and
+  BUG-46 before it. A defence whose failure mode is "nobody can sign in" is not
+  a default for a local-first product. So the pragma is set to **OFF**, before
+  the key, on every connection — set rather than inherited, so the posture never
+  depends on how SQLCipher was built — and Raiker **says which posture it is
+  on**: `/api/health` reports `cipher_memory_security`,
+  `memory_security_reason`, and `memlock_allowance_bytes`, the allowance this
+  machine would actually have given.
+
+  `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` is the owner's decision and is honoured
+  exactly: the pragma is forced on, and a refused lock fails **closed** by name
+  as `store_memory_lock_unavailable`, naming the setting that asked for it,
+  rather than surfacing as a bare `MemoryError`.
 * **A refusal is recoverable, then named.** On `MemoryError` the thread releases
-  every handle it may release and retries once; if Raiker chose the policy
-  itself it drops memory security and retries again, recording
-  `memlock_refused_by_platform`. Only then does it raise `StoreUnavailableError`,
-  which the API turns into a 503 carrying a reason code.
+  every handle it may release — the connection population is the likeliest thing
+  to have exhausted the allowance — and retries once. Only then does it raise
+  `StoreUnavailableError`, which the API turns into a 503 carrying a reason
+  code.
 * **The store and the strip now read the same probe.** `/api/health` opens and
   reads the store; `status` is `ok` only while both the server and the store
   are. The lock screen shows **"Encrypted store unavailable"** in the strip and
@@ -6699,11 +6711,11 @@ unreadable.
   disables the credential form, because no password can answer a store that
   will not open.
 
-**Evidence.** `tests/test_sqlcipher_memory_security.py` — eight tests covering
-the absolute ceiling, a six-thread pool staying under it, each branch of the
-policy decision, the fall-back-and-record path, the fail-closed path when the
-owner demanded memory security, the health view, and the cached handle whose
-key pages were reclaimed.
+**Evidence.** `tests/test_sqlcipher_memory_security.py` — the absolute ceiling,
+a six-thread pool staying under it, each branch of the policy decision, the
+pragma read back off a live connection in both postures, the fail-closed path
+when the owner demanded memory security, the health view, and the cached handle
+whose key pages were reclaimed.
 
 **Evidence (live).** `apps/web/e2e/critical-bugs-live.spec.ts` against a running
 host: [`working/215-FIXED-150-store-healthy-live.png`](screenshots/working/215-FIXED-150-store-healthy-live.png)

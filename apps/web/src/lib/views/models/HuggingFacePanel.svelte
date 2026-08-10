@@ -11,6 +11,12 @@
   let query = $state("");
   let searching = $state(false);
   let results = $state<HuggingFaceSearchResult[]>([]);
+  // The Hub cannot be browsed exhaustively, so this stays search-first. What it
+  // must not do is open to an empty box: an owner who does not already know a
+  // repository id had nowhere to start. Until the first search, the list shows
+  // the most-downloaded GGUF repositories.
+  let showingTrending = $state(false);
+  let loadingTrending = $state(true);
   let selectedRepo = $state<string | null>(null);
   let variants = $state<HuggingFaceVariant[]>([]);
   let selected = $state<HuggingFaceVariant | null>(null);
@@ -29,6 +35,23 @@
     n < 1024 ** 3
       ? `${(n / 1024 ** 2).toFixed(0)} MB`
       : `${(n / 1024 ** 3).toFixed(1)} GB`;
+  async function loadTrending() {
+    loadingTrending = true;
+    try {
+      results = (await api.trendingHuggingFace()).items;
+      showingTrending = results.length > 0;
+    } catch {
+      // A Hub that cannot be reached is not an error worth interrupting the
+      // panel for before the owner has asked for anything; the empty state
+      // still explains what to do, and a real search reports the failure.
+      results = [];
+      showingTrending = false;
+    } finally {
+      loadingTrending = false;
+    }
+  }
+  void loadTrending();
+
   async function search() {
     if (!query.trim()) return;
     searching = true;
@@ -37,6 +60,7 @@
     variants = [];
     try {
       results = (await api.searchHuggingFace(query.trim())).items;
+      showingTrending = false;
     } catch (e) {
       error =
         e instanceof ApiError
@@ -216,8 +240,15 @@
 
   <div class="catalogue">
     <section class="results" aria-label="Hugging Face search results">
+      {#if showingTrending}<p class="results-lead">
+          Most downloaded GGUF models — search above for anything else.
+        </p>{/if}
       {#if results.length === 0}<div class="empty">
-          <strong>Search the Hub catalogue</strong><span
+          <strong
+            >{loadingTrending
+              ? "Loading popular models…"
+              : "Search the Hub catalogue"}</strong
+          ><span
             >Results stay here; selecting one reveals immutable downloadable
             variants.</span
           >
@@ -302,7 +333,7 @@
         type="button"
         disabled={!destination || preview === null}
         onclick={() => void download()}>Confirm download</button
-      >{#if !destination}<a href="#/models?tab=library"
+      >{#if !destination}<a href="#/models?tab=local"
           >Approve a model folder first →</a
         >{/if}
     </section>{/if}
@@ -474,6 +505,11 @@
   }
   .incomplete {
     opacity: 0.55;
+  }
+  .results-lead {
+    color: var(--text-3);
+    font-size: 0.76rem;
+    margin: 0 0 8px;
   }
   .empty {
     height: 100%;

@@ -24,11 +24,13 @@ from raiker.models.exceptions import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
+    ProviderQuotaExhaustedError,
     ProviderRateLimitError,
     ProviderResponseValidationError,
     ProviderStreamError,
     ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
+    is_quota_exhausted,
 )
 from raiker.models.health import ProviderHealth
 from raiker.models.providers.llama_cpp_server import _parse_text_json_tool_calls, _parse_tool_calls
@@ -51,7 +53,12 @@ def _join_origin(base: str, path: str) -> str:
     return urlunsplit((parts.scheme, parts.netloc, joined, "", ""))
 
 
-def _map_status(status: int, *, model: str) -> Exception:
+def _map_status(status: int, *, model: str, body: str = "") -> Exception:
+    # OpenAI reports an exhausted allowance as 429 `insufficient_quota` and
+    # OpenAI-compatible routers as a bare 402. Neither is fixed by waiting, so
+    # neither may be reported as a rate limit.
+    if is_quota_exhausted(status, body):
+        return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
     if status in {401, 403}:
         return ProviderAuthenticationError(f"provider_auth_failed:http_{status}")
     if status == 404:
@@ -275,7 +282,7 @@ class AsyncOpenAICompatibleProvider:
         except httpx.HTTPError as exc:
             raise ProviderConnectionError("provider_connection_failed") from exc
         if response.status_code >= 400:
-            raise _map_status(response.status_code, model=self.model)
+            raise _map_status(response.status_code, model=self.model, body=response.text)
         return response
 
     async def health(self, *, timeout: float = 1.0) -> ProviderHealth:
@@ -314,7 +321,7 @@ class AsyncOpenAICompatibleProvider:
             method, _join_origin(self.endpoint, path), headers=headers, **kwargs
         )
         if response.status_code >= 400:
-            raise _map_status(response.status_code, model=self.model)
+            raise _map_status(response.status_code, model=self.model, body=response.text)
         return _json(response)
 
     async def _with_local_context(
@@ -529,7 +536,13 @@ class AsyncOpenAICompatibleProvider:
                 timeout=self.timeout,
             ) as response:
                 if response.status_code >= 400:
-                    raise _map_status(response.status_code, model=self.model)
+                    # Streamed responses have not read their body yet, and the
+                    # classification below needs it.
+                    raise _map_status(
+                        response.status_code,
+                        model=self.model,
+                        body=(await response.aread()).decode("utf-8", "replace"),
+                    )
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data:"):
                         continue

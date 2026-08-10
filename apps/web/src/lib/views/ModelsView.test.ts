@@ -1,5 +1,5 @@
-// Coverage for the Models view: its action-category tabs (Providers, Library,
-// Discover, Activity, Routing, Pricing, Posture), provider selection and catalogue, and the fallback-sequence
+// Coverage for the Models view: its action-category tabs (Local, Hosted,
+// Hugging Face, Activity, Routing, Pricing, Posture), provider selection and catalogue, and the fallback-sequence
 // and advisor editors on the Routing tab. The read is the single GET
 // /api/models; writes go to PUT /api/model-fallback, /api/model-selection, and
 // /api/model-advisor (human gate-manager only, enforced server-side).
@@ -105,6 +105,132 @@ describe("ModelsView state grammar", () => {
     );
   });
 
+  // BUG-69 — the headline counted providers with a saved credential and called
+  // them "set up". A saved key is not a working model: on 2026-08-09 a live run
+  // showed "1 of 10 providers set up" on this page while Chat, correctly, said
+  // "No readiness check exists for this exact model" and refused to send.
+  it("counts models proven ready, not providers holding a credential", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic",
+      provider: "anthropic",
+      model: "opus",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+      readiness_state: "not_configured",
+    });
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView);
+
+    expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+    expect(screen.queryByText("providers set up")).not.toBeInTheDocument();
+  });
+
+  // The page used to put local runtimes, hosted accounts, advanced routers,
+  // install actions, and the GGUF library in one scroll called "Providers".
+  // They are separate jobs: obtaining a model that runs on this machine, and
+  // signing in to somebody else's. Each now owns a tab.
+  const localProfile = () =>
+    profile({
+      profile_id: "ollama-local-openai-compatible",
+      provider: "ollama",
+      model: "gemma4:31b-cloud",
+      local_only: true,
+      requires_network: false,
+      endpoint_kind: "local",
+    });
+  const hostedProfile = () =>
+    profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      local_only: false,
+      requires_network: true,
+      off_machine: true,
+      endpoint_kind: "hosted",
+    });
+
+  it("keeps hosted accounts off the Local tab", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [localProfile(), hostedProfile()],
+        chat_profiles: [localProfile(), hostedProfile()],
+      }),
+      "GET /api/model-library": { roots: [], models: [] },
+    });
+    render(ModelsView, { tab: "local" });
+
+    expect(await screen.findByText("On this device")).toBeInTheDocument();
+    // Building a local model lives here: install a runtime, pull, and index.
+    expect(screen.getByText("Install, connect, or pull")).toBeInTheDocument();
+    expect(screen.queryByText("Your hosted providers")).not.toBeInTheDocument();
+    expect(screen.queryByText("Advanced connections")).not.toBeInTheDocument();
+  });
+
+  it("keeps local runtimes and install actions off the Hosted tab", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [localProfile(), hostedProfile()],
+        chat_profiles: [localProfile(), hostedProfile()],
+      }),
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
+    expect(screen.queryByText("On this device")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Install, connect, or pull"),
+    ).not.toBeInTheDocument();
+  });
+
+  // Readiness and the global default describe the whole page, not one panel.
+  // Reaching them used to mean navigating back to Providers first.
+  it("shows readiness and the global default from every tab", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [hostedProfile()],
+        chat_profiles: [hostedProfile()],
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView, { tab: "pricing" });
+
+    expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+    expect(
+      screen.getByRole("combobox", { name: "Global model" }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows each provider's exact readiness state, not just its connection", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic",
+      provider: "anthropic",
+      model: "opus",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+      readiness_state: "quota_exhausted",
+      readiness_summary:
+        "Anthropic accepted the credential but the account has no credit or quota left.",
+    });
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView);
+
+    expect(await screen.findByText("No credit")).toBeInTheDocument();
+  });
+
   // A "selected" chip on the provider card read as "only this provider is
   // selected", i.e. that the others had been turned off. They had not — every
   // configured provider stays usable, and a per-chat picker can still choose
@@ -191,16 +317,17 @@ describe("ModelsView state grammar", () => {
         ],
       }),
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "hosted" });
 
     expect(await screen.findByText("Not used yet")).toBeTruthy();
     expect(screen.queryByText("No API cost — runs on this machine")).toBeNull();
   });
 });
 
-// The Models page is split by action category: Providers, Routing, Pricing,
-// and Posture. Tests that exercise the fallback sequence or the advisor render
-// the Routing tab; everything else stays on the default Providers tab.
+// The Models page is split by action category: Local, Hosted, Hugging Face,
+// Activity, Routing, Pricing, and Posture. Tests that exercise the fallback
+// sequence or the advisor render the Routing tab; a hosted or advanced profile
+// renders the Hosted tab; everything else stays on the default Local tab.
 describe("ModelsView routing, selection, and provider catalogue", () => {
   it("renders the persisted sequence in order", async () => {
     stubFetch({
@@ -325,6 +452,60 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     await waitFor(() => expect(onchanged).toHaveBeenCalled());
   });
 
+  // BUG-69 — "Test" listed the catalogue and reported "Anthropic responded and
+  // exposed 10 models", which reads as "this works". It proved nothing about
+  // the pinned model and wrote no readiness observation, so every surface
+  // stayed blocked while the page said success. The obvious control has to be
+  // the authoritative one.
+  it("runs the exact-model readiness check from the provider card's Test action", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      configured: true,
+      connection_configured: true,
+      ready: false,
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+        ready_provider_count: 0,
+      }),
+      "POST /api/model-readiness/check": {
+        state: "quota_exhausted",
+        ready: false,
+        reason_code: "provider_quota_exhausted",
+        summary:
+          "Anthropic accepted the credential but the account has no credit or quota left.",
+        remediation: "Add credit or raise the quota, then check again.",
+      },
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Test")).toBeTruthy());
+
+    await fireEvent.click(screen.getByText("Test"));
+
+    await waitFor(() => {
+      const post = mock.mock.calls.find(
+        (c) =>
+          (c[1]?.method ?? "GET").toUpperCase() === "POST" &&
+          String(c[0]).includes("/api/model-readiness/check"),
+      );
+      expect(post).toBeTruthy();
+      expect(JSON.parse(post![1]!.body as string)).toEqual({
+        profile_id: "anthropic-hosted",
+        model: "claude-haiku-4-5-20251001",
+      });
+    });
+    // The verdict and its repair, not "responded and exposed 10 models".
+    expect(
+      await screen.findByText(
+        "Anthropic accepted the credential but the account has no credit or quota left. Add credit or raise the quota, then check again.",
+      ),
+    ).toBeInTheDocument();
+  });
+
   it("lists the provider's models on demand and selects one", async () => {
     const mock = stubFetch({
       "GET /api/models": models({
@@ -403,7 +584,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         ],
       },
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "hosted" });
     const chooseModel = await screen.findByRole("button", {
       name: /choose model/i,
     });
@@ -577,9 +758,9 @@ describe("ModelsView action-category tabs", () => {
         .getAllByRole("tab")
         .map((tab) => tab.textContent?.trim()),
     ).toEqual([
-      "Providers",
-      "Library",
-      "Discover",
+      "Local",
+      "Hosted",
+      "Hugging Face",
       "Activity",
       "Routing",
       "Pricing",
@@ -610,7 +791,10 @@ describe("ModelsView action-category tabs", () => {
     expect(
       await screen.findByRole("heading", { name: "Pricing" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Global model" })).toBeNull();
+    // Provider cards belong to Local and Hosted. The readiness summary and the
+    // global default are page-level on purpose and stay visible here.
+    expect(screen.queryByText("On this device")).toBeNull();
+    expect(screen.queryByText("Your hosted providers")).toBeNull();
   });
 
   it("puts the read-only posture on its own tab", async () => {
@@ -619,7 +803,8 @@ describe("ModelsView action-category tabs", () => {
     expect(
       await screen.findByText("Off-machine provider posture"),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Global model" })).toBeNull();
+    expect(screen.queryByText("On this device")).toBeNull();
+    expect(screen.queryByText("Your hosted providers")).toBeNull();
   });
 
   it("marks the selected tab and links each panel back to it", async () => {
@@ -660,11 +845,23 @@ describe("ModelsView action-category tabs", () => {
 // for every card, and the local row that started the test had nowhere to show
 // it at all. Two connected providers, one test, one message, in the right place.
 describe("ModelsView provider test feedback", () => {
+  // BUG-47 — every test result names the provider it came from and attaches to
+  // the card whose Test produced it. Two local runtimes prove attribution
+  // between sibling cards; the cross-layout leak that first exposed this (a
+  // local result surfacing under the hosted cards) is now structurally
+  // impossible, because local and hosted are different tabs.
   const ollama = () =>
     profile({
       profile_id: "ollama-local-openai-compatible",
       provider: "ollama",
       model: "gemma4:31b-cloud",
+      connection_configured: true,
+    });
+  const llamaCpp = () =>
+    profile({
+      profile_id: "raiker-local-llama-cpp",
+      provider: "llama.cpp",
+      model: "local-gguf",
       connection_configured: true,
     });
   const anthropic = () =>
@@ -678,121 +875,128 @@ describe("ModelsView provider test feedback", () => {
       endpoint_kind: "hosted",
       connection_configured: true,
     });
+  const openrouter = () =>
+    profile({
+      profile_id: "openrouter-policy-gated",
+      provider: "openrouter",
+      model: "openai/gpt-4o-mini",
+      requires_network: true,
+      off_machine: true,
+      local_only: false,
+      endpoint_kind: "hosted",
+      connection_configured: true,
+    });
 
   it("shows one provider's result only under that provider", async () => {
     stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["a", "b", "c", "d", "e", "f", "g", "h", "i"],
+      "GET /api/models": models({ profiles: [ollama(), llamaCpp()] }),
+      "GET /api/model-library": { roots: [], models: [] },
+      "POST /api/model-readiness/check": {
+        state: "ready",
+        ready: true,
+        reason_code: "model_ready",
+        summary: "Ollama can reach gemma4:31b-cloud.",
+        remediation: "",
       },
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "local" });
 
     const tests = await screen.findAllByRole("button", { name: "Test" });
     expect(tests).toHaveLength(2);
     await fireEvent.click(tests[0]);
 
-    const message = "Ollama responded and exposed 9 models.";
+    const message = "Ollama can reach gemma4:31b-cloud.";
     await waitFor(() => expect(screen.getAllByText(message)).toHaveLength(1));
-    // Attached to Ollama, and nowhere near Anthropic's card.
     const result = screen.getByText(message);
     expect(result).toHaveAttribute(
       "data-test-result",
       "ollama-local-openai-compatible",
     );
-    expect(result.closest(".local-row")).not.toBeNull();
+    const row = result.closest(".local-row");
+    expect(row).not.toBeNull();
+    // The sibling runtime's row is untouched.
+    const rows = Array.from(document.querySelectorAll(".local-row"));
+    expect(rows).toHaveLength(2);
     expect(
-      within(
-        document.querySelector("article.provider-card") as HTMLElement,
-      ).queryByText(message),
+      within(rows.find((node) => node !== row) as HTMLElement).queryByText(
+        message,
+      ),
     ).toBeNull();
   });
 
   it("keeps each provider's result independent when both are tested", async () => {
     stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "available",
-        reason_code: null,
-        models: ["a"],
-      },
-      "GET /api/models/anthropic-hosted/provider-models": {
-        profile_id: "anthropic-hosted",
-        provider: "anthropic",
-        status: "available",
-        reason_code: null,
-        models: ["claude-haiku-4-5-20251001", "claude-opus-4-5"],
+      "GET /api/models": models({ profiles: [anthropic(), openrouter()] }),
+      "POST /api/model-readiness/check": {
+        state: "ready",
+        ready: true,
+        reason_code: "model_ready",
+        summary: "The exact model is reachable.",
+        remediation: "",
       },
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "hosted" });
+
+    const tests = await screen.findAllByRole("button", { name: "Test" });
+    await fireEvent.click(tests[0]);
+    await waitFor(() =>
+      expect(screen.getAllByText("The exact model is reachable.")).toHaveLength(
+        1,
+      ),
+    );
+    await fireEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
+
+    // Testing the second provider does not overwrite the first: two results
+    // stand, each attributed to the card whose Test produced it.
+    await waitFor(() =>
+      expect(screen.getAllByText("The exact model is reachable.")).toHaveLength(
+        2,
+      ),
+    );
+    expect(
+      screen
+        .getAllByText("The exact model is reachable.")
+        .map((node) => node.getAttribute("data-test-result"))
+        .sort(),
+    ).toEqual(["anthropic-hosted", "openrouter-policy-gated"]);
+  });
+
+  it("names the provider it could not reach, so a failure is attributable too", async () => {
+    stubFetch({
+      "GET /api/models": models({ profiles: [anthropic(), openrouter()] }),
+    });
+    render(ModelsView, { tab: "hosted" });
 
     const tests = await screen.findAllByRole("button", { name: "Test" });
     await fireEvent.click(tests[0]);
     await waitFor(() =>
       expect(
-        screen.getByText("Ollama responded and exposed 1 model."),
+        screen.getByText("Raiker could not check Anthropic."),
       ).toBeTruthy(),
     );
-    await fireEvent.click(screen.getAllByRole("button", { name: "Test" })[1]);
-    await waitFor(() =>
-      expect(
-        screen.getByText("Anthropic responded and exposed 2 models."),
-      ).toBeTruthy(),
-    );
-
-    // Testing the second provider does not overwrite or duplicate the first.
-    expect(
-      screen.getAllByText("Ollama responded and exposed 1 model."),
-    ).toHaveLength(1);
-    expect(
-      screen.getAllByText("Anthropic responded and exposed 2 models."),
-    ).toHaveLength(1);
-    expect(
-      screen.getByText("Anthropic responded and exposed 2 models."),
-    ).toHaveAttribute("data-test-result", "anthropic-hosted");
-  });
-
-  it("names the provider it could not reach, so a failure is attributable too", async () => {
-    stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-    });
-    render(ModelsView);
-
-    const tests = await screen.findAllByRole("button", { name: "Test" });
-    await fireEvent.click(tests[1]);
-    await waitFor(() =>
-      expect(
-        screen.getByText("Raiker could not reach Anthropic."),
-      ).toBeTruthy(),
-    );
-    expect(screen.queryByText("Raiker could not reach Ollama.")).toBeNull();
+    expect(screen.queryByText("Raiker could not check OpenRouter.")).toBeNull();
   });
 
   it("names the provider in an unreachable answer, not only in a successful one", async () => {
     // An anonymous "Provider unreachable" is what let a misplaced result go
     // unnoticed: nothing in the sentence contradicted the card above it.
     stubFetch({
-      "GET /api/models": models({ profiles: [ollama(), anthropic()] }),
-      "GET /api/models/ollama-local-openai-compatible/provider-models": {
-        profile_id: "ollama-local-openai-compatible",
-        provider: "ollama",
-        status: "unavailable",
-        reason_code: "provider_unreachable",
-        models: [],
+      "GET /api/models": models({ profiles: [ollama(), llamaCpp()] }),
+      "GET /api/model-library": { roots: [], models: [] },
+      "POST /api/model-readiness/check": {
+        state: "runtime_stopped",
+        ready: false,
+        reason_code: "local_runtime_unreachable",
+        summary: "Ollama is not reachable.",
+        remediation: "Start or reconnect Ollama, then check again.",
       },
     });
-    render(ModelsView);
+    render(ModelsView, { tab: "local" });
 
     await fireEvent.click(
       (await screen.findAllByRole("button", { name: "Test" }))[0],
     );
-    const result = await screen.findByText(/^Ollama could not be reached\./);
+    const result = await screen.findByText(/^Ollama is not reachable\./);
     expect(result).toHaveAttribute(
       "data-test-result",
       "ollama-local-openai-compatible",

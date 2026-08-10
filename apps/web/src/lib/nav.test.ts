@@ -110,6 +110,31 @@ describe("nav model", () => {
     expect(tabFromHash("#/checkpoints")).toBe("checkpoints");
   });
 
+  // Models grew Local, Hosted, Hugging Face, and Activity panels but `HUB_TABS`
+  // still listed only the pre-BUG-69 four, so every deep link into an
+  // unregistered panel fell through to the hub's first tab. Verified live on
+  // 2026-08-09: `#/models?tab=library` opened Providers, which is where the
+  // "Use models LM Studio already downloaded →" link and the operation tray's
+  // "View downloads" both pointed.
+  it("resolves every Models panel from a deep link", () => {
+    expect(tabFromHash("#/models?tab=local")).toBe("local");
+    expect(tabFromHash("#/models?tab=hosted")).toBe("hosted");
+    expect(tabFromHash("#/models?tab=huggingface")).toBe("huggingface");
+    expect(tabFromHash("#/models?tab=activity")).toBe("activity");
+    expect(tabFromHash("#/models?tab=routing")).toBe("routing");
+    expect(tabFromHash("#/models?tab=pricing")).toBe("pricing");
+    expect(tabFromHash("#/models?tab=posture")).toBe("posture");
+  });
+
+  // Bookmarks and older builds still emit the pre-split ids. They must land on
+  // the panel that now owns their content, not on the default tab.
+  it("maps a superseded Models tab id onto the panel that replaced it", () => {
+    expect(tabFromHash("#/models?tab=providers")).toBe("local");
+    expect(tabFromHash("#/models?tab=library")).toBe("local");
+    expect(tabFromHash("#/models?tab=discover")).toBe("huggingface");
+    expect(tabFromHash("#/models?tab=downloads")).toBe("activity");
+  });
+
   it("falls back to a hub's first panel for an unknown or absent tab", () => {
     expect(tabFromHash("#/observe")).toBe("overview");
     expect(tabFromHash("#/observe?tab=nonsense")).toBe("overview");

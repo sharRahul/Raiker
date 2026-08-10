@@ -2529,6 +2529,31 @@ CREATE INDEX IF NOT EXISTS idx_local_models_owner_name
 """
 
 
+# A default model per work surface.
+#
+# Raiker already had a global default and a model captured on an individual
+# task. Neither expresses "Chat on the small local model, Build on the big one":
+# the per-turn picker was view state that reset on every reload, so both
+# surfaces silently fell back to the same global choice.
+#
+# One row per owner and surface, replaced rather than accumulated — a surface
+# has exactly one default or none. The row is a *preference*: it decides where
+# the picker starts, and the turn it produces still carries an explicit profile
+# and model that the readiness gate judges on its own terms. Nothing here can
+# put work on a model that was never proven.
+SURFACE_MODEL_DEFAULT_MIGRATION_ID = "RAIKER-1046-surface-model-defaults"
+SURFACE_MODEL_DEFAULT_SQL = """
+CREATE TABLE IF NOT EXISTS principal_surface_models (
+  principal_id TEXT NOT NULL,
+  surface TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  model TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, surface)
+);
+"""
+
+
 # B9 — the repository code map.
 #
 # Every turn used to start cold: no symbol index, no map of the tree, so on a

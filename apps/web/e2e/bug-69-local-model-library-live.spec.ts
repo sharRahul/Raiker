@@ -54,14 +54,14 @@ test("BUG-69 approved local root detects a GGUF without a system-wide scan", asy
       ggufString("llama"),
     ]),
   );
-  await page.goto(`${BASE}/#/models?tab=library`);
+  await page.goto(`${BASE}/#/models?tab=local`);
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
     await page.getByLabel("Username").fill("owner");
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-    await page.goto(`${BASE}/#/models?tab=library`);
+    await page.goto(`${BASE}/#/models?tab=local`);
   }
-  await page.getByRole("tab", { name: "Library" }).click();
+  await page.getByRole("tab", { name: "Local" }).click();
   await page.getByLabel("Absolute model folder").fill(ROOT);
   await page.getByRole("button", { name: "Add and scan" }).click();
   await expect(page.getByText("Raiker Live GGUF")).toBeVisible({

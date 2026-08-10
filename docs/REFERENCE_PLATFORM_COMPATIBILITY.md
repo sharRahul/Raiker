@@ -97,6 +97,51 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 
 ---
 
+## Model readiness and acquisition control set
+
+Reviewed 2026-08-09 while closing BUG-69, against the model-selection and
+model-readiness controls of **Claude Cowork**, **Claude Code**, **ChatGPT**,
+**Codex**, **OpenClaw**, and **Hermes Agent**. Scope is only the model control
+set: how each system lets an owner pick a model, prove it works, learn why it
+does not, and obtain one. Nothing here is a claim about the rest of those
+products.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Reference behaviour (where it exists) | Raiker | Status |
+|---|---|---|---|
+| Global default model | Claude Code `settings.json → model`; Codex `config.toml → model`; ChatGPT account default | Models → Global model | ✅ |
+| Per-turn / per-conversation model | Claude Code `/model`; ChatGPT per-conversation picker; Codex `-m` | `ModelPicker`, `/model use` | ✅ |
+| Per-task / scheduled-run model | Claude Code subagent frontmatter `model:`; Codex profiles | `model_profile` + `model` on a task, rechecked at run time | ✅ |
+| Per-surface default model | None — Claude Code, ChatGPT and Codex each hold one session/global model | Chat, Build, Tasks and Schedule each remember their own (`/api/surface-models`) | ✅ beyond |
+| Several local models serving at once | Codex `--oss` runs one Ollama model; none manage concurrent local servers | Four managed llama.cpp slots, own port and served name each, plus Ollama/LM Studio multi-model endpoints | ✅ beyond |
+| A starting point before the first search | LM Studio and Ollama show curated/trending models | Hugging Face opens on the most-downloaded GGUF repositories | ✅ |
+| Ordered fallback model | Claude Code `--fallback-model`; OpenClaw provider fallback | Owner-ordered fallback sequence, readiness-judged as one chain (Task 13) | ✅ |
+| Custom OpenAI-compatible provider | Codex `model_providers` (base URL, env key, headers) | `generic-openai-compatible` plus a custom endpoint on any card | ✅ |
+| Credential entry and storage | Claude Code `/login` / API key; Codex `env_key`; ChatGPT account | Connect dialog → encrypted vault; never on argv or in logs | ✅ |
+| Exact-model reachability check | Claude Code `/doctor`, `/status`; OpenClaw `doctor` | `POST /api/model-readiness/check`, per exact owner/profile/model/endpoint | ✅ |
+| Distinct billing / quota exhaustion | ChatGPT usage caps; Claude Code credit-balance and usage-limit messages; Codex quota errors | `quota_exhausted` state and `provider_quota_exhausted` code (Task 13) | ✅ |
+| Distinct auth failure | All | `authentication_failed` | ✅ |
+| Refuse work before submission when nothing is ready | None — all four coding agents fail at call time | Fail-closed gate on Workbench, Chat, Build, Tasks, Schedule, and background runs, draft preserved | ✅ beyond |
+| Guided first-run model setup | ChatGPT onboarding; OpenClaw connector onboarding | Resumable five-screen `#/model-setup` | ✅ |
+| Context window and capability metadata | Claude Code `/context`; Codex `model_context_window`; ChatGPT model descriptions | Discovered capacity with its source, Details drawer | ✅ |
+| Cost and usage per model | Claude Code `/cost`; ChatGPT usage | Pricing tab, per-profile spend | ✅ |
+| Reasoning-effort control | Codex `model_reasoning_effort`; Claude Code thinking levels | `reasoning_effort` validated against the exact profile's declared values | ✅ |
+| Local runtime install / connect | Codex `--oss` (Ollama) | Vendor-sourced install plans for Ollama, LM Studio, llama.cpp; never bundled | ✅ beyond |
+| Model acquisition (pull / download / convert) | Codex pulls via Ollama | Ollama pull, revision-pinned Hugging Face GGUF download, isolated Safetensors→GGUF conversion | ✅ beyond |
+| Readiness of a secondary / auxiliary model | Claude Code `ANTHROPIC_SMALL_FAST_MODEL` | Advisor model is configured but never readiness-checked or surfaced | ❌ BUG-82 |
+| Continuous / background revalidation | ChatGPT and Claude Code re-check per request | Fixed five-minute TTL, owner-triggered re-check only | 🟡 BUG-83 |
+| Single-provider live acceptance run | n/a | The BUG-69 live spec hard-requires two provider keys | 🟡 BUG-84 |
+
+Raiker difference: readiness is **exact and pre-submission**. Every reference
+system above lets an owner select a model that cannot run and discovers the
+problem when the request fails. Raiker binds readiness to the exact
+owner/profile/model/endpoint tuple, persists the observation with a short TTL,
+and refuses to create a turn, task, schedule, or background run until something
+in the resolved chain is proven ready.
+
+---
+
 ## Eidetic Memory Coverage
 
 | Concept | Raiker specification |

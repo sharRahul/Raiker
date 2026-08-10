@@ -10,7 +10,8 @@
 
 ## Global Constraints
 
-- Exact readiness, not a configured model name, controls Workbench, Chat, Build, Tasks, Schedule, and background-agent submission.
+- Exact readiness, not a configured model name, controls Workbench, Chat, Build, Tasks, Schedule, and background-agent submission. Readiness is judged over the chain the runtime will actually try — the selected model followed by the owner's fallback sequence — so the gate and the orchestrator can never disagree about what is runnable (Task 13).
+- Every non-ready answer names a repair the owner can perform. An exhausted account, a rejected credential, and an unreachable provider are three different states because they have three different repairs (Task 13).
 - Preserve the owner-authoritative, monitored, fail-closed posture in `docs/SECURITY_AND_POLICY.md`.
 - Never silently install software, download weights, accept licences, move/copy models, execute repository code, enable `trust_remote_code`, or fall back to a hosted provider.
 - Do not redistribute LM Studio. Ollama installation retrieves the official installer at runtime only after explicit owner consent.
@@ -23,12 +24,12 @@
 
 ## File structure
 
-- `raiker/models/readiness.py`: readiness states, probe protocol, exact-key cache, invalidation, and submission guard.
+- `raiker/models/readiness.py`: readiness states, probe protocol, exact-key cache, invalidation, chain resolution, and submission guard.
 - `raiker/models/local_operations.py`: human-only durable install/download/import/conversion job lifecycle.
 - `raiker/models/runtime_installers.py`: reviewed Ollama, LM Studio/llmster, and llama.cpp install plans and execution adapters.
 - `raiker/models/library.py`: approved roots, provider inventory adapters, bounded GGUF metadata indexing, and deployment records.
 - `raiker/models/gguf.py`: bounded pure-Python GGUF header reader and shard/projector grouping.
-- `raiker/models/local_runtime.py`: managed loopback llama.cpp lifecycle and exact-model health.
+- `raiker/models/local_runtime.py`: managed loopback llama.cpp lifecycle and exact-model health, across four declared slots (Task 15).
 - `raiker/models/huggingface.py`: Hub search, repository/variant metadata, dry-run and revision-pinned downloads.
 - `raiker/models/conversion.py`: pinned llama.cpp conversion/quantization plan and isolated worker invocation.
 - `raiker/api/routes_models.py`: focused readiness, setup, operation, library, Hugging Face, and conversion API.
@@ -41,7 +42,7 @@
 - `apps/web/src/lib/views/models/LocalLibraryPanel.svelte`: sources, discovered models, and deployment review.
 - `apps/web/src/lib/views/models/HuggingFacePanel.svelte`: search, variant comparison, download and conversion review.
 - `apps/web/src/lib/views/models/DownloadsPanel.svelte`: durable job history and cleanup controls.
-- `apps/web/src/lib/views/models/ExistingModelsPanel.svelte`: unchanged Routing, Pricing, and Posture content extracted from the current Models view.
+- Routing, Pricing, and Posture stay inline in `ModelsView.svelte`; the `ExistingModelsPanel.svelte` wrapper this line once named became a pass-through around `LocalLibraryPanel` and was deleted in Task 14.
 
 ---
 
@@ -87,6 +88,7 @@ class ModelReadinessState(StrEnum):
     MODEL_MISSING = "model_missing"
     POLICY_BLOCKED = "policy_blocked"
     AUTHENTICATION_FAILED = "authentication_failed"
+    QUOTA_EXHAUSTED = "quota_exhausted"  # added in Task 13
     UNREACHABLE = "unreachable"
     UNSUPPORTED = "unsupported"
     STALE = "stale"
@@ -883,6 +885,305 @@ Run: `gh run list --branch main --commit "$(git rev-parse HEAD)" --limit 20`
 
 For every non-green workflow, inspect with `gh run view <run-id> --log-failed`, reproduce locally, add a regression where applicable, fix, commit, push, and monitor the new head. Completion requires every required workflow for the final pushed commit to report success.
 
+> Still open. FIXED-137 in `docs/plans/TO_BE_FIXED.md` records one CI failure found and fixed after BUG-69 landed on `main`; this step stays unchecked until a full run on the final head is confirmed green.
+
+### Task 13: Reference-platform parity review of the readiness control set
+
+**Files:**
+- Modify: `raiker/models/exceptions.py`
+- Modify: `raiker/models/providers/anthropic_messages.py`
+- Modify: `raiker/models/providers/openai_compatible.py`
+- Modify: `raiker/models/readiness.py`
+- Modify: `raiker/gateway/agent_gateway.py`
+- Modify: `apps/web/src/lib/apiTypes.ts`
+- Modify: `apps/web/src/lib/views/ModelsView.svelte`
+- Modify: `docs/REFERENCE_PLATFORM_COMPATIBILITY.md`
+- Test: `tests/test_model_quota_readiness.py`
+- Test: `tests/test_model_readiness_fallback_chain.py`
+- Test: `apps/web/src/lib/views/ModelsView.test.ts`
+
+**Interfaces:**
+- Consumes: Tasks 1–12.
+- Produces: `ProviderQuotaExhaustedError`, `is_quota_exhausted()`, `ModelReadinessState.QUOTA_EXHAUSTED`.
+- Produces: `ModelReadinessService.resolve_chain()` and chain-aware `require_ready()`.
+
+Reviewed against the model-selection and model-readiness control set of Claude
+Cowork, Claude Code, ChatGPT, Codex, OpenClaw, and Hermes Agent. Full mapping in
+`docs/REFERENCE_PLATFORM_COMPATIBILITY.md` → "Model readiness and acquisition
+control set". Three parity defects were found live and fixed here; the residual
+gaps are BUG-82 to BUG-84 in `docs/plans/TO_BE_FIXED.md`.
+
+- [x] **Step 1: Write failing quota, chain, and Models-headline tests**
+
+```python
+def test_anthropic_credit_balance_400_is_quota_not_a_connection_error() -> None:
+    provider = _anthropic(lambda _: httpx.Response(400, json=CREDIT_BALANCE_TOO_LOW))
+    with pytest.raises(ProviderQuotaExhaustedError, match="provider_quota_exhausted"):
+        asyncio.run(provider.chat(_chat("claude-haiku-4-5-20251001")))
+```
+
+```ts
+it("counts models proven ready, not providers holding a credential", async () => {
+  render(ModelsView);
+  expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+  expect(screen.queryByText("providers set up")).not.toBeInTheDocument();
+});
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `python -m pytest tests/test_model_quota_readiness.py tests/test_model_readiness_fallback_chain.py -q`
+
+Run: `npm --prefix apps/web test -- ModelsView.test.ts`
+Expected: `ProviderQuotaExhaustedError` and `resolve_chain` do not exist; the
+Models headline still counts saved connections.
+
+- [x] **Step 3: Classify billing failures, judge the whole chain, and stop claiming readiness the page never checked**
+
+Billing exhaustion is its own state. Anthropic answers an empty balance with
+HTTP 400 on a valid key and OpenAI with `insufficient_quota` on 429, so status
+alone sent owners to rotate a working credential or to debug a healthy network.
+`is_quota_exhausted(status, body)` reads the error body only to classify;
+the raised code is fixed (`provider_quota_exhausted:http_<status>`) so no
+provider prose reaches an event, an API response, or a readiness record. Bare
+`quota` is deliberately not a marker — it would swallow a per-minute rate limit
+that a retry does fix.
+
+`require_ready()` now resolves the same chain `RuntimeOrchestrator._provider_chain`
+builds: the primary followed by the owner's fallback sequence. A ready primary
+still wins, a refusal still reports the primary, and the resolution reads the
+per-profile pinned model so a hosted fallback shipping a `<model>` placeholder
+is no longer silently dropped from the chain the runtime will actually try.
+
+The Models headline reads `ready_provider_count`, the Test action on a provider
+card runs the exact-model readiness check instead of a catalogue listing, and
+each card carries a chip for its exact state.
+
+```python
+def require_ready(self, owner_principal_id, profile_id, model) -> ModelReadiness:
+    chain = self.resolve_chain(owner_principal_id, profile_id, model)
+    for readiness in chain:
+        if readiness.ready:
+            return readiness
+    raise ModelNotReady(chain[0])
+```
+
+- [x] **Step 4: Verify GREEN and the full local gate**
+
+Run: `python -m pytest -q`
+
+Run: `python -m ruff check . && python -m mypy raiker apps tests`
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+Expected: all pass; no existing readiness, guard, or provider contract test changes meaning.
+
+- [x] **Step 5: Re-verify live through the UI with a real credential**
+
+A fresh workspace, an Anthropic key entered only through the Models connect
+dialog, `claude-haiku-4-5-20251001` pinned from the live catalogue of ten
+models. The key carries no credit, which makes it an exact fixture for the new
+state: the catalogue call succeeds and every inference call returns HTTP 400
+`credit_balance_too_low`.
+
+Observed after the fix: the card reads **No credit**, Test reports "Anthropic
+accepted the credential but the account has no credit or quota left. Add credit
+or raise the quota on your Anthropic account, then check again.", the headline
+reads **0 models ready · 1 of 10 connected**, Chat shows the same sentence and
+keeps Send disabled with the draft preserved, and the browser console is clean.
+Evidence: `docs/plans/screenshots/working/bug69-models-quota-readiness-live.png`
+and `bug69-chat-quota-readiness-live.png`.
+
+A generative turn could not be completed in this round because the credential
+has no credit. Catalogue listing, credential storage, exact-model probing, state
+classification, cross-surface gating, and repair guidance were all exercised
+against the real provider; token generation was not.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add raiker/models apps/web/src apps/web/src/lib/views/ModelsView.test.ts tests docs
+git commit -m "fix: classify quota exhaustion and judge the whole model chain"
+```
+
+### Task 14: Split the Models page by where a model comes from
+
+**Files:**
+- Modify: `apps/web/src/lib/nav.ts`
+- Modify: `apps/web/src/lib/views/ModelsView.svelte`
+- Modify: `apps/web/src/lib/views/models/ProvidersPanel.svelte`
+- Modify: `apps/web/src/lib/views/models/LocalLibraryPanel.svelte`
+- Modify: `apps/web/src/lib/views/models/HuggingFacePanel.svelte`
+- Modify: `apps/web/src/lib/views/ModelSetupView.svelte`
+- Modify: `apps/web/src/lib/components/ModelOperationTray.svelte`
+- Modify: `apps/web/src/lib/components/ModelCapacityBadge.svelte`
+- Delete: `apps/web/src/lib/views/models/ExistingModelsPanel.svelte`
+- Test: `apps/web/src/lib/nav.test.ts`
+- Test: `apps/web/src/lib/views/ModelsView.test.ts`
+- Test: `apps/web/e2e/composer.spec.ts`, `apps/web/e2e/bug-69-*.spec.ts`, `apps/web/e2e/bug-44-47-live.spec.ts`
+
+**Interfaces:**
+- Consumes: Tasks 8–11 panels.
+- Produces: `HUB_TABS.models = [local, hosted, huggingface, activity, routing, pricing, posture]` and `HUB_TAB_ALIASES`.
+
+Task 11 shipped the acquisition panels but left them behind one **Providers**
+tab holding local runtimes, hosted accounts, advanced routers, and vendor
+installers, with the GGUF index on a separate **Library** tab. Obtaining a model
+that runs on this machine and signing in to somebody else's are different jobs;
+each now owns a tab, and the local library moves next to the runtime that will
+serve it. Revised IA in `docs/superpowers/specs/2026-08-09-model-readiness-onboarding-and-acquisition-design.md`.
+
+- [x] **Step 1: Write failing navigation and panel-isolation tests**
+
+```ts
+it("resolves every Models panel from a deep link", () => {
+  expect(tabFromHash("#/models?tab=huggingface")).toBe("huggingface");
+  expect(tabFromHash("#/models?tab=activity")).toBe("activity");
+});
+
+it("keeps hosted accounts off the Local tab", async () => {
+  render(ModelsView, { tab: "local" });
+  expect(await screen.findByText("On this device")).toBeInTheDocument();
+  expect(screen.queryByText("Your hosted providers")).not.toBeInTheDocument();
+});
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `npm --prefix apps/web test -- nav.test.ts ModelsView.test.ts`
+Expected: `HUB_TABS.models` has no `huggingface`/`activity` entry, and one
+Providers panel still renders every section.
+
+- [x] **Step 3: Register the panels, split the sections, and lift the page-level cards**
+
+`HUB_TABS.models` gains every panel it actually has; `HUB_TAB_ALIASES` maps the
+superseded ids so bookmarks and older links keep working. `TAB_SECTIONS` decides
+which provider groups a tab owns, the readiness summary and Global model card
+move above the tab strip, `LocalLibraryPanel` renders under the Local tab, and
+the `ExistingModelsPanel` pass-through wrapper is deleted.
+
+```ts
+const TAB_SECTIONS: Record<string, readonly ("Local" | "Hosted" | "Advanced")[]> = {
+  local: ["Local"],
+  hosted: ["Hosted", "Advanced"],
+};
+```
+
+- [x] **Step 4: Verify GREEN, the full local gate, and the mocked suite**
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+
+Run: `npm --prefix apps/web run test:e2e:mocked`
+Expected: all pass; every spec that deep-links into Models names a current tab.
+
+- [x] **Step 5: Verify live, including the four superseded ids**
+
+All seven panels resolve from a deep link; `providers` and `library` land on
+Local, `discover` on Hugging Face, `downloads` on Activity; clicking a tab writes
+the canonical hash. No horizontal page overflow at 1440, 1024, 768, or 375
+pixels, and the console is clean in light and dark themes. Evidence:
+`docs/plans/screenshots/working/bug69-models-tab-*.png`.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add apps/web/src apps/web/e2e docs
+git commit -m "feat: split Models by where a model comes from"
+```
+
+### Task 15: One model per surface, several local models at once, and a Hub starting point
+
+**Files:**
+- Create: `raiker/models/local_runtime.py` slots (`LocalSlot`, `LOCAL_SLOTS`, `slot_for_profile`)
+- Create: `apps/web/src/lib/surfaceModel.svelte.ts`
+- Modify: `config/model-profiles.json`, `raiker/storage/migrations.py`, `raiker/storage/sqlite.py`
+- Modify: `raiker/models/huggingface.py`, `raiker/api/routes_models.py`, `raiker/api/schemas.py`
+- Modify: `apps/web/src/lib/api.ts`, `components/ModelPicker.svelte`, `views/ChatView.svelte`, `views/BuildView.svelte`, `views/TasksView.svelte`, `views/models/HuggingFacePanel.svelte`, `views/models/LocalLibraryPanel.svelte`
+- Test: `tests/test_managed_llama_runtime.py`, `tests/test_surface_model_defaults.py`, `tests/test_huggingface_models.py`
+- Test: `apps/web/src/lib/surfaceModel.test.ts`, `views/ChatView.test.ts`, `views/models/HuggingFacePanel.test.ts`
+
+**Interfaces:**
+- Produces: migration `RAIKER-1046-surface-model-defaults`; `GET/PUT /api/surface-models`; `GET /api/hugging-face/trending`.
+- Produces: `raiker-local-llama-cpp-2|3|4` profiles on ports 8081-8083.
+
+Three limits found by walking the shipped product rather than the plan. The Hub
+panel opened on an empty search box, so an owner who did not already know a
+repository id had nowhere to start. Chat and Build shared one global default,
+because the per-turn picker was view state that reset on reload. And the managed
+llama.cpp runtime was a singleton, so deploying a second GGUF silently replaced
+the first — a local-only owner could never put Chat on a small model and Build
+on a large one.
+
+- [x] **Step 1: Write failing tests for all three**
+
+```python
+def test_two_models_serve_at_once_on_their_own_ports_and_aliases(tmp_path: Path) -> None:
+    runtime = _runtime(calls, (tmp_path,))
+    first = runtime.start(small, executable=Path("llama-server"))
+    second = runtime.start(large, executable=Path("llama-server"))
+    assert first.slot != second.slot
+    assert runtime.status(first.slot).running is True
+```
+
+```python
+def test_each_surface_keeps_its_own_default(workspace: Path) -> None:
+    store.save_surface_model_default("principal_owner", "chat", "ollama-local-openai-compatible", "gemma4:31b-cloud")
+    store.save_surface_model_default("principal_owner", "build", "anthropic-hosted", "claude-haiku-4-5-20251001")
+    assert store.load_surface_model_default("principal_owner", "tasks") is None
+```
+
+- [x] **Step 2: Run and verify RED**
+
+Run: `python -m pytest tests/test_managed_llama_runtime.py tests/test_surface_model_defaults.py tests/test_huggingface_models.py -q`
+
+Run: `npm --prefix apps/web test -- surfaceModel.test.ts HuggingFacePanel.test.ts`
+
+- [x] **Step 3: Slots, a surface preference, and a Hub starting point**
+
+The managed runtime keeps a bounded set of declared slots rather than one
+process. Declared, not allocated, so each slot is an ordinary shipped profile
+that appears in every picker, fallback sequence, task, and surface default with
+no dynamic registry and no new policy surface. Four is a judgement — each slot
+is a resident process holding weights — and a full pool refuses rather than
+evicting a model another surface may be mid-turn on.
+
+A surface default is a **preference**: it decides where a picker starts. The
+turn still names an exact profile and model, and the readiness gate judges that
+pair, so remembering a choice can never make an unproven model runnable. A
+partial choice is never written, because that would clear a default the owner
+did not ask to clear.
+
+`GET /api/hugging-face/trending` lists the most-downloaded GGUF repositories.
+The Hub cannot be browsed exhaustively, so the panel stays search-first; this
+only replaces the empty box before the first query, and an unreachable Hub falls
+back to that empty state rather than raising an alert nobody asked for.
+
+- [x] **Step 4: Verify GREEN and the full local gate**
+
+Run: `python -m pytest -q` · `ruff` · `mypy raiker apps tests`
+
+Run: `npm --prefix apps/web test && npm --prefix apps/web run check && npm --prefix apps/web run lint && npm --prefix apps/web run build`
+
+- [x] **Step 5: Verify live**
+
+Four local slots appear as selectable models on the Local tab. Chat set to
+**Local GGUF 2** and Build to **Local GGUF 4**; after a full reload and a fresh
+sign-in each surface still opened on its own model — which is the point, since
+the bearer token lives in memory and the preference has to be server-side. The
+picker still refuses an unready slot. Console clean. Evidence:
+`docs/plans/screenshots/working/bug69-local-llama-slots-live.png` and
+`bug69-surface-default-build-live.png`.
+
+The trending list itself could not be verified live: this environment's egress
+proxy blocks `huggingface.co`. The unreachable-Hub path was exercised instead
+and degrades to the search-first empty state with no console error.
+
+- [x] **Step 6: Commit**
+
+```bash
+git add raiker apps config docs tests
+git commit -m "feat: one model per surface and several local models at once"
+```
+
 ## Plan self-review mapping
 
 - Readiness domain, all states, exact binding, freshness, invalidation: Tasks 1–3.
@@ -893,3 +1194,6 @@ For every non-green workflow, inspect with `gh run view <run-id> --log-failed`, 
 - Hugging Face search, licences, gating, GGUF-first download: Tasks 9 and 11.
 - Safetensors-only isolated conversion and quantization: Task 10 and Task 11.
 - Three-provider live testing, local GGUF/Hugging Face evidence, docs, push, green CI: Task 12.
+- Reference-platform parity for the readiness control set, billing/quota state, chain-aware gating: Task 13.
+- Models information architecture split by model origin, and every panel reachable by deep link: Task 14.
+- A default model per surface, concurrent managed llama.cpp slots, and a Hub starting point: Task 15.

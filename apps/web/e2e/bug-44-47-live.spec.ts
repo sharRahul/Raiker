@@ -117,7 +117,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
 
 test("BUG-47 — a provider's test result stays under that provider", async () => {
   test.setTimeout(180_000);
-  await page.goto(`${SOURCE}/#/models?tab=providers`);
+  await page.goto(`${SOURCE}/#/models?tab=local`);
 
   const ollamaRow = page.locator(".local-row").filter({ hasText: "Ollama" });
   const anthropicCard = page.locator("article.provider-card").filter({ hasText: "Anthropic" });

@@ -19,6 +19,7 @@ class ModelReadinessState(StrEnum):
     MODEL_MISSING = "model_missing"
     POLICY_BLOCKED = "policy_blocked"
     AUTHENTICATION_FAILED = "authentication_failed"
+    QUOTA_EXHAUSTED = "quota_exhausted"
     UNREACHABLE = "unreachable"
     UNSUPPORTED = "unsupported"
     STALE = "stale"
@@ -195,6 +196,24 @@ class ProviderCatalogueProbe:
             evidence={"provider": provider},
         )
 
+    def _quota_exhausted(
+        self, key: ModelReadinessKey, label: str, provider: str
+    ) -> ModelReadiness:
+        """One answer for both probe stages: reachable, authorised, unpayable.
+
+        Kept separate from `unreachable` and `authentication_failed` because the
+        repair is neither a network fix nor a new key — the account needs credit
+        or a higher quota, and saying so is the whole point of an exact state.
+        """
+        return self._result(
+            key,
+            ModelReadinessState.QUOTA_EXHAUSTED,
+            f"{label} accepted the credential but the account has no credit or quota left.",
+            "provider_quota_exhausted",
+            f"Add credit or raise the quota on your {label} account, then check again.",
+            provider=provider,
+        )
+
     async def check(self, key: ModelReadinessKey) -> ModelReadiness:
         from raiker.models.connections import get_model_connection
         from raiker.models.exceptions import (
@@ -203,6 +222,7 @@ class ProviderCatalogueProbe:
             ProviderConnectionError,
             ProviderModelNotFoundError,
             ProviderPolicyError,
+            ProviderQuotaExhaustedError,
             ProviderRateLimitError,
             ProviderResponseValidationError,
             ProviderTimeoutError,
@@ -244,6 +264,8 @@ class ProviderCatalogueProbe:
                 "Review the provider policy and check again.",
                 provider=profile.provider,
             )
+        except ProviderQuotaExhaustedError:
+            return self._quota_exhausted(key, label, profile.provider)
         except ProviderConfigurationError:
             state = (
                 ModelReadinessState.RUNTIME_MISSING
@@ -337,6 +359,8 @@ class ProviderCatalogueProbe:
                     "Update the provider credential and check again.",
                     provider=profile.provider,
                 )
+            except ProviderQuotaExhaustedError:
+                return self._quota_exhausted(key, label, profile.provider)
             except ProviderModelNotFoundError:
                 return self._result(
                     key,
@@ -536,6 +560,17 @@ class ModelReadinessService:
             key.endpoint_fingerprint,
         )
 
+    def _configured_model(self, owner_principal_id: str, profile_id: str) -> str | None:
+        """The owner's most recent pinned model for one profile, if any."""
+        try:
+            pairs = self.store.list_configured_models(owner_principal_id)  # type: ignore[attr-defined]
+        except Exception:  # noqa: BLE001 — an unreadable pin resolves nothing
+            return None
+        for candidate_profile, candidate_model in reversed(list(pairs or [])):
+            if candidate_profile == profile_id and candidate_model:
+                return str(candidate_model)
+        return None
+
     def resolve_request_target(
         self,
         owner_principal_id: str,
@@ -557,6 +592,15 @@ class ModelReadinessService:
             effective_model = profile.model
             if state is not None and state.profile_id == profile.profile_id and state.model:
                 effective_model = state.model
+            if not effective_model or "<" in effective_model:
+                # Hosted profiles ship a `<model>` placeholder, and the single
+                # session state only ever names the currently selected profile.
+                # The owner's pinned choice for any *other* profile lives in the
+                # configured-model table, which is what makes a fallback entry
+                # resolvable at all.
+                pinned = self._configured_model(owner_principal_id, profile.profile_id)
+                if pinned:
+                    effective_model = pinned
             if model and model.strip():
                 effective_model = model.strip()
             return profile.profile_id, effective_model
@@ -574,22 +618,82 @@ class ModelReadinessService:
         )
         return native.profile_id, native.model
 
+    def _fallback_profile_ids(self, owner_principal_id: str) -> list[str]:
+        """The owner's ordered fallback profile ids, or none if unreadable."""
+        from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+
+        try:
+            # Owner-scoped first, terminal only when the owner has none. A
+            # credential-backed owner and a CLI-bootstrapped one write to
+            # different rows, and a sequence the owner saved is theirs either
+            # way — keying off the presence of an account row would silently
+            # ignore one of them.
+            stored = self.store.load_principal_model_fallback_sequence(  # type: ignore[attr-defined]
+                owner_principal_id
+            ) or self.store.load_model_fallback_sequence(  # type: ignore[attr-defined]
+                TERMINAL_MODEL_SESSION_ID
+            )
+        except Exception:  # noqa: BLE001 — an unreadable sequence adds no candidate
+            return []
+        return [str(entry) for entry in stored or []]
+
+    def resolve_chain(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> list[ModelReadiness]:
+        """Readiness for every model this turn could actually run, in order.
+
+        ``RuntimeOrchestrator._provider_chain`` builds exactly this list — the
+        resolved primary followed by the owner's fallback sequence — and tries
+        each entry in turn. Judging readiness on the primary alone therefore
+        answers a question the runtime never asks.
+        """
+        resolved_profile, resolved_model = self.resolve_request_target(
+            owner_principal_id,
+            profile_id,
+            model,
+        )
+        chain = [
+            self.current_selected(owner_principal_id, resolved_profile, resolved_model)
+        ]
+        seen = {(resolved_profile, resolved_model)}
+        for candidate_id in self._fallback_profile_ids(owner_principal_id):
+            try:
+                candidate_profile, candidate_model = self.resolve_request_target(
+                    owner_principal_id, candidate_id, None
+                )
+            except (KeyError, ValueError, StopIteration):
+                continue
+            # An unresolved `<model>` placeholder is not a runnable candidate;
+            # the orchestrator drops it from the chain for the same reason.
+            if not candidate_model or "<" in candidate_model:
+                continue
+            if (candidate_profile, candidate_model) in seen:
+                continue
+            seen.add((candidate_profile, candidate_model))
+            chain.append(
+                self.current_selected(
+                    owner_principal_id, candidate_profile, candidate_model
+                )
+            )
+        return chain
+
     def require_ready(
         self,
         owner_principal_id: str,
         profile_id: str | None,
         model: str | None,
     ) -> ModelReadiness:
-        resolved_profile, resolved_model = self.resolve_request_target(
-            owner_principal_id,
-            profile_id,
-            model,
-        )
-        readiness = self.current_selected(
-            owner_principal_id,
-            resolved_profile,
-            resolved_model,
-        )
-        if not readiness.ready:
-            raise ModelNotReady(readiness)
-        return readiness
+        """Admit the turn when any model the runtime would try is ready.
+
+        The primary keeps priority, so a ready primary is always the answer it
+        returns. A refusal reports the primary's reason: that is the model the
+        owner chose, and it is the one whose repair they came to perform.
+        """
+        chain = self.resolve_chain(owner_principal_id, profile_id, model)
+        for readiness in chain:
+            if readiness.ready:
+                return readiness
+        raise ModelNotReady(chain[0])

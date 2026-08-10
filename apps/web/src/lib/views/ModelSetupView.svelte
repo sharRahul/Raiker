@@ -210,10 +210,10 @@
       ><a
         class="primary"
         href={setupState.path === "hugging_face"
-          ? "#/models?tab=discover"
+          ? "#/models?tab=huggingface"
           : setupState.path === "local_gguf"
-            ? "#/models?tab=library"
-            : "#/models?tab=providers"}>Continue in Models</a
+            ? "#/models?tab=local"
+            : "#/models?tab=hosted"}>Continue in Models</a
       >
     </div>
   {:else if setupState.step === "review"}

@@ -288,6 +288,8 @@ from raiker.storage.migrations import (
     STANDING_GRANTS_SQL,
     SUBAGENT_BUDGETS_MIGRATION_ID,
     SUBAGENT_BUDGETS_SQL,
+    SURFACE_MODEL_DEFAULT_MIGRATION_ID,
+    SURFACE_MODEL_DEFAULT_SQL,
     SUSPENDED_TURN_QUEUE_MIGRATION_ID,
     SUSPENDED_TURN_QUEUE_SQL,
     SUSPENDED_TURNS_MIGRATION_ID,
@@ -961,6 +963,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_LIBRARY_MIGRATION_ID,
                 MODEL_LIBRARY_SQL,
+                connection,
+            )
+            self._apply_migration(
+                SURFACE_MODEL_DEFAULT_MIGRATION_ID,
+                SURFACE_MODEL_DEFAULT_SQL,
                 connection,
             )
             self._rebuild_memory_fts(connection)
@@ -6660,6 +6667,52 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
         return int(cursor.rowcount)
+
+    def save_surface_model_default(
+        self, principal_id: str, surface: str, profile_id: str, model: str
+    ) -> None:
+        """Remember which model a work surface should start on.
+
+        A preference, not an authority: the turn this produces still carries an
+        explicit profile and model, and the readiness gate judges that pair.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO principal_surface_models
+                (principal_id, surface, profile_id, model, updated_at)
+                VALUES (?, ?, ?, ?, ?)""",
+                (principal_id, surface, profile_id, model, utc_now()),
+            )
+
+    def load_surface_model_default(
+        self, principal_id: str, surface: str
+    ) -> tuple[str, str] | None:
+        """The surface's default, or None when it has no opinion of its own."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT profile_id, model FROM principal_surface_models
+                WHERE principal_id = ? AND surface = ?""",
+                (principal_id, surface),
+            ).fetchone()
+        return None if row is None else (str(row["profile_id"]), str(row["model"]))
+
+    def list_surface_model_defaults(self, principal_id: str) -> list[tuple[str, str, str]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT surface, profile_id, model FROM principal_surface_models
+                WHERE principal_id = ? ORDER BY surface""",
+                (principal_id,),
+            ).fetchall()
+        return [
+            (str(row["surface"]), str(row["profile_id"]), str(row["model"])) for row in rows
+        ]
+
+    def clear_surface_model_default(self, principal_id: str, surface: str) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM principal_surface_models WHERE principal_id = ? AND surface = ?",
+                (principal_id, surface),
+            )
 
     def list_configured_models(self, principal_id: str) -> list[tuple[str, str]]:
         with self.connect() as connection:

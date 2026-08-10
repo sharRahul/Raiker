@@ -15,6 +15,7 @@
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
+  import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import {
     alreadyResumedElsewhere,
     watchForResumableTurns,
@@ -443,6 +444,13 @@
 
   onMount(() => {
     void refreshModels();
+    // Chat starts on the model Chat was last set to, not on whatever the global
+    // default happens to be. An explicit per-turn choice still overrides it.
+    void surfaceModel("chat").then((remembered) => {
+      if (remembered === null || modelProfile) return;
+      modelProfile = remembered.profileId;
+      model = remembered.model;
+    });
     void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
     // sending a prompt of its own. There is one governed send path, and it is
@@ -1375,7 +1383,7 @@
           disabled={streaming}
         ></textarea>
         <div class="upper-controls">
-          <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
+          <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)} disabled={streaming} />
           <ExecutionEnvironmentBadge />
           <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
           {#if reasoningEfforts.length > 0}

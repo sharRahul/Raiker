@@ -20,6 +20,13 @@ class FakeHub:
         assert limit <= 50
         return [SimpleNamespace(id="owner/repo", downloads=12, likes=3, gated=self.gated)]
 
+    def trending(self, *, limit: int, token: str | None) -> list[SimpleNamespace]:
+        assert limit <= 50
+        return [
+            SimpleNamespace(id="owner/popular-gguf", downloads=9001, likes=42, gated=False),
+            SimpleNamespace(id="owner/second-gguf", downloads=900, likes=4, gated=False),
+        ]
+
     def model_info(
         self, repo_id: str, *, revision: str | None, token: str | None
     ) -> SimpleNamespace:
@@ -131,3 +138,31 @@ def test_safetensors_snapshot_is_offered_for_safe_local_conversion(tmp_path: Pat
         "model-00002-of-00002.safetensors",
         "tokenizer.json",
     )
+
+
+# The Hub has millions of repositories, so there is no "browse everything" list
+# and the panel is search-first. Opening it to an empty box still gives an owner
+# who does not already know a repository id nowhere to start, which is what
+# every local model browser solves with a most-downloaded list.
+def test_trending_offers_a_starting_point_without_a_query(tmp_path: Path) -> None:
+    service = HuggingFaceService(FakeHub(), cache_dir=tmp_path / "hf")
+
+    items = service.trending()
+
+    assert [item.repo_id for item in items] == [
+        "owner/popular-gguf",
+        "owner/second-gguf",
+    ]
+    assert items[0].downloads == 9001
+
+
+def test_trending_reports_hub_failure_as_a_classified_error(tmp_path: Path) -> None:
+    class BrokenHub(FakeHub):
+        def trending(self, *, limit: int, token: str | None) -> list[SimpleNamespace]:
+            raise RuntimeError("network down")
+
+    service = HuggingFaceService(BrokenHub(), cache_dir=tmp_path / "hf")
+
+    with pytest.raises(HuggingFaceAccessError) as caught:
+        service.trending()
+    assert caught.value.code == "hugging_face_unavailable"

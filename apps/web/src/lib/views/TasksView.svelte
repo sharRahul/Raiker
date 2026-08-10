@@ -12,6 +12,7 @@
   import ComposerChips from "../components/ComposerChips.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { api, ApiError } from "../api";
+  import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import type { ApprovalView, PromptAttachment, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
@@ -34,6 +35,22 @@
   let model = $state("");
   const attachStore = createAttachmentStore();
   const profiles = $derived(chatProfiles());
+  // One composer creates both, and the cadence chips say which: a schedule
+  // captures its model onto every future run, so it is worth remembering apart
+  // from a one-off task.
+  const surface = $derived<Surface>(
+    cadence === "once" || cadence === "daily" ? "schedule" : "tasks",
+  );
+  // Re-reads whenever the cadence chips change which surface is being composed,
+  // so switching from Task to Daily routine offers the routine's own model.
+  $effect(() => {
+    const active = surface;
+    void surfaceModel(active).then((remembered) => {
+      if (remembered === null || surface !== active || modelProfile) return;
+      modelProfile = remembered.profileId;
+      model = remembered.model;
+    });
+  });
   const selectedProfile = $derived(profiles.find((profile) => profile.selected) ?? null);
   const activeProfile = $derived(
     profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile,
@@ -229,7 +246,7 @@
     <ComposerChips store={attachStore} disabled={creating} />
     <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
-    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={activeProfile?.context_window_tokens} source={activeProfile?.context_window_source} /></div>
+    <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model onchosen={(profileId, chosen) => void rememberSurfaceModel(surface, profileId, chosen)} /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={activeProfile?.context_window_tokens} source={activeProfile?.context_window_source} /></div>
     <ModelReadinessStrip readiness={modelReadiness} draftPreserved={Boolean(title.trim() || objective.trim())} />
     <button class="btn btn-primary" disabled={creating || attachStore.uploading || !modelReadiness.ready || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>

@@ -16,6 +16,7 @@
    * surfaces the rest of the workspace uses.
    */
   import { onMount, tick } from "svelte";
+  import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
@@ -318,6 +319,13 @@
   onMount(() => {
     void loadRepos();
     void refreshModels();
+    // Build keeps its own model. Coding work and conversation rarely want the
+    // same one, and before this both surfaces shared the global default.
+    void surfaceModel("build").then((remembered) => {
+      if (remembered === null || modelProfile) return;
+      modelProfile = remembered.profileId;
+      model = remembered.model;
+    });
     void syncModeFromRuntime();
     const onCompose = (event: Event) => {
       const detail = (event as CustomEvent<{
@@ -1073,7 +1081,7 @@
             disabled={streaming}
           ></textarea>
           <div class="upper-controls">
-            <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} disabled={streaming} />
+            <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)} disabled={streaming} />
             <ExecutionEnvironmentBadge />
             <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
             {#if reasoningEfforts.length > 0}

@@ -23,11 +23,13 @@ from raiker.models.exceptions import (
     ProviderAuthenticationError,
     ProviderConnectionError,
     ProviderModelNotFoundError,
+    ProviderQuotaExhaustedError,
     ProviderRateLimitError,
     ProviderResponseValidationError,
     ProviderStreamError,
     ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
+    is_quota_exhausted,
 )
 from raiker.models.health import ProviderHealth
 
@@ -57,7 +59,12 @@ def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
     return None
 
 
-def _map_status(status: int, *, model: str) -> Exception:
+def _map_status(status: int, *, model: str, body: str = "") -> Exception:
+    # Checked before auth and rate limiting: Anthropic answers an empty balance
+    # with HTTP 400 on a perfectly valid key, so status alone would send the
+    # owner to rotate a credential that is not the problem.
+    if is_quota_exhausted(status, body):
+        return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
     if status in {401, 403}:
         return ProviderAuthenticationError(f"provider_auth_failed:http_{status}")
     if status == 404:
@@ -194,7 +201,7 @@ class AsyncAnthropicMessagesProvider:
         except httpx.HTTPError as exc:
             raise ProviderConnectionError("provider_connection_failed") from exc
         if response.status_code >= 400:
-            raise _map_status(response.status_code, model=self.model)
+            raise _map_status(response.status_code, model=self.model, body=response.text)
         return response
 
     async def health(self, *, timeout: float = 1.0) -> ProviderHealth:
@@ -353,7 +360,13 @@ class AsyncAnthropicMessagesProvider:
                 timeout=self.timeout,
             ) as response:
                 if response.status_code >= 400:
-                    raise _map_status(response.status_code, model=self.model)
+                    # The error body has not been read yet on a streamed
+                    # response; classification needs it and it is bounded.
+                    raise _map_status(
+                        response.status_code,
+                        model=self.model,
+                        body=(await response.aread()).decode("utf-8", "replace"),
+                    )
                 async for line in response.aiter_lines():
                     if not line or not line.startswith("data:"):
                         continue

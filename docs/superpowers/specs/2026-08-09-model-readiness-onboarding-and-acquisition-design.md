@@ -354,12 +354,34 @@ synonyms.
 
 The existing Models header and tab strip remain. The tabs become:
 
-- **Providers** — connect hosted providers and install, start, or test local runtimes;
-- **Local library** — approved folders, discovered GGUF files, validation, and deploy;
+- **Local** — everything needed to run a model on this machine: install or start a
+  runtime, pull a model, and index, validate, and deploy GGUF files in approved
+  folders;
+- **Hosted** — provider accounts, plus the advanced custom endpoints and routers;
 - **Hugging Face** — search, variants, download, and conversion;
-- **Downloads** — active and historic install/download/conversion jobs;
+- **Activity** — active and historic install/download/conversion jobs;
 - **Routing**, **Pricing**, and **Posture** — the existing controls, unchanged in
   purpose.
+
+> Revised 2026-08-09. The first cut kept one **Providers** tab holding local
+> runtimes, hosted accounts, advanced routers, and vendor installers, with the
+> GGUF index on a separate **Local library** tab. That split the one job an
+> owner actually performs — *obtain a model that runs here* — across two tabs
+> while joining two jobs that share almost no controls or vocabulary. Local and
+> Hosted are now the top-level division, and the GGUF library sits under Local
+> with the runtime that will serve it. Local is first because Raiker prefers
+> local backends.
+>
+> Superseded tab ids (`providers`, `library`, `discover`, `downloads`) resolve
+> to their replacements through `HUB_TAB_ALIASES` in `apps/web/src/lib/nav.ts`,
+> so bookmarks and older links keep working.
+
+The readiness summary and the Global model card sit **above** the tab strip
+rather than inside one panel. Both describe the whole page: an owner reading
+Pricing or Posture can still see whether anything can run, and change what runs
+by default, without navigating away. Below 44rem their explanatory copy is
+dropped — the headline and the labelled select carry the meaning — so the tab
+strip stays above the fold on a phone.
 
 At desktop width the strip scrolls horizontally only if required. At tablet and mobile
 width it becomes a labelled overflow menu after the active tab; it never wraps into two

@@ -55,9 +55,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| FIXED-01 | High | Models | Fixed |
-| FIXED-02 | High | Chat / API redaction | Fixed |
-| FIXED-03 | Medium | Models / Chat / Build | Fixed |
+| [FIXED-01](#fixed-01-model-connection-showed-a-raw-reason-codey-to-act-on-it) | High | Models | Fixed |
+| [FIXED-02](#fixed-02-context-meter-showed-0-nan-nan-token-counts-stripped-from-the-audit-log) | High | Chat / API redaction | Fixed |
+| [FIXED-03](#fixed-03-no-token-or-cost-accounting-models-showed-a-meaningless-percentage) | Medium | Models / Chat / Build | Fixed |
 | FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
 | FIXED-05 | High | Models / policy | Fixed |
 | FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |

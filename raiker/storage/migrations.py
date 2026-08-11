@@ -2841,3 +2841,27 @@ MODEL_OPERATION_PAYLOAD_MIGRATION_ID = "RAIKER-1048-model-operation-payload"
 MODEL_OPERATION_PAYLOAD_SQL = """
 ALTER TABLE model_operations ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
 """
+
+
+# ── Conversation recall (RAIKER-2020) ────────────────────────────────────────
+#
+# Chat search used to be `LIKE '%term%'` over `sessions.title`, `turns.prompt_text`
+# and `turns.summary`: an unindexed scan of every turn the owner had ever taken,
+# returning whole conversations with no indication of *which* exchange matched.
+# It answered "which chats mention this" slowly and could not answer "what
+# exactly did we decide, and when", which is the question a conversation from
+# years ago is actually asked.
+#
+# `conversation_fts` is a rebuildable projection of the `turns` table — never a
+# second source of truth. One row per side of an exchange (`prompt` for what the
+# owner typed, `answer` for what the model replied) so a hit can be attributed
+# and quoted. `turn_id` carries the row back to the governed record, which is
+# where scope, ownership and redaction are still decided; the index itself
+# authorises nothing.
+CONVERSATION_FTS_MIGRATION_ID = "RAIKER-2020-conversation-fts"
+
+CONVERSATION_FTS_SQL = """
+CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts4(
+  turn_id UNINDEXED, session_id UNINDEXED, role UNINDEXED, text
+);
+"""

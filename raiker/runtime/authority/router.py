@@ -107,6 +107,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     # what gives the owner one switch over the whole feature — the scan and the
     # search alike — instead of a gate that only covers half of it.
     "code_map_search": "code_map_indexing",
+    "code_map_references": "code_map_indexing",
     "code_map_indexing": "code_map_indexing",
     "semantic_memory": "semantic_memory_runtime",
     "vector_embedding": "vector_embedding_runtime",

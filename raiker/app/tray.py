@@ -25,6 +25,37 @@ def menu_state(host: dict[str, Any]) -> TrayMenuState:
     return TrayMenuState(labels.get(state, "Needs attention"), "Resume" if state == "paused" else "Pause")
 
 
+TRAY_ICON_SIZE = (64, 64)
+
+
+def tray_image(image_module: Any, draw_module: Any) -> Any:
+    """The system-tray icon: the shipped icon, or a drawn stand-in.
+
+    The tray used to draw its own rounded rectangle, so the mark in the menu bar
+    was not the mark the product ships — a different Raiker in the one place the
+    app is visible while it is doing nothing. It now loads
+    ``raiker/assets/raiker-icon.png`` through :func:`raiker.assets.icon_path`,
+    downsampled to tray size with alpha preserved so it stays legible on a dark
+    menu bar. The drawn shape survives only as the fallback for a build whose
+    icon is missing: a tray with a placeholder is still a working tray, and
+    failing to start one would remove the owner's Pause and Quit.
+    """
+    from raiker.assets import icon_path
+
+    source = icon_path()
+    if source is not None:
+        try:
+            with image_module.open(source) as handle:
+                return handle.convert("RGBA").resize(TRAY_ICON_SIZE, image_module.LANCZOS)
+        except (OSError, ValueError):
+            pass
+    image = image_module.new("RGBA", TRAY_ICON_SIZE, "#14213d")
+    draw = draw_module.Draw(image)
+    draw.rounded_rectangle((8, 8, 56, 56), radius=12, fill="#f4b942")
+    draw.line((22, 19, 22, 45, 42, 45), fill="#14213d", width=7)
+    return image
+
+
 def start_native_tray(base_url: str, bootstrap_secret: str) -> threading.Thread:
     thread = threading.Thread(
         target=_run_native_tray,
@@ -59,10 +90,7 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
         with httpx.Client(headers=headers, timeout=3) as client:
             client.post(f"{base_url}{path}", json=body or {})
 
-    image = Image.new("RGBA", (64, 64), "#14213d")
-    draw = ImageDraw.Draw(image)
-    draw.rounded_rectangle((8, 8, 56, 56), radius=12, fill="#f4b942")
-    draw.line((22, 19, 22, 45, 42, 45), fill="#14213d", width=7)
+    image = tray_image(Image, ImageDraw)
 
     icon: Any = None
 

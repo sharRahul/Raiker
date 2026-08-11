@@ -656,10 +656,6 @@
     margin: var(--space-2) 0 var(--space-3);
     align-items: center;
   }
-  .grant-form input,
-  .grant-form select {
-    padding: var(--space-2) var(--space-3);
-  }
   ul.grants {
     list-style: none;
     padding: 0;

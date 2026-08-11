@@ -93,6 +93,8 @@ from raiker.storage.migrations import (
     CONNECTOR_INVOCATIONS_SQL,
     CONVERSATION_COMPACTIONS_MIGRATION_ID,
     CONVERSATION_COMPACTIONS_SQL,
+    CONVERSATION_FTS_MIGRATION_ID,
+    CONVERSATION_FTS_SQL,
     CREDENTIAL_SECURITY_MIGRATION_ID,
     CREDENTIAL_SECURITY_SQL,
     CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
@@ -1277,7 +1279,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SURFACE_MODEL_DEFAULT_SQL,
                 connection,
             )
+            self._apply_migration(
+                CONVERSATION_FTS_MIGRATION_ID,
+                CONVERSATION_FTS_SQL,
+                connection,
+            )
             self._rebuild_memory_fts(connection)
+            self._backfill_conversation_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1951,6 +1959,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_code_map_files(
+        self, owner_principal_id: str, repo_path: str, *, limit: int = 5000
+    ) -> list[dict[str, Any]]:
+        """Every indexed file of one map, largest first.
+
+        The set a reference scan is allowed to read: exactly the files the owner's
+        indexing run already accepted, so a scan can never reach outside what the
+        map itself covers.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT path, language, line_count, size_bytes FROM code_map_files
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                   ORDER BY symbol_count DESC, path LIMIT ?""",
+                (owner_principal_id, repo_path, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def code_map_declarations(
+        self, owner_principal_id: str, repo_path: str, name: str, *, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Exact-name declarations, so a reference scan can exclude them."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT path, name, kind, qualified_name, line_start, line_end, signature
+                   FROM code_map_symbols
+                   WHERE owner_principal_id = ? AND repo_path = ? AND name_lower = ?
+                   ORDER BY path, line_start LIMIT ?""",
+                (owner_principal_id, repo_path, name.lower(), limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def top_code_map_files(
         self, owner_principal_id: str, repo_path: str, *, limit: int = 12
     ) -> list[dict[str, Any]]:
@@ -2542,22 +2582,49 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def search_sessions(self, query: str, user_id: str | None = None) -> list[dict[str, Any]]:
-        term = f"%{query}%"
-        conditions = ["(sessions.title LIKE ? OR turns.prompt_text LIKE ? OR turns.summary LIKE ?)"]
-        params: list[Any] = [term, term, term]
+    def search_sessions(
+        self, query: str, user_id: str | None = None, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Conversations matching *query*, each carrying the exchange that matched.
+
+        RAIKER-2020: the title still matches on its own, but the message-body half
+        now goes through ``conversation_fts`` instead of an unindexed
+        ``LIKE '%term%'`` over every turn the owner has ever taken. The row keeps
+        the shape it had and gains ``match_snippet`` / ``match_turn_id``, so the
+        result list can say *why* a conversation matched rather than only that it
+        did — which is the difference between finding a chat from years ago and
+        recognising it.
+        """
+        stripped = query.strip()
+        if not stripped:
+            return []
+        matched: dict[str, dict[str, Any]] = {}
+        for hit in self.search_conversation_turns(stripped, user_id=user_id, limit=limit):
+            matched.setdefault(
+                str(hit["session_id"]),
+                {"turn_id": str(hit["turn_id"]), "snippet": str(hit.get("snippet") or "")},
+            )
+        placeholders = ",".join("?" * len(matched)) if matched else "SELECT NULL"
+        conditions = [f"(sessions.title LIKE ? OR sessions.session_id IN ({placeholders}))"]
+        params: list[Any] = [f"%{stripped}%", *sorted(matched)]
         if user_id is not None:
             conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
             params.append(user_id)
         with self.connect() as connection:
             rows = connection.execute(
-                """
-                SELECT sessions.* FROM sessions
-                LEFT JOIN turns ON turns.session_id = sessions.session_id
-                WHERE """ + " AND ".join(conditions) + " GROUP BY sessions.session_id ORDER BY sessions.updated_at DESC",
-                params,
+                "SELECT sessions.* FROM sessions WHERE "
+                + " AND ".join(conditions)
+                + " ORDER BY sessions.updated_at DESC LIMIT ?",
+                [*params, limit],
             ).fetchall()
-        return [dict(row) for row in rows]
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            record = dict(row)
+            hit = matched.get(str(record.get("session_id")), {})
+            record["match_snippet"] = " ".join(str(hit.get("snippet", "")).split())[:300]
+            record["match_turn_id"] = hit.get("turn_id", "")
+            results.append(record)
+        return results
 
     # ── Governed local MCP server profiles (Control Deck task 4) ─────────────
     # Every row is owner-scoped by ``principal_id``: an account can only list,
@@ -3870,6 +3937,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 (title, title, utc_now(), session_id),
             )
+            self._sync_conversation_fts(connection, turn_id)
 
     def complete_turn(self, turn_id: str, status: str, summary: str) -> None:
         with self.connect() as connection:
@@ -3877,6 +3945,144 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE turns SET status = ?, completed_at = ?, summary = ? WHERE turn_id = ?",
                 (status, utc_now(), summary, turn_id),
             )
+            self._sync_conversation_fts(connection, turn_id)
+
+    # ── Conversation recall (RAIKER-2020) ────────────────────────────────────
+    #
+    # `conversation_fts` is a projection of `turns`, rebuilt from it and never
+    # read as an authority. Every search below carries its hits back to the
+    # `turns`/`sessions` rows so ownership is still decided by `sessions.user_id`
+    # — the index narrows the candidate set, it does not widen who may see one.
+
+    @staticmethod
+    def _sync_conversation_fts(connection: sqlite3.Connection, turn_id: str) -> None:
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute("DELETE FROM conversation_fts WHERE turn_id = ?", (turn_id,))
+            connection.execute(
+                """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+                   SELECT turn_id, session_id, 'prompt', prompt_text FROM turns
+                   WHERE turn_id = ? AND prompt_text IS NOT NULL AND TRIM(prompt_text) != ''""",
+                (turn_id,),
+            )
+            connection.execute(
+                """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+                   SELECT turn_id, session_id, 'answer', summary FROM turns
+                   WHERE turn_id = ? AND summary IS NOT NULL AND TRIM(summary) != ''""",
+                (turn_id,),
+            )
+
+    @staticmethod
+    def _backfill_conversation_fts(connection: sqlite3.Connection) -> None:
+        """Populate the index once, for the turns that predate it.
+
+        Deliberately *not* a rebuild on every open: a workspace carrying years of
+        conversation would pay a full re-index to start the app. New turns keep
+        themselves in sync through ``_sync_conversation_fts``; a workspace that
+        needs a repair gets one from ``rebuild_conversation_fts`` on request.
+        """
+        with contextlib.suppress(sqlite3.OperationalError):
+            indexed = connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0]
+            if int(indexed or 0) > 0:
+                return
+            SQLiteStore._rebuild_conversation_fts(connection)
+
+    @staticmethod
+    def _rebuild_conversation_fts(connection: sqlite3.Connection) -> None:
+        connection.execute("DELETE FROM conversation_fts")
+        connection.execute(
+            """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+               SELECT turn_id, session_id, 'prompt', prompt_text FROM turns
+               WHERE prompt_text IS NOT NULL AND TRIM(prompt_text) != ''"""
+        )
+        connection.execute(
+            """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+               SELECT turn_id, session_id, 'answer', summary FROM turns
+               WHERE summary IS NOT NULL AND TRIM(summary) != ''"""
+        )
+
+    def rebuild_conversation_fts(self) -> int:
+        """Owner-started repair. Returns the number of indexed rows."""
+        with self.connect() as connection:
+            self._rebuild_conversation_fts(connection)
+            return int(connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0] or 0)
+
+    @staticmethod
+    def _match_terms(query: str) -> list[str]:
+        """FTS4-safe terms. Operators and punctuation are stripped, not escaped."""
+        cleaned = "".join(character if character.isalnum() else " " for character in query)
+        return [term for term in cleaned.split() if len(term) >= 3][:12]
+
+    def search_conversation_turns(
+        self,
+        query: str,
+        *,
+        user_id: str | None = None,
+        limit: int = 10,
+        session_id: str | None = None,
+        after: str | None = None,
+        before: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Exchanges matching *query*, newest first, scoped to one owner.
+
+        The index answers "which exchanges mention this"; the join answers "and
+        may this caller see them". ``after``/``before`` are ISO timestamps, which
+        is what makes an old conversation reachable at all: without them a bounded
+        result set is always the recent one.
+        """
+        if limit < 1:
+            return []
+        terms = self._match_terms(query)
+        conditions = ["turns.turn_id IS NOT NULL"]
+        params: list[Any] = []
+        if terms:
+            source = (
+                "conversation_fts JOIN turns ON turns.turn_id = conversation_fts.turn_id "
+                "JOIN sessions ON sessions.session_id = turns.session_id"
+            )
+            selected = (
+                "conversation_fts.role AS role, "
+                "snippet(conversation_fts, '', '', '…', -1, 18) AS snippet"
+            )
+            conditions.append("conversation_fts MATCH ?")
+            params.append(" ".join(terms))
+        else:
+            # Terms shorter than the index tokenizer's floor (an identifier such
+            # as `q3`) still have to be findable, so a substring scan stands in.
+            source = "turns JOIN sessions ON sessions.session_id = turns.session_id"
+            selected = (
+                "'prompt' AS role, "
+                "SUBSTR(COALESCE(turns.prompt_text, turns.summary, ''), 1, 220) AS snippet"
+            )
+            like = f"%{query.strip()}%"
+            conditions.append("(turns.prompt_text LIKE ? OR turns.summary LIKE ?)")
+            params.extend([like, like])
+        if user_id is not None:
+            conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
+            params.append(user_id)
+        if session_id is not None:
+            conditions.append("turns.session_id = ?")
+            params.append(session_id)
+        if after:
+            conditions.append("turns.created_at >= ?")
+            params.append(after)
+        if before:
+            conditions.append("turns.created_at <= ?")
+            params.append(before)
+        params.append(limit)
+        sql = (
+            f"SELECT turns.turn_id AS turn_id, turns.session_id AS session_id, "
+            f"turns.created_at AS created_at, turns.prompt_text AS prompt_text, "
+            f"turns.summary AS summary, sessions.title AS session_title, "
+            f"sessions.origin AS origin, {selected} FROM {source} "
+            f"WHERE {' AND '.join(conditions)} "
+            f"ORDER BY turns.created_at DESC LIMIT ?"
+        )
+        with self.connect() as connection:
+            try:
+                rows = connection.execute(sql, params).fetchall()
+            except sqlite3.OperationalError:
+                return []
+        return [dict(row) for row in rows]
 
     def index_event(
         self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str,

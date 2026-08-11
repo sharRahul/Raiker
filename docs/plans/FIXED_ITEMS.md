@@ -195,6 +195,13 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-184 | High | Runtime / automatic context compaction | Fixed (former Known Limit) |
 | FIXED-185 | Medium | Models / connected-provider rolling usage | Fixed (former Known Limit) |
 | FIXED-186 | High | Audit / concurrent event writers could tear JSONL and its hash chain | Fixed (found during final verification) |
+| FIXED-187 | **Critical** | Recall / a turn could not read a past conversation | Fixed (was MEM-01) |
+| FIXED-188 | High | Context assembly / ambient recall offered the eight most recent chats | Fixed (was MEM-02) |
+| FIXED-189 | Medium | Recall / a search result was truncated mid-sentence for the model | Fixed (found during the live round) |
+| FIXED-190 | Medium | Build / the code map had no reference search | Fixed (was a README known limit) |
+| FIXED-191 | Medium | Build / matching failed on whitespace the model mis-transcribed | Fixed (was a README known limit) |
+| FIXED-192 | Medium | Desktop / the tray drew its own icon and the AppImage shipped an empty one | Fixed |
+| FIXED-193 | Low | Visual consistency / eight views re-declared the same control styling | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7120,3 +7127,202 @@ forces 48 writer instances through the former race and validates every JSON
 line, indexed offset, digest, and predecessor. The original batched-denial
 regression and the event-log suite pass with the new lock.
 
+
+
+---
+
+## FIXED-187 — A turn could not read a past conversation
+
+**Status: fixed in this change. Was MEM-01 in
+[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** Asked what was decided in an earlier chat, a turn answered from
+whatever remained in its context window. It never consulted the transcript
+because it had no tool that could: `memory_search`, `memory_list` and
+`memory_get` are all scoped to approved durable memory, a store that is empty on
+a default install because `memory_write_execution` ships off. Chat search
+existed only as a page a human could open.
+
+**Root cause.** Two gaps that read as one. No tool reached conversations at all,
+and `SQLiteStore.search_sessions` ran `LIKE '%term%'` across `sessions.title`,
+`turns.prompt_text` and `turns.summary` with no index — a full scan of every turn
+the owner had ever taken, returning whole conversations with no indication of
+which exchange matched.
+
+**Fix.** `conversation_fts` (migration `RAIKER-2020`), an FTS4 projection of the
+`turns` table with one row per side of an exchange, rebuilt from `turns` and
+never read as an authority: every hit is carried back to the `turns`/`sessions`
+rows, so `sessions.user_id` still decides visibility and the index only narrows
+the candidate set. New turns keep themselves in sync; a workspace that predates
+the index is backfilled once on open rather than re-indexed on every start, and
+`rebuild_conversation_fts()` is the owner-started repair. `conversation_search`
+is the tool — read-shaped for the same reason `memory_search` is, delegable to a
+subagent, and carrying `after`/`before` so a question about a particular period
+can reach it rather than the most recent matches.
+
+**User-interface outcome.** Search Chat rows carry the exchange that matched, so
+a result says *why* it matched. A turn that used the tool records a
+`conversation` source, so the transcript shows what the answer rested on.
+
+**Evidence.** `tests/test_conversation_recall.py` (18 cases). Live round
+2026-08-11: with a conversation dated **18 April 2022** in the workspace, the
+model was asked for the retention window agreed "back in 2022" and returned the
+exact figure, the verbatim sentence, the date and the stated reason —
+`r0811b-13-recall-2022-conversation.png`.
+
+---
+
+## FIXED-188 — Ambient recall offered the eight most recent chats, whatever the turn was about
+
+**Status: fixed in this change. Found while fixing FIXED-187. Was MEM-02.**
+
+**Observed.** Every turn's context bundle carried a recall item whose prior-chat
+half was `store.list_sessions(limit=8, …)` — the eight most recently *updated*
+conversations, ranked by nothing to do with the prompt. A conversation from years
+ago could never be recalled however exactly it answered the question, and on a
+busy workspace the eight slots were spent on chats from that morning.
+
+**Fix.** `_recalled_sessions` asks the conversation index with the turn's own
+prompt first and fills the remaining slots with recent conversations, so a prompt
+with no lexical match behaves exactly as it did. Each recalled row carries the
+one line that matched, and stays metadata plus one line — the full exchange stays
+behind `conversation_search`, so ambient context does not grow with history.
+
+**User-interface outcome.** The recall item names the matched line, so the owner
+can see which old conversation the model was given and why. Incognito remains an
+absolute read opt-out ahead of all of it.
+
+**Evidence.** `tests/test_conversation_recall.py::test_ambient_recall_prefers_a_relevant_old_chat_over_a_recent_one`.
+
+---
+
+## FIXED-189 — A recalled exchange was truncated before the model could read it
+
+**Status: fixed in this change. Found during the live round, not by a test.**
+
+**Observed.** In the first live recall round the model found the right
+conversation and still could not answer. It reported: *"the text is truncated at
+'we rotate the SQLCipher key every…' and doesn't show the complete frequency."*
+
+**Root cause.** The tool returned the index's own `snippet()` — roughly eighteen
+tokens around the hit. That is the right amount for a person scanning a result
+list and the wrong amount for the model, which had located the sentence holding
+the answer and was handed the half of it before the number.
+
+**Fix.** A result carries the matched message, bounded at 1200 characters, and
+the short snippet separately as the reason it matched. The two audiences are
+different and now get different fields.
+
+**User-interface outcome.** Re-run live, the same question returned "nas-alpha-7"
+and "every 90 days" with the sentence quoted verbatim —
+`r0811b-12-recall-across-chats.png`.
+
+**Evidence.** `test_a_result_carries_the_whole_message_not_only_the_matched_fragment`,
+written from the live transcript.
+
+---
+
+## FIXED-190 — The code map found declarations and nothing that used them
+
+**Status: fixed in this change. Was a README known limit.**
+
+**Observed.** `code_map_search` answered "where is this defined". Nothing
+answered "what would break if I change it", so every impact question fell back to
+a guessed grep pattern and several reads.
+
+**Fix.** `code_map_references` scans the files the owner's own indexing run
+already accepted for word-boundary uses of one identifier, excluding the lines
+the map records as declarations of that name, and returns a path, a line and that
+line's text. Governance is identical to `code_map_search` and enforced in the
+same place: the `code_map_indexing` gate, the decision mode, and the same
+workspace containment. It is bounded on files scanned, file size and results, and
+reports `partial` with the bound it hit rather than presenting a truncated answer
+as a complete one. Free text is refused rather than matched loosely.
+
+**User-interface outcome.** The README states what the search is — textual
+word-boundary matches, not a resolved call graph, so a same-named symbol from
+another module matches too — rather than implying a precision it does not have.
+
+**Evidence.** `tests/test_code_map_references.py` (12 cases).
+
+---
+
+## FIXED-191 — An edit failed because the model mis-transcribed whitespace
+
+**Status: fixed in this change. Was a README known limit.**
+
+**Observed.** `edit_file` required an exact `old_text` match and a patch hunk
+required exact context. A model that quoted a tab-indented line with spaces, or
+dropped trailing whitespace the file carried, had named the right code and was
+refused.
+
+**Fix.** Matching tries the exact text first; when that finds nothing, the same
+search runs again ignoring trailing whitespace and indentation style. What does
+**not** relax is uniqueness — a relaxed search hitting two places is still
+refused — so the tolerance can never land an edit somewhere it was not meant to.
+Interior spacing stays text: `a + b` and `a+b` remain a mismatch. When a match
+was tolerant the file keeps its own indentation and the replacement is shifted to
+it, so an edit cannot silently de-indent a method into module scope.
+
+**User-interface outcome.** The README's known limit now describes what is
+strict (which code you named) and what is not (how you typed it).
+
+**Evidence.** `tests/test_edit_whitespace_tolerance.py` (11 cases), including the
+two that would have made the tolerance unsafe.
+
+---
+
+## FIXED-192 — The tray drew its own icon and the AppImage shipped an empty one
+
+**Status: fixed in this change.**
+
+**Observed.** The application icon had three different answers. `raiker/app/tray.py`
+drew a rounded rectangle with PIL, so the mark in the system tray was not the
+mark the product ships — a different Raiker in the one place the app is visible
+while idle. `scripts/build_installer.py` looked for `assets/icons/raiker.png`, a
+name that has never existed in this repository, and on not finding it wrote a
+**zero-byte** `raiker.png` into the AppImage, so a Linux install showed a blank
+square in its launcher. The icon that does exist, `assets/icons/raiker-icon.png`,
+was in no wheel at all.
+
+**Fix.** One resolver, `raiker.assets.icon_path()`, checking `RAIKER_ICON_PATH`,
+then the packaged copy, then the source tree. The icon ships in the wheel via
+`[tool.setuptools.package-data]`. The tray loads it and downsamples it to 64px
+with alpha preserved, keeping the drawn shape only as the fallback for a build
+whose icon is missing — a tray with a placeholder is still a working tray, and
+failing to start one would remove the owner's Pause and Quit. The AppImage build
+now fails loudly rather than shipping an empty file.
+
+**Evidence.** `tests/test_tray_icon.py`; the tray image loads at 64×64 RGBA from
+the packaged asset and falls back cleanly when `RAIKER_ICON_PATH` points at
+nothing.
+
+---
+
+## FIXED-193 — Eight views re-declared the same control styling, four different ways
+
+**Status: fixed in this change.**
+
+**Observed.** Memory's filter dropdowns, Settings' General and Personalisation
+selects, Runtime's environment form, Models' three pickers, Projects' move row,
+MCP's create row and Security's grant form each declared their own control
+styling — at 40px, 42px and 44px tall, with `--border` or `--border-strong`,
+`--surface` or `--sunken`, `--r-sm` or `--r-md`. Twenty of the thirty-seven
+`<select>` elements in the app carried no class at all and rendered as the raw
+platform control. The result was four different-looking boxes on one page.
+
+**Fix.** The control appearance is declared once against the *element* rather
+than a class, wrapped in `:where()` so its specificity is zero and any component
+that genuinely needs to differ still overrides it with a plain class — nothing
+had to be unpicked to adopt it. `.input` / `.select` / `.textarea` remain as
+explicit opt-ins for markup that already names them. Every dropdown gets one
+inline chevron instead of each platform's own. `--control-min-h` joins the
+density tokens, so Compact and Spacious move control height with everything else.
+The eight per-view declarations were deleted.
+
+**Why the element and not the class.** Adding `class="select"` to thirty-seven
+call sites would have fixed today's markup and none of tomorrow's; the next view
+would have started the drift again.
+
+**Evidence.** `r0811b-15-memory-filters.png`, `r0811b-16-settings-dropdowns.png`
+and `r0811b-17-settings-dropdowns-dark.png` — the same control in both themes.

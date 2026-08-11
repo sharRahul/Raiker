@@ -1083,6 +1083,11 @@ export interface SessionSummary {
   // "task" for the server-owned session a task run executes in. Provenance
   // only — a task session stays readable in Sessions and from Tasks.
   origin?: string;
+  // RAIKER-2020 — set only on a search result: the exchange that matched and
+  // the turn it belongs to, so a result can say *why* it matched rather than
+  // only that it did. Empty on a plain listing.
+  match_snippet?: string;
+  match_turn_id?: string;
 }
 
 export interface TurnSummary {

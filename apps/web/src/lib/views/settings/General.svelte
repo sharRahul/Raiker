@@ -83,6 +83,5 @@
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: clamp(1.25rem, 3vw, 2rem); margin-bottom: var(--space-4); }
   label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
   label small { color: var(--text-2); font-weight: 400; }
-  select { width: 100%; min-height: 44px; padding: 0 .8rem; border: 1px solid var(--border-strong); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); font: inherit; }
-  select:focus-visible { outline: 3px solid var(--focus-ring); outline-offset: 2px; }
+  select { width: 100%; }
 </style>

@@ -125,8 +125,8 @@
     font-weight:650;
   }
   label small { color:var(--text-2); font-weight:400; }
-  .settings-select { width:100%; min-height:44px; padding:0 .8rem; border:1px solid var(--border-strong); border-radius:var(--r-md); background:var(--surface); color:var(--text-1); font:inherit; }
-  .settings-select:focus-visible,.opt:focus-visible,.density-opt:focus-visible { outline:3px solid var(--focus-ring); outline-offset:2px; }
+  .settings-select { width:100%; }
+  .opt:focus-visible,.density-opt:focus-visible { outline:3px solid var(--focus-ring); outline-offset:2px; }
 
   /* Each option shows what it does. Three stacked rows at that mode's own row
      height is the smallest honest preview of a density setting — a name and a

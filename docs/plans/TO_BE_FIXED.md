@@ -59,8 +59,81 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [OPT-01](#opt-01--adding-one-tool-takes-twelve-edits-across-seven-files) | Medium | Codebase structure | Open |
+| MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
+
+The memory audit of **2026-08-11** has its own document,
+[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
+standard. Its MEM-01 and MEM-02 are closed in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188; MEM-03 through
+MEM-09 are open there rather than duplicated here.
+
+---
+
+## OPT-01 — Adding one tool takes twelve edits across seven files
+
+**Severity: Medium. Area: codebase structure. This is the measured
+line-reduction opportunity, not a defect.**
+
+**Observed.** Registering `conversation_search` and `code_map_references` this
+round required the same tool name to be written into **seven files at twelve
+sites**, none of which fails loudly when one is missed:
+
+| File | What it decides | Sites |
+|---|---|---|
+| `models/tool_call_validation.py` | risk band, required args, list args, arg schemas, optional args, description | 5 |
+| `contracts/models.py` | the name is known at all | 1 |
+| `runtime/turn_sources.py` | what kind of source a result is | 2 |
+| `runtime/authority/router.py` | which capability the tool answers to | 1 |
+| `policy/config.py` | whether the proposal is read-shaped | 1 |
+| `agents/orchestration.py` | whether a subagent may be delegated it | 1 |
+| `tools/broker.py` | the executor | 1 |
+
+Inside `tool_call_validation.py` alone, **43 tools produce 148 key lines across
+six parallel dictionaries** keyed by the same string. Every tool appears in more
+than one. A tool registered in six of the seven files does not raise an error —
+it silently behaves as an unknown tool, or as one with no description, or as one
+a subagent may not use.
+
+**Root cause.** Each table was added where it was needed, by a change that was
+correct in isolation. Nothing forces a new tool to be complete, because
+completeness is not represented anywhere.
+
+**Proposed fix.** One declarative `ToolDefinition` per tool in a single registry
+module — name, risk band, approval requirement, arguments (required, list,
+optional, schemas), description, capability, source kind, delegable, read-shaped
+— and derive the existing tables from it. Every current consumer keeps its
+current shape, so the change is additive and reviewable a file at a time; the
+tables become one-line comprehensions over the registry. A dataclass with
+required fields is what makes a half-registered tool a construction error rather
+than a runtime surprise.
+
+**Estimated reduction.** ~105 of the 148 key lines in
+`tool_call_validation.py`, and 11 of the 12 edit sites for each future tool. The
+descriptions and the explanatory comments are the file's value and are kept
+verbatim — the saving is duplication, not prose.
+
+**Applied instance (proof the method works).** The same shape of problem in the
+web app was fixed this round as **FIXED-193**: eight views re-declared the same
+control styling four different ways, and thirty-seven `<select>` elements had
+twenty different appearances. Declaring the control appearance once against the
+*element* inside `:where()` — zero specificity, so nothing had to be unpicked —
+deleted all eight declarations and, more importantly, removed the drift for every
+view written after it. The principle both share: **when correctness depends on
+remembering to repeat something, move the requirement into one place that cannot
+be forgotten** — a registry that fails construction, or a rule that applies
+without being named.
+
+**Required user-interface outcome.** None directly; this is internal. The
+outcome that matters is that a tool cannot ship half-registered, which is what
+produced the `conversation` source kind and the delegable-set entry being
+separate manual steps this round.
+
+**Not done in this session.** The registry touches the validation path every turn
+runs through, and this session's remaining budget was committed to verifying the
+memory work live. It is written up here rather than half-applied.
 
 ---
 

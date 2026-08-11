@@ -146,6 +146,7 @@
      height rather than only the gaps between cards. */
   --control-y: 0.42rem;
   --control-x: 0.85rem;
+  --control-min-h: 40px;
   --row-y: 0.5rem;
   --row-x: 0.6rem;
   --card-pad-y: var(--space-4);
@@ -325,6 +326,7 @@
   --space-6: 1.5rem;
   --control-y: 0.3rem;
   --control-x: 0.7rem;
+  --control-min-h: 34px;
   --row-y: 0.32rem;
   --row-x: 0.5rem;
 }
@@ -335,6 +337,7 @@
   --space-6: 2.6rem;
   --control-y: 0.55rem;
   --control-x: 1rem;
+  --control-min-h: 46px;
   --row-y: 0.7rem;
   --row-x: 0.8rem;
 }
@@ -670,6 +673,24 @@ code,
   }
 }
 
+/* One control appearance, applied to the element rather than to a class.
+   Eight views used to re-declare this — at 40px, 42px and 44px tall, with
+   --border or --border-strong, --surface or --sunken, --r-sm or --r-md — so
+   Memory's filters, Settings' dropdowns and Models' pickers were four
+   different-looking controls on the same page. Adding `class="select"` to
+   thirty-seven call sites would have fixed today's markup and none of
+   tomorrow's; styling the element fixes both.
+
+   `:where()` keeps the specificity at zero, so any component that genuinely
+   needs to differ (the composer's inline chips, a borderless search field)
+   still overrides it with a plain class — nothing had to be unpicked to adopt
+   this. `.input` / `.select` / `.textarea` stay as explicit opt-ins for the
+   markup that already names them. */
+:where(
+  select,
+  textarea,
+  input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"])
+),
 .input,
 .select,
 .textarea {
@@ -680,14 +701,34 @@ code,
   border: 1px solid var(--border-strong);
   border-radius: var(--r-sm);
   padding: var(--control-y) calc(var(--control-x) * 0.76);
+  min-height: var(--control-min-h);
   transition: border-color var(--motion-fast) var(--ease);
 }
+/* Every dropdown gets the same indicator instead of each platform's own, so a
+   select reads as the same control on macOS, Windows and Linux. */
+:where(select),
+.select {
+  appearance: none;
+  padding-right: calc(var(--control-x) * 2.1);
+  /* One inline chevron rather than each platform's own control. The grey is
+     within a step of --text-3 in both themes, which is the only colour a data
+     URI can carry — a token cannot cross into one. */
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%2372828d' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-position: right calc(var(--control-x) * 0.8) center;
+  background-size: 10px 6px;
+  background-repeat: no-repeat;
+}
+:where(select, textarea, input):focus-visible,
 .input:focus-visible,
 .select:focus-visible,
 .textarea:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 0;
   border-color: var(--focus-ring);
+}
+:where(select, textarea, input):disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .textarea {
   resize: vertical;

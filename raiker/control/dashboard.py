@@ -184,6 +184,12 @@ class SessionView:
     # be moved in or out; the project grants nothing and only bounds the
     # context the chat receives.
     project_id: str | None = None
+    # RAIKER-2020 — when this row came from a search, the exchange that matched
+    # and the turn it belongs to. Empty on a plain listing. It is what lets a
+    # result say *why* it matched rather than only that it did, which is the
+    # difference between finding a chat from years ago and recognising it.
+    match_snippet: str = ""
+    match_turn_id: str = ""
     # Soft-archive state (Control Deck task 3). Archiving is a reversible
     # organizing action — it moves a chat out of the default active list but
     # never deletes transcripts, events, checkpoints, or permissions.
@@ -5033,6 +5039,8 @@ class DashboardService:
             archived=bool(row.get("archived", 0)),
             archived_at=row.get("archived_at"),
             origin=str(row.get("origin") or "chat"),
+            match_snippet=str(row.get("match_snippet") or ""),
+            match_turn_id=str(row.get("match_turn_id") or ""),
         )
 
     @staticmethod

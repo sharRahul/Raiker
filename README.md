@@ -202,10 +202,19 @@ Highlights, each verified against a live instance:
 
 - **Chat** — streamed turns against local or hosted models, image and document
   attachments, sanitised Markdown rendering, source citations, a recent-chat
-  list with per-row delete and move-to-project, full-text search across titles
-  and message bodies, and one-click export of a conversation to HTML, Markdown
-  or PDF; at 90% of a known context capacity, older completed exchanges are
-  compacted automatically while the transcript remains unchanged.
+  list with per-row delete and move-to-project, indexed full-text search across
+  titles and message bodies that shows the exchange each result matched on, and
+  one-click export of a conversation to HTML, Markdown or PDF; at 90% of a known
+  context capacity, older completed exchanges are compacted automatically while
+  the transcript remains unchanged.
+- **Recall** — a turn can read your own past conversations, not only the ones it
+  can still see. `conversation_search` searches every exchange you have had,
+  narrowed to a date range when the question is about a particular period, and
+  returns the matching exchange with its conversation, timestamp and turn id so
+  an answer can cite the record instead of reconstructing it. Ambient recall
+  offers the conversations that match this prompt rather than the eight most
+  recent ones. What it returns is your own transcript, treated as data rather
+  than as instruction; **Incognito** switches the whole path off.
 - **Tasks** — four work types: run now, schedule once, daily routine, and a
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.
@@ -258,14 +267,20 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   pause is lost — the remainder is parked with the turn and re-governed one
   decision at a time when you resume — but a batch containing three edits is
   three decisions, not one.
-- **Build patching is strict about matching, not about scope.** One unified
-  diff may cover several files, including creates and deletes, and it is
-  applied as a single approval and a single reversible change set. What stays
-  strict is the match: exact edits require exactly one `old_text` match, every
-  hunk must match its context exactly and unambiguously, a section that edits or
+- **Build patching is strict about which code you named, not about how you
+  typed it.** One unified diff may cover several files, including creates and
+  deletes, and it is applied as a single approval and a single reversible change
+  set. Matching tries the exact text first; when that finds nothing, the same
+  search runs again ignoring **trailing whitespace and indentation style**, so a
+  quote that used spaces where the file uses a tab still names the right code —
+  and the file keeps its own indentation rather than adopting the quote's. What
+  does **not** relax is uniqueness: an edit still requires exactly one match and
+  a relaxed search that hits two places is refused, so the tolerance can never
+  land an edit somewhere it was not meant to. Interior spacing is text, not
+  formatting — `a + b` and `a+b` remain a mismatch. A section that edits or
   deletes must name a text file that already exists inside the workspace and one
   that creates must name a path that does not, and a patch naming the same file
-  twice is rejected before anything is written. There is no fuzzy or partial
+  twice is rejected before anything is written. There is still no partial
   application — one bad hunk fails the whole proposal.
 - **A push needs its own switch, its own allowlist and your own credential.**
   An approved `git_commit` records the change set you reviewed, and an approved
@@ -300,16 +315,21 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   states rather than implies. Widening a permission still happens on Permissions,
   under the step-up: a recorded reason, and a threat-model acknowledgement where
   the capability demands one.
-- **The code map finds declarations, not every reference, and it is exact only
-  for Python.** Turning on **Code map** lets Raiker index the repository Build
-  points at, so the agent can ask where something is defined instead of guessing
-  a search pattern; it is rebuilt on demand and refreshed for the files an
-  approved change touched. Python is parsed with a real parser; fifteen other
-  languages are matched with bounded patterns, which finds most declarations and
-  misses unusual ones — each file records which extractor produced it. A scan
-  that hits one of its bounds reports `partial` and names the bound rather than
-  presenting a partial map as a complete one. There is no reference or
-  call-graph search and no embeddings over the tree.
+- **The code map answers where a name is defined and where it is used, but it
+  matches text rather than resolving a call graph.** Turning on **Code map** lets
+  Raiker index the repository Build points at, so the agent can ask where
+  something is defined instead of guessing a search pattern; it is rebuilt on
+  demand and refreshed for the files an approved change touched. Python is parsed
+  with a real parser; fifteen other languages are matched with bounded patterns,
+  which finds most declarations and misses unusual ones — each file records which
+  extractor produced it. **Find references** answers the other half — what would
+  break if you changed this — by scanning the files that map already accepted for
+  word-boundary uses of one identifier, excluding the declaration itself. It is
+  textual, so a same-named symbol from another module matches too, and it says so
+  rather than implying a precision it does not have. A scan that hits one of its
+  bounds reports `partial` and names the bound rather than presenting a partial
+  answer as a complete one. There is still no resolved call graph and no
+  embeddings over the tree.
 - **A component that keeps failing is contained, and stays contained until you
   say otherwise.** Budgets alone let a hard-down provider or a broken tool spend
   a whole turn one doomed call at a time, so Raiker counts consecutive failures
@@ -393,7 +413,11 @@ FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
 The 2026-08-11 round closed **FIXED-181** through **FIXED-186**: multi-call
 answer seams, the checked-in live stub, dead transcript markup, automatic 90%
 context compaction, the connected-provider rolling seven-day usage view, and
-concurrent audit-log integrity.
+concurrent audit-log integrity. The same round closed two of the limits this
+section used to list — reference search over the code map, and matching that
+survives whitespace — and **MEM-01** and **MEM-02** in
+[docs/plans/MEMORY_RELIABILITY_PLAN.md](docs/plans/MEMORY_RELIABILITY_PLAN.md),
+which is the memory audit's own record of what recall can and cannot do yet.
 
 ## Documentation
 

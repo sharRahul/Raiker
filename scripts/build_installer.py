@@ -198,11 +198,15 @@ def build_appimage(payload: Path, record: dict[str, object], out_dir: Path) -> P
         "Icon=raiker\nCategories=Utility;\n",
         encoding="utf-8",
     )
-    icon = Path("assets/icons/raiker.png")
-    if icon.is_file():
-        shutil.copyfile(icon, appdir / "raiker.png")
-    else:
-        (appdir / "raiker.png").write_bytes(b"")
+    # One resolver for the shipped icon. This used to name
+    # `assets/icons/raiker.png`, which has never existed here, so every AppImage
+    # was built with a zero-byte icon and showed a blank square in the launcher.
+    from raiker.assets import icon_path
+
+    icon = icon_path()
+    if icon is None:
+        raise InstallerError("installer_missing_icon:appimage")
+    shutil.copyfile(icon, appdir / "raiker.png")
     image = out_dir / f"Raiker-{version}-{appimage_arch}.AppImage"
     _run([tool, "--appimage-extract-and-run", "--no-appstream", str(appdir), str(image)])
     return image

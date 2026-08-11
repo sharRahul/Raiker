@@ -1902,12 +1902,6 @@
   }
   .global-model-field select {
     width: 100%;
-    min-height: 44px;
-    padding: 0 0.8rem;
-    border: 1px solid var(--border-strong);
-    border-radius: var(--r-md);
-    background: var(--surface);
-    color: var(--text-1);
     font: inherit;
   }
   .global-model-field select:focus-visible {
@@ -2502,13 +2496,7 @@
     flex-wrap: wrap;
   }
   .fallback-add select {
-    padding: 0.35rem 0.5rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text-1);
     max-width: 22rem;
-    font: inherit;
     font-size: 0.86rem;
   }
   .ok-note {
@@ -2543,13 +2531,7 @@
     color: var(--text-2);
   }
   .advisor-row select {
-    padding: 0.35rem 0.5rem;
-    border-radius: var(--r-md);
-    border: 1px solid var(--border-strong);
-    background: var(--surface);
-    color: var(--text-1);
     max-width: 22rem;
-    font: inherit;
     font-size: 0.86rem;
   }
   .gate-status {

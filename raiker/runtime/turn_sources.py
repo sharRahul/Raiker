@@ -79,6 +79,8 @@ TOOL_SOURCE_KINDS: dict[str, str] = {
     "git_diff": "repository",
     "git_log": "repository",
     "code_map_search": "repository",
+    "code_map_references": "repository",
+    "conversation_search": "conversation",
     "memory_search": "memory",
     "memory_list": "memory",
     "memory_get": "memory",

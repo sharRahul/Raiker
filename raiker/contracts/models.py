@@ -464,6 +464,8 @@ TOOLS = {
     "memory_write",
     "memory_search",
     "code_map_search",
+    "code_map_references",
+    "conversation_search",
     "memory_forget",
     "memory_list",
     "memory_get",

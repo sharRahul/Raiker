@@ -661,6 +661,10 @@ class ContextUsageView:
     # rate exists. The popover states "Unknown" and offers Configure → rather
     # than showing nothing or implying the turn was free.
     price_unknown: bool = False
+    # Latest automatic provider-context compaction. This is deliberately
+    # metadata-only; the summary remains in the encrypted workspace store and
+    # transcript turns are never rewritten.
+    latest_compaction: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -4264,6 +4268,24 @@ class DashboardService:
             registered = PriceRegistry(self.store).resolve(
                 acting_principal_id, profile.provider, model
             )
+        latest_compaction = None
+        if acting_principal_id:
+            from raiker.runtime.conversation_compaction import ContextCompactionStore
+
+            compacted = ContextCompactionStore(self.store).latest(
+                acting_principal_id, session_id
+            )
+            if compacted is not None:
+                latest_compaction = {
+                    "status": compacted.status,
+                    "created_at": compacted.created_at,
+                    "source_turn_count": compacted.source_turn_count,
+                    "estimated_input_tokens_before": (
+                        compacted.estimated_input_tokens_before
+                    ),
+                    "estimated_summary_tokens": compacted.estimated_summary_tokens,
+                    "reason_code": compacted.reason_code,
+                }
         return ContextUsageView(
             session_id=session_id,
             profile_id=profile.profile_id if profile is not None else None,
@@ -4296,6 +4318,7 @@ class DashboardService:
             ),
             price_effective_from=registered.effective_from if registered is not None else None,
             price_unknown=price_unknown,
+            latest_compaction=latest_compaction,
         )
 
     # ── BUG-21: the pricing registry surface ─────────────────────────────

@@ -56,6 +56,11 @@ EVENT_TYPES = {
     # Prior turns of this conversation replayed to the model. Counts only —
     # message count and character total — never the transcript itself.
     "conversation_history_replayed",
+    # Automatic 90% model-context compaction. Metadata only: source-turn count
+    # and token estimates, or a governed reason code on safe fallback. The
+    # summary itself remains in the encrypted workspace store.
+    "compacted_context_created",
+    "compacted_context_failed",
     # B2 — a turn parked for an approval, and the same turn picking up again
     # once the owner resolved it. Counts and ids only; the parked conversation
     # stays in the encrypted store and never enters an event payload.

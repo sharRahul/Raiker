@@ -2530,6 +2530,31 @@ CREATE INDEX IF NOT EXISTS idx_provider_usage_snapshot_expiry
   ON provider_usage_snapshots(owner_principal_id, expires_at);
 """
 
+CONVERSATION_COMPACTIONS_MIGRATION_ID = "RAIKER-2043-conversation-compactions"
+CONVERSATION_COMPACTIONS_SQL = """
+-- Durable model-context summaries. Transcript turns remain untouched; the
+-- exact through-turn boundary determines which originals a future request may
+-- replace in provider context.
+CREATE TABLE IF NOT EXISTS conversation_compactions (
+  compaction_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  through_turn_id TEXT,
+  summary_text TEXT,
+  protected_context TEXT NOT NULL DEFAULT '',
+  source_turn_count INTEGER NOT NULL DEFAULT 0,
+  estimated_input_tokens_before INTEGER NOT NULL DEFAULT 0,
+  estimated_summary_tokens INTEGER NOT NULL DEFAULT 0,
+  provider TEXT NOT NULL,
+  model TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('completed', 'failed')),
+  reason_code TEXT,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_conversation_compactions_session
+  ON conversation_compactions(owner_principal_id, session_id, created_at);
+"""
+
 
 SETUP_STATE_MIGRATION_ID = "RAIKER-1049-full-setup-state"
 SETUP_STATE_SQL = """

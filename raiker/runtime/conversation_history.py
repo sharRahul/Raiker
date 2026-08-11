@@ -67,6 +67,8 @@ def conversation_messages(
     for row in rows:
         if exclude_turn_id and str(row.get("turn_id") or "") == exclude_turn_id:
             continue
+        if str(row.get("status") or "") != "completed":
+            continue
         prompt = str(row.get("prompt_text") or "").strip()
         reply = str(row.get("summary") or "").strip()
         if not prompt or not reply:

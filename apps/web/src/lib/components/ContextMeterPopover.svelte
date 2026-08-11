@@ -43,6 +43,8 @@
   const capacityNote = $derived(
     usage?.context_window_source === "provider"
       ? "reported by runtime"
+      : usage?.context_window_source === "owner"
+        ? "set by owner"
       : usage?.context_window_source === "config"
         ? "configured in Raiker"
         : null,
@@ -116,6 +118,25 @@
     <p>Context capacity is not configured for this model.</p>
   {/if}
 
+  {#if usage?.latest_compaction}
+    <div
+      class="compaction {usage.latest_compaction.status}"
+      aria-label="Automatic context compaction status"
+    >
+      {#if usage.latest_compaction.status === "completed"}
+        <strong>Earlier context compacted</strong>
+        <span>
+          {number.format(usage.latest_compaction.estimated_input_tokens_before)} â†’
+          {number.format(usage.latest_compaction.estimated_summary_tokens)} tokens
+        </span>
+        <p>Chat transcript is unchanged; only the context sent to the model was summarised.</p>
+      {:else}
+        <strong>Recent history retained</strong>
+        <span>Compaction was unavailable, so this turn continued with bounded recent context.</span>
+      {/if}
+    </div>
+  {/if}
+
   {#if usage?.billable}
     <div class="cost" aria-label="API pricing and cost">
       {#if priceMissing}
@@ -164,6 +185,12 @@
   .meter { margin-top:.75rem; }
   .remaining { display:flex; justify-content:space-between; flex-wrap:wrap; gap:.5rem; margin-top:.7rem; color:var(--text-2); font-size:.76rem; }
   .reported { display:flex; align-items:center; flex-wrap:wrap; gap:.3rem; } .capacity-source { color:var(--text-2); } .info { width:1rem; height:1rem; display:inline-grid; place-items:center; border:1px solid var(--border-strong); border-radius:50%; font-size:.65rem; color:var(--text-2); cursor:help; }
+  .compaction { display:grid; grid-template-columns:1fr auto; gap:.2rem .9rem; margin-top:1rem; padding:.75rem .85rem; border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:.5rem; background:var(--sunken); }
+  .compaction strong { color:var(--text-1); font-size:.8rem; }
+  .compaction > span { color:var(--text-2); font-size:.74rem; font-variant-numeric:tabular-nums; }
+  .compaction p { grid-column:1 / -1; margin:.05rem 0 0; font-size:.72rem; }
+  .compaction.failed { border-left-color:var(--warning, #a86b17); }
+  .compaction.failed > span { grid-column:1 / -1; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }
   .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:.84rem; color:var(--text-1); }
   .cost-row + .cost-row { margin-top:.25rem; }

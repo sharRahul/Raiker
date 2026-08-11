@@ -9,6 +9,8 @@ HOOK_EVENTS = {
     "SessionStart",
     "SessionEnd",
     "UserPromptSubmit",
+    "PreCompact",
+    "PostCompact",
     "PreToolUse",
     "PostToolUse",
     "PostToolUseFailure",

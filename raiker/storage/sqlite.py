@@ -91,6 +91,8 @@ from raiker.storage.migrations import (
     CONNECTOR_ECOSYSTEM_SQL,
     CONNECTOR_INVOCATIONS_MIGRATION_ID,
     CONNECTOR_INVOCATIONS_SQL,
+    CONVERSATION_COMPACTIONS_MIGRATION_ID,
+    CONVERSATION_COMPACTIONS_SQL,
     CREDENTIAL_SECURITY_MIGRATION_ID,
     CREDENTIAL_SECURITY_SQL,
     CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
@@ -1183,6 +1185,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
                 PROVIDER_USAGE_SNAPSHOTS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                CONVERSATION_COMPACTIONS_MIGRATION_ID,
+                CONVERSATION_COMPACTIONS_SQL,
                 connection,
             )
             self._apply_migration(

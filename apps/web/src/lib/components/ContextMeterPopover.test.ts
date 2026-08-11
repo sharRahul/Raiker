@@ -62,6 +62,13 @@ describe("ContextMeterPopover", () => {
     expect(screen.getByText(/Capacity configured in Raiker/)).toBeInTheDocument();
   });
 
+  it("labels an owner-set capacity as owner control", () => {
+    render(ContextMeterPopover, {
+      usage: usage({ context_window_source: "owner" }),
+    });
+    expect(screen.getByText(/Capacity set by owner/)).toBeInTheDocument();
+  });
+
   it("says no API cost for a provider that runs on this machine", () => {
     render(ContextMeterPopover, {
       usage: usage({ billable: false, provider: "llama.cpp", session_cost: null, provider_total_cost: null }),
@@ -133,5 +140,41 @@ describe("ContextMeterPopover", () => {
       usage: usage({ used_tokens: 400_000, context_window_tokens: 200_000 }),
     });
     expect(screen.getByRole("progressbar")).toHaveAttribute("aria-valuenow", "100");
+  });
+
+  it("shows that earlier context was compacted without implying transcript deletion", () => {
+    render(ContextMeterPopover, {
+      usage: usage({
+        latest_compaction: {
+          status: "completed",
+          created_at: "2026-08-11T12:00:00Z",
+          source_turn_count: 8,
+          estimated_input_tokens_before: 180_000,
+          estimated_summary_tokens: 2_400,
+          reason_code: null,
+        },
+      }),
+      locale: "en-GB",
+    });
+    expect(screen.getByText("Earlier context compacted")).toBeInTheDocument();
+    expect(screen.getByText(/180,000.*2,400 tokens/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chat transcript is unchanged/)).toBeInTheDocument();
+  });
+
+  it("states the safe fallback when automatic compaction was unavailable", () => {
+    render(ContextMeterPopover, {
+      usage: usage({
+        latest_compaction: {
+          status: "failed",
+          created_at: "2026-08-11T12:00:00Z",
+          source_turn_count: 6,
+          estimated_input_tokens_before: 182_000,
+          estimated_summary_tokens: 0,
+          reason_code: "provider_unavailable",
+        },
+      }),
+    });
+    expect(screen.getByText("Recent history retained")).toBeInTheDocument();
+    expect(screen.getByText(/Compaction was unavailable/)).toBeInTheDocument();
   });
 });

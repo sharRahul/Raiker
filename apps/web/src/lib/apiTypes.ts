@@ -565,6 +565,16 @@ export interface ContextUsage {
   /** True on a billable provider with no exact rate for this model. The popover
    *  states **Unknown** and offers Configure → rather than implying it was free. */
   price_unknown?: boolean;
+  /** Most recent automatic context-compaction outcome. Transcript turns stay
+   *  unchanged; this describes only provider-context replay. */
+  latest_compaction?: {
+    status: "completed" | "failed";
+    created_at: string;
+    source_turn_count: number;
+    estimated_input_tokens_before: number;
+    estimated_summary_tokens: number;
+    reason_code: string | null;
+  } | null;
 }
 
 /** BUG-21 — one exact model's row in the Models → Pricing surface. */

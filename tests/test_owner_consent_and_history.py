@@ -152,6 +152,12 @@ class TestConversationHistory:
         store.insert_turn("sess_1", "turn_1", "never answered")
         assert conversation_messages(store, "sess_1") == []
 
+    def test_a_failed_turn_with_an_error_summary_is_skipped(self, store: SQLiteStore) -> None:
+        store.create_session("sess_1", "cli")
+        store.insert_turn("sess_1", "turn_1", "request that failed")
+        store.complete_turn("turn_1", "failed", "The provider was unavailable.")
+        assert conversation_messages(store, "sess_1") == []
+
     def test_history_is_scoped_to_its_session(self, store: SQLiteStore) -> None:
         store.create_session("sess_1", "cli")
         store.create_session("sess_2", "cli")

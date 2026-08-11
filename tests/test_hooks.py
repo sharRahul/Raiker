@@ -23,6 +23,26 @@ def test_unknown_event_rejected() -> None:
         )
 
 
+@pytest.mark.parametrize("event", ["PreCompact", "PostCompact"])
+def test_compaction_hook_events_are_valid(event: str) -> None:
+    registry = HooksRegistry.from_config(
+        {
+            "schema_version": "1.0",
+            "hooks": {
+                event: [
+                    {
+                        "matcher": "*",
+                        "handlers": [
+                            {"id": "audit", "type": "builtin", "builtin": "noop"}
+                        ],
+                    }
+                ]
+            },
+        }
+    )
+    assert registry.for_event(event)
+
+
 def test_command_handler_requires_argv_list() -> None:
     with pytest.raises(HookConfigError):
         HooksRegistry.from_config(

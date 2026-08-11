@@ -124,8 +124,15 @@ class TestOpenAICompatibleHints:
         payload = _oai_provider("openai")._payload(_req(cache_ttl="5m"), stream=True)
         assert payload["stream_options"] == {"include_usage": True}
 
+    def test_ollama_stream_requests_usage(self) -> None:
+        # Ollama's OpenAI-compatible stream emits token counts only when
+        # include_usage is requested, so the ledger must ask for them.
+        payload = _oai_provider("ollama")._payload(_req(), stream=True)
+        assert payload["stream_options"] == {"include_usage": True}
+
     def test_local_stream_omits_stream_options(self) -> None:
-        # Local servers can reject stream_options — only OpenAI gets it.
+        # Other local servers can reject stream_options; Ollama is the one
+        # documented local runtime that needs it for streamed usage.
         payload = _oai_provider("llama.cpp")._payload(_req(cache_ttl="5m"), stream=True)
         assert "stream_options" not in payload
 

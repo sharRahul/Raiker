@@ -21,7 +21,7 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { hostedProviderCard } from "./hosted-provider";
+import { checkModelReady, hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -46,7 +46,11 @@ async function signIn(target: Page) {
   } else {
     await target.getByRole("button", { name: /unlock|sign in/i }).click();
   }
-  await expect(target.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 30_000 });
+  await expect(
+    target
+      .getByRole("heading", { name: /Welcome/ })
+      .or(target.getByRole("heading", { name: /Finish setup/ })),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 /** The pending approval the batch is currently stopped on. */
@@ -83,6 +87,7 @@ test("the batching model is connected through the product UI", async () => {
   await expect(card.locator("code").filter({ hasText: /Raiker Batch Stub/i })).toBeVisible({
     timeout: 30_000,
   });
+  await checkModelReady(page, await hostedProviderCard(page, BASE, "OpenAI-compatible"));
 });
 
 test("a three-mutation batch parks as decision 1 of 3, not as one call and two losses", async () => {

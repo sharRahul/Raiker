@@ -821,3 +821,34 @@ unambiguous.
 
 The automated evidence for this round includes the compaction, usage adapter,
 ledger/API, Svelte component, checked-in fixture, and live Playwright suites.
+
+**Result: deterministic and local-provider paths passed; hosted execution was
+environment-blocked.** The checked-in stub scenarios passed against the real
+FastAPI runtime, including the two-paragraph multi-call answer assertion. All
+four requested connections were entered through Models with the connection
+dialogs closed before capture. Anthropic, OpenAI, and OpenRouter then failed
+closed as **Unreachable** because this managed run could not grant the server
+outbound network access; no hosted response is represented as a live turn.
+OpenRouter's ordinary-key usage request therefore reports temporarily
+unavailable, while Anthropic and OpenAI correctly request separate organization
+admin credentials instead of inventing account limits.
+
+Ollama `gemma4:31b-cloud` passed exact-model readiness and returned both bounded
+markers in Chat. Its streamed OpenAI-compatible response exposed a live defect:
+the request omitted `stream_options.include_usage`, so the first turn did not
+reach the ledger. The adapter now requests those metrics for Ollama streams;
+the repeated turn recorded **5,405 tokens, 1 turn, 1 model request**, with **No
+API cost — local runtime**. All four connected rows accepted owner weekly token
+budgets and retained them after a server restart. The same restart exposed and
+closed a second defect: placeholder-provider cards now retain each configured
+model instead of showing `no model pinned` whenever another provider is the
+global selection. A compact 900 px pass also fixed the tablet Menu/title
+overlap and finished with no horizontal overflow.
+
+Screenshots: `bug-52-chat-refusal-does-not-end-the-turn.png`,
+`round0811-ollama-live-turn.png`,
+`round0811-hosted-provider-readiness.png`,
+`round0811-provider-usage-connected.png`, and
+`round0811-provider-usage-compact.png` in
+[`screenshots/working/`](screenshots/working). Every retained image was reviewed
+after dialogs closed; none contains a credential value.

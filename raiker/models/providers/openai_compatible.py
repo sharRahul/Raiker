@@ -476,7 +476,7 @@ class AsyncOpenAICompatibleProvider:
                 payload["prompt_cache_options"] = {"ttl": request.cache_ttl}
             elif self.provider == "llama.cpp":
                 payload["cache_prompt"] = True
-        if stream and self.provider == "openai":
+        if stream and self.provider in {"openai", "ollama"}:
             payload["stream_options"] = {"include_usage": True}
         reasoning = request.reasoning
         if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:

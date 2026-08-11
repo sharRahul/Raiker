@@ -58,6 +58,14 @@
     return new Intl.NumberFormat().format(value);
   }
 
+  function counted(value: number, singular: string): string {
+    return `${number(value)} ${singular}${value === 1 ? "" : "s"}`;
+  }
+
+  function hasNoApiCost(provider: string): boolean {
+    return ["ollama", "llama.cpp", "lm-studio", "vllm"].includes(provider);
+  }
+
   function budgetPercent(row: ProviderWeeklyUsage): number {
     if (!row.owner_budget) return 0;
     return Math.min(100, (row.observed.total_tokens / row.owner_budget) * 100);
@@ -122,7 +130,7 @@
               <p class="source-label">Raiker observed</p>
               <strong>{number(row.observed.total_tokens)} tokens</strong>
               <p>
-                {number(row.observed.turns)} turns · {number(row.observed.requests)} model requests
+                {counted(row.observed.turns, "turn")} · {counted(row.observed.requests, "model request")}
                 {#if row.observed.compactions > 0}
                   · {number(row.observed.compactions)} compaction{row.observed.compactions === 1 ? "" : "s"}
                 {/if}
@@ -132,6 +140,8 @@
                   {metricValue(row.observed.known_cost, row.observed.cost_currency ?? "USD")}
                   known cost
                 </p>
+              {:else if row.observed.total_tokens > 0 && hasNoApiCost(row.provider)}
+                <p class="quiet">No API cost — local runtime.</p>
               {:else if row.observed.total_tokens > 0}
                 <p class="quiet">Cost unknown for the recorded model pricing.</p>
               {/if}

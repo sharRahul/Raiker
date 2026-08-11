@@ -313,3 +313,24 @@ value.
 | `round0810-09-live-turn-answered.png` | FIXED-133 — a live Haiku 4.5 turn answering with the exact requested marker, no raw reason code anywhere |
 | `round0810-10-contained-subject.png` | FIXED-163 — a connector contained after three consecutive failures, with its reason, streak, last failure code, the matching high-severity finding above it, and a **Resume** control |
 | `round0810-11-containment-resumed.png` | FIXED-163 — the same subject back to active after one press, offering **Pause** and **Stop** again |
+
+## Multi-provider usage and compaction round — 2026-08-11
+
+Captured from an isolated production-build workspace. Anthropic, OpenAI, and
+OpenRouter credentials were entered only through Models; Ollama used the local
+`gemma4:31b-cloud` connection. Credential dialogs were closed before every
+capture. The managed server could not obtain outbound network access, so the
+hosted screenshot records the genuine fail-closed readiness result rather than
+claiming a hosted turn succeeded.
+
+| File | Records |
+|---|---|
+| `bug-52-chat-refusal-does-not-end-the-turn.png` | BUG-53 — two successive model answer passes remain separate paragraphs after a first-pass tool refusal |
+| `round0811-ollama-live-turn.png` | A real Ollama turn answering the exact requested marker through Chat |
+| `round0811-hosted-provider-readiness.png` | Anthropic, OpenAI, and OpenRouter connected with their exact pinned models retained after restart, each honestly marked **Unreachable** in this network-restricted run |
+| `round0811-provider-usage-connected.png` | All four connected providers only; Raiker-observed and provider-reported sources separated; genuine provider API limitations stated; persisted owner budgets; Ollama at 5,405 tokens and one request with no API cost |
+| `round0811-provider-usage-top.png` | The ordinary 1600 × 900 Activity viewport with the rolling seven-day headline and live Ollama ledger row |
+| `round0811-provider-usage-compact.png` | The settled 900 × 700 Activity layout after the tablet Menu/title overlap fix, with no horizontal page overflow |
+
+All retained images were inspected at rendered resolution and contain no
+credential value.

@@ -189,6 +189,23 @@ class TestReads:
         assert hosted["requires_egress_policy"] is True
         assert hosted["off_machine"] is True
 
+    def test_models_keeps_each_placeholder_provider_model_visible(
+        self, client: TestClient, app: FastAPI
+    ) -> None:
+        store = SQLiteStore(app.state.workspace_root)
+        store.save_configured_model(
+            "principal_owner", "anthropic-hosted", "claude-haiku-4-5-20251001"
+        )
+        store.save_configured_model(
+            "principal_owner", "openai-hosted", "gpt-4o-mini"
+        )
+
+        response = client.get("/api/models", headers=_auth_headers(_token(client)))
+        assert response.status_code == 200
+        profiles = {row["profile_id"]: row for row in response.json()["profiles"]}
+        assert profiles["anthropic-hosted"]["model"] == "claude-haiku-4-5-20251001"
+        assert profiles["openai-hosted"]["model"] == "gpt-4o-mini"
+
     def test_diagnostics_reports_disabled_capabilities_and_scope(self, client: TestClient) -> None:
         resp = client.get("/api/diagnostics", headers=_auth_headers(_token(client)))
         assert resp.status_code == 200

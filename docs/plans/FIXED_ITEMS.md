@@ -194,6 +194,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-183 | Low | Chat / disabled transcript implementation | Fixed (was BUG-55) |
 | FIXED-184 | High | Runtime / automatic context compaction | Fixed (former Known Limit) |
 | FIXED-185 | Medium | Models / connected-provider rolling usage | Fixed (former Known Limit) |
+| FIXED-186 | High | Audit / concurrent event writers could tear JSONL and its hash chain | Fixed (found during final verification) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -292,8 +293,9 @@ under a count-shaped key. Wired into `redact_event_payload`, `redact_response_bo
 and `assert_no_secrets_in_body`. Covered by `tests/test_token_count_redaction.py`.
 
 **Follow-on.** The estimate fallback and the missing cost data were addressed
-separately in FIXED-03 below; automatic 90 % compaction and a weekly quota remain
-open and are not tracked by any entry in this document.
+separately in FIXED-03 below. Automatic 90% compaction and rolling provider
+usage were still open at the time; they are now closed as **FIXED-184** and
+**FIXED-185**.
 
 ---
 
@@ -4142,13 +4144,15 @@ sections this entry was opened for.
 **`working-in-chat.md` → Known limits.** All three entries had shipped, so all
 three are gone and named: Markdown rendering (**FIXED-06**), export
 (**FIXED-12**, superseded by **FIXED-19** and **FIXED-54**), and an approved
-file write reaching the disk (**FIXED-08**). What replaces them is the set of
-edges a Chat user can still hit, each checked against the tree: `network` and
+file write reaching the disk (**FIXED-08**). What replaced them at the time was
+the set of edges a Chat user could still hit, each checked against the tree:
+`network` and
 `process` approvals are still record-only (`EXECUTABLE_ON_APPROVAL` in
 `raiker/approvals/execution.py` carries neither); a batch runs concurrently only
 while nothing in it needs a decision; `web_fetch` ships closed and `web_search`
 has no endpoint at all; conversational task creation stops at an approval (below);
-and compaction at 90 % and weekly quota remain specified but not shipped. The
+and compaction at 90% and weekly usage were then specified but not shipped
+(both are now **FIXED-184** and **FIXED-185**). The
 duplicate statement of that last one at the foot of the page is gone — one
 document stating the same limit twice is how this drift starts.
 
@@ -7080,8 +7084,39 @@ Normalized numeric snapshots are owner-scoped and cached for five minutes.
 Owners can set an advisory weekly token budget that is explicitly not a provider
 subscription limit.
 
+**Live follow-up.** Ollama's OpenAI-compatible stream now requests
+`include_usage`, which is the only way that runtime emits streamed token counts;
+local runs state **No API cost — local runtime** and singular request labels are
+grammatical. Configured placeholder-provider models remain pinned on every card
+after another provider becomes global and after restart. The 900 px shell also
+reserves enough header room for its tablet Menu control.
+
 **Evidence.** Provider adapter, bounded snapshot, connection, API, ledger and
-Models component tests pass. Playwright live turns cover Anthropic, OpenRouter,
-OpenAI and Ollama with credentials entered through Models and dialogs closed
-before screenshots.
+Models component tests pass. Playwright entered all four requested connections
+through Models with dialogs closed before screenshots. Ollama readiness and its
+live turn passed; the three hosted providers failed closed as **Unreachable**
+because this managed test server could not obtain outbound network access, so
+the run records that limitation instead of claiming hosted turns succeeded.
+
+---
+
+## FIXED-186 — Concurrent event writers preserve JSONL and its hash chain
+
+**Status: fixed in this change. Found during final verification.**
+
+**Observed.** The complete suite exposed a batched-denial event file containing
+a torn JSON fragment. Each `EventLogWriter` opened the same session file and
+looked up the previous digest independently, so simultaneous lifecycle writers
+could interleave appends or record two events against the same predecessor.
+
+**Fix.** A bounded process-local lock stripe plus a per-session operating-system
+file lock now covers the previous-hash read, complete JSONL append, flush, and
+SQLite index write as one serialized unit. It works across writer instances,
+threads, and a terminal/web process pair sharing one workspace without growing
+one in-memory lock per conversation.
+
+**Evidence.** `test_concurrent_writer_instances_keep_jsonl_and_hash_chain_intact`
+forces 48 writer instances through the former race and validates every JSON
+line, indexed offset, digest, and predecessor. The original batched-denial
+regression and the event-log suite pass with the new lock.
 

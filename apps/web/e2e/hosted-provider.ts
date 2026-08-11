@@ -21,7 +21,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
- * Close the first-run "Choose how to run models" sheet if it is up.
+ * Complete the first-run model/privacy/backup wizard if it is up.
  *
  * A brand-new instance opens it over the workbench (FIXED-133), and it is
  * modal: a spec that signs in and goes straight to Models is talking to a page
@@ -30,9 +30,24 @@ import { expect, type Locator, type Page } from "@playwright/test";
  */
 export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
   const skip = page.getByRole("button", { name: "Skip for now" });
-  if (!(await skip.isVisible().catch(() => false))) return false;
-  await skip.click();
-  await expect(skip).toBeHidden({ timeout: 30_000 });
+  if (await skip.isVisible().catch(() => false)) {
+    await skip.click();
+    await expect(skip).toBeHidden({ timeout: 30_000 });
+    return true;
+  }
+
+  // FIXED-172 replaced the old one-click sheet with the five-stage setup
+  // wizard. Live provider scenarios deliberately defer model selection here,
+  // choose the hosted-compatible privacy posture, and defer backup; the model
+  // itself is still connected through Models in the next step.
+  const decideLater = page.getByRole("button", { name: "Decide later" });
+  if (!(await decideLater.isVisible().catch(() => false))) return false;
+  await decideLater.click();
+  await page.getByRole("button", { name: "Balanced" }).click();
+  await page.getByRole("button", { name: "Set up later" }).click();
+  await page.getByRole("button", { name: "Open Workbench" }).click();
+  await expect(page).toHaveURL(/#\/home$/, { timeout: 30_000 });
+  await expect(decideLater).toBeHidden({ timeout: 30_000 });
   return true;
 }
 
@@ -48,9 +63,10 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
 export async function openHostedProviders(page: Page, base: string): Promise<void> {
   const hosted = page.getByRole("tab", { name: "Hosted" });
   const skip = page.getByRole("button", { name: "Skip for now" });
+  const decideLater = page.getByRole("button", { name: "Decide later" });
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto(`${base}/#/models?tab=hosted`);
-    await expect(hosted.or(skip).first()).toBeVisible({ timeout: 30_000 });
+    await expect(hosted.or(skip).or(decideLater).first()).toBeVisible({ timeout: 30_000 });
     if (!(await dismissFirstRunModelSetup(page))) break;
   }
   await expect(hosted).toBeVisible({ timeout: 30_000 });

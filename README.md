@@ -390,6 +390,11 @@ that closed the older limits this section used to list are FIXED-34, FIXED-39,
 FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
 [ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
+The 2026-08-11 round closed **FIXED-181** through **FIXED-186**: multi-call
+answer seams, the checked-in live stub, dead transcript markup, automatic 90%
+context compaction, the connected-provider rolling seven-day usage view, and
+concurrent audit-log integrity.
+
 ## Documentation
 
 - **[User guide](docs/guide/README.md)** — install, connect a model, permissions,
@@ -398,7 +403,7 @@ FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
   commands, API contracts, capability status, verification.
 - **[Live manual test plan](docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — a
   repeatable end-to-end plan and the recorded result of the last round
-  (2026-08-08, hosted Anthropic, every catalogue model), with
+  (2026-08-11, four provider connections plus a live Ollama turn), with
   [screenshots](docs/plans/screenshots) of what worked and what did not.
 - **[Security philosophy and policy](docs/SECURITY_AND_POLICY.md)** — read this
   before enabling any governed capability.

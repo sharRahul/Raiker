@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import socket
 import threading
 import time
@@ -84,6 +85,10 @@ def test_stub_catalogue_and_deterministic_batch_shapes() -> None:
             "write_file",
             "write_file",
         ]
+        assert all(
+            set(json.loads(call["function"]["arguments"])) == {"path", "text"}
+            for call in three_writes
+        )
 
         refusal_then_writes = _calls(
             _completion(

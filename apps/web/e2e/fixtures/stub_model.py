@@ -42,10 +42,10 @@ def _batch_for(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]
         return (
             "I’ll prepare the three files.",
             [
-                _tool_call("call_one", "write_file", {"path": "one.md", "content": "# One\n"}),
-                _tool_call("call_two", "write_file", {"path": "two.md", "content": "# Two\n"}),
+                _tool_call("call_one", "write_file", {"path": "one.md", "text": "# One\n"}),
+                _tool_call("call_two", "write_file", {"path": "two.md", "text": "# Two\n"}),
                 _tool_call(
-                    "call_three", "write_file", {"path": "three.md", "content": "# Three\n"}
+                    "call_three", "write_file", {"path": "three.md", "text": "# Three\n"}
                 ),
             ],
         )
@@ -54,9 +54,9 @@ def _batch_for(messages: list[dict[str, Any]]) -> tuple[str, list[dict[str, Any]
             "I’ll inspect the path and prepare both files.",
             [
                 _tool_call("call_outside", "read_file", {"path": "../escape.md"}),
-                _tool_call("call_one", "write_file", {"path": "one.md", "content": "# One\n"}),
+                _tool_call("call_one", "write_file", {"path": "one.md", "text": "# One\n"}),
                 _tool_call(
-                    "call_three", "write_file", {"path": "three.md", "content": "# Three\n"}
+                    "call_three", "write_file", {"path": "three.md", "text": "# Three\n"}
                 ),
             ],
         )

@@ -32,7 +32,7 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { hostedProviderCard } from "./hosted-provider";
+import { checkModelReady, hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -57,7 +57,11 @@ async function signIn(target: Page) {
   } else {
     await target.getByRole("button", { name: /unlock|sign in/i }).click();
   }
-  await expect(target.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 30_000 });
+  await expect(
+    target
+      .getByRole("heading", { name: /Welcome/ })
+      .or(target.getByRole("heading", { name: /Finish setup/ })),
+  ).toBeVisible({ timeout: 30_000 });
 }
 
 /** The "policy refused …" card for the most recent turn. */
@@ -93,6 +97,7 @@ test("the batching model is connected through the product UI", async () => {
   await expect(card.locator("code").filter({ hasText: /Raiker Batch Stub/i })).toBeVisible({
     timeout: 30_000,
   });
+  await checkModelReady(page, await hostedProviderCard(page, BASE, "OpenAI-compatible"));
 });
 
 test("a refused first call no longer ends the turn — the read behind it still answers", async () => {
@@ -108,6 +113,14 @@ test("a refused first call no longer ends the turn — the read behind it still 
   await expect(page.getByRole("main").getByText(/policy refused that one call/i)).toBeVisible({
     timeout: 180_000,
   });
+  // BUG-53: these are two model requests in one turn. They must remain two
+  // paragraphs, while deltas within either request still join without spaces.
+  const answer = page.locator(".message-bubble-raiker").last();
+  await expect(answer.locator(".markdown > p")).toHaveCount(2);
+  await expect(answer.locator(".markdown > p").first()).toContainText("inspect both locations");
+  await expect(answer.locator(".markdown > p").last()).toContainText(
+    "The policy refused that one call",
+  );
 
   // And the refusal is stated in the transcript, named to its own call, so a
   // reader does not take it as a verdict on everything the batch asked for.

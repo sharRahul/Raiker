@@ -87,4 +87,38 @@ describe("ProviderUsagePanel", () => {
       ),
     );
   });
+
+  it("labels one local request grammatically and as having no API cost", async () => {
+    stubFetch({
+      "GET /api/models/weekly-usage": {
+        ...weekly,
+        providers: [
+          {
+            ...weekly.providers[0],
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            observed: {
+              ...weekly.providers[0].observed,
+              turns: 1,
+              requests: 1,
+              compactions: 0,
+              known_cost: null,
+              cost_currency: null,
+            },
+            native: {
+              status: "not_supported",
+              reason_code: "provider_quota_api_not_supported",
+              checked_at: null,
+              expires_at: null,
+              metrics: [],
+            },
+          },
+        ],
+      },
+    });
+    render(ProviderUsagePanel);
+
+    expect(await screen.findByText("1 turn · 1 model request")).toBeInTheDocument();
+    expect(screen.getByText("No API cost — local runtime.")).toBeInTheDocument();
+  });
 });

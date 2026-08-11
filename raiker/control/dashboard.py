@@ -3780,17 +3780,6 @@ class DashboardService:
                 **_usage_fields(profile),
             )
 
-        profiles = tuple(
-            _profile_view(
-                profile,
-                override
-                if override and profile.profile_id == current
-                else profile.model,
-                selected=profile.profile_id == current,
-            )
-            for profile in registry_profiles
-        )
-
         configured_pairs = (
             self.store.list_configured_models(acting_principal_id)
             if acting_principal_id
@@ -3799,6 +3788,24 @@ class DashboardService:
         configured_by_profile: dict[str, list[str]] = {}
         for profile_id, configured_model in configured_pairs:
             configured_by_profile.setdefault(profile_id, []).append(configured_model)
+
+        def _card_model(profile: Any) -> str:
+            if override and profile.profile_id == current:
+                return override
+            choices = configured_by_profile.get(profile.profile_id, [])
+            if profile.model == "<model>" and choices:
+                return choices[-1]
+            return profile.model
+
+        profiles = tuple(
+            _profile_view(
+                profile,
+                _card_model(profile),
+                selected=profile.profile_id == current,
+            )
+            for profile in registry_profiles
+        )
+
         chat_profiles: list[ModelProfileView] = []
         seen_choices: set[tuple[str, str]] = set()
         for profile in registry_profiles:

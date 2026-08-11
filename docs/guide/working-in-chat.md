@@ -279,13 +279,15 @@ are the edges a Chat user can still hit:
   the batch requires approval, the batch is walked one call at a time and pauses
   there; nothing behind the pause is lost, but a turn proposing three edits is
   three decisions.
-- **Web fetch is off until you turn it on, twice.** `web_fetch` is disabled by
-  default and still withholds at its default `ask` decision mode, so reaching
-  the open internet takes both the capability gate and a raised decision mode.
-  Once it is at **Allow**, a turn fetches the page and quotes it, and a host
-  outside `RAIKER_WEB_EGRESS_ALLOWLIST` is refused by name. `web_search` answers
-  the same gate but has no endpoint shipped with Raiker: it reports
-  `web_search_not_configured` until you point it at one.
+- **Web reads work, and you say what they may not reach.** A turn can fetch a
+  page and quote it, and search the web, with nothing configured first. Add
+  anything you want refused under **Settings → Web access** — a domain, a
+  wildcard, an IP, a range, or a pattern — and check a host there without
+  contacting it. Your own network is never reachable and that is not a setting:
+  a private, loopback or link-local destination is refused however it is spelled
+  and wherever a redirect leads. What comes back is the page as text with the
+  hidden parts removed, and it is data you can act on — never an instruction the
+  page gets to give.
 - **Remembering something is a decision, and it starts off.** With **Memory
   store** turned on in Permissions, a turn can propose a durable fact or
   preference to keep; you see the exact sentence before you approve, and

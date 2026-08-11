@@ -196,7 +196,7 @@ zero-trust verification is applied at every authority boundary.
 | Knowledge | **Memory**, **Knowledge Map** |
 | Control | **Approvals**, **Permissions**, **Models**, **Extensions** |
 | Observe | **Observability** — readiness, audit log, checkpoints, live work, notifications, sessions |
-| Utilities | **Settings** |
+| Utilities | **Settings** — including **Web access** and **Git credential** |
 
 Highlights, each verified against a live instance:
 
@@ -226,6 +226,14 @@ Highlights, each verified against a live instance:
   and connected-provider rolling seven-day tokens, turns, requests,
   compactions, known cost, genuine provider data where available, and advisory
   owner budgets.
+- **Web access** — Raiker can read public pages and search the web out of the
+  box. Settings → Web access holds your blocklist (domains, wildcards, IPs,
+  ranges, patterns) and a check that answers "would this be reachable" without
+  contacting anything. Private and loopback destinations are refused always,
+  and a fetched page arrives as sanitised text with what was removed reported.
+- **Git credential** — the token Raiker pushes with, stored encrypted and lent
+  to one command at a time under an approval you make once or for a session.
+  It never appears in a log, an error, or a command's output.
 - **Extensions** — governed service connectors and Model Context Protocol
   servers you can build, connect, monitor, and contain, plus **Skills**:
   `SKILL.md` documents and `*.skill` bundles you upload, import from a
@@ -282,22 +290,45 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   that creates must name a path that does not, and a patch naming the same file
   twice is rejected before anything is written. There is still no partial
   application — one bad hunk fails the whole proposal.
-- **A push needs its own switch, its own allowlist and your own credential.**
-  An approved `git_commit` records the change set you reviewed, and an approved
-  `git_push` really publishes the branch — but publishing is egress carrying
-  repository content off the machine, so it answers to **Git push**
-  (`git_push_execution`) rather than to Git writes, and it does nothing until
-  the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and
-  `RAIKER_GITHUB_TOKEN` is set. Only HTTPS GitHub remotes are pushable, because
-  that is the credential Raiker holds; it never forces and never deletes a
-  branch. `github_write` then has a head to open a pull request against.
-- **Web fetch takes two deliberate steps to turn on.** `web_fetch` is gated by
-  its own capability and withholds by default at `ask`, so a page is fetched
-  only once the owner has both enabled the gate and raised the decision mode to
-  **Allow** — and then only for a host on `RAIKER_WEB_EGRESS_ALLOWLIST`, which
-  is empty until you set it. `web_search` answers the same gate, but Raiker
-  ships no search endpoint: it reports `web_search_not_configured` until you
-  point it at one.
+- **A push needs its own switch, its own allowlist, and a credential you lend
+  rather than leave lying about.** An approved `git_commit` records the change
+  set you reviewed, and an approved `git_push` really publishes the branch — but
+  publishing is egress carrying repository content off the machine, so it answers
+  to **Git push** (`git_push_execution`) rather than to Git writes, and it does
+  nothing until the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The
+  credential is stored encrypted from **Settings → Git credential** and lent to
+  one command at a time under a grant you make — **once**, or **for this
+  session** — which carries its own expiry and can be withdrawn in a press. It is
+  passed in the command's own environment rather than on a command line, and
+  removed from every log, error and captured output for as long as the loan
+  lasts. `RAIKER_GITHUB_TOKEN` in the host environment still works for an
+  install configured that way, and the page says which of the two you are on.
+  Only HTTPS GitHub remotes are pushable, because that is the credential Raiker
+  holds; it never forces and never deletes a branch.
+- **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
+  and `web_search` work on a fresh install: there is no list to fill in first,
+  and `web_search` uses a keyless endpoint until you point
+  `RAIKER_WEB_SEARCH_ENDPOINT` at your own. What you control is the **blocklist**
+  — **Settings → Web access**, or `RAIKER_WEB_EGRESS_BLACKLIST` — which takes a
+  domain (covering its subdomains), a wildcard, an IP address, a CIDR range, or a
+  `/regex/`, and can be tested against a host without contacting it. What you do
+  **not** control, and cannot switch off, is the address guard: https only, no
+  credential in the URL, and every address a name resolves to must be public, so
+  a fetch can never reach your loopback interface, your home network, or a cloud
+  metadata service — including through a name that resolves to one, an
+  IPv4-mapped IPv6 address, or a redirect. The connection is pinned to an address
+  that already passed, so the destination cannot change between the check and the
+  request. Emptying the blocklist opens none of that.
+- **A fetched page reaches the model as text, not as markup or instruction.**
+  Scripts, styles and comments are dropped; elements a visitor could never see —
+  `hidden`, `display:none`, zero-size, off-screen, `aria-hidden` — are removed and
+  counted, because text nobody can read is the usual carrier for an instruction
+  meant only for a model; zero-width and bidirectional characters are stripped;
+  and a line shaped like a conversation role marker is defanged so page text
+  cannot open a turn. What was removed is reported alongside the page rather than
+  silently swallowed. None of this is a filter that decides whether content is
+  safe — the thing that stops a hijack is that fetched text never carries
+  instruction authority — but an injection attempt arrives visible and inert.
 - **Remembering something is a decision, and Memory store starts off.**
   `memory_write` and `memory_forget` are offered to the model, but like every
   acting capability they answer to their own gate, which ships **off**. With it

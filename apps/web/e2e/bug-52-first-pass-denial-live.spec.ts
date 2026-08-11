@@ -26,7 +26,7 @@
  * batch twice. The stub guarantees the input; everything downstream is shipped.
  *
  * Prerequisites:
- *   1. `python <scratch>/stub_model.py 8811`   (the batching model, as ADD-02)
+ *   1. `python apps/web/e2e/fixtures/stub_model.py 8811` (the batching model, as ADD-02)
  *   2. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
  *      with `RAIKER_MODEL_EGRESS_ALLOWLIST=127.0.0.1`
  */

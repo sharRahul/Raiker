@@ -16,7 +16,7 @@
  * downstream of it is the shipped product.
  *
  * Prerequisites:
- *   1. `python <scratch>/stub_model.py`               (the batching model)
+ *   1. `python apps/web/e2e/fixtures/stub_model.py 8811` (the batching model)
  *   2. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";

@@ -80,6 +80,18 @@ def test_a_term_below_the_index_floor_still_finds_its_turn(store: SQLiteStore) -
     assert store.search_conversation_turns("q3")
 
 
+def test_the_fallback_scan_attributes_the_side_that_actually_matched(
+    store: SQLiteStore,
+) -> None:
+    """Otherwise a hit in an answer is reported as a prompt and read back from
+    the wrong column."""
+    store.create_session("sess_side", "/w")
+    _exchange(store, "sess_side", "turn_side", "what shipped?", "we shipped q3 targets")
+    hit = store.search_conversation_turns("q3")[0]
+    assert hit["role"] == "answer"
+    assert "q3" in hit["snippet"]
+
+
 def test_another_owner_never_sees_the_conversation(store: SQLiteStore) -> None:
     """The index narrows candidates; `sessions.user_id` still decides visibility."""
     with store.connect() as connection:

@@ -3981,8 +3981,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         needs a repair gets one from ``rebuild_conversation_fts`` on request.
         """
         with contextlib.suppress(sqlite3.OperationalError):
-            indexed = connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0]
-            if int(indexed or 0) > 0:
+            # `LIMIT 1`, not `COUNT(*)`: counting an FTS4 table scans its whole
+            # content table, and a workspace carrying years of conversation would
+            # pay that on every start — the exact case this index exists for.
+            if connection.execute("SELECT 1 FROM conversation_fts LIMIT 1").fetchone():
                 return
             SQLiteStore._rebuild_conversation_fts(connection)
 
@@ -4048,12 +4050,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         else:
             # Terms shorter than the index tokenizer's floor (an identifier such
             # as `q3`) still have to be findable, so a substring scan stands in.
+            # The role has to be decided by which side actually matched, or a hit
+            # in an answer is reported as a prompt and read back from the wrong
+            # column.
             source = "turns JOIN sessions ON sessions.session_id = turns.session_id"
             selected = (
-                "'prompt' AS role, "
-                "SUBSTR(COALESCE(turns.prompt_text, turns.summary, ''), 1, 220) AS snippet"
+                "CASE WHEN turns.prompt_text LIKE ? THEN 'prompt' ELSE 'answer' END AS role, "
+                "SUBSTR(CASE WHEN turns.prompt_text LIKE ? THEN turns.prompt_text "
+                "ELSE COALESCE(turns.summary, '') END, 1, 220) AS snippet"
             )
             like = f"%{query.strip()}%"
+            params.extend([like, like])
             conditions.append("(turns.prompt_text LIKE ? OR turns.summary LIKE ?)")
             params.extend([like, like])
         if user_id is not None:

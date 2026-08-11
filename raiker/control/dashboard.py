@@ -2020,12 +2020,18 @@ class DashboardService:
                         session_id, principal_id
                     )
                 )
+        sources_by_turn: dict[str, list[dict[str, Any]]] = {}
+        if principal_id:
+            with contextlib.suppress(Exception):
+                for source in self.store.load_turn_sources(session_id, principal_id):
+                    sources_by_turn.setdefault(str(source.get("turn_id", "")), []).append(source)
         return build_transcript(
             session_id=session_id,
             title=detail.session.title or "Untitled conversation",
             created_at=detail.session.created_at,
             turns=detail.turns,
             files=files,
+            sources_by_turn=sources_by_turn,
         )
 
     def record_transcript_export(

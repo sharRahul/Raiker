@@ -63,6 +63,44 @@ def _seed_conversation(workspace: Path, principal_id: str, prompt: str, answer: 
 
 
 class TestRendering:
+    def test_citations_are_portable_and_unresolved_markers_are_not_exported(self) -> None:
+        transcript = build_transcript(
+            session_id="ses_1",
+            title="Evidence",
+            created_at=None,
+            turns=[{
+                "turn_id": "turn_1",
+                "prompt_text": "What changed?",
+                "summary": "The setting changed [s1]. An invented claim [s9].",
+                "status": "completed",
+            }],
+            sources_by_turn={
+                "turn_1": [{
+                    "source_id": "s1",
+                    "ordinal": 1,
+                    "title": "<Primary plan>",
+                    "locator": "docs/plan.md",
+                    "kind": "file",
+                    "tool_name": "read_file",
+                    "passage": "This passage must never be exported.",
+                }]
+            },
+        )
+
+        assert transcript.messages[1].text == "The setting changed [s1]. An invented claim."
+        assert [source.source_id for source in transcript.messages[1].sources] == ["s1"]
+        assert transcript.manifest()["unresolved_citation_count"] == 1
+        markdown = render_markdown(transcript)
+        html = render_html(transcript)
+        pdf = render_pdf(transcript).decode("latin-1")
+        for rendered in (markdown, html, pdf):
+            assert "[s1]" in rendered
+            assert "Sources for this answer" in rendered
+            assert "docs/plan.md" in rendered
+            assert "[s9]" not in rendered
+            assert "This passage must never be exported." not in rendered
+        assert "&lt;Primary plan&gt;" in html
+
     def test_a_secret_shaped_value_never_reaches_a_rendered_transcript(self) -> None:
         transcript = build_transcript(
             session_id="ses_1",
@@ -159,6 +197,46 @@ class TestRendering:
 
 
 class TestExportApi:
+    def test_manifest_includes_owner_visible_citation_metadata_without_passages(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers, principal = _session(client)
+        session_id = _seed_conversation(
+            workspace, principal, "Show evidence", "Supported [s1], unresolved [s8]."
+        )
+        store = SQLiteStore(workspace)
+        turn_id = str(store.list_turns(session_id)[0]["turn_id"])
+        store.record_turn_sources(
+            session_id=session_id,
+            turn_id=turn_id,
+            principal_id=principal,
+            rows=[{
+                "source_id": "s1",
+                "ordinal": 1,
+                "kind": "file",
+                "title": "Release plan",
+                "locator": "docs/plan.md",
+                "tool_name": "read_file",
+                "passage": "private source passage",
+            }],
+        )
+
+        body = client.get(
+            f"/api/sessions/{session_id}/export/manifest", headers=headers
+        ).json()
+
+        answer = body["messages"][1]
+        assert answer["text"] == "Supported [s1], unresolved."
+        assert answer["sources"] == [{
+            "source_id": "s1",
+            "title": "Release plan",
+            "locator": "docs/plan.md",
+            "kind": "file",
+            "tool_name": "read_file",
+        }]
+        assert body["unresolved_citation_count"] == 1
+        assert "private source passage" not in str(body)
+
     def test_the_manifest_states_counts_files_and_the_redaction_policy(
         self, client: TestClient, workspace: Path
     ) -> None:

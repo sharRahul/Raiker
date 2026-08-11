@@ -28,7 +28,7 @@ route exists precisely so the owner sees it *before* the file is produced:
 from __future__ import annotations
 
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
@@ -50,8 +50,30 @@ FILE_EXTENSIONS = {"html": "html", "markdown": "md", "pdf": "pdf"}
 REDACTION_POLICY = (
     "Secret-shaped values (API keys, tokens, and credentials) are replaced with "
     "***REDACTED*** in every message. Attached files are listed by name, type, "
-    "and size; their contents are never embedded."
+    "and size; their contents are never embedded. Citation source titles and "
+    "locators are listed; source passages are never embedded."
 )
+
+
+_CITATION_MARKER = re.compile(r"(?P<space>[ \t]*)\[(?P<source_id>s[1-9][0-9]{0,5})\]")
+
+
+@dataclass(frozen=True)
+class TranscriptSource:
+    source_id: str
+    title: str
+    locator: str
+    kind: str
+    tool_name: str
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "source_id": self.source_id,
+            "title": self.title,
+            "locator": self.locator,
+            "kind": self.kind,
+            "tool_name": self.tool_name,
+        }
 
 
 @dataclass(frozen=True)
@@ -60,6 +82,8 @@ class TranscriptMessage:
     text: str
     timestamp: str | None
     status: str | None = None
+    sources: tuple[TranscriptSource, ...] = ()
+    unresolved_citation_count: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -67,6 +91,8 @@ class TranscriptMessage:
             "text": self.text,
             "timestamp": self.timestamp,
             "status": self.status,
+            "sources": [source.to_dict() for source in self.sources],
+            "unresolved_citation_count": self.unresolved_citation_count,
         }
 
 
@@ -101,6 +127,10 @@ class Transcript:
     def message_count(self) -> int:
         return len(self.messages)
 
+    @property
+    def unresolved_citation_count(self) -> int:
+        return sum(message.unresolved_citation_count for message in self.messages)
+
     def manifest(self) -> dict[str, Any]:
         """What the owner reviews before choosing a format.
 
@@ -118,6 +148,7 @@ class Transcript:
             "redaction_policy": REDACTION_POLICY,
             "formats": list(EXPORT_FORMATS),
             "messages": [message.to_dict() for message in self.messages],
+            "unresolved_citation_count": self.unresolved_citation_count,
         }
 
 
@@ -128,6 +159,7 @@ def build_transcript(
     created_at: str | None,
     turns: Sequence[Any],
     files: Sequence[Any] = (),
+    sources_by_turn: Mapping[str, Sequence[Any]] | None = None,
 ) -> Transcript:
     """Assemble a redacted transcript from stored turns and attachment records.
 
@@ -148,12 +180,19 @@ def build_transcript(
                 TranscriptMessage(role="you", text=redact_secret_like_text(prompt), timestamp=created)
             )
         if summary:
+            turn_id = str(_field(turn, "turn_id") or "")
+            text, sources, unresolved = _portable_answer(
+                redact_secret_like_text(summary),
+                (sources_by_turn or {}).get(turn_id, ()),
+            )
             messages.append(
                 TranscriptMessage(
                     role="raiker",
-                    text=redact_secret_like_text(summary),
+                    text=text,
                     timestamp=completed or created,
                     status=status,
+                    sources=sources,
+                    unresolved_citation_count=unresolved,
                 )
             )
     return Transcript(
@@ -172,6 +211,39 @@ def build_transcript(
             for file in files
         ),
     )
+
+
+def _portable_answer(
+    text: str, source_rows: Sequence[Any]
+) -> tuple[str, tuple[TranscriptSource, ...], int]:
+    """Resolve answer markers against the owner-visible ledger, without passages."""
+    visible: dict[str, TranscriptSource] = {}
+    for row in source_rows:
+        source_id = str(_field(row, "source_id") or "")
+        if not re.fullmatch(r"s[1-9][0-9]{0,5}", source_id):
+            continue
+        visible[source_id] = TranscriptSource(
+            source_id=source_id,
+            title=redact_secret_like_text(str(_field(row, "title") or "Untitled source")),
+            locator=redact_secret_like_text(str(_field(row, "locator") or "")),
+            kind=redact_secret_like_text(str(_field(row, "kind") or "source")),
+            tool_name=redact_secret_like_text(str(_field(row, "tool_name") or "")),
+        )
+    used: list[TranscriptSource] = []
+    unresolved = 0
+
+    def resolve(match: re.Match[str]) -> str:
+        nonlocal unresolved
+        source_id = match.group("source_id")
+        source = visible.get(source_id)
+        if source is None:
+            unresolved += 1
+            return ""
+        if source not in used:
+            used.append(source)
+        return f"{match.group('space')}[{source_id}]"
+
+    return _CITATION_MARKER.sub(resolve, text), tuple(used), unresolved
 
 
 def _field(record: Any, name: str) -> Any:
@@ -218,7 +290,20 @@ def render_markdown(transcript: Transcript) -> str:
         who = "You" if message.role == "you" else "Raiker"
         stamp = f" — {message.timestamp}" if message.timestamp else ""
         lines += [f"### {who}{stamp}", "", message.text, ""]
+        if message.sources:
+            lines += ["#### Sources for this answer", ""]
+            lines += [_markdown_source(source) for source in message.sources]
+            lines.append("")
     return "\n".join(lines).rstrip() + "\n"
+
+
+def _markdown_source(source: TranscriptSource) -> str:
+    title = re.sub(r"([\\`*_{}\[\]()#+!|<>])", r"\\\1", source.title)
+    locator = re.sub(r"([\\`*_{}\[\]()#+!|<>])", r"\\\1", source.locator)
+    context = " · ".join(part for part in (source.kind, source.tool_name) if part)
+    suffix = f" ({context})" if context else ""
+    location = f" — {locator}" if locator else ""
+    return f"- [{source.source_id}] **{title}**{location}{suffix}"
 
 
 # ── HTML ─────────────────────────────────────────────────────────────────
@@ -251,6 +336,10 @@ article { margin: 0 0 1.1rem; page-break-inside: avoid; break-inside: avoid; }
 .body { margin: .3rem 0 0; padding: .7rem .9rem; border: 1px solid #dfe5e7; border-radius: .6rem;
   white-space: pre-wrap; overflow-wrap: anywhere; background: #fbfcfc; }
 article.you .body { background: #eef5f5; }
+.answer-sources { margin: .55rem 0 0; padding: .55rem .8rem; border-left: 2px solid #a9c9ca;
+  color: #33474d; font-size: .8rem; }
+.answer-sources h3 { margin: 0 0 .25rem; font-size: .8rem; }
+.answer-sources ul { margin: 0; padding-left: 1.1rem; }
 footer { margin-top: 2.5rem; color: #75868c; font-size: .75rem; }
 @page { margin: 18mm 15mm; }
 @media print { body { padding: 0; } .policy { background: none; } }
@@ -289,8 +378,21 @@ def render_html(transcript: Transcript) -> str:
             f'<article class="{_escape(message.role)}">'
             f'<div class="who">{who}{stamp}</div>'
             f'<div class="body">{_escape(message.text)}</div>'
-            "</article>"
         )
+        if message.sources:
+            parts.append('<section class="answer-sources"><h3>Sources for this answer</h3><ul>')
+            for source in message.sources:
+                context = " · ".join(
+                    part for part in (source.kind, source.tool_name) if part
+                )
+                suffix = f" ({_escape(context)})" if context else ""
+                locator = f" — {_escape(source.locator)}" if source.locator else ""
+                parts.append(
+                    f"<li>[{_escape(source.source_id)}] <strong>{_escape(source.title)}</strong>"
+                    f"{locator}{suffix}</li>"
+                )
+            parts.append("</ul></section>")
+        parts.append("</article>")
     parts.append(
         "<footer>Exported from Raiker. This document contains no scripts and "
         "fetches nothing.</footer></main></body></html>"
@@ -375,6 +477,17 @@ def render_pdf(transcript: Transcript) -> bytes:
         stamp = f"  {message.timestamp}" if message.timestamp else ""
         rows.append(("who", f"{who}{stamp}"))
         rows.append(("body", message.text))
+        if message.sources:
+            rows.append(("source-heading", "Sources for this answer"))
+            for source in message.sources:
+                context = " / ".join(
+                    part for part in (source.kind, source.tool_name) if part
+                )
+                locator = f" - {source.locator}" if source.locator else ""
+                suffix = f" ({context})" if context else ""
+                rows.append(
+                    ("source", f"[{source.source_id}] {source.title}{locator}{suffix}")
+                )
         rows.append(("blank", ""))
 
     pages: list[list[tuple[str, str]]] = [[]]
@@ -394,7 +507,7 @@ def render_pdf(transcript: Transcript) -> bytes:
         stream = ["BT"]
         y = _PAGE_HEIGHT - _MARGIN
         for kind, line in page:
-            font = "/F2" if kind in ("heading", "who") else "/F1"
+            font = "/F2" if kind in ("heading", "who", "source-heading") else "/F1"
             size = 14 if kind == "heading" else (10 if kind != "meta" else 8)
             stream.append(f"{font} {size} Tf")
             stream.append(f"1 0 0 1 {_MARGIN} {y} Tm")

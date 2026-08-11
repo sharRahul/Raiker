@@ -6950,3 +6950,26 @@ artifact-action digests. `tests/test_release_pipeline.py` asserts the exact
 four-runner matrix; `tests/test_installer_build.py` covers x86-64 and ARM64 Linux
 package metadata and filenames.
 
+---
+
+## FIXED-180 — Linux CI no longer stalls with every test store memory-locked
+
+**Status: fixed in this change. Found during hosted verification.**
+
+**Observed.** The Ubuntu CI runner passed the SQLCipher memory-security probe,
+so the complete 3,272-test suite ran with locked key pages. Store-heavy tests
+then remained at four percent for more than thirty minutes, while Windows local
+verification completed because that host correctly fell back to memory security
+off.
+
+**Fix.** CI proves the real Linux SQLCipher memory-lock capability in one
+dedicated fail-closed probe, then runs the broad isolation suite with
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=off`. Verbose test names, slow-test timings
+and a 45-minute job limit make any future stall attributable and bounded. The
+dedicated BUG-46 tests continue to exercise enabled, unavailable and explicit
+off behavior.
+
+**Evidence.** `tests/test_ci_workflow.py` pins the probe/suite separation,
+diagnostic output and job timeout. The focused CI, SQLCipher and API regression
+set passes with 55 tests.
+

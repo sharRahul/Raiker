@@ -10,6 +10,7 @@ jobs:
   python:
     name: Python 3.11
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - name: Checkout
         # actions/checkout v5.0.1 (Node 24 runtime)
@@ -27,9 +28,35 @@ jobs:
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
+      - name: Verify SQLCipher memory-security probe
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          from raiker.storage.sqlcipher_probe import probe_memory_security
+
+          result = probe_memory_security(Path.cwd())
+          print(
+              "SQLCipher memory security:",
+              result.reason_code,
+              result.sqlcipher_version or "version unavailable",
+          )
+          if not result.supported:
+              raise SystemExit(
+                  "The Linux release host could not lock SQLCipher key-bearing pages: "
+                  + result.reason_code
+              )
+          PY
       - name: Run tests
         run: |
-          python -m pytest
+          python -m pytest -vv --durations=25
+        # The real platform probe above proves Linux page locking separately.
+        # Running thousands of isolated stores with locking enabled makes the
+        # suite roughly seven times slower and can exhaust the runner's memlock
+        # allowance, which hides test progress instead of adding coverage. The
+        # BUG-46 tests exercise enabled and fail-closed behavior directly.
+        env:
+          RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
       - name: Run ruff
         run: |
           python -m ruff check .

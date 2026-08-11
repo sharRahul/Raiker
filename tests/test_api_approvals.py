@@ -228,7 +228,11 @@ class TestApprovalsResolve:
             workspace,
             tool_name="shell",
             arguments={
-                "command": ["python", "-c", "print('web relay')"],
+                # RAIKER-2023: `python -c` is an interpreter escape and is now
+                # refused by the command policy, so this scenario — approval
+                # reaches a real executor and its evidence is bounded — is
+                # exercised with a command that is not one.
+                "command": ["echo", "web relay"],
                 "max_output_bytes": 64,
             },
         )

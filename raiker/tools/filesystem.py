@@ -265,15 +265,74 @@ def _relative_path(workspace_root: str | Path, resolved: Path) -> str:
     return str(resolved.relative_to(Path(workspace_root).resolve()))
 
 
-def _unique_match(text: str, old_text: str) -> int | dict[str, Any]:
+def _same_line(left: str, right: str) -> bool:
+    """Two source lines that differ only in whitespace.
+
+    Trailing whitespace and the indentation *style* are the two things a model
+    reliably gets wrong when it quotes a line back: an editor stripped the
+    trailing space, or the file uses tabs where the model wrote spaces. Neither
+    changes which line is meant. Interior spacing is **not** normalized — `a + b`
+    and `a+b` are different text and must stay a mismatch.
+    """
+    if left == right:
+        return True
+    left, right = left.rstrip(), right.rstrip()
+    return left == right or (
+        left.lstrip() == right.lstrip()
+        and left.lstrip() != ""
+        and left[: len(left) - len(left.lstrip())].replace("\t", " ").strip() == ""
+        and right[: len(right) - len(right.lstrip())].replace("\t", " ").strip() == ""
+    )
+
+
+def _whitespace_tolerant_spans(text: str, old_text: str) -> list[tuple[int, int]]:
+    """Character spans of *text* matching *old_text* up to line whitespace.
+
+    Whole lines only. A fragment inside a line never reaches here, because the
+    exact search already ran and this comparison is line-for-line — so relaxing
+    whitespace can never make a *narrower* match than the strict one.
+    """
+    needle = old_text.splitlines()
+    if not needle:
+        return []
+    lines = text.splitlines(keepends=True)
+    offsets, position = [], 0
+    for line in lines:
+        offsets.append(position)
+        position += len(line)
+    offsets.append(position)
+    stripped = [line.rstrip("\r\n") for line in lines]
+    width = len(needle)
+    return [
+        (offsets[index], offsets[index + width])
+        for index in range(len(lines) - width + 1)
+        if all(_same_line(stripped[index + offset], needle[offset]) for offset in range(width))
+    ]
+
+
+def _unique_match(text: str, old_text: str) -> tuple[int, int] | dict[str, Any]:
+    """The one span *old_text* identifies, as ``(start, end)`` character offsets.
+
+    Exact first. When that finds nothing, the same search runs again ignoring
+    trailing whitespace and indentation style — which is the difference between
+    an edit failing because the model mis-transcribed a tab and an edit failing
+    because it named the wrong code. What does **not** relax is uniqueness: a
+    relaxed search matching two places is still refused, so the tolerance can
+    never make an edit land somewhere it was not meant to.
+    """
     if not old_text:
         return _failure("old_text_empty")
     first = text.find(old_text)
-    if first < 0:
+    if first >= 0:
+        if text.find(old_text, first + 1) >= 0:
+            return _failure("old_text_not_unique")
+        return first, first + len(old_text)
+    spans = _whitespace_tolerant_spans(text, old_text)
+    if not spans:
         return _failure("old_text_not_found")
-    if text.find(old_text, first + 1) >= 0:
+    if len(spans) > 1:
         return _failure("old_text_not_unique")
-    return first
+    return spans[0]
 
 
 def _replace_candidate(
@@ -286,7 +345,42 @@ def _replace_candidate(
     match = _unique_match(before, old_text)
     if isinstance(match, dict):
         return match
-    return resolved, before, before[:match] + new_text + before[match + len(old_text):]
+    start, end = match
+    replacement = new_text
+    if before[start:end] != old_text:
+        # The match was whitespace-tolerant, so the file and the quote disagree
+        # about indentation. The file is right about its own indentation — an
+        # edit that adopted the quote's would silently de-indent a method into
+        # module scope. Shift the replacement by the difference instead.
+        replacement = _reindented(replacement, _indent_delta(before[start:end], old_text))
+        # A tolerant span covers whole lines, so the replacement has to end the
+        # way the text it replaces did or the following line joins it.
+        if before[start:end].endswith("\n") and not replacement.endswith("\n"):
+            replacement += "\n"
+    return resolved, before, before[:start] + replacement + before[end:]
+
+
+def _leading_whitespace(line: str) -> str:
+    return line[: len(line) - len(line.lstrip())]
+
+
+def _indent_delta(matched: str, quoted: str) -> str:
+    """The indentation the file has and the quote lacks, if it is a clean prefix."""
+    matched_lines = [line for line in matched.splitlines() if line.strip()]
+    quoted_lines = [line for line in quoted.splitlines() if line.strip()]
+    if not matched_lines or not quoted_lines:
+        return ""
+    file_indent = _leading_whitespace(matched_lines[0])
+    quote_indent = _leading_whitespace(quoted_lines[0])
+    return file_indent[len(quote_indent):] if file_indent.startswith(quote_indent) else ""
+
+
+def _reindented(text: str, delta: str) -> str:
+    if not delta:
+        return text
+    return "".join(
+        delta + line if line.strip() else line for line in text.splitlines(keepends=True)
+    )
 
 
 _HUNK_HEADER = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@(?: .*)?$")
@@ -364,8 +458,28 @@ def _parse_unified_patch(
 
 
 def _matching_starts(lines: list[str], needle: list[str]) -> list[int]:
+    """Line indexes where a hunk's context sits.
+
+    Exact first, then the same whitespace tolerance ``_unique_match`` applies:
+    trailing whitespace and indentation style may differ, nothing else may. The
+    relaxed pass runs only when the exact one found nothing, so a diff that
+    already matches is unaffected, and ``_patch_candidate``'s ambiguity check
+    still refuses a context that now matches two places.
+    """
     width = len(needle)
-    return [index for index in range(len(lines) - width + 1) if lines[index:index + width] == needle]
+    exact = [
+        index for index in range(len(lines) - width + 1) if lines[index:index + width] == needle
+    ]
+    if exact:
+        return exact
+    return [
+        index
+        for index in range(len(lines) - width + 1)
+        if all(
+            _same_line(lines[index + offset].rstrip("\r\n"), needle[offset].rstrip("\r\n"))
+            for offset in range(width)
+        )
+    ]
 
 
 def _patch_candidate(workspace_root: str | Path, path: str | Path, patch: str) -> _PatchCandidate | dict[str, Any]:

@@ -200,7 +200,10 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(
     broker.store.put_session_command_grant(  # type: ignore[union-attr]
         session_id=session_id,
         principal_id="principal_owner",
-        commands=[["python", "-c"]],
+        # RAIKER-2023: the grant names a command the policy will also allow;
+        # `python -c` is an interpreter escape and is refused before any grant
+        # is consulted.
+        commands=[["echo"]],
         timeout_seconds=5,
         expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
     )
@@ -208,7 +211,7 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(
         ToolCallProposal(
             call_id="call_command",
             tool_name="run_command",
-            arguments={"command": "python -c 'print(42)'"},
+            arguments={"command": "echo 42"},
         )
     )
     result, decision = broker.execute(allowed, session_id=session_id, turn_id=new_id("turn_"))

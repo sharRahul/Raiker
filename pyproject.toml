@@ -51,6 +51,9 @@ include = ["raiker*", "apps*"]
 
 [tool.setuptools.package-data]
 "raiker.config" = ["*.json"]
+# The application icon travels in the wheel so the tray and the installers can
+# resolve one file rather than three guesses at a repository path.
+"raiker.assets" = ["*.png"]
 # The skills Raiker ships live as reviewable directories in the source tree and
 # are packed into a *.skill bundle at install time, so every file in one has to
 # travel in the wheel — not just the SKILL.md.

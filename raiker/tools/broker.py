@@ -31,7 +31,7 @@ from raiker.runtime.identity.lifecycle import TrustedTurnIdentity
 from raiker.runtime.identity.verifier import MachineIdentityVerifier
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.advisor_tools import consult_advisor
-from raiker.tools.codemap_tools import code_map_search
+from raiker.tools.codemap_tools import code_map_references, code_map_search
 from raiker.tools.connector_tools import (
     connector_read,
     gcal_read,
@@ -39,6 +39,7 @@ from raiker.tools.connector_tools import (
     gmail_read,
     slack_read,
 )
+from raiker.tools.conversation_tools import conversation_search
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     diff_files,
@@ -282,6 +283,31 @@ class ToolBroker:
                 self.workspace_root,
                 str(args.get("query", "")),
                 args.get("max_results", 10),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            # RAIKER-2020 — recall of the owner's own past conversations. Scoped
+            # to the owner's user, bounded, and read-only: it returns transcript
+            # text the owner already owns, so it opens nothing `get_session`
+            # would not already have shown them.
+            "conversation_search": lambda args: conversation_search(
+                self.workspace_root,
+                str(args.get("query", "")),
+                max_results=args.get("max_results", 10),
+                session_id=str(args["session_id"]) if args.get("session_id") else None,
+                after=str(args["after"]) if args.get("after") else None,
+                before=str(args["before"]) if args.get("before") else None,
+                store=self.store,
+                user_id=(
+                    self.store.principal_user_id(self.owner_scope or self.principal_id)
+                    if self.store
+                    else None
+                ),
+            ),
+            "code_map_references": lambda args: code_map_references(
+                self.workspace_root,
+                str(args.get("name", "")),
+                args.get("max_results", 25),
                 store=self.store,
                 principal_id=self.principal_id,
             ),

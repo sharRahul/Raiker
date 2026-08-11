@@ -30,6 +30,12 @@ class StaticPolicyConfig:
                 # decision mode — and it returns coordinates into files the agent
                 # may already open with `read_file`, so it adds no authority.
                 "code_map_search",
+                "code_map_references",
+                # RAIKER-2020 — reading back the owner's own past
+                # conversations. Read-shaped for the same reason
+                # `memory_search` is: it returns records the owner already
+                # owns and can already open in Chat.
+                "conversation_search",
                 # Reading an installed skill is a local, owner-scoped read of
                 # the owner's own instruction document. Nothing is executed.
                 "skill_load",

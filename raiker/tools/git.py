@@ -541,8 +541,15 @@ def push_egress_allowlist() -> frozenset[str]:
     return connector_egress_allowlist()
 
 
-def _push_credential() -> str:
-    return os.environ.get(GIT_PUSH_TOKEN_ENV, "").strip()
+def _push_credential(lent: str | None = None) -> str:
+    """The credential a push may use.
+
+    *lent* is the value a :class:`~raiker.runtime.git_credential.GitCredentialBroker`
+    handed over for this one command, and it wins. The environment is the legacy
+    fallback for a host configured before RAIKER-2022 and for the CLI, which has
+    no session to hold a grant.
+    """
+    return (lent or "").strip() or os.environ.get(GIT_PUSH_TOKEN_ENV, "").strip()
 
 
 def _remote_names(root: Path) -> list[str]:
@@ -613,13 +620,23 @@ def _outgoing(remote: str, branch: str, tracking: str) -> list[str]:
     return [branch, "--not", f"--remotes={remote}"]
 
 
-def _redact_token(text: str) -> str:
-    token = _push_credential()
+def _redact_token(text: str, lent: str | None = None) -> str:
+    """Remove the credential from anything git said.
+
+    Belt and braces with the redactor's own registry: this catches the exact
+    value in *this* command's output, and ``remember_secret`` catches it
+    everywhere else for as long as the loan lasts.
+    """
+    token = _push_credential(lent)
     return text.replace(token, "***") if token else text
 
 
 def proposed_push_snapshot(
-    repo_root: str | Path, remote: str | None = None, branch: str | None = None
+    repo_root: str | Path,
+    remote: str | None = None,
+    branch: str | None = None,
+    *,
+    credential: str | None = None,
 ) -> dict[str, Any]:
     """Exactly what pushing would send — computed without touching the network.
 
@@ -661,7 +678,7 @@ def proposed_push_snapshot(
         return _failed("unsupported_remote_host", host=host, credential=GIT_PUSH_TOKEN_ENV)
     if host not in push_egress_allowlist():
         return _failed("push_egress_denied", host=host)
-    if not _push_credential():
+    if not _push_credential(credential):
         return _failed("push_credential_unset", credential=GIT_PUSH_TOKEN_ENV)
     tracking = _tracking_ref(root, remote_name, branch_name)
     creates_remote_branch = not tracking
@@ -687,28 +704,39 @@ def proposed_push_snapshot(
 
 
 def push_branch(
-    repo_root: str | Path, remote: str | None = None, branch: str | None = None
+    repo_root: str | Path,
+    remote: str | None = None,
+    branch: str | None = None,
+    *,
+    credential: str | None = None,
 ) -> dict[str, Any]:
     """Push the proposed branch to the proposed remote. Re-validates everything first.
 
     Never forces and never deletes: the refspec is written out in full so a
     branch name can neither be read as an option nor move a ref it does not name.
     """
-    snapshot = proposed_push_snapshot(repo_root, remote, branch)
+    snapshot = proposed_push_snapshot(repo_root, remote, branch, credential=credential)
     if snapshot["status"] != "success":
         return snapshot
     root = resolve_workspace_path(repo_root, ".")
     remote_name = str(snapshot["remote"])
     branch_name = str(snapshot["branch"])
-    environment = {
-        **os.environ,
-        _PUSH_TOKEN_VAR: _push_credential(),
-        # No terminal, no GUI prompt: a push that cannot authenticate must fail
-        # with a reason rather than block this process for its wall-clock cap.
-        "GIT_TERMINAL_PROMPT": "0",
-        "GIT_ASKPASS": "",
-        "SSH_ASKPASS": "",
-    }
+    # RAIKER-2023: a constructed environment, not the host's. A push inheriting
+    # `os.environ` handed the child every credential the host held, which is the
+    # opposite of lending one for a single command.
+    from raiker.runtime.command_policy import sandbox_environment
+
+    environment = sandbox_environment(
+        workspace_root=root,
+        extra={
+            _PUSH_TOKEN_VAR: _push_credential(credential),
+            # No terminal, no GUI prompt: a push that cannot authenticate must
+            # fail with a reason rather than block this process for its cap.
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ASKPASS": "",
+            "SSH_ASKPASS": "",
+        },
+    )
     args = [
         "git",
         "-C",
@@ -733,7 +761,7 @@ def push_branch(
         )
     except subprocess.TimeoutExpired:
         return _failed("push_timed_out", remote=remote_name, branch=branch_name)
-    output = _redact_token(_git_output(proc))
+    output = _redact_token(_git_output(proc), credential)
     if proc.returncode != 0:
         lowered = output.lower()
         if "non-fast-forward" in lowered or "fetch first" in lowered or "rejected" in lowered:

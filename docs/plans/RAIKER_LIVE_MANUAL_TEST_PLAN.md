@@ -34,6 +34,13 @@ for something this round did not re-run, the section says so.
 The plan is ordered so each section's preconditions are satisfied by the ones
 before it. Work §1 → §17 in order.
 
+§19 onwards are **recorded rounds** — each one a dated pass with its own steps and
+result, kept because the evidence is still the best record of the behaviour it
+proves. §22 is the map from every closed entry in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) to the section that re-verifies it, plus the
+steps that were added because nothing covered them; read it before concluding
+that something is untested.
+
 ---
 
 ## 1. Environment setup
@@ -852,3 +859,106 @@ Screenshots: `bug-52-chat-refusal-does-not-end-the-turn.png`,
 `round0811-provider-usage-compact.png` in
 [`screenshots/working/`](screenshots/working). Every retained image was reviewed
 after dialogs closed; none contains a credential value.
+
+
+---
+
+## 22. Regression coverage map — which section proves which closed item
+
+Added **2026-08-11** after checking every entry in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) against this plan. 189 items are closed there;
+28 were cited by number in a step, which made the plan look far thinner than it
+is — most closed items *are* exercised, by a step that describes the behaviour
+rather than the defect number. This section makes that mapping explicit, and adds
+a step wherever the check was genuinely absent.
+
+Read it as the answer to "if I run §1–§17, what have I re-verified?"
+
+### 22.1 Already exercised by an existing section
+
+| Section | Closed items it re-verifies |
+|---|---|
+| §2 First run and the lock screen | first-run bootstrap and guided setup, the lock-screen heading, the first-run model sheet, the "Workbench"-titled first screen |
+| §4 Connect a hosted model | credential persistence across restart, provider test attribution, readiness against the fallback chain, deep-linkable Models tabs, billing exhaustion reported as itself, throttled reads, in-app credential removal, the model-profile copies staying in step |
+| §5 Chat | transcript export in three formats and print, generated DOCX/XLSX/PDF/Markdown artifacts, the file preview and download surfaces, code-block controls, attachment presentation outside the bubble, source citations and their coordinates, multi-call answer separation, one transcript implementation, deleting a conversation and its dependents, automatic 90% compaction |
+| §6 Permissions | the step-up dialog's confirmation-token explanation, capability gate states, the composer permission control |
+| §7 Approvals | approval resolution in another tab continuing Chat, a parked approval surviving reload, atomic multi-file patch approval, refused proposals not raised as decisions, withheld-call disclosure |
+| §8 Tasks | scheduled work resuming after approval, an approved run continuing immediately, task creation not implying execution, schedule attachments |
+| §9 Build | patch application forms, repository sub-folder resolution, the code map and its cold start, plans and delegated subagents, repository state after a Permissions visit, stopping and correcting a running turn |
+| §10 Extensions | MCP server usability disclosure, plugin signature levels, skills |
+| §13 Observability | the audit log showing recorded events, its turn-identity column, machine-identity presentation, containment entries |
+| §14 Settings | preferences versus governed work, settings chosen while loading, runtime configuration |
+| §16 Projects and adaptive navigation | the responsive breakpoints, Workbench activity awareness |
+
+### 22.2 Automated-only — a manual step would add nothing
+
+These closed items are properties of the build, the test runtime, or a platform
+probe. They are verified by CI on every push and cannot be observed by clicking:
+CI runtime and quality gates, web development dependency advisories, Python test
+dependency warnings, Playwright browser launch, jsdom navigation noise, offline
+gateway determinism, `compileall` and shipped-skill checks, Windows process and
+memory-locking probes, Linux CI store memory-locking, release artifact pinning,
+SQLCipher connection caching and key derivation, concurrent event-writer
+integrity, and project-export ordering within one second.
+
+**If one of these regresses, CI fails — do not add a manual step for it.**
+
+### 22.3 Steps added because nothing covered them
+
+Run these after §16, in this order.
+
+| # | Step | Expected |
+|---|---|---|
+| 22.1 | Open **Knowledge Map**, add a source from each named place the picker offers, then reload | The picker opens on named places, not a file browser; the count pill and the empty state agree; a granted folder is read where it is and adding a single file asks first; sources persist |
+| 22.2 | Switch the OS to dark while Knowledge Map is open | The graph follows the shared theme; the simulation does not rebuild on every tick (no visible jitter) |
+| 22.3 | Open a generated image in the file inspector | Zoom, pan and rotate are available and keyboard-reachable |
+| 22.4 | Open **Memory** with the store off, then on | The page states which posture you are in rather than promising proposals a disabled gate cannot produce; the filter row, search box and sort control are one visual family |
+| 22.5 | Export a project, then re-import it into a fresh workspace | Counts, checksums, and event order match; the export carries its citation ledger |
+| 22.6 | Trigger a backup from Settings and restore it into an isolated workspace | The manifest records key ID, retention and restore verification; restored memory and audit rows match the source |
+| 22.7 | Open **Host → Install & updates** | The build is named honestly (signed release, unsigned build, or source checkout); opening it makes no outbound request |
+| 22.8 | Run `raiker-app service install`, `status`, `uninstall` | Each reports what it did using the platform's own service manager |
+| 22.9 | With the desktop payload, check the system tray | The tray icon is the shipped Raiker mark, not a drawn placeholder; Open, Pause/Resume, Restart and Quit act through the governed host routes *(FIXED-192)* |
+| 22.10 | Compare a `<select>`, a text input and a button on Memory, Settings → General, Models and Projects | One height, border, radius and focus ring across all four; every dropdown carries the same chevron; repeat in dark and in Compact/Spacious density *(FIXED-193)* |
+| 22.11 | Open Models → Activity while a pull or download is running | Background state refreshes without a manual reload; a managed llama.cpp process does not outlive a graceful quit |
+| 22.12 | Read the README's "Known limits" and the user guide's, against the app | Every line describes current behaviour; nothing shipped is described as missing |
+
+**Result 2026-08-11:** 22.4, 22.9 and 22.10 were run this round and passed —
+`r0811b-15-memory-filters.png`, `r0811b-16-settings-dropdowns.png`,
+`r0811b-17-settings-dropdowns-dark.png`, and `tests/test_tray_icon.py` for the
+tray in a headless environment where no system tray exists. 22.1–22.3, 22.5–22.8,
+22.11 and 22.12 are written for the next full round.
+
+---
+
+## 23. Memory recall round — 2026-08-11
+
+The round that verified [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md)
+MEM-01 and MEM-02, closed as FIXED-187 through FIXED-189. Run against the
+production web build with Anthropic connected through the Models dialog.
+
+The question this round exists to answer is the one memory is actually asked:
+**can Raiker pick up a conversation from years ago and quote it exactly?**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 23.1 | Register a fresh owner, take the Anthropic path through setup, finish the wizard | Lock screen, then the dashboard mounts; 0 console errors | ✅ `r0811b-01-lock-screen.png`, `r0811b-04-setup-complete.png` |
+| 23.2 | Models → Hosted → **Connect** on Anthropic; paste the key in the dialog | Card reads **Connected**; the field is masked and the key is never echoed | ✅ `r0811b-05-models-hosted.png`, `r0811b-06-connect-dialog.png`, `r0811b-07-anthropic-connected.png` |
+| 23.3 | **Choose model…**, pick a model from the live catalogue, **Use model** | The catalogue is the provider's own list | ✅ `r0811b-08-model-picker.png` |
+| 23.4 | **Test** on the Anthropic card | "1 model ready · Anthropic can reach `claude-haiku-4-5-20251001`" | ✅ `r0811b-09-model-readiness.png` |
+| 23.5 | In a new chat, state a fact worth recalling (a host name and an interval) and ask for a one-word acknowledgement | A live streamed turn; the reply is stored as the conversation record | ✅ `r0811b-11-chat-first-turn.png` |
+| 23.6 | In a **separate** chat, ask what was said earlier and require a citation | The turn calls `conversation_search`, quotes the sentence **verbatim**, and cites the conversation, its date and its id | ✅ `r0811b-12-recall-across-chats.png` |
+| 23.7 | Seed a conversation dated **three or four years back**, then ask about it with a period in the question ("back in 2022", "before 2023") | The turn narrows by date, finds the old conversation, and returns the exact figure, the quoted sentence, the date and the stated reason | ✅ `r0811b-13-recall-2022-conversation.png` |
+| 23.8 | Search Chat for a term that appears only in a message body | Each result shows the exchange that matched beneath its title, and an old conversation is grouped under its own date | ✅ `r0811b-14-search-chat.png` |
+| 23.9 | Turn **Incognito** on and repeat 23.6 | No recall item is assembled at all — the opt-out is absolute, ahead of every recall path | — written for the next round |
+| 23.10 | Sign in as a second local principal and search for the first's conversation | Nothing is returned; the index narrows candidates, `sessions.user_id` still decides visibility | Covered by `test_another_owner_never_sees_the_conversation` |
+
+> 23.6 is the step that distinguishes recall from a long context window. Start a
+> genuinely separate conversation — not a new turn in the same one — or the model
+> can answer from history it still has.
+
+**Result: passed.** The first pass of 23.6 found the right conversation and still
+could not answer, because the tool returned the index's own ~18-token snippet and
+the model was handed "…we rotate the SQLCipher key every…". That is **FIXED-189**,
+fixed and re-run in the same round; the regression test is written from the live
+transcript. 23.7 then recalled an 18 April 2022 conversation with the exact
+retention window, the verbatim sentence, the date and the reason.

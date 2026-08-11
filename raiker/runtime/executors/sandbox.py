@@ -20,11 +20,41 @@ ALLOWED_SHELL_COMMANDS: frozenset[str] = frozenset({
 
 
 def check_command_allowlist(command: Sequence[str], allowlist: frozenset[str]) -> None:
-    if not command:
-        raise SandboxError("empty_command")
-    base = Path(command[0]).name
-    if base not in allowlist:
-        raise SandboxError(f"command_not_allowed:{base}")
+    """The full command policy, raised as a :class:`SandboxError`.
+
+    RAIKER-2023: this used to be a one-line check on the binary's basename, which
+    said nothing about the *arguments*. `git -c core.sshCommand=… push` and
+    `find . -exec sh {} ;` both pass a basename allowlist and both run a program
+    of the caller's choosing. :mod:`raiker.runtime.command_policy` parses the
+    whole argv — including any string that will itself be read as shell source —
+    and refuses chaining, pipes, redirection, substitution, expansion, globbing,
+    interpreters, per-binary escape flags, and any path outside the workspace.
+    """
+    from raiker.runtime.command_policy import CommandRejected, validate_command
+
+    try:
+        validate_command(command, workspace_root=_command_workspace(), allowlist=allowlist)
+    except CommandRejected as exc:
+        raise SandboxError(exc.reason_code) from None
+
+
+_COMMAND_WORKSPACE: Path | None = None
+
+
+def set_command_workspace(root: str | Path | None) -> None:
+    """Name the directory a governed command may touch.
+
+    Set by the executors, which know the workspace; kept here because
+    ``check_command_allowlist`` is reached through call sites that do not carry
+    it. Unset, containment falls back to the process working directory, which is
+    the workspace for every path Raiker actually launches commands from.
+    """
+    global _COMMAND_WORKSPACE
+    _COMMAND_WORKSPACE = Path(root).resolve() if root else None
+
+
+def _command_workspace() -> Path:
+    return _COMMAND_WORKSPACE or Path.cwd().resolve()
 
 
 def run_command(
@@ -38,7 +68,14 @@ def run_command(
     stdin_text: str | None = None,
 ) -> dict[str, Any]:
     if allowlist is not None:
+        set_command_workspace(cwd)
         check_command_allowlist(command, allowlist)
+    # A child gets a constructed environment, never the host's. Inheriting it
+    # would hand every command every credential the host holds — including the
+    # git token this runtime lends for exactly one command at a time.
+    from raiker.runtime.command_policy import sandbox_environment
+
+    child_env = sandbox_environment(workspace_root=cwd or Path.cwd(), extra=env)
     try:
         proc = subprocess.run(
             command,
@@ -46,7 +83,7 @@ def run_command(
             text=False,
             timeout=timeout,
             cwd=cwd,
-            env={**os.environ, **env} if env else None,
+            env=child_env,
             input=stdin_text.encode("utf-8") if stdin_text is not None else None,
         )
     except subprocess.TimeoutExpired:
@@ -122,7 +159,6 @@ def channel_egress_allowlist() -> frozenset[str]:
     fail-closed by default even when the gate is on. Model-proposed URLs are
     untrusted and can only resolve to allowlisted hosts.
     """
-    import os
     raw = os.environ.get("RAIKER_CHANNEL_EGRESS_ALLOWLIST", "")
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
@@ -137,28 +173,17 @@ def connector_egress_allowlist() -> frozenset[str]:
     built from validated components (never a model-supplied raw URL), so this is
     a second, independent egress boundary.
     """
-    import os
     raw = os.environ.get("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "")
     return frozenset(part.strip() for part in raw.split(",") if part.strip())
 
 
-def web_egress_allowlist() -> frozenset[str]:
-    """Owner-controlled outbound host allowlist for the agent's own web reads.
-
-    Read from ``RAIKER_WEB_EGRESS_ALLOWLIST`` (comma-separated host globs, e.g.
-    ``docs.python.org,*.readthedocs.io``). Defaults to **empty** so the agent
-    cannot reach the network until the owner explicitly allowlists a host —
-    fail-closed by default even when the ``web_fetch`` capability gate is on.
-
-    This is the one egress boundary where the URL itself is *model-supplied*
-    rather than built from validated components, so it is the boundary that
-    decides where a model may send the owner's machine. It is deliberately
-    separate from ``RAIKER_CONNECTOR_EGRESS_ALLOWLIST``: allowing a connector's
-    API host must not also allow the agent to fetch arbitrary pages from it.
-    """
-    import os
-    raw = os.environ.get("RAIKER_WEB_EGRESS_ALLOWLIST", "")
-    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+# `web_egress_allowlist()` was removed in RAIKER-2021. The agent's own web reads
+# are governed by `raiker.runtime.web_policy` instead: an owner *blocklist*
+# (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in the app) over public
+# destinations, and a non-editable address guard that refuses every private,
+# loopback and link-local address. The connector and channel allowlists above are
+# untouched — those hosts are built from validated components rather than chosen
+# by a model, and they answer to a different question.
 
 
 def get_url(

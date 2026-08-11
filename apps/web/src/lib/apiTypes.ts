@@ -1083,6 +1083,11 @@ export interface SessionSummary {
   // "task" for the server-owned session a task run executes in. Provenance
   // only — a task session stays readable in Sessions and from Tasks.
   origin?: string;
+  // RAIKER-2020 — set only on a search result: the exchange that matched and
+  // the turn it belongs to, so a result can say *why* it matched rather than
+  // only that it did. Empty on a plain listing.
+  match_snippet?: string;
+  match_turn_id?: string;
 }
 
 export interface TurnSummary {
@@ -1821,4 +1826,55 @@ export interface UpdateStatusView {
 
 export interface UpdateCheckResult extends UpdateStatusView {
   ok: boolean;
+}
+
+
+// ── Web access blocklist (RAIKER-2021) ──────────────────────────────────────
+// Three sources with different affordances: `stored` the owner can delete here,
+// `environment` and `builtin` they cannot. `address_guard` is reported rather
+// than listed because it is not a rule and cannot be switched off.
+export interface WebBlocklistRule {
+  rule_id: string;
+  rule: string;
+  kind: string;
+  note: string;
+  created_at: string;
+}
+
+export interface WebBlocklist {
+  stored: WebBlocklistRule[];
+  environment: string[];
+  environment_variable: string;
+  builtin: string[];
+  effective_count: number;
+  address_guard: { enforced: boolean; editable: boolean; description: string };
+}
+
+export interface WebBlocklistProbe {
+  host: string;
+  allowed: boolean;
+  reason: string;
+  addresses: string[];
+}
+
+// ── Git credential (RAIKER-2022) ────────────────────────────────────────────
+// Never carries the token. `token_configured` says one exists, `token_source`
+// says where it came from, and `grant` is the owner's current decision.
+export interface GitCredentialGrant {
+  grant_id: string;
+  scope: string;
+  status: string;
+  granted_at: string;
+  expires_at: string;
+  session_id: string | null;
+  uses: number;
+}
+
+export interface GitCredentialStatus {
+  credential_configured: boolean;
+  credential_source: string;
+  grant: GitCredentialGrant | null;
+  scopes: string[];
+  grant_seconds: Record<string, number>;
+  checked_at: string;
 }

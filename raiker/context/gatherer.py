@@ -241,6 +241,13 @@ class ContextGatherer:
         any chat/project scope; prior chats, Build runs, and projects contribute
         metadata only, keeping raw prompts out of ambient context. The model can
         use the exposed memory tools when it needs the full governed record.
+
+        RAIKER-2020: the prior-chat half used to be *the eight most recently
+        updated conversations*, whatever the turn was about. A conversation from
+        three years ago could therefore never be recalled, however exactly it
+        answered the question. Conversations whose text matches this prompt now
+        come first, from anywhere in the owner's history; recency only fills the
+        remaining slots, so a turn with no lexical match behaves as it did.
         """
         if owner_principal_id is None or store.is_memory_incognito(owner_principal_id):
             return None
@@ -248,8 +255,7 @@ class ContextGatherer:
         memories = retrieve_hybrid_memory(
             store=store, query=query, limit=6, owner_principal_id=owner_principal_id
         )
-        sessions = [s for s in store.list_sessions(limit=8, user_id=user_id, include_archived=True)
-                    if str(s.get("session_id")) != session_id]
+        sessions = self._recalled_sessions(store, query, session_id, user_id)
         projects = store.list_projects(user_id=user_id)[:8]
         if not memories and not sessions and not projects:
             return None
@@ -261,6 +267,7 @@ class ContextGatherer:
         lines.extend(
             f"- prior {s.get('origin', 'chat')} session {s.get('session_id')}: "
             f"{str(s.get('title') or 'Untitled')[:160]} updated={s.get('updated_at')}"
+            + (f" matched=\"{s['match_snippet']}\"" if s.get("match_snippet") else "")
             for s in sessions
         )
         lines.extend(
@@ -277,6 +284,39 @@ class ContextGatherer:
                       "session_ids": [str(s.get("session_id")) for s in sessions],
                       "project_ids": [str(p.get("project_id")) for p in projects]},
         )
+
+    @staticmethod
+    def _recalled_sessions(
+        store: SQLiteStore, query: str, session_id: str, user_id: str | None,
+        *, limit: int = 8,
+    ) -> list[dict[str, object]]:
+        """Prior conversations worth naming: relevant first, then recent.
+
+        Metadata only — a title, an origin, a timestamp and the one line that
+        matched. The full exchange stays behind ``conversation_search``, so
+        ambient context never grows with the owner's history.
+        """
+        recalled: dict[str, dict[str, object]] = {}
+        for row in store.search_conversation_turns(query, user_id=user_id, limit=limit * 3):
+            key = str(row.get("session_id"))
+            if key == session_id or key in recalled:
+                continue
+            recalled[key] = {
+                "session_id": key,
+                "title": row.get("session_title"),
+                "origin": row.get("origin", "chat"),
+                "updated_at": row.get("created_at"),
+                "match_snippet": " ".join(str(row.get("snippet") or "").split())[:160],
+            }
+            if len(recalled) >= limit:
+                break
+        for row in store.list_sessions(limit=limit, user_id=user_id, include_archived=True):
+            key = str(row.get("session_id"))
+            if len(recalled) >= limit:
+                break
+            if key != session_id and key not in recalled:
+                recalled[key] = dict(row)
+        return list(recalled.values())
 
     def _code_map(
         self, root: Path, store: SQLiteStore, prompt_text: str,

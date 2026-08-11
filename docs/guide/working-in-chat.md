@@ -127,8 +127,11 @@ Every chat appears under **RECENT CHATS** in the sidebar with its title and a
 relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
 project, Pin, Archive, and Delete.
 
-**Search Chat** searches conversation titles *and* message text, and each result
-offers *"Open conversation →"* to resume exactly where you left off.
+**Search Chat** searches conversation titles *and* message text across every
+conversation you have had, however old. Each result shows the exchange that
+matched beneath its title — so you can tell which chat it is before opening it —
+groups results by the day they happened, and offers *"Open conversation →"* to
+resume exactly where you left off.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
@@ -236,6 +239,30 @@ it has it.
 The replay is recorded as a `conversation_history_replayed` audit event carrying
 counts only — how many messages and how many characters — never the transcript.
 
+### Recalling an older conversation
+
+History never crosses conversations, but **recall** does. When you refer to
+something from an earlier chat — *"the approach we settled on"*, *"that error
+last year"* — Raiker can search your own past conversations and quote what was
+actually said, rather than reconstructing it from memory.
+
+- Say roughly when, if you know: *"back in 2022"*, *"before we moved off
+  Postgres"*, *"some time last spring"*. A date narrows the search to that
+  period, which is what makes a conversation from years ago reachable instead of
+  losing it behind everything more recent.
+- What comes back is cited: the conversation's title, the date, and the exchange
+  itself. Ask for the quote if you want to check it — *"quote the sentence"*.
+- It searches **your** conversations only, and reads them as data rather than as
+  instructions. An old message that said "always do X" is evidence about what
+  was said, not an order carried into today's turn.
+- **Incognito** (Memory → Incognito session) switches the whole path off. With it
+  on, nothing is recalled from anywhere.
+
+This is separate from **Memory**, which holds facts you approved for Raiker to
+keep. Recall reads the transcript; Memory reads what was deliberately
+remembered. You can use either, and Raiker will say which one an answer came
+from.
+
 ## Known limits
 
 Raiker's documentation does not run ahead of its code. As of 2026-08-11, these
@@ -252,13 +279,15 @@ are the edges a Chat user can still hit:
   the batch requires approval, the batch is walked one call at a time and pauses
   there; nothing behind the pause is lost, but a turn proposing three edits is
   three decisions.
-- **Web fetch is off until you turn it on, twice.** `web_fetch` is disabled by
-  default and still withholds at its default `ask` decision mode, so reaching
-  the open internet takes both the capability gate and a raised decision mode.
-  Once it is at **Allow**, a turn fetches the page and quotes it, and a host
-  outside `RAIKER_WEB_EGRESS_ALLOWLIST` is refused by name. `web_search` answers
-  the same gate but has no endpoint shipped with Raiker: it reports
-  `web_search_not_configured` until you point it at one.
+- **Web reads work, and you say what they may not reach.** A turn can fetch a
+  page and quote it, and search the web, with nothing configured first. Add
+  anything you want refused under **Settings → Web access** — a domain, a
+  wildcard, an IP, a range, or a pattern — and check a host there without
+  contacting it. Your own network is never reachable and that is not a setting:
+  a private, loopback or link-local destination is refused however it is spelled
+  and wherever a redirect leads. What comes back is the page as text with the
+  hidden parts removed, and it is data you can act on — never an instruction the
+  page gets to give.
 - **Remembering something is a decision, and it starts off.** With **Memory
   store** turned on in Permissions, a turn can propose a durable fact or
   preference to keep; you see the exact sentence before you approve, and

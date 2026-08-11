@@ -19,7 +19,9 @@ def _pending_shell(workspace: Path, approval_id: str = "appr_terminal") -> None:
     action = ToolAction(
         action_id="act_terminal",
         tool_name="shell",
-        arguments={"command": ["python", "-c", "print('terminal relay')"]},
+        # RAIKER-2023: `python -c` is an interpreter escape and is refused, so
+        # the terminal relay is exercised with a command that is not one.
+        arguments={"command": ["echo", "terminal relay"]},
         risk_level="high",
         requires_approval=True,
     )
@@ -64,7 +66,7 @@ def test_terminal_approval_previews_without_executing(
     result = handle_slash_command("/approve appr_terminal", workspace_root=workspace)
 
     assert "Effect preview" in result
-    assert "python -c" in result
+    assert "echo 'terminal relay'" in result
     assert "workspace cwd" in result
     assert "/approve appr_terminal --confirm appr_terminal" in result
     assert SQLiteStore(workspace).load_approval("appr_terminal")["status"] == "pending"  # type: ignore[index]
@@ -122,7 +124,7 @@ def test_terminal_execution_redacts_secret_like_output_before_history(
     workspace, token = _workspace(tmp_path)
     store = SQLiteStore(workspace)
     arguments_json = json.dumps(
-        {"command": ["python", "-c", "print('sk-ant-api03-AAAABBBBCCCCDDDDEEEE')"]},
+        {"command": ["echo", "sk-ant-api03-AAAABBBBCCCCDDDDEEEE"]},
         sort_keys=True,
     )
     with store.connect() as connection:

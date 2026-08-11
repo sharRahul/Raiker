@@ -102,6 +102,12 @@ _PREFIXES = {
     # Capability-agnostic behaviour monitoring (BUG-76/77): one redacted
     # activity row per governed capability invocation.
     "cact_",
+    # RAIKER-2021: one owner rule on the web egress blocklist. Holds a domain,
+    # address, network or pattern — never a credential.
+    "wbl_",
+    # RAIKER-2022: one owner decision to lend the git credential, scoped to a
+    # single command or to a session. Holds the decision, never the token.
+    "grant_",
 }
 
 

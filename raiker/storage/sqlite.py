@@ -93,6 +93,8 @@ from raiker.storage.migrations import (
     CONNECTOR_INVOCATIONS_SQL,
     CONVERSATION_COMPACTIONS_MIGRATION_ID,
     CONVERSATION_COMPACTIONS_SQL,
+    CONVERSATION_FTS_MIGRATION_ID,
+    CONVERSATION_FTS_SQL,
     CREDENTIAL_SECURITY_MIGRATION_ID,
     CREDENTIAL_SECURITY_SQL,
     CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
@@ -105,6 +107,8 @@ from raiker.storage.migrations import (
     EXECUTION_ENVIRONMENT_CONTROL_SQL,
     GIST_MEMORY_MIGRATION_ID,
     GIST_MEMORY_SQL,
+    GIT_CREDENTIAL_GRANT_MIGRATION_ID,
+    GIT_CREDENTIAL_GRANT_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
@@ -319,6 +323,8 @@ from raiker.storage.migrations import (
     TURN_CONTROLS_SQL,
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
+    WEB_BLOCKLIST_MIGRATION_ID,
+    WEB_BLOCKLIST_SQL,
 )
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 
@@ -1277,7 +1283,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SURFACE_MODEL_DEFAULT_SQL,
                 connection,
             )
+            self._apply_migration(
+                CONVERSATION_FTS_MIGRATION_ID,
+                CONVERSATION_FTS_SQL,
+                connection,
+            )
+            self._apply_migration(WEB_BLOCKLIST_MIGRATION_ID, WEB_BLOCKLIST_SQL, connection)
+            self._apply_migration(
+                GIT_CREDENTIAL_GRANT_MIGRATION_ID, GIT_CREDENTIAL_GRANT_SQL, connection
+            )
             self._rebuild_memory_fts(connection)
+            self._backfill_conversation_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
                 "ALTER TABLE api_sessions ADD COLUMN absolute_expires_at TEXT",
@@ -1951,6 +1967,38 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def list_code_map_files(
+        self, owner_principal_id: str, repo_path: str, *, limit: int = 5000
+    ) -> list[dict[str, Any]]:
+        """Every indexed file of one map, largest first.
+
+        The set a reference scan is allowed to read: exactly the files the owner's
+        indexing run already accepted, so a scan can never reach outside what the
+        map itself covers.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT path, language, line_count, size_bytes FROM code_map_files
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                   ORDER BY symbol_count DESC, path LIMIT ?""",
+                (owner_principal_id, repo_path, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def code_map_declarations(
+        self, owner_principal_id: str, repo_path: str, name: str, *, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Exact-name declarations, so a reference scan can exclude them."""
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT path, name, kind, qualified_name, line_start, line_end, signature
+                   FROM code_map_symbols
+                   WHERE owner_principal_id = ? AND repo_path = ? AND name_lower = ?
+                   ORDER BY path, line_start LIMIT ?""",
+                (owner_principal_id, repo_path, name.lower(), limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def top_code_map_files(
         self, owner_principal_id: str, repo_path: str, *, limit: int = 12
     ) -> list[dict[str, Any]]:
@@ -2542,22 +2590,49 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def search_sessions(self, query: str, user_id: str | None = None) -> list[dict[str, Any]]:
-        term = f"%{query}%"
-        conditions = ["(sessions.title LIKE ? OR turns.prompt_text LIKE ? OR turns.summary LIKE ?)"]
-        params: list[Any] = [term, term, term]
+    def search_sessions(
+        self, query: str, user_id: str | None = None, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """Conversations matching *query*, each carrying the exchange that matched.
+
+        RAIKER-2020: the title still matches on its own, but the message-body half
+        now goes through ``conversation_fts`` instead of an unindexed
+        ``LIKE '%term%'`` over every turn the owner has ever taken. The row keeps
+        the shape it had and gains ``match_snippet`` / ``match_turn_id``, so the
+        result list can say *why* a conversation matched rather than only that it
+        did — which is the difference between finding a chat from years ago and
+        recognising it.
+        """
+        stripped = query.strip()
+        if not stripped:
+            return []
+        matched: dict[str, dict[str, Any]] = {}
+        for hit in self.search_conversation_turns(stripped, user_id=user_id, limit=limit):
+            matched.setdefault(
+                str(hit["session_id"]),
+                {"turn_id": str(hit["turn_id"]), "snippet": str(hit.get("snippet") or "")},
+            )
+        placeholders = ",".join("?" * len(matched)) if matched else "SELECT NULL"
+        conditions = [f"(sessions.title LIKE ? OR sessions.session_id IN ({placeholders}))"]
+        params: list[Any] = [f"%{stripped}%", *sorted(matched)]
         if user_id is not None:
             conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
             params.append(user_id)
         with self.connect() as connection:
             rows = connection.execute(
-                """
-                SELECT sessions.* FROM sessions
-                LEFT JOIN turns ON turns.session_id = sessions.session_id
-                WHERE """ + " AND ".join(conditions) + " GROUP BY sessions.session_id ORDER BY sessions.updated_at DESC",
-                params,
+                "SELECT sessions.* FROM sessions WHERE "
+                + " AND ".join(conditions)
+                + " ORDER BY sessions.updated_at DESC LIMIT ?",
+                [*params, limit],
             ).fetchall()
-        return [dict(row) for row in rows]
+        results: list[dict[str, Any]] = []
+        for row in rows:
+            record = dict(row)
+            hit = matched.get(str(record.get("session_id")), {})
+            record["match_snippet"] = " ".join(str(hit.get("snippet", "")).split())[:300]
+            record["match_turn_id"] = hit.get("turn_id", "")
+            results.append(record)
+        return results
 
     # ── Governed local MCP server profiles (Control Deck task 4) ─────────────
     # Every row is owner-scoped by ``principal_id``: an account can only list,
@@ -3870,6 +3945,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """,
                 (title, title, utc_now(), session_id),
             )
+            self._sync_conversation_fts(connection, turn_id)
 
     def complete_turn(self, turn_id: str, status: str, summary: str) -> None:
         with self.connect() as connection:
@@ -3877,6 +3953,278 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE turns SET status = ?, completed_at = ?, summary = ? WHERE turn_id = ?",
                 (status, utc_now(), summary, turn_id),
             )
+            self._sync_conversation_fts(connection, turn_id)
+
+    # ── Conversation recall (RAIKER-2020) ────────────────────────────────────
+    #
+    # `conversation_fts` is a projection of `turns`, rebuilt from it and never
+    # read as an authority. Every search below carries its hits back to the
+    # `turns`/`sessions` rows so ownership is still decided by `sessions.user_id`
+    # — the index narrows the candidate set, it does not widen who may see one.
+
+    @staticmethod
+    def _sync_conversation_fts(connection: sqlite3.Connection, turn_id: str) -> None:
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute("DELETE FROM conversation_fts WHERE turn_id = ?", (turn_id,))
+            connection.execute(
+                """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+                   SELECT turn_id, session_id, 'prompt', prompt_text FROM turns
+                   WHERE turn_id = ? AND prompt_text IS NOT NULL AND TRIM(prompt_text) != ''""",
+                (turn_id,),
+            )
+            connection.execute(
+                """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+                   SELECT turn_id, session_id, 'answer', summary FROM turns
+                   WHERE turn_id = ? AND summary IS NOT NULL AND TRIM(summary) != ''""",
+                (turn_id,),
+            )
+
+    @staticmethod
+    def _backfill_conversation_fts(connection: sqlite3.Connection) -> None:
+        """Populate the index once, for the turns that predate it.
+
+        Deliberately *not* a rebuild on every open: a workspace carrying years of
+        conversation would pay a full re-index to start the app. New turns keep
+        themselves in sync through ``_sync_conversation_fts``; a workspace that
+        needs a repair gets one from ``rebuild_conversation_fts`` on request.
+        """
+        with contextlib.suppress(sqlite3.OperationalError):
+            # `LIMIT 1`, not `COUNT(*)`: counting an FTS4 table scans its whole
+            # content table, and a workspace carrying years of conversation would
+            # pay that on every start — the exact case this index exists for.
+            if connection.execute("SELECT 1 FROM conversation_fts LIMIT 1").fetchone():
+                return
+            SQLiteStore._rebuild_conversation_fts(connection)
+
+    @staticmethod
+    def _rebuild_conversation_fts(connection: sqlite3.Connection) -> None:
+        connection.execute("DELETE FROM conversation_fts")
+        connection.execute(
+            """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+               SELECT turn_id, session_id, 'prompt', prompt_text FROM turns
+               WHERE prompt_text IS NOT NULL AND TRIM(prompt_text) != ''"""
+        )
+        connection.execute(
+            """INSERT INTO conversation_fts(turn_id, session_id, role, text)
+               SELECT turn_id, session_id, 'answer', summary FROM turns
+               WHERE summary IS NOT NULL AND TRIM(summary) != ''"""
+        )
+
+    # ── Web egress blocklist (RAIKER-2021) ───────────────────────────────────
+
+    def list_web_blocklist_rules(self, *, principal_id: str | None = None) -> list[str]:
+        """Just the rule strings, for the policy layer to compile."""
+        return [str(row["rule"]) for row in self.list_web_blocklist(principal_id=principal_id)]
+
+    def list_web_blocklist(self, *, principal_id: str | None = None) -> list[dict[str, Any]]:
+        """Owner rules, plus any that predate per-owner scoping.
+
+        A row with a NULL owner is included for everyone: it was written before
+        the column existed, and dropping it silently would *unblock* something.
+        """
+        sql = "SELECT * FROM web_egress_blocklist"
+        params: list[Any] = []
+        if principal_id:
+            sql += " WHERE owner_principal_id = ? OR owner_principal_id IS NULL"
+            params.append(principal_id)
+        sql += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            return [dict(row) for row in connection.execute(sql, params).fetchall()]
+
+    def add_web_blocklist_rule(
+        self, rule: str, kind: str, *, principal_id: str | None = None,
+        note: str = "", created_by: str = "",
+    ) -> str:
+        rule_id = new_id("wbl_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO web_egress_blocklist
+                   (rule_id, owner_principal_id, rule, kind, note, created_at, created_by)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (rule_id, principal_id, rule, kind, note[:500], utc_now(), created_by),
+            )
+        return rule_id
+
+    def delete_web_blocklist_rule(self, rule_id: str, *, principal_id: str | None = None) -> bool:
+        sql = "DELETE FROM web_egress_blocklist WHERE rule_id = ?"
+        params: list[Any] = [rule_id]
+        if principal_id:
+            sql += " AND (owner_principal_id = ? OR owner_principal_id IS NULL)"
+            params.append(principal_id)
+        with self.connect() as connection:
+            return connection.execute(sql, params).rowcount > 0
+
+    # ── Git credential grants (RAIKER-2022) ──────────────────────────────────
+
+    def create_git_credential_grant(
+        self, *, principal_id: str, scope: str, expires_at: str,
+        session_id: str | None = None, reason: str = "",
+    ) -> dict[str, Any]:
+        """Record one owner decision to lend the git credential.
+
+        ``scope`` is ``once`` or ``session``. Creating a grant supersedes any
+        active one for the same principal: two live grants would mean the owner
+        could not tell which decision was in force, and revoking one would leave
+        the other standing.
+        """
+        grant_id = new_id("grant_")
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE git_credential_grants SET status = 'superseded', revoked_at = ?
+                   WHERE owner_principal_id = ? AND status = 'active'""",
+                (now, principal_id),
+            )
+            connection.execute(
+                """INSERT INTO git_credential_grants
+                   (grant_id, owner_principal_id, session_id, scope, status, reason,
+                    granted_at, expires_at)
+                   VALUES (?, ?, ?, ?, 'active', ?, ?, ?)""",
+                (grant_id, principal_id, session_id, scope, reason[:500], now, expires_at),
+            )
+        return {
+            "grant_id": grant_id, "scope": scope, "status": "active",
+            "granted_at": now, "expires_at": expires_at, "session_id": session_id,
+        }
+
+    def active_git_credential_grant(
+        self, principal_id: str, *, session_id: str | None = None, now: str | None = None
+    ) -> dict[str, Any] | None:
+        """The grant that would authorise a git command right now, if any.
+
+        Expiry is evaluated here rather than by a sweep: a grant the owner set to
+        last an hour must stop working an hour later whether or not anything has
+        run since.
+        """
+        moment = now or utc_now()
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM git_credential_grants
+                   WHERE owner_principal_id = ? AND status = 'active' AND expires_at > ?
+                   ORDER BY granted_at DESC LIMIT 1""",
+                (principal_id, moment),
+            ).fetchone()
+        if row is None:
+            return None
+        grant = dict(row)
+        # A session grant is exactly that: it does not carry into another chat.
+        if (
+            str(grant.get("scope")) == "session"
+            and grant.get("session_id")
+            and session_id is not None
+            and str(grant["session_id"]) != session_id
+        ):
+            return None
+        return grant
+
+    def consume_git_credential_grant(self, grant_id: str) -> None:
+        """Count a use, and close a one-shot grant behind it."""
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE git_credential_grants
+                   SET uses = uses + 1,
+                       consumed_at = COALESCE(consumed_at, ?),
+                       status = CASE WHEN scope = 'once' THEN 'consumed' ELSE status END
+                   WHERE grant_id = ?""",
+                (utc_now(), grant_id),
+            )
+
+    def revoke_git_credential_grants(self, principal_id: str) -> int:
+        with self.connect() as connection:
+            return connection.execute(
+                """UPDATE git_credential_grants SET status = 'revoked', revoked_at = ?
+                   WHERE owner_principal_id = ? AND status = 'active'""",
+                (utc_now(), principal_id),
+            ).rowcount
+
+    def rebuild_conversation_fts(self) -> int:
+        """Owner-started repair. Returns the number of indexed rows."""
+        with self.connect() as connection:
+            self._rebuild_conversation_fts(connection)
+            return int(connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0] or 0)
+
+    @staticmethod
+    def _match_terms(query: str) -> list[str]:
+        """FTS4-safe terms. Operators and punctuation are stripped, not escaped."""
+        cleaned = "".join(character if character.isalnum() else " " for character in query)
+        return [term for term in cleaned.split() if len(term) >= 3][:12]
+
+    def search_conversation_turns(
+        self,
+        query: str,
+        *,
+        user_id: str | None = None,
+        limit: int = 10,
+        session_id: str | None = None,
+        after: str | None = None,
+        before: str | None = None,
+    ) -> list[dict[str, Any]]:
+        """Exchanges matching *query*, newest first, scoped to one owner.
+
+        The index answers "which exchanges mention this"; the join answers "and
+        may this caller see them". ``after``/``before`` are ISO timestamps, which
+        is what makes an old conversation reachable at all: without them a bounded
+        result set is always the recent one.
+        """
+        if limit < 1:
+            return []
+        terms = self._match_terms(query)
+        conditions = ["turns.turn_id IS NOT NULL"]
+        params: list[Any] = []
+        if terms:
+            source = (
+                "conversation_fts JOIN turns ON turns.turn_id = conversation_fts.turn_id "
+                "JOIN sessions ON sessions.session_id = turns.session_id"
+            )
+            selected = (
+                "conversation_fts.role AS role, "
+                "snippet(conversation_fts, '', '', '…', -1, 18) AS snippet"
+            )
+            conditions.append("conversation_fts MATCH ?")
+            params.append(" ".join(terms))
+        else:
+            # Terms shorter than the index tokenizer's floor (an identifier such
+            # as `q3`) still have to be findable, so a substring scan stands in.
+            # The role has to be decided by which side actually matched, or a hit
+            # in an answer is reported as a prompt and read back from the wrong
+            # column.
+            source = "turns JOIN sessions ON sessions.session_id = turns.session_id"
+            selected = (
+                "CASE WHEN turns.prompt_text LIKE ? THEN 'prompt' ELSE 'answer' END AS role, "
+                "SUBSTR(CASE WHEN turns.prompt_text LIKE ? THEN turns.prompt_text "
+                "ELSE COALESCE(turns.summary, '') END, 1, 220) AS snippet"
+            )
+            like = f"%{query.strip()}%"
+            params.extend([like, like])
+            conditions.append("(turns.prompt_text LIKE ? OR turns.summary LIKE ?)")
+            params.extend([like, like])
+        if user_id is not None:
+            conditions.append("(sessions.user_id = ? OR sessions.user_id IS NULL)")
+            params.append(user_id)
+        if session_id is not None:
+            conditions.append("turns.session_id = ?")
+            params.append(session_id)
+        if after:
+            conditions.append("turns.created_at >= ?")
+            params.append(after)
+        if before:
+            conditions.append("turns.created_at <= ?")
+            params.append(before)
+        params.append(limit)
+        sql = (
+            f"SELECT turns.turn_id AS turn_id, turns.session_id AS session_id, "
+            f"turns.created_at AS created_at, turns.prompt_text AS prompt_text, "
+            f"turns.summary AS summary, sessions.title AS session_title, "
+            f"sessions.origin AS origin, {selected} FROM {source} "
+            f"WHERE {' AND '.join(conditions)} "
+            f"ORDER BY turns.created_at DESC LIMIT ?"
+        )
+        with self.connect() as connection:
+            try:
+                rows = connection.execute(sql, params).fetchall()
+            except sqlite3.OperationalError:
+                return []
+        return [dict(row) for row in rows]
 
     def index_event(
         self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str,

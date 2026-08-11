@@ -385,7 +385,6 @@
   .create { display: flex; align-items: flex-end; gap: var(--space-3); flex-wrap: wrap; padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--surface); margin-bottom: var(--space-4); }
   .field { display: flex; flex-direction: column; gap: 0.35rem; }
   .field-label { font-size: 0.75rem; font-weight: 600; color: var(--text-2); }
-  .input, .select { padding: 0.5rem 0.65rem; border: 1px solid var(--border-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--text-1); font: inherit; }
   .input { min-width: 16rem; }
   .rename { min-width: 12rem; }
   .list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-3); }

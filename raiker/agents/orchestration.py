@@ -29,6 +29,10 @@ DELEGABLE_TOOLS: frozenset[str] = frozenset({
     # the delegable set's rule. It is also the tool a wide investigation most
     # wants: finding where things are defined is the search a subagent is for.
     "code_map_search",
+    "code_map_references",
+    # RAIKER-2020 — a read of the owner's own transcript: local, read-only
+    # and egress-free, which is exactly the delegable set's rule.
+    "conversation_search",
     "vector_get", "skill_load",
 })
 

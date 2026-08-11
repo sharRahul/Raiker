@@ -196,16 +196,25 @@ zero-trust verification is applied at every authority boundary.
 | Knowledge | **Memory**, **Knowledge Map** |
 | Control | **Approvals**, **Permissions**, **Models**, **Extensions** |
 | Observe | **Observability** — readiness, audit log, checkpoints, live work, notifications, sessions |
-| Utilities | **Settings** |
+| Utilities | **Settings** — including **Web access** and **Git credential** |
 
 Highlights, each verified against a live instance:
 
 - **Chat** — streamed turns against local or hosted models, image and document
   attachments, sanitised Markdown rendering, source citations, a recent-chat
-  list with per-row delete and move-to-project, full-text search across titles
-  and message bodies, and one-click export of a conversation to HTML, Markdown
-  or PDF; at 90% of a known context capacity, older completed exchanges are
-  compacted automatically while the transcript remains unchanged.
+  list with per-row delete and move-to-project, indexed full-text search across
+  titles and message bodies that shows the exchange each result matched on, and
+  one-click export of a conversation to HTML, Markdown or PDF; at 90% of a known
+  context capacity, older completed exchanges are compacted automatically while
+  the transcript remains unchanged.
+- **Recall** — a turn can read your own past conversations, not only the ones it
+  can still see. `conversation_search` searches every exchange you have had,
+  narrowed to a date range when the question is about a particular period, and
+  returns the matching exchange with its conversation, timestamp and turn id so
+  an answer can cite the record instead of reconstructing it. Ambient recall
+  offers the conversations that match this prompt rather than the eight most
+  recent ones. What it returns is your own transcript, treated as data rather
+  than as instruction; **Incognito** switches the whole path off.
 - **Tasks** — four work types: run now, schedule once, daily routine, and a
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.
@@ -217,6 +226,14 @@ Highlights, each verified against a live instance:
   and connected-provider rolling seven-day tokens, turns, requests,
   compactions, known cost, genuine provider data where available, and advisory
   owner budgets.
+- **Web access** — Raiker can read public pages and search the web out of the
+  box. Settings → Web access holds your blocklist (domains, wildcards, IPs,
+  ranges, patterns) and a check that answers "would this be reachable" without
+  contacting anything. Private and loopback destinations are refused always,
+  and a fetched page arrives as sanitised text with what was removed reported.
+- **Git credential** — the token Raiker pushes with, stored encrypted and lent
+  to one command at a time under an approval you make once or for a session.
+  It never appears in a log, an error, or a command's output.
 - **Extensions** — governed service connectors and Model Context Protocol
   servers you can build, connect, monitor, and contain, plus **Skills**:
   `SKILL.md` documents and `*.skill` bundles you upload, import from a
@@ -247,10 +264,13 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   resolution executes file changes and patches, bounded local `shell` commands,
   and the owner-configured SSH and Daytona profiles. `network` and `process`
   keep metadata-only resolution. This is deliberate, not an oversight: a file
-  write is checkpointed and reversible, and a shell command is allowlisted,
-  workspace-contained, time- and output-bounded, and captured; those two are
-  neither. Resolving one still continues the parked turn, with an honest
-  "approved, but not executed" result the agent can react to.
+  write is checkpointed and reversible, and a shell command is parsed before it
+  runs — refused if it chains, pipes, redirects, substitutes, expands or reaches
+  an interpreter, held to an allowlist of binaries and to the workspace, denied
+  its own `.raiker` and `.git`, given a constructed environment rather than the
+  host's, and time- and output-bounded with secret-like output redacted. Those
+  two are none of that. Resolving one still continues the parked turn, with an
+  honest "approved, but not executed" result the agent can react to.
 - **A batch of tool calls runs in parallel only when nothing in it needs a
   decision.** Every validated read-only call in a batch is executed
   concurrently; the moment one call in the same batch requires approval, the
@@ -258,31 +278,60 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   pause is lost — the remainder is parked with the turn and re-governed one
   decision at a time when you resume — but a batch containing three edits is
   three decisions, not one.
-- **Build patching is strict about matching, not about scope.** One unified
-  diff may cover several files, including creates and deletes, and it is
-  applied as a single approval and a single reversible change set. What stays
-  strict is the match: exact edits require exactly one `old_text` match, every
-  hunk must match its context exactly and unambiguously, a section that edits or
+- **Build patching is strict about which code you named, not about how you
+  typed it.** One unified diff may cover several files, including creates and
+  deletes, and it is applied as a single approval and a single reversible change
+  set. Matching tries the exact text first; when that finds nothing, the same
+  search runs again ignoring **trailing whitespace and indentation style**, so a
+  quote that used spaces where the file uses a tab still names the right code —
+  and the file keeps its own indentation rather than adopting the quote's. What
+  does **not** relax is uniqueness: an edit still requires exactly one match and
+  a relaxed search that hits two places is refused, so the tolerance can never
+  land an edit somewhere it was not meant to. Interior spacing is text, not
+  formatting — `a + b` and `a+b` remain a mismatch. A section that edits or
   deletes must name a text file that already exists inside the workspace and one
   that creates must name a path that does not, and a patch naming the same file
-  twice is rejected before anything is written. There is no fuzzy or partial
+  twice is rejected before anything is written. There is still no partial
   application — one bad hunk fails the whole proposal.
-- **A push needs its own switch, its own allowlist and your own credential.**
-  An approved `git_commit` records the change set you reviewed, and an approved
-  `git_push` really publishes the branch — but publishing is egress carrying
-  repository content off the machine, so it answers to **Git push**
-  (`git_push_execution`) rather than to Git writes, and it does nothing until
-  the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and
-  `RAIKER_GITHUB_TOKEN` is set. Only HTTPS GitHub remotes are pushable, because
-  that is the credential Raiker holds; it never forces and never deletes a
-  branch. `github_write` then has a head to open a pull request against.
-- **Web fetch takes two deliberate steps to turn on.** `web_fetch` is gated by
-  its own capability and withholds by default at `ask`, so a page is fetched
-  only once the owner has both enabled the gate and raised the decision mode to
-  **Allow** — and then only for a host on `RAIKER_WEB_EGRESS_ALLOWLIST`, which
-  is empty until you set it. `web_search` answers the same gate, but Raiker
-  ships no search endpoint: it reports `web_search_not_configured` until you
-  point it at one.
+- **A push needs its own switch, its own allowlist, and a credential you lend
+  rather than leave lying about.** An approved `git_commit` records the change
+  set you reviewed, and an approved `git_push` really publishes the branch — but
+  publishing is egress carrying repository content off the machine, so it answers
+  to **Git push** (`git_push_execution`) rather than to Git writes, and it does
+  nothing until the remote's host is on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`. The
+  credential is stored encrypted from **Settings → Git credential** and lent to
+  one command at a time under a grant you make — **once**, or **for this
+  session** — which carries its own expiry and can be withdrawn in a press. It is
+  passed in the command's own environment rather than on a command line, and
+  removed from every log, error and captured output for as long as the loan
+  lasts. `RAIKER_GITHUB_TOKEN` in the host environment still works for an
+  install configured that way, and the page says which of the two you are on.
+  Only HTTPS GitHub remotes are pushable, because that is the credential Raiker
+  holds; it never forces and never deletes a branch.
+- **Web reads are on, and what they may not reach is yours to say.** `web_fetch`
+  and `web_search` work on a fresh install: there is no list to fill in first,
+  and `web_search` uses a keyless endpoint until you point
+  `RAIKER_WEB_SEARCH_ENDPOINT` at your own. What you control is the **blocklist**
+  — **Settings → Web access**, or `RAIKER_WEB_EGRESS_BLACKLIST` — which takes a
+  domain (covering its subdomains), a wildcard, an IP address, a CIDR range, or a
+  `/regex/`, and can be tested against a host without contacting it. What you do
+  **not** control, and cannot switch off, is the address guard: https only, no
+  credential in the URL, and every address a name resolves to must be public, so
+  a fetch can never reach your loopback interface, your home network, or a cloud
+  metadata service — including through a name that resolves to one, an
+  IPv4-mapped IPv6 address, or a redirect. The connection is pinned to an address
+  that already passed, so the destination cannot change between the check and the
+  request. Emptying the blocklist opens none of that.
+- **A fetched page reaches the model as text, not as markup or instruction.**
+  Scripts, styles and comments are dropped; elements a visitor could never see —
+  `hidden`, `display:none`, zero-size, off-screen, `aria-hidden` — are removed and
+  counted, because text nobody can read is the usual carrier for an instruction
+  meant only for a model; zero-width and bidirectional characters are stripped;
+  and a line shaped like a conversation role marker is defanged so page text
+  cannot open a turn. What was removed is reported alongside the page rather than
+  silently swallowed. None of this is a filter that decides whether content is
+  safe — the thing that stops a hijack is that fetched text never carries
+  instruction authority — but an injection attempt arrives visible and inert.
 - **Remembering something is a decision, and Memory store starts off.**
   `memory_write` and `memory_forget` are offered to the model, but like every
   acting capability they answer to their own gate, which ships **off**. With it
@@ -300,16 +349,21 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   states rather than implies. Widening a permission still happens on Permissions,
   under the step-up: a recorded reason, and a threat-model acknowledgement where
   the capability demands one.
-- **The code map finds declarations, not every reference, and it is exact only
-  for Python.** Turning on **Code map** lets Raiker index the repository Build
-  points at, so the agent can ask where something is defined instead of guessing
-  a search pattern; it is rebuilt on demand and refreshed for the files an
-  approved change touched. Python is parsed with a real parser; fifteen other
-  languages are matched with bounded patterns, which finds most declarations and
-  misses unusual ones — each file records which extractor produced it. A scan
-  that hits one of its bounds reports `partial` and names the bound rather than
-  presenting a partial map as a complete one. There is no reference or
-  call-graph search and no embeddings over the tree.
+- **The code map answers where a name is defined and where it is used, but it
+  matches text rather than resolving a call graph.** Turning on **Code map** lets
+  Raiker index the repository Build points at, so the agent can ask where
+  something is defined instead of guessing a search pattern; it is rebuilt on
+  demand and refreshed for the files an approved change touched. Python is parsed
+  with a real parser; fifteen other languages are matched with bounded patterns,
+  which finds most declarations and misses unusual ones — each file records which
+  extractor produced it. **Find references** answers the other half — what would
+  break if you changed this — by scanning the files that map already accepted for
+  word-boundary uses of one identifier, excluding the declaration itself. It is
+  textual, so a same-named symbol from another module matches too, and it says so
+  rather than implying a precision it does not have. A scan that hits one of its
+  bounds reports `partial` and names the bound rather than presenting a partial
+  answer as a complete one. There is still no resolved call graph and no
+  embeddings over the tree.
 - **A component that keeps failing is contained, and stays contained until you
   say otherwise.** Budgets alone let a hard-down provider or a broken tool spend
   a whole turn one doomed call at a time, so Raiker counts consecutive failures
@@ -390,10 +444,27 @@ that closed the older limits this section used to list are FIXED-34, FIXED-39,
 FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
 [ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
+The same date's second round rebuilt two governed boundaries. **RAIKER-2021**
+replaced the web egress allowlist with a blocklist — `web_fetch` and
+`web_search` now work on a fresh install instead of being advertised to the
+model and refused — while moving the part that matters into a guard the owner
+cannot edit: no private, loopback or link-local destination, however it is
+spelled and wherever a redirect leads, with the connection pinned to an address
+that already passed. Fetched pages are reduced to inert text first.
+**RAIKER-2023** parses a command before it runs rather than checking only the
+name of its binary, and **RAIKER-2022** moved the push credential out of the
+host environment into a loan the owner grants once or for a session. The limits
+this section used to carry about web fetch taking two deliberate steps, and
+about a push needing a credential left in the environment, are gone with them.
+
 The 2026-08-11 round closed **FIXED-181** through **FIXED-186**: multi-call
 answer seams, the checked-in live stub, dead transcript markup, automatic 90%
 context compaction, the connected-provider rolling seven-day usage view, and
-concurrent audit-log integrity.
+concurrent audit-log integrity. The same round closed two of the limits this
+section used to list — reference search over the code map, and matching that
+survives whitespace — and **MEM-01** and **MEM-02** in
+[docs/plans/MEMORY_RELIABILITY_PLAN.md](docs/plans/MEMORY_RELIABILITY_PLAN.md),
+which is the memory audit's own record of what recall can and cannot do yet.
 
 ## Documentation
 

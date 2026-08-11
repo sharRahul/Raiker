@@ -65,7 +65,8 @@ def test_estimator_and_planner_trigger_at_ninety_percent(store: SQLiteStore) -> 
         current_prompt="z" * 100,
         latest_compaction=None,
     )
-    assert plan.estimated_tokens >= plan.threshold_tokens == 180
+    assert plan.threshold_tokens == 180
+    assert plan.estimated_tokens >= plan.threshold_tokens
     assert plan.should_compact is True
     assert [row["turn_id"] for row in plan.eligible_turns] == ["turn_0", "turn_1"]
     assert plan.compact_through_turn_id == "turn_1"

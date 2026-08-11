@@ -377,6 +377,7 @@ def main(argv: list[str] | None = None) -> int:
         workspace,
         ui_dir=ui_dir,
         tray_bootstrap_secret=tray_bootstrap_secret,
+        loopback_only=True,
     )
 
     if not args.no_browser:

@@ -187,7 +187,11 @@ def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
     if any(getattr(route, "path", "") == f"/instances/{name}" for route in app.router.routes):
         return
     ui_dir = getattr(app.state, "instance_ui_dir", None)
-    instance = create_app(workspace, ui_dir=ui_dir)
+    instance = create_app(
+        workspace,
+        ui_dir=ui_dir,
+        loopback_only=bool(getattr(app.state, "loopback_only", True)),
+    )
     route = Mount(f"/instances/{name}", app=instance, name=f"instance-{name}")
     static_index = next(
         (
@@ -221,6 +225,7 @@ def create_app(
     max_body_bytes: int = 1_000_000,
     hsts: bool = False,
     tray_bootstrap_secret: str | None = None,
+    loopback_only: bool = True,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -316,6 +321,7 @@ def create_app(
     # no worker waiting the nudge is simply a set flag nobody reads, which costs
     # nothing and keeps the resolve path free of "is the host running?" branches.
     app.state.scheduler_wakeup = SchedulerWakeup()
+    app.state.loopback_only = loopback_only
     from raiker.models.local_runtime import ManagedLlamaRuntime
 
     app.state.managed_llama_runtime = ManagedLlamaRuntime()
@@ -363,7 +369,12 @@ def create_app(
             "/api/brain/sources/upload": (MAX_KNOWLEDGE_UPLOAD_BYTES * 4) // 3 + 4096,
         },
     )
-    app.add_middleware(RateLimitMiddleware, max_requests=rate_limit_per_minute, window_seconds=60.0)
+    app.add_middleware(
+        RateLimitMiddleware,
+        max_requests=rate_limit_per_minute,
+        window_seconds=60.0,
+        loopback_only=loopback_only,
+    )
     app.add_middleware(SecurityHeadersMiddleware, hsts=hsts)
     app.include_router(auth_router)
     app.include_router(instances_router)

@@ -96,6 +96,7 @@ def main(argv: list[str] | None = None) -> int:
         ui_dir=ui_dir,
         rate_limit_per_minute=args.rate_limit_per_minute,
         hsts=public,
+        loopback_only=not public,
     )
 
     # Auto-open the dashboard in the user's default browser for local loopback

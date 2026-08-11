@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ipaddress
 import json
 import time
 from collections import defaultdict, deque
@@ -116,10 +117,18 @@ class RateLimitMiddleware:
     principal) remains the real gate.
     """
 
-    def __init__(self, app: ASGIApp, *, max_requests: int = 120, window_seconds: float = 60.0) -> None:
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_requests: int = 120,
+        window_seconds: float = 60.0,
+        loopback_only: bool = True,
+    ) -> None:
         self.app = app
         self._max = max_requests
         self._window = window_seconds
+        self._loopback_only = loopback_only
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._last_sweep = time.monotonic()
 
@@ -128,6 +137,27 @@ class RateLimitMiddleware:
         if isinstance(client, (tuple, list)) and client:
             return str(client[0])
         return "unknown"
+
+    def _safe_loopback_read(self, scope: Scope) -> bool:
+        """Whether this request may bypass the abuse window (BUG-88).
+
+        The socket peer is the only identity considered. Forwarding headers are
+        deliberately ignored: on a public bind they are attacker-controlled,
+        and on a loopback bind no proxy assertion is needed.
+        """
+        if not self._loopback_only or str(scope.get("method", "GET")).upper() not in {
+            "GET",
+            "HEAD",
+            "OPTIONS",
+        }:
+            return False
+        client = scope.get("client")
+        if not isinstance(client, (tuple, list)) or not client:
+            return False
+        try:
+            return ipaddress.ip_address(str(client[0])).is_loopback
+        except ValueError:
+            return False
 
     def _sweep(self, now: float) -> None:
         # Drop per-IP deques that have fully aged out. Without this, one entry
@@ -142,6 +172,9 @@ class RateLimitMiddleware:
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] != "http" or not scope.get("path", "").startswith("/api"):
+            await self.app(scope, receive, send)
+            return
+        if self._safe_loopback_read(scope):
             await self.app(scope, receive, send)
             return
         now = time.monotonic()

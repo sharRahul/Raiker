@@ -48,11 +48,96 @@ def test_hsts_emitted_when_enabled(workspace: Path) -> None:
 
 
 def test_rate_limit_returns_429(workspace: Path) -> None:
-    client = TestClient(create_app(workspace, rate_limit_per_minute=3))
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=3, loopback_only=False),
+        client=("127.0.0.1", 50000),
+    )
     headers = _headers(workspace)
     statuses = [client.get("/api/events", headers=headers).status_code for _ in range(5)]
     assert 429 in statuses
     assert statuses.count(200) == 3
+
+
+@pytest.mark.parametrize("peer", ["127.0.0.1", "::1"])
+def test_loopback_only_safe_reads_do_not_compete_with_the_write_budget(
+    workspace: Path, peer: str
+) -> None:
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=3, loopback_only=True),
+        client=(peer, 50000),
+    )
+    headers = _headers(workspace)
+
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(12)]
+
+    assert statuses == [200] * 12
+
+
+def test_loopback_writes_remain_limited(workspace: Path) -> None:
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=True),
+        client=("127.0.0.1", 50000),
+    )
+
+    # Safe reads (including browser preflight/head probes) are a separate lane
+    # and neither consume nor relax the mutation budget.
+    for _ in range(5):
+        assert client.head("/api/health").status_code != 429
+        assert client.options("/api/health").status_code != 429
+    statuses = [client.post("/api/auth/session", json={}).status_code for _ in range(4)]
+
+    assert statuses[:2] == [200, 200]
+    assert statuses[2:] == [429, 429]
+
+
+def test_ordinary_loopback_navigation_and_polling_stays_responsive(workspace: Path) -> None:
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=3, loopback_only=True),
+        client=("127.0.0.1", 50000),
+    )
+    headers = _headers(workspace)
+    paths = [
+        "/api/health",
+        "/api/tasks",
+        "/api/models",
+        "/api/diagnostics",
+        "/api/events",
+        "/api/setup",
+    ]
+
+    statuses = [
+        client.get(path, headers=headers).status_code
+        for _ in range(4)
+        for path in paths
+    ]
+
+    assert 429 not in statuses
+
+
+def test_forwarded_headers_cannot_spoof_a_loopback_peer(workspace: Path) -> None:
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=True),
+        client=("198.51.100.23", 50000),
+    )
+    headers = {**_headers(workspace), "X-Forwarded-For": "127.0.0.1"}
+
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
+
+    assert statuses[:2] == [200, 200]
+    assert statuses[2:] == [429, 429]
+
+
+def test_public_bind_limits_safe_reads_even_from_the_host(workspace: Path) -> None:
+    client = TestClient(
+        create_app(workspace, rate_limit_per_minute=2, loopback_only=False),
+        client=("::1", 50000),
+    )
+    headers = _headers(workspace)
+
+    statuses = [client.get("/api/events", headers=headers).status_code for _ in range(4)]
+
+    assert statuses[:2] == [200, 200]
+    assert statuses[2:] == [429, 429]
 
 
 # ── Body size limit ──

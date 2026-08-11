@@ -2655,3 +2655,93 @@ CREATE INDEX IF NOT EXISTS idx_code_map_edges_from
 CREATE INDEX IF NOT EXISTS idx_code_map_edges_target
   ON code_map_edges(owner_principal_id, repo_path, target);
 """
+
+# Capability-agnostic behaviour monitoring and containment (BUG-76, BUG-77).
+#
+# Until this migration, anomaly detection, findings and containment existed for
+# exactly one capability family — monitored MCP connections. Every other family
+# (connectors, plugins, subagents, local execution, providers, tools) had a
+# budget and nothing else: a component that failed every call spent its whole
+# budget one doomed call at a time, and a component that started misbehaving
+# raised no finding and could not be contained short of disabling the whole
+# capability.
+#
+# `capability_activity_log` is the generic sibling of `mcp_session_log`: one
+# redacted row per governed capability invocation, keyed by
+# `(principal_id, capability, subject_id)`. The same hard invariant holds — only
+# counts, hostnames (netloc), classification *labels* and outcome codes are ever
+# stored, never a payload, argument value, token, or full URL. Rolling rows form
+# each subject's baseline.
+#
+# `capability_containment` carries the owner-authoritative lifecycle state for a
+# subject in the same vocabulary the MCP monitor already uses: `active`,
+# `paused` (the revocable circuit breaker — automatic on a high-severity anomaly
+# or on a consecutive-failure threshold, and the owner's one-call stop) and
+# `killed` (the instant kill switch). Both are revocable: containment is never a
+# ban, only what keeps a frictionless default safe. `failure_streak` and
+# `probe_after` carry the breaker's own state so a half-open probe is a property
+# of the row rather than of a process that may have restarted.
+CAPABILITY_MONITORING_MIGRATION_ID = "RAIKER-1047-capability-monitoring"
+
+CAPABILITY_MONITORING_SQL = """
+CREATE TABLE IF NOT EXISTS capability_activity_log (
+  activity_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  operation TEXT NOT NULL DEFAULT '',
+  hosts_json TEXT,
+  tools_json TEXT,
+  calls INTEGER NOT NULL DEFAULT 0,
+  bytes_in INTEGER NOT NULL DEFAULT 0,
+  bytes_out INTEGER NOT NULL DEFAULT 0,
+  error_count INTEGER NOT NULL DEFAULT 0,
+  outcome TEXT NOT NULL DEFAULT 'ok',
+  reason_code TEXT NOT NULL DEFAULT '',
+  arg_sensitivity TEXT,
+  result_sensitivity TEXT,
+  observed_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_capability_activity_subject
+  ON capability_activity_log(principal_id, capability, subject_id, observed_at DESC);
+
+CREATE TABLE IF NOT EXISTS capability_containment (
+  principal_id TEXT NOT NULL,
+  capability TEXT NOT NULL,
+  subject_id TEXT NOT NULL,
+  label TEXT NOT NULL DEFAULT '',
+  state TEXT NOT NULL DEFAULT 'active',
+  reason TEXT,
+  source TEXT NOT NULL DEFAULT 'owner',
+  finding_id TEXT,
+  failure_streak INTEGER NOT NULL DEFAULT 0,
+  last_failure_code TEXT NOT NULL DEFAULT '',
+  contained_at TEXT,
+  probe_after TEXT,
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (principal_id, capability, subject_id)
+);
+CREATE INDEX IF NOT EXISTS idx_capability_containment_state
+  ON capability_containment(principal_id, state, updated_at DESC);
+"""
+
+# Resumable, cancellable, cleanable model operations (BUG-75).
+#
+# Ollama pull, Hugging Face download, conversion and managed GGUF deployment all
+# start real background workers, but three of their controls were record-only:
+# **Retry** reset the durable row to `queued` without reconstructing and
+# dispatching the original worker, **Cancel** recorded `cancel_requested` that
+# not every worker polled, and **Clear record** removed the row while leaving an
+# incomplete destination on disk.
+#
+# `payload_json` is the secret-safe typed payload a retry needs to dispatch the
+# same job again: the repository, revision, model name, quantization and the
+# resolved destination — never a token, a credential, or a header. It is stored
+# beside the row rather than in it so the API projection can keep showing the
+# *redacted* destination while cleanup can still name the exact approved path
+# the owner confirms.
+MODEL_OPERATION_PAYLOAD_MIGRATION_ID = "RAIKER-1048-model-operation-payload"
+
+MODEL_OPERATION_PAYLOAD_SQL = """
+ALTER TABLE model_operations ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
+"""

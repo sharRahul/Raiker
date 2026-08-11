@@ -298,6 +298,22 @@ class SubagentRunner:
                     "steps_executed": executed,
                     "tools_used": sorted(set(tools_used)),
                     "status": status,
+                    # BUG-78 — who this spawn was. The caller needs these to mint
+                    # the attestation that binds the findings to this spawn, and
+                    # the audit trail needs them to prove which of several spawns
+                    # in one turn produced a given result. Identifiers only: the
+                    # child's token never leaves the runner.
+                    "spawn_identity": {
+                        "spawn_principal_id": child_identity.claims.principal_id,
+                        "parent_principal_id": parent_identity.claims.principal_id,
+                        "owner_principal_id": owner_id,
+                        "session_id": effective_session_id,
+                        # The parent turn the attestation is verified against,
+                        # and the child turn the spawn's own identity row carries.
+                        "turn_id": turn_id or "",
+                        "spawn_turn_id": child_turn_id,
+                        "subject": child_identity.claims.subject,
+                    },
                     "budget": {
                         "max_steps": budget.max_steps,
                         "max_tool_calls": budget.max_tool_calls,

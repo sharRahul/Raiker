@@ -258,6 +258,27 @@ EVENT_TYPES = {
     "mcp_connection_paused",
     "mcp_connection_resumed",
     "mcp_connection_killed",
+    # Capability-agnostic monitoring and containment (BUG-76, BUG-77). The same
+    # three facts the MCP stream records, for every other capability family:
+    # an anomaly rule tripped on a connector/plugin/subagent/execution subject;
+    # a subject was contained (the revocable pause a high-severity anomaly or a
+    # consecutive-failure threshold trips, or the owner's stop) or cleared; and
+    # a call was refused because its subject is contained. Redacted metadata
+    # only — capability, subject id, counts and a stated reason.
+    "capability_anomaly_detected",
+    "capability_contained",
+    "capability_containment_cleared",
+    "capability_call_refused",
+    # A source this turn read contained text shaped like a prompt-injection
+    # attempt (BUG-81). Advisory and provenance-only: the refusal path stays the
+    # tool gate. The payload names the rules that matched, their counts, and the
+    # source's own locator — never the matched text.
+    "prompt_injection_suspected",
+    # A delegated subagent result was bound to the spawn that produced it, or
+    # could not be and was refused (BUG-78). Identifiers and a digest only — the
+    # findings themselves reach the calling model and nowhere else.
+    "subagent_result_verified",
+    "subagent_result_refused",
     "task_created",
     "task_started",
     "task_progress",

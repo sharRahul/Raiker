@@ -300,6 +300,41 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
   that hits one of its bounds reports `partial` and names the bound rather than
   presenting a partial map as a complete one. There is no reference or
   call-graph search and no embeddings over the tree.
+- **A component that keeps failing is contained, and stays contained until you
+  say otherwise.** Budgets alone let a hard-down provider or a broken tool spend
+  a whole turn one doomed call at a time, so Raiker counts consecutive failures
+  per tool and per provider in durable state: three in a row pauses that subject
+  with a stated reason and a raised finding, and further calls are refused rather
+  than retried. After a minute one call is let through as a probe; if it works,
+  the pause clears itself. Nothing here is a ban — Settings → Security & sign-in
+  lists every contained subject with its reason and clears it in one press — but
+  a turn that finds every model contained says so instead of trying them all
+  again.
+- **Suspicious content in a source is reported, never blocked.** Text a page,
+  message or attachment carries that is shaped like a prompt-injection attempt —
+  cancelling earlier instructions, impersonating a system turn, asking for a key,
+  asking to skip approval, hidden characters — raises a finding naming that exact
+  document or URL. It is deliberately advisory: the thing that actually stops a
+  hijack is the deny-by-default tool gate, and external content is framed as data
+  and never as instruction whatever the scan finds. The rules are fixed patterns
+  with names, not a classifier, because a filter that is right most of the time
+  would read as an assurance it cannot give.
+- **A plugin signature proves an author only once you configure a key.** Raiker
+  verifies manifest checksums always, and manifest signatures against
+  `RAIKER_PLUGIN_SIGNING_KEY` (yours) or `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (a
+  publisher's) when either is set. With neither set — the default — a signature
+  is recorded as **Present only**: the checksum still catches an accidental edit,
+  but nothing was checked against an author. Extensions → Plugins states which of
+  the three levels each installed plugin earned and what would raise it. The
+  default is not silently hardened; it is stated.
+- **A model check expires, and Raiker re-confirms it quietly rather than
+  stopping you.** Before any surface will send, the exact model has to have
+  passed a reachability check; that check is good for five minutes by default and
+  1–120 minutes by your setting (Settings → Runtime). While a work surface is
+  open, the selected model is re-confirmed in the background as its window runs
+  down, so a long session does not spontaneously disable Send — and connecting,
+  switching model, pulling, or changing an endpoint or credential still
+  invalidates a check immediately, whatever the window is set to.
 - Automatic context compaction at 90 % and weekly quota display are specified
   but not shipped. The view-only file inspector is shipped, and so are
   conversation export (HTML / Markdown / PDF) and **Print / Save as PDF**.
@@ -322,19 +357,30 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
 
 Where one of these is tracked as work rather than a deliberate boundary, it is
 written up with a reproduction and a proposed fix in
-[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md). The 2026-08-08 round's
-four open findings are all closed there — **FIXED-154** (the context meter's
-`NaN input · NaN output`), **FIXED-155** (Build's mode chips rewriting standing
-permissions), **FIXED-156** (memory unreachable from Chat and Build) and
-**FIXED-157** (a resumed turn denying an execution that happened) — together
-with **FIXED-158**, which gives the advisor model the readiness check and chip
-the chat model already had, and **FIXED-159**, the unused composer permission
-control that went with FIXED-155. The 2026-08-10 sweep's findings are closed as
-**FIXED-149** through **FIXED-153**: the stale BUG-47 live scenario, the
-SQLCipher lockout, the audit log that showed nothing, the Knowledge Map picker
-that browsed the whole installation, and the audit log's mojibake column. The
-entries that closed the older limits this section used to list are FIXED-34,
-FIXED-39, FIXED-90, FIXED-99, FIXED-101 and FIXED-109 there, and
+[docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md), which now lists only what
+is still open; everything closed keeps its full record — observation, root cause,
+and the interface outcome that had to be true first — in
+[docs/plans/FIXED_ITEMS.md](docs/plans/FIXED_ITEMS.md).
+
+The 2026-08-10 round closed eleven entries there. **FIXED-133** is the one this
+section is written against: a new owner's first message used to fail with the raw
+string `model_unavailable: provider_error_unclassified`, and a fresh install now
+either answers or explains in a sentence why it cannot. The rest are the OWASP
+Agentic Top 10 gaps that review exposed — **FIXED-163** (a failing tool or
+provider contained rather than retried to exhaustion), **FIXED-164** (anomaly
+detection and containment for every capability, not only MCP), **FIXED-165** (a
+delegated subagent result bound to the spawn that produced it), **FIXED-166** (a
+plugin signature that states what it proved), **FIXED-167** (a security mapping
+whose every row cites the code) and **FIXED-168** (the prompt-injection scanning
+hook) — together with **FIXED-161** (the production bundle back under its size
+warning), **FIXED-162** (retry, cancellation and partial cleanup that do what
+they say), **FIXED-169** (the readiness window above) and **FIXED-170** (the live
+acceptance spec running on one provider key).
+
+The 2026-08-08 round's findings are **FIXED-154** through **FIXED-159**, and the
+2026-08-10 visual sweep's are **FIXED-149** through **FIXED-153**. The entries
+that closed the older limits this section used to list are FIXED-34, FIXED-39,
+FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
 [ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
 
 ## Documentation

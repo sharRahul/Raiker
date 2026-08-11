@@ -46,19 +46,24 @@ is stated rather than scored as coverage.
 
 | ASI ID | Risk | Status | Primary Raiker control | Gap |
 |---|---|---|---|---|
-| ASI01 | Agent goal hijack | 🟡 | Untrusted-data framing on every external source + deny-by-default tool gate | BUG-81 |
+| ASI01 | Agent goal hijack | ✅ | Untrusted-data framing on every external source + deny-by-default tool gate, plus a deterministic advisory injection scanner naming the source (FIXED-168) | — |
 | ASI02 | Tool misuse and exploitation | ✅ | `PolicyEngine.review()` deny-by-default, per-turn tool-call bound, schema-validated tool calls | — |
 | ASI03 | Identity and privilege abuse | ✅ | Per-turn signed machine identity, distinct acting principal, step-up on critical approvals | — |
-| ASI04 | Agentic supply chain | 🟡 | Manifest checksum + SPDX SBOM in CI; signature verification is presence-only by default | BUG-79 |
+| ASI04 | Agentic supply chain | 🟡 | Manifest checksum + SPDX SBOM in CI; HMAC/Ed25519 verification when a key is set, and the level stated on every plugin either way (FIXED-166) | No trusted-publisher allowlist |
 | ASI05 | Unexpected code execution | ✅ | Command allowlist, container isolation (no network, dropped caps, read-only rootfs), empty allowlist denies | — |
 | ASI06 | Memory and context poisoning | ✅ | Provenance with `source_passage_sha256` re-verification, governed write lifecycle, checksum integrity sweep | — |
-| ASI07 | Insecure inter-agent communication | 🟡 | Subagents run in-process under a clamped four-dimension budget; no identity binding on delegation | BUG-78 |
-| ASI08 | Cascading agent failures | 🟡 | Per-turn and per-subagent budgets, API rate limiting; no failure-rate circuit breaker | BUG-76 |
+| ASI07 | Insecure inter-agent communication | ✅ | Clamped four-dimension budget plus a spawn-scoped attestation binding each result to the spawn, verified before it becomes a turn source (FIXED-165) | — |
+| ASI08 | Cascading agent failures | ✅ | Budgets and rate limiting plus a durable consecutive-failure circuit breaker per tool and per provider, with a half-open probe (FIXED-163) | — |
 | ASI09 | Human-agent trust exploitation | ✅ | Approvals with previews, reversibility classification, tamper-evident audit trail | — |
-| ASI10 | Rogue agents | 🟡 | Anomaly detection, auto-pause and kill switch — for MCP connections only | BUG-77 |
+| ASI10 | Rogue agents | ✅ | The same baseline, rules, findings, auto-pause and kill switch for connectors, plugins, subagents, providers, tools and local execution (FIXED-164) | — |
 | — | Traceability (AGT extension) | ✅ | Hash-chained append-only event log with offset-verified replay | — |
 
-**6/10 implemented, 4/10 partial, 0 unmitigated.** Every partial has a filed BUG.
+**9/10 implemented, 1/10 partial, 0 unmitigated.** The 2026-08-10 round closed
+ASI01, ASI07, ASI08 and ASI10 as FIXED-168, FIXED-165, FIXED-163 and FIXED-164,
+and raised ASI04 to real signature verification (FIXED-166) — its remaining gap
+is a trusted-publisher allowlist, which is named rather than filed as a defect
+because nothing today claims to have one. The per-risk sections below record the
+gap each entry answered, and the control that answered it.
 
 ---
 
@@ -87,7 +92,7 @@ Behind that, hijacked intent still has to cross the tool boundary, where
 evaluates a prompt for injection before model execution — AGT's ASI01 control.
 `raiker/runtime/classifier.py` is an intent router, not a detector.
 `OWASP_GENAI_SECURITY_MAPPING.md` already states Raiker "must support
-prompt-injection scanning hooks"; it does not have them. Filed as **BUG-81**.
+prompt-injection scanning hooks". It now has them: `raiker/security/injection_scan.py` runs deterministic, named rules over every untrusted context item and raises a redacted finding attributed to the exact page or document. It is advisory by design — the refusal path stays the tool gate, and there is deliberately no probabilistic filtering, because AGT is explicit that prompt-level defence is not a control surface. Closed as **FIXED-168**.
 
 Note that AGT's own README concedes prompt-level detection is probabilistic and
 cites 100% attack success under adaptive attack. The structural controls above
@@ -163,7 +168,7 @@ presence marker only** (`raiker/plugins/verify.py:53`, returning
 proves internal consistency, not provenance: it detects accidental edit, not a
 hostile author. On a default install nothing distinguishes a signed plugin from
 an unsigned one, and the owner is not told which state they are in. Filed as
-**BUG-79**.
+**FIXED-166**: the verification level — `verified`, `present only` or `unsigned` — is now a first-class, owner-visible property of every installed plugin and of the install permission diff, with the reason code that produced it and the one step that would raise it. The default is stated, not silently hardened.
 
 **Status: 🟡 partial.** *AGT also rates itself ⚠️ partial here (no SBOM); Raiker
 has the SBOM and lacks the enforced signature.*
@@ -233,7 +238,7 @@ produced it, and `raiker/runtime/turn_sources.py:327` treats subagent output as
 a source without a verification step. In-process delegation makes spoofing a
 local-code-execution problem rather than a network one, which is why this is
 partial and not a gap — but the machine-identity substrate (ASI03) already
-exists and is not applied here. Filed as **BUG-78**.
+exists and is now applied here: a spawn-scoped Ed25519 attestation binds each result's digest to the spawn that produced it, the parent verifies it before the result becomes a turn source, and the binding is recorded on the hash-chained event. Closed as **FIXED-165**.
 
 **Status: 🟡 partial.** *AGT rates itself ✅ full (DID-based trust gate).*
 
@@ -257,7 +262,7 @@ exists and is not applied here. Filed as **BUG-78**.
 a **circuit breaker** — nothing opens after N consecutive failures. A provider
 or tool failing every call consumes its whole budget one failing call at a time,
 on every turn, with no state carried between turns to stop it. Filed as
-**BUG-76**.
+**FIXED-163**: consecutive failures per tool and per provider are counted in durable state, a threshold contains the subject with a stated reason, further calls are refused, and a half-open probe after a cooldown closes the breaker on the first success — in the containment vocabulary the MCP monitor already used, and revocable by the owner in one call.
 
 **Status: 🟡 partial.** *AGT rates itself ✅ full (circuit breaker + rate
 limiter).*
@@ -309,7 +314,7 @@ equivalent baseline, anomaly rule, auto-pause, or kill switch exists for the
 other capability families — plugins, connectors, subagents, shell and container
 execution. `raiker/runtime/interrupts.py` stops a *turn*, not a misbehaving
 component, and does not persist a containment state across turns. Filed as
-**BUG-77**.
+**FIXED-164**: the baseline, the five rules, the redacted finding and the three containment states are lifted into a capability-agnostic substrate keyed by `(principal, capability, subject)`, and connectors, plugins, subagents, providers, tools and local execution are registered against it at the one seam every governed tool call passes.
 
 **Status: 🟡 partial.** *AGT rates itself ✅ full (`AgentBehaviorMonitor` +
 quarantine + `KillSwitch`). Raiker's per-connection monitor is comparable in
@@ -343,7 +348,7 @@ Raiker's position on each:
 | AGT lesson | Raiker |
 |---|---|
 | Hardcoded deny-lists are discoverable — externalise to runtime config | 🟡 `ALLOWED_SHELL_COMMANDS` and the tier allowlists are in source. Raiker is allow-listed rather than deny-listed, which inverts the disclosure risk (publishing what is permitted leaks less than publishing what is blocked), so this is noted, not filed. |
-| Stub `verify()` functions are a recurring root cause | ✅ Verification is real (`raiker/verification/verifier.py`); the former `VerificationStub` was replaced. But `OWASP_GENAI_SECURITY_MAPPING.md` still says "Verifier is a stub" — a doc-truthfulness defect filed as **BUG-80**. |
+| Stub `verify()` functions are a recurring root cause | ✅ Verification is real (`raiker/verification/verifier.py`); the former `VerificationStub` was replaced. But `OWASP_GENAI_SECURITY_MAPPING.md` still says "Verifier is a stub" — that doc-truthfulness defect is closed as **FIXED-167**: every row of the LLM Top-10 table was re-audited against current code and now cites the file that proves it. |
 | Unbounded dictionaries cause memory DoS | 🟡 Not audited in this pass. Store connection caching was bounded by FIXED-100; per-session caches and rate-limit buckets were not reviewed for eviction policy. Stated as unverified rather than claimed. |
 | Provide a legacy lookup map when migrating taxonomies | ✅ This document adds the ASI taxonomy alongside the LLM Top 10 rather than replacing it; neither mapping is retired. |
 

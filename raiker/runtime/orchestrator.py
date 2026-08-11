@@ -11,6 +11,7 @@ from typing import Any
 
 from raiker.context.gatherer import ContextGatherer
 from raiker.context.models import ContextBundle
+from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import (
     PARKED_FOR_APPROVAL_NOTICE,
     AgentResponse,
@@ -54,6 +55,19 @@ from raiker.runtime.planner import SimplePlanner
 from raiker.runtime.retrieval import RetrievalAugmentor
 from raiker.runtime.state_machine import RuntimeStateMachine
 from raiker.runtime.turn_suspension import queued_denial_outcome
+from raiker.security.capability_registry import (
+    classify_tool,
+    telemetry_for_call,
+    untrusted_content,
+)
+from raiker.security.containment import (
+    CAPABILITY_PROVIDER,
+    CAPABILITY_TOOL,
+    CapabilityBreaker,
+    CapabilityMonitor,
+    ContainmentView,
+)
+from raiker.security.injection_scan import InjectionScanner
 from raiker.tools.broker import ToolBroker
 from raiker.tools.mcp_tools import mcp_tool_specs
 from raiker.verification.models import VerificationResult
@@ -295,6 +309,18 @@ class RuntimeOrchestrator:
         accepted = attachment_sources(items)
         if not accepted:
             return {}
+        # BUG-81 — an attached document is outside content just as surely as a
+        # fetched page is: the owner chose the file, not the words inside it.
+        by_id = {str(item.get("item_id", "")): item for item in items}
+        for item_id, draft in accepted:
+            source_item = by_id.get(item_id, {})
+            self._scan_untrusted_source(
+                envelope,
+                text=str(source_item.get("content") or ""),
+                source_kind="attachment",
+                locator=draft.locator or item_id,
+                title=draft.title,
+            )
         recorded = self._record_turn_sources(
             envelope, [draft for _item_id, draft in accepted]
         )
@@ -308,6 +334,102 @@ class RuntimeOrchestrator:
         from raiker.runtime.turn_sources import citation_prompt
 
         return citation_prompt()
+
+    def _scan_untrusted_source(
+        self,
+        envelope: PromptEnvelope,
+        *,
+        text: str | None,
+        source_kind: str,
+        locator: str,
+        title: str = "",
+    ) -> None:
+        """Raise an advisory finding when outside content looks like an attempt (BUG-81).
+
+        Detection and provenance only — the refusal path stays the tool gate.
+        The point is that a hijack attempt the gate correctly refused no longer
+        leaves the owner without a trace naming the page or document it came
+        from. A scan that fails costs the turn nothing.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None or not text:
+            return
+        with contextlib.suppress(Exception):
+            InjectionScanner(store).scan(
+                self._source_owner(envelope),
+                text=text,
+                source_kind=source_kind,
+                locator=locator,
+                title=title,
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+            )
+
+    def _verify_delegated_result(
+        self, envelope: PromptEnvelope, action: ToolAction, payload: dict[str, Any]
+    ) -> dict[str, Any] | None:
+        """Refuse a subagent result that is not bound to the spawn (BUG-78).
+
+        Delegation is the one governed hand-off that used to skip the machine
+        identity Raiker already issues and verifies everywhere else. A result now
+        arrives with an attestation binding it to its spawn and to its own
+        content; one that fails verification is refused with a stated reason
+        rather than silently consumed, and the successful binding is recorded on
+        the turn's hash-chained event so the delegation is provable afterwards.
+        """
+        if action.tool_name != "spawn_subagent" or payload.get("status") != "success":
+            return None
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return None
+        from raiker.agents.delegation import DelegationError, verify_delegation
+
+        token = payload.get("delegation_attestation")
+        try:
+            if not isinstance(token, str) or not token:
+                raise DelegationError("delegation_attestation_missing")
+            claims = verify_delegation(
+                store,
+                token,
+                expected_owner_principal_id=self._source_owner(envelope),
+                expected_session_id=envelope.session_id,
+                expected_turn_id=envelope.turn_id,
+                expected_content=str(payload.get("content", "")),
+            )
+        except DelegationError as exc:
+            self._event(
+                envelope,
+                "subagent_result_refused",
+                {
+                    "subagent_id": str(payload.get("subagent_id", "")),
+                    "name": str(payload.get("name", "")),
+                    "reason": exc.reason_code,
+                },
+            )
+            return {
+                "status": "failed",
+                "subagent_id": payload.get("subagent_id"),
+                "name": payload.get("name"),
+                "error": {
+                    "type": exc.reason_code,
+                    "message": (
+                        "The subagent's findings could not be tied to the spawn that "
+                        "produced them, so they were not used."
+                    ),
+                },
+            }
+        self._event(
+            envelope,
+            "subagent_result_verified",
+            {
+                "subagent_id": claims.subagent_id,
+                "spawn_principal_id": claims.spawn_principal_id,
+                "parent_principal_id": claims.parent_principal_id,
+                "subject": claims.subject,
+                "result_digest": claims.result_digest,
+            },
+        )
+        return None
 
     def _cite_result(
         self, envelope: PromptEnvelope, action: ToolAction, payload: dict[str, Any]
@@ -323,9 +445,19 @@ class RuntimeOrchestrator:
             return payload
         from raiker.runtime.turn_sources import source_from_tool_result
 
+        refusal = self._verify_delegated_result(envelope, action, payload)
+        if refusal is not None:
+            return refusal
         draft = source_from_tool_result(action.tool_name, dict(action.arguments), payload)
         if draft is None:
             return payload
+        self._scan_untrusted_source(
+            envelope,
+            text=untrusted_content(action.tool_name, payload),
+            source_kind=draft.kind,
+            locator=draft.locator or action.tool_name,
+            title=draft.title,
+        )
         recorded = self._record_turn_sources(envelope, [draft])
         if not recorded:
             return payload
@@ -916,10 +1048,18 @@ class RuntimeOrchestrator:
         # set only by the failure handler below, so the extra slot costs nothing
         # on a healthy turn or on a turn the provider actually decided.
         retry_armed = False
+        breaker = self._capability_breaker()
         for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
             if is_retry and not retry_armed:
                 continue
             retry_armed = False
+            contained = self._contained_provider(breaker, envelope, provider)
+            if contained is not None:
+                # A provider that already failed this turn keeps its own reason:
+                # the owner's repair is the provider's fault, not the breaker's.
+                if last_error_code == UNCLASSIFIED_PROVIDER_ERROR:
+                    last_error_code = contained
+                continue
             if is_retry:
                 self._event(
                     envelope,
@@ -965,6 +1105,9 @@ class RuntimeOrchestrator:
                     },
                 )
                 _log_provider_failure(provider, model, exc, last_error_code, streaming=False)
+                self._record_provider_outcome(
+                    breaker, envelope, provider, ok=False, reason_code=last_error_code
+                )
                 retry_armed = not is_retry and _is_transport_failure(last_error_code)
                 continue
             usage = summarize_model_usage(response.usage)
@@ -980,10 +1123,66 @@ class RuntimeOrchestrator:
                 },
             )
             self._record_usage(envelope, provider, model, usage)
+            self._record_provider_outcome(breaker, envelope, provider, ok=True)
             return response
         return ModelResponse(
             text=provider_failure_message(last_error_code), finish_reason="error"
         )
+
+    def _contained_provider(
+        self, breaker: CapabilityBreaker | None, envelope: PromptEnvelope, provider: str
+    ) -> str | None:
+        """Skip a provider the breaker has contained; return its reason code.
+
+        BUG-76 — the chain used to try a hard-down provider on every turn, once
+        per fallback entry, until the turn's budget was gone. A contained
+        provider is now stepped over with a stated reason so the chain reaches a
+        working one immediately, and the turn that runs out of providers reports
+        containment rather than a generic connection failure.
+        """
+        if breaker is None:
+            return None
+        try:
+            refusal = breaker.refusal(
+                self._source_owner(envelope), CAPABILITY_PROVIDER, provider
+            )
+        except Exception:  # noqa: BLE001 — an unreadable breaker contains nothing
+            return None
+        if refusal is None:
+            return None
+        self._event(
+            envelope,
+            "capability_call_refused",
+            {
+                "capability": refusal.capability,
+                "subject_id": refusal.subject_id,
+                "state": refusal.state,
+                "failure_streak": refusal.failure_streak,
+                "reason": refusal.reason,
+            },
+        )
+        return "provider_contained"
+
+    def _record_provider_outcome(
+        self,
+        breaker: CapabilityBreaker | None,
+        envelope: PromptEnvelope,
+        provider: str,
+        *,
+        ok: bool,
+        reason_code: str = "",
+    ) -> None:
+        if breaker is None:
+            return
+        with contextlib.suppress(Exception):
+            breaker.record(
+                self._source_owner(envelope),
+                CAPABILITY_PROVIDER,
+                provider,
+                ok=ok,
+                label=provider,
+                reason_code=reason_code,
+            )
 
     @staticmethod
     def _format_from_result(action: ToolAction, tool_result: ToolResult) -> str:
@@ -1040,10 +1239,18 @@ class RuntimeOrchestrator:
         # set only by the failure handler below, so the extra slot costs nothing
         # on a healthy turn or on a turn the provider actually decided.
         retry_armed = False
+        breaker = self._capability_breaker()
         for rank, provider, model, is_retry in _attempt_plan(self._provider_chain(envelope)):
             if is_retry and not retry_armed:
                 continue
             retry_armed = False
+            contained = self._contained_provider(breaker, envelope, provider)
+            if contained is not None:
+                # A provider that already failed this turn keeps its own reason:
+                # the owner's repair is the provider's fault, not the breaker's.
+                if last_error_code == UNCLASSIFIED_PROVIDER_ERROR:
+                    last_error_code = contained
+                continue
             if is_retry:
                 self._event(
                     envelope,
@@ -1130,6 +1337,9 @@ class RuntimeOrchestrator:
                     },
                 )
                 _log_provider_failure(provider, model, exc, last_error_code, streaming=True)
+                self._record_provider_outcome(
+                    breaker, envelope, provider, ok=False, reason_code=last_error_code
+                )
                 for lifecycle in self._drain_sink():
                     yield lifecycle
                 if output_committed:
@@ -1170,6 +1380,7 @@ class RuntimeOrchestrator:
                 },
             )
             self._record_usage(envelope, provider, model, normalised_usage)
+            self._record_provider_outcome(breaker, envelope, provider, ok=True)
             for lifecycle in self._drain_sink():
                 yield lifecycle
             yield response
@@ -1418,8 +1629,26 @@ class RuntimeOrchestrator:
         drained from the approval queue: the broker — policy, gates, hooks,
         checkpoints, the executor itself — runs on a worker thread. Governance
         is unchanged; only *where* the blocking work happens is.
+
+        BUG-76 — it is also the one place every tool call passes, so it is where
+        the circuit breaker lives. A tool that has failed its way to the
+        threshold is refused here with a stated reason instead of being retried
+        until the turn's budget runs out; the outcome of every call that does run
+        moves the breaker, so one success closes it again.
         """
-        return await asyncio.to_thread(
+        owner = self._source_owner(envelope)
+        breaker = self._capability_breaker()
+        family = classify_tool(action.tool_name, dict(action.arguments))
+        # The breaker reads and writes the store, so it goes off the event loop
+        # for the same reason the broker does (BUG-72). These are two indexed
+        # reads rather than a network call, but "cheap enough to run inline" is
+        # exactly the reasoning that put a `web_fetch` on the loop.
+        refusal = await asyncio.to_thread(
+            self._containment_refusal, breaker, owner, action, family
+        )
+        if refusal is not None:
+            return self._contained_tool_result(envelope, action, refusal)
+        result, decision = await asyncio.to_thread(
             self.tool_broker.execute,
             action,
             session_id=envelope.session_id,
@@ -1429,6 +1658,133 @@ class RuntimeOrchestrator:
             approval_mode=envelope.options.approval_mode,
             turn_capability_modes=envelope.options.capability_modes,
         )
+        if breaker is not None and result.status in {"success", "failed"}:
+            await asyncio.to_thread(
+                self._record_tool_outcome, breaker, owner, action, result, family
+            )
+        return result, decision
+
+    @staticmethod
+    def _containment_refusal(
+        breaker: CapabilityBreaker | None,
+        owner: str,
+        action: ToolAction,
+        family: tuple[str, str, str] | None,
+    ) -> ContainmentView | None:
+        """The containment refusing this call: the tool's own, or its family's."""
+        if breaker is None:
+            return None
+        subjects = [(CAPABILITY_TOOL, action.tool_name)]
+        if family is not None:
+            subjects.append((family[0], family[1]))
+        for capability, subject in subjects:
+            try:
+                refusal = breaker.refusal(owner, capability, subject)
+            except Exception:  # noqa: BLE001 — an unreadable breaker contains nothing
+                return None
+            if refusal is not None:
+                return refusal
+        return None
+
+    def _record_tool_outcome(
+        self,
+        breaker: CapabilityBreaker,
+        owner: str,
+        action: ToolAction,
+        result: ToolResult,
+        family: tuple[str, str, str] | None,
+    ) -> None:
+        """Move the breaker and hand the monitor its redacted telemetry."""
+        with contextlib.suppress(Exception):
+            breaker.record(
+                owner,
+                CAPABILITY_TOOL,
+                action.tool_name,
+                ok=result.status == "success",
+                label=action.tool_name,
+                reason_code=str((result.error or {}).get("type", "") or ""),
+            )
+        if family is not None:
+            self._observe_capability(owner, action, result)
+
+    def _observe_capability(
+        self, owner: str, action: ToolAction, result: ToolResult
+    ) -> None:
+        """Hand this call's redacted metadata to the capability monitor (BUG-77).
+
+        Off the event loop because it writes; suppressed because monitoring must
+        never be the reason a governed call fails. What reaches the monitor is
+        counts, netlocs, an operation name and classification labels — never a
+        payload.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return
+        with contextlib.suppress(Exception):
+            telemetry = telemetry_for_call(
+                owner,
+                action.tool_name,
+                dict(action.arguments),
+                status=result.status,
+                output=result.output,
+                error=result.error,
+            )
+            if telemetry is not None:
+                CapabilityMonitor(store).observe(telemetry)
+
+    def _capability_breaker(self) -> CapabilityBreaker | None:
+        """The owner's circuit breaker, or ``None`` when there is nowhere to record.
+
+        Monitoring must never be the reason a governed call fails, so a store
+        that cannot be reached simply means no breaker rather than an error.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return None
+        try:
+            return CapabilityBreaker(store)
+        except Exception:  # noqa: BLE001 — an unusable breaker contains nothing
+            return None
+
+    def _contained_tool_result(
+        self, envelope: PromptEnvelope, action: ToolAction, refusal: ContainmentView
+    ) -> tuple[ToolResult, PolicyDecision]:
+        """Refuse a contained tool in the owner's words, without running it."""
+        now = utc_now()
+        self._event(
+            envelope,
+            "capability_call_refused",
+            {
+                "capability": refusal.capability,
+                "subject_id": refusal.subject_id,
+                "state": refusal.state,
+                "failure_streak": refusal.failure_streak,
+                "reason": refusal.reason,
+            },
+        )
+        result = ToolResult(
+            action_id=action.action_id,
+            tool_name=action.tool_name,
+            status="failed",
+            output=None,
+            error={
+                "type": "capability_contained",
+                "message": refusal.reason
+                or f"'{refusal.label or refusal.subject_id}' is contained and will not run until you resume it.",
+                "containment": refusal.to_dict(),
+            },
+            started_at=now,
+            completed_at=now,
+        )
+        decision = PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="deny",
+            reasons=["capability_contained"],
+            requires_user_approval=False,
+            timestamp=now,
+        )
+        return result, decision
 
     async def _arun_agent_loop(
         self,

@@ -200,6 +200,15 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "the provider is rate limiting this account right now. Wait a moment and try again.",
     ),
     (
+        # BUG-76 — the circuit breaker, not a provider answer. Saying so is the
+        # whole point: the owner is not waiting on a flaky network, they are
+        # looking at a component Raiker has stopped calling until it recovers.
+        "provider_contained",
+        "every model this turn could use has been contained after repeated failures. "
+        "Raiker will retry one call after a short pause; resume it yourself in Settings "
+        "→ Security & sign-in if you have fixed it.",
+    ),
+    (
         "provider_timeout",
         "the provider did not answer in time. Try again, or choose a different model on Models.",
     ),

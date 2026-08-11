@@ -302,6 +302,76 @@ export interface ModelOperation {
   error_detail: string | null;
   created_at: string;
   updated_at: string;
+  /** True when a retry can really reconstruct and dispatch this job (BUG-75). */
+  retryable: boolean;
+  /** True when a terminal operation may have left an incomplete destination. */
+  partial_files_present: boolean;
+}
+
+/** What a confirmed "Delete partial files" would remove — named exactly. */
+export interface PartialFiles {
+  path: string | null;
+  exists: boolean;
+  bytes: number;
+  file_count: number;
+}
+
+/** One monitored subject's containment state (BUG-76, BUG-77). */
+export interface ContainedSubject {
+  capability: string;
+  capability_label: string;
+  subject_id: string;
+  label: string;
+  state: "active" | "paused" | "killed";
+  reason: string;
+  source: string;
+  finding_id: string | null;
+  failure_streak: number;
+  last_failure_code: string;
+  contained_at: string | null;
+  probe_after: string | null;
+  updated_at: string;
+}
+
+export interface CapabilityContainmentView {
+  subjects: ContainedSubject[];
+  contained: number;
+  capabilities: { id: string; label: string }[];
+}
+
+/** What a plugin manifest's signature actually proved (BUG-79). */
+export interface PluginSignature {
+  level: "verified" | "present_only" | "unsigned";
+  label: string;
+  reason: string;
+  method: string;
+  verified: boolean;
+  explanation: string;
+  remediation: string;
+}
+
+export interface InstalledPlugin {
+  record_id: string;
+  plugin_id: string;
+  version: string;
+  trust_level: string;
+  status: string;
+  source_url: string | null;
+  installed_at: string;
+  installed_by: string;
+  checksum_present: boolean;
+  signature: PluginSignature;
+}
+
+export interface PluginsView {
+  plugins: InstalledPlugin[];
+  signing: {
+    configured: boolean;
+    hmac_key_set: boolean;
+    publisher_key_set: boolean;
+    summary: string;
+    remediation: string;
+  };
 }
 
 export interface RuntimeInstallPlan {

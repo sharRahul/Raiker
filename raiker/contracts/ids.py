@@ -97,6 +97,9 @@ _PREFIXES = {
     # or a GitHub `owner/repo` coordinate. A reference holds no credential and
     # grants no capability.
     "repo_",
+    # Capability-agnostic behaviour monitoring (BUG-76/77): one redacted
+    # activity row per governed capability invocation.
+    "cact_",
 }
 
 

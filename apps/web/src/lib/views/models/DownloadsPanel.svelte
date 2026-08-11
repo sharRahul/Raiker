@@ -1,9 +1,15 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { api } from "../../api";
-  import type { ModelOperation } from "../../apiTypes";
+  import type { ModelOperation, PartialFiles } from "../../apiTypes";
+  import { formatBytes } from "../../composerAttachments.svelte";
   let items = $state<ModelOperation[]>([]);
   let error = $state<string | null>(null);
+  // BUG-75 — deleting bytes from disk is its own decision, so it takes its own
+  // confirmation and names the exact approved path and size first. `Clear
+  // record` stays metadata-only and is deliberately not merged into it.
+  let deleting = $state<{ operationId: string; summary: PartialFiles } | null>(null);
+  let deleteError = $state<string | null>(null);
   const terminal = (state: string) =>
     ["complete", "failed", "cancelled"].includes(state);
   async function load() {
@@ -19,17 +25,61 @@
     await load();
   }
   async function retry(id: string) {
-    await api.retryModelOperation(id);
+    try {
+      await api.retryModelOperation(id);
+      error = null;
+    } catch {
+      error = "That job could not be started again. Its original parameters were not recorded.";
+    }
+    await load();
+  }
+
+  async function askDeletePartial(id: string) {
+    deleteError = null;
+    try {
+      deleting = { operationId: id, summary: await api.partialFiles(id) };
+    } catch {
+      deleteError = "Could not read what this job left behind.";
+    }
+  }
+
+  async function confirmDeletePartial() {
+    if (deleting === null) return;
+    try {
+      await api.deletePartialFiles(deleting.operationId);
+      deleting = null;
+      deleteError = null;
+    } catch {
+      deleteError = "That path is not inside your approved model library, so nothing was deleted.";
+    }
     await load();
   }
   async function cleanup(id: string) {
     await api.cleanupModelOperation(id);
     await load();
   }
+  // A once-a-second poll is what a running download needs and what an idle
+  // panel wastes: on its own it spends half the API's per-minute rate budget,
+  // and an owner who leaves Activity open then sees unrelated reads throttled.
+  // The cadence follows the work instead — fast while something is running,
+  // slow when everything has reached a terminal state.
+  const ACTIVE_POLL_MS = 2_000;
+  const IDLE_POLL_MS = 15_000;
+  let timer: number | undefined;
+
+  function schedule() {
+    const anyRunning = items.some((item) => !terminal(item.state));
+    timer = window.setTimeout(async () => {
+      if (document.visibilityState === "visible") await load();
+      schedule();
+    }, anyRunning ? ACTIVE_POLL_MS : IDLE_POLL_MS);
+  }
+
   onMount(() => {
-    void load();
-    const interval = window.setInterval(() => void load(), 1_000);
-    return () => window.clearInterval(interval);
+    void load().then(schedule);
+    return () => {
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
   });
 </script>
 
@@ -46,6 +96,33 @@
     <button class="btn btn-ghost" type="button" onclick={load}>Refresh</button>
   </header>
   {#if error}<p class="error" role="alert">{error}</p>{/if}
+  {#if deleting !== null}
+    <div class="confirm" role="alertdialog" aria-labelledby="delete-partial-title">
+      <h3 id="delete-partial-title">Delete the files this job left behind?</h3>
+      {#if deleting.summary.exists && deleting.summary.path}
+        <p>
+          <code>{deleting.summary.path}</code> — {deleting.summary.file_count}
+          {deleting.summary.file_count === 1 ? "file" : "files"},
+          {formatBytes(deleting.summary.bytes)}. This cannot be undone, and it removes only that
+          path inside your approved model library.
+        </p>
+      {:else}
+        <p>Nothing is left on disk for this job.</p>
+      {/if}
+      {#if deleteError}<p class="error" role="alert">{deleteError}</p>{/if}
+      <div class="actions">
+        <button
+          class="btn btn-sm"
+          type="button"
+          disabled={!deleting.summary.exists}
+          onclick={() => void confirmDeletePartial()}>Delete files</button
+        >
+        <button class="btn btn-ghost btn-sm" type="button" onclick={() => (deleting = null)}
+          >Keep them</button
+        >
+      </div>
+    </div>
+  {/if}
   {#if items.length === 0}<div class="empty">
       <strong>No model activity yet</strong><span
         >Downloads, conversions, runtime installs, pulls, and deployments appear
@@ -84,10 +161,15 @@
                   class="btn btn-ghost btn-sm"
                   type="button"
                   onclick={() => void cancel(item.operation_id)}>Cancel</button
-                >{:else if item.state === "failed"}<button
+                >{:else if item.state === "failed" && item.retryable}<button
                   class="btn btn-sm"
                   type="button"
                   onclick={() => void retry(item.operation_id)}>Retry</button
+                >{/if}{#if item.partial_files_present}<button
+                  class="btn btn-ghost btn-sm"
+                  type="button"
+                  onclick={() => void askDeletePartial(item.operation_id)}
+                  >Delete partial files</button
                 >{/if}{#if terminal(item.state)}<button
                   class="btn btn-ghost btn-sm"
                   type="button"
@@ -95,6 +177,12 @@
                   >Clear record</button
                 >{/if}
             </div>
+            {#if item.state === "failed" && !item.retryable}
+              <p class="note">
+                This job cannot be started again — it has no recorded parameters to run from.
+                Start it fresh from its own page.
+              </p>
+            {/if}
           </div>
         </article>{/each}
     </div>{/if}
@@ -199,5 +287,27 @@
     display: flex;
     gap: 8px;
     margin-top: 10px;
+  }
+  .note {
+    margin: 8px 0 0;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+  }
+  .confirm {
+    display: grid;
+    gap: 8px;
+    padding: 14px 16px;
+    border: 1px solid var(--warn-border);
+    border-radius: 12px;
+    background: var(--warn-soft);
+  }
+  .confirm h3 {
+    margin: 0;
+  }
+  .confirm p {
+    margin: 0;
+  }
+  .confirm code {
+    word-break: break-all;
   }
 </style>

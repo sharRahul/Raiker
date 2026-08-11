@@ -8,7 +8,11 @@ from raiker.plugins.dependencies import (
     validate_plugin_dependencies,
 )
 from raiker.plugins.manifest import PluginManifestValidation, validate_plugin_manifest
-from raiker.plugins.verify import validate_supply_chain
+from raiker.plugins.verify import (
+    SignatureVerification,
+    signature_verification,
+    validate_supply_chain,
+)
 
 SAFE_READ_ONLY = {
     "tool:read_file",
@@ -41,6 +45,10 @@ class PluginRegistrationPlan:
     execution_enabled: bool = False
     entrypoints: dict[str, Any] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
+    # BUG-79 — what the manifest's signature actually proved. Carried on the plan
+    # so the permission diff the owner reads states it alongside the permissions,
+    # rather than leaving `verified` and `present only` looking identical.
+    signature: SignatureVerification | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -52,6 +60,7 @@ class PluginRegistrationPlan:
             "execution_enabled": self.execution_enabled,
             "entrypoints": self.entrypoints,
             "events": self.events,
+            "signature": self.signature.to_dict() if self.signature is not None else None,
         }
 
 
@@ -65,6 +74,7 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
     permissions = validation.permissions
     supply_chain_reasons = validate_supply_chain(manifest)
     reasons.extend(supply_chain_reasons)
+    signature = signature_verification(manifest)
     dependency_reasons = validate_plugin_dependencies(
         manifest, allowlist=plugin_dependency_allowlist()
     )
@@ -111,7 +121,10 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
                     "plugin_id": validation.plugin_id,
                     "status": status,
                     "execution_enabled": False,
+                    "signature_level": signature.level,
+                    "signature_reason": signature.reason,
                 },
             },
         ],
+        signature=signature,
     )

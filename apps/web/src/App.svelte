@@ -16,20 +16,13 @@
   import LoginView from "./lib/views/LoginView.svelte";
   import ChatView from "./lib/views/ChatView.svelte";
   import BuildView from "./lib/views/BuildView.svelte";
-  import SearchChatView from "./lib/views/SearchChatView.svelte";
-  import MemoryView from "./lib/views/MemoryView.svelte";
-  import ProjectsView from "./lib/views/ProjectsView.svelte";
-  import ApprovalsView from "./lib/views/ApprovalsView.svelte";
-  import TasksView from "./lib/views/TasksView.svelte";
-  import BrainView from "./lib/views/BrainView.svelte";
-  import SessionsView from "./lib/views/SessionsView.svelte";
-  import CapabilitiesView from "./lib/views/CapabilitiesView.svelte";
-  import ModelsView from "./lib/views/ModelsView.svelte";
-  import ExtensionsView from "./lib/views/ExtensionsView.svelte";
-  import ObserveView from "./lib/views/ObserveView.svelte";
-  import SettingsView from "./lib/views/SettingsView.svelte";
   import WorkbenchView from "./lib/views/WorkbenchView.svelte";
-  import ModelSetupView from "./lib/views/ModelSetupView.svelte";
+  // BUG-74 — every other destination is code-split. Workbench, Chat and Build
+  // stay eager: they are what a session opens with, and Chat and Build also stay
+  // mounted across route visits to keep their transcripts alive.
+  import LazyRoute from "./lib/components/LazyRoute.svelte";
+  import { prefetchRoutes } from "./lib/routeComponents";
+  import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
 
@@ -80,7 +73,17 @@
       document.getElementById("main")?.focus();
     };
     window.addEventListener("hashchange", handler);
-    return () => window.removeEventListener("hashchange", handler);
+    // BUG-83 — while a work surface is open, the selected model's readiness is
+    // re-confirmed in the background as its window runs down, so a long session
+    // does not spontaneously disable Send.
+    const stopRevalidation = startReadinessRevalidation();
+    // Warm the split route chunks off the critical path, so the first click on
+    // a secondary destination is as instant as it was in the single-chunk build.
+    prefetchRoutes();
+    return () => {
+      window.removeEventListener("hashchange", handler);
+      stopRevalidation();
+    };
   });
 
   // Called by the lock screen once a full control session exists.
@@ -164,7 +167,7 @@
            opens with its own lead so nothing is said twice. -->
         <ResponsivePage>
           {#if current === "model-setup"}
-            <ModelSetupView />
+            <LazyRoute route="model-setup" />
           {:else if chatVisited}
             <div hidden={current !== "new-chat"}>
               <ChatView
@@ -186,36 +189,57 @@
           {#if current === "home"}
             <WorkbenchView />
           {:else if current === "search-chat"}
-            <SearchChatView />
+            <LazyRoute route="search-chat" />
           {:else if current === "memory"}
-            <MemoryView />
+            <LazyRoute route="memory" />
           {:else if current === "approvals"}
-            <ApprovalsView sessionId={continuedSessionId} />
+            <LazyRoute
+              route="approvals"
+              props={{ sessionId: continuedSessionId }}
+            />
           {:else if current === "tasks"}
-            <TasksView
-              projectId={activeProjectId}
-              sessionId={continuedSessionId}
+            <LazyRoute
+              route="tasks"
+              props={{
+                projectId: activeProjectId,
+                sessionId: continuedSessionId,
+              }}
             />
           {:else if current === "brain"}
-            <BrainView />
+            <LazyRoute route="brain" />
           {:else if current === "sessions"}
-            <SessionsView
-              projectId={activeProjectId}
-              sessionId={continuedSessionId}
+            <LazyRoute
+              route="sessions"
+              props={{
+                projectId: activeProjectId,
+                sessionId: continuedSessionId,
+              }}
             />
           {:else if current === "projects"}
-            <ProjectsView onchanged={refreshProjects} />
+            <LazyRoute
+              route="projects"
+              props={{ onchanged: refreshProjects }}
+            />
           {:else if current === "capabilities"}
-            <CapabilitiesView {principal} />
+            <LazyRoute route="capabilities" props={{ principal }} />
           {:else if current === "models"}
-            <ModelsView tab={currentTab ?? "providers"} />
+            <LazyRoute
+              route="models"
+              props={{ tab: currentTab ?? "providers" }}
+            />
           {:else if current === "extensions"}
-            <ExtensionsView tab={currentTab ?? "connectors"} />
+            <LazyRoute
+              route="extensions"
+              props={{ tab: currentTab ?? "connectors" }}
+            />
           {:else if current === "observe"}
-            <ObserveView
-              tab={currentTab ?? "overview"}
-              sessionId={continuedSessionId}
-              projectId={activeProjectId}
+            <LazyRoute
+              route="observe"
+              props={{
+                tab: currentTab ?? "overview",
+                sessionId: continuedSessionId,
+                projectId: activeProjectId,
+              }}
             />
             <!-- Settings is the fallback route, so every guard that renders
                  something else above has to be repeated here. `model-setup` is
@@ -226,7 +250,10 @@
             current !== "new-chat" &&
             current !== "build" &&
             current !== "model-setup"}
-            <SettingsView {principal} tab={currentTab ?? "general"} />
+            <LazyRoute
+              route="settings"
+              props={{ principal, tab: currentTab ?? "general" }}
+            />
           {/if}
         </ResponsivePage>
       </main>

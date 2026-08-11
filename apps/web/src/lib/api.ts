@@ -11,8 +11,10 @@ import type {
   BrainSourceBrowse,
   BrainSourceRoot,
   BrainSourceReview,
+  CapabilityContainmentView,
   CapabilityDecisionMode,
   CapabilityGate,
+  ContainedSubject,
   ContextUsage,
   Checkpoint,
   ComposerApprovalModeSettings,
@@ -46,6 +48,8 @@ import type {
   ModelReadinessView,
   ModelSetupState,
   ModelOperation,
+  PartialFiles,
+  PluginsView,
   RuntimeInstallPlan,
   ModelLibraryView,
   HuggingFaceSearchResult,
@@ -473,6 +477,15 @@ export const api = {
       `/api/model-operations/${encodeURIComponent(operationId)}/retry`,
       {},
     ),
+  partialFiles: (operationId: string) =>
+    request<PartialFiles>(
+      `/api/model-operations/${encodeURIComponent(operationId)}/partial-files`,
+    ),
+  deletePartialFiles: (operationId: string) =>
+    postJson<PartialFiles & { ok: boolean }>(
+      `/api/model-operations/${encodeURIComponent(operationId)}/delete-partial-files?confirmed=true`,
+      {},
+    ),
   cleanupModelOperation: (operationId: string) =>
     request<{ ok: boolean }>(
       `/api/model-operations/${encodeURIComponent(operationId)}`,
@@ -669,6 +682,19 @@ export const api = {
     request<CredentialLifecycle[]>("/api/security/credentials"),
   securityFindings: () => request<McpFinding[]>("/api/security/findings"),
   securityHealth: () => request<SecurityHealth[]>("/api/security/health"),
+  capabilityContainment: () =>
+    request<CapabilityContainmentView>("/api/security/containment"),
+  setCapabilityContainment: (
+    capability: string,
+    subjectId: string,
+    action: "pause" | "kill" | "resume",
+  ) =>
+    postJson<ContainedSubject>(
+      `/api/security/containment/${encodeURIComponent(capability)}/` +
+        `${encodeURIComponent(subjectId)}/${action}`,
+      {},
+    ),
+  plugins: () => request<PluginsView>("/api/plugins"),
   verifySecurityCredential: (provider: string) =>
     postJson<CredentialLifecycle>(
       `/api/security/credentials/${encodeURIComponent(provider)}/verify`,

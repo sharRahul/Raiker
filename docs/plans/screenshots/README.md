@@ -292,3 +292,24 @@ Providers scroll. Same live workspace as the round above.
 |---|---|
 | `bug69-local-llama-slots-live.png` | The Local tab listing four managed llama.cpp slots as separate selectable models |
 | `bug69-surface-default-build-live.png` | Build holding its own model (Local GGUF 4) while Chat holds another (Local GGUF 2), after a reload and a fresh sign-in |
+
+## Known-limits round — 2026-08-10
+
+A fresh isolated workspace driven through the production build in real Chromium
+with one Anthropic credential entered only through the Models connect dialog. All
+eleven images were reviewed at rendered resolution and contain no credential
+value.
+
+| File | Records |
+|---|---|
+| `round0810-01-first-run-model-setup.png` | The first-run "Choose how to run models" sheet on a brand-new owner |
+| `round0810-02-code-split-routes-mount.png` | FIXED-161 — the last of the eleven code-split destinations mounted with content and no console error |
+| `round0810-03-plugin-signing-posture.png` | FIXED-166 — the workspace signing posture stated in words, naming both variables that would raise it, and saying installs are unaffected |
+| `round0810-04-capability-containment.png` | FIXED-164 — **Monitored capabilities** on an empty workspace: what is watched, and that nothing has failed often enough to appear yet |
+| `round0810-05-readiness-window-setting.png` | FIXED-169 — the readiness window at 30 minutes after **Save changes**, with its bounds and what still invalidates a check regardless |
+| `round0810-06-model-activity.png` | FIXED-162 — the durable operations surface, stating that failed work is never silently retried |
+| `round0810-07-anthropic-connected.png` | Anthropic connected through the UI, with the model pinned from the live catalogue |
+| `round0810-08-readiness-chip-confirmed.png` | FIXED-169 — `Ready · confirmed just now`, naming the exact model the provider reached, and **1 model ready** |
+| `round0810-09-live-turn-answered.png` | FIXED-133 — a live Haiku 4.5 turn answering with the exact requested marker, no raw reason code anywhere |
+| `round0810-10-contained-subject.png` | FIXED-163 — a connector contained after three consecutive failures, with its reason, streak, last failure code, the matching high-severity finding above it, and a **Resume** control |
+| `round0810-11-containment-resumed.png` | FIXED-163 — the same subject back to active after one press, offering **Pause** and **Stop** again |

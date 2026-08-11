@@ -172,7 +172,68 @@ describe("ExtensionsView", () => {
     stubFetch({});
     render(ExtensionsView, { props: { tab: "plugins" } });
     expect(await screen.findByText(/plugin panels are not available yet/i)).toBeInTheDocument();
+  });
+
+  it("states the signing posture rather than leaving it to be inferred", async () => {
+    // BUG-79 — on a default install a manifest signature is a presence marker,
+    // and the owner was never told which state they were in.
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [],
+        signing: {
+          configured: false,
+          hmac_key_set: false,
+          publisher_key_set: false,
+          summary:
+            "No signing key is configured, so a manifest signature is a presence marker only. " +
+            "Installs are unaffected; verification is not.",
+          remediation: "Set RAIKER_PLUGIN_SIGNING_KEY before installing.",
+        },
+      },
+    });
+    render(ExtensionsView, { props: { tab: "plugins" } });
+    expect(await screen.findByText(/presence marker only/i)).toBeInTheDocument();
+    expect(screen.getByText(/RAIKER_PLUGIN_SIGNING_KEY/)).toBeInTheDocument();
     expect(screen.getByText(/no plugin code runs in this browser/i)).toBeInTheDocument();
+  });
+
+  it("marks a present-only plugin as visibly distinct from a verified one", async () => {
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [
+          {
+            record_id: "plr_1",
+            plugin_id: "example.plugin",
+            version: "1.0.0",
+            trust_level: "local_dev",
+            status: "installed",
+            source_url: null,
+            installed_at: "now",
+            installed_by: "cli",
+            checksum_present: true,
+            signature: {
+              level: "present_only",
+              label: "Present only",
+              reason: "signature_present",
+              method: "none",
+              verified: false,
+              explanation: "The manifest carries a signature but no signing key is configured.",
+              remediation: "Set RAIKER_PLUGIN_SIGNING_KEY and reinstall.",
+            },
+          },
+        ],
+        signing: {
+          configured: false,
+          hmac_key_set: false,
+          publisher_key_set: false,
+          summary: "No signing key is configured.",
+          remediation: "",
+        },
+      },
+    });
+    render(ExtensionsView, { props: { tab: "plugins" } });
+    expect(await screen.findByText("example.plugin")).toBeInTheDocument();
+    expect(screen.getByTitle("signature_present")).toHaveTextContent("Present only");
   });
 
   it("states plainly that channels are not available yet", async () => {

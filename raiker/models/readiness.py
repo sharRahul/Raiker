@@ -113,6 +113,48 @@ def _utc_now() -> datetime:
     return datetime.now(UTC)
 
 
+# BUG-83 — the observation window used to be a hard-coded five minutes with no
+# way to move it and nothing to re-check in the background, so a long editing
+# session traded a stale-ready window for a spurious-stale interruption. The TTL
+# is now the owner's, bounded so neither end can be set to something dishonest:
+# under a minute is a check on every keystroke, over two hours is not a check.
+DEFAULT_READINESS_TTL_MINUTES = 5
+MIN_READINESS_TTL_MINUTES = 1
+MAX_READINESS_TTL_MINUTES = 120
+
+
+def readiness_ttl_minutes(store: Any, owner_principal_id: str) -> int:
+    """The owner's readiness TTL in minutes, clamped, defaulting when unset.
+
+    Read from the same per-account settings blob the UI writes
+    (``settings.models.readiness_ttl_minutes``). A missing, malformed or
+    out-of-range value resolves to the default rather than failing: a preference
+    that cannot be read must never be the reason a turn cannot start.
+    """
+    try:
+        row = store.get_user_settings(owner_principal_id)
+    except Exception:  # noqa: BLE001 — an unreadable preference is the default
+        return DEFAULT_READINESS_TTL_MINUTES
+    if not row:
+        return DEFAULT_READINESS_TTL_MINUTES
+    import json
+
+    try:
+        settings = json.loads(row["settings_json"])
+        # The settings blob carries both shapes — the flat dotted keys the
+        # settings sections write and the nested objects a few older readers
+        # use — so both are accepted rather than one silently winning.
+        raw = settings.get("models.readiness_ttl_minutes")
+        if raw is None:
+            raw = (settings.get("models") or {}).get("readiness_ttl_minutes")
+        if raw is None:
+            return DEFAULT_READINESS_TTL_MINUTES
+        value = int(raw)
+    except (KeyError, TypeError, ValueError, AttributeError):
+        return DEFAULT_READINESS_TTL_MINUTES
+    return max(MIN_READINESS_TTL_MINUTES, min(MAX_READINESS_TTL_MINUTES, value))
+
+
 def _provider_label(provider: str) -> str:
     return {
         "ollama": "Ollama",
@@ -432,12 +474,26 @@ class ModelReadinessService:
         *,
         probe: ModelProbe,
         clock: Callable[[], datetime] = _utc_now,
-        ttl: timedelta = timedelta(minutes=5),
+        ttl: timedelta | None = None,
     ) -> None:
         self.store = store
         self.probe = probe
         self.clock = clock
-        self.ttl = ttl
+        # ``None`` means "ask the owner's settings at check time" (BUG-83). An
+        # explicit value stays fixed, which is what tests and one-off callers
+        # want; the running product takes the owner's.
+        self._fixed_ttl = ttl
+
+    def ttl_for(self, owner_principal_id: str) -> timedelta:
+        """This owner's observation window."""
+        if self._fixed_ttl is not None:
+            return self._fixed_ttl
+        return timedelta(minutes=readiness_ttl_minutes(self.store, owner_principal_id))
+
+    @property
+    def ttl(self) -> timedelta:
+        """The default window, for callers that have no owner in hand."""
+        return self._fixed_ttl or timedelta(minutes=DEFAULT_READINESS_TTL_MINUTES)
 
     @staticmethod
     def key(
@@ -480,7 +536,7 @@ class ModelReadinessService:
             observed,
             key=key,
             checked_at=now.isoformat(),
-            expires_at=(now + self.ttl).isoformat(),
+            expires_at=(now + self.ttl_for(owner_principal_id)).isoformat(),
         )
         self.store.save_model_readiness(readiness)
         return readiness

@@ -3,10 +3,148 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+from dataclasses import dataclass
 from typing import Any
 
 PLUGIN_SIGNING_KEY_ENV = "RAIKER_PLUGIN_SIGNING_KEY"
 PLUGIN_ED25519_PUBLIC_KEY_ENV = "RAIKER_PLUGIN_ED25519_PUBLIC_KEY"
+
+# The three states a manifest signature can actually be in (BUG-79). They are
+# named because the default install is `present_only`, and an owner who is never
+# told that cannot tell a genuinely signed plugin from one carrying the literal
+# string "signature".
+LEVEL_VERIFIED = "verified"
+LEVEL_PRESENT_ONLY = "present_only"
+LEVEL_UNSIGNED = "unsigned"
+
+_LEVEL_LABELS = {
+    LEVEL_VERIFIED: "Verified",
+    LEVEL_PRESENT_ONLY: "Present only",
+    LEVEL_UNSIGNED: "Unsigned",
+}
+
+_LEVEL_EXPLANATIONS = {
+    LEVEL_VERIFIED: (
+        "The manifest signature was checked against a key you configured, so the "
+        "author is who the manifest says."
+    ),
+    LEVEL_PRESENT_ONLY: (
+        "The manifest carries a signature but no signing key is configured on this "
+        "machine, so nothing was checked against an author. The checksum still "
+        "proves the manifest is internally consistent — it catches an accidental "
+        "edit, not a hostile one."
+    ),
+    LEVEL_UNSIGNED: "The manifest carries no signature at all.",
+}
+
+
+@dataclass(frozen=True)
+class SignatureVerification:
+    """What a manifest's signature actually proved, and why.
+
+    Raiker's default install has no owner signing key, which is a deliberate
+    local-development baseline rather than an oversight — but an unstated one was
+    the defect. This is the statement: the level, the reason code that produced
+    it, the method that ran, and the one step that would raise it.
+    """
+
+    level: str
+    reason: str
+    method: str
+    ok: bool
+
+    @property
+    def label(self) -> str:
+        return _LEVEL_LABELS.get(self.level, self.level)
+
+    @property
+    def explanation(self) -> str:
+        return _LEVEL_EXPLANATIONS.get(self.level, "")
+
+    @property
+    def remediation(self) -> str:
+        if self.level == LEVEL_VERIFIED:
+            return ""
+        return (
+            f"Set {PLUGIN_SIGNING_KEY_ENV} to your signing key (or "
+            f"{PLUGIN_ED25519_PUBLIC_KEY_ENV} to a publisher's public key) and reinstall "
+            "to have signatures verified rather than merely present."
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "level": self.level,
+            "label": self.label,
+            "reason": self.reason,
+            "method": self.method,
+            "verified": self.ok and self.level == LEVEL_VERIFIED,
+            "explanation": self.explanation,
+            "remediation": self.remediation,
+        }
+
+
+def signature_verification(manifest: dict[str, Any]) -> SignatureVerification:
+    """Classify what this manifest's signature proved — never silently harden.
+
+    A `present_only` plugin still installs exactly as it did before: the posture
+    at the top of `docs/plans/TO_BE_FIXED.md` is to tell the owner what they have
+    and give them the one-step path to a stronger state, not to block an install
+    that works today.
+    """
+    supply_chain = manifest.get("supply_chain") or {}
+    asymmetric_ok, asymmetric_reason = verify_plugin_asymmetric_signature(manifest)
+    if plugin_ed25519_public_key():
+        # An owner-trusted publisher key is the strongest statement available and
+        # is authoritative when configured — including when it fails.
+        return SignatureVerification(
+            level=LEVEL_VERIFIED if asymmetric_ok else LEVEL_UNSIGNED,
+            reason=asymmetric_reason,
+            method="ed25519",
+            ok=asymmetric_ok,
+        )
+    signature = supply_chain.get("signature")
+    if not signature:
+        return SignatureVerification(
+            level=LEVEL_UNSIGNED,
+            reason="no_signature_in_manifest",
+            method="none",
+            ok=False,
+        )
+    ok, reason = verify_plugin_signature(manifest)
+    if reason == "signature_present":
+        return SignatureVerification(
+            level=LEVEL_PRESENT_ONLY, reason=reason, method="none", ok=True
+        )
+    return SignatureVerification(
+        level=LEVEL_VERIFIED if ok else LEVEL_UNSIGNED,
+        reason=reason,
+        method="hmac",
+        ok=ok,
+    )
+
+
+def signing_posture() -> dict[str, Any]:
+    """The workspace's own signing posture, independent of any one manifest."""
+    hmac_key = bool(plugin_signing_key())
+    publisher_key = bool(plugin_ed25519_public_key())
+    configured = hmac_key or publisher_key
+    return {
+        "configured": configured,
+        "hmac_key_set": hmac_key,
+        "publisher_key_set": publisher_key,
+        "summary": (
+            "Manifest signatures are verified against a key you configured."
+            if configured
+            else "No signing key is configured, so a manifest signature is a presence "
+            "marker only. Installs are unaffected; verification is not."
+        ),
+        "remediation": (
+            ""
+            if configured
+            else f"Set {PLUGIN_SIGNING_KEY_ENV} (your own key) or "
+            f"{PLUGIN_ED25519_PUBLIC_KEY_ENV} (a publisher's public key) before installing."
+        ),
+    }
 
 
 def plugin_signing_key() -> str:

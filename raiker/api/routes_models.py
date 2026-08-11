@@ -10,6 +10,7 @@ from typing import Any
 
 import httpx
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, status
+from pydantic import ValidationError
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
@@ -27,7 +28,11 @@ from raiker.api.sessions import ApiSession
 from raiker.models.conversion import ConversionRefused, ModelConversionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
-from raiker.models.local_operations import ModelOperationRequest, ModelOperationService
+from raiker.models.local_operations import (
+    ModelOperation,
+    ModelOperationRequest,
+    ModelOperationService,
+)
 from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime, slot_for_profile
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
@@ -272,6 +277,105 @@ def start_model_operation(
     )
 
 
+def _dispatch_operation(
+    background: BackgroundTasks,
+    request: Request,
+    owner: str,
+    operation: ModelOperation,
+) -> None:
+    """Reconstruct and schedule the worker one re-queued operation needs.
+
+    Dispatch is by *kind*, from the typed payload persisted when the operation
+    started. Nothing secret was stored: a Hugging Face retry re-reads the token
+    from the vault, and a pull or a conversion never held one.
+    """
+    workspace = Path(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    payload = operation.payload()
+    operation_id = operation.operation_id
+    if operation.kind == "pull":
+        background.add_task(
+            _pull_ollama_model, workspace, owner, operation_id, str(payload.get("model", ""))
+        )
+        return
+    if operation.kind == "convert":
+        try:
+            body = ModelConversionRequestBody(
+                source=str(payload.get("source", "")),
+                output=str(payload.get("output", "")),
+                revision=str(payload.get("revision", "")),
+                quantization=payload.get("quantization"),  # type: ignore[arg-type]
+                confirmed=True,
+            )
+        except ValidationError as exc:
+            raise HTTPException(
+                status_code=422, detail={"reason_code": "operation_payload_invalid"}
+            ) from exc
+        background.add_task(_run_model_conversion, workspace, owner, operation_id, body)
+        return
+    if operation.kind == "deploy":
+        background.add_task(
+            _run_local_deployment,
+            workspace,
+            owner,
+            operation_id,
+            Path(str(payload.get("model_path", ""))),
+            tuple(Path(path) for path in _library_service(request).roots(owner)),
+            request.app.state.managed_llama_runtime,  # type: ignore[attr-defined]
+        )
+        return
+    if operation.kind == "download":
+        background.add_task(
+            _run_hugging_face_download,
+            workspace,
+            owner,
+            operation_id,
+            dict(payload),
+            _hugging_face_token(request, owner),
+            _hugging_face_service(request),
+        )
+
+
+def _run_hugging_face_download(
+    workspace: Path,
+    owner: str,
+    operation_id: str,
+    payload: dict[str, Any],
+    token: str | None,
+    service: HuggingFaceService,
+) -> None:
+    """Re-run one Hugging Face snapshot download from its persisted payload."""
+    operations = ModelOperationService(SQLiteStore(workspace))
+    try:
+        operations.running(owner, operation_id, phase="downloading")
+        repo_id = str(payload.get("repo_id", ""))
+        revision = str(payload.get("revision", ""))
+        files = tuple(part for part in str(payload.get("variant", "")).split(",") if part)
+        destination = Path(str(payload.get("destination", "")))
+        if not repo_id or not revision or not files or not destination.name:
+            raise ValueError("hugging_face_retry_payload_incomplete")
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
+        variant = next(
+            (
+                item
+                for item in service.variants(repo_id, revision=revision, token=token)
+                if item.revision == revision and item.files == files and item.complete
+            ),
+            None,
+        )
+        if variant is None:
+            raise ValueError("hugging_face_selection_changed")
+        service.download(repo_id, variant, destination, token=token)
+        ModelLibraryService(SQLiteStore(workspace)).rescan(owner)
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
+        operations.complete(owner, operation_id)
+    except Exception:  # noqa: BLE001 - durable operation exposes only a bounded code
+        operations.fail(owner, operation_id, code="hugging_face_download_failed")
+
+
 def _operation_action(
     action: str,
     operation_id: str,
@@ -284,8 +388,6 @@ def _operation_action(
     try:
         if action == "cancel":
             return service.cancel(session.principal_id, operation_id).to_dict()
-        if action == "retry":
-            return service.retry(session.principal_id, operation_id).to_dict()
         return {"ok": service.cleanup(session.principal_id, operation_id)}
     except KeyError as exc:
         raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
@@ -300,9 +402,85 @@ def cancel_model_operation(
 
 @router.post("/api/model-operations/{operation_id}/retry")
 def retry_model_operation(
+    operation_id: str,
+    background: BackgroundTasks,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Re-queue a failed operation **and dispatch its worker again** (BUG-75).
+
+    Retry used to reset the durable row to `queued` and stop there, so an
+    operation that had failed sat honestly recorded and permanently idle. The
+    typed payload persisted at start is what makes the real dispatch possible:
+    the same job, reconstructed by kind, with the credential re-read from the
+    vault rather than remembered.
+    """
+    session, principal = auth_data
+    _require_human(principal)
+    service = _operation_service(request)
+    try:
+        operation = service.require(session.principal_id, operation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
+    try:
+        requeued = service.retry(session.principal_id, operation_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"reason_code": str(exc)}) from exc
+    _dispatch_operation(background, request, session.principal_id, operation)
+    return requeued.to_dict()
+
+
+@router.get("/api/model-operations/{operation_id}/partial-files")
+def preview_partial_files(
     operation_id: str, request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
 ) -> dict[str, Any]:
-    return _operation_action("retry", operation_id, request, auth_data)
+    """What a confirmed cleanup would delete: the exact approved path and bytes."""
+    session, principal = auth_data
+    _require_human(principal)
+    try:
+        return _operation_service(request).partial_files(session.principal_id, operation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
+
+
+@router.post("/api/model-operations/{operation_id}/delete-partial-files")
+def delete_partial_files(
+    operation_id: str,
+    request: Request,
+    confirmed: bool = False,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Delete the incomplete destination an abandoned operation left behind.
+
+    Separate from **Clear record**, which stays metadata-only: removing bytes
+    from disk is its own decision, so it takes its own confirmation and names the
+    exact path and size first. The path must resolve inside one of the owner's
+    approved model-library roots — anything else is refused rather than deleted.
+    """
+    session, principal = auth_data
+    _require_human(principal)
+    if not confirmed:
+        raise HTTPException(status_code=409, detail={"reason_code": "confirmation_required"})
+    service = _operation_service(request)
+    try:
+        summary = service.partial_files(session.principal_id, operation_id)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail={"reason_code": str(exc.args[0])}) from exc
+    path = summary.get("path")
+    if not path or not summary.get("exists"):
+        return {"ok": False, "reason_code": "no_partial_files", **summary}
+    target = Path(str(path)).resolve()
+    roots = [Path(root).resolve() for root in _library_service(request).roots(session.principal_id)]
+    if not any(target == root or root in target.parents for root in roots):
+        raise HTTPException(
+            status_code=422, detail={"reason_code": "destination_not_in_model_library"}
+        )
+    if target.is_dir():
+        shutil.rmtree(target)
+    else:
+        target.unlink()
+    _library_service(request).rescan(session.principal_id)
+    return {"ok": True, **summary}
 
 
 @router.delete("/api/model-operations/{operation_id}")
@@ -373,6 +551,9 @@ def _run_local_deployment(
     started_slot: str | None = None
     try:
         operations.running(owner, operation_id, phase="starting_llama_cpp")
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
         executable = shutil.which("llama-server")
         if executable is None:
             raise RuntimeError("llama_server_missing")
@@ -398,6 +579,11 @@ def _run_local_deployment(
                         break
                 except (httpx.HTTPError, ValueError):
                     pass
+                # The readiness wait is the long part of a deploy, so it is where
+                # Cancel has to land. `RuntimeError` unwinds into the handler
+                # below, which stops the slot this deployment started.
+                if operations.cancel_requested(owner, operation_id):
+                    raise RuntimeError("local_model_deploy_cancelled")
                 time.sleep(0.2)
             else:
                 raise RuntimeError("llama_server_not_ready")
@@ -409,13 +595,16 @@ def _run_local_deployment(
             reason_code="local_runtime_deployed",
         )
         operations.complete(owner, operation_id)
-    except Exception:  # noqa: BLE001 - durable operation exposes only a bounded code
+    except Exception as exc:  # noqa: BLE001 - durable operation exposes only a bounded code
         # Only this deployment's own slot is stopped. Another model already
         # serving a surface must not be torn down by an unrelated failure, which
         # is exactly what a bare `stop()` would now do.
         if started_slot is not None:
             runtime.stop(started_slot)
-        operations.fail(owner, operation_id, code="local_model_deploy_failed")
+        if str(exc) == "local_model_deploy_cancelled":
+            operations.cancelled(owner, operation_id)
+        else:
+            operations.fail(owner, operation_id, code="local_model_deploy_failed")
 
 
 @router.post("/api/model-library/{model_id:path}/deploy")
@@ -444,6 +633,7 @@ def deploy_local_model(
             ModelOperationRequest(
                 kind="deploy", target=model.model_id, confirmed=True, destination=model.primary_path
             ),
+            payload={"model_id": model.model_id, "model_path": model.primary_path},
         )
         .to_dict()
     )
@@ -641,6 +831,12 @@ def download_hugging_face_model(
             source_url=f"https://huggingface.co/{body.repo_id}",
             destination=str(destination),
         ),
+        payload={
+            "repo_id": body.repo_id,
+            "revision": body.revision,
+            "variant": ",".join(body.files or []),
+            "destination": str(destination),
+        },
     )
     operations = _operation_service(request)
     try:
@@ -713,7 +909,16 @@ def _run_model_conversion(
         preview = service.preview(
             Path(body.source), Path(body.output), body.revision, body.quantization
         )
+        # Conversion is one bounded subprocess, so it has exactly two points at
+        # which it can co-operate: before it commits the CPU, and after. Both are
+        # checked rather than neither.
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
         service.convert(preview)
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
         operations.complete(owner, operation_id)
         ModelLibraryService(SQLiteStore(workspace)).rescan(owner)
     except Exception:
@@ -745,6 +950,13 @@ def start_model_conversion(
             confirmed=True,
             destination=str(output),
         ),
+        payload={
+            "source": str(source),
+            "output": str(output),
+            "revision": body.revision,
+            "quantization": body.quantization,
+            "destination": str(output),
+        },
     )
     background.add_task(
         _run_model_conversion,
@@ -776,6 +988,14 @@ async def _pull_ollama_model(workspace: Path, owner: str, operation_id: str, mod
                 payload = json.loads(line)
                 if payload.get("error"):
                     raise RuntimeError("ollama_pull_rejected")
+                # BUG-75 — cancellation is cooperative, so every worker has to
+                # co-operate. Checking on each streamed progress line is the
+                # tightest bound this job offers, so Cancel reaches a terminal
+                # state in about one chunk rather than at the end of the pull.
+                if operations.cancel_requested(owner, operation_id):
+                    await response.aclose()
+                    operations.cancelled(owner, operation_id)
+                    return
                 completed = int(payload.get("completed") or 0)
                 raw_total = payload.get("total")
                 total = int(raw_total) if raw_total is not None else None
@@ -813,6 +1033,7 @@ def pull_ollama_model(
     operation = _operation_service(request).start(
         session.principal_id,
         ModelOperationRequest(kind="pull", target=model, confirmed=True),
+        payload={"model": model},
     )
     background.add_task(
         _pull_ollama_model,

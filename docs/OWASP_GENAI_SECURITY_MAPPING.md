@@ -61,29 +61,42 @@ This table tracks each OWASP LLM Top-10 (2025) risk against what is **documented
 **actually enforced in code today**. Honesty here is a security control in itself: a documented
 mitigation is not a real one. Status: ✅ implemented · 🟡 partial · 🔒 disabled-by-default · 📘 doc only.
 
-| ID | Risk | Doc | Code | Highest-value control to add |
+Every row cites the file that proves its rating. A row without a citation is a
+claim, and this table does not make claims.
+
+| ID | Risk | Doc | Code | What is enforced today, and what is not |
 |---|---|---|---|---|
-| LLM01 | Prompt injection | yes | 🟡 | Tag every context item with source + trust; never grant instruction authority to file/tool/channel content. |
-| LLM02 | Sensitive information disclosure | yes | 🟡 | `redact_secret_like_text()` exists for approval previews; apply one redaction pass to **all** persisted text and model egress; add egress classifier. |
-| LLM03 | Supply chain | yes | 🔒 | Manifest validation real; add signing/checksums + trusted-publisher allowlist + dependency policy. |
-| LLM04 | Data & model poisoning | yes | 🔒 | Memory writes disabled; enforce provenance + contradiction checks when enabled. |
-| LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools / missing args are rejected (`model_tool_call_rejected`) before execution. |
-| LLM06 | Excessive agency | yes | ✅ | Broker + approvals + per-turn max-tool-calls fail-safe (`PromptOptions.max_tool_calls`, enforced in the orchestrator loop; the default is effectively unbounded — `DEFAULT_MAX_TOOL_CALLS = 10000` — so a turn ends when the model finishes or the provider's context/token budget runs out; the counter only stops runaway loops, and callers may pass a lower explicit bound). Add time/token budgets next. |
-| LLM07 | System prompt leakage | yes | 📘 | Separate system/security prompt from user-visible context; implement with first real provider. |
-| LLM08 | Vector & embedding weaknesses | yes | 🔒 | Vector writes disabled; apply sensitivity/provenance filters on retrieval when enabled. |
-| LLM09 | Misinformation | yes | 🟡 | Verifier is a stub (`raiker/runtime/verifier.py`); implement verification + citation/provenance gating. |
-| LLM10 | Unbounded consumption | yes | 🟡 | Per-turn tool-call fail-safe enforced (default is deliberately effectively unbounded; the provider's context/token budget is the practical per-turn bound). Add token/time budgets and rate limits next. |
+| LLM01 | Prompt injection | yes | ✅ | Structural, not prompt-level: external content is framed as untrusted data and never as instruction (`raiker/runtime/web_access.py`, `raiker/runtime/retrieval.py`, `raiker/runtime/attachments.py`), each context item carries source and trust (`raiker/context/models.py`), and hijacked intent still has to cross a deny-by-default tool gate (`raiker/policy/engine.py`). The scanning hook this document requires now exists as an **advisory** signal: `raiker/security/injection_scan.py` raises a redacted finding naming the exact page or document, and never blocks — the refusal path stays the gate. |
+| LLM02 | Sensitive information disclosure | yes | ✅ | One redaction pass covers the API surface and the event log by *shape*, not keyword (`raiker/api/redaction.py`, `raiker/context/redaction.py`); egress answers per-capability allowlists (`RAIKER_WEB_EGRESS_ALLOWLIST`, `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`); local-only profiles refuse hosted routing (`raiker/models/endpoint_policy.py`). Remaining gap: no classifier ranks *content* sensitivity before model egress — the boundary is the allowlist, not the payload. |
+| LLM03 | Supply chain | yes | 🟡 | Manifest validation, permission diff and checksums are real, and both HMAC and Ed25519 signature verification are implemented (`raiker/plugins/verify.py`). The default install has no owner key, so a signature is verified as **present-only** rather than authentic — which is now a first-class, owner-visible property of every plugin rather than a silent default (FIXED-166). A trusted-publisher allowlist is still absent. |
+| LLM04 | Data & model poisoning | yes | 🔒 | The governed memory lifecycle is real — proposal, provenance, confidence, contradiction review and forgetting (`raiker/memory/`) — and credential-shaped text is refused before the owner is asked (`raiker/memory/policy.py`). The `memory_write` / `memory_forget` gates ship **off**, so this is disabled-by-default rather than unimplemented. |
+| LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools and missing arguments are rejected (`model_tool_call_rejected`) before execution. |
+| LLM06 | Excessive agency | yes | ✅ | Broker plus approvals plus the per-turn max-tool-calls fail-safe (`PromptOptions.max_tool_calls`, enforced in `raiker/runtime/orchestrator.py`; the default `DEFAULT_MAX_TOOL_CALLS = 10000` is deliberately effectively unbounded, so a turn ends when the model finishes or the provider's context budget does). Subagents cannot widen the parent's authority (`raiker/agents/orchestration.py`), and their results are now identity-bound to the spawn that produced them (`raiker/agents/delegation.py`). |
+| LLM07 | System prompt leakage | yes | ✅ | The system prompt is a separate message role assembled in the orchestrator (`raiker/runtime/orchestrator.py`, `_SYSTEM_PROMPT`), never part of user-visible context, and no route exports it. |
+| LLM08 | Vector & embedding weaknesses | yes | 🔒 | Semantic writes answer a sensitivity policy before anything is embedded (`raiker/memory/policy.py`, `semantic_write_policy_decision`), and retrieval carries provenance (`raiker/runtime/source_provenance.py`). The capability ships off, so this is disabled-by-default. |
+| LLM09 | Misinformation | yes | ✅ | The verifier is real and deterministic (`raiker/verification/verifier.py`; `raiker/runtime/verifier.py` is now only a re-export), and answers carry citations resolved to the passage used (`raiker/runtime/turn_sources.py`). |
+| LLM10 | Unbounded consumption | yes | ✅ | Budgets plus, since FIXED-163, a real circuit breaker: consecutive failures per tool and per provider are counted in durable state, a threshold contains the subject with a stated reason, and a half-open probe closes it again (`raiker/security/containment.py`). API rate limiting is enforced separately (`raiker/api/security.py`). |
 
 **Implemented strengths today:** workspace path-safety (symlink/traversal rejection), policy-gated
-tool execution with approvals, append-only event log, and disabled-by-default for high-risk
-capabilities. **Four controls (LLM01, LLM05, LLM06, LLM10)** are small, local orchestrator/broker
-changes that would convert documented-only mitigations into enforced ones — do these first.
+tool execution with approvals, an append-only hash-chained event log, per-turn signed machine
+identity, capability-agnostic anomaly detection and containment, and disabled-by-default for
+high-risk capabilities. **The remaining gaps are named in the rows above** — a content sensitivity
+classifier before egress (LLM02) and a trusted-publisher allowlist (LLM03) — rather than left to be
+inferred from a status glyph.
 
 ---
 
 ## Prompt Injection Requirements
 
 Raiker must label every context source by trust level, never treat retrieved content as system instruction, block external content from granting permissions, preserve source provenance in context bundles, support prompt-injection scanning hooks, and verify model tool calls against policy.
+
+The scanning hook is `raiker/security/injection_scan.py`. It is **detection and
+provenance, not prevention**: deterministic, explainable rules run over each
+untrusted context item as it enters the turn, and a hit raises a redacted
+`security_findings` row attributed to the source document or URL. It never
+refuses a turn — the refusal path is the tool gate — and it deliberately uses no
+probabilistic model-based filtering, because a classifier that is right most of
+the time would turn an advisory signal into a false assurance.
 
 ---
 

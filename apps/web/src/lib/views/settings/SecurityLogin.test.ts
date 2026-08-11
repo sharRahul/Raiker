@@ -24,6 +24,31 @@ function stub(routes: Record<string, (init?: RequestInit) => unknown>) {
 }
 
 describe("Security & Login settings", () => {
+  it("shows encrypted storage separately from key-memory locking", async () => {
+    stub({
+      "GET /api/settings": () => ({ settings: {}, status: { vault: "configured_valid", mfa_enrolled: false, username: "alice" } }),
+      "GET /api/security/credentials": () => [],
+      "GET /api/security/findings": () => [],
+      "GET /api/security/health": () => [],
+      "GET /api/health": () => ({
+        status: "ok",
+        store: "ok",
+        cipher_memory_security: "off",
+        memory_security_mode: "auto",
+        memory_security_probe: "failed",
+        memory_security_reason: "auto_probe_host_crash",
+        sqlcipher_version: "4.12.0",
+      }),
+    });
+
+    render(SecurityLogin);
+
+    expect(await screen.findByText("Encrypted")).toBeInTheDocument();
+    expect(screen.getByText("Database encryption")).toBeInTheDocument();
+    expect(screen.getByText("Degraded on this host")).toBeInTheDocument();
+    expect(screen.getByText(/4\.12\.0/)).toBeInTheDocument();
+  });
+
   it("shows the fail-closed pill when the vault is missing", async () => {
     stub({
       "GET /api/settings": () => ({

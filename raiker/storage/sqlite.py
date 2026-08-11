@@ -312,6 +312,7 @@ from raiker.storage.migrations import (
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
 )
+from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 
 # SQLCipher performs its key derivation when a connection is opened. API routes
 # construct short-lived SQLiteStore objects, so opening in ``connect`` made a
@@ -438,6 +439,8 @@ def cached_connection_count() -> int:
 _MEMORY_SECURITY_ENV = "RAIKER_SQLCIPHER_MEMORY_SECURITY"
 _MEMORY_SECURITY_LOCK = threading.Lock()
 _MEMORY_SECURITY: tuple[bool, str] | None = None
+_MEMORY_SECURITY_PROBE: MemorySecurityProbeResult | None = None
+_MEMORY_SECURITY_MODE = "auto"
 
 
 def memlock_allowance_bytes() -> int | None:
@@ -460,7 +463,9 @@ def memlock_allowance_bytes() -> int | None:
     return int(soft)
 
 
-def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
+def resolve_memory_security(
+    workspace_root: str | Path | None = None, *, refresh: bool = False
+) -> tuple[bool, str]:
     """``(enabled, reason)`` for ``PRAGMA cipher_memory_security``.
 
     Off unless the owner asks for it, for the two reasons in the note above:
@@ -469,17 +474,28 @@ def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
     slow work. Resolved once per process and reported verbatim on the health
     endpoint. ``refresh`` re-resolves it, which only tests need.
     """
-    global _MEMORY_SECURITY
+    global _MEMORY_SECURITY, _MEMORY_SECURITY_MODE, _MEMORY_SECURITY_PROBE
     with _MEMORY_SECURITY_LOCK:
         if _MEMORY_SECURITY is not None and not refresh:
             return _MEMORY_SECURITY
         declared = os.environ.get(_MEMORY_SECURITY_ENV, "").strip().casefold()
-        if declared in {"on", "1", "true", "yes"}:
-            resolved = (True, "requested_on")
-        elif declared in {"off", "0", "false", "no"}:
+        if declared in {"off", "0", "false", "no"}:
+            _MEMORY_SECURITY_MODE = "off"
+            _MEMORY_SECURITY_PROBE = None
             resolved = (False, "requested_off")
         else:
-            resolved = (False, "default_off_cost_and_lockout_risk")
+            _MEMORY_SECURITY_MODE = "on" if declared in {"on", "1", "true", "yes"} else "auto"
+            probe_root = Path(workspace_root or Path.cwd())
+            _MEMORY_SECURITY_PROBE = probe_memory_security(probe_root)
+            if _MEMORY_SECURITY_PROBE.supported:
+                resolved = (True, "requested_on" if _MEMORY_SECURITY_MODE == "on" else "auto_probe_supported")
+            elif _MEMORY_SECURITY_MODE == "on":
+                resolved = (
+                    False,
+                    f"required_but_unavailable_{_MEMORY_SECURITY_PROBE.reason_code}",
+                )
+            else:
+                resolved = (False, f"auto_probe_{_MEMORY_SECURITY_PROBE.reason_code}")
         _MEMORY_SECURITY = resolved
         if not resolved[0]:
             # Recorded, not silent: running without locked key pages is a real
@@ -493,9 +509,10 @@ def resolve_memory_security(*, refresh: bool = False) -> tuple[bool, str]:
         return resolved
 
 
-def memory_security_posture() -> dict[str, Any]:
+def memory_security_posture(workspace_root: str | Path | None = None) -> dict[str, Any]:
     """What the health endpoint and the security posture page both read."""
-    enabled, reason = resolve_memory_security()
+    enabled, reason = resolve_memory_security(workspace_root)
+    probe = _MEMORY_SECURITY_PROBE
     return {
         "cipher_memory_security": "on" if enabled else "off",
         # Deliberately not "reason": the store's own reason travels beside this
@@ -503,6 +520,12 @@ def memory_security_posture() -> dict[str, Any]:
         # posture overwrite the failure — the kind of quiet contradiction this
         # bug is about.
         "memory_security_reason": reason,
+        "memory_security_mode": _MEMORY_SECURITY_MODE,
+        "memory_security_probe": (
+            "not_run" if probe is None else "supported" if probe.supported else "failed"
+        ),
+        "memory_security_checked_at": probe.checked_at if probe is not None else None,
+        "sqlcipher_version": probe.sqlcipher_version if probe is not None else None,
         # -1 means unlimited; null means the platform would not say.
         "memlock_allowance_bytes": memlock_allowance_bytes(),
         "connection_ceiling": connection_cache_ceiling(),
@@ -516,7 +539,7 @@ def store_health(workspace_root: str | Path) -> dict[str, Any]:
     so the lock screen could report the runtime operational in the same breath
     as refusing every sign-in. This is the one probe both statements read.
     """
-    posture = memory_security_posture()
+    posture = memory_security_posture(workspace_root)
     try:
         SQLiteStore(workspace_root).connect().execute("SELECT 1")
     except StoreUnavailableError as exc:
@@ -648,7 +671,13 @@ class SQLiteStore:
         """Open one keyed connection under the resolved memory-security policy."""
         connection = sqlite3.connect(str(self.db_path), timeout=5.0, check_same_thread=False)
         try:
-            memory_security, _reason = resolve_memory_security()
+            memory_security, reason = resolve_memory_security(self.paths.workspace_root)
+            if reason.startswith("required_but_unavailable_"):
+                raise StoreUnavailableError(
+                    "store_memory_lock_unavailable",
+                    "This machine could not prove that SQLCipher can lock key-bearing "
+                    "memory pages while RAIKER_SQLCIPHER_MEMORY_SECURITY=on is required.",
+                )
             # Set before the key: the pragma governs how the key material about
             # to be derived is held, so afterwards would be too late.
             connection.execute(
@@ -713,7 +742,7 @@ class SQLiteStore:
                 stale.close()
         with contextlib.suppress(MemoryError, sqlite3.Error):
             return self._open_keyed()
-        enabled, _reason = resolve_memory_security()
+        enabled, _reason = resolve_memory_security(self.paths.workspace_root)
         detail = (
             "This machine would not lock the memory pages SQLCipher holds the "
             "workspace key in. Memory security is on because "

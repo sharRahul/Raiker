@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { api, auth, getToken, setToken, ApiError } from "../../api";
+  import { api, auth, getToken, health as runtimeHealth, setToken, ApiError } from "../../api";
+  import type { HealthView } from "../../api";
   import type {
     CapabilityContainmentView,
     ContainedSubject,
@@ -54,6 +55,7 @@
   let credentials = $state<CredentialLifecycle[]>([]);
   let findings = $state<McpFinding[]>([]);
   let health = $state<SecurityHealth[]>([]);
+  let storageHealth = $state<HealthView | null>(null);
   // BUG-77 — containment used to exist for monitored MCP connections and nothing
   // else. This is the same three facts for every capability family: what is
   // contained, why, and the one control that clears it.
@@ -143,6 +145,8 @@
     } catch {
       // Security posture stays unavailable rather than fabricating a healthy state.
     }
+    try { storageHealth = await runtimeHealth(); }
+    catch { storageHealth = null; }
   }
 
   async function scanSecurity() {
@@ -298,6 +302,36 @@
       {notice.text}
     </p>
   {/if}
+
+  <div class="field storage-posture" data-testid="storage-posture">
+    <div class="field-head"><h3>Database encryption</h3></div>
+    {#if storageHealth === null}
+      <p class="sub">Storage posture is unavailable right now.</p>
+    {:else}
+      <div class="posture-grid">
+        <div>
+          <span class="posture-label">Database</span>
+          <strong>{storageHealth.store === "ok" ? "Encrypted" : "Unavailable"}</strong>
+        </div>
+        <div>
+          <span class="posture-label">Key memory</span>
+          <strong>
+            {storageHealth.cipher_memory_security === "on"
+              ? "Locked in memory"
+              : storageHealth.memory_security_mode === "off"
+                ? "Disabled by user"
+                : "Degraded on this host"}
+          </strong>
+        </div>
+      </div>
+      <p class="sub posture-detail">
+        The workspace remains encrypted at rest. Memory locking is enabled only after an isolated
+        host check succeeds.{storageHealth.sqlcipher_version
+          ? ` SQLCipher ${storageHealth.sqlcipher_version}.`
+          : ""}
+      </p>
+    {/if}
+  </div>
 
   <!-- Vault Key -->
   <div class="field">
@@ -572,6 +606,31 @@
     align-items: center;
     justify-content: space-between;
     gap: var(--space-3);
+  }
+  .posture-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .posture-grid > div {
+    display: grid;
+    gap: 0.25rem;
+    padding: var(--space-3);
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-md);
+    background: var(--bg-2);
+  }
+  .posture-label {
+    color: var(--text-2);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .posture-detail { margin-bottom: 0; }
+  @media (max-width: 560px) {
+    .posture-grid { grid-template-columns: 1fr; }
   }
   label {
     display: flex;

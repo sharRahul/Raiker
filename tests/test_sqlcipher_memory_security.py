@@ -10,6 +10,7 @@ its own status strip called the runtime operational.
 
 from __future__ import annotations
 
+import subprocess
 import threading
 from pathlib import Path
 from typing import Any
@@ -17,6 +18,7 @@ from typing import Any
 import pytest
 
 import raiker.storage.sqlite as sqlite_module
+from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 from raiker.storage.sqlite import (
     SQLiteStore,
     StoreUnavailableError,
@@ -28,6 +30,16 @@ from raiker.storage.sqlite import (
     resolve_memory_security,
     store_health,
 )
+
+
+def _supported_probe() -> MemorySecurityProbeResult:
+    return MemorySecurityProbeResult(True, "supported", "4.12.0", "2026-08-11T00:00:00Z")
+
+
+@pytest.fixture(autouse=True)
+def _default_memory_security_off(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    resolve_memory_security(refresh=True)
 
 
 def test_the_ceiling_is_an_absolute_connection_count_not_a_thread_multiple(
@@ -83,7 +95,7 @@ def test_a_threadpool_stays_under_the_declared_ceiling(
     close_cached_connections()
 
 
-def test_memory_security_is_off_unless_the_owner_asks_for_it(
+def test_memory_security_auto_enables_only_after_a_passing_probe(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The decision is stated, and the default is the cheap, openable one.
@@ -94,22 +106,20 @@ def test_memory_security_is_off_unless_the_owner_asks_for_it(
     lock by default, says which posture it is on, and honours an owner who asks
     for the other one.
     """
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
-    assert resolve_memory_security(refresh=True) == (
-        False,
-        "default_off_cost_and_lockout_risk",
-    )
+    assert resolve_memory_security(refresh=True) == (True, "auto_probe_supported")
 
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
     assert resolve_memory_security(refresh=True) == (True, "requested_on")
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     assert resolve_memory_security(refresh=True) == (False, "requested_off")
 
-    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     resolve_memory_security(refresh=True)
     posture = memory_security_posture()
     assert posture["cipher_memory_security"] == "off"
-    assert posture["memory_security_reason"] == "default_off_cost_and_lockout_risk"
+    assert posture["memory_security_reason"] == "requested_off"
     # The allowance is reported so an owner deciding whether to turn it on can
     # see what this platform would actually give them. -1 is unlimited; None is
     # a platform that will not say.
@@ -117,7 +127,7 @@ def test_memory_security_is_off_unless_the_owner_asks_for_it(
     resolve_memory_security(refresh=True)
 
 
-def test_the_pragma_is_set_explicitly_and_defaults_to_off(
+def test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Set on every connection, so the posture never depends on the build.
@@ -127,19 +137,13 @@ def test_the_pragma_is_set_explicitly_and_defaults_to_off(
     not a property a test should rest on.
     """
     close_cached_connections()
-    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     resolve_memory_security(refresh=True)
     store = SQLiteStore(tmp_path)
     assert str(store.connect().execute("PRAGMA cipher_memory_security").fetchone()[0]) == "0"
 
     close_cached_connections()
-    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
-    resolve_memory_security(refresh=True)
-    locked = SQLiteStore(tmp_path)
-    assert str(locked.connect().execute("PRAGMA cipher_memory_security").fetchone()[0]) == "1"
-
-    close_cached_connections()
-    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     resolve_memory_security(refresh=True)
 
 
@@ -149,6 +153,7 @@ def test_a_refused_lock_fails_closed_by_name_when_the_owner_demanded_it(
     """``=on`` is the owner's decision, so it is honoured and named, not eroded."""
     close_cached_connections()
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     assert resolve_memory_security(refresh=True) == (True, "requested_on")
 
     def refusing_open(_self: SQLiteStore) -> Any:
@@ -174,6 +179,7 @@ def test_store_health_reports_the_unopenable_store_rather_than_ok(
     assert store_health(tmp_path)["store"] == "ok"
 
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     resolve_memory_security(refresh=True)
 
     def refusing_open(_self: SQLiteStore) -> Any:
@@ -229,3 +235,67 @@ def test_the_limit_still_bounds_one_threads_workspaces(
         assert SQLiteStore(workspace).table_names()
         assert cached_connection_count() <= connection_cache_limit()
     close_cached_connections()
+
+
+def test_probe_maps_windows_stack_overflow_without_crashing_parent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(args, -1073741571, "", ""),
+    )
+
+    result = probe_memory_security(tmp_path)
+
+    assert result.supported is False
+    assert result.reason_code == "host_crash"
+
+
+def test_probe_maps_timeout_without_exposing_child_output(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def timed_out(*args: Any, **kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired(args[0], timeout=1, output="probe-key", stderr="secret")
+
+    monkeypatch.setattr(subprocess, "run", timed_out)
+
+    result = probe_memory_security(tmp_path, timeout_seconds=1)
+
+    assert result.supported is False
+    assert result.reason_code == "probe_timeout"
+    assert "probe-key" not in repr(result)
+    assert "secret" not in repr(result)
+
+
+def test_auto_and_required_modes_use_the_isolated_probe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    failed = MemorySecurityProbeResult(False, "host_crash", "4.12.0", "2026-08-11T00:00:00Z")
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: failed)
+
+    monkeypatch.delenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", raising=False)
+    assert resolve_memory_security(tmp_path, refresh=True) == (
+        False,
+        "auto_probe_host_crash",
+    )
+    posture = memory_security_posture(tmp_path)
+    assert posture["memory_security_mode"] == "auto"
+    assert posture["memory_security_probe"] == "failed"
+
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
+    assert resolve_memory_security(tmp_path, refresh=True) == (
+        False,
+        "required_but_unavailable_host_crash",
+    )
+
+
+def test_explicit_off_bypasses_the_probe(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    monkeypatch.setattr(
+        sqlite_module,
+        "probe_memory_security",
+        lambda root: pytest.fail("explicit off must not launch the probe"),
+    )
+
+    assert resolve_memory_security(tmp_path, refresh=True) == (False, "requested_off")

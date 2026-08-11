@@ -213,6 +213,11 @@ export type HealthView = {
   reason?: string;
   detail?: string;
   cipher_memory_security?: string;
+  memory_security_mode?: "auto" | "on" | "off";
+  memory_security_probe?: "supported" | "failed" | "not_run";
+  memory_security_reason?: string;
+  memory_security_checked_at?: string | null;
+  sqlcipher_version?: string | null;
 };
 
 /**

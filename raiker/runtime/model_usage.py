@@ -16,6 +16,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
@@ -31,7 +32,9 @@ class UsageTotals:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    requests: int = 0
     turns: int = 0
+    compactions: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -53,6 +56,7 @@ class ModelUsageRow:
     provider: str
     model: str
     totals: UsageTotals
+    profile_id: str | None = None
 
 
 class ModelUsageLedger:
@@ -69,12 +73,17 @@ class ModelUsageLedger:
         provider: str,
         model: str,
         usage: Mapping[str, Any] | None,
+        profile_id: str | None = None,
+        request_kind: str = "turn",
+        recorded_at: str | None = None,
     ) -> bool:
         """Append one turn's counts. Returns False when there is nothing to record.
 
         A provider that reported no usage writes no row at all, so a missing
         count never becomes a zero that later reads would present as "free".
         """
+        if request_kind not in {"turn", "compaction", "readiness"}:
+            raise ValueError("invalid_model_usage_request_kind")
         if not owner_principal_id or not session_id or not isinstance(usage, Mapping):
             return False
 
@@ -97,8 +106,8 @@ class ModelUsageLedger:
                 INSERT INTO model_usage_ledger (
                   usage_id, owner_principal_id, session_id, provider, model,
                   input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
-                  recorded_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                  recorded_at, profile_id, request_kind
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     new_id("usage_"),
@@ -110,7 +119,9 @@ class ModelUsageLedger:
                     output_tokens,
                     cache_read,
                     cache_write,
-                    utc_now(),
+                    _utc_timestamp(recorded_at),
+                    profile_id,
+                    request_kind,
                 ),
             )
         return True
@@ -120,27 +131,33 @@ class ModelUsageLedger:
             cursor = connection.execute(sql, params)
             return [
                 ModelUsageRow(
-                    provider=str(row[0]),
-                    model=str(row[1]),
+                    profile_id=str(row[0]) if row[0] is not None else None,
+                    provider=str(row[1]),
+                    model=str(row[2]),
                     totals=UsageTotals(
-                        input_tokens=int(row[2] or 0),
-                        output_tokens=int(row[3] or 0),
-                        cache_read_tokens=int(row[4] or 0),
-                        cache_write_tokens=int(row[5] or 0),
-                        turns=int(row[6] or 0),
+                        input_tokens=int(row[3] or 0),
+                        output_tokens=int(row[4] or 0),
+                        cache_read_tokens=int(row[5] or 0),
+                        cache_write_tokens=int(row[6] or 0),
+                        requests=int(row[7] or 0),
+                        turns=int(row[8] or 0),
+                        compactions=int(row[9] or 0),
                     ),
                 )
                 for row in cursor.fetchall()
             ]
 
     _AGGREGATE = """
-        SELECT provider, model,
+        SELECT profile_id, provider, model,
                SUM(input_tokens), SUM(output_tokens),
-               SUM(cache_read_tokens), SUM(cache_write_tokens), COUNT(*)
+               SUM(cache_read_tokens), SUM(cache_write_tokens),
+               COUNT(*),
+               SUM(CASE WHEN request_kind = 'turn' THEN 1 ELSE 0 END),
+               SUM(CASE WHEN request_kind = 'compaction' THEN 1 ELSE 0 END)
         FROM model_usage_ledger
         WHERE owner_principal_id = ?{extra}
-        GROUP BY provider, model
-        ORDER BY provider, model
+        GROUP BY profile_id, provider, model
+        ORDER BY provider, model, profile_id
     """
 
     def session_usage(self, owner_principal_id: str, session_id: str) -> list[ModelUsageRow]:
@@ -150,9 +167,84 @@ class ModelUsageLedger:
             (owner_principal_id, session_id),
         )
 
-    def provider_usage(self, owner_principal_id: str) -> list[ModelUsageRow]:
-        """All-time totals for this owner, split by provider and model."""
-        return self._rows(self._AGGREGATE.format(extra=""), (owner_principal_id,))
+    def provider_usage(
+        self,
+        owner_principal_id: str,
+        *,
+        profile_id: str | None = None,
+        started_at: str | None = None,
+        ended_at: str | None = None,
+    ) -> list[ModelUsageRow]:
+        """Bounded totals for this owner, split by profile, provider, and model."""
+        clauses: list[str] = []
+        params: list[Any] = [owner_principal_id]
+        if profile_id is not None:
+            clauses.append("profile_id = ?")
+            params.append(profile_id)
+        if started_at is not None:
+            clauses.append("recorded_at >= ?")
+            params.append(_utc_timestamp(started_at))
+        if ended_at is not None:
+            clauses.append("recorded_at <= ?")
+            params.append(_utc_timestamp(ended_at))
+        extra = "".join(f" AND {clause}" for clause in clauses)
+        return self._rows(self._AGGREGATE.format(extra=extra), tuple(params))
+
+    def weekly_usage(
+        self, owner_principal_id: str, profile_id: str, *, now: datetime
+    ) -> UsageTotals:
+        """Raiker-observed usage in the inclusive rolling seven-day window."""
+        if now.tzinfo is None:
+            raise ValueError("weekly_usage_now_must_be_timezone_aware")
+        end = now.astimezone(UTC).replace(microsecond=0)
+        start = end - timedelta(days=7)
+        return sum_totals(
+            self.provider_usage(
+                owner_principal_id,
+                profile_id=profile_id,
+                started_at=start.isoformat(),
+                ended_at=end.isoformat(),
+            )
+        )
+
+    def set_weekly_token_budget(
+        self, owner_principal_id: str, profile_id: str, tokens: int | None
+    ) -> None:
+        """Set or clear an owner-defined advisory token budget."""
+        if not owner_principal_id or not profile_id:
+            raise ValueError("weekly_token_budget_scope_required")
+        if tokens is not None and (
+            isinstance(tokens, bool) or not isinstance(tokens, int) or tokens <= 0
+        ):
+            raise ValueError("weekly_token_budget_must_be_positive")
+        with self.store.connect() as connection:
+            if tokens is None:
+                connection.execute(
+                    "DELETE FROM model_weekly_budgets "
+                    "WHERE owner_principal_id = ? AND profile_id = ?",
+                    (owner_principal_id, profile_id),
+                )
+                return
+            connection.execute(
+                """
+                INSERT INTO model_weekly_budgets (
+                  owner_principal_id, profile_id, token_budget, updated_at
+                ) VALUES (?, ?, ?, ?)
+                ON CONFLICT(owner_principal_id, profile_id) DO UPDATE SET
+                  token_budget = excluded.token_budget,
+                  updated_at = excluded.updated_at
+                """,
+                (owner_principal_id, profile_id, tokens, utc_now()),
+            )
+
+    def weekly_token_budget(self, owner_principal_id: str, profile_id: str) -> int | None:
+        with self.store.connect() as connection:
+            row = connection.execute(
+                "SELECT token_budget FROM model_weekly_budgets "
+                "WHERE owner_principal_id = ? AND profile_id = ?",
+                (owner_principal_id, profile_id),
+            ).fetchone()
+        return int(row[0]) if row is not None else None
 
 
 def sum_totals(rows: list[ModelUsageRow]) -> UsageTotals:
@@ -161,5 +253,19 @@ def sum_totals(rows: list[ModelUsageRow]) -> UsageTotals:
         output_tokens=sum(row.totals.output_tokens for row in rows),
         cache_read_tokens=sum(row.totals.cache_read_tokens for row in rows),
         cache_write_tokens=sum(row.totals.cache_write_tokens for row in rows),
+        requests=sum(row.totals.requests for row in rows),
         turns=sum(row.totals.turns for row in rows),
+        compactions=sum(row.totals.compactions for row in rows),
     )
+
+
+def _utc_timestamp(value: str | None) -> str:
+    if value is None:
+        return utc_now()
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("model_usage_recorded_at_invalid") from exc
+    if parsed.tzinfo is None:
+        raise ValueError("model_usage_recorded_at_timezone_required")
+    return parsed.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")

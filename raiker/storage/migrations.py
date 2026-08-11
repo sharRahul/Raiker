@@ -2490,6 +2490,27 @@ SELECT principal_id, 'complete', 'ready', NULL, NULL, NULL, created_at, updated_
 FROM account_credentials;
 """
 
+MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID = "RAIKER-2041-model-usage-rolling-window"
+MODEL_USAGE_ROLLING_WINDOW_SQL = """
+-- Attribute every new request to the configured profile that served it and
+-- distinguish owner turns from supporting model work such as compaction.
+-- Existing rows remain readable as ordinary turns with an unknown profile.
+ALTER TABLE model_usage_ledger ADD COLUMN profile_id TEXT;
+ALTER TABLE model_usage_ledger ADD COLUMN request_kind TEXT NOT NULL DEFAULT 'turn';
+CREATE INDEX IF NOT EXISTS idx_model_usage_profile_window
+  ON model_usage_ledger(owner_principal_id, profile_id, recorded_at);
+
+-- An owner budget is advisory Raiker control, not a claim about a provider's
+-- subscription quota. Removing a budget removes the row.
+CREATE TABLE IF NOT EXISTS model_weekly_budgets (
+  owner_principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  token_budget INTEGER NOT NULL CHECK (token_budget > 0),
+  updated_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, profile_id)
+);
+"""
+
 
 SETUP_STATE_MIGRATION_ID = "RAIKER-1049-full-setup-state"
 SETUP_STATE_SQL = """

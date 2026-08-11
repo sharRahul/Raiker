@@ -7,6 +7,7 @@ never as zero. "$0.00" must always mean "this was free".
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -213,6 +214,102 @@ class TestLedger:
         assert {row.model for row in rows} == {"haiku", "opus"}
         assert sum_totals(rows).input_tokens == 300
         assert sum_totals(rows).turns == 3
+
+    def test_weekly_usage_is_profile_scoped_and_excludes_older_rows(
+        self, store: SQLiteStore
+    ) -> None:
+        ledger = ModelUsageLedger(store)
+        common = {
+            "owner_principal_id": "p1",
+            "session_id": "s1",
+            "provider": "openai",
+            "model": "gpt-5",
+        }
+        assert ledger.record(
+            **common,
+            profile_id="openai-hosted",
+            recorded_at="2026-08-10T12:00:00+00:00",
+            usage={"input_tokens": 80},
+        )
+        assert ledger.record(
+            **common,
+            profile_id="openai-hosted",
+            recorded_at="2026-08-04T12:00:00+00:00",
+            usage={"input_tokens": 20},
+        )
+        assert ledger.record(
+            **common,
+            profile_id="openai-hosted",
+            recorded_at="2026-08-03T12:00:00+00:00",
+            usage={"input_tokens": 900},
+        )
+        assert ledger.record(
+            **common,
+            profile_id="openai-compatible",
+            recorded_at="2026-08-10T12:00:00+00:00",
+            usage={"input_tokens": 40},
+        )
+
+        totals = ledger.weekly_usage(
+            "p1",
+            "openai-hosted",
+            now=datetime(2026, 8, 11, 12, tzinfo=UTC),
+        )
+        assert totals.input_tokens == 100
+        assert totals.requests == 2
+        assert totals.turns == 2
+        assert totals.compactions == 0
+
+    def test_compaction_counts_as_usage_but_not_as_a_user_turn(self, store: SQLiteStore) -> None:
+        ledger = ModelUsageLedger(store)
+        common = {
+            "owner_principal_id": "p1",
+            "session_id": "s1",
+            "provider": "anthropic",
+            "model": "claude-sonnet-4-5",
+            "profile_id": "anthropic-hosted",
+            "recorded_at": "2026-08-10T12:00:00+00:00",
+        }
+        ledger.record(**common, request_kind="turn", usage={"input_tokens": 30})
+        ledger.record(**common, request_kind="compaction", usage={"input_tokens": 70})
+        totals = ledger.weekly_usage(
+            "p1",
+            "anthropic-hosted",
+            now=datetime(2026, 8, 11, 12, tzinfo=UTC),
+        )
+        assert totals.input_tokens == 100
+        assert totals.requests == 2
+        assert totals.turns == 1
+        assert totals.compactions == 1
+
+    def test_weekly_budget_can_be_set_updated_cleared_and_is_owner_scoped(
+        self, store: SQLiteStore
+    ) -> None:
+        ledger = ModelUsageLedger(store)
+        ledger.set_weekly_token_budget("p1", "openai-hosted", 100_000)
+        assert ledger.weekly_token_budget("p1", "openai-hosted") == 100_000
+        assert ledger.weekly_token_budget("p2", "openai-hosted") is None
+
+        ledger.set_weekly_token_budget("p1", "openai-hosted", 250_000)
+        assert ledger.weekly_token_budget("p1", "openai-hosted") == 250_000
+
+        ledger.set_weekly_token_budget("p1", "openai-hosted", None)
+        assert ledger.weekly_token_budget("p1", "openai-hosted") is None
+
+        with pytest.raises(ValueError, match="weekly_token_budget_must_be_positive"):
+            ledger.set_weekly_token_budget("p1", "openai-hosted", 0)
+
+    def test_rejects_unknown_request_kinds(self, store: SQLiteStore) -> None:
+        with pytest.raises(ValueError, match="invalid_model_usage_request_kind"):
+            ModelUsageLedger(store).record(
+                owner_principal_id="p1",
+                session_id="s1",
+                provider="openai",
+                model="gpt-5",
+                profile_id="openai-hosted",
+                request_kind="background",
+                usage={"input_tokens": 1},
+            )
 
 
 class TestMixedModelPricing:

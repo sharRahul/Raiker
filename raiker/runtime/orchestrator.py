@@ -718,12 +718,18 @@ class RuntimeOrchestrator:
         if store is None or not principal_id:
             return
         try:
+            try:
+                profile_id = self.model_router.registry.resolve(provider, model).profile_id
+            except Exception:  # noqa: BLE001 - legacy/custom rows may not resolve
+                profile_id = None
             ModelUsageLedger(store).record(
                 owner_principal_id=str(principal_id),
                 session_id=envelope.session_id,
                 provider=provider,
                 model=model,
                 usage=usage,
+                profile_id=profile_id,
+                request_kind="turn",
             )
         except Exception:  # noqa: BLE001 - accounting never breaks a completed turn
             return

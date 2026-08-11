@@ -176,6 +176,8 @@ from raiker.storage.migrations import (
     MODEL_SETUP_STATE_SQL,
     MODEL_USAGE_LEDGER_MIGRATION_ID,
     MODEL_USAGE_LEDGER_SQL,
+    MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID,
+    MODEL_USAGE_ROLLING_WINDOW_SQL,
     OWNED_CONTEXT_DATA_MIGRATION_ID,
     OWNED_CONTEXT_DATA_SQL,
     OWNED_MEMORY_METADATA_MIGRATION_ID,
@@ -1170,6 +1172,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 MODEL_USAGE_LEDGER_MIGRATION_ID, MODEL_USAGE_LEDGER_SQL, connection
+            )
+            self._apply_migration(
+                MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID,
+                MODEL_USAGE_ROLLING_WINDOW_SQL,
+                connection,
             )
             self._apply_migration(
                 SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection

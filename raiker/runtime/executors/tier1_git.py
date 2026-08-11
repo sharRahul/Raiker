@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.tools.git import (
@@ -12,6 +13,15 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
+
+
+def _legacy_credential() -> bool:
+    """True when this host still carries the token in its environment."""
+    import os
+
+    from raiker.runtime.git_credential import LEGACY_TOKEN_ENV
+
+    return bool(os.environ.get(LEGACY_TOKEN_ENV, "").strip())
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -190,6 +200,38 @@ class GitPushExecutor:
             self._workspace_root, selected_repository_subpath(self._store, scope)
         )
 
+    def _lend(
+        self, principal: Principal, action: GovernedAction
+    ) -> tuple[str | None, Callable[[], Any]] | ExecutionResult:
+        """The credential for this push, and the callable that ends the loan.
+
+        Returns an :class:`ExecutionResult` instead when the owner has not
+        approved one — a refusal the model can read and act on, rather than an
+        exception.
+        """
+        from raiker.runtime.git_credential import (
+            RUNTIME_TOKEN_VAR,
+            GitCredentialBroker,
+            GitCredentialError,
+        )
+
+        if self._store is None:
+            # No store means no grant can exist to check, so the only honest
+            # path is the legacy environment credential.
+            return None, lambda: None
+        broker = GitCredentialBroker(self._store, principal.principal_id)
+        loan = broker.lend(session_id=action.arguments.get("session_id"))
+        try:
+            environment = loan.__enter__()
+        except GitCredentialError as exc:
+            if exc.reason == "git_grant_required" and _legacy_credential():
+                return None, lambda: None
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=exc.reason, summary=exc.message, artifacts={},
+            )
+        return environment.get(RUNTIME_TOKEN_VAR), lambda: loan.__exit__(None, None, None)
+
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         if action.action_type not in ("git_push", "git_push_execution"):
             return ExecutionResult(
@@ -201,11 +243,24 @@ class GitPushExecutor:
             root = self._repo_root(principal)
             remote = action.arguments.get("remote")
             branch = action.arguments.get("branch")
-            result = push_branch(
-                root,
-                str(remote).strip() if remote else None,
-                str(branch).strip() if branch else None,
-            )
+            remote_name = str(remote).strip() if remote else None
+            branch_name = str(branch).strip() if branch else None
+            # RAIKER-2022 — the credential is lent for this one command, under a
+            # grant the owner made. `lend()` refuses without one, registers the
+            # exact value with the redactor for the length of the call, and
+            # consumes a one-shot grant on the way out.
+            #
+            # A host still configured the old way (RAIKER_GITHUB_TOKEN in the
+            # environment, no grant row) keeps working: the push falls back to
+            # it. This adds a control without taking a working deployment away.
+            granted = self._lend(principal, action)
+            if isinstance(granted, ExecutionResult):
+                return granted
+            lent, release = granted
+            try:
+                result = push_branch(root, remote_name, branch_name, credential=lent)
+            finally:
+                release()
         except Exception as exc:  # noqa: BLE001 — every failure is reported, never raised
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,

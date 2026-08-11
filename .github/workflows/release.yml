@@ -14,12 +14,6 @@
 # without identities: it produces artifacts named `-unsigned`, records
 # `signing.applied = false` inside them so the installed product says so, and
 # refuses to publish. Nothing in between.
-#
-# One deviation from this repository's convention, stated rather than hidden:
-# `actions/upload-artifact` and `actions/download-artifact` are pinned to their
-# major tag instead of a commit SHA, because the commit digests could not be
-# resolved from the environment this file was written in. Pin them to SHAs the
-# way every other action here is pinned (tracked as BUG-49).
 name: Release
 
 on:
@@ -131,8 +125,8 @@ jobs:
         run: npm run build
         working-directory: apps/web
       - name: Upload
-        # Tag-pinned rather than SHA-pinned; see the note at the top of this file.
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: web-assets
           path: apps/web/dist
@@ -161,11 +155,11 @@ jobs:
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
-      - name: Install package
-        run: python -m pip install -e .
+      - name: Install package and desktop build tool
+        run: python -m pip install -e ".[dev]"
       - name: Download web assets
-        # Tag-pinned rather than SHA-pinned; see the note at the top of this file.
-        uses: actions/download-artifact@v4
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: web-assets
           path: web-dist
@@ -195,8 +189,13 @@ jobs:
       - name: Install appimagetool
         if: matrix.os == 'linux'
         run: |
+          case "${{ matrix.arch }}" in
+            x86_64) appimage_arch=x86_64 ;;
+            arm64) appimage_arch=aarch64 ;;
+            *) echo "refused: unsupported AppImage architecture ${{ matrix.arch }}" >&2; exit 1 ;;
+          esac
           curl -fsSL -o "$RUNNER_TEMP/appimagetool" \
-            https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage
+            "https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-${appimage_arch}.AppImage"
           chmod +x "$RUNNER_TEMP/appimagetool"
           echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
 
@@ -372,7 +371,8 @@ jobs:
           done
 
       - name: Upload this target's artifacts
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-${{ matrix.target }}
           path: |
@@ -392,6 +392,9 @@ jobs:
   channel:
     name: Channel index
     needs: [plan, build]
+    # Unsigned manual runs end after their per-target artifacts are uploaded.
+    # A channel is an updater trust root, so it exists only for signed builds.
+    if: inputs.signing == 'require'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -403,7 +406,8 @@ jobs:
       - name: Install package
         run: python -m pip install -e .
       - name: Collect every target's artifacts
-        uses: actions/download-artifact@v4
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           pattern: release-*
           path: collected
@@ -455,7 +459,8 @@ jobs:
           PY
           echo "pin with: raiker-app update --channel-url <url> --channel-key $(cat dist/release-public-key.txt)"
       - name: Upload the signed channel
-        uses: actions/upload-artifact@v4
+        # actions/upload-artifact v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: release-channel
           path: dist
@@ -472,7 +477,8 @@ jobs:
       contents: write
     steps:
       - name: Collect the signed channel
-        uses: actions/download-artifact@v4
+        # actions/download-artifact v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: release-channel
           path: dist
@@ -483,8 +489,8 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           cat > notes.md <<'NOTES'
-          Signed release artifacts for macOS (Apple Silicon and Intel),
-          Windows 10/11, and Linux.
+          Signed release artifacts for macOS (Apple Silicon), Windows 10/11 on
+          x86-64 (AMD or Intel), and Linux on x86-64 (AMD or Intel) and ARM64.
 
           Each artifact carries an `installation.json` recording the target it was
           built for and that platform signing was applied, and is covered by an

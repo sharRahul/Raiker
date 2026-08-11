@@ -48,6 +48,20 @@ class InstallerError(RuntimeError):
     """A refusal with a stable reason code."""
 
 
+_LINUX_ARCHITECTURES = {
+    "x86_64": ("amd64", "x86_64"),
+    "arm64": ("arm64", "aarch64"),
+}
+
+
+def _linux_architectures(record: dict[str, object]) -> tuple[str, str]:
+    arch = str(record.get("arch", ""))
+    try:
+        return _LINUX_ARCHITECTURES[arch]
+    except KeyError:
+        raise InstallerError(f"installer_architecture_unknown:{arch}") from None
+
+
 def _run(command: list[str], *, cwd: Path | None = None) -> None:
     print(f"$ {' '.join(command)}", flush=True)
     result = subprocess.run(command, cwd=cwd, check=False)  # noqa: S603 - fixed argv
@@ -90,6 +104,7 @@ def build_deb(payload: Path, record: dict[str, object], out_dir: Path) -> Path:
     if shutil.which("dpkg-deb") is None:
         raise InstallerError("installer_tool_missing:dpkg-deb")
     version = str(record["version"])
+    debian_arch, _ = _linux_architectures(record)
     prefix = "/opt/raiker"
     staging = out_dir / "deb"
     shutil.rmtree(staging, ignore_errors=True)
@@ -106,7 +121,7 @@ def build_deb(payload: Path, record: dict[str, object], out_dir: Path) -> Path:
                 f"Version: {version}",
                 "Section: utils",
                 "Priority: optional",
-                "Architecture: amd64",
+                f"Architecture: {debian_arch}",
                 "Depends: python3 (>= 3.11), python3-venv",
                 "Maintainer: Raiker <raiker@localhost>",
                 "Description: Raiker governed agent runtime",
@@ -136,7 +151,7 @@ def build_deb(payload: Path, record: dict[str, object], out_dir: Path) -> Path:
     )
     prerm.chmod(0o755)
 
-    package = out_dir / f"raiker_{version}_amd64.deb"
+    package = out_dir / f"raiker_{version}_{debian_arch}.deb"
     _run(["dpkg-deb", "--root-owner-group", "--build", str(staging), str(package)])
     return package
 
@@ -148,7 +163,10 @@ def build_appimage(payload: Path, record: dict[str, object], out_dir: Path) -> P
     target's primary format, and the workflow reports which formats it actually
     produced rather than assuming.
     """
-    tool = shutil.which("appimagetool") or shutil.which("appimagetool-x86_64.AppImage")
+    _, appimage_arch = _linux_architectures(record)
+    tool = shutil.which("appimagetool") or shutil.which(
+        f"appimagetool-{appimage_arch}.AppImage"
+    )
     if tool is None:
         print("skip: appimagetool is not on this builder", flush=True)
         return None
@@ -185,7 +203,7 @@ def build_appimage(payload: Path, record: dict[str, object], out_dir: Path) -> P
         shutil.copyfile(icon, appdir / "raiker.png")
     else:
         (appdir / "raiker.png").write_bytes(b"")
-    image = out_dir / f"Raiker-{version}-x86_64.AppImage"
+    image = out_dir / f"Raiker-{version}-{appimage_arch}.AppImage"
     _run([tool, "--appimage-extract-and-run", "--no-appstream", str(appdir), str(image)])
     return image
 

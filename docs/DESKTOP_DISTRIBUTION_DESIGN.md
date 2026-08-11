@@ -138,9 +138,9 @@ The release pipeline — `.github/workflows/release.yml`, started deliberately w
 | Target | Runner | Installer | Signing identity |
 |---|---|---|---|
 | macOS Apple Silicon | `macos-14` | `.pkg` | Developer ID + notarytool |
-| macOS Intel | `macos-13` | `.pkg` | Developer ID + notarytool |
-| Windows 10/11 | `windows-2022` | `.msi` | Authenticode (`signtool`) |
-| Linux x86-64 | `ubuntu-22.04` | `.deb`, AppImage | GPG detached signature |
+| Windows 10/11 x86-64 (AMD64; AMD or Intel CPU) | `windows-2022` | `.msi` | Authenticode (`signtool`) |
+| Linux x86-64 (AMD64; AMD or Intel CPU) | `ubuntu-22.04` | `.deb`, AppImage | GPG detached signature |
+| Linux ARM64 | `ubuntu-22.04-arm` | `.deb`, AppImage | GPG detached signature |
 
 The table lives in `raiker.app.release.TARGETS`, so the workflow, the tests and
 the product read one list rather than three that can disagree.

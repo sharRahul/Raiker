@@ -187,6 +187,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-176 | Low | Export / portable citation ledgers | Fixed (was BUG-65) |
 | FIXED-177 | Low | Web / loopback and public-bind rate limits | Fixed (was BUG-88) |
 | FIXED-178 | Low | Models / remove a provider credential in-app | Fixed (found during live verification) |
+| FIXED-179 | Low | CI / immutable release artifact actions | Fixed (was BUG-49) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -6922,4 +6923,30 @@ returns the card to **Not connected**.
 **Evidence.** `ModelsView.test.ts` covers the owner flow. Anthropic, OpenAI and
 OpenRouter test credentials were removed through this control after the live
 provider run.
+
+---
+
+## FIXED-179 — Release artifact actions are pinned immutably
+
+**Status: fixed in this change. Was BUG-49.**
+
+**Observed.** All six `actions/upload-artifact` and
+`actions/download-artifact` uses in the manual Release workflow referenced the
+mutable `@v4` major tag while handling the binaries owners install.
+
+**Fix.** Every upload use is pinned to
+`ea165f8d65b6e75b540449e92b4886f43607fa02`; every download use is pinned to
+`d3f86a106a0bac45b974a628896c90dbdf5c8093`. The same change replaces the macOS
+Intel target with native Linux ARM64, installs the Windows desktop build tool,
+and makes Debian/AppImage names and appimagetool downloads architecture-aware
+while keeping Release manual-only and draft-only. Explicitly unsigned test runs
+now stop successfully after their per-target uploads instead of entering the
+signed-channel verifier and failing.
+
+**Evidence.** `tests/test_release_workflow.py` parses the workflow and asserts
+its sole trigger, signed-draft gate, supported cross-platform runners, desktop
+build dependency, native appimagetool selection, and 40-character
+artifact-action digests. `tests/test_release_pipeline.py` asserts the exact
+four-runner matrix; `tests/test_installer_build.py` covers x86-64 and ARM64 Linux
+package metadata and filenames.
 

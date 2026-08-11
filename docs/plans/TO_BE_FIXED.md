@@ -59,33 +59,11 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| BUG-49 | Low | CI / release workflow action pinning | Open (found while building the release workflow) |
 | BUG-53 | Low | Chat / multi-call answer text runs together | Open (found while verifying FIXED-99) |
 | BUG-54 | Medium | Web e2e / the live stub model is not in the repository | Open (found while writing FIXED-99's live scenario) |
 | BUG-55 | Low | Chat / a disabled transcript block reads as live code | Open (found while verifying FIXED-99) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
-
----
-
-## BUG-49 — Two release-workflow actions are pinned by tag, not by digest
-
-**Status: open; found while building `.github/workflows/release.yml`.**
-
-**Observed.** Every other action in this repository is pinned to a commit SHA.
-`actions/upload-artifact` and `actions/download-artifact` in
-`.github/workflows/release.yml` are pinned to `@v4`, because the commit digests
-could not be resolved from the environment the workflow was written in. A tag is
-mutable: whoever controls it can change what those steps run, and those steps
-handle the release artifacts.
-
-**Required fix.** Resolve both actions' commit digests and pin them, with the
-version in a comment beside each, exactly as `actions/checkout`,
-`actions/setup-python` and `actions/setup-node` are pinned. Then check no other
-workflow has acquired a tag pin.
-
-**UI when closed.** None — this is supply-chain hygiene for the pipeline that
-produces what owners install.
 
 ---
 

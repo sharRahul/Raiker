@@ -101,20 +101,26 @@ def test_every_target_names_the_signing_identity_it_requires() -> None:
     """A target that could publish without an identity is the whole defect."""
     assert {target.target_id for target in TARGETS} == {
         "macos-arm64",
-        "macos-x86_64",
         "windows-x86_64",
         "linux-x86_64",
+        "linux-arm64",
+    }
+    assert {target.target_id: target.runner for target in TARGETS} == {
+        "macos-arm64": "macos-14",
+        "windows-x86_64": "windows-2022",
+        "linux-x86_64": "ubuntu-22.04",
+        "linux-arm64": "ubuntu-22.04-arm",
     }
     for target in TARGETS:
         assert target.installer_formats, target.target_id
         assert target.signing.secrets, target.target_id
         assert target.signing.tool.strip(), target.target_id
         assert target.runner.strip(), target.target_id
-    # Both macOS architectures are built, because a native wheel that packages on
-    # Apple Silicon is not evidence about Intel.
-    assert {t.arch for t in TARGETS if t.os_name == "macos"} == {"arm64", "x86_64"}
-    assert ".deb" in TARGETS_BY_ID["linux-x86_64"].installer_formats
-    assert ".AppImage" in TARGETS_BY_ID["linux-x86_64"].installer_formats
+    assert {t.arch for t in TARGETS if t.os_name == "macos"} == {"arm64"}
+    assert {t.arch for t in TARGETS if t.os_name == "linux"} == {"arm64", "x86_64"}
+    for target_id in ("linux-x86_64", "linux-arm64"):
+        assert ".deb" in TARGETS_BY_ID[target_id].installer_formats
+        assert ".AppImage" in TARGETS_BY_ID[target_id].installer_formats
 
 
 def test_a_bundle_rebuilds_to_the_same_bytes(

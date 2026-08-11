@@ -143,12 +143,14 @@ TARGETS: tuple[ReleaseTarget, ...] = (
     # The design allows ".dmg or .pkg"; the pipeline builds ".pkg", which is the
     # one of the two that installs rather than only presenting a folder.
     ReleaseTarget("macos-arm64", "macos", "arm64", "macos-14", (".pkg",), _APPLE),
-    ReleaseTarget("macos-x86_64", "macos", "x86_64", "macos-13", (".pkg",), _APPLE),
     ReleaseTarget(
         "windows-x86_64", "windows", "x86_64", "windows-2022", (".msi",), _AUTHENTICODE
     ),
     ReleaseTarget(
         "linux-x86_64", "linux", "x86_64", "ubuntu-22.04", (".AppImage", ".deb"), _LINUX
+    ),
+    ReleaseTarget(
+        "linux-arm64", "linux", "arm64", "ubuntu-22.04-arm", (".AppImage", ".deb"), _LINUX
     ),
 )
 TARGETS_BY_ID: dict[str, ReleaseTarget] = {target.target_id: target for target in TARGETS}

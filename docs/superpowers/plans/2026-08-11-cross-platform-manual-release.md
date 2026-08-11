@@ -4,7 +4,7 @@
 
 **Goal:** Make the manually dispatched Release workflow reliably build signed or explicitly unsigned artifacts for macOS, Windows, and Linux and create only a signed draft GitHub release.
 
-**Architecture:** Keep `raiker.app.release.TARGETS` as the target source of truth and `.github/workflows/release.yml` as the manual runner/signing wrapper. Add a parsed-YAML contract test for trigger, publication, build-tool, Linux AppImage, and immutable-action invariants; update the retired runner and workflow defects without changing release payload semantics.
+**Architecture:** Keep `raiker.app.release.TARGETS` as the target source of truth and `.github/workflows/release.yml` as the manual runner/signing wrapper. Add parsed-YAML and installer contract tests for trigger, publication, build-tool, Linux architecture, and immutable-action invariants; replace macOS Intel with Linux ARM64 without changing release trust semantics.
 
 **Tech Stack:** GitHub Actions YAML, Python 3.11, PyYAML, pytest, PyInstaller, WiX, pkgbuild/productsign/notarytool, dpkg-deb, appimagetool, GitHub CLI.
 
@@ -13,8 +13,8 @@
 - `.github/workflows/release.yml` must contain `workflow_dispatch` as its only trigger.
 - A GitHub release must remain a draft and require `publish=true` plus `signing=require`.
 - `signing=skip` may build explicitly unsigned workflow artifacts but must never create a GitHub release.
-- Targets remain macOS ARM64, macOS Intel, Windows x86-64, and Linux x86-64.
-- Use `macos-15-intel` for macOS Intel; retain `macos-14`, `windows-2022`, and `ubuntu-22.04` for the other targets.
+- Targets are macOS ARM64, Windows x86-64, Linux x86-64, and Linux ARM64.
+- Use `macos-14`, `windows-2022`, `ubuntu-22.04`, and `ubuntu-22.04-arm` respectively.
 - Artifact actions must be pinned to resolved 40-character commit digests.
 - Do not dispatch the Release workflow or create a GitHub release during verification.
 
@@ -28,7 +28,7 @@
 
 **Interfaces:**
 - Consumes: `.github/workflows/release.yml` as YAML and `raiker.app.release.TARGETS_BY_ID`.
-- Produces: regression assertions for manual dispatch, draft-only publishing, all four targets, build dependencies, AppImage extraction, and immutable artifact actions.
+- Produces: regression assertions for manual dispatch, draft-only publishing, all four targets, build dependencies, native AppImage tooling, and immutable artifact actions.
 
 - [ ] **Step 1: Write the failing workflow contract tests**
 
@@ -39,9 +39,9 @@ assert set(workflow["on"]) == {"workflow_dispatch"}
 assert "inputs.publish" in workflow["jobs"]["publish"]["if"]
 assert "inputs.signing == 'require'" in workflow["jobs"]["publish"]["if"]
 assert "--draft" in create_release_step["run"]
-assert TARGETS_BY_ID["macos-x86_64"].runner == "macos-15-intel"
+assert TARGETS_BY_ID["linux-arm64"].runner == "ubuntu-22.04-arm"
 assert 'python -m pip install -e ".[dev]"' in install_step["run"]
-assert native_installer_step["env"]["APPIMAGE_EXTRACT_AND_RUN"] == "1"
+assert "aarch64" in appimagetool_step["run"]
 assert all(re.fullmatch(r"actions/(upload|download)-artifact@[0-9a-f]{40}", use) for use in artifact_uses)
 ```
 
@@ -51,7 +51,7 @@ Extend the existing matrix test to assert the exact runner mapping for all four 
 
 Run: `python -m pytest tests/test_release_workflow.py tests/test_release_pipeline.py -q`
 
-Expected: failures for `macos-13`, runtime-only installation, missing AppImage extraction mode, and mutable `@v4` artifact action references.
+Expected: failures for the macOS Intel/Linux ARM64 matrix replacement, runtime-only installation, x86-only Linux packaging, and mutable `@v4` artifact action references.
 
 - [ ] **Step 3: Keep the red tests local**
 
@@ -63,8 +63,10 @@ Do not push a red commit. Inline execution keeps the tests uncommitted until Tas
 
 **Files:**
 - Modify: `raiker/app/release.py`
+- Modify: `scripts/build_installer.py`
 - Modify: `.github/workflows/release.yml`
 - Modify: `docs/DESKTOP_DISTRIBUTION_DESIGN.md`
+- Create: `tests/test_installer_build.py`
 - Test: `tests/test_release_workflow.py`
 - Test: `tests/test_release_pipeline.py`
 
@@ -72,9 +74,9 @@ Do not push a red commit. Inline execution keeps the tests uncommitted until Tas
 - Consumes: the Task 1 workflow contract.
 - Produces: a manual workflow whose matrix can build `.pkg`, `.msi`, `.deb`, and `.AppImage` artifacts and whose draft job receives the complete verified channel.
 
-- [ ] **Step 1: Replace the retired Intel runner**
+- [ ] **Step 1: Replace macOS Intel with Linux ARM64**
 
-Change only the `macos-x86_64` target runner from `macos-13` to `macos-15-intel` in `TARGETS`; update the desktop distribution table to match.
+Remove `macos-x86_64`, add `linux-arm64` on `ubuntu-22.04-arm`, and update the desktop distribution table and draft release notes to match.
 
 - [ ] **Step 2: Install the desktop build dependency**
 
@@ -87,16 +89,18 @@ In the matrix build job, use:
 
 Keep the plan and channel jobs on runtime-only installation because they do not invoke PyInstaller.
 
-- [ ] **Step 3: Make AppImage tooling runner-safe**
+- [ ] **Step 3: Make Linux installers architecture-aware**
 
-Set the native-installer step environment without changing non-Linux behavior:
+Map release architecture names explicitly:
 
-```yaml
-env:
-  APPIMAGE_EXTRACT_AND_RUN: ${{ matrix.os == 'linux' && '1' || '0' }}
+```python
+_LINUX_ARCHITECTURES = {
+    "x86_64": ("amd64", "x86_64"),
+    "arm64": ("arm64", "aarch64"),
+}
 ```
 
-The existing `scripts/build_installer.py` subprocess inherits the value when it launches `appimagetool`.
+Use the mapping for Debian control metadata/package names and AppImage tool lookup/output names. In `release.yml`, select `appimagetool-x86_64.AppImage` or `appimagetool-aarch64.AppImage` from `matrix.arch`. Preserve the existing `--appimage-extract-and-run` invocation.
 
 - [ ] **Step 4: Pin artifact actions immutably and close the stale warning**
 
@@ -116,7 +120,7 @@ Update comments to identify the v4 major line and remove the top-of-file BUG-49 
 
 - [ ] **Step 5: Run focused workflow and release tests**
 
-Run: `python -m pytest tests/test_release_workflow.py tests/test_release_pipeline.py tests/test_desktop_build.py -q`
+Run: `python -m pytest tests/test_release_workflow.py tests/test_release_pipeline.py tests/test_installer_build.py tests/test_desktop_build.py -q`
 
 Expected: all pass.
 
@@ -126,8 +130,8 @@ Run:
 
 ```powershell
 python -c "from pathlib import Path; import yaml; data=yaml.load(Path('.github/workflows/release.yml').read_text(encoding='utf-8'), Loader=yaml.BaseLoader); assert set(data['on']) == {'workflow_dispatch'}"
-python -m ruff check raiker/app/release.py tests/test_release_workflow.py tests/test_release_pipeline.py
-python -m mypy raiker/app/release.py
+python -m ruff check raiker/app/release.py scripts/build_installer.py tests/test_release_workflow.py tests/test_release_pipeline.py tests/test_installer_build.py
+python -m mypy raiker/app/release.py scripts/build_installer.py
 ```
 
 Expected: all exit zero.
@@ -135,7 +139,7 @@ Expected: all exit zero.
 - [ ] **Step 7: Commit the green workflow implementation**
 
 ```powershell
-git add -- .github/workflows/release.yml raiker/app/release.py tests/test_release_workflow.py tests/test_release_pipeline.py docs/DESKTOP_DISTRIBUTION_DESIGN.md
+git add -- .github/workflows/release.yml raiker/app/release.py scripts/build_installer.py tests/test_release_workflow.py tests/test_release_pipeline.py tests/test_installer_build.py docs/DESKTOP_DISTRIBUTION_DESIGN.md
 git commit -m "fix: make manual releases cross-platform"
 ```
 

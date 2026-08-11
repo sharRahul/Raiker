@@ -53,3 +53,7 @@ superseded guides, and screenshots are not maintained here.
   reproduction, root cause, and proposed fix.
 - [Fixed items](plans/FIXED_ITEMS.md): the same record for everything that has
   been closed, kept separate so the open list answers one question.
+- [Memory reliability plan](plans/MEMORY_RELIABILITY_PLAN.md): the memory
+  subsystem audited against its five specifications, written to the same
+  standard — what recall can do today, and what still stands between it and
+  being relied on.

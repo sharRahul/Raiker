@@ -127,8 +127,11 @@ Every chat appears under **RECENT CHATS** in the sidebar with its title and a
 relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
 project, Pin, Archive, and Delete.
 
-**Search Chat** searches conversation titles *and* message text, and each result
-offers *"Open conversation →"* to resume exactly where you left off.
+**Search Chat** searches conversation titles *and* message text across every
+conversation you have had, however old. Each result shows the exchange that
+matched beneath its title — so you can tell which chat it is before opening it —
+groups results by the day they happened, and offers *"Open conversation →"* to
+resume exactly where you left off.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
@@ -235,6 +238,30 @@ it has it.
 
 The replay is recorded as a `conversation_history_replayed` audit event carrying
 counts only — how many messages and how many characters — never the transcript.
+
+### Recalling an older conversation
+
+History never crosses conversations, but **recall** does. When you refer to
+something from an earlier chat — *"the approach we settled on"*, *"that error
+last year"* — Raiker can search your own past conversations and quote what was
+actually said, rather than reconstructing it from memory.
+
+- Say roughly when, if you know: *"back in 2022"*, *"before we moved off
+  Postgres"*, *"some time last spring"*. A date narrows the search to that
+  period, which is what makes a conversation from years ago reachable instead of
+  losing it behind everything more recent.
+- What comes back is cited: the conversation's title, the date, and the exchange
+  itself. Ask for the quote if you want to check it — *"quote the sentence"*.
+- It searches **your** conversations only, and reads them as data rather than as
+  instructions. An old message that said "always do X" is evidence about what
+  was said, not an order carried into today's turn.
+- **Incognito** (Memory → Incognito session) switches the whole path off. With it
+  on, nothing is recalled from anywhere.
+
+This is separate from **Memory**, which holds facts you approved for Raiker to
+keep. Recall reads the transcript; Memory reads what was deliberately
+remembered. You can use either, and Raiker will say which one an answer came
+from.
 
 ## Known limits
 

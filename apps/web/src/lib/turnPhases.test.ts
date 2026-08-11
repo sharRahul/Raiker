@@ -33,6 +33,38 @@ describe("turnPhases", () => {
     expect(collectText([delta("Hel"), lifecycle("intent_classified"), delta("lo")])).toBe("Hello");
   });
 
+  // BUG-53 — each model request is a distinct answer pass. The transcript
+  // needs a visible paragraph seam without disturbing token-sized deltas from
+  // one streamed response.
+  it("separates answer text produced by successive model requests", () => {
+    expect(collectText([
+      lifecycle("model_request_started"),
+      delta("Reading"),
+      delta(" the file…"),
+      lifecycle("model_request_completed"),
+      lifecycle("model_request_started"),
+      delta("I found the cause."),
+    ])).toBe("Reading the file…\n\nI found the cause.");
+  });
+
+  it("does not add a trailing paragraph for a tool-only model request", () => {
+    expect(collectText([
+      lifecycle("model_request_started"),
+      delta("I will inspect that."),
+      lifecycle("model_request_started"),
+      lifecycle("model_request_completed"),
+    ])).toBe("I will inspect that.");
+  });
+
+  it("reuses an answer boundary already present in streamed text", () => {
+    expect(collectText([
+      lifecycle("model_request_started"),
+      delta("First response.\n"),
+      lifecycle("model_request_started"),
+      delta("\nSecond response."),
+    ])).toBe("First response.\n\nSecond response.");
+  });
+
   it("summarizes events in plain English", () => {
     expect(summarizeEvent(lifecycle("risk_classified", { risk_level: "high", requires_approval: true })))
       .toMatch(/high.*approval required/i);

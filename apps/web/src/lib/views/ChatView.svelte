@@ -42,7 +42,7 @@
   import SourceChips from "../components/SourceChips.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
-  import { collectText, groupPhases, PHASE_LABELS, PHASE_ORDER, summarizeEvent, type PhaseId } from "../turnPhases";
+  import { collectText } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { reactionForPrompt, refusedCalls, thinkingSteps } from "../chatPresentation";
@@ -592,11 +592,6 @@
     };
   }
 
-  function currentPhase(turn: ChatTurn): PhaseId | null {
-    const rows = groupPhases(turn.events);
-    return rows.length > 0 ? rows[rows.length - 1].phase : null;
-  }
-
   function answerText(turn: ChatTurn): string {
     const streamed = collectText(turn.events);
     if (streamed.trim() !== "") return streamed;
@@ -1065,98 +1060,6 @@
         </div>
 
         <div class="message-group message-group-raiker">
-          {#if turn.response !== null}
-          {#if false}
-          {#if turn.streaming}
-            <p class="phase-line" role="status">
-              <span class="pulse" aria-hidden="true"></span>
-              {#if currentPhase(turn)}
-                Working — {PHASE_LABELS[currentPhase(turn) as PhaseId]}
-              {:else}
-                Working…
-              {/if}
-            </p>
-          {/if}
-
-          {#if answerText(turn) !== ""}
-            <p class="bubble-text answer">{answerText(turn)}</p>
-          {:else if !turn.streaming && turn.error === null && turn.response !== null}
-            <p class="bubble-text answer muted">{turn.response?.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p>
-          {/if}
-
-          {#if turn.error !== null}
-            <p class="error-line" role="alert">{turn.error}</p>
-          {/if}
-
-          {#if turn.response !== null}
-            <!-- Legacy runtime metadata intentionally omitted from Chat. -->
-            <!--
-            <div class="response-meta">
-              <Badge variant={responseBadge(turn.response!.status)} label={turn.response!.status} />
-              {#if cacheInfo(turn)}
-                {@const cache = cacheInfo(turn)}
-                <span
-                  class="cache-chip"
-                  class:hit={cache?.hit}
-                  title="Prompt cache — cached input tokens reused this turn (cuts cost and latency)"
-                >
-                  {cache?.hit ? `Cache hit · ${cache.read} tok` : "Cache miss"}
-                </span>
-              {/if}
-            </div>
-            -->
-
-            {#if turn.response!.status === "needs_approval" && turn.response!.approval}
-              <div class="approval-card">
-                <p class="approval-title">
-                  <Icon name="approvals" size={15} />
-                  This action is waiting for your approval
-                </p>
-                <!--
-                <p class="approval-body">
-                  <strong>{humanize(turn.response.approval.tool_name)}</strong> — risk
-                  <strong>{turn.response.approval.risk_level}</strong>.
-                  {turn.response.approval.message}
-                </p>
-                -->
-                <p class="approval-note">
-                  Review it in the Approvals inbox.
-                  {turn.response!.approval!.expected_effect ||
-                    "Recording a decision never executes the action."}
-                </p>
-                <a class="btn btn-soft btn-sm" href="#/approvals">Open Approvals</a>
-              </div>
-            {/if}
-          {/if}
-
-          {#if turn.events.some((e) => e.kind === "lifecycle" || e.kind === "tool")}
-            <details class="under-hood" open={turn.streaming}>
-              <summary>
-                <Icon name="shield" size={13} />
-                {turn.streaming ? "Governing this turn…" : "How this turn was governed"}
-              </summary>
-              <ol class="phases">
-                {#each groupPhases(turn.events) as row (row.phase)}
-                  <li>
-                    <span class="phase-name">
-                      {PHASE_ORDER.indexOf(row.phase) + 1}. {row.label}
-                    </span>
-                    <ul class="phase-events">
-                      {#each row.events as ev, i (i)}
-                        <li>{summarizeEvent(ev)}</li>
-                      {/each}
-                    </ul>
-                  </li>
-                {/each}
-              </ol>
-              {#each turn.events.filter((e) => e.kind === "tool") as ev, i (i)}
-                <p class="tool-line">{humanize(ev.event_type)} {ev.text}</p>
-              {/each}
-            </details>
-          {/if}
-          {/if}
-          {/if}
-
           {#if turn.streaming}
             <p class="streaming-label" role="status">
               <span class="pulse" aria-hidden="true"></span>
@@ -1806,14 +1709,6 @@
   .muted {
     color: var(--text-3);
   }
-  .phase-line {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    color: var(--text-2);
-    font-size: 0.85rem;
-    margin: 0 0 0.35rem;
-  }
   .pulse {
     width: 8px;
     height: 8px;
@@ -1936,51 +1831,6 @@
   }
   .conversation-menu .menu button:hover:not(:disabled) { background: var(--accent-soft); }
   .conversation-menu .menu button:disabled { color: var(--text-3); cursor: default; }
-  .under-hood {
-    margin-top: 0.7rem;
-    border-top: 1px dashed var(--border);
-    padding-top: 0.5rem;
-  }
-  .under-hood summary {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    cursor: pointer;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: var(--text-3);
-    list-style: none;
-  }
-  .under-hood summary::-webkit-details-marker {
-    display: none;
-  }
-  .under-hood summary:hover {
-    color: var(--text-1);
-  }
-  .phases {
-    margin: 0.5rem 0 0;
-    padding-left: 0;
-    list-style: none;
-    display: flex;
-    flex-direction: column;
-    gap: 0.4rem;
-  }
-  .phase-name {
-    font-size: 0.78rem;
-    font-weight: 650;
-    color: var(--accent);
-  }
-  .phase-events {
-    margin: 0.15rem 0 0;
-    padding-left: 1rem;
-    font-size: 0.8rem;
-    color: var(--text-2);
-  }
-  .tool-line {
-    font-size: 0.8rem;
-    color: var(--text-2);
-    margin: 0.3rem 0 0;
-  }
   .composer {
     padding-top: var(--space-3);
     background: var(--bg);

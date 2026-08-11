@@ -81,12 +81,35 @@ export function groupPhases(events: StreamEvent[]): PhaseRow[] {
   return rows;
 }
 
-/** Concatenate streamed answer text deltas in arrival order. */
+/**
+ * Concatenate streamed answer text in arrival order.
+ *
+ * A tool-using turn can contain several model requests. Token deltas inside one
+ * request remain byte-for-byte adjacent, while the first text from a later
+ * request begins a new paragraph. Delaying the separator until text arrives
+ * avoids blank trailing paragraphs for tool-only requests.
+ */
 export function collectText(events: StreamEvent[]): string {
-  return events
-    .filter((ev) => ev.kind === "text_delta")
-    .map((ev) => ev.text)
-    .join("");
+  let text = "";
+  let paragraphPending = false;
+
+  for (const ev of events) {
+    if (ev.kind === "lifecycle" && ev.event_type === "model_request_started") {
+      if (text.length > 0) paragraphPending = true;
+      continue;
+    }
+    if (ev.kind !== "text_delta" || ev.text.length === 0) continue;
+
+    if (paragraphPending) {
+      const trailingNewlines = text.match(/\n*$/)?.[0].length ?? 0;
+      const leadingNewlines = ev.text.match(/^\n*/)?.[0].length ?? 0;
+      text += "\n".repeat(Math.max(0, 2 - trailingNewlines - leadingNewlines));
+      paragraphPending = false;
+    }
+    text += ev.text;
+  }
+
+  return text;
 }
 
 /** A short, plain-English summary of a single lifecycle event for the timeline. */

@@ -58,7 +58,7 @@ def _ws(request: Request) -> str | Path:
 
 
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
-    return AuthMiddleware(_ws(request)).authenticate(request)
+    return AuthMiddleware(_ws(request)).authenticate(request, required_scope="host_control")
 
 
 def _control(request: Request) -> HostControl:

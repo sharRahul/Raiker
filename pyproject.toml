@@ -24,12 +24,14 @@ dependencies = [
     "argon2-cffi>=23.1",
     "pyotp>=2.9",
     "sqlcipher3-wheels>=0.5.0",
+    "pystray>=0.19.5",
+    "Pillow>=10.4",
     # Official client for revision-pinned, filtered, dry-run-capable model downloads.
     "huggingface_hub>=1.25,<2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "httpx2>=2.9"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "httpx2>=2.9", "pyinstaller>=6.10"]
 
 [project.scripts]
 raiker = "raiker.cli.main:main"

@@ -197,6 +197,26 @@ class ModelSetupUpdateRequest(BaseModel):
     selected_model: str | None = None
 
 
+class SetupUpdateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+
+    status: Literal["required", "in_progress", "skipped", "complete"]
+    stage: Literal["account", "model", "privacy", "backup", "finish"]
+    selected_profile_id: str | None = None
+    selected_model: str | None = None
+    model_deferred: bool = False
+    privacy_mode: Literal["local_first", "balanced"] | None = None
+    backup_mode: Literal["later", "local"] = "later"
+    backup_target: str | None = None
+    background_service_enabled: bool = False
+
+
+class SetupBackupRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    target: str
+
+
 class ModelOperationRequestBody(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
 

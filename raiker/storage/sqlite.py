@@ -57,7 +57,7 @@ from raiker.models.library import LocalModel
 from raiker.models.local_operations import ModelOperation
 from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
-from raiker.models.setup import ModelSetupState
+from raiker.models.setup import ModelSetupState, SetupState
 from raiker.storage.migrations import (
     AGENT_PLANS_MIGRATION_ID,
     AGENT_PLANS_SQL,
@@ -289,6 +289,8 @@ from raiker.storage.migrations import (
     SESSION_ORIGIN_SQL,
     SESSION_TAGS_MIGRATION_ID,
     SESSION_TAGS_SQL,
+    SETUP_STATE_MIGRATION_ID,
+    SETUP_STATE_SQL,
     SKILLS_MIGRATION_ID,
     SKILLS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
@@ -1229,6 +1231,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MODEL_SETUP_STATE_SQL,
                 connection,
             )
+            self._apply_migration(SETUP_STATE_MIGRATION_ID, SETUP_STATE_SQL, connection)
             self._apply_migration(
                 MODEL_OPERATIONS_MIGRATION_ID,
                 MODEL_OPERATIONS_SQL,
@@ -5835,6 +5838,39 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (
                     saved.owner_principal_id, saved.status, saved.step, saved.path,
                     saved.selected_profile_id, saved.selected_model, saved.created_at, saved.updated_at,
+                ),
+            )
+        return saved
+
+    def load_setup_state(self, owner_principal_id: str) -> SetupState:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM setup_state WHERE owner_principal_id = ?",
+                (owner_principal_id,),
+            ).fetchone()
+        if row is None:
+            return SetupState(owner_principal_id=owner_principal_id)
+        values = dict(row)
+        values["model_deferred"] = bool(values["model_deferred"])
+        values["background_service_enabled"] = bool(values["background_service_enabled"])
+        return SetupState(**values)
+
+    def save_setup_state(self, state: SetupState) -> SetupState:
+        now = utc_now()
+        saved = SetupState(**(state.to_dict() | {"created_at": state.created_at or now, "updated_at": now}))
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR REPLACE INTO setup_state
+                (owner_principal_id, status, stage, selected_profile_id, selected_model,
+                 model_deferred, privacy_mode, privacy_acknowledged_at, backup_mode,
+                 backup_target, backup_verified_at, background_service_enabled, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    saved.owner_principal_id, saved.status, saved.stage,
+                    saved.selected_profile_id, saved.selected_model, int(saved.model_deferred),
+                    saved.privacy_mode, saved.privacy_acknowledged_at, saved.backup_mode,
+                    saved.backup_target, saved.backup_verified_at,
+                    int(saved.background_service_enabled), saved.created_at, saved.updated_at,
                 ),
             )
         return saved

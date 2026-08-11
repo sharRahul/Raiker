@@ -2491,6 +2491,37 @@ FROM account_credentials;
 """
 
 
+SETUP_STATE_MIGRATION_ID = "RAIKER-1049-full-setup-state"
+SETUP_STATE_SQL = """
+CREATE TABLE IF NOT EXISTS setup_state (
+  owner_principal_id TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  stage TEXT NOT NULL,
+  selected_profile_id TEXT,
+  selected_model TEXT,
+  model_deferred INTEGER NOT NULL DEFAULT 0,
+  privacy_mode TEXT,
+  privacy_acknowledged_at TEXT,
+  backup_mode TEXT NOT NULL DEFAULT 'later',
+  backup_target TEXT,
+  backup_verified_at TEXT,
+  background_service_enabled INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+INSERT OR IGNORE INTO setup_state
+  (owner_principal_id, status, stage, selected_profile_id, selected_model,
+   model_deferred, backup_mode, background_service_enabled, created_at, updated_at)
+SELECT owner_principal_id,
+       CASE WHEN status = 'complete' THEN 'complete' ELSE 'required' END,
+       CASE WHEN status = 'complete' THEN 'finish' ELSE 'model' END,
+       selected_profile_id, selected_model,
+       CASE WHEN status = 'skipped' THEN 1 ELSE 0 END,
+       'later', 0, created_at, updated_at
+FROM model_setup_state;
+"""
+
+
 MODEL_OPERATIONS_MIGRATION_ID = "RAIKER-1044-model-operations"
 MODEL_OPERATIONS_SQL = """
 CREATE TABLE IF NOT EXISTS model_operations (

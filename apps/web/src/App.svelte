@@ -99,7 +99,7 @@
         api.runtimeMode(),
         api.diagnostics(),
         api.projects(),
-        api.modelSetup(),
+        api.setup(),
       ]);
       projects = projectsList;
       if (setup.status === "required" || setup.status === "in_progress") {

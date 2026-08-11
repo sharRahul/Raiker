@@ -130,9 +130,9 @@ export function tabFromHash(hash: string): string | null {
 const OFF_NAV_ITEMS: NavItem[] = [
   {
     id: "model-setup",
-    label: "Set up models",
+    label: "Finish setup",
     icon: "models",
-    hint: "Choose how Raiker runs models before your first turn",
+    hint: "Confirm model, privacy and backup choices before your first turn",
   },
 ];
 

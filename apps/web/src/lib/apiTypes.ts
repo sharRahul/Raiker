@@ -280,6 +280,23 @@ export interface ModelSetupState {
   updated_at: string | null;
 }
 
+export interface SetupState {
+  owner_principal_id: string;
+  status: "required" | "in_progress" | "skipped" | "complete";
+  stage: "account" | "model" | "privacy" | "backup" | "finish";
+  selected_profile_id: string | null;
+  selected_model: string | null;
+  model_deferred: boolean;
+  privacy_mode: "local_first" | "balanced" | null;
+  privacy_acknowledged_at: string | null;
+  backup_mode: "later" | "local";
+  backup_target: string | null;
+  backup_verified_at: string | null;
+  background_service_enabled: boolean;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
 export interface ModelOperation {
   operation_id: string;
   owner_principal_id: string;

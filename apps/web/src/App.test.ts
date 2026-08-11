@@ -20,11 +20,11 @@ describe("App shell", () => {
   it("routes a first owner into resumable model setup", async () => {
     stubFetch({
       ...BOOTSTRAP_ROUTES,
-      "GET /api/model-setup": { owner_principal_id: "prin_owner", status: "required", step: "choose_path", path: null, selected_profile_id: null, selected_model: null, created_at: null, updated_at: null },
+      "GET /api/setup": { owner_principal_id: "prin_owner", status: "required", stage: "model", selected_profile_id: null, selected_model: null, model_deferred: false, privacy_mode: null, privacy_acknowledged_at: null, backup_mode: "later", backup_target: null, backup_verified_at: null, background_service_enabled: false, created_at: null, updated_at: null },
     });
     render(App);
     await signIn();
-    expect(await screen.findByRole("heading", { name: "Choose how to run models" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Choose where Raiker thinks" })).toBeInTheDocument();
     expect(window.location.hash).toBe("#/model-setup");
   });
   it("signs in, then shows the runtime status and grouped navigation", async () => {

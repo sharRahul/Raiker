@@ -105,6 +105,7 @@ export const BOOTSTRAP_ROUTES: Record<string, unknown> = {
   "GET /api/diagnostics": DIAGNOSTICS,
   "GET /api/projects": { projects: [], active_project_id: null },
   "GET /api/model-setup": { owner_principal_id: "prin_owner", status: "complete", step: "ready", path: null, selected_profile_id: null, selected_model: null, created_at: null, updated_at: null },
+  "GET /api/setup": { owner_principal_id: "prin_owner", status: "complete", stage: "finish", selected_profile_id: null, selected_model: null, model_deferred: true, privacy_mode: "local_first", privacy_acknowledged_at: null, backup_mode: "later", backup_target: null, backup_verified_at: null, background_service_enabled: false, created_at: null, updated_at: null },
   "GET /api/models": {
     profiles: [],
     current_profile_id: null,

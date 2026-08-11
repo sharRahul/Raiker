@@ -154,7 +154,7 @@ describe("nav model", () => {
   // item's title and hint, so the first-run model setup screen was headed
   // "Workbench · Resume governed work and see what needs attention".
   it("titles an off-nav route as itself rather than as the Workbench", () => {
-    expect(navItem("model-setup").label).toBe("Set up models");
+    expect(navItem("model-setup").label).toBe("Finish setup");
     expect(navItem("model-setup").hint).not.toBe(NAV_ITEMS[0].hint);
     expect(NAV_ITEMS.some((item) => item.id === "model-setup")).toBe(false);
   });

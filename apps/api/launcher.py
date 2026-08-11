@@ -57,6 +57,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import secrets
 import shutil
 import socket
 import subprocess
@@ -371,7 +372,12 @@ def main(argv: list[str] | None = None) -> int:
     print(f"[raiker] {os_name} · data in {workspace}")
     print(f"[raiker] Starting on {url} (loopback only)")
 
-    app = create_app(workspace, ui_dir=ui_dir)
+    tray_bootstrap_secret = secrets.token_urlsafe(32)
+    app = create_app(
+        workspace,
+        ui_dir=ui_dir,
+        tray_bootstrap_secret=tray_bootstrap_secret,
+    )
 
     if not args.no_browser:
         # After the server has had a moment to bind, so the first request is not
@@ -386,6 +392,9 @@ def main(argv: list[str] | None = None) -> int:
     # including a crash-free quit, so a stale record never reports "running".
     control = HostControl(workspace)
     control.record_start(pid=os.getpid(), port=port)
+    from raiker.app.tray import start_native_tray
+
+    start_native_tray(url, tray_bootstrap_secret)
     try:
         uvicorn.run(app, host=LOOPBACK, port=port)
     finally:

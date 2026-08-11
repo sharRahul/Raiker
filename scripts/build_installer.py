@@ -252,6 +252,9 @@ def build_msi(payload: Path, record: dict[str, object], out_dir: Path) -> Path:
     wix = shutil.which("wix") or shutil.which("wix.exe")
     if wix is None:
         raise InstallerError("installer_tool_missing:wix")
+    executable = payload / "desktop" / "Raiker" / "Raiker.exe"
+    if not executable.is_file():
+        raise InstallerError("installer_desktop_runtime_missing")
     version = str(record["version"])
     source = out_dir / "raiker.wxs"
     source.write_text(
@@ -299,6 +302,18 @@ def main(argv: list[str] | None = None) -> int:
         elif os_name == "macos":
             built.append(str(build_pkg(payload, record, out_dir)))
         elif os_name == "windows":
+            from raiker.app.desktop_build import main as build_desktop
+
+            desktop = payload / "desktop"
+            result = build_desktop(
+                [
+                    "--source-root", str(payload / "service"),
+                    "--web-assets", str(payload / "web"),
+                    "--out", str(desktop),
+                ]
+            )
+            if result != 0:
+                raise InstallerError("installer_desktop_build_failed")
             built.append(str(build_msi(payload, record, out_dir)))
         else:
             raise InstallerError(f"installer_target_unknown:{os_name}")

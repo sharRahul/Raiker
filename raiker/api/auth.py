@@ -18,6 +18,8 @@ class AuthMiddleware:
 
     @staticmethod
     def _scope_satisfies(session_scope: str, required_scope: str) -> bool:
+        if required_scope == "host_control":
+            return session_scope in {"host_control", "control", "elevated"}
         if required_scope == "control":
             return session_scope in {"control", "elevated"}
         if required_scope == "elevated":

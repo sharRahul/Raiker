@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -28,7 +30,9 @@ from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
 from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_settings import router as settings_router
+from raiker.api.routes_setup import router as setup_router
 from raiker.api.routes_skills import router as skills_router
+from raiker.api.routes_tray import router as tray_router
 from raiker.api.routes_updates import router as updates_router
 from raiker.api.routes_vault import router as vault_router
 from raiker.api.security import (
@@ -56,6 +60,7 @@ _REDACTION_EXEMPT_PATHS = frozenset(
         "/api/auth/mfa/enroll",
         "/api/auth/elevate",
         "/api/prompts/stream",
+        "/api/tray/session",
     }
 )
 
@@ -215,6 +220,7 @@ def create_app(
     rate_limit_per_minute: int = 120,
     max_body_bytes: int = 1_000_000,
     hsts: bool = False,
+    tray_bootstrap_secret: str | None = None,
 ) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -294,6 +300,13 @@ def create_app(
         lifespan=lifespan,
     )
     app.state.workspace_root = Path(workspace_root).resolve()
+    app.state.tray_bootstrap_digest = (
+        hashlib.sha256(tray_bootstrap_secret.encode()).hexdigest()
+        if tray_bootstrap_secret is not None
+        else None
+    )
+    app.state.tray_bootstrap_expires = time.monotonic() + 120 if tray_bootstrap_secret else 0.0
+    app.state.tray_bootstrap_used = False
     # BUG-39 — created here rather than in the lifespan so a route can nudge the
     # scheduler even in the tests and embedded hosts that never start one. With
     # no worker waiting the nudge is simply a set flag nobody reads, which costs
@@ -358,6 +371,8 @@ def create_app(
     app.include_router(dashboard_router)
     app.include_router(memory_router)
     app.include_router(models_router)
+    app.include_router(setup_router)
+    app.include_router(tray_router)
     app.include_router(prompts_router)
     app.include_router(attachments_router)
     app.include_router(approvals_router)

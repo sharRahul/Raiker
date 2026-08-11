@@ -47,6 +47,7 @@ import type {
   ModelPricingView,
   ModelReadinessView,
   ModelSetupState,
+  SetupState,
   ModelOperation,
   PartialFiles,
   PluginsView,
@@ -442,6 +443,16 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     }),
+  setup: () => request<SetupState>("/api/setup"),
+  updateSetup: (
+    body: Omit<SetupState, "owner_principal_id" | "privacy_acknowledged_at" | "backup_verified_at" | "created_at" | "updated_at">,
+  ) => request<SetupState>("/api/setup", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }),
+  createSetupBackup: (target: string) =>
+    postJson<{ ok: boolean; path: string; setup: SetupState }>("/api/setup/backup/create", { target }),
   modelLibrary: () => request<ModelLibraryView>("/api/model-library"),
   addModelLibraryRoot: (path: string) =>
     postJson<{ ok: boolean; path: string }>("/api/model-library/roots", {

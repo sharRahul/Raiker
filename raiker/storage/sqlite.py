@@ -107,6 +107,8 @@ from raiker.storage.migrations import (
     EXECUTION_ENVIRONMENT_CONTROL_SQL,
     GIST_MEMORY_MIGRATION_ID,
     GIST_MEMORY_SQL,
+    GIT_CREDENTIAL_GRANT_MIGRATION_ID,
+    GIT_CREDENTIAL_GRANT_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
@@ -321,6 +323,8 @@ from raiker.storage.migrations import (
     TURN_CONTROLS_SQL,
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
+    WEB_BLOCKLIST_MIGRATION_ID,
+    WEB_BLOCKLIST_SQL,
 )
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 
@@ -1283,6 +1287,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CONVERSATION_FTS_MIGRATION_ID,
                 CONVERSATION_FTS_SQL,
                 connection,
+            )
+            self._apply_migration(WEB_BLOCKLIST_MIGRATION_ID, WEB_BLOCKLIST_SQL, connection)
+            self._apply_migration(
+                GIT_CREDENTIAL_GRANT_MIGRATION_ID, GIT_CREDENTIAL_GRANT_SQL, connection
             )
             self._rebuild_memory_fts(connection)
             self._backfill_conversation_fts(connection)
@@ -4001,6 +4009,133 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                SELECT turn_id, session_id, 'answer', summary FROM turns
                WHERE summary IS NOT NULL AND TRIM(summary) != ''"""
         )
+
+    # ── Web egress blocklist (RAIKER-2021) ───────────────────────────────────
+
+    def list_web_blocklist_rules(self, *, principal_id: str | None = None) -> list[str]:
+        """Just the rule strings, for the policy layer to compile."""
+        return [str(row["rule"]) for row in self.list_web_blocklist(principal_id=principal_id)]
+
+    def list_web_blocklist(self, *, principal_id: str | None = None) -> list[dict[str, Any]]:
+        """Owner rules, plus any that predate per-owner scoping.
+
+        A row with a NULL owner is included for everyone: it was written before
+        the column existed, and dropping it silently would *unblock* something.
+        """
+        sql = "SELECT * FROM web_egress_blocklist"
+        params: list[Any] = []
+        if principal_id:
+            sql += " WHERE owner_principal_id = ? OR owner_principal_id IS NULL"
+            params.append(principal_id)
+        sql += " ORDER BY created_at DESC"
+        with self.connect() as connection:
+            return [dict(row) for row in connection.execute(sql, params).fetchall()]
+
+    def add_web_blocklist_rule(
+        self, rule: str, kind: str, *, principal_id: str | None = None,
+        note: str = "", created_by: str = "",
+    ) -> str:
+        rule_id = new_id("wbl_")
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT OR IGNORE INTO web_egress_blocklist
+                   (rule_id, owner_principal_id, rule, kind, note, created_at, created_by)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (rule_id, principal_id, rule, kind, note[:500], utc_now(), created_by),
+            )
+        return rule_id
+
+    def delete_web_blocklist_rule(self, rule_id: str, *, principal_id: str | None = None) -> bool:
+        sql = "DELETE FROM web_egress_blocklist WHERE rule_id = ?"
+        params: list[Any] = [rule_id]
+        if principal_id:
+            sql += " AND (owner_principal_id = ? OR owner_principal_id IS NULL)"
+            params.append(principal_id)
+        with self.connect() as connection:
+            return connection.execute(sql, params).rowcount > 0
+
+    # ── Git credential grants (RAIKER-2022) ──────────────────────────────────
+
+    def create_git_credential_grant(
+        self, *, principal_id: str, scope: str, expires_at: str,
+        session_id: str | None = None, reason: str = "",
+    ) -> dict[str, Any]:
+        """Record one owner decision to lend the git credential.
+
+        ``scope`` is ``once`` or ``session``. Creating a grant supersedes any
+        active one for the same principal: two live grants would mean the owner
+        could not tell which decision was in force, and revoking one would leave
+        the other standing.
+        """
+        grant_id = new_id("grant_")
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE git_credential_grants SET status = 'superseded', revoked_at = ?
+                   WHERE owner_principal_id = ? AND status = 'active'""",
+                (now, principal_id),
+            )
+            connection.execute(
+                """INSERT INTO git_credential_grants
+                   (grant_id, owner_principal_id, session_id, scope, status, reason,
+                    granted_at, expires_at)
+                   VALUES (?, ?, ?, ?, 'active', ?, ?, ?)""",
+                (grant_id, principal_id, session_id, scope, reason[:500], now, expires_at),
+            )
+        return {
+            "grant_id": grant_id, "scope": scope, "status": "active",
+            "granted_at": now, "expires_at": expires_at, "session_id": session_id,
+        }
+
+    def active_git_credential_grant(
+        self, principal_id: str, *, session_id: str | None = None, now: str | None = None
+    ) -> dict[str, Any] | None:
+        """The grant that would authorise a git command right now, if any.
+
+        Expiry is evaluated here rather than by a sweep: a grant the owner set to
+        last an hour must stop working an hour later whether or not anything has
+        run since.
+        """
+        moment = now or utc_now()
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM git_credential_grants
+                   WHERE owner_principal_id = ? AND status = 'active' AND expires_at > ?
+                   ORDER BY granted_at DESC LIMIT 1""",
+                (principal_id, moment),
+            ).fetchone()
+        if row is None:
+            return None
+        grant = dict(row)
+        # A session grant is exactly that: it does not carry into another chat.
+        if (
+            str(grant.get("scope")) == "session"
+            and grant.get("session_id")
+            and session_id is not None
+            and str(grant["session_id"]) != session_id
+        ):
+            return None
+        return grant
+
+    def consume_git_credential_grant(self, grant_id: str) -> None:
+        """Count a use, and close a one-shot grant behind it."""
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE git_credential_grants
+                   SET uses = uses + 1,
+                       consumed_at = COALESCE(consumed_at, ?),
+                       status = CASE WHEN scope = 'once' THEN 'consumed' ELSE status END
+                   WHERE grant_id = ?""",
+                (utc_now(), grant_id),
+            )
+
+    def revoke_git_credential_grants(self, principal_id: str) -> int:
+        with self.connect() as connection:
+            return connection.execute(
+                """UPDATE git_credential_grants SET status = 'revoked', revoked_at = ?
+                   WHERE owner_principal_id = ? AND status = 'active'""",
+                (utc_now(), principal_id),
+            ).rowcount
 
     def rebuild_conversation_fts(self) -> int:
         """Owner-started repair. Returns the number of indexed rows."""

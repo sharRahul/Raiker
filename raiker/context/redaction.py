@@ -4,6 +4,7 @@ import re
 from collections.abc import Callable
 
 REDACTED_SECRET = "[REDACTED_SECRET]"
+REDACTED_CREDENTIAL = "[REDACTED_CREDENTIAL]"
 REDACTED_TOKEN = "[REDACTED_TOKEN]"
 REDACTED_EMAIL = "[REDACTED_EMAIL]"
 REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
@@ -172,6 +173,67 @@ _DIGEST_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | 
 )
 
 
+# ── Exact secrets, registered while they are in use ──────────────────────────
+#
+# The pattern scan below recognises credential *shapes*. That is the right tool
+# for text nobody warned us about, and the wrong one for a credential we are
+# knowingly handing to a child process: a GitHub token echoed back by a command,
+# split across a wrapped line, or embedded in a remote URL may not look like a
+# token by the time it reaches a log.
+#
+# So a caller that is about to lend a secret registers the exact value first.
+# Every redaction pass then removes that literal wherever it appears, whatever
+# shape it has taken, for exactly as long as the loan lasts. The registry holds
+# values in memory only, is never persisted, and is emptied by the same
+# ``finally`` that ends the loan.
+_ACTIVE_SECRETS: dict[str, int] = {}
+_SECRETS_LOCK = __import__("threading").Lock()
+
+#: Below this length a "secret" is too short to remove safely — redacting a
+#: four-character value would blank out unrelated text everywhere it occurred.
+MIN_REGISTERED_SECRET = 8
+
+
+def remember_secret(value: str) -> None:
+    """Redact this exact value from every scan until it is forgotten.
+
+    Reference-counted, so two overlapping loans of the same token do not have the
+    first ``forget_secret`` stop redacting it for the second.
+    """
+    text = (value or "").strip()
+    if len(text) < MIN_REGISTERED_SECRET:
+        return
+    with _SECRETS_LOCK:
+        _ACTIVE_SECRETS[text] = _ACTIVE_SECRETS.get(text, 0) + 1
+
+
+def forget_secret(value: str) -> None:
+    text = (value or "").strip()
+    with _SECRETS_LOCK:
+        remaining = _ACTIVE_SECRETS.get(text, 0) - 1
+        if remaining > 0:
+            _ACTIVE_SECRETS[text] = remaining
+        else:
+            _ACTIVE_SECRETS.pop(text, None)
+
+
+def registered_secret_count() -> int:
+    """How many secrets are on loan. For tests and diagnostics; never the values."""
+    with _SECRETS_LOCK:
+        return len(_ACTIVE_SECRETS)
+
+
+def _strip_registered_secrets(text: str) -> tuple[str, bool]:
+    with _SECRETS_LOCK:
+        secrets = sorted(_ACTIVE_SECRETS, key=len, reverse=True)
+    changed = False
+    for secret in secrets:
+        if secret in text:
+            text = text.replace(secret, REDACTED_CREDENTIAL)
+            changed = True
+    return text, changed
+
+
 def redact_text(
     text: str,
     *,
@@ -201,7 +263,11 @@ def redact_text(
         patterns = _IDENTIFIER_PATTERNS
     elif digest_value:
         patterns = _DIGEST_PATTERNS
-    redacted = text
+    # Registered secrets come out first, and unconditionally. A value we knowingly
+    # lent must not depend on a shape heuristic recognising it — this pass runs on
+    # every mode, including the relaxed locator/identifier ones, because a token
+    # embedded in a remote URL is exactly the case those modes relax for.
+    redacted, _ = _strip_registered_secrets(text)
     for pattern, replacement in patterns:
         redacted = pattern.sub(replacement, redacted)
     return redacted, redacted != text

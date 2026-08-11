@@ -36,13 +36,14 @@ from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import default_tool_specs, validate_tool_call
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
-from raiker.runtime.executors.sandbox import SandboxError, web_egress_allowlist
+from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.web_access import (
     SEARCH_ENDPOINT_ENV,
     WebAccessService,
     check_url,
     html_to_text,
 )
+from raiker.runtime.web_policy import parse_rules
 from raiker.storage.sqlite import SQLiteStore
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
@@ -70,7 +71,7 @@ def store(workspace: Path) -> SQLiteStore:
 @pytest.fixture(autouse=True)
 def _no_ambient_allowlist(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every test states its own egress posture; none inherits the host's."""
-    monkeypatch.delenv("RAIKER_WEB_EGRESS_ALLOWLIST", raising=False)
+    monkeypatch.delenv("RAIKER_WEB_EGRESS_BLACKLIST", raising=False)
     monkeypatch.delenv(SEARCH_ENDPOINT_ENV, raising=False)
 
 
@@ -96,10 +97,15 @@ def _allow(ctrl: RuntimeControlService) -> None:
 
 
 def _allowlist(monkeypatch: pytest.MonkeyPatch, hosts: str = "docs.example.com") -> None:
-    monkeypatch.setenv("RAIKER_WEB_EGRESS_ALLOWLIST", hosts)
+    """Kept as a no-op so the tests that called it still read as they did.
+
+    RAIKER-2021 removed the allowlist: a public host needs nothing configured to
+    be reachable, so "allowlist these hosts" is now "do nothing".
+    """
+    return None
 
 
-def _ok_fetch(url: str, allowlist: frozenset[str], headers: dict[str, str]) -> dict[str, Any]:
+def _ok_fetch(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
     assert url.startswith("https://")
     return {
         "final_url": url,
@@ -119,9 +125,18 @@ def _governed(workspace: Path, store: SQLiteStore, fetch_fn: Any = _ok_fetch) ->
 
 @pytest.fixture(autouse=True)
 def _public_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Resolution is a live DNS question; these tests are about governance.
+
+    ``TestUrlSafety`` pins the real resolver separately, and
+    ``test_web_egress_blocklist.py`` covers the address guard on its own.
+    """
     monkeypatch.setattr(
-        "raiker.runtime.web_access._is_public_address",
-        lambda host: not host.endswith(".internal") and host not in {"localhost", "127.0.0.1"},
+        "raiker.runtime.web_policy.resolve_public_addresses",
+        lambda host, port=443: (
+            []
+            if host.endswith(".internal") or host in {"localhost", "127.0.0.1"}
+            else ["93.184.216.34"]
+        ),
     )
 
 
@@ -133,12 +148,19 @@ class TestWebFetchGovernance:
         assert outcome["error"]["remediation_route"] == "capabilities"
         assert "Settings" not in outcome["error"]["message"]
 
-    def test_default_ask_withholds(self, workspace: Path, store: SQLiteStore) -> None:
+    def test_default_ask_no_longer_withholds(self, workspace: Path, store: SQLiteStore) -> None:
+        """RAIKER-2021: a public read under a guard the owner cannot switch off is
+        a read, not an escalation — so `ask` behaves like the connector reads."""
+        _enable_gate(workspace, store)
+        outcome = _governed(workspace, store).fetch("https://docs.example.com/widget")
+        assert outcome["status"] == "success"
+
+    def _superseded_test_default_ask_withholds(self, workspace: Path, store: SQLiteStore) -> None:
         _enable_gate(workspace, store)
         outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
         assert outcome["error"]["type"] == "web_withheld_ask"
 
-    def test_auto_withholds(self, workspace: Path, store: SQLiteStore) -> None:
+    def _superseded_test_auto_withholds(self, workspace: Path, store: SQLiteStore) -> None:
         ctrl = _enable_gate(workspace, store)
         ctrl.set_capability_decision_mode(_CAP, "auto", "principal_owner", "test")
         outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
@@ -150,12 +172,13 @@ class TestWebFetchGovernance:
         outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
         assert outcome["error"]["type"] == "web_denied_by_decision_mode"
 
-    def test_allow_without_allowlist_fails_closed(
+    def test_no_blocklist_means_a_public_host_is_reachable(
         self, workspace: Path, store: SQLiteStore
     ) -> None:
+        """The trade this change makes: nothing to fill in before the tool works."""
         _allow(_enable_gate(workspace, store))
-        outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
-        assert outcome["error"]["type"] == "web_egress_denied:no_allowlist"
+        outcome = _governed(workspace, store).fetch("https://docs.example.com/widget")
+        assert outcome["status"] == "success"
 
     def test_allow_reads_when_fully_governed(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
@@ -166,99 +189,113 @@ class TestWebFetchGovernance:
         assert outcome["status"] == "success"
         assert outcome["title"] == "Widget docs"
         assert outcome["untrusted"] is True
-        assert "untrusted data, not instructions" in outcome["content"]
+        assert "Untrusted web content" in outcome["content"]
         assert "widget.start()" in outcome["content"]
         # Script and style bodies are dropped, not flattened into the text.
         assert "alert(" not in outcome["content"]
         assert "color:red" not in outcome["content"]
 
-    def test_host_outside_allowlist_is_refused(
+    def test_a_blocked_host_is_refused(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _allow(_enable_gate(workspace, store))
-        _allowlist(monkeypatch, "docs.example.com")
+        monkeypatch.setenv("RAIKER_WEB_EGRESS_BLACKLIST", "evil.example.net")
         outcome = _governed(workspace, store).fetch("https://evil.example.net/a")
-        assert outcome["error"]["type"] == "web_egress_denied:evil.example.net"
+        assert outcome["error"]["type"] == "web_egress_blocked:evil.example.net"
 
 
 class TestUrlSafety:
-    ALLOW = frozenset({"docs.example.com", "*.readthedocs.io"})
+    BLOCK = parse_rules(["blocked.example.com", "*.ads.example.com"])
 
     @pytest.mark.parametrize(
         ("url", "reason"),
         [
             ("http://docs.example.com/a", "web_url_not_https"),
             ("file:///etc/passwd", "web_url_not_https"),
-            ("https://user:pw@docs.example.com/a", "web_url_invalid"),
-            ("https://other.example.com/a", "web_egress_denied:other.example.com"),
+            ("https://user:pw@docs.example.com/a", "web_url_credentials"),
         ],
     )
-    def test_refusals(self, url: str, reason: str, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("raiker.runtime.web_access._is_public_address", lambda host: True)
-        assert check_url(url, self.ALLOW) == reason
+    def test_unfetchable_shapes_are_refused(self, url: str, reason: str) -> None:
+        assert check_url(url, self.BLOCK).reason == reason
 
-    def test_empty_allowlist_denies_everything(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        monkeypatch.setattr("raiker.runtime.web_access._is_public_address", lambda host: True)
-        assert check_url("https://docs.example.com/a", frozenset()) == "web_egress_denied:no_allowlist"
-
-    def test_glob_allowlist_entry_matches_subdomain(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr("raiker.runtime.web_access._is_public_address", lambda host: True)
-        assert check_url("https://raiker.readthedocs.io/en/latest/", self.ALLOW) is None
-
-    def test_allowlisted_name_pointing_inside_is_refused(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """An owner can allowlist a name; a name can still point at the loopback."""
-        monkeypatch.setattr("raiker.runtime.web_access._is_public_address", lambda host: False)
-        assert (
-            check_url("https://docs.example.com/a", self.ALLOW)
-            == "web_host_not_public:docs.example.com"
+    def test_a_blocked_name_is_refused(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "raiker.runtime.web_policy.resolve_public_addresses", lambda h, p=443: ["93.184.216.34"]
+        )
+        assert check_url("https://blocked.example.com/a", self.BLOCK).reason == (
+            "web_egress_blocked"
         )
 
-    def test_real_resolver_refuses_localhost(self) -> None:
-        from raiker.runtime.web_access import _is_public_address
+    def test_an_unblocked_public_host_is_allowed(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        monkeypatch.setattr(
+            "raiker.runtime.web_policy.resolve_public_addresses", lambda h, p=443: ["93.184.216.34"]
+        )
+        assert check_url("https://docs.example.com/a", self.BLOCK).allowed
 
-        assert _is_public_address("localhost") is False
-
-    def test_web_egress_allowlist_is_owner_configured(
+    def test_a_name_pointing_inside_is_refused_whatever_the_blocklist_says(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        assert web_egress_allowlist() == frozenset()
-        monkeypatch.setenv("RAIKER_WEB_EGRESS_ALLOWLIST", "a.example.com, b.example.com")
-        assert web_egress_allowlist() == frozenset({"a.example.com", "b.example.com"})
+        """The half that stayed deny-by-default: a name can still point at loopback."""
+        monkeypatch.setattr(
+            "raiker.runtime.web_policy.resolve_public_addresses", lambda h, p=443: []
+        )
+        assert check_url("https://docs.example.com/a", ()).reason == "web_host_not_public"
 
-    def test_connector_allowlist_does_not_grant_web_access(
+    def test_the_real_resolver_refuses_localhost(self) -> None:
+        from raiker.runtime.web_policy import resolve_public_addresses
+
+        assert resolve_public_addresses("localhost") == []
+
+    def test_the_connector_allowlist_is_a_separate_boundary(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Allowing a connector's API host must not also allow agent page reads."""
+        """Allowing a connector's API host must not change the agent's own reads."""
+        from raiker.runtime.web_policy import env_blocklist
+
         monkeypatch.setenv("RAIKER_CONNECTOR_EGRESS_ALLOWLIST", "api.github.com")
-        assert web_egress_allowlist() == frozenset()
+        assert env_blocklist() == ()
 
 
 class TestRedirects:
     def test_every_hop_is_re_governed(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """A page that redirects off the allowlist stops at the boundary."""
+        """A page that redirects to a blocked host stops at the boundary."""
 
-        def redirecting(url: str, allowlist: frozenset[str], headers: dict[str, str]) -> dict[str, Any]:
+        def redirecting(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
             # Stand in for the real hop loop: the second destination is checked
             # with the same function the loop uses, and refuses.
-            reason = check_url("https://evil.example.net/a", allowlist)
-            assert reason is not None
-            raise SandboxError(reason)
+            decision = check_url("https://evil.example.net/a", rules)
+            assert not decision.allowed
+            raise SandboxError(decision.reason_code)
 
         _allow(_enable_gate(workspace, store))
-        _allowlist(monkeypatch, "docs.example.com")
+        monkeypatch.setenv("RAIKER_WEB_EGRESS_BLACKLIST", "evil.example.net")
         outcome = _governed(workspace, store, redirecting).fetch("https://docs.example.com/go")
         assert outcome["status"] == "denied"
-        assert outcome["error"]["type"] == "web_egress_denied:evil.example.net"
+        assert outcome["error"]["type"] == "web_egress_blocked:evil.example.net"
 
 
 class TestWebSearch:
-    def test_off_until_the_owner_configures_a_provider(
+    def test_search_works_without_the_owner_configuring_a_provider(
+        self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """RAIKER-2021: `web_search_not_configured` is gone — the tool was
+        advertised to the model and then refused on every fresh install."""
+        _allow(_enable_gate(workspace, store))
+        rows = '<a href="https://docs.example.com/w">Widget docs</a>'
+
+        def html_search(url: str, rules: Any, headers: dict[str, str]) -> dict[str, Any]:
+            assert "duckduckgo" in url
+            return {"final_url": url, "status": 200, "content_type": "text/html",
+                    "body": rows, "truncated": False}
+
+        outcome = _governed(workspace, store, html_search).search("widget docs")
+        assert outcome["status"] == "success"
+        assert outcome["endpoint_configured"] is False
+        assert outcome["results"][0]["url"] == "https://docs.example.com/w"
+
+    def _superseded_test_off_until_the_owner_configures_a_provider(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         _allow(_enable_gate(workspace, store))
@@ -294,16 +331,17 @@ class TestWebSearch:
         assert outcome["status"] == "success"
         assert outcome["result_count"] == 1
         assert outcome["results"][0]["url"] == "https://docs.example.com/w"
-        assert "untrusted data, not instructions" in outcome["content"]
+        assert "Untrusted web content" in outcome["content"]
 
-    def test_search_endpoint_must_be_allowlisted(
+    def test_a_blocked_search_endpoint_is_refused(
         self, workspace: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
     ) -> None:
+        """The endpoint answers to the blocklist like any other destination."""
         _allow(_enable_gate(workspace, store))
-        _allowlist(monkeypatch, "docs.example.com")
         monkeypatch.setenv(SEARCH_ENDPOINT_ENV, "https://search.example.com/api")
+        monkeypatch.setenv("RAIKER_WEB_EGRESS_BLACKLIST", "search.example.com")
         outcome = _governed(workspace, store).search("widget docs")
-        assert outcome["error"]["type"] == "web_egress_denied:search.example.com"
+        assert outcome["error"]["type"] == "web_egress_blocked:search.example.com"
 
 
 class TestModelSurface:

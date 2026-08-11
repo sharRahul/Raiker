@@ -2865,3 +2865,62 @@ CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts4(
   turn_id UNINDEXED, session_id UNINDEXED, role UNINDEXED, text
 );
 """
+
+
+# ── Owner-managed web egress blocklist (RAIKER-2021) ─────────────────────────
+#
+# Web egress used to be an allowlist that only existed in the process
+# environment, on the stated grounds that the last boundary before bytes leave
+# the machine should not be editable from a browser session. That reasoning held
+# while the list was the *only* thing standing between a model-chosen URL and the
+# network. It no longer is: the address guard refuses every private, loopback and
+# link-local destination and is not owner-editable at all, so what the owner edits
+# here is their own policy about public destinations — which is exactly the kind
+# of thing a person should be able to change without editing a service file.
+#
+# `RAIKER_WEB_EGRESS_BLACKLIST` still applies and is unioned with these rows, so
+# a deployment that wants rules the app cannot remove still has them.
+WEB_BLOCKLIST_MIGRATION_ID = "RAIKER-2021-web-egress-blocklist"
+
+WEB_BLOCKLIST_SQL = """
+CREATE TABLE IF NOT EXISTS web_egress_blocklist (
+  rule_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT,
+  rule TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  note TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  created_by TEXT NOT NULL DEFAULT ''
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_web_blocklist_rule
+  ON web_egress_blocklist(owner_principal_id, rule);
+"""
+
+
+# ── Session-scoped git credential grants (RAIKER-2022) ───────────────────────
+#
+# A push needs a credential, and the credential is the owner's. Holding it in the
+# process environment for the life of the host means every command the runtime
+# ever launches inherits it, and a grant that never expires is one the owner
+# cannot meaningfully withdraw. A grant row is the opposite: it names the scope
+# (one command, or this session), it carries an expiry, and revoking it is a
+# delete rather than a restart.
+GIT_CREDENTIAL_GRANT_MIGRATION_ID = "RAIKER-2022-git-credential-grants"
+
+GIT_CREDENTIAL_GRANT_SQL = """
+CREATE TABLE IF NOT EXISTS git_credential_grants (
+  grant_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT,
+  scope TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'active',
+  reason TEXT NOT NULL DEFAULT '',
+  granted_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  consumed_at TEXT,
+  revoked_at TEXT,
+  uses INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_git_grants_active
+  ON git_credential_grants(owner_principal_id, status, expires_at);
+"""

@@ -31,7 +31,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "httpx2>=2.9", "pyinstaller>=6.10"]
+dev = ["pytest>=8", "ruff>=0.6", "mypy>=1.10", "types-PyYAML>=6.0.12", "httpx2>=2.9", "pyinstaller>=6.10"]
 
 [project.scripts]
 raiker = "raiker.cli.main:main"

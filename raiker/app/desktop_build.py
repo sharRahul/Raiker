@@ -18,6 +18,7 @@ def pyinstaller_command(
         "--noconfirm",
         "--clean",
         "--onedir",
+        *(["--windowed"] if platform_name == "win32" else []),
         "--name",
         "Raiker",
         "--paths",
@@ -57,4 +58,3 @@ def main(argv: list[str] | None = None) -> int:
         check=False,
     )
     return completed.returncode
-

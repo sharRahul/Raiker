@@ -238,9 +238,25 @@ _WXS = """<?xml version="1.0" encoding="utf-8"?>
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="INSTALLFOLDER" Name="Raiker" />
     </StandardDirectory>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="Raiker" />
+    </StandardDirectory>
     <ComponentGroup Id="Payload" Directory="INSTALLFOLDER">
       <Files Include="{payload}\\**" />
     </ComponentGroup>
+    <Component Id="ApplicationShortcut" Directory="ApplicationProgramsFolder" Guid="*">
+      <Shortcut Id="RaikerStartMenuShortcut" Name="Raiker"
+                Description="Raiker governed AI assistant"
+                Target="[INSTALLFOLDER]desktop\\Raiker\\Raiker.exe"
+                WorkingDirectory="INSTALLFOLDER" />
+      <RemoveFolder Id="RemoveApplicationProgramsFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\\Raiker" Name="StartMenuShortcut"
+                     Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+    <Feature Id="MainFeature" Title="Raiker" Level="1">
+      <ComponentGroupRef Id="Payload" />
+      <ComponentRef Id="ApplicationShortcut" />
+    </Feature>
   </Package>
 </Wix>
 """

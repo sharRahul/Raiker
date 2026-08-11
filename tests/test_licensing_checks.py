@@ -31,4 +31,4 @@ def test_license_exceptions_cover_linux_tray_backend_and_build_backend_metadata(
     policy = load_policy(Path(__file__).resolve().parents[1])
 
     assert has_exception({"name": "python-xlib", "license": "LGPLv2+"}, policy)
-    assert has_exception({"name": "setuptools", "license": "NOASSERTION"}, policy)
+    assert has_exception({"name": "setuptools", "license": None}, policy)

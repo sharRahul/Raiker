@@ -179,6 +179,8 @@ def write_sbom(path: Path, components: list[dict[str, str | None]]) -> None:
 
 def has_exception(component: dict[str, str | None], policy: dict[str, Any]) -> bool:
     license_value = normalize_license(component["license"])
+    if license_value is None or license_value.upper() in UNKNOWN:
+        license_value = "NOASSERTION"
     return any(
         exception["component"] == component["name"] and exception["license"] == license_value
         for exception in policy["exceptions"]

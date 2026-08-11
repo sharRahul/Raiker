@@ -123,7 +123,7 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Distinct billing / quota exhaustion | ChatGPT usage caps; Claude Code credit-balance and usage-limit messages; Codex quota errors | `quota_exhausted` state and `provider_quota_exhausted` code (Task 13) | ✅ |
 | Distinct auth failure | All | `authentication_failed` | ✅ |
 | Refuse work before submission when nothing is ready | None — all four coding agents fail at call time | Fail-closed gate on Workbench, Chat, Build, Tasks, Schedule, and background runs, draft preserved | ✅ beyond |
-| Guided first-run model setup | ChatGPT onboarding; OpenClaw connector onboarding | Resumable five-screen `#/model-setup` | ✅ |
+| Guided first-run model setup | ChatGPT desktop quickstart; OpenClaw and Hermes provider onboarding | Current `#/model-setup` is a resumable three-stage, model-only route; BUG-48 expands it into the full instance/model/privacy/backup/finish flow and makes a real readiness check part of completion | 🟡 |
 | Context window and capability metadata | Claude Code `/context`; Codex `model_context_window`; ChatGPT model descriptions | Discovered capacity with its source, Details drawer | ✅ |
 | Cost and usage per model | Claude Code `/cost`; ChatGPT usage | Pricing tab, per-profile spend | ✅ |
 | Reasoning-effort control | Codex `model_reasoning_effort`; Claude Code thinking levels | `reasoning_effort` validated against the exact profile's declared values | ✅ |
@@ -139,6 +139,49 @@ problem when the request fails. Raiker binds readiness to the exact
 owner/profile/model/endpoint tuple, persists the observation with a short TTL,
 and refuses to create a turn, task, schedule, or background run until something
 in the resolved chain is proven ready.
+
+---
+
+## Desktop onboarding, host control, governed work and portable evidence
+
+Reviewed 2026-08-11 while designing BUG-46, BUG-48, BUG-51, BUG-60, BUG-64,
+BUG-65 and BUG-88, against the applicable desktop, setup, approval, scheduling
+and evidence controls of **Claude Cowork**, **Claude Code**, **ChatGPT**,
+**Codex**, **OpenClaw**, and **Hermes Agent**. Scope is only this control set;
+nothing here is a claim about the rest of those products.
+
+Primary sources: [Claude Cowork setup](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork),
+[Claude Cowork scheduled tasks](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork),
+[Claude Code Desktop](https://code.claude.com/docs/en/desktop),
+[Claude Code permissions](https://code.claude.com/docs/en/permissions),
+[ChatGPT/Codex desktop app](https://learn.chatgpt.com/docs/app),
+[ChatGPT/Codex permissions](https://learn.chatgpt.com/docs/permission-modes),
+[ChatGPT scheduled tasks](https://learn.chatgpt.com/docs/automations),
+[Codex approvals and sandboxing](https://learn.chatgpt.com/docs/agent-approvals-security),
+[OpenClaw onboarding](https://docs.openclaw.ai/start/wizard),
+[OpenClaw Control UI](https://docs.openclaw.ai/web/control-ui),
+[OpenClaw Windows Hub](https://openclaw.ai/), and
+[Hermes quickstart](https://hermes-agent.nousresearch.com/docs/getting-started/quickstart).
+
+Status: ✅ at parity or beyond · 🟡 partial / designed · ❌ absent.
+
+| Control | Reference behaviour (where it exists) | Raiker | Status |
+|---|---|---|---|
+| No-terminal desktop first run | ChatGPT and Claude Desktop install and onboard in-app; OpenClaw Windows Hub exposes setup; Hermes ships a desktop installer | Account creation and model-only setup exist in the browser, but the installed Windows payload is not yet self-contained and the full guided flow is BUG-48 | 🟡 |
+| Provider choice proven by a real call | OpenClaw tests detected/selected inference before continuing; Hermes says to verify a clean chat before adding gateway, cron or skills | Exact readiness API exists, but the current setup review screen does not invoke it before completion; BUG-48 binds completion to that proof | 🟡 |
+| Native host presence and lifecycle | Claude/ChatGPT Desktop are resident applications; OpenClaw Windows Hub exposes native tray controls | Web Host control is authoritative; BUG-48 adds a thin native tray that calls those same routes | 🟡 |
+| Technical boundary separate from approval policy | Codex separates OS sandbox mode from approval policy; Claude Code combines ordered permission rules with OS sandboxing | Policy engine, capability gates and execution environments are separate runtime layers | ✅ |
+| Deny/withhold is runtime-visible | Claude Code exposes tool activity and permission decisions; OpenClaw persists approval decisions and resolver attribution | Outer policy refusals stream a card, but inner governed withheld results rely on model narration until BUG-60 | 🟡 |
+| Configuration shown as authoritative is consumed | Claude Code and Codex document live settings; OpenClaw Labs hides unshipped switches; Hermes Blank Slate writes explicit tool configuration | `StaticPolicyConfig.denied_actions` looks authoritative but is unread; BUG-51 removes it and adds a classification invariant | ❌ |
+| Creating work is distinct from scheduling/running it | ChatGPT and Claude Cowork use explicit Scheduled workflows and manual runs; Hermes separates cron create and run | Human task creation is intentional start-now, but approved model proposals also start now until BUG-64 parks them for explicit **Run now** | ❌ |
+| Portable evidence resolves its own citations | Reference products keep source-backed work reviewable in the surface; shareable OpenClaw/Hermes diagnostics are sanitized | Live turn citations resolve, but exported transcripts omit the source ledger until BUG-65 | ❌ |
+| Local and exposed traffic have different trust posture | Codex defaults to local sandbox/no network; OpenClaw distinguishes direct loopback control from paired remote devices | Authentication already distinguishes loopback bootstrap, but one global read/write rate budget still makes ordinary local navigation compete with abuse control until BUG-88 | 🟡 |
+| Database encryption and key-memory lock are stated separately | None of the six reference products exposes this embedded-database distinction | BUG-46 adds separately proven **Encrypted** and **Locked in memory / Degraded** facts, never inferring one from the other | 🟡 beyond when shipped |
+
+Design contract:
+[`plans/BUG_46_48_51_60_64_65_88_DESIGN.md`](plans/BUG_46_48_51_60_64_65_88_DESIGN.md).
+The rows above remain partial or absent until implementation and live evidence
+exist; a written design is not a shipped control.
 
 ---
 

@@ -361,6 +361,52 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     await waitFor(() => expect(screen.getByText("Cache 5m")).toBeTruthy());
   });
 
+  it("sends the optional usage admin key separately from the inference key", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      local_only: false,
+      requires_network: true,
+      endpoint_kind: "remote_hosted",
+      off_machine: true,
+      connection_configured: false,
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({ profiles: [anthropic] }),
+      "PUT /api/models/anthropic-hosted/connection": {
+        ok: true,
+        connection_configured: true,
+      },
+    });
+    render(ModelsView, { props: { tab: "hosted" } });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+    await fireEvent.input(screen.getByLabelText("Anthropic API key"), {
+      target: { value: "inference-key" },
+    });
+    await fireEvent.input(
+      screen.getByLabelText(/Organization usage admin key/),
+      { target: { value: "usage-admin-key" } },
+    );
+    await fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Connect" }),
+    );
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/models/anthropic-hosted/connection",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({
+            endpoint: null,
+            api_key: "inference-key",
+            admin_api_key: "usage-admin-key",
+          }),
+        }),
+      ),
+    );
+  });
+
   it("shows the empty state when no fallback is configured", async () => {
     stubFetch({ "GET /api/models": models({ fallback_sequence: [] }) });
     render(ModelsView, { props: { tab: "routing" } });
@@ -538,7 +584,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         "/api/models/anthropic-hosted/connection",
         expect.objectContaining({
           method: "PUT",
-          body: JSON.stringify({ endpoint: null, api_key: null }),
+          body: JSON.stringify({ endpoint: null, api_key: null, admin_api_key: null }),
         }),
       ),
     );

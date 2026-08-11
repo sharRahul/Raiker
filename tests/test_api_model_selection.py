@@ -234,19 +234,45 @@ def test_model_connection_is_encrypted_and_principal_scoped(
     response = client.put(
         "/api/models/generic-openai-compatible/connection",
         headers=_auth(owner_token),
-        json={"endpoint": "http://127.0.0.1:9000/v1", "api_key": "instance-secret"},
+        json={
+            "endpoint": "http://127.0.0.1:9000/v1",
+            "api_key": "instance-secret",
+            "admin_api_key": "admin-secret",
+        },
     )
     assert response.status_code == 200, response.text
     assert response.json() == {"ok": True, "connection_configured": True}
     profiles = client.get("/api/models", headers=_auth(owner_token)).json()["profiles"]
     generic = next(item for item in profiles if item["profile_id"] == "generic-openai-compatible")
     assert generic["connection_configured"] is True
+    assert generic["usage_admin_configured"] is True
     with SQLiteStore(workspace).connect() as connection:
         row = connection.execute(
             "SELECT encrypted_payload FROM connector_credentials WHERE principal_id=? AND connector_id=?",
             ("principal_owner", "model:generic-openai-compatible"),
         ).fetchone()
-    assert row is not None and b"instance-secret" not in bytes(row["encrypted_payload"])
+    assert row is not None
+    assert b"instance-secret" not in bytes(row["encrypted_payload"])
+    assert b"admin-secret" not in bytes(row["encrypted_payload"])
+
+    weekly = client.get("/api/models/weekly-usage", headers=_auth(owner_token))
+    assert weekly.status_code == 200, weekly.text
+    providers = weekly.json()["providers"]
+    assert [item["profile_id"] for item in providers] == ["generic-openai-compatible"]
+    assert providers[0]["observed"]["source"] == "raiker_ledger"
+    assert providers[0]["native"]["status"] == "not_checked"
+
+    budget = client.put(
+        "/api/models/generic-openai-compatible/weekly-budget",
+        headers=_auth(owner_token),
+        json={"token_budget": 50_000},
+    )
+    assert budget.status_code == 200, budget.text
+    assert budget.json() == {"ok": True, "profile_id": "generic-openai-compatible"}
+    providers = client.get(
+        "/api/models/weekly-usage", headers=_auth(owner_token)
+    ).json()["providers"]
+    assert providers[0]["owner_budget"] == 50_000
 
 
 def test_model_connection_survives_application_restart(

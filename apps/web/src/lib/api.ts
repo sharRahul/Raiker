@@ -68,6 +68,7 @@ import type {
   PromptAttachment,
   PromptRequestBody,
   ProviderModelList,
+  ProviderWeeklyUsageView,
   ResolveApprovalResult,
   ResumableTurnsView,
   ResolveCriticalApprovalResult,
@@ -412,6 +413,21 @@ export const api = {
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   models: () => request<ModelsView>("/api/models"),
+  weeklyModelUsage: (refreshNative = false) =>
+    request<ProviderWeeklyUsageView>(
+      withQuery("/api/models/weekly-usage", {
+        refresh_native: refreshNative ? "true" : undefined,
+      }),
+    ),
+  setWeeklyModelBudget: (profileId: string, tokenBudget: number | null) =>
+    request<{ ok: boolean; profile_id: string }>(
+      `/api/models/${encodeURIComponent(profileId)}/weekly-budget`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token_budget: tokenBudget }),
+      },
+    ),
   modelReadiness: () =>
     request<{ items: ModelReadinessView[] }>("/api/model-readiness"),
   checkModelReadiness: (profile_id: string, model: string) =>
@@ -800,7 +816,12 @@ export const api = {
         body: JSON.stringify({ profile_id, model: model || null }),
       },
     ),
-  saveModelConnection: (profileId: string, endpoint: string, apiKey: string) =>
+  saveModelConnection: (
+    profileId: string,
+    endpoint: string,
+    apiKey: string,
+    adminApiKey = "",
+  ) =>
     request<{ ok: boolean; connection_configured: boolean }>(
       `/api/models/${encodeURIComponent(profileId)}/connection`,
       {
@@ -809,6 +830,7 @@ export const api = {
         body: JSON.stringify({
           endpoint: endpoint || null,
           api_key: apiKey || null,
+          admin_api_key: adminApiKey || null,
         }),
       },
     ),

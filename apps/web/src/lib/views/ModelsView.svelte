@@ -25,6 +25,7 @@
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
   import DownloadsPanel from "./models/DownloadsPanel.svelte";
+  import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
@@ -161,6 +162,7 @@
   // per-instance vault and never returned to this view.
   let signInFor = $state<string | null>(null);
   let signInApiKey = $state("");
+  let signInAdminApiKey = $state("");
   let signInEndpoint = $state("");
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
@@ -230,6 +232,7 @@
   function openSignIn(profileId: string) {
     signInFor = profileId;
     signInApiKey = "";
+    signInAdminApiKey = "";
     signInEndpoint = "";
     signInAdvanced = false;
     signInError = null;
@@ -237,6 +240,9 @@
   }
   function closeSignIn() {
     signInFor = null;
+    signInApiKey = "";
+    signInAdminApiKey = "";
+    signInEndpoint = "";
     signInError = null;
     signInGuidance = null;
   }
@@ -253,8 +259,10 @@
         profileId,
         signInEndpoint.trim(),
         signInApiKey.trim(),
+        signInAdminApiKey.trim(),
       );
       signInApiKey = "";
+      signInAdminApiKey = "";
       signInEndpoint = "";
       signInFor = null;
       await load();
@@ -910,9 +918,11 @@
       aria-labelledby="tab-activity"
     >
       <p class="tab-lead">
-        Installs, pulls, downloads, conversions, and deployments — running and
-        historic. Every job names its source and destination.
+        Provider use over the last seven days, followed by installs, pulls,
+        downloads, conversions, and deployments. Observed use and provider
+        account data are always labeled separately.
       </p>
+      <ProviderUsagePanel />
       <DownloadsPanel />
     </div>{/if}
   {#if showsProviderCards}
@@ -1764,6 +1774,25 @@
         </label>
       {/if}
 
+      {#if signInProfile.provider === "openai" || signInProfile.provider === "anthropic"}
+        <label class="field admin-usage-field">
+          <span class="field-label"
+            >Organization usage admin key <small>(optional)</small></span
+          >
+          <input
+            class="input"
+            type="password"
+            placeholder="Admin key for usage reports"
+            bind:value={signInAdminApiKey}
+            autocomplete="off"
+          />
+          <small>
+            Used only to read genuine organization usage. Raiker never uses this
+            key for model calls.
+          </small>
+        </label>
+      {/if}
+
       <button
         type="button"
         class="sso-toggle"
@@ -2292,6 +2321,11 @@
   .field-label small {
     color: var(--text-3);
     font-weight: 400;
+  }
+  .admin-usage-field > small {
+    color: var(--text-3);
+    font-size: 0.68rem;
+    line-height: 1.35;
   }
   .sso-toggle {
     align-self: flex-start;

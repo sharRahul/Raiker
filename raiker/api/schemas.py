@@ -312,6 +312,18 @@ class ModelConnectionRequest(BaseModel):
 
     endpoint: str | None = None
     api_key: str | None = None
+    # OpenAI and Anthropic expose organization usage only to separate admin
+    # credentials. It is optional, encrypted with the connection, and never
+    # substituted for the inference key.
+    admin_api_key: str | None = None
+
+
+class ModelWeeklyBudgetRequest(BaseModel):
+    """Owner-defined advisory budget; null clears it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    token_budget: int | None = None
 
 
 class SetModelAdvisorRequest(BaseModel):

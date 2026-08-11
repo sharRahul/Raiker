@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,7 @@ from raiker.api.schemas import (
     ExportSessionRequest,
     ModelConnectionRequest,
     ModelPriceRequest,
+    ModelWeeklyBudgetRequest,
     MoveProjectRequest,
     RenameMcpServerRequest,
     RenameSessionRequest,
@@ -45,6 +47,7 @@ from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.provider_usage import ProviderUsageService
 from raiker.models.readiness import (
     ModelNotReady,
     ModelReadinessService,
@@ -1570,6 +1573,58 @@ async def get_models(
     return serialize_dto(_service(request).get_models(session.principal_id))
 
 
+@router.get("/api/models/weekly-usage")
+async def get_weekly_model_usage(
+    request: Request,
+    refresh_native: bool = False,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Rolling Raiker-observed usage plus optional provider-native metrics.
+
+    Only connected profiles are returned. A native refresh is explicit because
+    it can contact a provider; ordinary reads use the five-minute normalized
+    cache and never expose raw account data.
+    """
+    session, _principal = auth_data
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    rows = await ProviderUsageService(store).weekly_rows(
+        session.principal_id,
+        now=datetime.now(UTC),
+        refresh_native=refresh_native,
+    )
+    return {"window": "rolling_7_days", "providers": [row.to_dict() for row in rows]}
+
+
+@router.put("/api/models/{profile_id}/weekly-budget")
+async def set_weekly_model_budget(
+    profile_id: str,
+    body: ModelWeeklyBudgetRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    if isinstance(body.token_budget, bool) or (
+        body.token_budget is not None and body.token_budget <= 0
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason_code": "weekly_token_budget_must_be_positive"},
+        )
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    service = ProviderUsageService(store)
+    if profile_id not in service.connected_profile_ids(session.principal_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"reason_code": "model_provider_not_connected"},
+        )
+    from raiker.runtime.model_usage import ModelUsageLedger
+
+    ModelUsageLedger(store).set_weekly_token_budget(
+        session.principal_id, profile_id, body.token_budget
+    )
+    return {"ok": True, "profile_id": profile_id}
+
+
 @router.get("/api/connections")
 async def get_connections(
     request: Request,
@@ -1789,7 +1844,11 @@ async def set_model_connection(
         raise HTTPException(status_code=404, detail={"reason_code": "unknown_model_profile"}) from exc
     values = {
         key: value.strip()
-        for key, value in {"endpoint": body.endpoint or "", "api_key": body.api_key or ""}.items()
+        for key, value in {
+            "endpoint": body.endpoint or "",
+            "api_key": body.api_key or "",
+            "admin_api_key": body.admin_api_key or "",
+        }.items()
         if value.strip()
     }
     if not values:
@@ -1809,7 +1868,7 @@ async def set_model_connection(
             policy=provider_runtime_policy_from_gates(
                 store, session.principal_id, configuring_profile_id=profile_id
             ),
-            connection=values,
+            connection={key: value for key, value in values.items() if key != "admin_api_key"},
         ).create(profile, require_model=False)
         put_model_connection(store, session.principal_id, profile_id, values)
     except ValueError as exc:

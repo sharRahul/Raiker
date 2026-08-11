@@ -19,6 +19,7 @@ def test_sqlite_bootstrap_creates_required_tables(tmp_path) -> None:  # type: ig
         "model_profiles",
         "model_usage_ledger",
         "model_weekly_budgets",
+        "provider_usage_snapshots",
         "checkpoints",
     }
     assert expected.issubset(store.table_names())

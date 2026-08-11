@@ -2511,6 +2511,25 @@ CREATE TABLE IF NOT EXISTS model_weekly_budgets (
 );
 """
 
+PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID = "RAIKER-2042-provider-usage-snapshots"
+PROVIDER_USAGE_SNAPSHOTS_SQL = """
+-- Five-minute metadata-only cache for provider-native usage. `metrics_json`
+-- contains only Raiker's bounded normalized metric contract, never a raw
+-- provider response, credential, key label, or account identifier.
+CREATE TABLE IF NOT EXISTS provider_usage_snapshots (
+  owner_principal_id TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  metrics_json TEXT NOT NULL,
+  reason_code TEXT,
+  checked_at TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  PRIMARY KEY (owner_principal_id, profile_id)
+);
+CREATE INDEX IF NOT EXISTS idx_provider_usage_snapshot_expiry
+  ON provider_usage_snapshots(owner_principal_id, expires_at);
+"""
+
 
 SETUP_STATE_MIGRATION_ID = "RAIKER-1049-full-setup-state"
 SETUP_STATE_SQL = """

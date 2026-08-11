@@ -502,6 +502,8 @@ export interface ModelProfile {
   off_machine: boolean;
   selected: boolean;
   connection_configured?: boolean;
+  /** A separate organization-usage credential is stored; never its value. */
+  usage_admin_configured?: boolean;
   prompt_cache_ttl: string | null;
   context_window_tokens?: number | null;
   /** "provider" | "config" — which source supplied the capacity above. */
@@ -690,6 +692,51 @@ export interface ModelsView {
   fallback_sequence: string[];
   no_silent_hosted_fallback: boolean;
   ready_provider_count?: number;
+}
+
+export interface NativeUsageMetric {
+  unit: string;
+  used: string;
+  limit: string | null;
+  remaining: string | null;
+  reset_interval: string | null;
+  resets_at: string | null;
+  scope: string;
+  source: "provider";
+}
+
+export interface ProviderWeeklyUsage {
+  profile_id: string;
+  provider: string;
+  display_name: string;
+  observed: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_read_tokens: number;
+    cache_write_tokens: number;
+    total_tokens: number;
+    requests: number;
+    turns: number;
+    compactions: number;
+    known_cost: string | null;
+    cost_currency: string | null;
+    unpriced_models: string[];
+    source: "raiker_ledger";
+    window: "rolling_7_days";
+  };
+  owner_budget: number | null;
+  native: {
+    status: "available" | "unavailable" | "not_configured" | "not_supported" | "not_checked";
+    reason_code: string | null;
+    checked_at: string | null;
+    expires_at: string | null;
+    metrics: NativeUsageMetric[];
+  };
+}
+
+export interface ProviderWeeklyUsageView {
+  window: "rolling_7_days";
+  providers: ProviderWeeklyUsage[];
 }
 
 /** Read-only status of one governed service connector (web-app task 4). Every

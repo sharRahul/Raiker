@@ -277,6 +277,8 @@ from raiker.storage.migrations import (
     PROJECTS_NESTING_MIGRATION_ID,
     PROJECTS_NESTING_SQL,
     PROJECTS_SQL,
+    PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
+    PROVIDER_USAGE_SNAPSHOTS_SQL,
     REMINDERS_MIGRATION_ID,
     REMINDERS_SQL,
     SESSION_ARCHIVE_MIGRATION_ID,
@@ -1176,6 +1178,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MODEL_USAGE_ROLLING_WINDOW_MIGRATION_ID,
                 MODEL_USAGE_ROLLING_WINDOW_SQL,
+                connection,
+            )
+            self._apply_migration(
+                PROVIDER_USAGE_SNAPSHOTS_MIGRATION_ID,
+                PROVIDER_USAGE_SNAPSHOTS_SQL,
                 connection,
             )
             self._apply_migration(

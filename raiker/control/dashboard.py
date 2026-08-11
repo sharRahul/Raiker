@@ -578,6 +578,7 @@ class ModelProfileView:
     off_machine: bool
     selected: bool
     connection_configured: bool = False
+    usage_admin_configured: bool = False
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None
@@ -3705,6 +3706,11 @@ class DashboardService:
             profile: Any, effective_model: str, *, selected: bool
         ) -> ModelProfileView:
             facts = self._resolve_facts(profile, effective_model, acting_principal_id)
+            saved_connection = (
+                get_model_connection(self.store, acting_principal_id, profile.profile_id)
+                if acting_principal_id
+                else None
+            )
             readiness = (
                 readiness_service.current_selected(
                     acting_principal_id,
@@ -3730,11 +3736,9 @@ class DashboardService:
                 off_machine=str(profile.raw.get("endpoint_kind", "unknown"))
                 in {"remote_hosted", "private_network"},
                 selected=selected,
-                connection_configured=bool(
-                    acting_principal_id
-                    and get_model_connection(
-                        self.store, acting_principal_id, profile.profile_id
-                    )
+                connection_configured=bool(saved_connection),
+                usage_admin_configured=bool(
+                    saved_connection and saved_connection.get("admin_api_key")
                 ),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))

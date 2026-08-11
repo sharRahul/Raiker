@@ -17,7 +17,7 @@ __pycache__/
 *$py.class
 .claude
 project-map.md
-docs/superpowers
+docs/superpowers/
 .superpowers
 build/
 *.lock
@@ -31,8 +31,3 @@ test-results/
 .raiker-testws/
 .raiker-e2e/
 win1312-probe/
-docs/plans/2026-07-22-hermes-informed-web-experience-plan.md
-docs/plans/2026-07-18-control-deck-task-6-shared-primitives.md
-docs/plans/2026-07-18-control-deck-task-5-credential-security.md
-docs/plans/2026-07-16-raiker-control-deck-implementation.md
-docs/plans/2026-07-14-project-only-export.md

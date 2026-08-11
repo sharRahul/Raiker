@@ -1156,6 +1156,7 @@ export const api = {
   addWebBlocklistRule: (rule: string, note = "") =>
     request<{ rule_id: string; rule: string; kind: string }>("/api/web-access/blocklist", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ rule, note }),
     }),
   deleteWebBlocklistRule: (ruleId: string) =>
@@ -1165,6 +1166,7 @@ export const api = {
   testWebBlocklist: (host: string) =>
     request<WebBlocklistProbe>("/api/web-access/blocklist/test", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ host }),
     }),
 
@@ -1178,6 +1180,7 @@ export const api = {
   putGitCredential: (token: string) =>
     request<GitCredentialStatus>("/api/git-credential", {
       method: "PUT",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token }),
     }),
   deleteGitCredential: () =>
@@ -1185,6 +1188,7 @@ export const api = {
   grantGitCredential: (scope: string, sessionId?: string) =>
     request<GitCredentialStatus>("/api/git-credential/grant", {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ scope, session_id: sessionId ?? null }),
     }),
   revokeGitCredential: () =>

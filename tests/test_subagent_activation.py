@@ -176,8 +176,15 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
     contract = store.list_subagent_contracts()[0]
     subagent = store.get_principal(outcome.ref_id)
     assert subagent is not None and subagent["principal_type"] == "ai_agent"
+    # The exact delegable set, written out rather than derived from
+    # DELEGABLE_TOOLS: a subagent must never widen the parent's authority, so
+    # adding a name here has to be a deliberate edit to a test that says what
+    # the set is — not a constant the production code can quietly grow.
+    # `conversation_search` and `code_map_references` (RAIKER-2020) are both
+    # local, read-only and egress-free, which is the rule this list encodes.
     assert json.loads(contract["allowed_tools_json"]) == sorted(
-        ["code_map_search", "diff_files", "git_diff", "git_log", "git_status", "glob", "grep",
+        ["code_map_references", "code_map_search", "conversation_search", "diff_files",
+         "git_diff", "git_log", "git_status", "glob", "grep",
          "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
          "skill_load", "stat_path", "vector_get"]
     )

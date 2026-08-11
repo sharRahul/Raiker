@@ -782,3 +782,42 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 [`screenshots/working/`](screenshots/working). The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
+
+## 21. Multi-provider usage and compaction round — 2026-08-11
+
+Run against the production web build. Enter every credential through Models;
+never seed a connection through the CLI, environment, fixture, or direct API.
+Close credential and connection dialogs before taking screenshots. Use a fresh
+conversation per provider so provider attribution and model readiness are
+unambiguous.
+
+1. Run the checked-in loopback fixture and both deterministic batch specs.
+   Confirm the refusal scenario renders successive model passes as separate
+   paragraphs, and both specs use `e2e/fixtures/stub_model.py`.
+2. Connect Anthropic in Models, choose a live catalog model, complete readiness,
+   and send a bounded marker prompt in Chat.
+3. Connect OpenRouter the same way and complete a live turn. Refresh Models →
+   Activity and verify the **Provider reported** key-level weekly metric appears
+   separately from **Raiker observed**.
+4. Connect OpenAI through Models and complete a live turn. Without a separate
+   organization admin key, verify provider data says it needs one rather than
+   presenting an invented quota.
+5. Select and check Ollama `gemma4:31b-cloud`, then complete a live turn. Verify
+   the provider side says no compatible account-quota API while Raiker-observed
+   local tokens and turns remain present with no API cost.
+6. Disconnect or stop one provider and verify a provider that is no longer
+   connected/ready is absent from the rolling view.
+7. Set an owner weekly token budget in each visible row. Confirm its label says
+   **Advisory Raiker control — not a provider subscription limit**, survives a
+   reload, and can be cleared.
+8. Exercise a known small owner context capacity in the deterministic runtime.
+   Confirm the extra compaction model request has no tools, the next turn sees
+   the compacted summary plus recent exchanges, and the Context popover says the
+   transcript is unchanged. Repeat with a failed compaction and confirm bounded
+   recent history is retained.
+9. Capture provider and Context screenshots only after all credential dialogs
+   are closed. Inspect the committed image set for key-shaped strings before
+   keeping it.
+
+The automated evidence for this round includes the compaction, usage adapter,
+ledger/API, Svelte component, checked-in fixture, and live Playwright suites.

@@ -236,3 +236,25 @@ Hugging Face search, immutable variants and confirmed downloads use
 `/api/hugging-face`; conversion preview/start uses `/api/model-conversion`.
 Credentials and tokens are write-only, paths are redacted in operation views,
 and every mutating route requires an authenticated human owner.
+
+### Provider usage and context compaction API
+
+`GET /api/models/weekly-usage` returns connected profiles only. Each row keeps
+two sources separate: `observed` is Raiker's rolling-seven-day ledger (token
+components, requests, turns, compactions, known cost and unpriced models), while
+`native` is a normalized provider report with `status`, numeric metrics, scope,
+period and optional limit/remaining values. `refresh_native=true` explicitly
+contacts supported providers; ordinary reads use the five-minute owner-scoped
+cache. Raw provider responses, account identifiers and credentials are never in
+this contract.
+
+`PUT /api/models/{profile_id}/weekly-budget` accepts
+`{"token_budget": 500000}`. `null` clears the budget. The profile must be
+connected and a non-null value must be a positive integer. This is an advisory
+owner control, not provider quota or billing data.
+
+`GET /api/sessions/{session_id}/context-usage` includes
+`latest_compaction` when automatic compaction has been attempted. Its bounded
+metadata is `status`, `created_at`, `source_turn_count`,
+`estimated_input_tokens_before`, `estimated_summary_tokens`, and a safe
+`reason_code`. Summary text is never returned by this status route.

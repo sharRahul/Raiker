@@ -295,20 +295,32 @@ Controls required:
 
 ## Context Compaction
 
-When context becomes too large:
+When the complete next request reaches 90% of a known model capacity:
 
 ```text
 PreCompact hook
-  -> summarise low-priority context
-  -> preserve active instructions and approvals
-  -> preserve pending tool/action IDs
-  -> preserve task state
-  -> create gist memory for dropped detail when policy permits
+  -> select older completed exchanges, retaining the newest two verbatim
+  -> run a separate model request with tools and reasoning disabled
+  -> preserve the active plan and approval/checkpoint/source IDs
+  -> store the summary with an exact through-turn boundary
   -> PostCompact hook
   -> compacted_context_created event
 ```
 
-Compaction must not drop active user instruction, security policy, pending approval, task objective, current plan, changed-file list, unresolved errors, or required provenance links.
+This is runtime context management, not durable memory creation. It never edits
+or deletes the transcript and it does not create a memory record. Completed
+summaries are encrypted, owner/session scoped, and excluded from event payloads.
+The usage ledger records the summary request as `request_kind=compaction`.
+
+When capacity is unknown, the 90% boundary cannot be measured and compaction is
+not claimed. When the provider, storage, or a `PreCompact` hook makes the summary
+unavailable, Raiker records `compacted_context_failed` and continues with bounded
+recent completed history. Failed, running, and approval-waiting turns are never
+eligible input.
+
+Compaction must not drop active user instruction, security policy, pending
+approval, task objective, current plan, changed-file list, unresolved errors, or
+required provenance links.
 
 ---
 

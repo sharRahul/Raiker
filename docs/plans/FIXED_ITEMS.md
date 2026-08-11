@@ -188,6 +188,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-177 | Low | Web / loopback and public-bind rate limits | Fixed (was BUG-88) |
 | FIXED-178 | Low | Models / remove a provider credential in-app | Fixed (found during live verification) |
 | FIXED-179 | Low | CI / immutable release artifact actions | Fixed (was BUG-49) |
+| FIXED-180 | Medium | CI / Linux SQLCipher test throughput | Fixed (found during hosted verification) |
+| FIXED-181 | Low | Chat / multi-call answer separation | Fixed (was BUG-53) |
+| FIXED-182 | Medium | Web e2e / checked-in deterministic model stub | Fixed (was BUG-54) |
+| FIXED-183 | Low | Chat / disabled transcript implementation | Fixed (was BUG-55) |
+| FIXED-184 | High | Runtime / automatic context compaction | Fixed (former Known Limit) |
+| FIXED-185 | Medium | Models / connected-provider rolling usage | Fixed (former Known Limit) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -3650,11 +3656,9 @@ scenario is
 [`e2e/bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts);
 its screenshots are `working/bug-52-*`.
 
-**Found and not fixed here.** Three things this work surfaced are recorded as
-BUG-53 (a multi-call turn's answer text runs together in Chat), BUG-54 (the live
-stub model both batch scenarios depend on is not in the repository), and BUG-55
-(ninety lines of the Chat transcript, including a second approval card with
-different copy, are disabled behind `{#if false}`).
+**Closed subsequently.** The three follow-up defects this work surfaced are now
+FIXED-181 (multi-call answer separation), FIXED-182 (the checked-in live stub),
+and FIXED-183 (removal of the disabled duplicate transcript block).
 
 **UI when closed.** A batch containing one refused call reports that call as
 refused and still presents the rest, in Chat and in Approvals, exactly as it does
@@ -6972,4 +6976,112 @@ off behavior.
 **Evidence.** `tests/test_ci_workflow.py` pins the probe/suite separation,
 diagnostic output and job timeout. The focused CI, SQLCipher and API regression
 set passes with 55 tests.
+
+---
+
+## FIXED-181 — Multi-call answer passes are separated in Chat *(was BUG-53)*
+
+**Status: fixed in this change.**
+
+**Observed.** A turn that spoke, called a tool, and then answered rendered the
+two model passes as one run-on sentence. `collectText` joined every streamed
+`text_delta` with an empty string and had no request boundary.
+
+**Fix.** Transcript collection now follows `model_request_started` lifecycle
+events and inserts exactly one paragraph boundary before the first text of a
+later model request. It inserts nothing for a tool-only pass and preserves an
+existing newline, so streaming deltas within one response still join without
+breaking words.
+
+**Evidence.** `turnPhases.test.ts` covers successive response passes, a tool-only
+pass, and an existing boundary. The deterministic denial live scenario verifies
+the visible seam in Chat and Build.
+
+---
+
+## FIXED-182 — The live end-to-end model stub is reproducible *(was BUG-54)*
+
+**Status: fixed in this change.**
+
+**Observed.** The two batched-call live specs referenced a scratch-only
+`stub_model.py`; neither the exact response sequence nor their claimed evidence
+could be reproduced from a clone.
+
+**Fix.** `apps/web/e2e/fixtures/stub_model.py` is a checked-in, loopback-only,
+OpenAI-compatible deterministic server. It implements the exact multi-read,
+write-batch, approval-queue and policy-refusal continuations used by both specs,
+with bounded request bodies and no credential or external network.
+
+**Evidence.** `tests/test_live_stub_model.py` verifies the scenario contract;
+both live specs now resolve the fixture by repository path.
+
+---
+
+## FIXED-183 — Chat has one live transcript implementation *(was BUG-55)*
+
+**Status: fixed in this change.**
+
+**Observed.** `ChatView.svelte` retained roughly ninety lines behind
+`{#if false}`, including a complete approval card whose governance copy differed
+from the live card.
+
+**Fix.** The disabled transcript tree, its unused imports and helpers, and its
+orphaned styles were removed. The one rendered approval path remains the source
+of truth.
+
+**Evidence.** Svelte check reports zero errors and warnings; the Chat component
+and live transcript regressions pass.
+
+---
+
+## FIXED-184 — Context compacts automatically at 90% *(former Known Limit)*
+
+**Status: fixed in this change.**
+
+**Observed.** History had a coarse replay bound but no runtime compaction. Long
+conversations dropped their oldest exchanges rather than preserving a compact
+continuity record, even though the README promised a 90% design.
+
+**Fix.** At 90% of a known exact-model capacity, Raiker summarizes older
+completed exchanges in a separate tool-free, reasoning-disabled request and
+retains the newest two verbatim. The durable record has an exact through-turn
+boundary and protected plan, approval, checkpoint, and source IDs. Transcript
+rows are never changed. `PreCompact` and `PostCompact` hooks bracket the pass;
+unknown capacity or any failure keeps bounded recent history and records the
+safe fallback. Compaction requests have their own ledger kind.
+
+**UI when closed.** Chat and Build's Context panel shows **Earlier context
+compacted** with before/after estimates or **Recent history retained** when the
+pass was unavailable, and states that the transcript is unchanged.
+
+**Evidence.** `tests/test_conversation_compaction.py` covers the threshold,
+boundary, owner scope, protected state, failure, bounded replay, tool-free model
+call and separate accounting. Runtime history, hooks, dashboard and context
+popover regressions pass.
+
+---
+
+## FIXED-185 — Connected providers have a truthful rolling usage view *(former Known Limit)*
+
+**Status: fixed in this change.**
+
+**Observed.** Models showed all-time local accounting but no weekly provider
+view. Calling that a quota would have been misleading: ordinary inference keys
+do not expose one uniform Anthropic/OpenAI/OpenRouter account limit, and Ollama
+has no account service.
+
+**Fix.** Models → Activity now lists connected providers only and presents two
+separate seven-day receipts. **Raiker observed** aggregates ledger tokens,
+turns, all model requests, compactions, and cost where exact pricing is known.
+**Provider reported** uses genuine OpenRouter key data with the ordinary key,
+and OpenAI/Anthropic organization usage only when a separate optional admin key
+was entered through Models; Ollama truthfully reports no compatible quota API.
+Normalized numeric snapshots are owner-scoped and cached for five minutes.
+Owners can set an advisory weekly token budget that is explicitly not a provider
+subscription limit.
+
+**Evidence.** Provider adapter, bounded snapshot, connection, API, ledger and
+Models component tests pass. Playwright live turns cover Anthropic, OpenRouter,
+OpenAI and Ollama with credentials entered through Models and dialogs closed
+before screenshots.
 

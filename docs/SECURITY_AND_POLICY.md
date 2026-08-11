@@ -92,3 +92,19 @@ gating before confirmation, never place tokens on argv or in returned URLs, and
 write collision-safe snapshots. Conversion accepts Safetensors only and runs
 without network in a digest-pinned container with read-only source, separate
 output, dropped privileges and resource limits.
+
+### Usage credentials and compaction summaries
+
+Inference credentials remain write-only and encrypted. OpenAI and Anthropic
+organization-usage integrations accept an optional, separately encrypted admin
+key; it is used only by the explicit provider-usage refresh and never by model
+execution. OpenRouter uses its ordinary API key for the provider's key-status
+endpoint. Ollama exposes no account quota. All provider responses are bounded to
+1 MiB, normalized immediately to non-negative finite numeric metrics, and cached
+without account identifiers, key labels, response bodies, headers, or secrets.
+
+Conversation compaction sends only completed earlier exchanges to the already
+selected provider. The request has no tools and reasoning is disabled. Stored
+summaries are scoped to owner and session in the encrypted database; the audit
+log contains counts, estimates, boundaries, and safe reason codes only. The
+original transcript remains authoritative and unchanged.

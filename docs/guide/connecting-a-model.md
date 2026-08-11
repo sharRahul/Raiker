@@ -132,6 +132,31 @@ PUT /api/models/{profile_id}/price
 Send both rates as `null` to clear the override and fall back to the published
 or shipped price.
 
+### Rolling seven-day usage
+
+Models → **Activity** shows one row for every connected provider and no row for
+an unconnected one. **Raiker observed** is the rolling seven-day total from the
+local ledger: input/output/cache tokens, owner turns, all model requests,
+automatic compactions, and cost where the exact recorded models have known
+prices. Local Ollama usage appears here too and is correctly labelled as having
+no API cost.
+
+**Provider reported** is a separate receipt, never blended into Raiker's count:
+
+- OpenRouter's ordinary API key supplies its genuine key-level weekly spend and
+  any limit/remaining values the provider returns.
+- OpenAI and Anthropic organization usage require their separate administrator
+  keys. The optional admin key is entered in the same Models connection dialog,
+  encrypted separately, and never used for model calls.
+- Ollama has no account-quota service, so its provider side says unsupported
+  while Raiker's observed local usage remains available.
+
+Provider responses are reduced immediately to bounded numeric metrics and cached
+for five minutes; raw account payloads and identifiers are not stored. **Refresh
+provider data** makes the external checks explicit. An optional owner weekly
+token budget is advisory Raiker control, not a provider subscription limit and
+not a promise about billing or reset dates.
+
 ## Fallback sequence
 
 Below the provider grid, **Model fallback sequence** orders the backends Raiker

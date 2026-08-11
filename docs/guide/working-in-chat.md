@@ -238,7 +238,7 @@ counts only — how many messages and how many characters — never the transcri
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-10, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-11, these
 are the edges a Chat user can still hit:
 
 - **An approved network or process action is recorded, not run.** Approving a
@@ -264,11 +264,10 @@ are the edges a Chat user can still hit:
   preference to keep; you see the exact sentence before you approve, and
   approving really stores it. Until you turn the capability on, no conversation
   can propose one — the Memory page states which of the two you are in.
-- **Asking for a task in Chat gets you an approval, not a task.** See
+- **Approving task creation parks the task; it does not run it.** The approved
+  task appears in Tasks with no schedule. **Run now** is a separate execution
+  decision. See
   [Tasks and projects](tasks-and-projects.md) → Known limits.
-- **An exported conversation carries citation numbers it cannot explain.** The
-  transcript resolves `[s1]` against the turn's sources; an export carries the
-  answer text only, so the numbers travel without the list they refer to.
 - **A tool that keeps failing stops being tried, and says so.** Three failures
   in a row on the same tool or the same provider contain it: the next call is
   refused with the reason and the failure count instead of being retried, and one
@@ -286,8 +285,6 @@ are the edges a Chat user can still hit:
   work surface is open Raiker re-confirms it quietly in the background before it
   lapses. Changing model, endpoint or credential invalidates it immediately
   whatever the window says.
-- Automatic context compaction at 90 % and weekly quota display are specified
-  but not shipped.
 
 Three limits this section used to list have shipped and are gone from it:
 Markdown rendering (**FIXED-06**), conversation export (**FIXED-12**, superseded
@@ -297,11 +294,11 @@ is tracked as work rather than a deliberate boundary, it has a reproduction and
 a proposed fix in [To be fixed](../plans/TO_BE_FIXED.md); the closed ones keep
 their full record in [Fixed items](../plans/FIXED_ITEMS.md).
 
-## Context and API cost
+## Context, compaction, and API cost
 
-The **Context** control opens a read-only panel with two independent facts, each
-labelled with where it came from. The same control is in the **Build** composer
-and reads the same data.
+The **Context** control opens a read-only panel with independently sourced
+capacity, usage, cost, and the latest automatic-compaction outcome. The same
+control is in the **Build** composer and reads the same data.
 
 ```
 Context window                    2.9K / 200.0K (1%)
@@ -320,6 +317,15 @@ the provider where one publishes it — Anthropic reports `max_input_tokens` per
 model — so the meter is correct for every model rather than assuming one number
 for a whole family. A model whose capacity nobody publishes says *"Context
 capacity is not configured for this model"* instead of guessing.
+
+**Automatic compaction.** At 90 % of a known capacity, Raiker asks the selected
+model to summarize older completed exchanges in a separate request with tools
+and reasoning disabled. It keeps the newest two exchanges verbatim and carries
+forward the active plan plus pending approval, checkpoint, and source IDs. The
+full transcript stays unchanged. The panel shows **Earlier context compacted**
+with before/after estimates, or **Recent history retained** when the provider or
+a `PreCompact` hook made compaction unavailable. An unknown capacity uses bounded
+recent history and never pretends the 90 % boundary was measured.
 
 **API cost.** Shown only for providers Raiker authenticates with an API key and
 reaches off this machine. A local runtime says *"Runs on this machine — no API

@@ -204,15 +204,19 @@ Highlights, each verified against a live instance:
   attachments, sanitised Markdown rendering, source citations, a recent-chat
   list with per-row delete and move-to-project, full-text search across titles
   and message bodies, and one-click export of a conversation to HTML, Markdown
-  or PDF.
+  or PDF; at 90% of a known context capacity, older completed exchanges are
+  compacted automatically while the transcript remains unchanged.
 - **Tasks** — four work types: run now, schedule once, daily routine, and a
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.
 - **Models** — local, home-lab, hosted, and advanced providers; live provider
   catalogues; an encrypted per-instance credential vault; a user-owned fallback
   sequence with no silent hosted fallback; first-run setup; approved-root GGUF
-  discovery; managed llama.cpp; revision-pinned Hugging Face downloads; and
-  per-provider token and API-cost accounting with each figure's source named.
+  discovery; managed llama.cpp; revision-pinned Hugging Face downloads;
+  per-provider token and API-cost accounting with each figure's source named;
+  and connected-provider rolling seven-day tokens, turns, requests,
+  compactions, known cost, genuine provider data where available, and advisory
+  owner budgets.
 - **Extensions** — governed service connectors and Model Context Protocol
   servers you can build, connect, monitor, and contain, plus **Skills**:
   `SKILL.md` documents and `*.skill` bundles you upload, import from a
@@ -237,7 +241,7 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-10:
+Raiker's documentation does not run ahead of its code. As of 2026-08-11:
 
 - **Approved network and process actions still do not run** — approval
   resolution executes file changes and patches, bounded local `shell` commands,
@@ -341,9 +345,6 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-10:
   down, so a long session does not spontaneously disable Send — and connecting,
   switching model, pulling, or changing an endpoint or credential still
   invalidates a check immediately, whatever the window is set to.
-- Automatic context compaction at 90 % and weekly quota display are specified
-  but not shipped. The view-only file inspector is shipped, and so are
-  conversation export (HTML / Markdown / PDF) and **Print / Save as PDF**.
 - **Key pages are not locked into RAM by default.** The workspace database is
   SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
   material so they never reach swap — and Raiker leaves that **off**, explicitly,

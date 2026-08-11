@@ -91,3 +91,23 @@ owner-triggered minimal execution preflight. The Models acquisition plane owns
 approved GGUF roots, durable jobs, managed loopback llama.cpp, immutable Hugging
 Face snapshots, and the isolated conversion worker; none bypasses turn
 governance.
+
+## Context budget and provider usage planes
+
+The runtime estimates the complete next request against the exact model's known
+context capacity. At 90%, `ContextBudgetPlanner` selects only older completed
+exchanges, preserving the newest two. `RuntimeOrchestrator` runs a separate
+tool-free, reasoning-disabled summary call between `PreCompact` and
+`PostCompact`, stores the owner/session-scoped summary and exact through-turn
+boundary, and replays protected plan/approval/checkpoint/source identifiers.
+Transcript rows are immutable. Unknown capacity or any compaction failure falls
+back to bounded recent history and records metadata-only outcome evidence.
+
+`ModelUsageLedger` is the local request-accounting source. It attributes turns
+and supporting calls such as compaction to the serving profile. The Models usage
+plane aggregates a rolling seven-day window for connected profiles, prices each
+recorded model only where a rate is known, and keeps that Raiker-observed receipt
+separate from provider-native data. OpenRouter can report key-level figures with
+the inference key; OpenAI and Anthropic organization adapters require separate
+admin credentials; Ollama has no account quota adapter. Provider payloads are
+immediately normalized to bounded numbers and cached for five minutes.

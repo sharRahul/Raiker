@@ -19,6 +19,7 @@ LICENSE_ALIASES = {
     "Apache Software License": "Apache-2.0",
     "BSD License": "BSD-3-Clause",
     "MIT License": "MIT",
+    "LGPLv2+": "LGPL-2.1-or-later",
     "LGPLv3": "LGPL-3.0-only",
     "Python Software Foundation License": "Python-2.0",
     "PSFL": "Python-2.0",

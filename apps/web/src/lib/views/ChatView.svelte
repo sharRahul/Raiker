@@ -54,6 +54,7 @@
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import { navItem } from "../nav";
 
   interface ChatTurn {
     id: number;
@@ -1297,6 +1298,11 @@
                     <strong>{humanize(call.toolName)}</strong>{call.reasons.length > 0
                       ? ` — ${call.reasons.join(", ")}`
                       : ""}
+                    {#if call.remediationRoute}
+                      <a class="btn btn-soft btn-sm" href={`#/${call.remediationRoute}`}>
+                        Open {navItem(call.remediationRoute).label}
+                      </a>
+                    {/if}
                   </li>
                 {/each}
               </ul>

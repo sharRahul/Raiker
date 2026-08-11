@@ -65,8 +65,13 @@ SEARCH_KEY_HEADER_ENV = "RAIKER_WEB_SEARCH_KEY_HEADER"
 MAX_SEARCH_RESULTS = 10
 
 
-def _denied(reason: str, message: str) -> dict[str, Any]:
-    return {"status": "denied", "error": {"type": reason, "message": message}}
+def _denied(
+    reason: str, message: str, *, remediation_route: str | None = None
+) -> dict[str, Any]:
+    error: dict[str, Any] = {"type": reason, "message": message}
+    if remediation_route is not None:
+        error["remediation_route"] = remediation_route
+    return {"status": "denied", "error": error}
 
 
 def _failed(reason: str, message: str) -> dict[str, Any]:
@@ -306,13 +311,15 @@ class WebAccessService:
             return _denied(
                 "web_gate_disabled",
                 f"{what} denied: the web_fetch capability gate is disabled (fail closed). "
-                "Enable it in Settings → Capabilities.",
+                "Enable it from Permissions.",
+                remediation_route="capabilities",
             )
         mode = self._mode()
         if mode == DecisionMode.DENY:
             return _denied(
                 "web_denied_by_decision_mode",
                 f"{what} denied by the owner's decision mode for web_fetch.",
+                remediation_route="capabilities",
             )
         if mode == DecisionMode.ASK or (
             mode == DecisionMode.AUTO and auto_requires_approval(_READ_RISK)
@@ -321,6 +328,7 @@ class WebAccessService:
                 f"web_withheld_{mode.value}",
                 f"{what} withheld: reaching the open internet needs a standing owner "
                 "decision — raise the web_fetch decision mode to allow.",
+                remediation_route="capabilities",
             )
         if not web_egress_allowlist():
             return _denied(

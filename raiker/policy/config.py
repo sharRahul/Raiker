@@ -149,21 +149,9 @@ class StaticPolicyConfig:
             "hardware_operator_runtime",
         })
     )
-    denied_actions: frozenset[str] = field(
-        default_factory=lambda: frozenset(
-            {
-                "write_file",
-                "edit_file",
-                "delete_file",
-                "network_request",
-                "web_fetch",
-                "plugin_execute",
-                "remote_execute",
-                "process",
-                "network",
-            }
-        )
-    )
-
     def __post_init__(self) -> None:
         object.__setattr__(self, "workspace_root", Path(self.workspace_root).resolve())
+        overlap = self.allowed_read_actions & self.approval_required_actions
+        if overlap:
+            names = ", ".join(sorted(overlap))
+            raise ValueError(f"policy actions cannot have conflicting verdicts: {names}")

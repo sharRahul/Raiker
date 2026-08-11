@@ -34,6 +34,7 @@ export function thinkingSteps(events: StreamEvent[]): string[] {
 export interface RefusedCall {
   toolName: string;
   reasons: string[];
+  remediationRoute?: string;
 }
 
 /**
@@ -54,7 +55,11 @@ export function refusedCalls(events: StreamEvent[]): RefusedCall[] {
     const reasons = Array.isArray(payload.reasons)
       ? payload.reasons.filter((reason): reason is string => typeof reason === "string")
       : [];
-    calls.push({ toolName, reasons });
+    const remediationRoute =
+      typeof payload.remediation_route === "string" && payload.remediation_route !== ""
+        ? payload.remediation_route
+        : undefined;
+    calls.push({ toolName, reasons, ...(remediationRoute ? { remediationRoute } : {}) });
   }
   return calls;
 }

@@ -42,13 +42,21 @@ describe("chat presentation", () => {
       {
         kind: "lifecycle",
         event_type: "model_tool_call_refused",
-        payload: { tool_name: "shell", reasons: ["capability_disabled", "no_grant"] },
+        payload: {
+          tool_name: "shell",
+          reasons: ["capability_disabled", "no_grant"],
+          remediation_route: "capabilities",
+        },
       },
     ] as unknown as StreamEvent[];
 
     expect(refusedCalls(events)).toEqual([
       { toolName: "read_file", reasons: ["path_outside_workspace"] },
-      { toolName: "shell", reasons: ["capability_disabled", "no_grant"] },
+      {
+        toolName: "shell",
+        reasons: ["capability_disabled", "no_grant"],
+        remediationRoute: "capabilities",
+      },
     ]);
   });
 

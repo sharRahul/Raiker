@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import fields
+
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ToolAction
 from raiker.policy.config import StaticPolicyConfig
@@ -82,3 +84,11 @@ def test_local_organisation_tools_take_the_approval_path(tmp_path) -> None:  # t
             ToolAction(new_id("act_"), name, {}, "high", True)
         )
         assert decision.decision == "needs_approval", name
+
+
+def test_static_policy_has_one_live_verdict_per_configured_action(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """BUG-51: policy configuration must not advertise an ignored deny list."""
+    config = StaticPolicyConfig(tmp_path)
+
+    assert "denied_actions" not in {item.name for item in fields(config)}
+    assert config.allowed_read_actions.isdisjoint(config.approval_required_actions)

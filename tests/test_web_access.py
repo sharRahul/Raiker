@@ -130,6 +130,8 @@ class TestWebFetchGovernance:
         outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
         assert outcome["status"] == "denied"
         assert outcome["error"]["type"] == "web_gate_disabled"
+        assert outcome["error"]["remediation_route"] == "capabilities"
+        assert "Settings" not in outcome["error"]["message"]
 
     def test_default_ask_withholds(self, workspace: Path, store: SQLiteStore) -> None:
         _enable_gate(workspace, store)

@@ -178,6 +178,42 @@ def test_model_executes_every_parallel_read_and_returns_every_result(tmp_path: P
     assert _events(orchestrator, response.session_id).count("tool_completed") == 2
 
 
+def test_runtime_discloses_a_tool_level_withholding_without_relying_on_model_copy(
+    tmp_path: Path,
+) -> None:
+    """BUG-60: an allowed call that a capability gate withholds is runtime UI state."""
+    router = FakeRouter([
+        ModelResponse(text="", tool_calls=[_list_dir_call()], finish_reason="tool_calls"),
+        ModelResponse(text="The model may narrate this, but is not the disclosure.", finish_reason="stop"),
+    ])
+    orchestrator = _orchestrator(tmp_path, router)
+    orchestrator.tool_broker.executors["list_directory"] = lambda _args: {
+        "status": "denied",
+        "error": {
+            "type": "capability_disabled",
+            "message": "Accès withheld — enable the permission.",
+            "remediation_route": "capabilities",
+        },
+    }
+    envelope = _envelope("list files")
+
+    response = _handle(orchestrator, envelope)
+
+    assert response.status == "failed", response
+    event = _event_record(orchestrator, envelope.session_id, "model_tool_call_refused")
+    assert {key: event["payload"][key] for key in (
+        "tool_name", "reasons", "disclosed_by", "refusal_source", "remediation_route"
+    )} == {
+        "tool_name": "list_directory",
+        "reasons": ["capability_disabled"],
+        "disclosed_by": "runtime",
+        "refusal_source": "tool",
+        "remediation_route": "capabilities",
+    }
+    tool_message = next(message for message in router.seen_messages[1] if message.role == "tool")
+    assert "Accès withheld — enable the permission." in tool_message.content
+
+
 def test_unknown_tool_call_is_rejected(tmp_path: Path) -> None:
     router = FakeRouter(
         [

@@ -185,7 +185,7 @@ def _queued_call_exchange(
         _queued_call_message(proposal),
         ModelMessage(
             role="tool",
-            content=json.dumps(payload),
+            content=json.dumps(payload, ensure_ascii=False),
             tool_call_id=proposal.call_id,
             name=tool_name,
         ),
@@ -892,7 +892,11 @@ class RuntimeOrchestrator:
         return str(row["stop_reason"] or "user requested stop")
 
     def _refusal_event(
-        self, envelope: PromptEnvelope, action: ToolAction, decision: PolicyDecision
+        self,
+        envelope: PromptEnvelope,
+        action: ToolAction,
+        decision: PolicyDecision,
+        result: ToolResult | None = None,
     ) -> None:
         """Say, in the transcript, that policy refused one call of a batch (BUG-52).
 
@@ -905,11 +909,24 @@ class RuntimeOrchestrator:
         Names the tool and the governed reason codes; the arguments and any
         workspace content stay out, exactly as they do for the queue events.
         """
-        self._event(
-            envelope,
-            "model_tool_call_refused",
-            {"tool_name": action.tool_name, "reasons": list(decision.reasons)},
+        tool_refusal = result is not None and result.status == "denied"
+        error = result.error if tool_refusal and isinstance(result.error, dict) else {}
+        error_type = error.get("type")
+        reasons = (
+            [str(error_type)]
+            if tool_refusal and isinstance(error_type, str) and error_type
+            else list(decision.reasons)
         )
+        payload: dict[str, Any] = {
+            "tool_name": action.tool_name,
+            "reasons": reasons,
+            "disclosed_by": "runtime",
+            "refusal_source": "tool" if tool_refusal else "policy",
+        }
+        remediation_route = error.get("remediation_route")
+        if isinstance(remediation_route, str) and remediation_route:
+            payload["remediation_route"] = remediation_route
+        self._event(envelope, "model_tool_call_refused", payload)
 
     def _verify_and_emit(
         self, envelope: PromptEnvelope, **kwargs: object
@@ -1901,6 +1918,11 @@ class RuntimeOrchestrator:
                 for pending in self._drain_sink():
                     yield pending
                 continue
+            if queued_result.status == "denied":
+                # BUG-60 — an executor-level gate may withhold a policy-allowed
+                # call. The model receives that result, but runtime owns the
+                # visible disclosure; model prose is never the audit channel.
+                self._refusal_event(envelope, action, queued_decision, queued_result)
             self._state(machine, envelope, "EXECUTING")
             self._state(machine, envelope, "OBSERVING")
             self._state(machine, envelope, "VERIFYING")
@@ -2132,6 +2154,12 @@ class RuntimeOrchestrator:
                         ),
                     ))
                     continue
+                if candidate_result.status == "denied":
+                    # BUG-60 — disclose a gate/executor refusal independently of
+                    # whatever the next model response chooses to say about it.
+                    self._refusal_event(
+                        envelope, candidate_action, candidate_decision, candidate_result
+                    )
                 batch_results.append(
                     (proposals[index], candidate_action, candidate_result, candidate_decision)
                 )
@@ -2216,7 +2244,7 @@ class RuntimeOrchestrator:
                         messages.append(
                             ModelMessage(
                                 role="tool",
-                                content=json.dumps(answered_payload),
+                                content=json.dumps(answered_payload, ensure_ascii=False),
                                 tool_call_id=answered_proposal.call_id,
                                 name=answered_name,
                             )
@@ -2286,7 +2314,7 @@ class RuntimeOrchestrator:
                 messages.append(
                     ModelMessage(
                         role="tool",
-                        content=json.dumps(answered_payload),
+                        content=json.dumps(answered_payload, ensure_ascii=False),
                         tool_call_id=answered_proposal.call_id,
                         name=answered_name,
                     )

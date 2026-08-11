@@ -196,9 +196,12 @@ class GitCredentialBroker:
     def status(self, *, session_id: str | None = None) -> dict[str, Any]:
         """What a surface needs to render the control. Never the token."""
         grant = self.active_grant(session_id=session_id)
+        # `credential_*` rather than `token_*`: the API redactor masks any field
+        # whose *key* contains "token", which is the right blunt instrument to
+        # keep. Renaming the field is cheaper than punching a hole in it.
         return {
-            "token_configured": self.token_configured(),
-            "token_source": self.token_source(),
+            "credential_configured": self.token_configured(),
+            "credential_source": self.token_source(),
             "grant": grant.as_dict() if grant else None,
             "scopes": sorted(GRANT_SCOPES),
             "grant_seconds": dict(GRANT_SECONDS),

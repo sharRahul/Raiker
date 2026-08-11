@@ -90,6 +90,9 @@ import type {
   TurnSourceExcerptView,
   TurnSourcesView,
   UploadedAttachment,
+  WebBlocklist,
+  WebBlocklistProbe,
+  GitCredentialStatus,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 
@@ -1144,6 +1147,48 @@ export const api = {
     ),
   searchChats: (q: string) =>
     request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
+
+  // ── Web access (RAIKER-2021) ─────────────────────────────────────────
+  // What web reads may not reach. The address guard that refuses private and
+  // loopback destinations is not represented here because it is not editable —
+  // the read below reports it so the page can say so.
+  webBlocklist: () => request<WebBlocklist>("/api/web-access/blocklist"),
+  addWebBlocklistRule: (rule: string, note = "") =>
+    request<{ rule_id: string; rule: string; kind: string }>("/api/web-access/blocklist", {
+      method: "POST",
+      body: JSON.stringify({ rule, note }),
+    }),
+  deleteWebBlocklistRule: (ruleId: string) =>
+    request<{ deleted: boolean }>(`/api/web-access/blocklist/${encodeURIComponent(ruleId)}`, {
+      method: "DELETE",
+    }),
+  testWebBlocklist: (host: string) =>
+    request<WebBlocklistProbe>("/api/web-access/blocklist/test", {
+      method: "POST",
+      body: JSON.stringify({ host }),
+    }),
+
+  // ── Git credential (RAIKER-2022) ─────────────────────────────────────
+  // The token is write-only across this boundary: it goes up, and no read ever
+  // returns it.
+  gitCredential: (sessionId?: string) =>
+    request<GitCredentialStatus>(
+      withQuery("/api/git-credential", sessionId ? { session_id: sessionId } : {}),
+    ),
+  putGitCredential: (token: string) =>
+    request<GitCredentialStatus>("/api/git-credential", {
+      method: "PUT",
+      body: JSON.stringify({ token }),
+    }),
+  deleteGitCredential: () =>
+    request<GitCredentialStatus>("/api/git-credential", { method: "DELETE" }),
+  grantGitCredential: (scope: string, sessionId?: string) =>
+    request<GitCredentialStatus>("/api/git-credential/grant", {
+      method: "POST",
+      body: JSON.stringify({ scope, session_id: sessionId ?? null }),
+    }),
+  revokeGitCredential: () =>
+    request<GitCredentialStatus>("/api/git-credential/grant", { method: "DELETE" }),
 
   // ── Reliable memory controls (backlog item 3) ────────────────────────
   // User-facing surface over the existing governed memory store. List carries

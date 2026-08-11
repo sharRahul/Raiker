@@ -140,8 +140,24 @@ def _public_hosts(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _disable_gate(store: SQLiteStore) -> None:
+    """Turn the gate *off*, explicitly.
+
+    RAIKER-2021: the absence of a row means "the owner has never touched this",
+    and the shipped default (enabled read-only) now applies to it — reading unset
+    as disabled is what made web_fetch advertised and unusable on a fresh
+    install. An owner who really turns it off writes a row, and that row wins,
+    which is what these two cover.
+    """
+    store.upsert_capability_gate_state(
+        {"capability": "web_fetch", "state": "disabled", "created_at": "2026-01-01",
+         "updated_at": "2026-01-01"}
+    )
+
+
 class TestWebFetchGovernance:
     def test_gate_disabled_fails_closed(self, workspace: Path, store: SQLiteStore) -> None:
+        _disable_gate(store)
         outcome = _governed(workspace, store).fetch("https://docs.example.com/a")
         assert outcome["status"] == "denied"
         assert outcome["error"]["type"] == "web_gate_disabled"
@@ -304,6 +320,7 @@ class TestWebSearch:
         assert outcome["error"]["type"] == "web_search_not_configured"
 
     def test_gate_still_governs_search(self, workspace: Path, store: SQLiteStore) -> None:
+        _disable_gate(store)
         outcome = _governed(workspace, store).search("widget docs")
         assert outcome["error"]["type"] == "web_gate_disabled"
 

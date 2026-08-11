@@ -285,7 +285,15 @@ class WebAccessService:
         except Exception:  # noqa: BLE001 — a broken read fails closed
             return False
         if not record:
-            return False
+            # RAIKER-2021: no row means the owner has never touched this gate, not
+            # that they turned it off. Reading "unset" as "disabled" is why a
+            # fresh install advertised web_fetch to the model and refused every
+            # call — the shipped default said enabled and nothing consulted it.
+            # An owner who *does* turn it off writes a row, and that row wins.
+            from raiker.phase_gates import default_capability_gates
+
+            declared = default_capability_gates().get(_CAP)
+            return declared is not None and declared.state.value in _ENABLED_GATE_STATES
         return str(record.get("state", "")) in _ENABLED_GATE_STATES
 
     def _mode(self) -> DecisionMode:

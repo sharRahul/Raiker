@@ -9,6 +9,8 @@
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
+  import WebAccess from "./settings/WebAccess.svelte";
+  import GitCredential from "./settings/GitCredential.svelte";
   import Icon from "../components/Icon.svelte";
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
@@ -22,6 +24,8 @@
     { id: "personalisation", label: "Personalisation", icon: "spark", group: "Personal" },
     { id: "security", label: "Security & sign-in", icon: "lock", group: "Personal" },
     { id: "account", label: "Account", icon: "user", group: "Personal" },
+    { id: "web-access", label: "Web access", icon: "connections", group: "System" },
+    { id: "git-credential", label: "Git credential", icon: "branch", group: "System" },
     { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
   ] as const;
 
@@ -161,6 +165,10 @@
       <SecurityLogin />
     {:else if active === "account"}
       <Account {settings} {save} {status} />
+    {:else if active === "web-access"}
+      <WebAccess />
+    {:else if active === "git-credential"}
+      <GitCredential />
     {:else}
       <Runtime {principal} {settings} {save} />
     {/if}

@@ -291,7 +291,9 @@ def test_relay_dispatches_tier2_shell(tmp_path: Path) -> None:
         risk_level="medium",
         # `echo` is a shell builtin on Windows, whereas `python` is an
         # explicitly allowed executable on every supported test platform.
-        arguments={"command": ["python", "-c", "print('relayed')"]},
+        # RAIKER-2023: `python -c` is an interpreter escape and is refused by
+        # the command policy, so this relay scenario uses a command that is not.
+        arguments={"command": ["echo", "relayed"]},
     )
 
     relay = ApprovalExecutionRelay(ws, store)

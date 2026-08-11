@@ -398,6 +398,20 @@ def _assert_contained(value: str, root: Path, reason: str) -> None:
         raise CommandRejected("command_path_protected", head)
 
 
+#: Variables carried through from the host. None of them is a credential, and
+#: every one of them turns a working command into a confusing failure if it is
+#: dropped: a corporate TLS trust store, a proxy an air-gapped network requires,
+#: or the certificate bundle an HTTPS push verifies against. Stripping the
+#: environment is about not leaking *secrets*, not about breaking TLS.
+_PASSTHROUGH = (
+    "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+    "GIT_SSL_CAINFO", "GIT_SSL_CAPATH",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
+    "http_proxy", "https_proxy", "no_proxy",
+    "SYSTEMROOT", "COMSPEC",  # Windows: sockets and process creation need them
+)
+
+
 def sandbox_environment(
     base: dict[str, str] | None = None, *, workspace_root: str | Path, extra: dict[str, str] | None = None
 ) -> dict[str, str]:
@@ -424,5 +438,8 @@ def sandbox_environment(
         "GIT_TERMINAL_PROMPT": "0",
         "GIT_ASKPASS": "",
     }
+    environment.update(
+        {name: source[name] for name in _PASSTHROUGH if source.get(name)}
+    )
     environment.update(extra or {})
     return environment

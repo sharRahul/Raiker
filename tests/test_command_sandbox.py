@@ -192,6 +192,44 @@ def test_git_cannot_read_a_global_config_from_the_sandbox(workspace: Path) -> No
     assert environment["GIT_TERMINAL_PROMPT"] == "0"
 
 
+def test_tls_and_proxy_configuration_survives(workspace: Path) -> None:
+    """Stripping the environment is about not leaking secrets, not breaking TLS.
+
+    A corporate trust store or a required proxy turns a working HTTPS push into
+    a confusing certificate failure if it is dropped, and none of these is a
+    credential.
+    """
+    environment = sandbox_environment(
+        {
+            "SSL_CERT_FILE": "/etc/ssl/corp.crt",
+            "HTTPS_PROXY": "http://proxy:8080",
+            "GIT_SSL_CAINFO": "/etc/ssl/git.crt",
+            "RAIKER_GITHUB_TOKEN": "ghp_secret",
+            "AWS_SECRET_ACCESS_KEY": "secret",
+        },
+        workspace_root=workspace,
+    )
+    assert environment["SSL_CERT_FILE"] == "/etc/ssl/corp.crt"
+    assert environment["HTTPS_PROXY"] == "http://proxy:8080"
+    assert environment["GIT_SSL_CAINFO"] == "/etc/ssl/git.crt"
+    assert "RAIKER_GITHUB_TOKEN" not in environment
+    assert "AWS_SECRET_ACCESS_KEY" not in environment
+
+
+def test_git_still_works_under_the_constructed_environment(workspace: Path) -> None:
+    """A sandbox that breaks the tool it sandboxes is not a sandbox."""
+    import subprocess
+
+    subprocess.run(["git", "init", "-q", str(workspace)], check=True)
+    result = subprocess.run(
+        ["git", "-C", str(workspace), "rev-parse", "--is-inside-work-tree"],
+        env=sandbox_environment(workspace_root=workspace),
+        capture_output=True, text=True,
+    )
+    assert result.returncode == 0
+    assert result.stdout.strip() == "true"
+
+
 def test_explicit_extras_are_the_only_way_in(workspace: Path) -> None:
     environment = sandbox_environment(
         {}, workspace_root=workspace, extra={"RAIKER_GIT_RUNTIME_TOKEN": "lent"}

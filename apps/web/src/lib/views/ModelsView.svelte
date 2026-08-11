@@ -165,6 +165,7 @@
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
   let signInError = $state<string | null>(null);
+  let disconnecting = $state<Record<string, true>>({});
   // BUG-47 — one provider being tested must not disable, or answer for, any
   // other. Both the in-flight flag and the result are per profile id.
   let testing = $state<Record<string, true>>({});
@@ -268,6 +269,32 @@
             : "Could not connect";
     } finally {
       signInSaving = false;
+    }
+  }
+
+  async function disconnectConnection(profile: ModelProfile) {
+    const id = profile.profile_id;
+    const name = providerName(profile.provider);
+    if (
+      !window.confirm(
+        `Disconnect ${name}? The encrypted credential and custom endpoint stored for this provider will be removed from this Raiker instance.`,
+      )
+    )
+      return;
+    disconnecting = { ...disconnecting, [id]: true };
+    testResults = without(testResults, id);
+    try {
+      await api.saveModelConnection(id, "", "");
+      await load();
+      testResults = { ...testResults, [id]: `${name} connection removed.` };
+      onchanged?.();
+    } catch {
+      testResults = {
+        ...testResults,
+        [id]: `Could not disconnect ${name}. The saved credential was left unchanged.`,
+      };
+    } finally {
+      disconnecting = without(disconnecting, id);
     }
   }
 
@@ -1221,6 +1248,16 @@
                             class="btn btn-ghost btn-sm"
                             onclick={() => openSignIn(p.profile_id)}
                             >Reconnect</button
+                          >
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            aria-label={`Disconnect ${providerName(p.provider)}`}
+                            onclick={() => void disconnectConnection(p)}
+                            disabled={disconnecting[p.profile_id] === true}
+                            >{disconnecting[p.profile_id] === true
+                              ? "Disconnecting…"
+                              : "Disconnect"}</button
                           >
                           <button
                             type="button"

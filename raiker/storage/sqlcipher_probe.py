@@ -36,29 +36,56 @@ def probe_memory_security(
     probe_parent.mkdir(parents=True, exist_ok=True)
     checked_at = _checked_at()
     with tempfile.TemporaryDirectory(prefix="sqlcipher-", dir=probe_parent) as raw_dir:
+        probe_dir = Path(raw_dir)
         payload = json.dumps(
             {"database": str(Path(raw_dir) / "probe.db"), "key": secrets.token_hex(32)}
         )
+        result_path = probe_dir / "result.json"
+        frozen = bool(getattr(sys, "frozen", False))
+        if frozen:
+            payload_path = probe_dir / "payload.json"
+            payload_path.write_text(payload, encoding="utf-8")
+            command = [
+                sys.executable,
+                "--sqlcipher-probe-worker",
+                str(payload_path),
+                str(result_path),
+            ]
+        else:
+            command = [sys.executable, "-m", "raiker.storage.sqlcipher_probe_worker"]
         try:
-            completed = subprocess.run(
-                [sys.executable, "-m", "raiker.storage.sqlcipher_probe_worker"],
-                input=payload,
-                text=True,
-                capture_output=True,
-                timeout=timeout_seconds,
-                check=False,
-            )
+            if frozen:
+                completed = subprocess.run(
+                    command,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                )
+            else:
+                completed = subprocess.run(
+                    command,
+                    input=payload,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                )
         except subprocess.TimeoutExpired:
             return MemorySecurityProbeResult(False, "probe_timeout", None, checked_at)
         except OSError:
             return MemorySecurityProbeResult(False, "probe_unavailable", None, checked_at)
-
-    if completed.returncode != 0:
-        unsigned_code = completed.returncode & 0xFFFFFFFF
-        reason = "host_crash" if unsigned_code == 0xC00000FD else "probe_failed"
-        return MemorySecurityProbeResult(False, reason, None, checked_at)
+        if completed.returncode != 0:
+            unsigned_code = completed.returncode & 0xFFFFFFFF
+            reason = "host_crash" if unsigned_code == 0xC00000FD else "probe_failed"
+            return MemorySecurityProbeResult(False, reason, None, checked_at)
+        raw_result = (
+            result_path.read_text(encoding="utf-8")
+            if frozen and result_path.is_file()
+            else completed.stdout
+        )
     try:
-        result = json.loads(completed.stdout)
+        result = json.loads(raw_result)
     except (json.JSONDecodeError, TypeError):
         return MemorySecurityProbeResult(False, "invalid_probe_result", None, checked_at)
     supported = result.get("status") == "supported"
@@ -69,4 +96,3 @@ def probe_memory_security(
         version,
         checked_at,
     )
-

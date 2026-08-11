@@ -8,12 +8,15 @@ than by whatever the test runner happens to be running on.
 from __future__ import annotations
 
 import socket
+import sys
 from pathlib import Path
 
 import pytest
 
 from apps.api.launcher import (
     DEFAULT_PORT,
+    _ensure_standard_streams,
+    _resolve_ui_dir,
     choose_port,
     default_workspace,
     detect_os,
@@ -153,6 +156,34 @@ def test_print_paths_reports_the_platform_and_directory_without_starting_anythin
     assert str(tmp_path / "data") in out
     # Nothing was created and nothing was served.
     assert not (tmp_path / "data").exists()
+
+
+def test_frozen_launcher_resolves_the_bundled_web_directory(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    bundled = tmp_path / "bundle"
+    (bundled / "web").mkdir(parents=True)
+    (bundled / "web" / "index.html").write_text("<html></html>", encoding="utf-8")
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundled), raising=False)
+
+    assert _resolve_ui_dir() == bundled / "web"
+
+
+def test_windowed_launcher_supplies_null_standard_streams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys, "stdin", None)
+    monkeypatch.setattr(sys, "stdout", None)
+    monkeypatch.setattr(sys, "stderr", None)
+
+    opened = _ensure_standard_streams()
+    try:
+        assert sys.stdin is not None
+        assert sys.stdout is not None
+        assert sys.stderr is not None
+    finally:
+        for stream in opened:
+            stream.close()
 
 
 def test_joining_a_running_host_opens_the_browser_and_exits_successfully(

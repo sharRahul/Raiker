@@ -33,6 +33,35 @@ def main() -> int:
     return 0
 
 
+def run_files(payload_path: Path, result_path: Path) -> int:
+    """Run inside the frozen GUI executable, whose standard streams are absent."""
+    try:
+        payload = json.loads(payload_path.read_text(encoding="utf-8"))
+        database = Path(str(payload["database"]))
+        key = str(payload["key"])
+        connection = sqlite3.connect(str(database))
+        try:
+            connection.execute("PRAGMA cipher_memory_security = ON")
+            connection.execute(f"PRAGMA key = \"x'{key}'\"")
+            connection.execute("CREATE TABLE probe(value TEXT NOT NULL)")
+            connection.execute("INSERT INTO probe(value) VALUES ('ok')")
+            connection.commit()
+            if connection.execute("SELECT value FROM probe").fetchone()[0] != "ok":
+                return 3
+            enabled = str(connection.execute("PRAGMA cipher_memory_security").fetchone()[0])
+            version = str(connection.execute("PRAGMA cipher_version").fetchone()[0])
+            if enabled not in {"1", "on"}:
+                return 4
+        finally:
+            connection.close()
+        result_path.write_text(
+            json.dumps({"status": "supported", "sqlcipher_version": version}),
+            encoding="utf-8",
+        )
+    except BaseException:
+        return 2
+    return 0
+
+
 if __name__ == "__main__":
     raise SystemExit(main())
-

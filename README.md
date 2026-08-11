@@ -90,10 +90,15 @@ signs the channel index the updater verifies. **It refuses to build without
 code-signing identities** rather than producing something that looks like a
 release; run it with `signing: skip` to exercise the pipeline and you get
 artifacts named `-unsigned` that the product itself calls unsigned and that the
-publish job will not release. No signed artifact has been published yet. The
-first-run wizard and a native tray icon are still to come — see
-`docs/DESKTOP_DISTRIBUTION_DESIGN.md` and BUG-48 in
-[to be fixed](docs/plans/TO_BE_FIXED.md).
+publish job will not release. No signed artifact has been published yet.
+
+The desktop payload is self-contained: it bundles the API, built dashboard and
+native tray integration. On first run, a five-stage wizard creates the local
+owner, connects or defers a model, explains the selected privacy posture,
+creates and verifies an optional encrypted backup, and opens the workspace.
+The tray then provides Open Raiker, Pause/Resume, Restart and Quit through the
+same governed host routes as the web control. See
+[`docs/DESKTOP_DISTRIBUTION_DESIGN.md`](docs/DESKTOP_DISTRIBUTION_DESIGN.md).
 
 `raiker-web` remains the service entry point for an explicit workspace and port,
 and is the only path that can bind beyond loopback (`--allow-public`, which also
@@ -113,7 +118,8 @@ request thereafter resolves an **acting-principal**.
 > to **Models** instead of sending a turn that cannot run.
 
 To connect a hosted model, open **Models**, press **Connect** on the provider,
-and paste your API key. That is the whole flow — see
+and paste your API key. Use **Disconnect** on that provider to remove its vault
+credential. That is the whole flow — see
 [Connecting a model](docs/guide/connecting-a-model.md).
 
 ## Owner-authoritative and monitored

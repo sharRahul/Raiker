@@ -35,10 +35,13 @@ they are not automatically prohibited. GPL, AGPL, proprietary, custom,
 UNKNOWN, and NOASSERTION values fail unless a narrow, documented exception is
 added. A dual-licensed dependency passes only when at least one offered licence
 is permitted. The current exceptions cover unmodified transitive `certifi`
-under MPL-2.0 (a CA bundle), development-only `pathspec` under MPL-2.0
-(mypy support), and Lightning CSS's Vite 8/Rolldown build packages; none of
-their source is copied or modified in Raiker distributions. The zero-clause
-BSD licence (`0BSD`) is accepted as permissive.
+under MPL-2.0 (a CA bundle), development-only `pathspec` under MPL-2.0,
+Lightning CSS's Vite 8/Rolldown build packages, the unmodified LGPL-3.0
+`pystray` runtime (whose complete licence files remain in the frozen payload),
+and development-only PyInstaller under its official bootloader distribution
+exception. Pillow's MIT-CMU licence is accepted as permissive. None of the
+reviewed dependency source is modified by Raiker. The zero-clause BSD licence
+(`0BSD`) is accepted as permissive.
 
 Run the checks after installing Python and web dependencies:
 

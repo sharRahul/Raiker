@@ -179,6 +179,14 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-160 | Low | Models / a throttled read reported only `Unavailable (429)` | Fixed (found while verifying FIXED-158 live) |
 | FIXED-169 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Fixed (was BUG-83) |
 | FIXED-170 | Low | Live tests / the BUG-69 acceptance spec could not run with a single provider key | Fixed (was BUG-84) |
+| FIXED-171 | Medium | Storage / Windows locked memory | Fixed (was BUG-46) |
+| FIXED-172 | Medium | Distribution / setup wizard and native tray | Fixed (was BUG-48) |
+| FIXED-173 | Low | Policy / dead `denied_actions` configuration | Fixed (was BUG-51) |
+| FIXED-174 | Low | Runtime / governed refusal destination and disclosure | Fixed (was BUG-59 and BUG-60) |
+| FIXED-175 | Low | Tasks / creation and execution intent | Fixed (was BUG-64) |
+| FIXED-176 | Low | Export / portable citation ledgers | Fixed (was BUG-65) |
+| FIXED-177 | Low | Web / loopback and public-bind rate limits | Fixed (was BUG-88) |
+| FIXED-178 | Low | Models / remove a provider credential in-app | Fixed (found during live verification) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -6766,4 +6774,152 @@ builds keep working, and every internal link now emits a canonical id.
 
 **Evidence.** Two nav tests covering all seven panels and all four aliases, plus
 a live sweep of eleven deep links.
+
+---
+
+## FIXED-171 — Windows SQLCipher memory locking is crash-contained and explicit
+
+**Status: fixed in this change. Was BUG-46.**
+
+**Observed.** This Windows SQLCipher build terminates a process with stack
+overflow after `VirtualLock` fails. Encryption remained healthy, but the product
+could neither prove locked key pages nor safely inspect the condition in-process.
+
+**Fix.** A disposable child now probes `cipher_memory_security`; the resident
+host maps a child crash, timeout, invalid result or unsupported lock to a durable
+degraded posture. Frozen GUI builds use private payload/result files and their
+own hidden worker entry rather than Python `-m`. Settings → Security reports
+database encryption separately from **Locked in memory** or **Degraded**.
+
+**Evidence.** `tests/test_sqlcipher_memory_security.py`, including the real
+Windows stack-overflow code and frozen-worker path; packaged health returned
+`store=ok` and `auto_probe_host_crash` without terminating. Screenshot:
+[`working/bug-46-security-live.png`](screenshots/working/bug-46-security-live.png).
+
+---
+
+## FIXED-172 — First run is guided and the desktop host has a native tray
+
+**Status: fixed in this change. Was BUG-48.**
+
+**Observed.** A fresh owner had separate login and model screens, no complete
+privacy/backup flow, and no operating-system tray icon. The release payload did
+not contain a self-contained GUI runtime.
+
+**Fix.** Fresh workspaces enter a resumable five-stage wizard: local owner,
+model choice or defer, exact readiness and privacy, optional encrypted verified
+backup, then completion. `scripts/build_desktop.py` creates the self-contained
+payload with dashboard and tray dependencies; Windows uses a no-console
+launcher, and WiX installs a Start Menu shortcut. The native tray exchanges a
+one-time secret for a host-control-only session and reuses the web Host routes.
+
+**Evidence.** Unit/API/component tests, a successful 75.8 MB frozen Windows
+payload smoke (`/` and `/api/health` both 200), and live screenshots:
+[`working/bug-48-setup-complete-live.png`](screenshots/working/bug-48-setup-complete-live.png),
+[`working/bug-48-setup-mobile-live.png`](screenshots/working/bug-48-setup-mobile-live.png),
+and [`working/bug-48-native-tray-menu-live.png`](screenshots/working/bug-48-native-tray-menu-live.png).
+
+---
+
+## FIXED-173 — Policy configuration no longer advertises a dead deny set
+
+**Status: fixed in this change. Was BUG-51.**
+
+**Observed.** `StaticPolicyConfig.denied_actions` looked authoritative and was
+never consumed by `PolicyEngine`.
+
+**Fix.** The dead field was removed. Static configuration now rejects an action
+classified as both allowed and approval-required, so the two live policy sets
+cannot silently contradict one another.
+
+**Evidence.** `tests/test_policy.py` and the full policy/runtime suite.
+
+---
+
+## FIXED-174 — Every governed withheld call is disclosed by the runtime
+
+**Status: fixed in this change. Was BUG-59 and BUG-60.**
+
+**Observed.** Executor-level withheld results were ordinary tool output, leaving
+disclosure to the model, and one web refusal sent the owner to a nonexistent
+Settings → Capabilities page.
+
+**Fix.** Governed executor refusals emit `model_tool_call_refused` with runtime
+attribution, tool, source, reasons and remediation route. Chat and Build render
+the refusal card whatever the model says. The destination is the shipped
+**Permissions** route, and tool JSON preserves readable Unicode.
+
+**Evidence.** Runtime and Svelte regression tests plus the live refusal and
+deep-link check in
+[`working/bug-60-runtime-refusal-live.png`](screenshots/working/bug-60-runtime-refusal-live.png).
+
+---
+
+## FIXED-175 — Approving task creation does not schedule execution
+
+**Status: fixed in this change. Was BUG-64.**
+
+**Observed.** Approving a model's **Create task** proposal stamped the current
+time and let the scheduler run it, though the approval only promised creation.
+
+**Fix.** `DashboardService.create_task` has explicit `start_immediately`
+semantics. Direct owner creation keeps start-now behaviour; approval and model
+tool paths park the task with no schedule. `POST /api/tasks/{id}/run` is the
+separate execution decision and Tasks exposes **Run now**.
+
+**Evidence.** Service/API/approval tests and live verification that approval
+created one parked task, the scheduler ignored it, and only **Run now** produced
+a completed run:
+[`working/bug-64-parked-task-live.png`](screenshots/working/bug-64-parked-task-live.png).
+
+---
+
+## FIXED-176 — Exported transcripts carry a portable citation ledger
+
+**Status: fixed in this change. Was BUG-65.**
+
+**Observed.** Markdown, HTML and PDF exports retained `[sN]` markers without the
+turn source ledger that resolved them in the live conversation.
+
+**Fix.** Each exported turn includes a sanitized source list with marker, title,
+locator and kind. Source passages remain local. A marker absent from the ledger
+is removed and counted in the export manifest rather than emitted as a broken
+citation.
+
+**Evidence.** `tests/test_session_transcript_export.py` covers all formats,
+escaping, redaction, resolved markers, unresolved markers and passage omission.
+
+---
+
+## FIXED-177 — Ordinary loopback reads no longer spend the public DoS budget
+
+**Status: fixed in this change. Was BUG-88.**
+
+**Observed.** A fast sweep through normal pages could exhaust the one global
+per-IP API window and make Models report a throttled read.
+
+**Fix.** A real socket peer on direct loopback may bypass the rate limit for
+safe reads only. Writes remain bounded. A public bind rate-limits all requests,
+and forwarded/proxy headers cannot manufacture the loopback exemption.
+
+**Evidence.** `tests/test_api_rest_hardening.py` covers loopback navigation,
+write limits, public-bind reads and forged proxy headers; the live desktop sweep
+completed without 429 responses.
+
+---
+
+## FIXED-178 — A connected provider credential can be removed in the app
+
+**Status: fixed in this change. Found during live verification.**
+
+**Observed.** Models could save and replace a provider key, while the backend's
+empty-connection removal path had no corresponding UI control.
+
+**Fix.** Each connected hosted-provider card exposes **Disconnect**, confirms
+the action, removes the encrypted vault credential through the existing API and
+returns the card to **Not connected**.
+
+**Evidence.** `ModelsView.test.ts` covers the owner flow. Anthropic, OpenAI and
+OpenRouter test credentials were removed through this control after the live
+provider run.
 

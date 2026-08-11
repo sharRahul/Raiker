@@ -506,6 +506,44 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     ).toBeInTheDocument();
   });
 
+  it("lets the owner remove a connected provider credential", async () => {
+    const anthropic = profile({
+      profile_id: "anthropic-hosted",
+      provider: "anthropic",
+      model: "claude-haiku-4-5-20251001",
+      configured: true,
+      connection_configured: true,
+      local_only: false,
+      requires_network: true,
+      off_machine: true,
+      endpoint_kind: "hosted",
+    });
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [anthropic],
+        chat_profiles: [anthropic],
+      }),
+      "PUT /api/models/anthropic-hosted/connection": {
+        ok: true,
+        connection_configured: false,
+      },
+    });
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    render(ModelsView, { props: { tab: "hosted" } });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Disconnect Anthropic" }));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/models/anthropic-hosted/connection",
+        expect.objectContaining({
+          method: "PUT",
+          body: JSON.stringify({ endpoint: null, api_key: null }),
+        }),
+      ),
+    );
+  });
+
   it("lists the provider's models on demand and selects one", async () => {
     const mock = stubFetch({
       "GET /api/models": models({

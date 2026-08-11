@@ -10,7 +10,9 @@ its own status strip called the runtime operational.
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 import threading
 from pathlib import Path
 from typing import Any
@@ -250,6 +252,33 @@ def test_probe_maps_windows_stack_overflow_without_crashing_parent(
 
     assert result.supported is False
     assert result.reason_code == "host_crash"
+
+
+def test_frozen_probe_uses_private_payload_files_instead_of_python_module_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def run(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        captured["command"] = command
+        captured["kwargs"] = kwargs
+        payload_path = Path(command[2])
+        result_path = Path(command[3])
+        assert payload_path.parent == result_path.parent
+        assert "key" in json.loads(payload_path.read_text(encoding="utf-8"))
+        result_path.write_text(
+            json.dumps({"status": "supported", "sqlcipher_version": "4.6.1"}),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(sys, "frozen", True, raising=False)
+    monkeypatch.setattr(subprocess, "run", run)
+    result = probe_memory_security(tmp_path)
+
+    assert captured["command"][:2] == [sys.executable, "--sqlcipher-probe-worker"]
+    assert "input" not in captured["kwargs"]
+    assert result.supported is True
 
 
 def test_probe_maps_timeout_without_exposing_child_output(

@@ -910,7 +910,9 @@ class RuntimeOrchestrator:
         workspace content stay out, exactly as they do for the queue events.
         """
         tool_refusal = result is not None and result.status == "denied"
-        error = result.error if tool_refusal and isinstance(result.error, dict) else {}
+        error: dict[str, Any] = {}
+        if tool_refusal and result is not None and isinstance(result.error, dict):
+            error = result.error
         error_type = error.get("type")
         reasons = (
             [str(error_type)]

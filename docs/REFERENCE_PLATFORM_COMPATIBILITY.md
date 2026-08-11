@@ -123,7 +123,7 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Distinct billing / quota exhaustion | ChatGPT usage caps; Claude Code credit-balance and usage-limit messages; Codex quota errors | `quota_exhausted` state and `provider_quota_exhausted` code (Task 13) | ✅ |
 | Distinct auth failure | All | `authentication_failed` | ✅ |
 | Refuse work before submission when nothing is ready | None — all four coding agents fail at call time | Fail-closed gate on Workbench, Chat, Build, Tasks, Schedule, and background runs, draft preserved | ✅ beyond |
-| Guided first-run model setup | ChatGPT desktop quickstart; OpenClaw and Hermes provider onboarding | Current `#/model-setup` is a resumable three-stage, model-only route; BUG-48 expands it into the full instance/model/privacy/backup/finish flow and makes a real readiness check part of completion | 🟡 |
+| Guided first-run model setup | ChatGPT desktop quickstart; OpenClaw and Hermes provider onboarding | Resumable instance/model/privacy/backup/finish wizard; configured models must pass exact readiness before completion, while defer remains explicit | ✅ |
 | Context window and capability metadata | Claude Code `/context`; Codex `model_context_window`; ChatGPT model descriptions | Discovered capacity with its source, Details drawer | ✅ |
 | Cost and usage per model | Claude Code `/cost`; ChatGPT usage | Pricing tab, per-profile spend | ✅ |
 | Reasoning-effort control | Codex `model_reasoning_effort`; Claude Code thinking levels | `reasoning_effort` validated against the exact profile's declared values | ✅ |
@@ -167,21 +167,23 @@ Status: ✅ at parity or beyond · 🟡 partial / designed · ❌ absent.
 
 | Control | Reference behaviour (where it exists) | Raiker | Status |
 |---|---|---|---|
-| No-terminal desktop first run | ChatGPT and Claude Desktop install and onboard in-app; OpenClaw Windows Hub exposes setup; Hermes ships a desktop installer | Account creation and model-only setup exist in the browser, but the installed Windows payload is not yet self-contained and the full guided flow is BUG-48 | 🟡 |
-| Provider choice proven by a real call | OpenClaw tests detected/selected inference before continuing; Hermes says to verify a clean chat before adding gateway, cron or skills | Exact readiness API exists, but the current setup review screen does not invoke it before completion; BUG-48 binds completion to that proof | 🟡 |
-| Native host presence and lifecycle | Claude/ChatGPT Desktop are resident applications; OpenClaw Windows Hub exposes native tray controls | Web Host control is authoritative; BUG-48 adds a thin native tray that calls those same routes | 🟡 |
+| No-terminal desktop first run | ChatGPT and Claude Desktop install and onboard in-app; OpenClaw Windows Hub exposes setup; Hermes ships a desktop installer | Self-contained payload and five-stage in-app wizard; no Python, Node, terminal, or environment editing | ✅ |
+| Provider choice proven by a real call | OpenClaw tests detected/selected inference before continuing; Hermes says to verify a clean chat before adding gateway, cron or skills | Setup invokes exact readiness for the chosen owner/profile/model/endpoint before completion; defer is explicit | ✅ |
+| Native host presence and lifecycle | Claude/ChatGPT Desktop are resident applications; OpenClaw Windows Hub exposes native tray controls | Native tray uses a one-time, host-control-only session and the same Open/Pause/Restart/Quit routes as the web Host control | ✅ |
 | Technical boundary separate from approval policy | Codex separates OS sandbox mode from approval policy; Claude Code combines ordered permission rules with OS sandboxing | Policy engine, capability gates and execution environments are separate runtime layers | ✅ |
-| Deny/withhold is runtime-visible | Claude Code exposes tool activity and permission decisions; OpenClaw persists approval decisions and resolver attribution | Outer policy refusals stream a card, but inner governed withheld results rely on model narration until BUG-60 | 🟡 |
-| Configuration shown as authoritative is consumed | Claude Code and Codex document live settings; OpenClaw Labs hides unshipped switches; Hermes Blank Slate writes explicit tool configuration | `StaticPolicyConfig.denied_actions` looks authoritative but is unread; BUG-51 removes it and adds a classification invariant | ❌ |
-| Creating work is distinct from scheduling/running it | ChatGPT and Claude Cowork use explicit Scheduled workflows and manual runs; Hermes separates cron create and run | Human task creation is intentional start-now, but approved model proposals also start now until BUG-64 parks them for explicit **Run now** | ❌ |
-| Portable evidence resolves its own citations | Reference products keep source-backed work reviewable in the surface; shareable OpenClaw/Hermes diagnostics are sanitized | Live turn citations resolve, but exported transcripts omit the source ledger until BUG-65 | ❌ |
-| Local and exposed traffic have different trust posture | Codex defaults to local sandbox/no network; OpenClaw distinguishes direct loopback control from paired remote devices | Authentication already distinguishes loopback bootstrap, but one global read/write rate budget still makes ordinary local navigation compete with abuse control until BUG-88 | 🟡 |
-| Database encryption and key-memory lock are stated separately | None of the six reference products exposes this embedded-database distinction | BUG-46 adds separately proven **Encrypted** and **Locked in memory / Degraded** facts, never inferring one from the other | 🟡 beyond when shipped |
+| Deny/withhold is runtime-visible | Claude Code exposes tool activity and permission decisions; OpenClaw persists approval decisions and resolver attribution | Every executor-level withheld call emits a runtime-authored refusal event/card with source, reason and a Permissions route, independent of model narration | ✅ |
+| Configuration shown as authoritative is consumed | Claude Code and Codex document live settings; OpenClaw Labs hides unshipped switches; Hermes Blank Slate writes explicit tool configuration | Dead `denied_actions` was removed; an invariant prevents an action being both allowed and approval-required | ✅ |
+| Creating work is distinct from scheduling/running it | ChatGPT and Claude Cowork use explicit Scheduled workflows and manual runs; Hermes separates cron create and run | Owner-authored tasks retain start-now semantics; model-proposed tasks are parked until explicit **Run now** | ✅ |
+| Portable evidence resolves its own citations | Reference products keep source-backed work reviewable in the surface; shareable OpenClaw/Hermes diagnostics are sanitized | Each transcript turn exports its portable source ledger; unresolved markers are stripped and counted, and source passages stay local | ✅ |
+| Local and exposed traffic have different trust posture | Codex defaults to local sandbox/no network; OpenClaw distinguishes direct loopback control from paired remote devices | Verified direct loopback reads bypass the DoS budget; writes and every public-bind request remain rate-limited, and proxy headers cannot forge loopback | ✅ |
+| Database encryption and key-memory lock are stated separately | None of the six reference products exposes this embedded-database distinction | Security reports **Encrypted** separately from **Locked in memory / Degraded**; the lock probe runs in a crash-contained child and never infers memory safety from encryption | ✅ beyond |
 
 Design contract:
-[`plans/BUG_46_48_51_60_64_65_88_DESIGN.md`](plans/BUG_46_48_51_60_64_65_88_DESIGN.md).
-The rows above remain partial or absent until implementation and live evidence
-exist; a written design is not a shipped control.
+[`superpowers/specs/BUG_46_48_51_60_64_65_88_DESIGN.md`](superpowers/specs/BUG_46_48_51_60_64_65_88_DESIGN.md).
+Implemented and live-verified on Windows on 2026-08-11. Evidence is under
+[`plans/screenshots/working/`](plans/screenshots/working/); the SQLCipher host
+reports the expected degraded memory-lock posture while database encryption
+and application health remain independently verified.
 
 ---
 

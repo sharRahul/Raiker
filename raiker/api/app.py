@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import json
-import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
@@ -314,7 +313,11 @@ def create_app(
         if tray_bootstrap_secret is not None
         else None
     )
-    app.state.tray_bootstrap_expires = time.monotonic() + 120 if tray_bootstrap_secret else 0.0
+    # A fresh owner may spend as long as needed in setup before the native tray
+    # can mint its host-control-only session. The secret is random, loopback-only
+    # and one-time, so validity ends on first use or process exit rather than an
+    # arbitrary wizard timer.
+    app.state.tray_bootstrap_expires = float("inf") if tray_bootstrap_secret else 0.0
     app.state.tray_bootstrap_used = False
     # BUG-39 — created here rather than in the lifespan so a route can nudge the
     # scheduler even in the tests and embedded hosts that never start one. With

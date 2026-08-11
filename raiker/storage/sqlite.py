@@ -456,9 +456,13 @@ def memlock_allowance_bytes() -> int | None:
         import resource  # noqa: PLC0415 - POSIX only, imported where it is used
     except ImportError:
         return None
+    getrlimit = getattr(resource, "getrlimit", None)
+    memlock = getattr(resource, "RLIMIT_MEMLOCK", None)
+    if not callable(getrlimit) or memlock is None:
+        return None
     try:
-        soft, _hard = resource.getrlimit(resource.RLIMIT_MEMLOCK)
-    except (AttributeError, OSError, ValueError):
+        soft, _hard = getrlimit(memlock)
+    except (OSError, ValueError):
         return None
     if soft < 0:
         return -1 if soft == -1 else None

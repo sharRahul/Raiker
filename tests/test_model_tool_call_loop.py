@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 from pathlib import Path
+from typing import Any
 
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
@@ -109,7 +110,7 @@ def _events(orchestrator: RuntimeOrchestrator, session_id: str) -> list[str]:
     return [json.loads(line)["event_type"] for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def _event_record(orchestrator: RuntimeOrchestrator, session_id: str, event_type: str) -> dict[str, object]:
+def _event_record(orchestrator: RuntimeOrchestrator, session_id: str, event_type: str) -> dict[str, Any]:
     path = orchestrator.writer.path_for_session(session_id)
     return next(
         record

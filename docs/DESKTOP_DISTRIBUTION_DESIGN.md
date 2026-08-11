@@ -2,9 +2,9 @@
 
 ## Status
 
-**Partly implemented.** Raiker runs as a Python service with a web application.
-This document defines the product shape required to distribute it as an
-installable application for Windows, macOS, and Linux.
+**Implemented, pending signed publication.** Raiker runs as a self-contained
+desktop payload with a web application. This document records the product shape
+used to distribute it for Windows, macOS, and Linux.
 
 What exists today (FIXED-88 and FIXED-92 in [to be fixed](plans/TO_BE_FIXED.md)):
 
@@ -33,8 +33,14 @@ What exists today (FIXED-88 and FIXED-92 in [to be fixed](plans/TO_BE_FIXED.md))
   `GET /api/host/update`, and the Host control's **Install & updates** section):
   signed release, unsigned build, or source checkout.
 
-What does not exist yet (BUG-48): the first-run setup wizard, and a native tray
-icon — which needs a packaged binary with a platform GUI toolkit.
+- `scripts/build_desktop.py` freezes the service, dashboard assets and tray
+  dependencies into the platform payload. The Windows no-console build supplies
+  safe null standard streams and resolves its web assets from the frozen bundle.
+- A resumable five-stage first-run wizard covers owner creation, model choice and
+  readiness, privacy, a verified encrypted backup choice, and completion.
+- The native tray exchanges a one-time bootstrap secret for a host-control-only
+  session and calls the same Open, Pause/Resume, Restart and Quit routes as the
+  web Host control.
 
 **No signed artifact has been published.** The pipeline is complete and refuses
 to run without code-signing identities rather than producing something that looks
@@ -79,7 +85,7 @@ its authorized local users.
 | Moment | Required behavior |
 |---|---|
 | Install | Install signed application files only; do not create an account, model connection, or backup without user action. **Implemented** — `scripts/build_installer.py` writes only application files, and its post-install step creates the environment offline from the bundled wheels. |
-| First run | Create a local account/instance, choose a model or defer it, select optional backup, then start the local service. |
+| First run | Create a local account/instance, choose a model or defer it, explain privacy, create and verify an optional encrypted backup, then open the workspace. **Implemented** — `raiker/setup/`, `/api/setup/*`, and `SetupWizard.svelte`. |
 | Host start | Start the Raiker host automatically and recover unfinished approved background work safely. |
 | Browser closed | Keep the service running; scheduled work and indexing continue only within their approved policies. |
 | Pause / quit | Pause stops new background work; quit stops the service explicitly and reports any waiting work. |
@@ -100,11 +106,10 @@ operations on every platform and nothing survives an uninstall in a registry
 hive. The shared-host rows remain specification: each is an explicit,
 administrator-made decision with its own review.
 
-The tray/menu-bar control must show `running`, `paused`, `needs attention`, or
-`stopped`, and provide Open Raiker, Pause, Restart, and Quit actions. Those
-states and the Pause / Restart / Quit actions are implemented in the web app's
-top bar and in `raiker-app`; a native tray icon needs the packaged, signed binary
-built by the FIXED-92 pipeline, and is tracked as BUG-48. `Restart` is offered only when a background registration exists —
+The tray/menu-bar control shows `running`, `paused`, `needs attention`, or
+`stopped`, and provides Open Raiker, Pause/Resume, Restart, and Quit actions.
+`raiker/app/tray.py` is bundled by `scripts/build_desktop.py`; it holds only a
+host-control session and reuses the web control's routes. `Restart` is offered only when a background registration exists —
 nothing else would start the host again, and offering it otherwise would be a
 control that lies.
 
@@ -180,10 +185,8 @@ recovery point remains until a later, separately governed retention decision.
 
 ## First-run experience
 
-The installer and setup wizard must not require Python, Node, a terminal, or
-environment-variable editing. The setup order is:
-
-The wizard is BUG-48; the order it must follow is:
+The installer and setup wizard do not require Python, Node, a terminal, or
+environment-variable editing. The implemented setup order is:
 
 1. create or sign in to the local Raiker instance;
 2. select a local model, add a user-owned hosted-provider key, or defer model

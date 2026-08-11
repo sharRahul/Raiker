@@ -38,7 +38,7 @@ def start_native_tray(base_url: str, bootstrap_secret: str) -> threading.Thread:
 
 def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
     try:
-        import pystray  # type: ignore[import-not-found]
+        import pystray  # type: ignore[import-untyped]
         from PIL import Image, ImageDraw
     except ImportError:
         return
@@ -84,7 +84,10 @@ def _run_native_tray(base_url: str, bootstrap_secret: str) -> None:
 
 
 def _exchange(base_url: str, secret: str) -> str | None:
-    for _ in range(20):
+    # On a fresh workspace the host answers 409 until the owner completes the
+    # setup wizard. This daemon thread lives only as long as the host, so keep
+    # waiting instead of silently removing the tray five seconds into first run.
+    while True:
         try:
             response = httpx.post(
                 f"{base_url}/api/tray/session", json={"secret": secret}, timeout=1
@@ -94,6 +97,4 @@ def _exchange(base_url: str, secret: str) -> str | None:
                 return str(token) if token else None
         except httpx.HTTPError:
             pass
-        threading.Event().wait(0.25)
-    return None
-
+        threading.Event().wait(0.5)

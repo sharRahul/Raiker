@@ -3,6 +3,7 @@
     "Apache-2.0",
     "MIT",
     "MIT-0",
+    "MIT-CMU",
     "BSD-2-Clause",
     "BSD-3-Clause",
     "0BSD",
@@ -29,6 +30,16 @@
     "PROPRIETARY"
   ],
   "exceptions": [
+    {
+      "component": "pyinstaller",
+      "license": "GPLv2-or-later with a special exception which allows to use PyInstaller to build and distribute non-free programs (including commercial ones)",
+      "reason": "Development-only freezer. PyInstaller's official bootloader exception permits distributing generated bundles under the application's licence; Raiker does not distribute a modified PyInstaller toolchain."
+    },
+    {
+      "component": "pystray",
+      "license": "LGPL-3.0-only",
+      "reason": "Unmodified desktop tray library. The frozen payload retains pystray's COPYING and COPYING.LGPL files under its dist-info directory; Raiker does not modify pystray source."
+    },
     {
       "component": "tqdm",
       "license": "MPL-2.0 AND MIT",

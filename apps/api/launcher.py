@@ -65,6 +65,7 @@ import sys
 import threading
 import webbrowser
 from pathlib import Path
+from typing import TextIO, cast
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -77,6 +78,17 @@ DEFAULT_PORT = 8765
 # would only hide.
 PORT_SCAN_RANGE = 12
 LOOPBACK = "127.0.0.1"
+
+
+def _ensure_standard_streams() -> list[TextIO]:
+    """Give no-console Windows builds harmless streams expected by libraries."""
+    opened: list[TextIO] = []
+    for name, mode in (("stdin", "r"), ("stdout", "w"), ("stderr", "w")):
+        if getattr(sys, name) is None:
+            stream = cast(TextIO, open(os.devnull, mode, encoding="utf-8"))  # noqa: SIM115
+            setattr(sys, name, stream)
+            opened.append(stream)
+    return opened
 
 
 def detect_os() -> str:
@@ -205,6 +217,10 @@ def open_browser(url: str, os_name: str | None = None) -> bool:
 
 def _resolve_ui_dir() -> Path | None:
     """The built web app, if this install has one."""
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root is not None:
+        candidate = Path(bundle_root) / "web"
+        return candidate if (candidate / "index.html").is_file() else None
     from apps.api.main import _resolve_ui_dir as resolve
 
     candidate = resolve(None)
@@ -324,7 +340,15 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = build_parser().parse_args(argv)
+    _ensure_standard_streams()
+    raw_args = list(sys.argv[1:] if argv is None else argv)
+    if raw_args[:1] == ["--sqlcipher-probe-worker"]:
+        if len(raw_args) != 3:
+            return 2
+        from raiker.storage.sqlcipher_probe_worker import run_files
+
+        return run_files(Path(raw_args[1]), Path(raw_args[2]))
+    args = build_parser().parse_args(raw_args)
     if getattr(args, "command", None):
         return _run_command(args)
 

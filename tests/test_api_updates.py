@@ -51,7 +51,7 @@ def test_status_reports_the_running_build_and_the_release_matrix(client: TestCli
     assert body["channel"] is None
     assert body["available"] is None
     targets = {target["target_id"]: target for target in body["targets"]}
-    assert set(targets) == {"macos-arm64", "macos-x86_64", "windows-x86_64", "linux-x86_64"}
+    assert set(targets) == {"macos-arm64", "windows-x86_64", "linux-x86_64", "linux-arm64"}
     for target in targets.values():
         assert target["signing"]["secrets"], target["target_id"]
         assert target["installer_formats"], target["target_id"]

@@ -1504,6 +1504,35 @@ async def create_task(
     return serialize_dto(view)
 
 
+@router.post("/api/tasks/{task_id}/run")
+async def run_task(
+    task_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Record explicit owner intent to run one parked task now (BUG-64)."""
+    _session, principal = auth_data
+    try:
+        view = _service(request).run_task_now(
+            task_id, user_id=principal.delegated_by_user_id
+        )
+    except ValueError as exc:
+        reason = str(exc)
+        code = (
+            status.HTTP_404_NOT_FOUND
+            if reason == "task_not_found"
+            else status.HTTP_409_CONFLICT
+        )
+        raise HTTPException(
+            status_code=code,
+            detail={"ok": False, "reason_code": reason},
+        ) from exc
+    wakeup = getattr(request.app.state, "scheduler_wakeup", None)
+    if wakeup is not None:
+        wakeup.request()
+    return serialize_dto(view)
+
+
 @router.post("/api/tasks/{task_id}/resume")
 async def resume_task(
     task_id: str,

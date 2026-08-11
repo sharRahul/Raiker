@@ -312,6 +312,20 @@ def test_shell_proposal_states_that_approving_executes_once(tmp_path) -> None:  
     )
 
 
+def test_create_task_proposal_says_creation_does_not_schedule_a_run(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    broker = _broker(tmp_path)
+    result, decision = broker.execute(
+        ToolAction(new_id("act_"), "create_task", {"title": "Draft notes"}, "high", True),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+    )
+
+    assert decision.decision == "needs_approval"
+    assert result.output["expected_effect"] == (  # type: ignore[index]
+        "Creates one task in Tasks. It will wait until you run or schedule it."
+    )
+
+
 def test_a_write_into_the_governance_directory_fails_instead_of_being_proposed(tmp_path) -> None:  # type: ignore[no-untyped-def]
     broker = _broker(tmp_path)
     result, _decision = broker.execute(

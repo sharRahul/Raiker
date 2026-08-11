@@ -256,7 +256,7 @@ def create_app(
                     await asyncio.wait_for(stop.wait(), timeout=15)
 
         async def continuations() -> None:
-            """BUG-39 — start an approved continuation the moment it is granted.
+            """Start explicitly requested work or a continuation without delay.
 
             The tick above still sweeps every 15 seconds and is what recovers a
             decision this worker never heard about (one made through another
@@ -270,6 +270,10 @@ def create_app(
                     continue
                 if stop.is_set():
                     return
+                # BUG-64 — the Run now route only records intent atomically;
+                # this resident worker claims it through the ordinary scheduler.
+                with suppress(Exception):
+                    await scheduler.run_due()
                 with suppress(Exception):
                     await resume_approved(scheduler)
 

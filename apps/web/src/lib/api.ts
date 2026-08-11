@@ -1462,6 +1462,10 @@ export const api = {
     model?: string;
     attachments?: PromptAttachment[];
   }) => postJson<TaskView>("/api/tasks", body),
+  // BUG-64 — creation alone does not execute model-proposed work. This is the
+  // owner's separate, explicit intent to make one parked task due now.
+  runTask: (taskId: string) =>
+    postJson<TaskView>(`/api/tasks/${encodeURIComponent(taskId)}/run`, {}),
   // BUG-25 — ask the host to continue one parked scheduled run now. The
   // scheduler does this on its own tick; this is the owner's retry for when
   // automatic continuation could not proceed, and it runs the same path.

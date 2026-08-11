@@ -102,6 +102,7 @@ class TaskManagementExecutor:
                 reminder_at=_optional_str(action.arguments, "reminder_at"),
                 recurrence=_optional_str(action.arguments, "recurrence"),
                 project_id=_optional_str(action.arguments, "project_id"),
+                start_immediately=False,
             )
         except ValueError as exc:
             return _failed(

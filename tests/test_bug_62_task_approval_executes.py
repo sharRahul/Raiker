@@ -110,8 +110,31 @@ class TestApprovedTaskIsCreated:
 
         listed = client.get("/api/tasks", headers=headers)
         assert listed.status_code == 200, listed.text
-        titles = [task["title"] for task in listed.json()]
-        assert "Draft the weekly summary" in titles
+        created = next(
+            task for task in listed.json() if task["title"] == "Draft the weekly summary"
+        )
+        # BUG-64: approving creation creates only the work object. It does not
+        # also schedule a turn the owner never asked to run.
+        assert created["scheduled_at"] is None
+
+    def test_owner_can_explicitly_run_an_approved_unscheduled_task(
+        self, workspace: Path, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        _pending(workspace, tool_name="create_task", arguments={"title": "Run deliberately"})
+        assert _resolve(client, headers, "appr_1").status_code == 200
+        task = next(
+            item
+            for item in client.get("/api/tasks", headers=headers).json()
+            if item["title"] == "Run deliberately"
+        )
+
+        started = client.post(f"/api/tasks/{task['task_id']}/run", headers=headers)
+
+        assert started.status_code == 200, started.text
+        assert started.json()["scheduled_at"] is not None
+        duplicate = client.post(f"/api/tasks/{task['task_id']}/run", headers=headers)
+        assert duplicate.status_code == 409
+        assert duplicate.json()["detail"]["reason_code"] == "task_already_scheduled"
 
     def test_the_resumed_turn_is_told_the_task_really_exists(
         self, workspace: Path, client: TestClient, headers: dict[str, str]
@@ -288,5 +311,6 @@ class TestWiringInvariants:
             requires_approval=True,
         )
         effect = broker._expected_effect(action, False)  # noqa: SLF001
-        assert "creates the task" in effect
-        assert "metadata-only" not in effect
+        assert effect == (
+            "Creates one task in Tasks. It will wait until you run or schedule it."
+        )

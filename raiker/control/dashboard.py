@@ -3469,6 +3469,7 @@ class DashboardService:
         model_profile: str | None = None,
         model: str | None = None,
         attachments: list[dict[str, Any]] | None = None,
+        start_immediately: bool = True,
     ) -> TaskView:
         """Create a local planning task in the caller's server-owned Inbox session.
 
@@ -3509,9 +3510,14 @@ class DashboardService:
                 clean_attachments.append({"type": kind, "attachment_id": attachment_id.strip()})
                 continue
             raise ValueError("invalid_attachment")
-        # An unscheduled task is work requested now; the resident host claims
-        # it on its next scheduler tick. Explicit times remain untouched.
-        if scheduled_at is None:
+        # BUG-64 — creation and execution are separate decisions for a model-
+        # proposed task. Human use of Tasks keeps the established start-now
+        # default; approval execution passes false and parks the new row until
+        # the owner explicitly runs it. A model-supplied date does not smuggle
+        # scheduling authority through a creation approval.
+        if not start_immediately:
+            scheduled_at = None
+        elif scheduled_at is None:
             scheduled_at = utc_now()
         if project_id is None:
             project_id = self.store.get_active_project(user_id)
@@ -3550,6 +3556,24 @@ class DashboardService:
             model_profile=model_profile,
             model=model,
             attachments=clean_attachments,
+        )
+        return self._task_view(task)
+
+    def run_task_now(self, task_id: str, *, user_id: str | None) -> TaskView:
+        """Schedule one visible, queued, unscheduled task for immediate claim."""
+        from raiker.events.types import make_event
+
+        task, reason = self.store.schedule_task_now(task_id, user_id=user_id)
+        if task is None:
+            raise ValueError(reason or "task_not_runnable")
+        EventLogWriter(self.store).append(
+            make_event(
+                session_id=task.session_id,
+                turn_id=task.parent_turn_id,
+                event_type="task_run_requested",
+                actor="dashboard",
+                payload={"task_id": task.task_id, "scheduled_at": task.scheduled_at},
+            )
         )
         return self._task_view(task)
 

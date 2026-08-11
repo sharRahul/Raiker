@@ -9,6 +9,31 @@ afterEach(() => { vi.unstubAllGlobals(); resetModels(); });
 const READY_MODEL = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
 
 describe("TasksView", () => {
+  it("offers Run now for an unscheduled queued task and invokes only the explicit run route", async () => {
+    const task = {
+      task_id: "task_ready", session_id: "sess_inbox", status: "queued",
+      title: "Review deliberate work", objective: "Wait for the owner.",
+      current_step: null, progress_percent: null,
+      created_at: "2026-08-11T09:00:00Z", updated_at: "2026-08-11T09:00:00Z",
+      completed_at: null, summary: null, project_id: null,
+      scheduled_at: null, recurrence: null, reminder_at: null, parent_task_id: null,
+    };
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [task],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+      "POST /api/tasks/task_ready/run": { ...task, scheduled_at: "2026-08-11T09:01:00Z" },
+    });
+    render(TasksView);
+
+    expect(await screen.findByText(/Ready when you run it/)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Run now" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tasks/task_ready/run",
+      expect.objectContaining({ method: "POST" }),
+    ));
+  });
+
   it("preserves task fields and disables all cadences when the model is unready", async () => {
     const stopped = { profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." };
     stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [stopped], chat_profiles: [stopped] } });

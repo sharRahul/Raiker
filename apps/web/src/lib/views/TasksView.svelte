@@ -192,6 +192,22 @@
     }
   }
 
+  async function runTask(task: TaskView) {
+    busyTask = task.task_id;
+    notice = null;
+    try {
+      await api.runTask(task.task_id);
+      notice = `Starting “${task.title}”.`;
+      await load();
+    } catch (error) {
+      notice = error instanceof ApiError
+        ? `Could not run this task (${error.reasonCode ?? error.status}).`
+        : "Could not run this task.";
+    } finally {
+      busyTask = null;
+    }
+  }
+
   async function stopTask(task: TaskView) {
     busyTask = task.task_id; notice = null;
     try {
@@ -320,7 +336,12 @@
             <footer>
               <span title={task.scheduled_at ?? task.updated_at}>{scheduleLabel(task)} · updated {relativeTime(task.updated_at)}</span>
               {#if ACTIVE_TASK_STATES.includes(task.status)}
-                <button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Stopping…" : "Stop"}</button>
+                <span class="task-actions">
+                  {#if task.status === "queued" && !task.scheduled_at}
+                    <button type="button" class="btn btn-primary btn-sm" onclick={() => runTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Starting…" : "Run now"}</button>
+                  {/if}
+                  <button type="button" class="btn btn-danger btn-sm" onclick={() => stopTask(task)} disabled={busyTask === task.task_id}>{busyTask === task.task_id ? "Stopping…" : "Stop"}</button>
+                </span>
               {/if}
             </footer>
           </article>
@@ -332,5 +353,5 @@
 </section>
 
 <style>
-  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:.75rem;gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:.74rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
+  .tasks{max-width:64rem}.tasks header,.composer-heading,.task-main,footer,.history-row{align-items:flex-start;display:flex;gap:var(--space-3);justify-content:space-between}.tasks header{margin-bottom:var(--space-4)}h3,h4{margin:0}.tasks header .page-lead{margin:0;max-width:60ch}.composer p,.task p{color:var(--text-2);font-size:.85rem;margin:.35rem 0 0}.composer{display:grid;gap:var(--space-3)}.composer label{color:var(--text-2);display:grid;font-size:.8rem;gap:.35rem}.composer .field-error{color:var(--danger);font-size:.8rem;margin:calc(var(--space-3) * -.5) 0 0}.fields{display:grid;gap:var(--space-3);grid-template-columns:repeat(3,minmax(0,1fr))}.summary{display:flex;gap:var(--space-4);margin:var(--space-4) 0}.summary span{color:var(--text-2);font-size:.85rem}.summary strong{color:var(--text-1);font-size:1.1rem}.work-list,.history{display:grid;gap:var(--space-2);margin-top:var(--space-4)}.task{margin-left:calc(var(--depth) * 1.15rem);max-width:calc(100% - var(--depth) * 1.15rem)}.task-title{display:flex;gap:.5rem}.branch{color:var(--accent);min-width:.8rem}.task h4{font-size:.96rem}.task-attachments{display:flex;flex-wrap:wrap;gap:.4rem;margin-top:.7rem}.task-attachments span{align-items:center;background:var(--sunken);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text-2);display:flex;font-size:.75rem;gap:.3rem;max-width:100%;overflow-wrap:anywhere;padding:.35rem .5rem}.step{color:var(--accent)!important}.continuing{align-items:center;background:var(--accent-soft);border:1px solid var(--accent-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.blocked{align-items:center;background:var(--warn-soft);border:1px solid var(--warn-border);border-radius:var(--r-sm);color:var(--text-1)!important;display:flex;flex-wrap:wrap;font-size:.8rem;gap:.4rem;margin-top:.6rem!important;padding:.4rem .6rem}.recovery{align-items:center;display:flex;flex-wrap:wrap;gap:.35rem;margin-left:auto}.recovery-note{color:var(--text-3);font-size:.74rem}.progress{background:var(--sunken);border-radius:var(--r-pill);height:6px;margin-top:.7rem;overflow:hidden}.progress div{background:var(--accent);height:100%}footer{align-items:center;color:var(--text-3);font-size:.76rem;margin-top:.8rem}.task-actions{align-items:center;display:flex;gap:.4rem}.history-row{align-items:center;border-bottom:1px solid var(--border);padding:.65rem 0}.history-row span:last-child{color:var(--text-3);font-size:.8rem}.history-main{display:grid;gap:.15rem;min-width:0}.history-title{color:var(--text-1)}.outcome{color:var(--text-2);font-size:.82rem;margin:.4rem 0 0}.history-main .outcome{margin:0}.notice{color:var(--success);margin:var(--space-3) 0}@media(max-width:42rem){.tasks header,.composer-heading{flex-direction:column}.fields{grid-template-columns:1fr}.task{margin-left:0;max-width:none}}
 </style>

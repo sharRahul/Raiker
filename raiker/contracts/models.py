@@ -280,6 +280,9 @@ EVENT_TYPES = {
     "subagent_result_verified",
     "subagent_result_refused",
     "task_created",
+    # BUG-64 — explicit owner intent that makes a parked task due. Creation is
+    # its own event and never implies this one for model-proposed work.
+    "task_run_requested",
     "task_started",
     "task_progress",
     "task_paused",

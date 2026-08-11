@@ -4862,6 +4862,41 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     claimed.append(self._task_from_row(row))
         return claimed
 
+    def schedule_task_now(
+        self, task_id: str, *, user_id: str | None
+    ) -> tuple[TaskRecord | None, str | None]:
+        """Atomically make one owner-visible parked task due (BUG-64)."""
+        now = utc_now()
+        with self.connect() as connection:
+            params: list[Any] = [task_id]
+            ownership = ""
+            if user_id is not None:
+                ownership = (
+                    " AND session_id IN (SELECT session_id FROM sessions "
+                    "WHERE user_id = ? OR user_id IS NULL)"
+                )
+                params.append(user_id)
+            row = connection.execute(
+                f"SELECT * FROM tasks WHERE task_id = ?{ownership}", params
+            ).fetchone()
+            if row is None:
+                return None, "task_not_found"
+            if row["scheduled_at"] is not None:
+                return None, "task_already_scheduled"
+            if row["status"] != "queued":
+                return None, "task_not_runnable"
+            updated = connection.execute(
+                "UPDATE tasks SET scheduled_at = ?, updated_at = ?, current_step = ? "
+                "WHERE task_id = ? AND status = 'queued' AND scheduled_at IS NULL",
+                (now, now, "Ready to start", task_id),
+            )
+            if updated.rowcount != 1:
+                return None, "task_not_runnable"
+            scheduled = connection.execute(
+                "SELECT * FROM tasks WHERE task_id = ?", (task_id,)
+            ).fetchone()
+        return self._task_from_row(scheduled), None
+
     def reschedule_task(self, task_id: str, scheduled_at: str, summary: str) -> None:
         self._update_task(task_id, status="queued", scheduled_at=scheduled_at, current_step="Waiting for next scheduled run", progress_percent=0, completed_at=None, summary=summary)
 

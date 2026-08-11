@@ -461,6 +461,7 @@ class ToolBroker:
                 reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
                 recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
                 project_id=str(args["project_id"]) if args.get("project_id") else None,
+                start_immediately=False,
             )
         except ValueError as exc:
             return {"status": "failed", "error": {"type": str(exc)}}
@@ -797,11 +798,9 @@ class ToolBroker:
                 # one as a write to "the proposed path" was how this sentence
                 # would have started lying the moment they became executable.
                 if action.tool_name == "create_task":
-                    title = str(self._redact_value(str(action.arguments.get("title", ""))))
                     return (
-                        f"Approving creates the task “{title}” in Tasks, once."
-                        if title
-                        else "Approving creates this task in Tasks, once."
+                        "Creates one task in Tasks. It will wait until you run or "
+                        "schedule it."
                     )
                 if action.tool_name == "assign_session_project":
                     return "Approving moves this conversation into the named project, once."

@@ -264,10 +264,13 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-11:
   resolution executes file changes and patches, bounded local `shell` commands,
   and the owner-configured SSH and Daytona profiles. `network` and `process`
   keep metadata-only resolution. This is deliberate, not an oversight: a file
-  write is checkpointed and reversible, and a shell command is allowlisted,
-  workspace-contained, time- and output-bounded, and captured; those two are
-  neither. Resolving one still continues the parked turn, with an honest
-  "approved, but not executed" result the agent can react to.
+  write is checkpointed and reversible, and a shell command is parsed before it
+  runs — refused if it chains, pipes, redirects, substitutes, expands or reaches
+  an interpreter, held to an allowlist of binaries and to the workspace, denied
+  its own `.raiker` and `.git`, given a constructed environment rather than the
+  host's, and time- and output-bounded with secret-like output redacted. Those
+  two are none of that. Resolving one still continues the parked turn, with an
+  honest "approved, but not executed" result the agent can react to.
 - **A batch of tool calls runs in parallel only when nothing in it needs a
   decision.** Every validated read-only call in a batch is executed
   concurrently; the moment one call in the same batch requires approval, the
@@ -440,6 +443,19 @@ The 2026-08-08 round's findings are **FIXED-154** through **FIXED-159**, and the
 that closed the older limits this section used to list are FIXED-34, FIXED-39,
 FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
 [ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
+
+The same date's second round rebuilt two governed boundaries. **RAIKER-2021**
+replaced the web egress allowlist with a blocklist — `web_fetch` and
+`web_search` now work on a fresh install instead of being advertised to the
+model and refused — while moving the part that matters into a guard the owner
+cannot edit: no private, loopback or link-local destination, however it is
+spelled and wherever a redirect leads, with the connection pinned to an address
+that already passed. Fetched pages are reduced to inert text first.
+**RAIKER-2023** parses a command before it runs rather than checking only the
+name of its binary, and **RAIKER-2022** moved the push credential out of the
+host environment into a loan the owner grants once or for a session. The limits
+this section used to carry about web fetch taking two deliberate steps, and
+about a push needing a credential left in the environment, are gone with them.
 
 The 2026-08-11 round closed **FIXED-181** through **FIXED-186**: multi-call
 answer seams, the checked-in live stub, dead transcript markup, automatic 90%

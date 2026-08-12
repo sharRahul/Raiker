@@ -423,49 +423,6 @@ is still open; everything closed keeps its full record — observation, root cau
 and the interface outcome that had to be true first — in
 [docs/plans/FIXED_ITEMS.md](docs/plans/FIXED_ITEMS.md).
 
-The 2026-08-10 round closed eleven entries there. **FIXED-133** is the one this
-section is written against: a new owner's first message used to fail with the raw
-string `model_unavailable: provider_error_unclassified`, and a fresh install now
-either answers or explains in a sentence why it cannot. The rest are the OWASP
-Agentic Top 10 gaps that review exposed — **FIXED-163** (a failing tool or
-provider contained rather than retried to exhaustion), **FIXED-164** (anomaly
-detection and containment for every capability, not only MCP), **FIXED-165** (a
-delegated subagent result bound to the spawn that produced it), **FIXED-166** (a
-plugin signature that states what it proved), **FIXED-167** (a security mapping
-whose every row cites the code) and **FIXED-168** (the prompt-injection scanning
-hook) — together with **FIXED-161** (the production bundle back under its size
-warning), **FIXED-162** (retry, cancellation and partial cleanup that do what
-they say), **FIXED-169** (the readiness window above) and **FIXED-170** (the live
-acceptance spec running on one provider key).
-
-The 2026-08-08 round's findings are **FIXED-154** through **FIXED-159**, and the
-2026-08-10 visual sweep's are **FIXED-149** through **FIXED-153**. The entries
-that closed the older limits this section used to list are FIXED-34, FIXED-39,
-FIXED-90, FIXED-99, FIXED-101 and FIXED-109, and
-[ADD-02](docs/plans/TO_BE_ADDED.md) in the companion document.
-
-The same date's second round rebuilt two governed boundaries. **RAIKER-2021**
-replaced the web egress allowlist with a blocklist — `web_fetch` and
-`web_search` now work on a fresh install instead of being advertised to the
-model and refused — while moving the part that matters into a guard the owner
-cannot edit: no private, loopback or link-local destination, however it is
-spelled and wherever a redirect leads, with the connection pinned to an address
-that already passed. Fetched pages are reduced to inert text first.
-**RAIKER-2023** parses a command before it runs rather than checking only the
-name of its binary, and **RAIKER-2022** moved the push credential out of the
-host environment into a loan the owner grants once or for a session. The limits
-this section used to carry about web fetch taking two deliberate steps, and
-about a push needing a credential left in the environment, are gone with them.
-
-The 2026-08-11 round closed **FIXED-181** through **FIXED-186**: multi-call
-answer seams, the checked-in live stub, dead transcript markup, automatic 90%
-context compaction, the connected-provider rolling seven-day usage view, and
-concurrent audit-log integrity. The same round closed two of the limits this
-section used to list — reference search over the code map, and matching that
-survives whitespace — and **MEM-01** and **MEM-02** in
-[docs/plans/MEMORY_RELIABILITY_PLAN.md](docs/plans/MEMORY_RELIABILITY_PLAN.md),
-which is the memory audit's own record of what recall can and cannot do yet.
-
 ## Documentation
 
 - **[User guide](docs/guide/README.md)** — install, connect a model, permissions,

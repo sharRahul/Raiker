@@ -35,13 +35,29 @@
 
 - `raiker/execution/commands/models.py`: immutable request, state, chunk, receipt, feature, and resolution contracts.
 - `raiker/execution/commands/store.py`: owner-scoped persistence facade over `SQLiteStore`.
-- `raiker/execution/commands/runner.py`: bounded concurrent stdout/stderr capture, redaction, timeout, input, and process-tree termination.
-- `raiker/execution/commands/backends.py`: `CommandBackend` protocol plus local, native, container, SSH, and Daytona adapters.
-- `raiker/execution/commands/network.py`: domain grants and isolated proxy topology/policy.
+- `raiker/execution/commands/redactor.py`: provably split-safe byte decoding and multi-pattern/structured streaming redaction.
+- `raiker/execution/commands/supervisor_protocol.py`: versioned authenticated frames shared by local and backend-resident supervisors.
+- `raiker/execution/commands/runner.py`: local supervisor client, bounded capture, timeout, input, and process-tree termination.
+- `raiker/execution/commands/backends/base.py`, `local.py`, `native.py`, `container.py`, `remote.py`: independently reviewable backend adapters.
+- `raiker/execution/commands/network.py`: domain grants and proxy control client.
+- `raiker/execution/commands/credential_broker.py`: secret detection, typed placeholders, purpose-bound injection, and safe display.
 - `raiker/execution/commands/receipts.py`: canonical receipt creation and digest.
+- `raiker/execution/commands/evidence.py`: checkpoint, symlink-safe change summary, and bounded diagnostic producers.
 - `raiker/execution/commands/service.py`: lifecycle operations and environment resolution.
 - `raiker/execution/commands/recovery.py`: startup reconciliation and bounded cleanup.
+- `raiker/execution/commands/composition.py`: one workspace-scoped service, recovery, and lease-reaper composition root.
 - `raiker/api/routes_commands.py`: owner-facing command history, output, input, stop, lease, and reset APIs.
+
+### New packaged security-boundary artifacts
+
+- `native/Cargo.toml`, `native/raiker-command-protocol/`: shared framed protocol, canonical request digest, redaction automaton, and test vectors.
+- `native/raiker-command-supervisor/`: backend-resident process/PTY/log/lease supervisor used by container, SSH, and Daytona backends.
+- `native/raiker-command-runner/`: Windows AppContainer/restricted-token, Job Object, ConPTY, ACL, named-pipe, and policy client.
+- `native/raiker-windows-policy-helper/`: narrowly elevated AppContainer profile/ACL and WFP dynamic-session setup/rollback helper.
+- `native/raiker-egress-proxy/`: authenticated HTTP CONNECT and SOCKS5 CONNECT proxy with DNS/address enforcement and connection audits.
+- `containers/command-sandbox/Containerfile`: pinned supervisor/proxy artifacts and non-root read-only command image.
+- `scripts/install_windows_runner.ps1`, `scripts/uninstall_windows_runner.ps1`: signature/digest verification, elevation UX, transactional firewall setup, and rollback.
+- `.github/workflows/native-security-boundaries.yml`: Linux/Rust tests, Windows helper build/integration tests, artifact digest, and release packaging checks.
 
 ### New web components
 
@@ -54,9 +70,11 @@
 - `raiker/storage/migrations.py`, `raiker/storage/sqlite.py`: command rows, chunks, grants, receipts, owner-scoped queries, and compare-and-swap transitions.
 - `raiker/execution/profiles.py`, `raiker/control/dashboard.py`: authoritative command profile and proven feature/readiness projection.
 - `raiker/runtime/executors/tier2_shell.py`, `tier5_network.py`, `containers.py`: adapters into the shared command service.
+- `raiker/runtime/executors/__init__.py`: inject the single application-scoped `CommandService` into the default registry.
 - `raiker/runtime/executors/tier1_approval.py`, `raiker/tools/broker.py`, `raiker/runtime/orchestrator.py`: shared execution path and metadata-only command lifecycle stream.
 - `raiker/models/tool_call_validation.py`, `raiker/contracts/models.py`, `raiker/policy/config.py`, `raiker/runtime/authority/router.py`: typed `run_command`/`process` tools and their unchanged governance.
-- `raiker/api/app.py`, `raiker/api/schemas.py`: router registration and strict request bodies.
+- `raiker/api/app.py`, `raiker/api/dependencies.py`, `raiker/api/schemas.py`: lifespan composition, router registration, shared service injection, strict request bodies, lease reaping, and shutdown.
+- `pyproject.toml`, release/build configuration, and Windows installer metadata: package pinned helper/proxy artifacts and verify protocol/digest compatibility.
 - `apps/web/src/lib/api.ts`, `apiTypes.ts`, `views/BuildView.svelte`, `views/ApprovalsView.svelte`, `views/settings/Runtime.svelte`: command API, terminal pane, effective boundary, and approval previews.
 - planning, Known Limits, compatibility, security, implementation-status, and live-test documents listed in Task 11.
 
@@ -73,7 +91,7 @@
 - Create: `tests/test_command_store.py`
 
 **Interfaces:**
-- Produces: `CommandRequest`, `CommandState`, `CommandChunk`, `CommandFeatures`, `CommandReceipt`, `CommandResolution`, `CommandStore.create`, `transition`, `append_chunk`, `list_runs`, `read_output`, `put_receipt`, and `list_recoverable`.
+- Produces: `CommandRequest`, `CommandState`, `CommandChunk`, `CommandFeatures`, `CommandReceipt`, `CommandResolution`, `CommandStore.create`, `transition`, `append_chunk`, `list_runs`, `read_output`, atomic `finalize_with_receipt`, and `list_recoverable`.
 - Consumes: `SQLiteStore.connect`, `new_id`, `utc_now`, and the existing migration registration path.
 
 - [ ] **Step 1: Write failing contract and state-machine tests**
@@ -85,7 +103,8 @@ def request(**overrides: object) -> CommandRequest:
         "acting_principal_id": "agent_a", "session_id": "sess_a",
         "turn_id": "turn_a", "action_id": "act_a", "repository_id": None,
         "workspace_root": Path("C:/workspace"), "cwd": ".",
-        "command": "npm test", "argv": (), "shell": True,
+        "executable_template": "npm test", "argv_template": (),
+        "safe_display": "npm test", "credential_bindings": (), "shell": True,
         "interactive": False, "background": False, "timeout_seconds": 30.0,
         "max_output_bytes": 100_000, "environment_profile_id": "container_default",
         "network_policy_id": None,
@@ -96,13 +115,14 @@ def request(**overrides: object) -> CommandRequest:
 
 def test_request_requires_exactly_one_command_representation() -> None:
     with pytest.raises(ValueError, match="command_representation_invalid"):
-        request(command="npm test", argv=("npm", "test"))
+        request(executable_template="npm test", argv_template=("npm", "test"))
     with pytest.raises(ValueError, match="command_representation_invalid"):
-        request(command="", argv=())
+        request(executable_template="", argv_template=())
 
 
-def test_terminal_states_cannot_transition_again() -> None:
-    assert can_transition(CommandState.RUNNING, CommandState.SUCCEEDED)
+def test_terminal_states_require_atomic_finalization() -> None:
+    assert can_transition(CommandState.RUNNING, CommandState.FINALIZING)
+    assert can_transition(CommandState.FINALIZING, CommandState.SUCCEEDED)
     assert not can_transition(CommandState.SUCCEEDED, CommandState.FAILED)
 ```
 
@@ -119,6 +139,7 @@ class CommandState(StrEnum):
     QUEUED = "queued"
     STARTING = "starting"
     RUNNING = "running"
+    FINALIZING = "finalizing"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
     TIMED_OUT = "timed_out"
@@ -136,12 +157,13 @@ TERMINAL_COMMAND_STATES = frozenset({
 def can_transition(current: CommandState, target: CommandState) -> bool:
     return target in {
         CommandState.QUEUED: {CommandState.STARTING, CommandState.CANCELLED},
-        CommandState.STARTING: {CommandState.RUNNING, CommandState.FAILED, CommandState.CONTAINED},
-        CommandState.RUNNING: TERMINAL_COMMAND_STATES,
+        CommandState.STARTING: {CommandState.RUNNING, CommandState.FINALIZING, CommandState.CONTAINED},
+        CommandState.RUNNING: {CommandState.FINALIZING},
+        CommandState.FINALIZING: TERMINAL_COMMAND_STATES,
     }.get(current, set())
 ```
 
-`CommandRequest.__post_init__` enforces the mutually exclusive command/argv contract, positive timeout/output limits, relative contained cwd, and required identity fields.
+`CommandRequest.__post_init__` enforces the mutually exclusive template contract, positive timeout/output limits, relative contained cwd, required identity fields, and safe-display/template digest consistency. Literal registered or pattern-matched secrets fail before `CommandStore.create`; credential references are typed placeholders only.
 
 - [ ] **Step 4: Write failing migration, ownership, chunk-order, and compare-and-swap tests**
 
@@ -177,10 +199,11 @@ CREATE TABLE IF NOT EXISTS command_runs (
   state TEXT NOT NULL,
   profile_id TEXT NOT NULL,
   backend TEXT NOT NULL DEFAULT '',
-  request_json TEXT NOT NULL,
-  command_digest TEXT NOT NULL,
+  safe_display TEXT NOT NULL,
+  template_digest TEXT NOT NULL,
+  encrypted_execution_material BLOB NOT NULL,
   isolation_json TEXT NOT NULL DEFAULT '{}',
-  backend_handle TEXT,
+  encrypted_backend_handle BLOB,
   started_at TEXT,
   completed_at TEXT,
   lease_expires_at TEXT,
@@ -197,10 +220,13 @@ CREATE TABLE IF NOT EXISTS command_runs (
 CREATE INDEX IF NOT EXISTS idx_command_runs_owner_session
   ON command_runs(owner_principal_id, session_id, created_at DESC);
 CREATE TABLE IF NOT EXISTS command_output_chunks (
+  owner_principal_id TEXT NOT NULL,
   run_id TEXT NOT NULL,
   sequence INTEGER NOT NULL,
   stream TEXT NOT NULL,
   text TEXT NOT NULL,
+  start_byte_offset INTEGER NOT NULL,
+  end_byte_offset INTEGER NOT NULL,
   byte_count INTEGER NOT NULL,
   emitted_at TEXT NOT NULL,
   PRIMARY KEY (run_id, sequence),
@@ -219,6 +245,21 @@ CREATE TABLE IF NOT EXISTS command_network_grants (
   created_at TEXT NOT NULL,
   revoked_at TEXT
 );
+CREATE TABLE IF NOT EXISTS command_network_attempts (
+  attempt_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  grant_id TEXT NOT NULL,
+  requested_host TEXT NOT NULL,
+  requested_port INTEGER NOT NULL,
+  resolved_address_digest TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  bytes_sent INTEGER NOT NULL DEFAULT 0,
+  bytes_received INTEGER NOT NULL DEFAULT 0,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT
+);
 CREATE TABLE IF NOT EXISTS command_receipts (
   run_id TEXT PRIMARY KEY,
   owner_principal_id TEXT NOT NULL,
@@ -229,7 +270,9 @@ CREATE TABLE IF NOT EXISTS command_receipts (
 );
 ```
 
-Persist request JSON without credentials or raw environment values. Enforce owner id in every read/update query and use `UPDATE ... WHERE state = ?` for state transitions.
+Encrypt executable templates, typed credential bindings, and supervisor handles with the existing vault envelope; only safe display and digests are queryable. Enforce owner id in every read/update query and use `UPDATE ... WHERE state = ?` for state transitions. Add owner/run indexes and quotas for chunks and connection attempts, immutable receipt insertion, terminal-only retention cleanup, and migration idempotence/rollback tests.
+
+Add failing tests before this implementation for: a registered/pattern-matched secret never appearing in any database column; encrypted material failing closed when the vault is locked; byte offsets remaining gap-free after pagination; cross-owner attempt/receipt isolation; per-run/per-owner quota enforcement; idempotent migration rerun and rollback after an injected DDL failure; and receipt insertion refusing replacement.
 
 - [ ] **Step 7: Run focused tests and commit**
 
@@ -247,32 +290,42 @@ git commit -m "feat: persist governed command runs"
 ### Task 2: Streaming runner, split-safe redaction, PTY, and process-tree stop
 
 **Files:**
+- Create: `raiker/execution/commands/redactor.py`
+- Create: `raiker/execution/commands/supervisor_protocol.py`
 - Create: `raiker/execution/commands/runner.py`
 - Modify: `raiker/context/redaction.py`
+- Create: `native/raiker-command-protocol/src/lib.rs`
+- Create: `native/raiker-command-supervisor/src/main.rs`
+- Create: `native/raiker-command-protocol/tests/vectors.rs`
 - Create: `tests/test_command_runner.py`
+- Create: `tests/test_command_supervisor_protocol.py`
 
 **Interfaces:**
-- Consumes: `CommandRequest`, `CommandChunk`, `CommandState`, `redact_text`.
-- Produces: `StreamingCommandRunner.start(request, command, cwd, env, sink, pty) -> RunningProcess`, `RunningProcess.poll`, `wait`, `write`, and `terminate`.
+- Consumes: `CommandRequest`, `CommandChunk`, registered/pattern secrets, vault instance key, protocol test vectors.
+- Produces: `StreamingRedactor`, authenticated framed `SupervisorClient`, supervisor run identity/log/status/PTY/lease records, `RunningProcess.poll`, `wait`, `write`, `terminate`, and `reattach`.
 
 - [ ] **Step 1: Write failing concurrent-stream, truncation, and split-token tests**
 
 ```python
-def test_runner_redacts_token_split_across_reads_and_preserves_stream_order(tmp_path: Path) -> None:
-    sink = RecordingSink()
-    process = FakeProcess([
-        ("stdout", b"prefix sk-proj-abc"),
-        ("stdout", b"defghijklmnop suffix"),
-        ("stderr", b"warning\n"),
-    ], returncode=0)
-    result = StreamingCommandRunner(process_factory=lambda *_a, **_k: process).start(
-        request(workspace_root=tmp_path), ["fake"], tmp_path, {}, sink, pty=False
-    ).wait()
-    assert result == CommandState.SUCCEEDED
-    joined = "".join(chunk.text for chunk in sink.chunks)
-    assert "sk-proj" not in joined
-    assert "[REDACTED]" in joined
-    assert [chunk.sequence for chunk in sink.chunks] == list(range(1, len(sink.chunks) + 1))
+@pytest.mark.parametrize("split", range(1, len(LONG_SECRET)))
+def test_no_secret_prefix_is_emitted_at_any_split(split: int) -> None:
+    redactor = StreamingRedactor(registered=(LONG_SECRET,), structured=PEM_RULES)
+    emitted = redactor.feed(("prefix " + LONG_SECRET)[:split].encode())
+    emitted += redactor.feed(("prefix " + LONG_SECRET)[split:].encode())
+    emitted += redactor.finish()
+    assert LONG_SECRET not in emitted
+    assert not any(LONG_SECRET.startswith(fragment) for fragment in emitted.split())
+    assert b"[REDACTED]" in emitted
+
+
+def test_redactor_handles_utf8_boundaries_concurrent_streams_pem_and_truncation() -> None:
+    result = adversarial_redaction_matrix(
+        registered=("x" * 4097,),
+        payloads=(UTF8_SPLITS, PEM_EVERY_SPLIT, INTERLEAVED_STDOUT_STDERR),
+        truncate_at=(0, 1, 255, 4096),
+    )
+    assert result.persisted_secrets == []
+    assert result.notified_before_safe == []
 
 
 def test_runner_records_total_bytes_after_capture_is_truncated(tmp_path: Path) -> None:
@@ -293,23 +346,27 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_command_runner.py -q --baset
 
 Expected: import failure for `StreamingCommandRunner`.
 
-- [ ] **Step 3: Implement bounded concurrent capture with carry-over redaction**
+- [ ] **Step 3: Implement a provably split-safe streaming automaton and shared vectors**
 
 ```python
 class StreamingRedactor:
-    def __init__(self, carry: int = 256) -> None:
-        self._carry = carry
-        self._pending = ""
+    def feed(self, data: bytes) -> bytes:
+        text = self.decoder.decode(data, final=False)
+        # pending is the exact longest automaton prefix that can still match.
+        # Structured rules withhold from start marker through validated end.
+        return self.machine.consume(text)
 
-    def feed(self, text: str, *, final: bool = False) -> tuple[str, int]:
-        merged = self._pending + text
-        cut = len(merged) if final else max(0, len(merged) - self._carry)
-        visible, self._pending = merged[:cut], merged[cut:]
-        redacted, changed = redact_text(visible)
-        return redacted, int(changed)
+    def finish(self) -> bytes:
+        return self.machine.consume(self.decoder.decode(b"", final=True), final=True)
 ```
 
-Read stdout/stderr on separate worker threads, serialize chunks through one sequence allocator, stop persisting content after the cap while continuing to drain pipes, and never block the child because output was truncated.
+Generate common JSON vectors for Python and Rust covering every split position,
+secrets longer than any input chunk, suffix/prefix overlaps, PEM/multiline
+regions, invalid and split UTF-8, final flush, truncation, and concurrent stream
+ordering. Nothing reaches a sink or durable supervisor frame until the machine
+proves it safe. Read streams concurrently, serialize safe chunks through one
+sequence allocator, stop persisting after the cap while continuing to drain,
+and never block the child because output was truncated.
 
 - [ ] **Step 4: Write failing timeout, PTY input, and descendant-stop tests**
 
@@ -330,26 +387,32 @@ def test_input_requires_a_pty_and_is_not_recorded(tmp_path: Path) -> None:
     assert handle.sink.input_events == [{"byte_count": 12}]
 ```
 
-- [ ] **Step 5: Implement platform process groups and PTY adapters**
+- [ ] **Step 5: Implement the authenticated backend-resident supervisor and local adapters**
 
 ```python
-def terminate_process_tree(process: subprocess.Popen[bytes]) -> None:
-    if os.name == "nt":
-        _terminate_windows_job(process.pid)
-    else:
-        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+class SupervisorClient:
+    def start(self, request: SupervisorStart) -> SupervisorIdentity: ...
+    def attach(self, identity: SupervisorIdentity) -> SupervisorSession: ...
 ```
 
-Use a Windows Job Object for all child processes, a new POSIX session/process group on Unix, stdlib `pty` on Unix, and the packaged Windows runner's ConPTY channel on Windows. Refuse `interactive=true` with `pty_unavailable` when the selected adapter did not prove PTY readiness.
+Use versioned length-prefixed frames authenticated by a vault-held instance key.
+The supervisor durably creates run identity, request digest, process start
+identity, append-only redacted log, atomic status/lease, and optional PTY endpoint
+before launch; it installs the exit callback before spawning and owns the
+process group/Job Object. Reattachment must prove supervisor instance, request
+digest, PID/start identity, and authenticated transport. Refuse unsupported
+background/PTY/recovery features instead of controlling only a Docker/SSH client.
 
 - [ ] **Step 6: Run focused tests and commit**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_command_runner.py -q --basetemp .tmp/pytest-command-runner`
+Run: `.venv\Scripts\python.exe -m pytest tests/test_command_runner.py tests/test_command_supervisor_protocol.py -q --basetemp .tmp/pytest-command-runner`
+
+Run: `cargo test --manifest-path native/Cargo.toml -p raiker-command-protocol -p raiker-command-supervisor`
 
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/runner.py raiker/context/redaction.py tests/test_command_runner.py
+git add -- raiker/execution/commands/redactor.py raiker/execution/commands/supervisor_protocol.py raiker/execution/commands/runner.py raiker/context/redaction.py native tests/test_command_runner.py tests/test_command_supervisor_protocol.py
 git commit -m "feat: stream bounded command output"
 ```
 
@@ -358,11 +421,26 @@ git commit -m "feat: stream bounded command output"
 ### Task 3: Authoritative environment resolution, local strict, and native sandbox drivers
 
 **Files:**
-- Create: `raiker/execution/commands/backends.py`
+- Create: `raiker/execution/commands/backends/base.py`
+- Create: `raiker/execution/commands/backends/local.py`
+- Create: `raiker/execution/commands/backends/native.py`
+- Create: `native/raiker-command-runner/src/main.rs`
+- Create: `native/raiker-command-runner/src/token.rs`
+- Create: `native/raiker-command-runner/src/job.rs`
+- Create: `native/raiker-command-runner/src/pipe.rs`
+- Create: `native/raiker-command-runner/src/appcontainer.rs`
+- Create: `native/raiker-command-runner/src/wfp.rs`
+- Create: `native/raiker-windows-policy-helper/src/main.rs`
+- Create: `native/raiker-windows-policy-helper/src/transaction.rs`
+- Create: `scripts/install_windows_runner.ps1`
+- Create: `scripts/uninstall_windows_runner.ps1`
+- Create: `.github/workflows/native-security-boundaries.yml`
 - Modify: `raiker/execution/profiles.py`
 - Modify: `raiker/control/dashboard.py`
 - Modify: `raiker/runtime/command_policy.py`
 - Create: `tests/test_command_backends.py`
+- Create: `tests/test_windows_command_runner.py`
+- Create: `native/raiker-command-runner/tests/windows_boundary.rs`
 - Modify: `tests/test_execution_environments.py`
 
 **Interfaces:**
@@ -431,6 +509,16 @@ def test_native_driver_wraps_command_and_denies_network(platform: str, marker: s
     assert marker in command[0]
     assert driver.policy(request(workspace_root=tmp_path)).network == "none"
     assert ".raiker" in driver.policy(request(workspace_root=tmp_path)).protected_paths
+
+
+def test_native_probe_proves_protected_paths_descendants_and_network(boundary) -> None:
+    proof = boundary.probe_with_descendant()
+    assert proof.workspace_write is True
+    assert proof.raiker_read is False and proof.raiker_write is False
+    assert proof.git_read is True and proof.git_write is False
+    assert proof.outside_workspace_write is False
+    assert proof.direct_network is False
+    assert proof.descendant_survived_stop is False
 ```
 
 - [ ] **Step 5: Implement native probes and local strict adapter**
@@ -439,23 +527,47 @@ def test_native_driver_wraps_command_and_denies_network(platform: str, marker: s
 class LocalStrictBackend:
     features = CommandFeatures(True, True, False, False, False, False, False)
 
-    def start(self, request: CommandRequest, sink: CommandEventSink) -> CommandHandle:
+    def start(self, request: CommandRequest) -> CommandHandle:
         if request.shell:
             raise CommandBackendError("local_strict_shell_source_denied")
-        validate_command(request.argv, workspace_root=request.workspace_root, allowlist=ALLOWED_SHELL_COMMANDS)
-        return self.runner.start(request, list(request.argv), request.workspace_root / request.cwd, sandbox_environment(workspace_root=request.workspace_root), sink, pty=False)
+        validate_command(request.argv_template, workspace_root=request.workspace_root, allowlist=ALLOWED_SHELL_COMMANDS)
+        return self.local_supervisor.start(request, list(request.argv_template), sandbox_environment(workspace_root=request.workspace_root))
 ```
 
-Linux uses `bwrap`; macOS uses a generated Seatbelt profile; Windows uses the packaged restricted-token/Job Object/firewall helper. Each readiness probe runs a harmless child that proves workspace write, protected-path denial, and network denial. A failed proof returns `native_sandbox_probe_failed`.
+Linux uses `bwrap`; macOS uses a generated Seatbelt profile. Windows builds a
+Rust helper whose versioned named pipe rejects remote clients, is ACL-limited to
+the owner SID/LocalSystem, authenticates requests with the vault instance key,
+opens/canonicalizes handles before applying ACLs, and inherits only an explicit
+supervisor/ConPTY handle list. It creates a per-profile AppContainer SID, a
+low-integrity restricted AppContainer token without network capability in
+offline mode (filtered mode adds only the client capability required to reach
+the proxy and relies on the scoped WFP deny/permit policy), a
+minimum workspace ACL that denies `.raiker` and `.git` writes, and a
+kill-on-close Job Object with CPU/memory/process limits. Installer scripts verify
+the Authenticode chain/digest and perform an elevated transactional WFP setup:
+in a dynamic session, ALE filters scoped to the AppContainer SID deny outbound
+and permit only the authenticated proxy endpoint; persist filter/session ids and
+roll back on failure/uninstall/reset/digest mismatch. Ordinary commands do not
+elevate, and closing the dynamic WFP session removes its filters.
+
+Every advertised platform runs traversal, symlink/junction, nested-repository,
+Windows path/case, descendant, `.raiker` read/write denial, `.git` write denial,
+outside-workspace denial, and direct-network probes. Windows CI builds the
+helper, runs protocol/unit tests, installs test rules, executes the boundary
+integration test, verifies rollback, and publishes a digest-checked release
+artifact. Any missing signature/digest/firewall/probe returns
+`native_sandbox_probe_failed`; native mode never degrades to local strict.
 
 - [ ] **Step 6: Run focused tests and commit**
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_command_backends.py tests/test_execution_environments.py tests/test_command_sandbox.py -q --basetemp .tmp/pytest-command-backends`
 
+Run on Windows: `cargo test --manifest-path native/Cargo.toml -p raiker-command-runner --test windows_boundary`
+
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends.py raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_execution_environments.py
+git add -- raiker/execution/commands/backends native/raiker-command-runner scripts/install_windows_runner.ps1 scripts/uninstall_windows_runner.ps1 .github/workflows/native-security-boundaries.yml raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_windows_command_runner.py tests/test_execution_environments.py
 git commit -m "feat: enforce selected command environment"
 ```
 
@@ -464,7 +576,8 @@ git commit -m "feat: enforce selected command environment"
 ### Task 4: Persistent Docker and Podman command sandbox
 
 **Files:**
-- Modify: `raiker/execution/commands/backends.py`
+- Create: `raiker/execution/commands/backends/container.py`
+- Create: `containers/command-sandbox/Containerfile`
 - Modify: `raiker/runtime/executors/containers.py`
 - Modify: `raiker/execution/container_tools.py`
 - Modify: `raiker/execution/tool_bridge.py`
@@ -472,8 +585,8 @@ git commit -m "feat: enforce selected command environment"
 - Modify: `tests/test_container_tool_bridge.py`
 
 **Interfaces:**
-- Consumes: `CommandBackend`, `CommandRequest`, `StreamingCommandRunner`, validated container profile.
-- Produces: `PersistentContainerBackend`, deterministic labelled container names, start/exec/reset/recreate/recover operations, and actual container-shell support.
+- Consumes: `CommandBackend`, `CommandRequest`, `SupervisorClient`, pinned supervisor image digest, validated container profile.
+- Produces: `PersistentContainerBackend`, deterministic labelled container names, authenticated supervisor start/attach/reset/recreate/recover operations, and actual container-shell support.
 
 - [ ] **Step 1: Write failing container creation and reuse tests**
 
@@ -487,7 +600,9 @@ def test_container_is_hardened_and_reused_for_one_session(tmp_path: Path) -> Non
     create = runtime.commands[0]
     assert ["--network", "none"] == adjacent(create, "--network")
     assert "--read-only" in create and ["--cap-drop", "ALL"] == adjacent(create, "--cap-drop")
-    assert all(".raiker" not in value or "readonly" in value for value in mount_values(create))
+    assert all(".raiker" not in value for value in mount_values(create))
+    assert git_mount(create).readonly is True
+    assert supervisor_digest(create) == EXPECTED_SUPERVISOR_DIGEST
     assert first.backend_handle.container_id == second.backend_handle.container_id
 ```
 
@@ -505,14 +620,22 @@ def command_container_name(owner: str, session: str, profile: str) -> str:
     return f"raiker-cmd-{digest}"
 
 
-def shell_exec(profile: ExecutionProfile, request: CommandRequest) -> list[str]:
-    assert profile.runtime in {"docker", "podman"}
-    assert profile.shell_path and profile.shell_path.startswith("/")
-    return [profile.runtime, "exec", "--interactive", profile.container_name,
-            profile.shell_path, "-lc", request.command]
+def supervisor_start(profile: ExecutionProfile, request: CommandRequest) -> SupervisorStart:
+    return SupervisorStart(
+        shell_path=profile.shell_path,
+        template=request.executable_template,
+        request_digest=request.template_digest,
+    )
 ```
 
-Create a read-only-root container with bounded tmpfs, `/sandbox-home`, `/workspace`, protected `.git`/`.raiker`, non-root uid, no capabilities, no-new-privileges, CPU/memory/PID/disk/lease labels, and no ambient environment. Run commands with `exec`; do not reapply the host basename/interpreter restriction inside the sandbox.
+Build the supervisor into a digest-pinned non-root image. Create a read-only-root
+container with bounded tmpfs, a removable `/sandbox-home` cache volume, host
+workspace bind mount, `.git` over-mounted read-only, `.raiker` absent, no
+capabilities, no-new-privileges, CPU/memory/PID/lease labels, and no ambient
+environment. Advertise a disk quota only when the runtime/storage driver probe
+proves it; always report tmpfs limits separately. Submit commands to the
+authenticated resident supervisor; a short-lived `exec` may transport a frame
+but never owns child lifetime, logs, PTY, or kill.
 
 - [ ] **Step 4: Write failing reset, recovery, daemon-probe, and no-host-fallback tests**
 
@@ -530,11 +653,25 @@ def test_daemon_probe_requires_a_runnable_approved_image(tmp_path: Path) -> None
     probe = probe_container_profile(profile(), runner=daemon_without_image)
     assert probe.available is False
     assert probe.reason_code == "container_image_unavailable:container_a"
+
+
+def test_reattach_after_raiker_restart_keeps_run_identity(container_backend) -> None:
+    run = container_backend.start(background_request())
+    restarted = container_backend.new_client_after_raiker_restart()
+    attached = restarted.attach(run.encrypted_handle)
+    assert attached.run_identity == run.run_identity
+    assert attached.log(after=0).sequence > 0
+    attached.kill("owner_stop")
+    assert attached.descendants_alive() is False
 ```
 
 - [ ] **Step 5: Implement probe, reset, recreate, and labelled recovery**
 
-Only reuse or remove containers whose Raiker labels match the owner/session/profile hashes in the durable row. A name match without labels is `container_identity_mismatch` and is never touched.
+Only reuse or remove containers whose Raiker labels, supervisor instance id,
+image digest, request digest, and workspace bounds match the durable encrypted
+handle. A name match without proof is `container_identity_mismatch` and is never
+touched. Add a live service-process restart test, an expired-lease reaper test,
+and a deliberately corrupted supervisor identity test that produces `lost`.
 
 - [ ] **Step 6: Complete the generic bridge's shell claim**
 
@@ -547,7 +684,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_persistent_command_container
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends.py raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_container_tool_bridge.py
+git add -- raiker/execution/commands/backends/container.py containers/command-sandbox/Containerfile raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_container_tool_bridge.py
 git commit -m "feat: add persistent command sandbox"
 ```
 
@@ -557,13 +694,19 @@ git commit -m "feat: add persistent command sandbox"
 
 **Files:**
 - Create: `raiker/execution/commands/network.py`
-- Modify: `raiker/execution/commands/backends.py`
+- Create: `native/raiker-egress-proxy/src/main.rs`
+- Create: `native/raiker-egress-proxy/src/http_connect.rs`
+- Create: `native/raiker-egress-proxy/src/socks5.rs`
+- Create: `native/raiker-egress-proxy/src/policy.rs`
+- Modify: `raiker/execution/commands/backends/container.py`
+- Modify: `raiker/execution/commands/backends/native.py`
 - Modify: `raiker/api/schemas.py`
 - Create: `tests/test_command_network.py`
+- Create: `native/raiker-egress-proxy/tests/egress_boundary.rs`
 
 **Interfaces:**
-- Consumes: command grant rows, public-address checks from `raiker.runtime.web_policy`, backend network adapters.
-- Produces: `CommandNetworkScope`, `CommandNetworkBroker.authorize`, `revoke`, `proxy_decision`, private container network/sidecar plan, and `command_network_approval_required`.
+- Consumes: command grant/attempt rows, vault instance key, public-address checks from `raiker.runtime.web_policy`, backend route/firewall adapters.
+- Produces: `CommandNetworkScope`, `CommandNetworkBroker.authorize`, `revoke`, authenticated proxy control/data protocol, HTTP CONNECT/SOCKS5 CONNECT listeners, immutable attempt audit, private container network/sidecar lifecycle, and `command_network_approval_required`.
 
 - [ ] **Step 1: Write failing scope, address, expiry, and revocation tests**
 
@@ -624,20 +767,52 @@ def test_proxy_rechecks_each_resolution_and_redirect() -> None:
     broker = proxy_with_resolver(lambda _host: next(resolver))
     assert broker.connect("registry.npmjs.org", 443).allowed
     assert broker.redirect("registry.npmjs.org", 443).reason_code == "command_network_private_address_denied"
+
+
+def test_direct_socket_fails_but_capability_bound_proxy_succeeds(live_sandbox) -> None:
+    assert live_sandbox.direct_connect("registry.npmjs.org", 443).denied
+    capability = live_sandbox.grant_once("registry.npmjs.org", 443)
+    assert live_sandbox.http_connect(capability, "registry.npmjs.org", 443).ok
+    assert live_sandbox.http_connect("wrong", "registry.npmjs.org", 443).unauthorized
+
+
+def test_revoke_closes_active_connection_before_marking_revoked(proxy, store) -> None:
+    connection = proxy.connect(active_grant())
+    proxy.revoke(active_grant().grant_id)
+    assert connection.closed
+    assert proxy.route_exists(active_grant().grant_id) is False
+    assert store.network_grant(active_grant().grant_id).status == "revoked"
 ```
 
 - [ ] **Step 5: Implement native proxy policy and container sidecar topology**
 
-Native drivers deny direct sockets and expose only the proxy transport. Container filtered mode creates one `--internal` command network and a proxy sidecar attached to both that network and an egress network. Removing/revoking the grant tears down the sidecar route before the durable status becomes revoked.
+Implement a packaged Rust proxy with a versioned authenticated control socket
+and separate HTTP CONNECT and SOCKS5 CONNECT listeners. Each connection must
+present a random per-run capability mapped to an active grant; reject UDP, BIND,
+raw IP destinations, unauthenticated clients, and unsupported methods. Resolve
+DNS inside the proxy for every connection, pin public answers, guard CNAME and
+rebinding to private/loopback/link-local/multicast/reserved/metadata space, and
+re-authorize proxy-observed redirects. Persist an immutable attempt row with
+host/port, resolved-address digest, decision/outcome/timestamps/byte counts only.
+
+Native drivers deny direct sockets and expose only the proxy endpoint through
+their sandbox/firewall policy. Container filtered mode creates one `--internal`
+command network and a proxy sidecar attached to it and a separate egress
+network. Revoke ordering is: stop accepts, close active connections, remove
+route/firewall permit, then durable revoked state. Startup recovery repeats
+cleanup idempotently. Tests cover teardown races, expired grants, DNS changes,
+redirects, wrong capabilities, direct socket denial, and sidecar crash/recovery.
 
 - [ ] **Step 6: Run focused tests and commit**
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_command_network.py tests/test_web_fetch_policy.py -q --basetemp .tmp/pytest-command-network`
 
+Run: `cargo test --manifest-path native/Cargo.toml -p raiker-egress-proxy`
+
 Expected: all tests pass and existing web policy remains unchanged.
 
 ```powershell
-git add -- raiker/execution/commands/network.py raiker/execution/commands/backends.py raiker/api/schemas.py tests/test_command_network.py
+git add -- raiker/execution/commands/network.py raiker/execution/commands/backends native/raiker-egress-proxy raiker/api/schemas.py tests/test_command_network.py
 git commit -m "feat: govern sandbox network grants"
 ```
 
@@ -648,13 +823,20 @@ git commit -m "feat: govern sandbox network grants"
 **Files:**
 - Create: `raiker/execution/commands/service.py`
 - Create: `raiker/execution/commands/receipts.py`
+- Create: `raiker/execution/commands/evidence.py`
 - Create: `raiker/execution/commands/recovery.py`
+- Create: `raiker/execution/commands/composition.py`
+- Modify: `raiker/runtime/executors/__init__.py`
+- Modify: `raiker/api/app.py`
+- Modify: `raiker/api/dependencies.py`
 - Create: `tests/test_command_service.py`
 - Create: `tests/test_command_recovery.py`
+- Create: `tests/test_command_lifespan.py`
+- Create: `tests/test_command_evidence.py`
 
 **Interfaces:**
-- Consumes: `CommandStore`, `CommandBackend`, `CommandNetworkBroker`, `CommandRequest`, `StreamingCommandRunner`.
-- Produces: `CommandService.start`, `poll`, `wait`, `log`, `write`, `stop`, `renew_lease`, `reset_environment`; `canonical_receipt`; `CommandRecovery.reconcile`.
+- Consumes: `CommandStore`, `CommandBackend`, `CommandNetworkBroker`, `CommandRequest`, `SupervisorClient`, vault/checkpoint services, FastAPI lifespan.
+- Produces: one workspace-scoped `CommandService`; `start`, `poll`, `wait`, `log`, `write`, `stop`, `renew_lease`, `reset_environment`; atomic `canonical_receipt` finalization; checkpoint/change/diagnostic evidence; `CommandRecovery.reconcile`; lease reaper and bounded shutdown.
 
 - [ ] **Step 1: Write failing lifecycle and foreground/background stop tests**
 
@@ -666,6 +848,21 @@ def test_service_persists_before_start_and_finalizes_once(store: CommandStore) -
     assert backend.observed_states_at_start == [CommandState.STARTING]
     assert service.wait("owner_a", run.run_id).state == CommandState.SUCCEEDED
     assert store.load("owner_a", run.run_id).receipt_digest is not None
+
+
+def test_immediate_exit_and_receipt_commit_are_atomic(store: CommandStore) -> None:
+    service = service_with_immediate_exit_backend(store)
+    run = service.start(request())
+    assert service.wait("owner_a", run.run_id).state == CommandState.SUCCEEDED
+    assert store.receipt_count(run.run_id) == 1
+
+
+def test_receipt_failure_never_publishes_success(store: CommandStore) -> None:
+    store.fail_next_receipt_transaction()
+    run = service_with_success_backend(store).start(request())
+    assert service_with_success_backend(store).wait("owner_a", run.run_id).state in {
+        CommandState.FINALIZING, CommandState.CONTAINED
+    }
 
 
 def test_turn_stop_kills_foreground_but_not_explicit_background_run(store: CommandStore) -> None:
@@ -693,13 +890,28 @@ class CommandService:
             return self.store.contain_before_start(request, resolution.reason_code or "backend_unavailable")
         self.store.create(request)
         self.store.transition(request.owner_principal_id, request.run_id, CommandState.QUEUED, CommandState.STARTING)
-        handle = resolution.backend.start(request, self._sink(request))
+        subscription = self._completion_subscription(request)
+        handle = resolution.backend.start(request, subscription.supervisor)
         self._handles[request.run_id] = handle
-        self.store.mark_running(request.owner_principal_id, request.run_id, handle.backend_handle)
+        self.store.mark_running_unless_finalizing(
+            request.owner_principal_id, request.run_id,
+            self.vault.encrypt(handle.recovery_identity),
+        )
         return self.store.load_required(request.owner_principal_id, request.run_id)
 ```
 
-The service owns all state transitions, per-owner handle lookup, background lease expiry, and re-governed input/stop/reset calls. Backend callbacks never update SQL directly.
+Install completion subscription before launch. A callback asks the service to
+compare-and-swap `starting|running -> finalizing`; it never writes SQL directly.
+One transaction inserts an immutable canonical receipt and changes finalizing
+to the selected terminal state. Retry uses the same digest and cannot duplicate
+the receipt; exhausted finalization becomes `contained`. Add deterministic race
+tests for immediate exit, natural exit versus timeout/stop, database failure,
+and retry.
+
+The service owns state transitions, owner/run handle lookup, background lease
+expiry, and re-governed input/stop/reset. Every lifecycle action rechecks the
+current owner session and original unrevoked grant; reset requires a fresh owner
+decision. Command creation is not exposed as a direct API.
 
 - [ ] **Step 4: Write failing canonical receipt and recovery tests**
 
@@ -713,7 +925,7 @@ def test_receipt_digest_changes_if_evidence_changes() -> None:
 
 
 def test_recovery_marks_unprovable_run_lost(store: CommandStore) -> None:
-    store.create_running(request(), backend_handle="opaque")
+    store.create_running(request(), encrypted_backend_handle=vault.encrypt("opaque"))
     recovered = CommandRecovery(store, backends={"container": UnknownHandleBackend()}).reconcile()
     assert recovered[0].state == CommandState.LOST
     assert recovered[0].termination_reason == "recovery_identity_unproven"
@@ -721,18 +933,39 @@ def test_recovery_marks_unprovable_run_lost(store: CommandStore) -> None:
 
 - [ ] **Step 5: Implement canonical receipts and bounded recovery**
 
-Receipt payload contains request identity, effective boundary, approval/grant ids, terminal outcome, byte/redaction/truncation counts, changed-file summary, recognised test status, checkpoints, and timestamps. Serialize with sorted keys and compact separators before SHA-256.
+Before mutation, use the existing checkpoint service to record repository id and
+a bounded workspace manifest. After exit, compare canonical workspace paths
+without following symlinks/junctions and record only relative paths, state, and
+bounded hashes. Parse already-redacted output through bounded pytest/compiler/
+test-runner diagnostic parsers without interpreting terminal escapes. Receipt
+payload contains safe display/template digest, request identity, effective
+boundary, approval/grant ids, outcome, byte/redaction/truncation counts, these
+evidence fields, and timestamps. Serialize with sorted keys and compact
+separators before SHA-256. Evidence failure is explicit and cannot read outside
+the selected workspace.
 
-Recovery resumes only when backend labels/handle identity match. Expired Raiker-owned resources are stopped only after path and label validation. Unknown outcomes become `lost`.
+`build_command_composition` creates one service and injects that exact instance
+into the default executor registry, ToolBroker, approval relay, routes, and
+orchestrator. FastAPI lifespan starts reconciliation and the periodic lease
+reaper; profile change invokes scoped cleanup; bounded shutdown stops foreground
+and non-persistent supervisors. Recovery resumes only when authenticated
+supervisor instance/request/PID-start identity, labels, and workspace bounds
+match. Unknown outcomes become `lost`.
+
+Add an integration fixture that starts a real loopback Raiker process and live
+container background command, kills/restarts Raiker, then proves identical run
+id, ordered log catch-up, PTY input when enabled, lease expiry, and kill. Corrupt
+identity and prove `lost`. Also assert both approval and standing-grant paths
+resolve the same injected service object and durable lifecycle.
 
 - [ ] **Step 6: Run focused tests and commit**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_command_service.py tests/test_command_recovery.py -q --basetemp .tmp/pytest-command-service`
+Run: `.venv\Scripts\python.exe -m pytest tests/test_command_service.py tests/test_command_recovery.py tests/test_command_lifespan.py tests/test_command_evidence.py -q --basetemp .tmp/pytest-command-service`
 
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/service.py raiker/execution/commands/receipts.py raiker/execution/commands/recovery.py tests/test_command_service.py tests/test_command_recovery.py
+git add -- raiker/execution/commands/service.py raiker/execution/commands/receipts.py raiker/execution/commands/evidence.py raiker/execution/commands/recovery.py raiker/execution/commands/composition.py raiker/runtime/executors/__init__.py raiker/api/app.py raiker/api/dependencies.py tests/test_command_service.py tests/test_command_recovery.py tests/test_command_lifespan.py tests/test_command_evidence.py
 git commit -m "feat: manage command lifecycle and recovery"
 ```
 
@@ -741,25 +974,34 @@ git commit -m "feat: manage command lifecycle and recovery"
 ### Task 7: SSH and Daytona lifecycle parity
 
 **Files:**
-- Modify: `raiker/execution/commands/backends.py`
+- Create: `raiker/execution/commands/backends/remote.py`
 - Modify: `raiker/runtime/executors/tier5_network.py`
 - Modify: `tests/test_execution_environments.py`
 - Create: `tests/test_remote_command_backends.py`
 
 **Interfaces:**
 - Consumes: `CommandBackend`, `CommandService`, current SSH/Daytona profile and cost helpers.
-- Produces: `SshCommandBackend`, `DaytonaCommandBackend` with proven feature flags and shared start/poll/wait/log/kill behavior.
+- Produces: `SshCommandBackend`, `DaytonaCommandBackend` with authenticated framed supervisor transport, proven feature flags, and shared start/poll/wait/log/kill/reattach behavior.
 
 - [ ] **Step 1: Write failing remote lifecycle and feature-honesty tests**
 
 ```python
 def test_ssh_backend_binds_host_key_cwd_and_exact_argv(tmp_path: Path) -> None:
-    backend, calls = ssh_backend(tmp_path, features={"pty": False})
-    backend.start(request(shell=False, command="", argv=("pytest", "-q")), RecordingSink())
-    command = calls[0]
-    assert "StrictHostKeyChecking=yes" in command
-    assert command[-2:] == ["pytest", "-q"]
+    backend, transport = ssh_backend(tmp_path, features={"pty": False})
+    backend.start(request(shell=False, executable_template="", argv_template=("pytest", "-q")))
+    frame = transport.decoded_start_frame()
+    assert transport.strict_host_key_checking is True
+    assert frame.cwd == "." and frame.argv == ("pytest", "-q")
+    assert transport.used_ad_hoc_shell_string is False
     assert backend.features.pty is False
+
+
+def test_remote_without_verified_supervisor_is_foreground_only(tmp_path: Path) -> None:
+    backend = ssh_backend_without_supervisor(tmp_path)
+    assert backend.features.background is False
+    assert backend.features.pty is False
+    assert backend.features.recoverable is False
+    assert backend.start(background_request()).reason_code == "remote_supervisor_required"
 
 
 def test_daytona_cost_reservation_survives_background_run(store: CommandStore) -> None:
@@ -780,13 +1022,20 @@ Expected: remote executors do not implement `CommandBackend`.
 
 ```python
 class SshCommandBackend:
-    def start(self, request: CommandRequest, sink: CommandEventSink) -> CommandHandle:
+    def start(self, request: CommandRequest) -> CommandHandle:
         profile = self._profiles.require_ssh(request.owner_principal_id, request.environment_profile_id)
-        command = self._bound_command(profile, request)
-        return self.runner.start(request, command, request.workspace_root, self._credential_env(profile), sink, pty=request.interactive)
+        supervisor = self._verified_supervisor_transport(profile)
+        return supervisor.start(self._framed_request(profile, request))
 ```
 
-Daytona retains pre/post provider spend snapshots and reservations; SSH retains strict host-key and identity-file binding. API feature flags are false unless probe commands prove remote PTY/input/background/kill support.
+Daytona retains pre/post provider spend snapshots and reservations; SSH retains
+strict host-key and protected credential-reference binding. Install or verify
+the approved supervisor version/digest before advertising capabilities. Exact
+cwd/argv/template travels only in the framed protocol, never an interpolated
+remote shell string. API flags for PTY/input/background/kill/lease/recovery and
+filtered network remain false unless a live authenticated supervisor/policy
+probe proves them. Add real restart/reattach/kill tests where configured; all
+other remote fixtures must prove honest feature refusal.
 
 - [ ] **Step 4: Run focused tests and commit**
 
@@ -795,7 +1044,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_remote_command_backends.py t
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends.py raiker/runtime/executors/tier5_network.py tests/test_remote_command_backends.py tests/test_execution_environments.py
+git add -- raiker/execution/commands/backends/remote.py raiker/runtime/executors/tier5_network.py tests/test_remote_command_backends.py tests/test_execution_environments.py
 git commit -m "feat: unify remote command backends"
 ```
 
@@ -812,6 +1061,7 @@ git commit -m "feat: unify remote command backends"
 - Modify: `raiker/policy/config.py`
 - Modify: `raiker/runtime/authority/router.py`
 - Modify: `raiker/runtime/orchestrator.py`
+- Create: `raiker/execution/commands/credential_broker.py`
 - Modify: `tests/test_approval_relay_general.py`
 - Modify: `tests/test_tool_broker.py`
 - Create: `tests/test_command_tool_integration.py`
@@ -826,14 +1076,22 @@ git commit -m "feat: unify remote command backends"
 def test_approved_shell_and_granted_run_command_use_same_service(broker, relay, command_service) -> None:
     relay.resolve(approved_shell_action("npm test"))
     broker.execute(granted_run_command_action("npm test"), session_id="sess_a", turn_id="turn_a")
-    assert [call.request.command for call in command_service.start_calls] == ["npm test", "npm test"]
+    assert [call.request.safe_display for call in command_service.start_calls] == ["npm test", "npm test"]
 
 
-def test_grant_cannot_widen_backend_network_or_interactivity(broker) -> None:
+def test_selected_profile_is_not_a_model_overridable_field(broker) -> None:
     result, _ = broker.execute(run_command_action(
         "npm test", profile_id="local_native", network_domains=["example.com"], interactive=True
     ), session_id="sess_a", turn_id="turn_a")
-    assert result.error == {"type": "command_grant_scope_mismatch"}
+    assert result.error == {"type": "unknown_tool_argument", "argument": "profile_id"}
+
+
+@pytest.mark.parametrize("surface", ["database", "approval", "event", "tool_result", "api"])
+def test_secret_bearing_command_is_rejected_before_every_surface(surface, harness) -> None:
+    secret = harness.register_secret("token-value-123456789")
+    result = harness.propose_command(f"tool --token {secret}")
+    assert result.reason_code == "command_secret_literal_denied"
+    assert secret not in harness.serialized(surface)
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -859,6 +1117,18 @@ ToolSpec(
 )
 ```
 
+`profile_id` is deliberately absent: resolution reads the owner-selected
+environment after approval and refuses if it changed. Add an optional typed
+`credential_bindings` collection containing only vault reference, purpose, and
+delivery target. `CommandCredentialBroker` scans literal command/argv with both
+registered values and bounded secret patterns before any durable proposal;
+secret-bearing literals are rejected. At supervisor launch it resolves a
+purpose-bound grant and delivers memory-only material via stdin, inherited
+descriptor/handle, protected ephemeral file, or an explicitly approved process
+environment. It creates the safe display and template digest. Tests search raw
+database pages, approval/event JSON, API/tool results, receipt, and rendered UI
+fixtures for registered and pattern secrets.
+
 Validation accepts only operations `list|poll|wait|log|write|kill`, boolean background/interactive flags, 1–1800 second timeout, at most 20 public-domain patterns, and bounded input/output offsets.
 
 - [ ] **Step 4: Route both tools through `CommandService` and emit metadata-only lifecycle events**
@@ -872,7 +1142,12 @@ def _emit_command_event(self, envelope: PromptEnvelope, event_type: str, run: Co
     })
 ```
 
-Do not include command strings or output in lifecycle events. The model tool result receives bounded redacted output for foreground completion, or run id/state/receipt link for background execution.
+Do not include executable templates, raw command strings, credential values, or
+output in lifecycle events. Use safe display only where a command label is
+necessary. The model tool result receives bounded redacted output for foreground
+completion, or run id/state/receipt link for background execution. Input, stop,
+lease, and reset recheck current session/original grant; revoked authority fails
+closed and reset always obtains a new owner decision.
 
 - [ ] **Step 5: Verify approval re-governance, queued calls, stop, and provider-valid tool replies**
 
@@ -917,6 +1192,19 @@ def test_input_rejects_unknown_fields_and_noninteractive_run(client: TestClient,
     response = client.post("/api/command-runs/cmd_a/input", headers=owner_headers, json={"input": "x"})
     assert response.status_code == 409
     assert response.json()["detail"]["reason_code"] == "command_not_interactive"
+
+
+@pytest.mark.parametrize("operation", ["input", "stop", "lease"])
+def test_lifecycle_control_rejects_revoked_session_or_grant(client, seeded_run, operation) -> None:
+    headers = revoked_auth_headers(client, seeded_run.owner)
+    response = post_lifecycle(client, seeded_run.run_id, operation, headers)
+    assert response.status_code in {401, 403, 409}
+
+
+def test_reset_requires_fresh_owner_decision(client, owner_headers) -> None:
+    response = client.post("/api/execution-environments/container_a/reset", headers=owner_headers, json={"mode": "recreate"})
+    assert response.status_code == 409
+    assert response.json()["detail"]["reason_code"] == "owner_decision_required"
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -938,7 +1226,12 @@ def command_output(run_id: str, after: int = Query(0, ge=0), limit: int = Query(
     return command_service(request).log(auth_data[0].principal_id, run_id, after=after, limit=limit)
 ```
 
-Return 404 for cross-owner resources, 409 with stable reason codes for invalid lifecycle operations, and only redacted chunks/receipts.
+There is no command-create endpoint. Return 404 for cross-owner resources, 409
+with stable reason codes for invalid lifecycle operations, and only redacted
+chunks/safe receipts. Recheck current session and original grant for input,
+stop, and lease; require a fresh owner decision for reset. Apply per-owner/run
+rate limits to list/output polling, input bytes, stop, lease renewal, and reset,
+with bounded pagination and retry metadata.
 
 - [ ] **Step 4: Run API and redaction tests and commit**
 
@@ -996,6 +1289,16 @@ it("shows the effective boundary and only valid controls", async () => {
   expect(screen.getByRole("button", { name: /stop process/i })).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: /send input/i })).not.toBeInTheDocument();
 });
+
+
+it("renders terminal content as text and never exposes secret-bearing fields", async () => {
+  const secret = "token-value-123456789";
+  render(CommandOutputPane, { initialRuns: [runningCommand({ command_display: "tool --token [REDACTED]" })] });
+  await emitOutput({ text: `<img src=x onerror=alert(1)> ${secret}`.replace(secret, "[REDACTED]") });
+  expect(screen.getByText(/<img src=x/)).toBeInTheDocument();
+  expect(document.querySelector("img")).toBeNull();
+  expect(document.body.textContent).not.toContain(secret);
+});
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -1007,11 +1310,11 @@ Expected: component/module imports fail.
 - [ ] **Step 3: Add exact API types and client methods**
 
 ```typescript
-export type CommandState = "queued" | "starting" | "running" | "succeeded" | "failed" | "timed_out" | "cancelled" | "contained" | "lost";
+export type CommandState = "queued" | "starting" | "running" | "finalizing" | "succeeded" | "failed" | "timed_out" | "cancelled" | "contained" | "lost";
 export interface CommandRunView {
   run_id: string; session_id: string; turn_id: string; state: CommandState;
   backend: "local_strict" | "native_sandbox" | "container" | "ssh" | "daytona";
-  profile_id: string; command_display: string; cwd: string;
+  profile_id: string; safe_display: string; template_digest: string; cwd: string;
   background: boolean; interactive: boolean; network: string[];
   started_at: string | null; completed_at: string | null; lease_expires_at: string | null;
   exit_code: number | null; stdout_bytes: number; stderr_bytes: number;
@@ -1022,7 +1325,13 @@ export interface CommandOutputChunk { run_id: string; sequence: number; stream: 
 
 - [ ] **Step 4: Implement the pane and transcript row**
 
-Use semantic buttons, labelled output regions, `aria-live="polite"` for state changes but not every output byte, keyboard-reachable resize controls, per-stream filters, output catch-up by sequence, and responsive drawer behavior below 768 px. `failureCoordinate(text)` recognises bounded `path:line[:column]` forms and calls the existing source inspector.
+Use semantic buttons, labelled output regions, `aria-live="polite"` for state
+changes but not every output byte, keyboard-reachable resize controls,
+per-stream filters, output catch-up by sequence, and responsive drawer behavior
+below 768 px. Render all output/safe display with Svelte text interpolation,
+never `{@html}` or an HTML sink. `failureCoordinate(text)` recognises bounded
+`path:line[:column]` forms and calls the existing source inspector only after
+canonical workspace containment.
 
 - [ ] **Step 5: Write and satisfy Build, Approval, and Runtime integration tests**
 
@@ -1088,7 +1397,17 @@ Stop any Raiker process first. Use the application's credential UI for Anthropic
 
 - [ ] **Step 3: Use the Playwright skill for the live matrix**
 
-Verify each provider separately with a Build prompt that causes a sandboxed foreground command and receipt. Then verify one background dev server, output polling, stop, reload recovery, PTY input, timeout, truncation, failed-test navigation, filtered-domain approval/retry, no-fallback refusal, reset, and recreate.
+Verify each provider separately with a Build prompt that causes a sandboxed
+foreground command and receipt. Then verify one background dev server, output
+polling, stop, browser reload recovery, PTY input, timeout, truncation,
+failed-test navigation, filtered-domain approval/retry, no-fallback refusal,
+reset, and recreate. While the background process is active, terminate and
+restart the Raiker service (not the container), reconnect through the UI, and
+prove identical run id, ordered catch-up, input/stop control, and lease expiry.
+Repeat with invalidated supervisor identity and prove the honest `lost` path.
+Use an approved domain to prove the proxy succeeds while an unproxied direct
+socket from the same sandbox fails, then revoke the grant and prove the active
+route closes.
 
 Capture reviewed screenshots at 375, 768, 1024, and 1440 px after secrets are no longer visible. Inspect every screenshot for correct backend/status, accessible controls, clipping, and private data.
 
@@ -1140,15 +1459,32 @@ Run: `npm run build`
 
 Expected: all commands exit zero.
 
-- [ ] **Step 3: Repeat and inspect the critical live scenarios**
+- [ ] **Step 3: Run native security-boundary and package gates**
 
-Repeat four-provider foreground execution, background/PTY, network escalation, stop/timeout/truncation, failure navigation, reload recovery, no-fallback refusal, and reset/recreate. Review the final screenshots rather than relying on DOM assertions alone.
+Run: `cargo fmt --manifest-path native/Cargo.toml --check`
 
-- [ ] **Step 4: Obtain an independent whole-change review**
+Run: `cargo clippy --manifest-path native/Cargo.toml --workspace --all-targets -- -D warnings`
+
+Run: `cargo test --manifest-path native/Cargo.toml --workspace`
+
+Run the Windows installer/firewall rollback integration in the Windows workflow
+and build the pinned command image twice, verifying supervisor/proxy protocol
+versions and artifact digests. Expected: all gates exit zero and the runtime
+refuses a tampered helper or image.
+
+- [ ] **Step 4: Repeat and inspect the critical live scenarios**
+
+Repeat four-provider foreground execution, background/PTY, network escalation,
+stop/timeout/truncation, failure navigation, browser reload, real Raiker service
+restart and same-run reattachment, invalid-identity `lost`, direct-socket denial,
+approved-proxy success/revocation, no-fallback refusal, and reset/recreate.
+Review final screenshots rather than relying on DOM assertions alone.
+
+- [ ] **Step 5: Obtain an independent whole-change review**
 
 Package `git log --oneline`, `git diff --stat`, and `git diff -U10` from the pre-implementation base to `HEAD`. Give the reviewer the specification, this plan, test evidence, live evidence, and deferred issues. Resolve every Critical/Important finding through a tested fix and scoped re-review before proceeding.
 
-- [ ] **Step 5: Inspect scope and commit intentional final changes**
+- [ ] **Step 6: Inspect scope and commit intentional final changes**
 
 Run: `git diff --check`
 
@@ -1158,7 +1494,7 @@ Run: `git diff --stat origin/main...HEAD`
 
 Do not add the user's untracked `debug.log`. Commit only intentional remaining changes with a specific message.
 
-- [ ] **Step 6: Push main and identify the pushed SHA**
+- [ ] **Step 7: Push main and identify the pushed SHA**
 
 Run: `git push origin main`
 
@@ -1166,12 +1502,12 @@ Run: `git rev-parse HEAD`
 
 Expected: `origin/main` advances to the printed SHA.
 
-- [ ] **Step 7: Monitor every GitHub Actions workflow for the pushed SHA**
+- [ ] **Step 8: Monitor every GitHub Actions workflow for the pushed SHA**
 
 Run: `gh run list --commit <FINAL_SHA> --json databaseId,name,status,conclusion,url,workflowName`
 
 For each incomplete run, run `gh run watch <RUN_ID> --exit-status`. For a failure, inspect `gh run view <RUN_ID> --log-failed`, reproduce locally, add a failing regression test, fix it, rerun the affected full gate, commit, push, and monitor the new SHA. Repeat until every workflow concludes `success`.
 
-- [ ] **Step 8: Produce the evidence-backed final summary**
+- [ ] **Step 9: Produce the evidence-backed final summary**
 
 Report the five closed items, effective backend/control set, automated test results, provider/model live results, screenshot paths, commits, final pushed SHA, workflow URLs/conclusions, and every unresolved issue added to `TO_BE_FIXED.md`.

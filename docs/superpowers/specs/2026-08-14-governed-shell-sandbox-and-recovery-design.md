@@ -133,8 +133,10 @@ The following invariants apply to every backend:
   read-only except through the separately governed git executors;
 - a background or interactive process cannot outlive its lease without an
   explicit renewal; and
-- a restart may lose a live pipe, but never loses the durable fact that the run
-  existed or misreports an unknown outcome as success.
+- a backend that advertises recovery keeps supervision and redacted output in
+  the backend boundary so a Raiker restart can reattach to the same run; a
+  backend without that proof advertises recovery, PTY, and background support
+  as unavailable and never misreports an unknown outcome as success.
 
 ## Architecture
 
@@ -158,8 +160,10 @@ class CommandRequest:
     repository_id: str | None
     workspace_root: Path
     cwd: str
-    command: str
-    argv: tuple[str, ...]
+    executable_template: str
+    argv_template: tuple[str, ...]
+    safe_display: str
+    credential_bindings: tuple[CredentialBinding, ...]
     shell: bool
     interactive: bool
     background: bool
@@ -173,7 +177,7 @@ class CommandBackend(Protocol):
     def start(
         self,
         request: CommandRequest,
-        sink: CommandEventSink,
+        supervisor: SupervisorClient,
     ) -> CommandHandle: ...
 
 
@@ -182,6 +186,7 @@ class CommandHandle(Protocol):
     def wait(self, timeout: float | None = None) -> CommandState: ...
     def write(self, data: str) -> None: ...
     def terminate(self, reason: str) -> None: ...
+    def reattach(self, run_identity: str) -> None: ...
 ```
 
 `CommandService` validates the request, resolves exactly one selected backend,
@@ -189,13 +194,49 @@ creates the durable run before starting a process, streams redacted chunks into
 the sink, enforces leases and budgets, finalises the receipt, and exposes
 start/poll/wait/log/write/kill/reset operations to tools and APIs.
 
-Exactly one command representation is executable. `shell=false` requires a
-non-empty `argv` and an empty `command`; `shell=true` requires a non-empty
-`command` and an empty `argv`. This prevents a reviewed display string and the
-executed argv from disagreeing.
+Exactly one command template is executable. `shell=false` requires a non-empty
+`argv_template` and an empty `executable_template`; `shell=true` requires a
+non-empty `executable_template` and an empty `argv_template`. Persisted
+templates contain typed credential placeholders, never credential material.
+`safe_display` is independently generated from that template, has all
+placeholders visibly redacted, and is stored with a digest of the canonical
+template. The broker rejects registered secrets and bounded secret patterns in
+literal command text before any request, approval, event, or receipt is stored.
+This prevents both a reviewed display/execution mismatch and credential leakage
+through durable command text.
 
 The existing approval relay and `ToolBroker` call `CommandService`; neither
 invokes `subprocess` or a container runtime directly after this change.
+
+### Backend-resident supervisor protocol
+
+Recoverable execution is provided by a packaged `raiker-command-supervisor`,
+not by keeping a `docker exec`, `ssh`, or Daytona client pipe alive. Each
+persistent container includes it. SSH and Daytona readiness installs or proves
+an owner-approved version and digest before advertising background, PTY, input,
+lease, or recovery support. The Windows native helper embeds the same protocol.
+
+The supervisor uses a versioned, length-prefixed authenticated protocol over a
+local Unix socket/named pipe or the authenticated SSH/Daytona transport. Before
+launch it durably creates a run directory owned by the sandbox identity with:
+
+- a random run identity bound to request digest and supervisor instance id;
+- PID/process-group or Job Object identity plus process start time;
+- append-only **redacted** stdout/stderr frames with sequence and byte offset;
+- atomic status, lease deadline, exit record, and truncation metadata; and
+- a PTY/input endpoint when the backend proved that feature.
+
+The supervisor installs its exit callback and durable identity before launching
+the child. It owns process-tree kill and lease expiry. Raiker may reattach only
+after the supervisor proves the same request digest, instance id, process start
+identity, and authenticated channel; otherwise the run becomes `lost`. Raw
+output is never written by the supervisor: the broker supplies a compiled
+streaming redaction program and purpose-bound credential values over the secure
+channel, they remain memory-only, and the child receives credentials only by
+the approved delivery target (`stdin`, inherited descriptor/handle, protected
+ephemeral file, or explicitly approved process environment). Credential values
+never appear in protocol metadata, argv, environment snapshots, logs, or
+receipts.
 
 ### Authoritative environment resolution
 
@@ -244,6 +285,33 @@ The native backend uses an explicit driver per operating system:
   for offline/online execution. Setup may require one elevated owner action;
   ordinary runs do not.
 
+The Windows helper is a dedicated Rust workspace under
+`native/raiker-command-runner`. Its versioned named-pipe protocol uses an ACL
+limited to the interactive owner SID and LocalSystem, rejects remote pipe
+clients, authenticates each request with a vault-held instance key, validates
+all canonical paths after handle-open, and inherits only an explicit
+supervisor/PTY handle list. It creates a per-profile AppContainer SID, applies a
+low-integrity restricted AppContainer token with administrative capabilities
+removed (and no network capability in offline mode), grants that SID the minimum workspace ACL while explicitly
+denying `.raiker` and write access to `.git`, and uses a kill-on-close Job Object
+with CPU/memory/process limits plus ConPTY when requested. The signed release
+artifact is installed beside the Python package by the Windows installer; its
+Authenticode chain, SHA-256 digest, and protocol version are checked before use.
+
+Offline mode is the default. Online filtered mode is enabled only after an
+elevated, owner-confirmed policy helper opens a Windows Filtering Platform (WFP)
+dynamic session and installs ALE filters scoped to that AppContainer SID. The
+filtered token receives only the client network capability required to reach the
+proxy; WFP blocks all outbound transports, then permits only the authenticated Raiker proxy
+endpoint. Filter ids and session identity are recorded; closing the dynamic
+session removes them, and setup rolls back on failure, uninstall, profile reset,
+or digest mismatch. Readiness executes a
+real low-integrity child and proves Job membership, workspace write, outside-
+workspace denial, `.raiker` read/write denial, `.git` write denial, descendant
+network denial, and complete process-tree termination. Windows packaging and CI
+build/test the helper; if installation, signature/digest, firewall state, or
+any probe is unavailable, `native_sandbox` is unavailable rather than emulated.
+
 Driver readiness checks a real harmless probe, not only the presence of a
 binary. If a platform driver cannot prove descendant filesystem and network
 containment, the backend is shown as unavailable rather than downgraded to the
@@ -254,8 +322,9 @@ strict host policy.
 Docker and Podman use one labelled container per owner/session/environment
 profile. The container is created lazily, reused for the session, and removed
 on reset, lease expiry, profile change, owner stop, or application shutdown.
-An optional owner setting preserves the bounded `/sandbox-home` and workspace
-volumes across host restarts; the default is session persistence only. The
+An optional owner setting preserves the `/sandbox-home` cache volume across
+Raiker restarts; the selected host workspace is already persistent through its
+bind mount. The default removes the cache volume at session expiry. The
 container root filesystem remains read-only. Package environments and caches
 must therefore live in `/sandbox-home` or the selected workspace rather than
 silently modifying the image layer.
@@ -265,19 +334,23 @@ The container has:
 - no network unless a filtered network grant is active;
 - a read-only root filesystem plus size-bounded tmpfs mounts;
 - all capabilities dropped and `no-new-privileges`;
-- CPU, memory, PID, output, disk, and wall-clock bounds;
+- CPU, memory, PID, output, and wall-clock bounds; a disk bound is advertised
+  only when the selected runtime/storage driver proves a project quota, while
+  tmpfs size bounds are always reported separately;
 - a non-root user;
 - the selected repository mounted read/write at `/workspace` for Build work;
-- `.git` and `.raiker` over-mounted read-only or unavailable;
+- `.git` over-mounted read-only and `.raiker` absent from the mount namespace;
 - no host home, Docker socket, provider key, vault key, or ambient credential;
   and
 - labels containing only hashed owner/session/profile ids for recovery and
   cleanup.
 
-Commands run through `docker exec`/`podman exec` inside that persistent
-container, using the profile's absolute shell path and `-lc`. Full shell syntax
-is permitted there because the technical boundary, not a basename heuristic,
-contains the command. The exact shell path and shell string are still shown in
+Commands are submitted to the supervisor inside that persistent container,
+using the profile's absolute shell path and `-lc`. A short-lived `docker exec`
+may carry the authenticated control frame, but is never the process supervisor;
+disconnecting it cannot orphan control or logs. Full shell syntax is permitted
+there because the technical boundary, not a basename heuristic, contains the
+command. The safe shell display and canonical template digest are shown in
 approval and bound into the receipt.
 
 Reset supports two choices: **Reset processes** stops live jobs but keeps the
@@ -287,9 +360,14 @@ Both are explicit, audited, and confirm their scope before execution.
 ### SSH and Daytona backends
 
 The existing bounded SSH and Daytona adapters implement the same command
-lifecycle rather than returning metadata through a separate path. Each backend
-must support start, poll, wait, bounded logs, and kill. `write` and PTY are
-advertised only when the remote backend proves them during readiness.
+lifecycle rather than returning metadata through a separate path. Exact argv is
+never serialized into an ad-hoc remote shell string. The authenticated
+transport starts or connects to the verified supervisor and sends a framed
+request containing cwd, argv/shell template, limits, and request digest. Each
+backend must prove start, poll, wait, bounded logs, and process-tree kill.
+`write`, PTY, background, lease, and restart recovery are advertised only when
+the remote supervisor proves them during readiness; without that supervisor the
+backend is foreground-only and recovery is unavailable.
 
 SSH binds host, user, host key, canonical cwd, command digest, and credential
 reference. Daytona binds sandbox id, provider snapshot, budget reservation, and
@@ -311,7 +389,8 @@ The model-visible `run_command` tool gains typed options:
 ```
 
 A new `process` tool supports `list`, `poll`, `wait`, `log`, `write`, and
-`kill`. Every operation is owner/session scoped and re-governed. `write` is
+`kill`. Every operation is owner/session scoped and re-governed against the
+original grant plus the current session; revoked authority fails closed. `write` is
 accepted only for an interactive run; it is byte-bounded and records only the
 actor, timestamp, and byte count. Raw input is never stored. A PTY is allocated only when
 `interactive=true`, the backend reports PTY support, and the exact request was
@@ -330,17 +409,26 @@ patterns through the existing approval system. The approval preview names the
 domains, ports, profile, command, expiry, and whether the grant is once or for
 this session.
 
-For native and container backends, outbound traffic uses a Raiker-owned proxy
-outside the command environment. A container with a filtered grant joins one
+For native and container backends, outbound traffic uses a packaged
+`raiker-egress-proxy` outside the command environment. It is a real runtime
+artifact built into the command image and Python release, with an authenticated
+control socket and separate data listeners for HTTP CONNECT and SOCKS5 CONNECT.
+Each connection presents a random per-run capability over the internal
+transport; the proxy maps it to an active grant and never accepts an
+unauthenticated host/port request. It does not support UDP, SOCKS BIND,
+arbitrary listening, or raw IP destinations. A container with a filtered grant joins one
 private `--internal` network shared only with a proxy sidecar; only the proxy
 sidecar joins a second egress-capable network. The command container therefore
 has no direct external route even when an application ignores proxy environment
 variables. Native drivers expose the proxy through their platform sandbox
 policy and deny direct sockets. The proxy:
 
-- accepts only DNS names or public addresses covered by the active grant;
-- re-checks redirects and resolved addresses against the private/loopback/link-
-  local guard;
+- accepts only DNS names and ports covered by the active grant;
+- resolves DNS itself for every connection, pins approved public addresses for
+  that connection, and rejects CNAME/address changes to private, loopback,
+  link-local, multicast, reserved, or metadata ranges;
+- re-authorizes the destination of every proxy-observed HTTP redirect; callers
+  that follow redirects themselves must make a newly authorized connection;
 - records host, port, byte counts, decision id, and outcome, never payloads;
 - has no general host environment or provider credentials; and
 - revokes a grant immediately when the owner stops the run or withdraws it.
@@ -354,47 +442,70 @@ side effect of enabling web search or a connector.
 SSH and Daytona enforce the same grant contract through their configured remote
 policy adapters. If a remote environment cannot prove filtered egress, it is
 labelled **Remote network policy not enforced** and cannot be selected for an
-allowlisted-network command.
+allowlisted-network command. Revocation first closes listeners and active
+connections, then removes the sandbox route/firewall permit, and only then
+marks the grant revoked; recovery repeats this teardown idempotently for
+expired grants.
 
 ### Durable data model
 
 Migration `RAIKER-2030-command-runs` adds owner-scoped tables:
 
 - `command_runs`: immutable request identity plus mutable state, timestamps,
-  backend, profile, command/argv digest, cwd, approval/grant ids, isolation
-  posture, PID/container/remote opaque handle, lease, exit code, termination
-  reason, byte counts, truncation, redaction count, and receipt digest;
+  backend, profile, canonical template digest, safe display, cwd,
+  approval/grant ids, isolation posture, encrypted supervisor-handle reference,
+  lease, exit code, termination reason, byte counts, truncation, redaction count,
+  and receipt digest; executable templates and credential bindings are stored
+  separately as vault-encrypted material and erased on terminal retention;
 - `command_output_chunks`: monotonically numbered, redacted stdout/stderr
   chunks with byte offsets and timestamps, bounded per run;
 - `command_network_grants`: domain/port scope, run/session binding, decision,
-  expiry, revocation, and use count; and
+  expiry, revocation, and use count;
+- `command_network_attempts`: immutable connection-attempt rows with run/grant,
+  requested DNS host/port, resolved-address digest, decision/outcome, open and
+  close timestamps, and byte counts, never payloads; and
 - `command_receipts`: canonical JSON evidence plus digest and checkpoint ids.
 
-Raw unredacted output and terminal input are never stored. Opaque backend
-handles are encrypted when they contain a remote identifier that should not be
-shown. Owner id is part of every primary lookup; a session id alone never grants
-access.
+Raw unredacted output and terminal input are never stored. Sensitive handles
+and executable material use the existing vault envelope mechanism and are never
+returned by list/detail APIs. Chunk and attempt tables have owner/run indexes,
+per-run and per-owner quotas, bounded retention, and oldest-first deletion only
+after receipt finalization. Migrations are transactional, idempotent, and
+rollback-tested. Receipt insertions are immutable. Owner id is part of every
+primary lookup; a session id alone never grants access.
 
 Run states are:
 
-`queued -> starting -> running -> {succeeded, failed, timed_out, cancelled,
-contained, lost}`.
+`queued -> starting -> running -> finalizing -> {succeeded, failed, timed_out,
+cancelled, contained, lost}`.
 
-Only `running` accepts input or kill. Every transition is compare-and-swap so a
-timeout, owner stop, and natural exit cannot finalise the run three different
-ways.
+Only `running` accepts input or kill. The supervisor callback is registered
+before launch, and immediate exit may compare-and-swap `starting` directly to
+`finalizing`. One database transaction inserts the canonical immutable receipt
+and changes `finalizing` to its terminal state. A receipt failure leaves the run
+in `finalizing`; a bounded retry may complete the same receipt digest exactly
+once, otherwise recovery moves it to `contained`. Every transition is
+compare-and-swap so timeout, owner stop, natural exit, and recovery cannot
+finalise the run differently.
 
 ### Streaming and event model
 
-The command runner reads stdout and stderr concurrently, splits them into
-bounded UTF-8 chunks, redacts each chunk with carry-over so a token split across
-two reads is still removed, and writes the durable chunk before notifying the
-client. A per-run byte budget stops further capture without blocking the child;
-the receipt records truncation and total observed bytes.
+The supervisor reads stdout and stderr concurrently as bytes, incrementally
+decodes UTF-8, and passes characters through a compiled multi-pattern streaming
+redactor. Registered finite secrets are represented by an Aho-Corasick-style
+automaton whose pending suffix is exactly the longest prefix of any secret that
+could still match; structured unbounded patterns such as PEM blocks use explicit
+start/end states and withhold the complete sensitive region. Nothing is emitted
+until it can no longer form part of a match. There is no arbitrary fixed carry
+length. The redactor emits only safe UTF-8 chunks, which are durably written
+before client notification. A per-run byte budget stops further capture without
+blocking the child; the receipt records truncation and total observed bytes.
 
-The API exposes:
+The API exposes no direct create endpoint; all command creation passes through
+the approval relay or standing-grant `run_command` tool so governance cannot be
+bypassed. The selected environment is resolved from owner state and is not an
+accepted model/API field. The read/control API exposes:
 
-- `POST /api/command-runs` for an owner-authored command;
 - `GET /api/command-runs?session_id=...` for scoped history;
 - `GET /api/command-runs/{run_id}` for state and receipt;
 - `GET /api/command-runs/{run_id}/output?after=<sequence>` for bounded catch-up;
@@ -412,13 +523,13 @@ puts command output into the general event payload.
 
 Every terminal run finishes with a receipt containing:
 
-- exact command display and digest;
+- redacted safe command display and canonical template digest;
 - effective backend, profile, sandbox mode, workspace/cwd, and network grant;
 - proposer, approver/grant, resolver, session, turn, action, and timestamps;
 - exit/cancel/timeout/lost state;
 - stdout/stderr byte counts, truncation, and redaction counts;
-- changed-file summary calculated after the run without treating it as an
-  approval to keep those changes;
+- changed-file summary calculated against a pre-run checkpoint without treating
+  it as an approval to keep those changes;
 - tests or diagnostics recognised from the command and their exit status;
 - checkpoint ids that predated governed mutations; and
 - a digest over the canonical receipt.
@@ -426,6 +537,23 @@ Every terminal run finishes with a receipt containing:
 The receipt is linked from the transcript, Approvals, Observability, and the
 Build output pane. It can be exported without output content, or with the
 already-redacted bounded content at the owner's choice.
+
+Before a mutating run, the existing checkpoint service records the repository
+identity and bounded workspace manifest. After finalization, a symlink-safe
+workspace walker compares canonical paths and records only relative changed
+paths, status, and bounded hashes; it never follows links/junctions or reads
+outside the selected workspace. A registry of bounded diagnostic parsers
+recognizes pytest, compiler, and common test-runner records from already-
+redacted output without evaluating terminal control sequences. These producers
+feed canonical receipt serialization and have independent failure fields.
+
+One application/workspace-scoped `CommandService` is created in the FastAPI
+composition root and injected into the executor registry, `ToolBroker`, approval
+relay, command routes, orchestrator, lease reaper, and recovery coordinator.
+FastAPI lifespan starts reconciliation and the periodic lease task, and bounded
+shutdown stops foreground runs plus non-persistent session supervisors while
+preserving explicitly configured recoverable sandboxes. Profile change runs the
+same scoped cleanup transaction.
 
 On application start, `CommandRecovery` inspects durable non-terminal runs and
 backend labels/handles:
@@ -437,6 +565,12 @@ backend labels/handles:
   `succeeded`, with a recovery action; and
 - expired Raiker-owned containers and processes are stopped only after their
   labels and workspace bounds match the durable record.
+
+An integration test kills and restarts the Raiker service while a supervised
+container command is active, then proves the same run id, ordered log catch-up,
+PTY input where enabled, lease expiry, and process-tree kill. A second test
+invalidates supervisor identity and proves the run becomes `lost` without a
+success/failure inference.
 
 ### Build terminal and output surface
 
@@ -474,12 +608,21 @@ Settings -> Runtime distinguishes:
 - PTY, background, input, filtered-network, and recovery support; and
 - the exact remediation for an unavailable capability.
 
-Approvals show the exact command, cwd, backend, isolation posture, requested
+Approvals show the redacted safe command display, cwd, backend, isolation posture, requested
 network domains, interactive/background flags, timeout, and affected workspace.
 The owner may approve once or create a narrowly scoped session grant. A grant
 can constrain command prefix, backend, cwd, network domains, interactivity,
 maximum duration, and expiry. Revocation terminates runs whose continued
 authority depends on that grant.
+
+Approvals and UI surfaces receive only `safe_display`; literal input is scanned
+for registered and pattern-matched secrets before an approval record exists.
+Commands that need a credential must choose a named broker reference and an
+allowed delivery target. The preview names the reference and target (for
+example, **OpenAI credential via protected descriptor**) but never the value.
+Input, stop, lease renewal, and environment reset each require the current owner
+session plus an unrevoked lifecycle grant. Reset additionally requires an
+owner-confirmed decision because it destroys processes or writable state.
 
 ## Error Handling
 
@@ -515,17 +658,27 @@ directories on Windows.
 - Linux/macOS/Windows native driver command/policy construction plus platform
   integration tests where the runner is available;
 - foreground/background state transitions, concurrent stdout/stderr, split-
-  token redaction, truncation, timeout, input, PTY, lease renewal, and process-
-  tree kill;
+  token redaction at every boundary, registered secrets longer than any input
+  chunk, PEM/multiline regions, UTF-8 byte splits, concurrent streams, final
+  flush and truncation, plus timeout, input, PTY, lease renewal, and process-tree
+  kill;
 - SSH/Daytona lifecycle parity and capability-advertisement honesty;
 - proxy domain/port matching, public-address guard, redirect/rebinding defense,
-  grant expiry/revocation, and byte-count-only audit;
-- compare-and-swap finalisation and restart recovery; and
-- canonical receipt digest and changed-file/test summaries.
+  authenticated CONNECT/SOCKS transport, direct-socket denial, grant
+  expiry/revocation ordering, cleanup recovery, and immutable byte-count-only
+  connection audit;
+- callback-before-launch, immediate-exit, exit/stop/timeout races, atomic
+  receipt finalization, idempotent retry, and real service restart recovery;
+- traversal, symlink/junction, nested-repository, Windows case/path, `.raiker`
+  read/write denial, `.git` write denial, and descendant boundary tests; and
+- canonical receipt digest, pre-run checkpoint, symlink-safe changed-file and
+  bounded diagnostic summaries.
 
 ### Automated API and web tests
 
 - owner/session isolation on every command endpoint;
+- rejected secret-bearing command text never reaches database, approval,
+  event, API, or rendered UI fixtures;
 - approval and standing-grant scope cannot be widened by request fields;
 - catch-up output pagination cannot skip, duplicate, or reveal unredacted data;
 - Build pane live updates, reload recovery, status/filter/input/stop/reset flows,
@@ -544,13 +697,16 @@ turn that executes a sandboxed foreground command and observes its receipt.
 Across the complete matrix, also verify:
 
 - a persistent background dev server: start, poll, log, input where supported,
-  stop, and recover after a browser reload;
+  stop, recover after a browser reload, then survive a real Raiker service
+  restart with identical run identity and controls;
 - an interactive PTY command;
 - a blocked network domain followed by an allow-once decision and retry;
 - timeout, output truncation, cancellation, and a deliberate test failure with
   jump-to-source;
 - unavailable Docker/Podman/native/remote states with no host fallback;
 - reset and recreate behavior; and
+- direct external sockets fail while the approved proxy domain succeeds and a
+  revoked grant closes the active route; and
 - screenshots at 375, 768, 1024, and 1440 px with no secrets, clipping, or
   inaccessible controls.
 

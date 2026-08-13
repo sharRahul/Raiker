@@ -208,6 +208,21 @@ through durable command text.
 The existing approval relay and `ToolBroker` call `CommandService`; neither
 invokes `subprocess` or a container runtime directly after this change.
 
+### Protocol trust and compromise boundaries
+
+| Component | Trusted for | Must not receive / compromise behavior |
+| --- | --- | --- |
+| Raiker service | Owner/session/grant decisions, vault resolution, durable evidence | A command never shares its process identity; service loss withholds new authority and recovery re-proves identity. |
+| Per-run supervisor | One run's process tree, PTY, lease, redaction, bounded logs | Has no vault/database/provider key and cannot address another supervisor; compromise contains to that worker/run boundary. |
+| Egress proxy sidecar | One worker identity plus one run capability/grant | Has no payload persistence/provider key and rejects replay from any sibling worker/network. |
+| Container runtime / native policy service | Kernel boundary construction and cleanup | Treated as privileged host TCB; digest/protocol/readiness mismatch makes the backend unavailable. |
+| SSH/Daytona host | Remote worker isolation and supervisor transport | Is a separately disclosed trust boundary; unsupported per-run isolation serializes the environment or disables background/concurrency/network credentials. |
+
+Supervisor and proxy frames include protocol version, instance/run identity,
+monotonic nonce, request digest, expiry, and message authentication. Replays,
+unknown fields, downgrade versions, cross-run identities, and expired frames are
+refused and audited without their payload.
+
 ### Backend-resident supervisor protocol
 
 Recoverable execution is provided by a packaged `raiker-command-supervisor`,
@@ -237,6 +252,17 @@ the approved delivery target (`stdin`, inherited descriptor/handle, protected
 ephemeral file, or explicitly approved process environment). Credential values
 never appear in protocol metadata, argv, environment snapshots, logs, or
 receipts.
+
+Any backend that permits overlapping runs must prove a distinct kernel process
+identity and protected process view per run: a worker PID/user namespace or
+cgroup/security principal, private `/proc`, private supervisor/control/log/PTY
+endpoints, and network authority bound to that identity. Windows native uses a
+per-run AppContainer profile/SID. A remote host may use an equivalent transient
+unit/container. If a backend cannot prove this, `concurrent_runs=false`; while
+one run is alive the next start fails with `environment_busy`, and the backend
+cannot lend credentials or filtered-network authority to an overlapping run.
+`local_strict` is explicitly reduced isolation and never accepts credential or
+filtered-network grants.
 
 ### Authoritative environment resolution
 
@@ -290,7 +316,8 @@ The Windows helper is a dedicated Rust workspace under
 limited to the interactive owner SID and LocalSystem, rejects remote pipe
 clients, authenticates each request with a vault-held instance key, validates
 all canonical paths after handle-open, and inherits only an explicit
-supervisor/PTY handle list. It creates a per-profile AppContainer SID, applies a
+supervisor/PTY handle list. It creates a per-run AppContainer SID under the
+owner/profile prefix, applies a
 low-integrity restricted AppContainer token with administrative capabilities
 removed (and no network capability in offline mode), grants that SID the minimum workspace ACL while explicitly
 denying `.raiker` and write access to `.git`, and uses a kill-on-close Job Object
@@ -298,14 +325,29 @@ with CPU/memory/process limits plus ConPTY when requested. The signed release
 artifact is installed beside the Python package by the Windows installer; its
 Authenticode chain, SHA-256 digest, and protocol version are checked before use.
 
-Offline mode is the default. Online filtered mode is enabled only after an
-elevated, owner-confirmed policy helper opens a Windows Filtering Platform (WFP)
-dynamic session and installs ALE filters scoped to that AppContainer SID. The
+Offline mode is the default. Online filtered mode is enabled only after the
+owner elevates once to install the signed `RaikerCommandPolicy` Windows service.
+The service runs as a least-privileged service SID, owns the long-lived Windows
+Filtering Platform (WFP) dynamic session, and installs ALE filters scoped to an
+approved per-run AppContainer SID. The
 filtered token receives only the client network capability required to reach the
 proxy; WFP blocks all outbound transports, then permits only the authenticated Raiker proxy
 endpoint. Filter ids and session identity are recorded; closing the dynamic
-session removes them, and setup rolls back on failure, uninstall, profile reset,
-or digest mismatch. Readiness executes a
+session removes them.
+
+The service exposes a local named pipe restricted to LocalSystem and the
+installing owner SID, rejects remote clients, impersonates the caller to verify
+that SID, and authenticates a nonce-bound request with the vault-held Raiker
+instance key. Its HKLM configuration is administrator-writable only and pins
+the Authenticode publisher, runner/proxy digests, protocol version, allowed
+AppContainer profile prefix, and proxy loopback endpoint; the protocol cannot
+request arbitrary filters or destinations. On boot or service restart it opens
+a new dynamic session but does not restore a permit until non-elevated Raiker
+re-authenticates an active run/grant. A crash removes all dynamic filters and
+commands fail closed until readiness proves the service/session and required
+filters live. Installer, update, reset, and uninstall are transactional and
+remove profiles, ACL projections, filters, service registration, and pinned
+configuration on rollback. Readiness executes a
 real low-integrity child and proves Job membership, workspace write, outside-
 workspace denial, `.raiker` read/write denial, `.git` write denial, descendant
 network denial, and complete process-tree termination. Windows packaging and CI
@@ -319,15 +361,35 @@ strict host policy.
 
 ### Persistent container backend
 
-Docker and Podman use one labelled container per owner/session/environment
-profile. The container is created lazily, reused for the session, and removed
-on reset, lease expiry, profile change, owner stop, or application shutdown.
-An optional owner setting preserves the `/sandbox-home` cache volume across
-Raiker restarts; the selected host workspace is already persistent through its
-bind mount. The default removes the cache volume at session expiry. The
-container root filesystem remains read-only. Package environments and caches
-must therefore live in `/sandbox-home` or the selected workspace rather than
-silently modifying the image layer.
+Docker and Podman represent one owner/session/environment as labelled persistent
+state, not one shared process container. The state consists of the selected host
+workspace bind, a per-session `/sandbox-home` cache volume, an immutable image
+digest, and a small Raiker-side coordinator record. Every run gets a separate
+worker container, PID namespace, non-root uid, supervisor instance, IPC mount,
+and network namespace. A foreground run and a background run may therefore
+coexist without a shared uid, `/proc`, signal boundary, control socket, PTY, log,
+credential descriptor, or proxy capability. The cache/workspace persist across
+workers; worker containers persist only while their run/lease needs them and
+are reattached after a Raiker restart. Reset processes removes workers but keeps
+session state; recreate also removes the cache volume.
+
+The `/sandbox-home` volume is owned by the session identity and mounted into a
+worker only for the duration of that run. To prevent hostile concurrent workers
+from using it as a cross-run control channel, executable files, sockets, device
+nodes, FIFOs, and hard links are refused at the volume boundary; supervisor
+state, credentials, logs, and capabilities never enter it. Worker isolation is
+proven with a two-run hostile test that attempts sibling process discovery and
+signals, `/proc` and descriptor reads, control/log/socket access, credential
+recovery, and reuse of the other run's proxy grant.
+
+Credential-bearing workers acquire an exclusive environment lease: no sibling
+worker may overlap them, and they cannot start while another worker is alive.
+This closes the remaining shared-workspace/cache exfiltration path in which a
+credentialed process could intentionally deposit its loan for a sibling. The
+approval preview states this serialization. Credential-free workers may overlap
+because their process, control, PTY, and network authority remain per-run;
+shared workspace/cache writes remain an explicit collaboration property of the
+session, not a process-authority channel.
 
 The container has:
 
@@ -339,13 +401,17 @@ The container has:
   tmpfs size bounds are always reported separately;
 - a non-root user;
 - the selected repository mounted read/write at `/workspace` for Build work;
-- `.git` over-mounted read-only and `.raiker` absent from the mount namespace;
+- `.git` over-mounted read-only and `.raiker` masked by a Raiker-owned empty
+  read-only bind whose empty source is mode `000` and owned by an unmapped host
+  identity, after the workspace mount. Preflight refuses a `.git` or
+  `.raiker` symlink/reparse-point target, and readiness proves `.raiker` cannot
+  be listed, read, written, traversed, or reached through a link/junction;
 - no host home, Docker socket, provider key, vault key, or ambient credential;
   and
 - labels containing only hashed owner/session/profile ids for recovery and
   cleanup.
 
-Commands are submitted to the supervisor inside that persistent container,
+Commands are submitted to the supervisor inside that run's worker container,
 using the profile's absolute shell path and `-lc`. A short-lived `docker exec`
 may carry the authenticated control frame, but is never the process supervisor;
 disconnecting it cannot orphan control or logs. Full shell syntax is permitted
@@ -413,9 +479,10 @@ For native and container backends, outbound traffic uses a packaged
 `raiker-egress-proxy` outside the command environment. It is a real runtime
 artifact built into the command image and Python release, with an authenticated
 control socket and separate data listeners for HTTP CONNECT and SOCKS5 CONNECT.
-Each connection presents a random per-run capability over the internal
-transport; the proxy maps it to an active grant and never accepts an
-unauthenticated host/port request. It does not support UDP, SOCKS BIND,
+Each worker has a distinct internal network and proxy sidecar. The proxy binds
+authorization to the worker network identity plus a random per-run capability;
+neither value is visible to another run. The proxy maps both to an active grant
+and never accepts an unauthenticated or wrong-worker host/port request. It does not support UDP, SOCKS BIND,
 arbitrary listening, or raw IP destinations. A container with a filtered grant joins one
 private `--internal` network shared only with a proxy sidecar; only the proxy
 sidecar joins a second egress-capable network. The command container therefore
@@ -483,23 +550,37 @@ Only `running` accepts input or kill. The supervisor callback is registered
 before launch, and immediate exit may compare-and-swap `starting` directly to
 `finalizing`. One database transaction inserts the canonical immutable receipt
 and changes `finalizing` to its terminal state. A receipt failure leaves the run
-in `finalizing`; a bounded retry may complete the same receipt digest exactly
-once, otherwise recovery moves it to `contained`. Every transition is
+non-terminal in `finalizing`; bounded retry either writes the intended receipt
+or atomically writes a minimal immutable containment receipt describing the
+evidence failure and transitions to `contained`. If storage cannot write even
+that containment receipt, the run remains `finalizing`, the UI says **Evidence
+not durable — success withheld**, and recovery keeps retrying. Owner discard is
+a separately authorized transaction that writes an immutable `discarded`
+containment receipt before terminal transition. Every transition is
 compare-and-swap so timeout, owner stop, natural exit, and recovery cannot
 finalise the run differently.
 
 ### Streaming and event model
 
 The supervisor reads stdout and stderr concurrently as bytes, incrementally
-decodes UTF-8, and passes characters through a compiled multi-pattern streaming
-redactor. Registered finite secrets are represented by an Aho-Corasick-style
-automaton whose pending suffix is exactly the longest prefix of any secret that
-could still match; structured unbounded patterns such as PEM blocks use explicit
-start/end states and withhold the complete sensitive region. Nothing is emitted
-until it can no longer form part of a match. There is no arbitrary fixed carry
-length. The redactor emits only safe UTF-8 chunks, which are durably written
-before client notification. A per-run byte budget stops further capture without
-blocking the child; the receipt records truncation and total observed bytes.
+decodes UTF-8, and passes characters through a compiled streaming redactor. A
+single versioned rule manifest is the source for every existing
+`raiker.context.redaction._PATTERNS` behavior: private keys; GitHub/OpenAI/AWS
+tokens; bearer headers; credential assignments and spoken credentials;
+email/card/account/medical identifiers; high-entropy fallback; registered exact
+secrets; the snake/server-id/path/digest exceptions; case/word boundaries; and
+callable replacement semantics. Python and Rust compile that manifest into
+equivalent DFA/transducer states. Variable-length token/assignment/email/high-
+entropy rules withhold the current lexical candidate until its terminating
+boundary, PEM rules withhold through the validated end marker, and registered
+secrets use a multi-pattern prefix automaton. Nothing is emitted until no rule
+can still match it. There is no arbitrary fixed carry length. Shared conformance
+vectors compare streaming output with `redact_text` for default, locator,
+identifier, and digest modes at every byte split, minimum lengths, word
+boundaries, EOF, invalid UTF-8, truncation, overlaps, and callable branches. The
+redactor emits only safe UTF-8 chunks, which are durably written before client
+notification. A per-run byte budget stops further capture without blocking the
+child; the receipt records truncation and total observed bytes.
 
 The API exposes no direct create endpoint; all command creation passes through
 the approval relay or standing-grant `run_command` tool so governance cannot be
@@ -642,8 +723,9 @@ All expected failures have stable reason codes and owner-facing remediation:
 
 An execution failure never tears down the agent loop. The tool result and Build
 surface state the failure, its boundary, and the safe next action. A receipt
-write failure prevents a success claim: the run becomes `contained` until the
-evidence can be finalised or the owner discards it explicitly.
+write failure prevents a success claim: the run stays non-terminal
+`finalizing` until the intended receipt or a minimal containment/discard receipt
+can be written atomically with the terminal transition.
 
 ## Testing and Verification
 

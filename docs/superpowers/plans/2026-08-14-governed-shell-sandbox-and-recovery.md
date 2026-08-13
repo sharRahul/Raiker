@@ -53,10 +53,10 @@
 - `native/Cargo.toml`, `native/raiker-command-protocol/`: shared framed protocol, canonical request digest, redaction automaton, and test vectors.
 - `native/raiker-command-supervisor/`: backend-resident process/PTY/log/lease supervisor used by container, SSH, and Daytona backends.
 - `native/raiker-command-runner/`: Windows AppContainer/restricted-token, Job Object, ConPTY, ACL, named-pipe, and policy client.
-- `native/raiker-windows-policy-helper/`: narrowly elevated AppContainer profile/ACL and WFP dynamic-session setup/rollback helper.
+- `native/raiker-windows-policy-service/`: installed least-privileged Windows service that owns the WFP dynamic session and authenticates narrowly scoped policy IPC.
 - `native/raiker-egress-proxy/`: authenticated HTTP CONNECT and SOCKS5 CONNECT proxy with DNS/address enforcement and connection audits.
 - `containers/command-sandbox/Containerfile`: pinned supervisor/proxy artifacts and non-root read-only command image.
-- `scripts/install_windows_runner.ps1`, `scripts/uninstall_windows_runner.ps1`: signature/digest verification, elevation UX, transactional firewall setup, and rollback.
+- `scripts/install_windows_runner.ps1`, `scripts/uninstall_windows_runner.ps1`: signature/digest verification, elevation UX, transactional policy-service/AppContainer setup, and rollback.
 - `.github/workflows/native-security-boundaries.yml`: Linux/Rust tests, Windows helper build/integration tests, artifact digest, and release packaging checks.
 
 ### New web components
@@ -124,6 +124,15 @@ def test_terminal_states_require_atomic_finalization() -> None:
     assert can_transition(CommandState.RUNNING, CommandState.FINALIZING)
     assert can_transition(CommandState.FINALIZING, CommandState.SUCCEEDED)
     assert not can_transition(CommandState.SUCCEEDED, CommandState.FAILED)
+
+
+@pytest.mark.parametrize("terminal", TERMINAL_COMMAND_STATES)
+def test_terminal_transition_requires_receipt_in_same_transaction(store, terminal) -> None:
+    store.create_finalizing(request())
+    with pytest.raises(ReceiptRequired):
+        store.transition("owner_a", "cmd_1", CommandState.FINALIZING, terminal)
+    store.finalize_with_receipt("owner_a", "cmd_1", terminal, receipt_for(terminal))
+    assert store.receipt_count("cmd_1") == 1
 ```
 
 - [ ] **Step 2: Run the model tests and verify RED**
@@ -307,15 +316,17 @@ git commit -m "feat: persist governed command runs"
 - [ ] **Step 1: Write failing concurrent-stream, truncation, and split-token tests**
 
 ```python
-@pytest.mark.parametrize("split", range(1, len(LONG_SECRET)))
+SECRET_PAYLOAD = ("prefix " + LONG_SECRET + " suffix").encode()
+
+
+@pytest.mark.parametrize("split", range(len(SECRET_PAYLOAD) + 1))
 def test_no_secret_prefix_is_emitted_at_any_split(split: int) -> None:
     redactor = StreamingRedactor(registered=(LONG_SECRET,), structured=PEM_RULES)
-    emitted = redactor.feed(("prefix " + LONG_SECRET)[:split].encode())
-    emitted += redactor.feed(("prefix " + LONG_SECRET)[split:].encode())
+    emitted = redactor.feed(SECRET_PAYLOAD[:split])
+    emitted += redactor.feed(SECRET_PAYLOAD[split:])
     emitted += redactor.finish()
-    assert LONG_SECRET not in emitted
-    assert not any(LONG_SECRET.startswith(fragment) for fragment in emitted.split())
-    assert b"[REDACTED]" in emitted
+    assert LONG_SECRET.encode() not in emitted
+    assert emitted == b"prefix [REDACTED_CREDENTIAL] suffix"
 
 
 def test_redactor_handles_utf8_boundaries_concurrent_streams_pem_and_truncation() -> None:
@@ -326,6 +337,15 @@ def test_redactor_handles_utf8_boundaries_concurrent_streams_pem_and_truncation(
     )
     assert result.persisted_secrets == []
     assert result.notified_before_safe == []
+
+
+@pytest.mark.parametrize("mode", ["default", "locator", "identifier", "digest"])
+def test_streaming_redaction_matches_existing_contract_at_every_byte_split(mode) -> None:
+    for vector in load_redaction_vectors(mode):
+        expected, _ = redact_text(vector.text, **vector.mode_kwargs)
+        for split in range(len(vector.encoded) + 1):
+            actual = stream_redact(vector.encoded[:split], vector.encoded[split:], mode=mode)
+            assert actual.decode("utf-8", errors="replace") == expected
 
 
 def test_runner_records_total_bytes_after_capture_is_truncated(tmp_path: Path) -> None:
@@ -360,13 +380,16 @@ class StreamingRedactor:
         return self.machine.consume(self.decoder.decode(b"", final=True), final=True)
 ```
 
-Generate common JSON vectors for Python and Rust covering every split position,
-secrets longer than any input chunk, suffix/prefix overlaps, PEM/multiline
-regions, invalid and split UTF-8, final flush, truncation, and concurrent stream
-ordering. Nothing reaches a sink or durable supervisor frame until the machine
-proves it safe. Read streams concurrently, serialize safe chunks through one
-sequence allocator, stop persisting after the cap while continuing to drain,
-and never block the child because output was truncated.
+Move the current `_PATTERNS` contract into one versioned rule manifest consumed
+by `redact_text` and the Python/Rust streaming compilers. Cover private keys;
+GitHub/OpenAI/AWS tokens; bearer headers; assignments and spoken credentials;
+email/card/account/medical ids; high entropy; registered values; snake/server-
+id/path/digest exemptions; every minimum/word/EOF boundary; and callable
+replacement branches. Generate common JSON vectors for default, locator,
+identifier, and digest modes at every byte split, including secrets longer than
+any input chunk, overlaps, invalid/split UTF-8, flush, truncation, and concurrent
+stream ordering. Assert exact equivalence to `redact_text`. Nothing reaches a
+sink or durable supervisor frame until the machine proves it safe.
 
 - [ ] **Step 4: Write failing timeout, PTY input, and descendant-stop tests**
 
@@ -429,9 +452,12 @@ git commit -m "feat: stream bounded command output"
 - Create: `native/raiker-command-runner/src/job.rs`
 - Create: `native/raiker-command-runner/src/pipe.rs`
 - Create: `native/raiker-command-runner/src/appcontainer.rs`
-- Create: `native/raiker-command-runner/src/wfp.rs`
-- Create: `native/raiker-windows-policy-helper/src/main.rs`
-- Create: `native/raiker-windows-policy-helper/src/transaction.rs`
+- Create: `native/raiker-command-runner/src/policy_client.rs`
+- Create: `native/raiker-windows-policy-service/src/main.rs`
+- Create: `native/raiker-windows-policy-service/src/service.rs`
+- Create: `native/raiker-windows-policy-service/src/pipe.rs`
+- Create: `native/raiker-windows-policy-service/src/wfp.rs`
+- Create: `native/raiker-windows-policy-service/src/transaction.rs`
 - Create: `scripts/install_windows_runner.ps1`
 - Create: `scripts/uninstall_windows_runner.ps1`
 - Create: `.github/workflows/native-security-boundaries.yml`
@@ -483,6 +509,7 @@ class CommandFeatures:
     filtered_network: bool
     persistent: bool
     recoverable: bool
+    concurrent_runs: bool
 
 
 def resolve_command_environment(store: SQLiteStore, owner_principal_id: str, tool_name: str) -> CommandResolution:
@@ -534,28 +561,48 @@ class LocalStrictBackend:
         return self.local_supervisor.start(request, list(request.argv_template), sandbox_environment(workspace_root=request.workspace_root))
 ```
 
+`local_strict` rejects credential bindings and filtered-network grants because
+it does not isolate commands from the Raiker/user process identity. For every
+other backend, readiness either proves distinct per-run principal/PID and
+private-process/control/log/PTY/network boundaries, or sets
+`concurrent_runs=false`; a second start while a run is alive then fails with
+`environment_busy`. Add two-hostile-run tests for each backend that advertises
+concurrency, and busy/refusal tests for every serialized backend.
+
 Linux uses `bwrap`; macOS uses a generated Seatbelt profile. Windows builds a
 Rust helper whose versioned named pipe rejects remote clients, is ACL-limited to
 the owner SID/LocalSystem, authenticates requests with the vault instance key,
 opens/canonicalizes handles before applying ACLs, and inherits only an explicit
-supervisor/ConPTY handle list. It creates a per-profile AppContainer SID, a
+supervisor/ConPTY handle list. It creates a per-run AppContainer SID under the
+owner/profile prefix, a
 low-integrity restricted AppContainer token without network capability in
 offline mode (filtered mode adds only the client capability required to reach
 the proxy and relies on the scoped WFP deny/permit policy), a
 minimum workspace ACL that denies `.raiker` and `.git` writes, and a
 kill-on-close Job Object with CPU/memory/process limits. Installer scripts verify
-the Authenticode chain/digest and perform an elevated transactional WFP setup:
-in a dynamic session, ALE filters scoped to the AppContainer SID deny outbound
-and permit only the authenticated proxy endpoint; persist filter/session ids and
-roll back on failure/uninstall/reset/digest mismatch. Ordinary commands do not
-elevate, and closing the dynamic WFP session removes its filters.
+the Authenticode chain/digest and install the `RaikerCommandPolicy` service once
+with owner confirmation. The service runs under a least-privileged service SID
+and owns the long-lived WFP dynamic session. Its local named pipe is ACL-limited
+to LocalSystem and the installing owner SID, rejects remote clients,
+impersonates the caller, and authenticates nonce-bound frames with the vault
+instance key. Administrator-only HKLM configuration pins the publisher,
+protocol, runner/proxy digests, AppContainer prefix, and allowed proxy endpoint;
+IPC cannot create arbitrary filters. ALE filters scoped to the AppContainer
+deny outbound and permit only that proxy. A crash closes the dynamic session
+and all filters; restart opens a clean session but requires Raiker to
+re-authenticate active grants before permits return. Readiness proves the
+service/session live. Installer/update/uninstall/profile reset roll back
+filters, profiles, ACLs, service registration, and configuration. Ordinary
+commands do not elevate.
 
 Every advertised platform runs traversal, symlink/junction, nested-repository,
 Windows path/case, descendant, `.raiker` read/write denial, `.git` write denial,
 outside-workspace denial, and direct-network probes. Windows CI builds the
-helper, runs protocol/unit tests, installs test rules, executes the boundary
-integration test, verifies rollback, and publishes a digest-checked release
-artifact. Any missing signature/digest/firewall/probe returns
+runner and policy service, runs protocol/unit tests, installs the service and
+test rules, proves a service crash removes filters and restart stays fail-closed
+until re-authentication, executes the boundary test, verifies uninstall/rollback,
+and publishes digest-checked artifacts. Any missing signature/digest/service/
+session/firewall/probe returns
 `native_sandbox_probe_failed`; native mode never degrades to local strict.
 
 - [ ] **Step 6: Run focused tests and commit**
@@ -567,7 +614,7 @@ Run on Windows: `cargo test --manifest-path native/Cargo.toml -p raiker-command-
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends native/raiker-command-runner scripts/install_windows_runner.ps1 scripts/uninstall_windows_runner.ps1 .github/workflows/native-security-boundaries.yml raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_windows_command_runner.py tests/test_execution_environments.py
+git add -- raiker/execution/commands/backends native/raiker-command-runner native/raiker-windows-policy-service scripts/install_windows_runner.ps1 scripts/uninstall_windows_runner.ps1 .github/workflows/native-security-boundaries.yml raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_windows_command_runner.py tests/test_execution_environments.py
 git commit -m "feat: enforce selected command environment"
 ```
 
@@ -586,24 +633,45 @@ git commit -m "feat: enforce selected command environment"
 
 **Interfaces:**
 - Consumes: `CommandBackend`, `CommandRequest`, `SupervisorClient`, pinned supervisor image digest, validated container profile.
-- Produces: `PersistentContainerBackend`, deterministic labelled container names, authenticated supervisor start/attach/reset/recreate/recover operations, and actual container-shell support.
+- Produces: `PersistentContainerBackend`, persistent session cache/workspace state, isolated per-run worker names/identities/networks, authenticated supervisor start/attach/reset/recreate/recover operations, and actual container-shell support.
 
 - [ ] **Step 1: Write failing container creation and reuse tests**
 
 ```python
-def test_container_is_hardened_and_reused_for_one_session(tmp_path: Path) -> None:
+def test_session_state_is_reused_but_each_run_has_an_isolated_worker(tmp_path: Path) -> None:
     runtime = RecordingContainerRuntime()
     backend = PersistentContainerBackend(runtime=runtime, workspace_root=tmp_path)
     first = backend.start(request(session_id="sess_a"), RecordingSink())
     second = backend.start(request(run_id="cmd_2", session_id="sess_a"), RecordingSink())
-    assert runtime.create_calls == 1
+    assert runtime.create_calls == 2
     create = runtime.commands[0]
     assert ["--network", "none"] == adjacent(create, "--network")
     assert "--read-only" in create and ["--cap-drop", "ALL"] == adjacent(create, "--cap-drop")
-    assert all(".raiker" not in value for value in mount_values(create))
+    assert raiker_mask(create).source == runtime.inaccessible_empty_mask_dir
+    assert raiker_mask(create).readonly is True
+    assert runtime.stat(runtime.inaccessible_empty_mask_dir).mode == 0
     assert git_mount(create).readonly is True
     assert supervisor_digest(create) == EXPECTED_SUPERVISOR_DIGEST
-    assert first.backend_handle.container_id == second.backend_handle.container_id
+    assert first.backend_handle.container_id != second.backend_handle.container_id
+    assert first.backend_handle.cache_volume == second.backend_handle.cache_volume
+
+
+def test_hostile_concurrent_workers_cannot_cross_run_boundaries(live_backend) -> None:
+    victim = live_backend.start(run_with_network_grant())
+    attacker = live_backend.start(hostile_inspection_run())
+    assert attacker.sibling_processes == []
+    assert attacker.signal_victim == "denied"
+    assert attacker.read_victim_proc_fds == "denied"
+    assert attacker.read_victim_control_or_logs == "denied"
+    assert attacker.recovered_credentials == []
+    assert attacker.use_victim_proxy_capability == "denied"
+    victim.stop()
+
+
+def test_credential_bound_worker_holds_exclusive_environment_lease(live_backend) -> None:
+    victim = live_backend.start(run_with_credential())
+    assert live_backend.start(hostile_inspection_run()).reason_code == "credential_environment_busy"
+    victim.stop()
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -615,8 +683,8 @@ Expected: `PersistentContainerBackend` is absent.
 - [ ] **Step 3: Implement labelled persistent creation and full shell exec**
 
 ```python
-def command_container_name(owner: str, session: str, profile: str) -> str:
-    digest = sha256(f"{owner}\0{session}\0{profile}".encode()).hexdigest()[:24]
+def command_container_name(owner: str, session: str, profile: str, run_id: str) -> str:
+    digest = sha256(f"{owner}\0{session}\0{profile}\0{run_id}".encode()).hexdigest()[:24]
     return f"raiker-cmd-{digest}"
 
 
@@ -628,14 +696,25 @@ def supervisor_start(profile: ExecutionProfile, request: CommandRequest) -> Supe
     )
 ```
 
-Build the supervisor into a digest-pinned non-root image. Create a read-only-root
-container with bounded tmpfs, a removable `/sandbox-home` cache volume, host
-workspace bind mount, `.git` over-mounted read-only, `.raiker` absent, no
-capabilities, no-new-privileges, CPU/memory/PID/lease labels, and no ambient
-environment. Advertise a disk quota only when the runtime/storage driver probe
-proves it; always report tmpfs limits separately. Submit commands to the
-authenticated resident supervisor; a short-lived `exec` may transport a frame
-but never owns child lifetime, logs, PTY, or kill.
+Build the supervisor into a digest-pinned non-root image. Persist session state
+as the host workspace plus one cache volume, but create a separate read-only-root
+worker container, non-root uid, PID namespace, supervisor/control mount, and
+network namespace for every run. The worker gets bounded tmpfs, the removable
+cache, and workspace bind; after that mount, over-mount `.git` read-only and
+mask `.raiker` with a Raiker-owned empty mode-`000`, unmapped-owner, read-only
+bind so listing and all access fail. Reject `.git`/`.raiker`
+symlink or reparse targets in preflight. Use no capabilities, no-new-privileges,
+CPU/memory/PID/lease labels, and no ambient environment. The cache boundary
+rejects executables, sockets, device nodes, FIFOs, and hard links; supervisor
+state, credentials, logs, and proxy capabilities never enter it. Advertise disk
+quota only when proven. A short-lived `exec` may transport a control frame but
+never owns lifetime, logs, PTY, or kill.
+
+Credential-bearing workers acquire an exclusive environment lease and cannot
+overlap any sibling; another live worker likewise blocks a credential-bearing
+start. Add both ordering tests. Credential-free workers may overlap with their
+separate kernel/control/network identities; shared workspace/cache writes are
+an explicit session collaboration property.
 
 - [ ] **Step 4: Write failing reset, recovery, daemon-probe, and no-host-fallback tests**
 
@@ -643,10 +722,12 @@ but never owns child lifetime, logs, PTY, or kill.
 def test_recreate_removes_state_but_reset_processes_keeps_volume(tmp_path: Path) -> None:
     runtime = RecordingContainerRuntime()
     backend = PersistentContainerBackend(runtime=runtime, workspace_root=tmp_path)
+    backend.start(request(run_id="worker_a"))
     backend.reset("owner_a", "sess_a", "container_a", recreate=False)
     assert runtime.kill_process_calls == 1 and runtime.remove_calls == 0
+    backend.start(request(run_id="worker_b"))
     backend.reset("owner_a", "sess_a", "container_a", recreate=True)
-    assert runtime.remove_calls == 1 and runtime.remove_volume_calls == 1
+    assert runtime.kill_process_calls == 2 and runtime.remove_volume_calls == 1
 
 
 def test_daemon_probe_requires_a_runnable_approved_image(tmp_path: Path) -> None:
@@ -672,6 +753,11 @@ image digest, request digest, and workspace bounds match the durable encrypted
 handle. A name match without proof is `container_identity_mismatch` and is never
 touched. Add a live service-process restart test, an expired-lease reaper test,
 and a deliberately corrupted supervisor identity test that produces `lost`.
+Add live `.raiker` tests for listing, reads, writes, `..` traversal, symlink and
+junction access, plus the two-hostile-worker test above. Prove workers cannot
+signal/inspect each other, read sibling descriptors/control/logs/credentials,
+or use the other worker's network capability. Reset-processes removes every
+worker but retains cache/workspace; recreate also removes cache state.
 
 - [ ] **Step 6: Complete the generic bridge's shell claim**
 
@@ -776,6 +862,13 @@ def test_direct_socket_fails_but_capability_bound_proxy_succeeds(live_sandbox) -
     assert live_sandbox.http_connect("wrong", "registry.npmjs.org", 443).unauthorized
 
 
+def test_capability_is_bound_to_worker_network_identity(proxy, two_workers) -> None:
+    victim, attacker = two_workers
+    capability = proxy.grant(victim.identity, "registry.npmjs.org", 443)
+    assert proxy.connect(victim.identity, capability, "registry.npmjs.org", 443).ok
+    assert proxy.connect(attacker.identity, capability, "registry.npmjs.org", 443).unauthorized
+
+
 def test_revoke_closes_active_connection_before_marking_revoked(proxy, store) -> None:
     connection = proxy.connect(active_grant())
     proxy.revoke(active_grant().grant_id)
@@ -787,8 +880,10 @@ def test_revoke_closes_active_connection_before_marking_revoked(proxy, store) ->
 - [ ] **Step 5: Implement native proxy policy and container sidecar topology**
 
 Implement a packaged Rust proxy with a versioned authenticated control socket
-and separate HTTP CONNECT and SOCKS5 CONNECT listeners. Each connection must
-present a random per-run capability mapped to an active grant; reject UDP, BIND,
+and separate HTTP CONNECT and SOCKS5 CONNECT listeners. Each per-run worker has
+a separate internal network and proxy sidecar. Each connection must present a
+random per-run capability bound to the runtime-proven worker network identity
+and active grant; reject wrong-worker reuse, UDP, BIND,
 raw IP destinations, unauthenticated clients, and unsupported methods. Resolve
 DNS inside the proxy for every connection, pin public answers, guard CNAME and
 rebinding to private/loopback/link-local/multicast/reserved/metadata space, and
@@ -859,10 +954,13 @@ def test_immediate_exit_and_receipt_commit_are_atomic(store: CommandStore) -> No
 
 def test_receipt_failure_never_publishes_success(store: CommandStore) -> None:
     store.fail_next_receipt_transaction()
-    run = service_with_success_backend(store).start(request())
-    assert service_with_success_backend(store).wait("owner_a", run.run_id).state in {
-        CommandState.FINALIZING, CommandState.CONTAINED
-    }
+    service = service_with_success_backend(store)
+    run = service.start(request())
+    assert service.wait("owner_a", run.run_id).state == CommandState.FINALIZING
+    assert store.receipt_count(run.run_id) == 0
+    service.retry_finalization(run.run_id)
+    assert store.load("owner_a", run.run_id).state == CommandState.SUCCEEDED
+    assert store.receipt_count(run.run_id) == 1
 
 
 def test_turn_stop_kills_foreground_but_not_explicit_background_run(store: CommandStore) -> None:
@@ -904,7 +1002,12 @@ Install completion subscription before launch. A callback asks the service to
 compare-and-swap `starting|running -> finalizing`; it never writes SQL directly.
 One transaction inserts an immutable canonical receipt and changes finalizing
 to the selected terminal state. Retry uses the same digest and cannot duplicate
-the receipt; exhausted finalization becomes `contained`. Add deterministic race
+the receipt. If intended receipt construction exhausts its retry budget, one
+transaction writes a minimal immutable containment receipt describing the
+evidence failure and transitions to `contained`. If storage cannot write that
+receipt, the run remains non-terminal `finalizing` and success stays withheld.
+Owner discard is a separately authorized transaction that first writes an
+immutable `discarded` containment receipt. Add deterministic race
 tests for immediate exit, natural exit versus timeout/stop, database failure,
 and retry.
 
@@ -921,7 +1024,9 @@ def test_receipt_digest_changes_if_evidence_changes() -> None:
     second = canonical_receipt(receipt_input(exit_code=1))
     assert first.digest != second.digest
     assert first.payload["command"]["display"] == "npm test"
-    assert "environment" not in json.dumps(first.payload).lower()
+    serialized = json.dumps(first.payload)
+    assert first.payload["environment"]["backend"] == "container"
+    assert "RAW_SECRET_VALUE" not in serialized
 
 
 def test_recovery_marks_unprovable_run_lost(store: CommandStore) -> None:
@@ -950,7 +1055,8 @@ orchestrator. FastAPI lifespan starts reconciliation and the periodic lease
 reaper; profile change invokes scoped cleanup; bounded shutdown stops foreground
 and non-persistent supervisors. Recovery resumes only when authenticated
 supervisor instance/request/PID-start identity, labels, and workspace bounds
-match. Unknown outcomes become `lost`.
+match. Unknown outcomes become `lost` only in the same transaction that writes
+their immutable recovery receipt; otherwise they remain `finalizing`.
 
 Add an integration fixture that starts a real loopback Raiker process and live
 container background command, kills/restarts Raiker, then proves identical run
@@ -1107,7 +1213,7 @@ ToolSpec(
     name="run_command",
     description="Run a governed command in the owner-selected environment.",
     required_args=("command",),
-    optional_args=("background", "interactive", "timeout_seconds", "notify_on_complete", "network_domains"),
+    optional_args=("background", "interactive", "timeout_seconds", "notify_on_complete", "network_domains", "credential_bindings"),
 )
 ToolSpec(
     name="process",

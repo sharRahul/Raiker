@@ -102,7 +102,7 @@ def test_execution_environment_api_configures_container_profile(
     assert view["container_options"] == {
         "runtimes": ["docker", "podman"],
         "images": ["raiker-tools:approved"],
-        "supported_tools": ["glob", "grep", "list_directory", "read_file", "stat_path"],
+        "supported_tools": ["glob", "grep", "list_directory", "read_file", "shell", "stat_path"],
     }
 
 

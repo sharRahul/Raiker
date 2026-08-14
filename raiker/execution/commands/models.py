@@ -162,15 +162,24 @@ class CommandChunk:
 
 @dataclass(frozen=True)
 class CommandFeatures:
+    shell: bool = True
     pty: bool = False
     background: bool = False
     input: bool = False
     process_tree_stop: bool = True
     network_escalation: bool = False
+    filtered_network: bool = False
     persistent_environment: bool = False
+    persistent: bool = False
     restart_recovery: bool = False
+    recoverable: bool = False
+    concurrent_runs: bool = False
     credential_delivery: bool = False
     credential_delta_quarantine: bool = False
+
+    def __post_init__(self) -> None:
+        if self.credential_delivery and not self.credential_delta_quarantine:
+            raise ValueError("credential_delivery_requires_quarantine")
 
 
 class CommandResolution(StrEnum):

@@ -58,6 +58,7 @@ include = ["raiker*", "apps*"]
 # are packed into a *.skill bundle at install time, so every file in one has to
 # travel in the wheel — not just the SKILL.md.
 "raiker.skills" = ["builtin/*/SKILL.md", "builtin/*/*/*"]
+"raiker.native" = ["*/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

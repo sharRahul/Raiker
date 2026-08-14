@@ -41,6 +41,7 @@ from raiker.execution.profiles import (
     ContainerRuntime,
     ExecutionProfile,
     RepositoryAccess,
+    probe_execution_profile,
     validate_execution_profile,
 )
 from raiker.memory.store import get_memory, list_memory
@@ -1341,26 +1342,38 @@ class DashboardService:
         )
         gate_enabled = gate is not None and gate.state not in _DISABLED_STATES
         default_image = allowed_images[0] if allowed_images else None
-        default_runtime_available = shutil.which("docker") is not None
+        default_profile = ExecutionProfile(
+            "container_default",
+            "container",
+            name="Local container",
+            runtime="docker",
+            image=default_image,
+            tools=("shell",),
+            repository_access="read_only",
+            writable_output=True,
+        )
+        default_probe = probe_execution_profile(default_profile)
         default_reason = (
             "container_gate_disabled"
             if not gate_enabled
             else (
                 "container_image_required:container_default"
                 if default_image is None
-                else (
-                    "container_runtime_unavailable:docker"
-                    if not default_runtime_available
-                    else None
-                )
+                else default_probe.reason_code
             )
         )
+        local_profile = ExecutionProfile("local_native", "local")
         environments: list[dict[str, Any]] = [
             {
-                "profile_id": "local_native", "kind": "local", "name": "Local workspace",
+                "profile_id": "local_native", "kind": "local", "name": "Local strict",
                 "enabled": True, "configured": True, "available": True,
                 "status": "ready", "selected": selected == "local_native",
                 "credential_configured": True, "budget": None, "cost": None,
+                "selected_for_commands": selected == "local_native",
+                "assigned_tools": ["run_command"],
+                "features": asdict(local_profile.features),
+                "probe_checked_at": utc_now(),
+                "availability_reason": None,
             },
             {
                 "profile_id": "container_default", "kind": "container", "name": "Local container",
@@ -1371,6 +1384,10 @@ class DashboardService:
                 "cost": None, "runtime": "docker", "image": default_image,
                 "repository_access": "read_only", "writable_output": True,
                 "assigned_tool_count": 1, "availability_reason": default_reason,
+                "selected_for_commands": selected == "container_default",
+                "assigned_tools": ["shell"],
+                "features": asdict(default_profile.features),
+                "probe_checked_at": default_probe.checked_at,
             },
         ]
         for row in self.store.list_remote_execution_profiles(owner_principal_id=owner_principal_id):
@@ -1404,8 +1421,9 @@ class DashboardService:
                     reason = f"container_image_not_allowed:{profile.profile_id}"
                 if reason is None and not gate_enabled:
                     reason = "container_gate_disabled"
-                if reason is None and profile.runtime and shutil.which(profile.runtime) is None:
-                    reason = f"container_runtime_unavailable:{profile.runtime}"
+                proof = probe_execution_profile(profile)
+                if reason is None:
+                    reason = proof.reason_code
                 available = bool(profile.enabled and reason is None)
                 environments.append(
                     {
@@ -1425,6 +1443,10 @@ class DashboardService:
                         "repository_access": profile.repository_access,
                         "writable_output": profile.writable_output,
                         "assigned_tool_count": len(profile.tools),
+                        "selected_for_commands": selected == profile.profile_id,
+                        "assigned_tools": list(profile.tools),
+                        "features": asdict(profile.features),
+                        "probe_checked_at": proof.checked_at,
                         "availability_reason": reason,
                         "config": {
                             "runtime": profile.runtime,
@@ -1452,6 +1474,15 @@ class DashboardService:
                     "selected": selected == row["profile_id"], "credential_configured": credential_configured,
                     "budget": budget,
                     "cost": cost,
+                    "selected_for_commands": selected == row["profile_id"],
+                    "assigned_tools": ["shell"],
+                    "features": asdict(ExecutionProfile(str(row["profile_id"]), cast(Any, kind), tools=("shell",)).features),
+                    "probe_checked_at": utc_now(),
+                    "availability_reason": None if available else (
+                        "execution_environment_credential_required"
+                        if configured and not credential_configured
+                        else "execution_environment_configuration_required"
+                    ),
                     "config": {key: value for key, value in config.items() if key not in {"password", "token", "api_key", "secret"}},
                 }
             )
@@ -1464,7 +1495,7 @@ class DashboardService:
             "container_options": {
                 "runtimes": ["docker", "podman"],
                 "images": allowed_images,
-                "supported_tools": sorted(CONTAINER_PROFILE_TOOLS - {"shell"}),
+                "supported_tools": sorted(CONTAINER_PROFILE_TOOLS),
             },
         }
 

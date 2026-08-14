@@ -136,15 +136,16 @@ def test_command_service_routes_selected_container_without_local_fallback(tmp_pa
         action_id="act_a",
         authority_kind="approval",
         authority_id="appr_a",
-        command="printf hello",
+        command="misleading display",
         argv=["printf", "hello"],
     )
 
     routed = selected.start.call_args.args[0]
     assert run.profile_id == "container_a"
-    assert routed.shell is True
-    assert routed.executable_template == "printf hello"
-    assert routed.argv_template == ()
+    assert routed.shell is False
+    assert routed.executable_template == ""
+    assert routed.argv_template == ("printf", "hello")
+    assert routed.safe_display == "printf hello"
     service.shutdown()
 
 

@@ -55,11 +55,11 @@ def request(tmp_path: Path, **overrides: object) -> CommandRequest:
         "repository_id": None,
         "workspace_root": tmp_path,
         "cwd": ".",
-        "executable_template": "printf hello",
-        "argv_template": (),
+        "executable_template": "",
+        "argv_template": ("printf", "%s", "hello world"),
         "safe_display": "printf hello",
         "credential_bindings": (),
-        "shell": True,
+        "shell": False,
         "interactive": False,
         "background": False,
         "timeout_seconds": 30.0,
@@ -164,7 +164,7 @@ def test_identity_mismatch_is_never_removed(tmp_path: Path) -> None:
     assert not any(call[1] == "rm" for call in runtime.calls)
 
 
-def test_foreground_shell_streams_through_exec_and_stop_removes_worker(tmp_path: Path) -> None:
+def test_foreground_command_preserves_exact_argv_and_stop_removes_worker(tmp_path: Path) -> None:
     runtime = RecordingRuntime()
     process = Mock()
     process.poll.return_value = None
@@ -175,13 +175,13 @@ def test_foreground_shell_streams_through_exec_and_stop_removes_worker(tmp_path:
         profile=profile(),
         runner=runner,
     )
-    command = request(tmp_path, executable_template="printf hello", background=False)
+    command = request(tmp_path, background=False)
 
     handle = backend.start(command, MemoryCommandSink())
 
     exec_argv = runner.call_args.args[1]
     assert exec_argv[:3] == ["docker", "exec", "-i"]
-    assert exec_argv[-3:] == ["/bin/sh", "-lc", "printf hello"]
+    assert exec_argv[-3:] == ["printf", "%s", "hello world"]
     handle.terminate()
     process.terminate.assert_called_once()
     assert any(call[1:3] == ["rm", "--force"] for call in runtime.calls)

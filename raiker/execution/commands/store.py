@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any
@@ -9,6 +8,7 @@ from typing import Any
 from cryptography.fernet import InvalidToken
 
 from raiker.auth.app_key import app_fernet
+from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
@@ -79,14 +79,6 @@ class CommandMaterialCipher:
         return value
 
 
-_SECRET_PATTERNS = (
-    re.compile(r"\bsk-(?:proj|ant|or-v1)-[A-Za-z0-9_-]{16,}\b"),
-    re.compile(r"\bsk-ant-api\d+-[A-Za-z0-9_-]{16,}\b"),
-    re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{16,}\b"),
-    re.compile(r"\bAKIA[A-Z0-9]{16}\b"),
-)
-
-
 class CommandStore:
     def __init__(
         self,
@@ -109,7 +101,9 @@ class CommandStore:
         for secret in self.registered_secrets:
             if secret in material or secret in safe_display:
                 raise SecretMaterialRejected("command_secret_literal_rejected")
-        if any(pattern.search(material) or pattern.search(safe_display) for pattern in _SECRET_PATTERNS):
+        _safe_material, material_changed = redact_text(material)
+        _safe_display, display_changed = redact_text(safe_display)
+        if material_changed or display_changed:
             raise SecretMaterialRejected("command_secret_pattern_rejected")
 
     def create(self, request: CommandRequest) -> StoredCommandRun:

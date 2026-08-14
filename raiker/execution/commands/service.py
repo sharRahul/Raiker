@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 import threading
 import weakref
 from collections.abc import Callable
@@ -171,10 +172,10 @@ class CommandService:
         profile = resolution.profile
         if not argv:
             raise CommandServiceError("command_argv_required")
-        display = command.strip()
+        del command
+        display = shlex.join(argv)
         if not display or any(char in display for char in "\r\n\0"):
             raise CommandServiceError("command_safe_display_invalid")
-        shell = profile.kind == "container"
         request = CommandRequest(
             run_id=new_id("cmd_"),
             owner_principal_id=owner_principal_id,
@@ -185,11 +186,11 @@ class CommandService:
             repository_id=None,
             workspace_root=self.workspace_root,
             cwd=cwd,
-            executable_template=display if shell else "",
-            argv_template=() if shell else tuple(argv),
+            executable_template="",
+            argv_template=tuple(argv),
             safe_display=display,
             credential_bindings=(),
-            shell=shell,
+            shell=False,
             interactive=False,
             background=False,
             timeout_seconds=timeout_seconds,
@@ -277,7 +278,15 @@ class CommandService:
             exit_code=None,
             termination_reason=reason,
             completed_at=utc_now(),
-            evidence={"backend": backend_name, "profile_id": request.environment_profile_id},
+            evidence={
+                "backend": backend_name,
+                "profile_id": request.environment_profile_id,
+                "template_digest": request.template_digest,
+                "authority": {
+                    "kind": request.authority_kind,
+                    "id": request.authority_id,
+                },
+            },
         )
         self.store.finalize_with_receipt(
             request.owner_principal_id, request.run_id, CommandState.CONTAINED, receipt
@@ -354,7 +363,16 @@ class CommandService:
             exit_code=None,
             termination_reason="command_backend_handle_unavailable_after_restart",
             completed_at=utc_now(),
-            evidence={"backend": run.backend or "unknown", "recovered": True},
+            evidence={
+                "backend": run.backend or "unknown",
+                "profile_id": run.profile_id,
+                "template_digest": run.template_digest,
+                "authority": {
+                    "kind": run.authority_kind,
+                    "id": run.authority_id,
+                },
+                "recovered": True,
+            },
         )
         self.store.finalize_with_receipt(run.owner_principal_id, run.run_id, CommandState.LOST, receipt)
 

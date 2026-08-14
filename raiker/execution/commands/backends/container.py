@@ -150,8 +150,8 @@ class PersistentContainerBackend:
     ) -> ContainerCommandHandle:
         if request.environment_profile_id != self.profile.profile_id:
             raise CommandBackendError("selected_environment_mismatch")
-        if not request.shell:
-            raise CommandBackendError("container_shell_template_required")
+        if request.shell or not request.argv_template:
+            raise CommandBackendError("container_argv_required")
         if request.background:
             raise CommandBackendError("selected_environment_background_unsupported")
         if request.interactive:
@@ -213,9 +213,7 @@ class PersistentContainerBackend:
                 "exec",
                 "-i",
                 container_id,
-                "/bin/sh",
-                "-lc",
-                request.executable_template,
+                *request.argv_template,
             ],
             self.workspace_root,
             sandbox_environment(workspace_root=self.workspace_root),

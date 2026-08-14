@@ -214,6 +214,26 @@ def test_registered_and_pattern_secrets_never_reach_the_database(sqlite: SQLiteS
     assert "sk-proj-aabbccddeeff00112233" not in dump
 
 
+@pytest.mark.parametrize(
+    "unsafe",
+    (
+        "password=correct-horse-battery-staple",
+        "Authorization: Bearer abcdefghijklmnop",
+        "operator@example.test",
+        "4111 1111 1111 1111",
+        "iban GB82WEST12345698765432",
+        "123-456-7890",
+        "A" * 40,
+        "-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----",
+    ),
+)
+def test_every_redaction_rule_is_rejected_before_command_persistence(
+    store: CommandStore, unsafe: str
+) -> None:
+    with pytest.raises(SecretMaterialRejected, match="command_secret_pattern_rejected"):
+        store.create(request(executable_template=unsafe, safe_display="[protected command]"))
+
+
 def test_encrypted_execution_material_is_not_plaintext(sqlite: SQLiteStore) -> None:
     store = CommandStore(sqlite)
     store.create(request())

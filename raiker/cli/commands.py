@@ -1740,9 +1740,12 @@ def _terminal_approval_preview(
     tool_name = str(approval.get("tool_name") or "unknown")
     lines = [f"  tool: {tool_name}", f"  risk: {approval.get('risk_level', 'unknown')}"]
     if tool_name == "shell" and isinstance(arguments, dict):
-        argv = arguments.get("command")
-        if isinstance(argv, list) and all(isinstance(item, str) for item in argv):
-            lines.append(f"  argv: {shlex.join(argv)}")
+        source = arguments.get("command")
+        if isinstance(source, str):
+            try:
+                lines.append(f"  argv: {shlex.join(shlex.split(source, posix=True))}")
+            except ValueError:
+                lines.append("  argv: invalid command syntax (execution will fail closed)")
         lines.append(f"  workspace cwd: {Path(workspace_root).resolve()}")
         lines.append(f"  timeout: {arguments.get('timeout', 30)} seconds")
         lines.append(f"  output limit: {arguments.get('max_output_bytes', 100_000)} bytes")

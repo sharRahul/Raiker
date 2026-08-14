@@ -384,7 +384,6 @@
         "api_key_env",
         "extra_headers.Authorization"
       ],
-      "prompt_cache_ttl": "5m",
       "supports_vision": true,
       "pricing": {
         "currency": "USD",

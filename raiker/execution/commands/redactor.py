@@ -29,18 +29,35 @@ _PRIVATE_KEY_BEGIN = "-----BEGIN"
 _PRIVATE_KEY_END = "-----END"
 _PRIVATE_KEY_END_TAIL = "PRIVATE KEY-----"
 _DEFAULT_MAX_PENDING_CHARACTERS = 64 * 1024
+_MULTILINE_PATTERN_TRIGGERS = (
+    "authorization",
+    "api_key",
+    "api-key",
+    "api key",
+    "secret",
+    "token",
+    "password",
+    "passwd",
+    "pwd",
+    "account",
+    "iban",
+    "bic",
+    "swift",
+    "routing",
+)
 
 
 class StreamingRedactor:
     """Redact a byte stream without releasing an undecidable suffix.
 
     The existing text redactor is the one policy contract. This adapter keeps a
-    complete-line boundary because every ordinary pattern is line-local. A
-    private-key start marker keeps the whole structured value pending until its
-    end marker arrives, and exact registered-secret prefixes move the boundary
-    backward when they could cross it. Bytes leave only after no current or
-    future chunk can change their classification; invalid UTF-8 is handled by
-    one incremental decoder across chunks.
+    complete-line boundary, then moves it before any canonical pattern trigger
+    whose whitespace may legally continue on a later line. A private-key start
+    marker keeps the whole structured value pending until its end marker
+    arrives, and exact registered-secret prefixes move the boundary backward
+    when they could cross it. Bytes leave only after no current or future chunk
+    can change their classification; invalid UTF-8 is handled by one
+    incremental decoder across chunks.
     """
 
     def __init__(
@@ -86,6 +103,7 @@ class StreamingRedactor:
         end = self._pending.rfind(_PRIVATE_KEY_END, 0, cut)
         if begin > end:
             cut = begin
+        cut = self._multiline_pattern_boundary(cut)
         cut = self._registered_secret_boundary(cut)
         if cut == 0:
             if len(self._pending) > self._max_pending_characters:
@@ -128,6 +146,24 @@ class StreamingRedactor:
                     cut -= length
                     break
         return cut
+
+    def _multiline_pattern_boundary(self, cut: int) -> int:
+        """Keep every possible cross-line canonical match undecided.
+
+        The canonical credential rules intentionally use ``\\s`` so prose and
+        assignments remain protected when terminals wrap or tools print fields
+        on separate lines. Holding from the earliest trigger is conservative:
+        harmless text containing one of these words may wait until ``finish``,
+        but credential-shaped text can never be emitted before the shared
+        redactor has seen its continuation.
+        """
+        lowered = self._pending[:cut].lower()
+        starts = [
+            position
+            for trigger in _MULTILINE_PATTERN_TRIGGERS
+            if (position := lowered.find(trigger)) != -1
+        ]
+        return min(cut, *starts) if starts else cut
 
     def finish(self) -> bytes:
         if self._finished:

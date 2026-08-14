@@ -373,11 +373,11 @@ available. Egress hosts must be added to `RAIKER_MODEL_EGRESS_ALLOWLIST`.
 | Provider | Profile id | Type | Egress host | Key env | Prompt caching | Status |
 |---|---|---|---|---|---|---|
 | Anthropic | `anthropic-hosted` | hosted | `api.anthropic.com` | `ANTHROPIC_API_KEY` | client `cache_control` breakpoint (5m/1h) | ✅ Verified (Haiku 4.5, 2026-08-08) |
-| OpenAI | `openai-hosted` | hosted | `api.openai.com` | `OPENAI_API_KEY` | `prompt_cache_key` + `stream_options.include_usage` (server-side cache) | 🟡 Ready — cloud egress proxy blocks this host; run on a machine that can reach it |
+| OpenAI | `openai-hosted` | hosted | `api.openai.com` | `OPENAI_API_KEY` | automatic server-side cache + `stream_options.include_usage`; no non-standard cache fields | ✅ Verified (`gpt-4o-mini` governed Build command, 2026-08-14) |
 | Gemini | `gemini-hosted-openai-compatible` | hosted | `generativelanguage.googleapis.com` | `GEMINI_API_KEY` | automatic server-side | 🟡 Ready — egress blocked in this environment |
-| OpenRouter | `openrouter-policy-gated` | hosted | `openrouter.ai` | `OPENROUTER_API_KEY` | automatic server-side | ✅ Verified (live provider catalogue and turn, 2026-08-08) |
+| OpenRouter | `openrouter-policy-gated` | hosted | `openrouter.ai` | `OPENROUTER_API_KEY` | automatic server-side | ✅ Verified (`openai/gpt-oss-20b:free` governed Build command, 2026-08-14) |
 | llama.cpp | `raiker-local-llama-cpp` | local | `127.0.0.1:8080` | — | `cache_prompt: true` (server KV cache) | 🟡 Ready — needs a running llama.cpp server |
-| Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | ✅ Verified (`gemma4:31b-cloud`, 2026-08-08) |
+| Ollama | `ollama-local-openai-compatible` | local | `127.0.0.1:11434` | — | automatic server-side | ✅ Verified (`gemma4:31b-cloud` governed Build command, 2026-08-14) |
 | LM Studio | `lm-studio-local-openai-compatible` | local | `127.0.0.1:1234` | — | automatic server-side | 🟡 Ready — needs LM Studio + a concrete model |
 | Custom OpenAI-compatible | `generic-openai-compatible` | local or home-lab | user-selected | user vault | provider-dependent | 🟡 Ready — configure the endpoint and model in Raiker |
 
@@ -452,14 +452,16 @@ service and browser were stopped after the run.
 | Governed terminal | ✅ A real exact-argv `git --version` command produced durable redacted output and an immutable receipt from the final rebuilt SPA; the earlier `git status --short` output/receipt also survived two app reloads |
 | Authority path | ✅ Direct `POST /api/command-runs` is unavailable; approved `shell`/`process` and standing-grant `run_command` use the shared service and store their authority identity |
 | Selected environment | ✅ Local host access was explicit and labelled reduced isolation; an unavailable selected backend failed closed with no host fallback |
+| Build navigation recovery | ✅ Returning from Approvals refreshes both collapsed and already-open terminals; starting a new Build session replaces a stale selected run id with that session's newest run |
 | Container readiness | 🟡 Docker CLI was present but its daemon named pipe was unreachable, so the digest-pinned command backend remained unavailable and no live container-execution claim is made |
-| Ollama | ✅ Exact catalogue/readiness succeeded for `gemma4:31b-cloud` |
-| Anthropic | ✅ `claude-sonnet-4-6` passed the bounded hosted execution preflight |
-| OpenAI | ✅ The account correctly refused unavailable `gpt-5.6-terra`; `gpt-4o-mini` then passed readiness |
-| OpenRouter | ✅ `liquid/lfm-2.5-2.6b:free` passed readiness |
-| Visual review | ✅ `output/playwright/governed-terminal-rerun-live.png` (expanded authority-bearing receipt) and `output/playwright/provider-readiness-live.png` were inspected for legibility, truthful status, clipping, and secret absence |
+| Ollama | ✅ `gemma4:31b-cloud` proposed and completed `git --version` through Build, approval, local execution, redacted output, and receipt |
+| Anthropic | ✅ `claude-sonnet-4-6` completed the same governed Build command path |
+| OpenAI | ✅ `gpt-4o-mini` completed the same governed Build command path after removing unsupported explicit cache fields; OpenAI caching remains automatic |
+| OpenRouter | ✅ `openai/gpt-oss-20b:free` completed the same governed Build command path |
+| Browser suite | ✅ `governed-shell-provider-matrix-live.spec.ts`: 4/4 provider cases passed serially in 38.5 seconds |
+| Visual review | ✅ `output/playwright/governed-shell-{anthropic,openrouter,openai,ollama}-live.png` were inspected at original resolution for command/provider identity, authority, isolation, output, receipt, clipping, and secret absence |
 
 This run proves the foreground local shell, durability, governance evidence,
-and four-provider readiness surface. It does not prove PTY/background input,
+and the complete four-provider model-to-command path. It does not prove PTY/background input,
 service-restart reattachment, filtered egress, credential quarantine, SSH,
 Daytona, or live Docker execution; those remain BUG-194.

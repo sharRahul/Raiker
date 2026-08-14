@@ -95,15 +95,13 @@ def _req(**kw: Any) -> ModelRequest:
 
 
 class TestOpenAICompatibleHints:
-    def test_openai_gets_cache_options_and_breakpoint(self) -> None:
+    def test_openai_uses_automatic_cache_without_invalid_hints(self) -> None:
         payload = _oai_provider("openai")._payload(_req(cache_ttl="5m"), stream=False)
-        assert payload["prompt_cache_options"] == {"ttl": "5m"}
+        assert "prompt_cache_options" not in payload
         assert "cache_prompt" not in payload
         system_message = payload["messages"][0]
         assert system_message["role"] == "system"
-        assert system_message["content"] == [
-            {"type": "text", "text": "s", "prompt_cache_breakpoint": {"mode": "explicit"}}
-        ]
+        assert system_message["content"] == "s"
 
     def test_llama_cpp_gets_cache_prompt(self) -> None:
         payload = _oai_provider("llama.cpp")._payload(_req(cache_ttl="5m"), stream=False)

@@ -293,7 +293,7 @@ def test_relay_dispatches_tier2_shell(tmp_path: Path) -> None:
         # explicitly allowed executable on every supported test platform.
         # RAIKER-2023: `python -c` is an interpreter escape and is refused by
         # the command policy, so this relay scenario uses a command that is not.
-        arguments={"command": ["echo", "relayed"]},
+        arguments={"command": "echo relayed"},
     )
 
     relay = ApprovalExecutionRelay(ws, store)

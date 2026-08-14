@@ -10,7 +10,10 @@
   import { humanize } from "../format";
   import Icon from "./Icon.svelte";
 
-  let { sessionId = null }: { sessionId?: string | null } = $props();
+  let {
+    sessionId = null,
+    visible = true,
+  }: { sessionId?: string | null; visible?: boolean } = $props();
   let open = $state(false);
   let environment = $state<ExecutionEnvironment | null>(null);
   let runs = $state<CommandRunView[]>([]);
@@ -20,6 +23,7 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let timer: ReturnType<typeof setInterval> | null = null;
+  let refreshRequest = 0;
 
   const selected = $derived(runs.find((run) => run.run_id === selectedId) ?? null);
   const terminal = $derived(
@@ -39,16 +43,29 @@
     } catch { environment = null; }
   }
 
-  async function refresh() {
+  async function refresh(targetSessionId: string | null = sessionId) {
+    const request = ++refreshRequest;
     try {
-      const view = await api.commandRuns(sessionId ?? "build_workspace");
+      const view = await api.commandRuns(targetSessionId ?? "build_workspace");
+      if (request !== refreshRequest) return;
       runs = view.runs;
-      if (selectedId === null && runs.length > 0) selectedId = runs[0].run_id;
-      if (selectedId !== null) {
-        const outputView = await api.commandOutput(selectedId, 0);
+      const nextSelectedId =
+        selectedId !== null && runs.some((run) => run.run_id === selectedId)
+          ? selectedId
+          : (runs[0]?.run_id ?? null);
+      selectedId = nextSelectedId;
+      chunks = [];
+      receipt = null;
+      if (nextSelectedId !== null) {
+        const outputView = await api.commandOutput(nextSelectedId, 0);
+        if (request !== refreshRequest) return;
         chunks = outputView.chunks;
-        const current = runs.find((run) => run.run_id === selectedId);
-        if (current?.receipt_digest) receipt = (await api.commandReceipt(selectedId)).receipt;
+        const current = runs.find((run) => run.run_id === nextSelectedId);
+        if (current?.receipt_digest) {
+          const receiptView = await api.commandReceipt(nextSelectedId);
+          if (request !== refreshRequest) return;
+          receipt = receiptView.receipt;
+        }
       }
       error = null;
     } catch (exc) { error = reason(exc); }
@@ -62,21 +79,35 @@
     finally { busy = false; }
   }
 
+  function toggle(): void {
+    open = !open;
+    if (open) {
+      // Build remains mounted while the owner reviews an approval. Re-read on
+      // open so a command executed on that other page appears immediately.
+      void loadEnvironment();
+      void refresh();
+    }
+  }
+
   function statusLabel(run: CommandRunView | null): string {
     if (run === null) return "Idle";
     return humanize(run.state);
   }
 
-  onMount(() => {
+  $effect(() => {
+    if (!visible) return;
     void loadEnvironment();
-    void refresh();
+    void refresh(sessionId);
+  });
+
+  onMount(() => {
     timer = setInterval(() => { if (open && selected && !terminal) void refresh(); }, 800);
     return () => { if (timer !== null) clearInterval(timer); };
   });
 </script>
 
 <section class="command-pane" class:expanded={open} aria-labelledby="command-pane-title">
-  <button class="pane-toggle" type="button" onclick={() => (open = !open)} aria-expanded={open}>
+  <button class="pane-toggle" type="button" onclick={toggle} aria-expanded={open}>
     <span class="terminal-mark" aria-hidden="true">&gt;_</span>
     <span class="pane-heading">
       <strong id="command-pane-title">Governed terminal</strong>

@@ -1309,7 +1309,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 COMMAND_AUTHORITY_EVIDENCE_SQL,
                 connection,
             )
-            self._rebuild_memory_fts(connection)
+            self._backfill_memory_fts(connection)
             self._backfill_conversation_fts(connection)
             for _alter_sql in (
                 "ALTER TABLE api_sessions ADD COLUMN scope TEXT NOT NULL DEFAULT 'control'",
@@ -6028,6 +6028,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
               AND superseded_at IS NULL""",
             (memory_id, utc_now(), utc_now(), utc_now()),
         )
+
+    @staticmethod
+    def _backfill_memory_fts(connection: sqlite3.Connection) -> None:
+        """Populate an empty memory index without rewriting it on every open.
+
+        Normal memory mutations keep the FTS projection synchronized. Bootstrap
+        only needs to cover a pre-index workspace; avoiding an unconditional
+        DELETE/INSERT also keeps read-model construction from competing with an
+        in-flight command receipt for SQLite's single writer slot.
+        """
+        try:
+            if connection.execute("SELECT 1 FROM approved_memory_fts LIMIT 1").fetchone():
+                return
+        except sqlite3.OperationalError as exc:
+            if "locked" in str(exc).lower():
+                raise
+            SQLiteStore._rebuild_memory_fts(connection)
+            return
+        source = connection.execute(
+            """SELECT 1 FROM approved_memory
+               WHERE deleted_at IS NULL AND archived_at IS NULL
+                 AND search_enabled = 1 AND (expires_at IS NULL OR expires_at > ?)
+                 AND (valid_from IS NULL OR valid_from <= ?)
+                 AND (valid_until IS NULL OR valid_until > ?)
+                 AND superseded_at IS NULL LIMIT 1""",
+            (utc_now(), utc_now(), utc_now()),
+        ).fetchone()
+        if source is not None:
+            SQLiteStore._rebuild_memory_fts(connection)
 
     @staticmethod
     def _rebuild_memory_fts(connection: sqlite3.Connection) -> None:

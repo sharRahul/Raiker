@@ -425,26 +425,6 @@ class AsyncOpenAICompatibleProvider:
         serialized["content"] = parts
         return serialized
 
-    @staticmethod
-    def _apply_openai_cache_breakpoint(messages: list[dict[str, Any]]) -> None:
-        for message in reversed(messages):
-            if message.get("role") not in {"system", "developer"}:
-                continue
-            content = message.get("content")
-            if isinstance(content, str) and content:
-                message["content"] = [
-                    {
-                        "type": "text",
-                        "text": content,
-                        "prompt_cache_breakpoint": {"mode": "explicit"},
-                    }
-                ]
-            elif isinstance(content, list) and content:
-                last = content[-1]
-                if isinstance(last, dict):
-                    last["prompt_cache_breakpoint"] = {"mode": "explicit"}
-            return
-
     def _payload(self, request: ModelRequest, *, stream: bool) -> dict[str, Any]:
         messages = [self._message_dict(message) for message in request.messages]
         payload: dict[str, Any] = {
@@ -470,12 +450,13 @@ class AsyncOpenAICompatibleProvider:
                     "schema": request.response_schema,
                 },
             }
-        if request.cache_ttl:
-            if self.provider == "openai":
-                self._apply_openai_cache_breakpoint(messages)
-                payload["prompt_cache_options"] = {"ttl": request.cache_ttl}
-            elif self.provider == "llama.cpp":
-                payload["cache_prompt"] = True
+        if request.cache_ttl and self.provider == "llama.cpp":
+            # OpenAI prompt caching is automatic. Its Chat Completions API does
+            # not accept Anthropic-style message breakpoints or the obsolete
+            # `prompt_cache_options` envelope; sending either makes an otherwise
+            # valid tool call fail with HTTP 400. llama.cpp's explicit switch is
+            # the only OpenAI-compatible hint used here.
+            payload["cache_prompt"] = True
         if stream and self.provider in {"openai", "ollama"}:
             payload["stream_options"] = {"include_usage": True}
         reasoning = request.reasoning

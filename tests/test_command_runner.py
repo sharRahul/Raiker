@@ -108,6 +108,28 @@ def test_redactor_matches_whole_text_at_every_byte_boundary(payload: bytes, expe
         assert emitted == expected
 
 
+@pytest.mark.parametrize(
+    "payload",
+    (
+        b"password=\nsecretvalue12345",
+        b"the token\nis abcdefghijklmnop",
+        b"iban\nGB82WEST12345698765432",
+    ),
+)
+def test_redactor_matches_whole_text_for_multiline_credentials_at_every_split(
+    payload: bytes,
+) -> None:
+    from raiker.context.redaction import redact_text
+
+    expected = redact_text(payload.decode())[0].encode()
+    for split in range(len(payload) + 1):
+        redactor = StreamingRedactor()
+        emitted = redactor.feed(payload[:split])
+        emitted += redactor.feed(payload[split:])
+        emitted += redactor.finish()
+        assert emitted == expected
+
+
 class FakeProcess:
     def __init__(
         self,

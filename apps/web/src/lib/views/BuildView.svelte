@@ -1042,7 +1042,7 @@
       {/if}
     </div>
 
-    <CommandOutputPane {sessionId} />
+    <CommandOutputPane {sessionId} {visible} />
 
     <form
       class="composer"

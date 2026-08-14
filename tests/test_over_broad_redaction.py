@@ -180,6 +180,18 @@ class TestServerIssuedLocatorsSurvive:
         body = {"attachment_urls": [self.PDF_URL, self.EVENTS_PATH]}
         assert redact_response_body(body) == body
 
+    def test_a_windows_locator_with_long_joined_segments_survives(self) -> None:
+        path = (
+            "C:\\Users\\owner\\AppData\\Local\\Temp"
+            "\\raiker-pytest-terminal-prod-shape-20260814b\\workspace"
+        )
+        assert redact_response_body({"workspace_path": path}) == {"workspace_path": path}
+
+    def test_a_token_segment_in_a_windows_locator_is_still_redacted(self) -> None:
+        path = "C:\\work\\AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK\\receipt.json"
+        redacted = redact_response_body({"receipt_path": path})["receipt_path"]
+        assert "AAAABBBB" not in redacted
+
     def test_a_nested_locator_survives(self) -> None:
         body = {"response": {"events_path": self.EVENTS_PATH}}
         assert redact_response_body(body) == body

@@ -130,7 +130,7 @@ def test_model_request_contract_rejects_invalid_generation_settings() -> None:
         ReasoningOptions(enabled=False, effort="high")
 
 
-def test_openai_payload_supports_json_schema_and_current_cache_fields() -> None:
+def test_openai_payload_supports_json_schema_without_invalid_cache_fields() -> None:
     provider = openai_provider(lambda _: httpx.Response(200, json={}))
     model_request = ModelRequest(
         "profile",
@@ -148,10 +148,9 @@ def test_openai_payload_supports_json_schema_and_current_cache_fields() -> None:
     )
     payload = provider._payload(model_request, stream=True)
     assert "prompt_cache_key" not in payload
-    assert payload["prompt_cache_options"] == {"ttl": "5m"}
-    assert payload["messages"][0]["content"][0]["prompt_cache_breakpoint"] == {
-        "mode": "explicit"
-    }
+    assert "prompt_cache_options" not in payload
+    assert "prompt_cache_breakpoint" not in json.dumps(payload["messages"])
+    assert payload["messages"][0]["content"] == "stable"
     assert payload["response_format"]["json_schema"]["name"] == "answer"
     assert payload["stream_options"] == {"include_usage": True}
     run(provider.aclose())

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -8,24 +9,29 @@ import pytest
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.commands import handle_slash_command
 from raiker.cli.principal_resolver import bootstrap_owner
-from raiker.contracts.models import ToolAction
 from raiker.control.dashboard import DashboardService
 from raiker.execution.commands.store import CommandStore
+from raiker.models.contracts import ToolCallProposal
+from raiker.models.tool_call_validation import validate_tool_call
 from raiker.storage.sqlite import SQLiteStore
 
 
 def _pending_shell(workspace: Path, approval_id: str = "appr_terminal") -> None:
     store = SQLiteStore(workspace)
-    store.create_session("sess_terminal", str(workspace))
-    action = ToolAction(
-        action_id="act_terminal",
-        tool_name="shell",
-        # RAIKER-2023: `python -c` is an interpreter escape and is refused, so
-        # the terminal relay is exercised with a command that is not one.
-        arguments={"command": ["echo", "terminal relay"]},
-        risk_level="high",
-        requires_approval=True,
+    store.create_session(
+        "sess_terminal",
+        str(workspace),
+        user_id=store.principal_user_id("principal_owner"),
     )
+    action = replace(validate_tool_call(
+        ToolCallProposal(
+            call_id="call_terminal",
+            tool_name="shell",
+            # RAIKER-2023: `python -c` is an interpreter escape and is refused,
+            # so the terminal relay is exercised with a command that is not one.
+            arguments={"command": "echo 'terminal relay'"},
+        )
+    ), action_id="act_terminal")
     store.insert_tool_action(
         action,
         session_id="sess_terminal",
@@ -125,7 +131,7 @@ def test_terminal_execution_redacts_secret_like_output_before_history(
     workspace, token = _workspace(tmp_path)
     store = SQLiteStore(workspace)
     arguments_json = json.dumps(
-        {"command": ["echo", "sk-ant-api03-AAAABBBBCCCCDDDDEEEE"]},
+        {"command": "echo sk-ant-api03-AAAABBBBCCCCDDDDEEEE"},
         sort_keys=True,
     )
     with store.connect() as connection:

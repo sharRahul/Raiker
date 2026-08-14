@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 
 import raiker.storage.sqlite as sqlite_module
+from raiker.storage.migrations import COMMAND_RUNS_MIGRATION_ID
 from raiker.storage.sqlite import (
     SQLiteStore,
     cached_connection_count,
@@ -54,6 +55,43 @@ def test_worker_reuses_one_keyed_connection_for_a_workspace(
     assert second.table_names()
 
     assert opened == 1
+
+
+def test_repeated_store_facades_do_not_repeat_writing_bootstrap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    invalidate_workspace_connections(tmp_path)
+    rebuilds = 0
+    real_rebuild = SQLiteStore._rebuild_memory_fts
+
+    def counted_rebuild(connection: Any) -> None:
+        nonlocal rebuilds
+        rebuilds += 1
+        real_rebuild(connection)
+
+    monkeypatch.setattr(SQLiteStore, "_rebuild_memory_fts", staticmethod(counted_rebuild))
+
+    SQLiteStore(tmp_path)
+    SQLiteStore(tmp_path)
+    SQLiteStore(tmp_path)
+
+    assert rebuilds == 0
+
+
+def test_repeated_store_facade_rechecks_deleted_migration_marker(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    with store.connect() as connection:
+        connection.execute(
+            "DELETE FROM migrations WHERE migration_id = ?", (COMMAND_RUNS_MIGRATION_ID,)
+        )
+
+    SQLiteStore(tmp_path)
+
+    with store.connect() as connection:
+        marker = connection.execute(
+            "SELECT 1 FROM migrations WHERE migration_id = ?", (COMMAND_RUNS_MIGRATION_ID,)
+        ).fetchone()
+    assert marker is not None
 
 
 def test_workspace_invalidation_closes_and_rekeys_on_next_read(

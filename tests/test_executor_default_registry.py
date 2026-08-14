@@ -128,7 +128,7 @@ def test_shell_executor_uses_durable_command_lifecycle(tmp_path: Path) -> None:
         principal_id="principal_owner",
         action_type="shell",
         tool_or_service_name="shell",
-        arguments={"command": ["git", "--version"]},
+        arguments={"command": "git --version"},
         session_id="sess_build",
         turn_id="turn_build",
         authority_kind="approval",

@@ -85,7 +85,10 @@ terminal outcome has an immutable authority-bound receipt. The feature matrix
 still correctly reports no native OS sandbox, PTY/input, background lifecycle,
 filtered egress, credential delivery/quarantine, restart reattachment, SSH, or
 Daytona command supervisor. Docker was installed but its daemon was unreachable
-on the live-test host, so the new container-shell path was not live-proven.
+on the live-test host, so the new container-shell path was not live-proven. The
+model-to-command route itself is live-proven: Anthropic, OpenRouter, OpenAI, and
+Ollama each completed Build → approval → exact-argv execution → redacted output
+→ immutable receipt in the 2026-08-14 Chromium matrix.
 
 **Reproduce.** Select `local_native` and inspect Runtime/Build: it is host access
 with reduced isolation, not an AppContainer/restricted-token boundary. Request

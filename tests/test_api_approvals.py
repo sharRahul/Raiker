@@ -232,7 +232,7 @@ class TestApprovalsResolve:
                 # refused by the command policy, so this scenario — approval
                 # reaches a real executor and its evidence is bounded — is
                 # exercised with a command that is not one.
-                "command": ["echo", "web relay"],
+                "command": "echo 'web relay'",
                 "max_output_bytes": 64,
             },
         )

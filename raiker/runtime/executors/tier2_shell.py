@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shlex
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -24,7 +25,21 @@ class ShellExecutor:
         self._commands = command_service or CommandService.for_workspace(self._workspace_root)
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
-        command: list[str] = list(action.arguments.get("command", []))
+        source = action.arguments.get("command")
+        if not isinstance(source, str) or not source.strip():
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="missing_argument:command",
+                summary="Shell execution denied: no command provided.",
+            )
+        try:
+            command = shlex.split(source, posix=True)
+        except ValueError:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code="invalid_argument:command",
+                summary="Shell execution denied: the approved command could not be parsed.",
+            )
         if not command:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
@@ -48,7 +63,7 @@ class ShellExecutor:
                 action_id=action.action_id,
                 authority_kind=action.authority_kind,
                 authority_id=action.authority_id,
-                command=" ".join(command),
+                command=source,
                 argv=command,
                 timeout_seconds=timeout,
                 max_output_bytes=max_output,

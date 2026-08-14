@@ -43,7 +43,17 @@ def _is_segmented_path(token: str) -> bool:
     a base64 secret containing a slash could otherwise split into two
     under-threshold halves and slip through.
     """
-    return "/" in token and all(len(part) < 40 for part in token.split("/"))
+    normalized = token.replace("\\", "/")
+    parts = normalized.split("/")
+    if len(parts) < 2:
+        return False
+
+    # Test runners and application-owned directories often use descriptive
+    # slug segments longer than the generic entropy threshold. Keep those when
+    # they contain several explicit word boundaries; an opaque credential still
+    # has one uninterrupted high-entropy segment and fails closed.
+    structured_slug = re.compile(r"[a-z][a-z0-9]*(?:[-_.][a-z0-9]+){2,}")
+    return all(len(part) < 40 or structured_slug.fullmatch(part) for part in parts)
 
 
 def _redact_high_entropy(match: re.Match[str]) -> str:
@@ -154,7 +164,8 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
 # a ``token=…`` query parameter or a ``Bearer …`` string inside a URL is matched
 # before the fallback is ever reached.
 _LOCATOR_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
-    _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_locator),)
+    _PATTERNS[:-1]
+    + ((re.compile(r"\b[A-Za-z0-9+/_\\\-]{40,}\b"), _redact_high_entropy_in_locator),)
 )
 
 # The same rules with an id-aware fallback, used only for values whose *key*

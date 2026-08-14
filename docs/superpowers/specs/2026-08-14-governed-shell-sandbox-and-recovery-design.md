@@ -197,6 +197,13 @@ class CommandHandle(Protocol):
     def reattach(self, run_identity: str) -> None: ...
 ```
 
+`CommandFeatures` includes separate `credential_delivery` and
+`credential_delta_quarantine` proofs. This release advertises both only for the
+container backend. Local strict, native, SSH, and Daytona reject
+`credential_bindings` with `selected_environment_credential_unsupported` until
+they provide equivalent private snapshots, durable scanning, and resolution
+receipts. A backend may not advertise delivery without quarantine.
+
 `CommandService` validates the request, resolves exactly one selected backend,
 creates the durable run before starting a process, streams redacted chunks into
 the sink, enforces leases and budgets, finalises the receipt, and exposes
@@ -420,6 +427,20 @@ worker write the value into workspace, cache, filename, xattr/ADS, symlink, and
 binary content and prove quarantine prevents any later worker from starting or
 reading it.
 
+Before delivery, the broker creates a cleanup-only scan bundle: exact credential
+matchers, rule-manifest version, and owner/run/environment binding encrypted
+under a distinct vault envelope purpose. Execution revocation or grant expiry
+immediately prevents further use by the command but does not revoke the
+quarantine scanner's mandatory cleanup authority. The bundle is never exposed
+to a backend, API, receipt, or UI and is retained only while the delta is
+unresolved. Vault-key rotation rewraps it transactionally. A locked/corrupt
+vault keeps the environment blocked and shows **Unlock vault to verify
+credentialed changes**. Each bundle has a unique data-encryption key wrapped by
+the vault; merge/discard crypto-erases it by destroying the wrapped key, deletes
+the ciphertext/snapshots, and verifies the private resource is gone. It
+records the erasure result, and only then releases the environment. Terminal
+material retention skips unresolved cleanup bundles.
+
 The container has:
 
 - no network unless a filtered network grant is active;
@@ -464,10 +485,12 @@ backend must prove start, poll, wait, bounded logs, and process-tree kill.
 the remote supervisor proves them during readiness; without that supervisor the
 backend is foreground-only and recovery is unavailable.
 
-SSH binds host, user, host key, canonical cwd, command digest, and credential
-reference. Daytona binds sandbox id, provider snapshot, budget reservation, and
-actual-cost reconciliation. Neither backend leaks its credential into a
-receipt, log, model result, or process argument.
+SSH binds host, user, host key, canonical cwd, command digest, and its transport
+credential reference, which remains outside the remote child. Daytona binds
+sandbox id, provider snapshot, budget reservation, and actual-cost
+reconciliation. Neither backend leaks its transport credential into a receipt,
+log, model result, or process argument; both reject command
+`credential_bindings` in this release.
 
 ### Background processes and PTY
 
@@ -551,8 +574,10 @@ Migration `RAIKER-2030-command-runs` adds owner-scoped tables:
   backend, profile, canonical template digest, safe display, cwd,
   approval/grant ids, isolation posture, encrypted supervisor-handle reference,
   lease, exit code, termination reason, byte counts, truncation, redaction count,
-  and receipt digest; executable templates and credential bindings are stored
-  separately as vault-encrypted material and erased on terminal retention;
+  and receipt digest; executable templates and execution-time credential
+  bindings are stored separately as vault-encrypted material and erased on
+  terminal retention, while the distinct cleanup-only scan bundle follows the
+  unresolved-delta lifetime below;
 - `command_output_chunks`: monotonically numbered, redacted stdout/stderr
   chunks with byte offsets and timestamps, bounded per run;
 - `command_network_grants`: domain/port scope, run/session binding, decision,
@@ -560,7 +585,15 @@ Migration `RAIKER-2030-command-runs` adds owner-scoped tables:
 - `command_network_attempts`: immutable connection-attempt rows with run/grant,
   requested DNS host/port, resolved-address digest, decision/outcome, open and
   close timestamps, and byte counts, never payloads; and
-- `command_receipts`: canonical JSON evidence plus digest and checkpoint ids.
+- `command_receipts`: canonical JSON evidence plus digest and checkpoint ids;
+- `command_credential_deltas`: owner/run/environment, compare-and-swap state,
+  encrypted private-snapshot handle and cleanup-only scan bundle, bounded safe
+  manifest, delta/scan digests, rule version, decision/selected-path ids,
+  checkpoint/apply idempotency key, and cleanup/erasure status; and
+- `command_delta_receipts`: immutable resolution evidence linked to run,
+  original command-receipt/delta digests, owner decision, selected paths,
+  second-scan version/result, checkpoint/apply and merge/discard outcome,
+  cleanup/erasure result, timestamp, and its own digest.
 
 Raw unredacted output and terminal input are never stored. Sensitive handles
 and executable material use the existing vault envelope mechanism and are never
@@ -569,6 +602,18 @@ per-run and per-owner quotas, bounded retention, and oldest-first deletion only
 after receipt finalization. Migrations are transactional, idempotent, and
 rollback-tested. Receipt insertions are immutable. Owner id is part of every
 primary lookup; a session id alone never grants access.
+
+Delta states are `scanning -> {clean, quarantined} -> resolving -> {merged,
+discarded, cleanup_failed}`. The unresolved environment lock is durable and is
+reconstructed before admitting commands at startup. Merge/discard acquires a
+CAS transition and owner decision. Merge rescans with the cleanup bundle,
+creates a checkpoint, applies selected canonical paths with an idempotency key,
+then atomically writes the immutable delta receipt and terminal delta state.
+Crash recovery completes a proven idempotent apply or restores the checkpoint
+before recording containment; it never guesses. Discard removes private state
+and bundle before atomically recording its resolution receipt; cleanup failure
+remains blocked and retryable. Concurrent resolution, cross-owner access,
+orphan cleanup, retention, and erasure are owner/run bounded.
 
 Run states are:
 
@@ -622,6 +667,7 @@ accepted model/API field. The read/control API exposes:
 - `POST /api/command-runs/{run_id}/input`;
 - `POST /api/command-runs/{run_id}/stop`;
 - `POST /api/command-runs/{run_id}/lease`; and
+- `GET /api/command-runs/{run_id}/delta` and `/delta/receipt`;
 - `POST /api/command-runs/{run_id}/delta/merge` for owner-selected clean paths;
 - `POST /api/command-runs/{run_id}/delta/discard`; and
 - `POST /api/execution-environments/{profile_id}/reset`.
@@ -645,6 +691,12 @@ Every terminal run finishes with a receipt containing:
 - tests or diagnostics recognised from the command and their exit status;
 - checkpoint ids that predated governed mutations; and
 - a digest over the canonical receipt.
+
+For a credentialed command, this immutable receipt records the delta digest and
+`pending_resolution` without claiming the effective workspace outcome. The
+later immutable delta-resolution receipt is linked from Build, Approvals,
+Observability, transcript export, and command-receipt export so merge/discard is
+reconstructable without mutating command history.
 
 The receipt is linked from the transcript, Approvals, Observability, and the
 Build output pane. It can be exported without output content, or with the
@@ -720,7 +772,9 @@ Settings -> Runtime distinguishes:
 - native/container/SSH/Daytona readiness from a real probe;
 - persistence and resource ceilings;
 - workspace read/write and protected-path posture;
-- PTY, background, input, filtered-network, and recovery support; and
+- PTY, background, input, filtered-network, and recovery support;
+- credential delivery and credential-delta quarantine as separate proven
+  capabilities; and
 - the exact remediation for an unavailable capability.
 
 Approvals show the redacted safe command display, cwd, backend, isolation posture, requested

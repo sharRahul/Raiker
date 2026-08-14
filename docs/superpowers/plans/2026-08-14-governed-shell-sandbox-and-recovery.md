@@ -522,6 +522,8 @@ class CommandFeatures:
     persistent: bool
     recoverable: bool
     concurrent_runs: bool
+    credential_delivery: bool
+    credential_delta_quarantine: bool
 
 
 def resolve_command_environment(store: SQLiteStore, owner_principal_id: str, tool_name: str) -> CommandResolution:
@@ -567,7 +569,8 @@ class LocalStrictBackend:
     features = CommandFeatures(
         shell=True, background=False, pty=False, input=False,
         filtered_network=False, persistent=False, recoverable=False,
-        concurrent_runs=False,
+        concurrent_runs=False, credential_delivery=False,
+        credential_delta_quarantine=False,
     )
 
     def start(self, request: CommandRequest) -> CommandHandle:
@@ -585,6 +588,15 @@ private-process/control/log/PTY/network boundaries, or sets
 `concurrent_runs=false`; a second start while a run is alive then fails with
 `environment_busy`. Add two-hostile-run tests for each backend that advertises
 concurrency, and busy/refusal tests for every serialized backend.
+
+This release sets `credential_delivery=true` and
+`credential_delta_quarantine=true` only for the container profile after its
+Task 4 readiness proof. Local strict, native, SSH, and Daytona reject credential
+bindings with `selected_environment_credential_unsupported`; delivery may never
+be true while quarantine is false. Add feature-honesty and refusal tests for all
+five backend kinds. Runtime and Approval projections show **Credential delivery
+with local quarantine**, **Credential delivery without quarantine — refused**,
+or **Credential delivery unsupported** from these proven flags.
 
 Linux uses `bwrap`; macOS uses a generated Seatbelt profile. Windows builds a
 Rust helper whose versioned named pipe rejects remote clients, is ACL-limited to
@@ -660,6 +672,9 @@ git commit -m "feat: enforce selected command environment"
 - Create: `raiker/execution/commands/backends/container.py`
 - Create: `raiker/execution/commands/cache_snapshots.py`
 - Create: `raiker/execution/commands/credential_delta.py`
+- Modify: `raiker/storage/migrations.py`
+- Modify: `raiker/storage/sqlite.py`
+- Modify: `raiker/execution/commands/store.py`
 - Create: `containers/command-sandbox/Containerfile`
 - Modify: `raiker/runtime/executors/containers.py`
 - Modify: `raiker/execution/container_tools.py`
@@ -670,8 +685,8 @@ git commit -m "feat: enforce selected command environment"
 - Modify: `tests/test_container_tool_bridge.py`
 
 **Interfaces:**
-- Consumes: `CommandBackend`, `CommandRequest`, `SupervisorClient`, pinned supervisor image digest, validated container profile.
-- Produces: `PersistentContainerBackend`, persistent session cache/workspace state, isolated per-run worker names/identities/networks, authenticated supervisor start/attach/reset/recreate/recover operations, and actual container-shell support.
+- Consumes: `CommandBackend`, `CommandRequest`, `SupervisorClient`, vault envelope/rotation APIs, pinned supervisor image digest, validated container profile.
+- Produces: `PersistentContainerBackend`, persistent session cache/workspace state, isolated per-run worker names/identities/networks, durable credential-delta state/scan bundle/resolution receipt, authenticated supervisor start/attach/reset/recreate/recover operations, and actual container-shell support.
 
 - [ ] **Step 1: Write failing container creation and reuse tests**
 
@@ -780,6 +795,61 @@ and later-worker denial tests. Credential-free workers may overlap with separate
 kernel/control/network/cache identities; the host workspace remains explicit
 shared mutable session state.
 
+Add migration `RAIKER-2031-command-credential-deltas` and its owner-scoped
+`CommandStore` facade:
+
+```sql
+CREATE TABLE command_credential_deltas (
+  run_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  environment_profile_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  encrypted_snapshot_handle BLOB NOT NULL,
+  encrypted_cleanup_scan_bundle BLOB NOT NULL,
+  safe_manifest_json TEXT NOT NULL,
+  delta_digest TEXT NOT NULL,
+  scan_digest TEXT NOT NULL,
+  scan_rule_version TEXT NOT NULL,
+  selected_paths_json TEXT,
+  decision_id TEXT,
+  checkpoint_id TEXT,
+  apply_idempotency_key TEXT,
+  cleanup_status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT
+);
+CREATE TABLE command_delta_receipts (
+  resolution_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  command_receipt_digest TEXT NOT NULL,
+  delta_digest TEXT NOT NULL,
+  receipt_json TEXT NOT NULL,
+  digest TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+```
+
+States compare-and-swap `scanning -> clean|quarantined -> resolving ->
+merged|discarded|cleanup_failed`. Persist no matched secret bytes. The
+environment-admission query blocks on every unresolved state and is restored
+before startup recovery accepts commands. A resolution saga binds owner
+decision, second-scan version/result, selected paths, checkpoint, idempotent
+apply, cleanup, and secure-erasure outcome into an immutable delta receipt;
+merge/discard cannot finish without it. Recovery completes a proven apply or
+restores its checkpoint.
+
+The cleanup-only exact matcher bundle uses a distinct vault purpose and remains
+available to the scanner after execution grant expiry/revocation and service
+restart, but never to a command/API/UI. Vault rotation rewraps it. Locked/corrupt
+vault keeps admission blocked. Merge/discard securely erase bundle/private
+snapshots before releasing the environment: every bundle uses a unique DEK,
+crypto-erasure destroys its vault-wrapped key, then ciphertext/private resources
+are deleted and absence verified. Retention skips unresolved rows.
+Add cross-owner, restart blocking, expired/revoked grant, locked-vault,
+key-rotation, concurrent merge/discard, idempotent apply/recovery, orphan
+cleanup, retention, immutable receipt, and secure-erasure tests.
+
 - [ ] **Step 4: Write failing reset, recovery, daemon-probe, and no-host-fallback tests**
 
 ```python
@@ -834,7 +904,7 @@ Run: `.venv\Scripts\python.exe -m pytest tests/test_persistent_command_container
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends/container.py raiker/execution/commands/cache_snapshots.py raiker/execution/commands/credential_delta.py containers/command-sandbox/Containerfile raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_command_cache_snapshots.py tests/test_credential_command_delta.py tests/test_container_tool_bridge.py
+git add -- raiker/storage/migrations.py raiker/storage/sqlite.py raiker/execution/commands/store.py raiker/execution/commands/backends/container.py raiker/execution/commands/cache_snapshots.py raiker/execution/commands/credential_delta.py containers/command-sandbox/Containerfile raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_command_cache_snapshots.py tests/test_credential_command_delta.py tests/test_container_tool_bridge.py
 git commit -m "feat: add persistent command sandbox"
 ```
 
@@ -1138,11 +1208,22 @@ supervisor instance/request/PID-start identity, labels, and workspace bounds
 match. Unknown outcomes become `lost` only in the same transaction that writes
 their immutable recovery receipt; otherwise they remain `finalizing`.
 
+Before admitting a new command, lifespan recovery loads unresolved credential
+deltas, restores environment locks, and verifies encrypted snapshot/scan-bundle
+identities. It never requires the expired execution grant. A locked/corrupt
+vault or orphaned private state remains blocked with a recovery action. Delta
+recovery uses Task 4's idempotent merge/discard/checkpoint saga and immutable
+resolution receipt.
+
 Add an integration fixture that starts a real loopback Raiker process and live
 container background command, kills/restarts Raiker, then proves identical run
 id, ordered log catch-up, PTY input when enabled, lease expiry, and kill. Corrupt
 identity and prove `lost`. Also assert both approval and standing-grant paths
 resolve the same injected service object and durable lifecycle.
+Add service-restart tests with clean and quarantined deltas, expired/revoked
+execution grants, locked vault, key rotation, orphan cleanup, and a later start
+that remains refused until a valid rescan plus merge/discard securely erases the
+bundle.
 
 - [ ] **Step 6: Run focused tests and commit**
 
@@ -1188,6 +1269,13 @@ def test_remote_without_verified_supervisor_is_foreground_only(tmp_path: Path) -
     assert backend.features.pty is False
     assert backend.features.recoverable is False
     assert backend.start(background_request()).reason_code == "remote_supervisor_required"
+
+
+@pytest.mark.parametrize("backend_factory", [ssh_backend, daytona_backend])
+def test_remote_backend_rejects_credential_without_delta_quarantine(backend_factory) -> None:
+    backend = backend_factory(features={"credential_delta_quarantine": False})
+    assert backend.features.credential_delivery is False
+    assert backend.start(credential_request()).reason_code == "selected_environment_credential_unsupported"
 
 
 def test_daytona_cost_reservation_survives_background_run(store: CommandStore) -> None:
@@ -1306,7 +1394,10 @@ ToolSpec(
 `profile_id` is deliberately absent: resolution reads the owner-selected
 environment after approval and refuses if it changed. Add an optional typed
 `credential_bindings` collection containing only vault reference, purpose, and
-delivery target. `CommandCredentialBroker` scans literal command/argv with both
+delivery target. Resolution accepts it only when both container
+`credential_delivery` and `credential_delta_quarantine` readiness proofs are
+true; all other backends return the stable unsupported reason.
+`CommandCredentialBroker` scans literal command/argv with both
 registered values and bounded secret patterns before any durable proposal;
 secret-bearing literals are rejected. At supervisor launch it resolves a
 purpose-bound grant and delivers memory-only material via stdin, inherited
@@ -1398,6 +1489,15 @@ def test_quarantined_delta_cannot_merge_and_discard_requires_owner_decision(clie
     response = client.post("/api/command-runs/cmd_a/delta/discard", headers=owner_headers, json={})
     assert response.status_code == 409
     assert response.json()["detail"]["reason_code"] == "owner_decision_required"
+
+
+def test_delta_and_resolution_receipt_are_owner_scoped_and_secret_free(client, seeded_delta) -> None:
+    owner = auth_headers(client, "owner_a")
+    other = auth_headers(client, "owner_b")
+    assert client.get("/api/command-runs/cmd_a/delta", headers=other).status_code == 404
+    payload = client.get("/api/command-runs/cmd_a/delta/receipt", headers=owner).json()
+    assert payload["delta_digest"] == seeded_delta.digest
+    assert "credential-value-123456789" not in json.dumps(payload)
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -1527,6 +1627,8 @@ export interface CommandRunView {
   started_at: string | null; completed_at: string | null; lease_expires_at: string | null;
   exit_code: number | null; stdout_bytes: number; stderr_bytes: number;
   truncated: boolean; redaction_count: number; receipt_digest: string | null;
+  credential_delta_state: "scanning" | "clean" | "quarantined" | "resolving" | "merged" | "discarded" | "cleanup_failed" | null;
+  delta_receipt_digest: string | null;
 }
 export interface CommandOutputChunk { run_id: string; sequence: number; stream: "stdout" | "stderr"; text: string; byte_count: number; emitted_at: string; }
 ```
@@ -1540,7 +1642,8 @@ below 768 px. Render all output/safe display with Svelte text interpolation,
 never `{@html}` or an HTML sink. `failureCoordinate(text)` recognises bounded
 `path:line[:column]` forms and calls the existing source inspector only after
 canonical workspace containment.
-Credentialed completion shows the TCB warning and delta state. A clean delta
+Credentialed completion shows the TCB warning, delta state, immutable command
+receipt, and linked immutable delta-resolution receipt when available. A clean delta
 offers per-path selection, second-scan status, **Merge selected**, and **Discard**;
 a secret match shows only counts/reason code, no matched path bytes or value,
 and offers discard only. While resolution is pending, Build explains why new
@@ -1568,9 +1671,21 @@ it("warns that a general command receiving a credential is in its TCB", async ()
   render(ApprovalsView, { approval: credentialedCommandApproval() });
   expect(screen.getByText(/can transform, persist, or exfiltrate this credential/i)).toBeInTheDocument();
 });
+
+
+it("shows credential delivery and quarantine as independent proven features", async () => {
+  render(Runtime, { profiles: [nativeProfile({ credential_delivery: false, credential_delta_quarantine: false }), containerProfile({ credential_delivery: true, credential_delta_quarantine: true })] });
+  expect(screen.getByText(/native.*credential delivery unsupported/i)).toBeInTheDocument();
+  expect(screen.getByText(/container.*credential delivery with local quarantine/i)).toBeInTheDocument();
+});
 ```
 
-Runtime cards show real probe time, features, persistence, protected paths, filtered network, and **Host access — reduced isolation**. Unsupported features are disabled with exact remediation.
+Runtime cards show real probe time, features, persistence, protected paths,
+filtered network, and **Host access — reduced isolation**. They separately show
+`credential_delivery` and `credential_delta_quarantine`: native, local strict,
+SSH, and Daytona credential controls are disabled with the stable unsupported
+reason; container approval states the recipient-TCB warning and quarantine
+defense. Unsupported features are disabled with exact remediation.
 
 - [ ] **Step 6: Run web tests, Svelte checks, and commit**
 

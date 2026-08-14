@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import threading
 import weakref
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
-from raiker.execution.commands.backends.base import CommandBackendError
+from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
+from raiker.execution.commands.backends.container import (
+    PersistentContainerBackend,
+    SubprocessContainerRuntime,
+)
 from raiker.execution.commands.backends.local import LocalStrictBackend
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
@@ -21,7 +26,7 @@ from raiker.execution.commands.store import (
     OutputQuotaExceeded,
     SecretMaterialRejected,
 )
-from raiker.execution.profiles import resolve_command_environment
+from raiker.execution.profiles import ExecutionProfile, resolve_command_environment
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -120,10 +125,18 @@ class CommandService:
                 cls._instances[key] = service
             return service
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(
+        self,
+        workspace_root: str | Path,
+        *,
+        profile_probe: Callable[[ExecutionProfile], Any] | None = None,
+        backend_factory: Callable[[ExecutionProfile], Any] | None = None,
+    ) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.sqlite = SQLiteStore(self.workspace_root)
         self.store = CommandStore(self.sqlite)
+        self._profile_probe = profile_probe
+        self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
         self._lock = threading.Lock()
 
@@ -143,19 +156,25 @@ class CommandService:
         timeout_seconds: float = 30.0,
         max_output_bytes: int = 100_000,
     ) -> StoredCommandRun:
-        resolution = resolve_command_environment(
-            self.sqlite, owner_principal_id, "shell"
+        resolution = (
+            resolve_command_environment(
+                self.sqlite,
+                owner_principal_id,
+                "shell",
+                probe=self._profile_probe,
+            )
+            if self._profile_probe is not None
+            else resolve_command_environment(self.sqlite, owner_principal_id, "shell")
         )
         if not resolution.available or resolution.profile is None:
             raise CommandServiceError(resolution.reason_code or "selected_environment_unavailable")
         profile = resolution.profile
-        if profile.kind != "local":
-            raise CommandServiceError(f"{profile.kind}_command_supervisor_unavailable")
         if not argv:
             raise CommandServiceError("command_argv_required")
         display = command.strip()
         if not display or any(char in display for char in "\r\n\0"):
             raise CommandServiceError("command_safe_display_invalid")
+        shell = profile.kind == "container"
         request = CommandRequest(
             run_id=new_id("cmd_"),
             owner_principal_id=owner_principal_id,
@@ -166,11 +185,11 @@ class CommandService:
             repository_id=None,
             workspace_root=self.workspace_root,
             cwd=cwd,
-            executable_template="",
-            argv_template=tuple(argv),
+            executable_template=display if shell else "",
+            argv_template=() if shell else tuple(argv),
             safe_display=display,
             credential_bindings=(),
-            shell=False,
+            shell=shell,
             interactive=False,
             background=False,
             timeout_seconds=timeout_seconds,
@@ -187,16 +206,22 @@ class CommandService:
         self.store.transition(owner_principal_id, request.run_id, CommandState.QUEUED, CommandState.STARTING)
 
         def complete(state: CommandState, returncode: int | None, sink: _StoreSink) -> None:
-            self._finalize(request, state, returncode, sink)
+            self._finalize(request, state, returncode, sink, backend_name)
 
         sink = _StoreSink(self.store, request, complete)
+        backend_name = "local_strict" if profile.kind == "local" else profile.kind
         try:
-            handle = LocalStrictBackend().start(request, sink)
+            backend = (
+                self._backend_factory(profile)
+                if self._backend_factory is not None
+                else self._default_backend(profile)
+            )
+            handle = backend.start(request, sink)
         except CommandBackendError as exc:
-            self._contain_start_failure(request, exc.reason_code)
+            self._contain_start_failure(request, exc.reason_code, backend_name)
             raise CommandServiceError(exc.reason_code) from None
         except OSError:
-            self._contain_start_failure(request, "command_launch_failed")
+            self._contain_start_failure(request, "command_launch_failed", backend_name)
             raise CommandServiceError("command_launch_failed") from None
         self.store.transition(owner_principal_id, request.run_id, CommandState.STARTING, CommandState.RUNNING)
         with self._lock:
@@ -204,6 +229,17 @@ class CommandService:
             if handle.poll() is not None:
                 self._active.pop(request.run_id, None)
         return self.store.load(owner_principal_id, request.run_id)  # type: ignore[return-value]
+
+    def _default_backend(self, profile: ExecutionProfile) -> Any:
+        if profile.kind == "local":
+            return LocalStrictBackend()
+        if profile.kind == "container":
+            return PersistentContainerBackend(
+                runtime=SubprocessContainerRuntime(self.workspace_root),
+                workspace_root=self.workspace_root,
+                profile=profile,
+            )
+        return UnavailableBackend(f"{profile.kind}_command_supervisor_unavailable")
 
     def run_foreground(self, **kwargs: Any) -> dict[str, Any]:
         run = self.start(**kwargs)
@@ -229,7 +265,9 @@ class CommandService:
             "receipt_digest": receipt.digest if receipt else None,
         }
 
-    def _contain_start_failure(self, request: CommandRequest, reason: str) -> None:
+    def _contain_start_failure(
+        self, request: CommandRequest, reason: str, backend_name: str
+    ) -> None:
         self.store.transition(
             request.owner_principal_id, request.run_id, CommandState.STARTING, CommandState.FINALIZING
         )
@@ -239,14 +277,19 @@ class CommandService:
             exit_code=None,
             termination_reason=reason,
             completed_at=utc_now(),
-            evidence={"backend": "local_strict", "profile_id": request.environment_profile_id},
+            evidence={"backend": backend_name, "profile_id": request.environment_profile_id},
         )
         self.store.finalize_with_receipt(
             request.owner_principal_id, request.run_id, CommandState.CONTAINED, receipt
         )
 
     def _finalize(
-        self, request: CommandRequest, state: CommandState, returncode: int | None, sink: _StoreSink
+        self,
+        request: CommandRequest,
+        state: CommandState,
+        returncode: int | None,
+        sink: _StoreSink,
+        backend_name: str,
     ) -> None:
         run = self.store.load(request.owner_principal_id, request.run_id)
         if run is None or run.state in TERMINAL_COMMAND_STATES:
@@ -262,7 +305,7 @@ class CommandService:
             termination_reason=state.value,
             completed_at=utc_now(),
             evidence={
-                "backend": "local_strict",
+                "backend": backend_name,
                 "profile_id": request.environment_profile_id,
                 "template_digest": request.template_digest,
                 "authority": {

@@ -15,6 +15,7 @@ from raiker.execution.commands.backends import (
     NativeSandboxDriver,
     UnavailableBackend,
 )
+from raiker.execution.commands.service import CommandService
 from raiker.execution.profiles import (
     ExecutionProfile,
     ProfileProbe,
@@ -113,6 +114,40 @@ def test_unavailable_selected_sandbox_never_calls_local_runner(tmp_path: Path) -
     local.start.assert_not_called()
 
 
+def test_command_service_routes_selected_container_without_local_fallback(tmp_path: Path) -> None:
+    store = SQLiteStore(tmp_path)
+    _container(store)
+    store.select_execution_environment("owner_a", "container_a")
+    selected = Mock()
+    handle = Mock()
+    handle.poll.return_value = None
+    selected.start.return_value = handle
+    service = CommandService(
+        tmp_path,
+        profile_probe=lambda profile: ProfileProbe(profile, True, None, utc_now()),
+        backend_factory=lambda profile: selected,
+    )
+
+    run = service.start(
+        owner_principal_id="owner_a",
+        acting_principal_id="agent_a",
+        session_id="sess_a",
+        turn_id="turn_a",
+        action_id="act_a",
+        authority_kind="approval",
+        authority_id="appr_a",
+        command="printf hello",
+        argv=["printf", "hello"],
+    )
+
+    routed = selected.start.call_args.args[0]
+    assert run.profile_id == "container_a"
+    assert routed.shell is True
+    assert routed.executable_template == "printf hello"
+    assert routed.argv_template == ()
+    service.shutdown()
+
+
 def test_local_strict_rejects_shell_background_network_and_credentials(tmp_path: Path) -> None:
     backend = LocalStrictBackend(runner=Mock())
     with pytest.raises(CommandBackendError, match="local_strict_shell_source_denied"):
@@ -207,7 +242,7 @@ def test_container_profile_advertises_only_the_proven_foreground_shell() -> None
     ).features
 
     assert features.shell is True
-    assert features.process_tree_stop is False
+    assert features.process_tree_stop is True
     assert features.pty is False
     assert features.background is False
     assert features.input is False

@@ -46,7 +46,7 @@ class ExecutionProfile:
         if self.kind == "container":
             return CommandFeatures(
                 shell="shell" in self.tools,
-                process_tree_stop=False,
+                process_tree_stop=True,
             )
         return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
 

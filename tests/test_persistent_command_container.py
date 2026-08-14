@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
@@ -9,8 +10,10 @@ from raiker.execution.commands.backends import CommandBackendError
 from raiker.execution.commands.backends.container import (
     EXPECTED_SUPERVISOR_DIGEST,
     PersistentContainerBackend,
+    SubprocessContainerRuntime,
     command_container_name,
 )
+from raiker.execution.commands.runner import MemoryCommandSink
 from raiker.execution.profiles import ExecutionProfile
 
 
@@ -25,6 +28,20 @@ class RecordingRuntime:
             self.counter += 1
             return {"returncode": 0, "stdout": f"container-{self.counter}\n", "stderr": ""}
         return {"returncode": 0, "stdout": "", "stderr": ""}
+
+
+def test_subprocess_runtime_uses_fixed_argv_and_secret_free_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    completed = Mock(returncode=0, stdout="container-id\n", stderr="")
+    launched = Mock(return_value=completed)
+    monkeypatch.setattr("subprocess.run", launched)
+
+    result = SubprocessContainerRuntime(tmp_path).run(["docker", "info"])
+
+    assert result["stdout"] == "container-id\n"
+    assert launched.call_args.args[0] == ["docker", "info"]
+    assert "OPENAI_API_KEY" not in launched.call_args.kwargs["env"]
 
 
 def request(tmp_path: Path, **overrides: object) -> CommandRequest:
@@ -145,3 +162,26 @@ def test_identity_mismatch_is_never_removed(tmp_path: Path) -> None:
     with pytest.raises(CommandBackendError, match="container_identity_mismatch"):
         backend.attach(handle.with_request_digest("wrong"))
     assert not any(call[1] == "rm" for call in runtime.calls)
+
+
+def test_foreground_shell_streams_through_exec_and_stop_removes_worker(tmp_path: Path) -> None:
+    runtime = RecordingRuntime()
+    process = Mock()
+    process.poll.return_value = None
+    runner = Mock(return_value=process)
+    backend = PersistentContainerBackend(
+        runtime=runtime,
+        workspace_root=tmp_path,
+        profile=profile(),
+        runner=runner,
+    )
+    command = request(tmp_path, executable_template="printf hello", background=False)
+
+    handle = backend.start(command, MemoryCommandSink())
+
+    exec_argv = runner.call_args.args[1]
+    assert exec_argv[:3] == ["docker", "exec", "-i"]
+    assert exec_argv[-3:] == ["/bin/sh", "-lc", "printf hello"]
+    handle.terminate()
+    process.terminate.assert_called_once()
+    assert any(call[1:3] == ["rm", "--force"] for call in runtime.calls)

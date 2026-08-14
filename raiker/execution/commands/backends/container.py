@@ -1,13 +1,18 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Protocol
+from threading import Lock
+from typing import Any, Protocol
 
 from raiker.execution.commands.backends.base import CommandBackendError
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
+from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
 from raiker.execution.profiles import ExecutionProfile
+from raiker.runtime.command_policy import sandbox_environment
 
 EXPECTED_SUPERVISOR_DIGEST = "sha256:" + ("b" * 64)
 
@@ -19,6 +24,32 @@ def command_container_name(owner: str, session: str, profile: str, run_id: str) 
 
 class ContainerRuntime(Protocol):
     def run(self, command: list[str]) -> dict[str, object]: ...
+
+
+class SubprocessContainerRuntime:
+    def __init__(self, workspace_root: Path) -> None:
+        self.workspace_root = workspace_root.resolve()
+
+    def run(self, command: list[str]) -> dict[str, object]:
+        try:
+            completed = subprocess.run(  # noqa: S603 - argv is backend-constructed
+                command,
+                cwd=self.workspace_root,
+                env=sandbox_environment(workspace_root=self.workspace_root),
+                capture_output=True,
+                text=True,
+                timeout=60,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as exc:
+            raise CommandBackendError("container_runtime_timeout") from exc
+        except OSError as exc:
+            raise CommandBackendError("container_runtime_unavailable") from exc
+        return {
+            "returncode": completed.returncode,
+            "stdout": completed.stdout,
+            "stderr": completed.stderr,
+        }
 
 
 @dataclass(frozen=True)
@@ -38,15 +69,54 @@ class ContainerBackendHandle:
         return replace(self, request_digest=value)
 
 
-@dataclass(frozen=True)
 class ContainerCommandHandle:
-    backend_handle: ContainerBackendHandle
+    def __init__(
+        self,
+        backend_handle: ContainerBackendHandle,
+        process: Any,
+        runtime: ContainerRuntime,
+        runtime_name: str,
+    ) -> None:
+        self.backend_handle = backend_handle
+        self._process = process
+        self._runtime = runtime
+        self._runtime_name = runtime_name
+        self._cleaned = False
+        self._lock = Lock()
+
+    def _cleanup(self) -> None:
+        with self._lock:
+            if self._cleaned:
+                return
+            self._runtime.run(
+                [self._runtime_name, "rm", "--force", self.backend_handle.container_id]
+            )
+            self._cleaned = True
+
+    def poll(self) -> Any:
+        state = self._process.poll()
+        if state is not None:
+            self._cleanup()
+        return state
+
+    def wait(self, timeout: float | None = None) -> Any:
+        state = self._process.wait(timeout)
+        self._cleanup()
+        return state
+
+    def write(self, value: str | bytes) -> None:
+        del value
+        raise CommandBackendError("selected_environment_pty_unsupported")
+
+    def terminate(self) -> None:
+        self._process.terminate()
+        self._cleanup()
 
 
 class PersistentContainerBackend:
     features = CommandFeatures(
         shell=True,
-        process_tree_stop=False,
+        process_tree_stop=True,
     )
 
     def __init__(
@@ -55,10 +125,12 @@ class PersistentContainerBackend:
         runtime: ContainerRuntime,
         workspace_root: Path,
         profile: ExecutionProfile,
+        runner: Callable[..., Any] | None = None,
     ) -> None:
         self.runtime = runtime
         self.workspace_root = workspace_root.resolve()
         self.profile = profile
+        self._runner = runner or StreamingCommandRunner().start
         self._handles: dict[str, ContainerBackendHandle] = {}
         self._credential_lease: tuple[str, str] | None = None
         self._blocked_deltas: set[tuple[str, str, str]] = set()
@@ -73,7 +145,9 @@ class PersistentContainerBackend:
             if protected.is_symlink():
                 raise CommandBackendError("container_protected_path_unsafe")
 
-    def start(self, request: CommandRequest) -> ContainerCommandHandle:
+    def start(
+        self, request: CommandRequest, sink: CommandSink | None = None
+    ) -> ContainerCommandHandle:
         if request.environment_profile_id != self.profile.profile_id:
             raise CommandBackendError("selected_environment_mismatch")
         if not request.shell:
@@ -132,7 +206,23 @@ class PersistentContainerBackend:
             self.profile.profile_id,
         )
         self._handles[request.run_id] = handle
-        return ContainerCommandHandle(handle)
+        process = self._runner(
+            request,
+            [
+                runtime,
+                "exec",
+                "-i",
+                container_id,
+                "/bin/sh",
+                "-lc",
+                request.executable_template,
+            ],
+            self.workspace_root,
+            sandbox_environment(workspace_root=self.workspace_root),
+            sink or MemoryCommandSink(),
+            pty=False,
+        )
+        return ContainerCommandHandle(handle, process, self.runtime, runtime)
 
     def _create_command(
         self,
@@ -186,18 +276,19 @@ class PersistentContainerBackend:
                 "--workdir",
                 f"/workspace/{request.cwd}".rstrip("/"),
                 image,
-                "raiker-command-supervisor",
-                "--request-digest",
-                request.template_digest,
+                "-c",
+                "trap 'exit 0' TERM INT; while :; do sleep 3600; done",
             ]
         )
+        entrypoint_index = command.index(image)
+        command[entrypoint_index:entrypoint_index] = ["--entrypoint", "/bin/sh"]
         return command
 
     def attach(self, handle: ContainerBackendHandle) -> ContainerCommandHandle:
         expected = self._handles.get(handle.run_id)
         if expected != handle:
             raise CommandBackendError("container_identity_mismatch")
-        return ContainerCommandHandle(handle)
+        raise CommandBackendError("container_reattach_unavailable")
 
     def complete(self, run_id: str) -> None:
         self._release_credential_lease(run_id)

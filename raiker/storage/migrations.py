@@ -3029,3 +3029,46 @@ CREATE TABLE IF NOT EXISTS command_receipts (
 CREATE INDEX IF NOT EXISTS idx_command_receipts_owner_run
   ON command_receipts(owner_principal_id, run_id);
 """
+
+
+# Credential-bearing container workers execute against private workspace/cache
+# snapshots. Their entire delta remains blocked until an owner resolves it and
+# the cleanup saga commits an immutable, owner-scoped receipt.
+COMMAND_CREDENTIAL_DELTAS_MIGRATION_ID = "RAIKER-2031-command-credential-deltas"
+
+COMMAND_CREDENTIAL_DELTAS_SQL = """
+CREATE TABLE IF NOT EXISTS command_credential_deltas (
+  run_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  environment_profile_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  encrypted_snapshot_handle BLOB NOT NULL,
+  encrypted_cleanup_scan_bundle BLOB NOT NULL,
+  safe_manifest_json TEXT NOT NULL,
+  delta_digest TEXT NOT NULL,
+  scan_digest TEXT NOT NULL,
+  scan_rule_version TEXT NOT NULL,
+  selected_paths_json TEXT,
+  decision_id TEXT,
+  checkpoint_id TEXT,
+  apply_idempotency_key TEXT,
+  cleanup_status TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  resolved_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_command_deltas_owner_environment
+  ON command_credential_deltas(owner_principal_id, environment_profile_id, state, created_at);
+
+CREATE TABLE IF NOT EXISTS command_delta_receipts (
+  resolution_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL UNIQUE,
+  owner_principal_id TEXT NOT NULL,
+  command_receipt_digest TEXT NOT NULL DEFAULT '',
+  delta_digest TEXT NOT NULL,
+  receipt_json TEXT NOT NULL,
+  digest TEXT NOT NULL UNIQUE,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_command_delta_receipts_owner_run
+  ON command_delta_receipts(owner_principal_id, run_id);
+"""

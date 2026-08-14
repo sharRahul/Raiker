@@ -108,6 +108,8 @@ _PREFIXES = {
     # RAIKER-2022: one owner decision to lend the git credential, scoped to a
     # single command or to a session. Holds the decision, never the token.
     "grant_",
+    # Immutable command credential-delta resolution receipt.
+    "dres_",
 }
 
 

@@ -1,0 +1,14 @@
+# syntax=docker/dockerfile:1.7
+FROM python:3.13.5-slim@sha256:5f3c53d6fefeb6d0f72b5ff7661f7405c063fd3a0f6b97b4ff1224f615d138e5
+
+RUN groupadd --gid 65532 raiker \
+ && useradd --uid 65532 --gid 65532 --no-create-home --home-dir /home/raiker raiker \
+ && mkdir -p /home/raiker/.cache /workspace \
+ && chown -R 65532:65532 /home/raiker /workspace
+
+COPY --chown=65532:65532 raiker-command-supervisor /usr/local/bin/raiker-command-supervisor
+RUN chmod 0555 /usr/local/bin/raiker-command-supervisor
+
+USER 65532:65532
+WORKDIR /workspace
+ENTRYPOINT ["/usr/local/bin/raiker-command-supervisor"]

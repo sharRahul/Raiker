@@ -9,7 +9,7 @@ from typing import Any
 from cryptography.fernet import InvalidToken
 
 from raiker.auth.app_key import app_fernet
-from raiker.contracts.ids import utc_now
+from raiker.contracts.ids import new_id, utc_now
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
     CommandChunk,
@@ -372,6 +372,152 @@ class CommandStore:
                 (owner_principal_id, run_id),
             ).fetchone()
         return int(row["count"]) if row else 0
+
+    def create_credential_delta(
+        self,
+        *,
+        owner_principal_id: str,
+        run_id: str,
+        environment_profile_id: str,
+        state: str,
+        snapshot_handle: bytes,
+        cleanup_scan_bundle: bytes,
+        safe_manifest_json: str,
+        delta_digest: str,
+        scan_digest: str,
+        scan_rule_version: str = "raiker-redaction-v1",
+    ) -> None:
+        if state not in {"scanning", "clean", "quarantined"}:
+            raise ValueError("credential_delta_state_invalid")
+        cipher = app_fernet(self.sqlite.paths.workspace_root)
+        encrypted_snapshot = cipher.encrypt(snapshot_handle)
+        encrypted_bundle = cipher.encrypt(cleanup_scan_bundle)
+        with self.sqlite.connect() as connection:
+            connection.execute(
+                """INSERT INTO command_credential_deltas (
+                    run_id, owner_principal_id, environment_profile_id, state,
+                    encrypted_snapshot_handle, encrypted_cleanup_scan_bundle,
+                    safe_manifest_json, delta_digest, scan_digest, scan_rule_version,
+                    cleanup_status, created_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
+                (
+                    run_id,
+                    owner_principal_id,
+                    environment_profile_id,
+                    state,
+                    encrypted_snapshot,
+                    encrypted_bundle,
+                    safe_manifest_json,
+                    delta_digest,
+                    scan_digest,
+                    scan_rule_version,
+                    utc_now(),
+                ),
+            )
+
+    def list_unresolved_deltas(
+        self, owner_principal_id: str, environment_profile_id: str
+    ) -> list[dict[str, Any]]:
+        with self.sqlite.connect() as connection:
+            rows = connection.execute(
+                """SELECT run_id, owner_principal_id, environment_profile_id, state,
+                          safe_manifest_json, delta_digest, scan_digest,
+                          scan_rule_version, cleanup_status, created_at
+                   FROM command_credential_deltas
+                   WHERE owner_principal_id = ? AND environment_profile_id = ?
+                     AND state NOT IN ('merged', 'discarded')
+                   ORDER BY created_at ASC""",
+                (owner_principal_id, environment_profile_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def resolve_credential_delta(
+        self,
+        owner_principal_id: str,
+        run_id: str,
+        *,
+        decision_id: str,
+        resolution: str,
+    ) -> bool:
+        if resolution not in {"merged", "discarded"}:
+            raise ValueError("credential_delta_resolution_invalid")
+        connection = self.sqlite.connect()
+        connection.commit()
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            existing = connection.execute(
+                "SELECT 1 FROM command_delta_receipts WHERE owner_principal_id = ? AND run_id = ?",
+                (owner_principal_id, run_id),
+            ).fetchone()
+            if existing is not None:
+                raise ReceiptImmutable("command_delta_receipt_immutable")
+            row = connection.execute(
+                """SELECT delta_digest, state FROM command_credential_deltas
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (owner_principal_id, run_id),
+            ).fetchone()
+            if row is None:
+                connection.rollback()
+                return False
+            if row["state"] in {"merged", "discarded"}:
+                raise ReceiptImmutable("command_delta_receipt_immutable")
+            now = utc_now()
+            receipt_payload = {
+                "cleanup_status": "crypto_erased",
+                "decision_id": decision_id,
+                "delta_digest": row["delta_digest"],
+                "owner_principal_id": owner_principal_id,
+                "resolution": resolution,
+                "resolved_at": now,
+                "run_id": run_id,
+            }
+            receipt_json = json.dumps(receipt_payload, sort_keys=True, separators=(",", ":"))
+            receipt_digest = __import__("hashlib").sha256(receipt_json.encode()).hexdigest()
+            cursor = connection.execute(
+                """UPDATE command_credential_deltas
+                   SET state = ?, decision_id = ?, cleanup_status = 'crypto_erased',
+                       encrypted_snapshot_handle = X'', encrypted_cleanup_scan_bundle = X'',
+                       resolved_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?
+                     AND state NOT IN ('merged', 'discarded')""",
+                (resolution, decision_id, now, owner_principal_id, run_id),
+            )
+            if cursor.rowcount != 1:
+                connection.rollback()
+                return False
+            connection.execute(
+                """INSERT INTO command_delta_receipts
+                   (resolution_id, run_id, owner_principal_id, delta_digest,
+                    receipt_json, digest, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    new_id("dres_"),
+                    run_id,
+                    owner_principal_id,
+                    row["delta_digest"],
+                    receipt_json,
+                    receipt_digest,
+                    now,
+                ),
+            )
+            connection.commit()
+            return True
+        except BaseException:
+            connection.rollback()
+            raise
+
+    def get_delta_receipt(self, owner_principal_id: str, run_id: str) -> dict[str, Any] | None:
+        with self.sqlite.connect() as connection:
+            row = connection.execute(
+                """SELECT receipt_json, digest FROM command_delta_receipts
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (owner_principal_id, run_id),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(str(row["receipt_json"]))
+        payload["digest"] = row["digest"]
+        return payload
 
     @staticmethod
     def _run(row: Any) -> StoredCommandRun:

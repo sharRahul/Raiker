@@ -3,6 +3,7 @@ from __future__ import annotations
 import fnmatch
 import os
 import subprocess
+import sys
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
@@ -76,9 +77,10 @@ def run_command(
     from raiker.runtime.command_policy import sandbox_environment
 
     child_env = sandbox_environment(workspace_root=cwd or Path.cwd(), extra=env)
+    launch_command = _portable_command(command)
     try:
         proc = subprocess.run(
-            command,
+            launch_command,
             capture_output=True,
             text=False,
             timeout=timeout,
@@ -103,6 +105,24 @@ def run_command(
         "stderr": proc.stderr[:max_output_bytes].decode("utf-8", errors="replace"),
         "truncated": stdout_len > max_output_bytes or stderr_len > max_output_bytes,
     }
+
+
+def _portable_command(command: Sequence[str]) -> Sequence[str]:
+    """Keep the small governed read surface usable on native Windows.
+
+    Policy validation always runs against the owner's original argv first, so
+    this fixed adapter cannot widen what was approved. Windows has no `cat`
+    executable; use Raiker's interpreter only as an implementation detail for
+    reading the already-contained file arguments.
+    """
+    if os.name != "nt" or not command or command[0].lower() != "cat":
+        return command
+    reader = (
+        "import pathlib,sys;"
+        "out=sys.stdout.buffer;"
+        "[out.write(pathlib.Path(name).read_bytes()) for name in sys.argv[1:]]"
+    )
+    return (sys.executable, "-c", reader, *command[1:])
 
 
 def fetch_url(

@@ -8,6 +8,9 @@ REDACTED_CREDENTIAL = "[REDACTED_CREDENTIAL]"
 REDACTED_TOKEN = "[REDACTED_TOKEN]"
 REDACTED_EMAIL = "[REDACTED_EMAIL]"
 REDACTED_PRIVATE_KEY = "[REDACTED_PRIVATE_KEY]"
+REDACTED_CARD = "[REDACTED_CARD]"
+REDACTED_ACCOUNT = "[REDACTED_ACCOUNT]"
+REDACTED_ID = "[REDACTED_ID]"
 
 # A lowercase snake_case identifier (two or more words joined by underscores).
 # Machine-readable reason codes / capability ids look like this and carry no
@@ -131,15 +134,15 @@ _PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], .
         REDACTED_EMAIL,
     ),
     # Bank/card-like numbers
-    (re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"), "[REDACTED_CARD]"),
+    (re.compile(r"\b(?:\d{4}[-\s]?){3}\d{4}\b"), REDACTED_CARD),
     (
         re.compile(
             r"\b(?:account|iban|bic|swift|routing)\s*[:=#]?\s*['\"]?[A-Z0-9]{8,}\b", re.IGNORECASE
         ),
-        "[REDACTED_ACCOUNT]",
+        REDACTED_ACCOUNT,
     ),
     # Medical identifiers (NHS/SSN-like patterns)
-    (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), "[REDACTED_ID]"),
+    (re.compile(r"\b\d{3}[-\s]?\d{3}[-\s]?\d{4}\b"), REDACTED_ID),
     # High-entropy fallback for long opaque strings (kept last so specific shapes
     # win). A callable replacement spares lowercase snake_case reason codes /
     # capability ids, which are long but carry no secret entropy.

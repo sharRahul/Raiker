@@ -1,0 +1,9 @@
+[package]
+name = "raiker-command-supervisor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+raiker-command-protocol = { path = "../raiker-command-protocol" }
+serde_json.workspace = true

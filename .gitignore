@@ -21,6 +21,8 @@ docs/superpowers/
 .superpowers
 build/
 *.lock
+!/native/Cargo.lock
+native/target/
 output/
 # Playwright writes its last-run marker beside the config unless outputDir
 # covers it; the evidence itself lives in output/ and docs/plans/screenshots.

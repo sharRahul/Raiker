@@ -9,6 +9,28 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
 
+#: The instance key travels between Raiker and the native supervisor as
+#: lowercase hex, because an environment block carries text and a raw 32-byte
+#: value would be mangled by any encoding on the way. Both sides decode to raw
+#: bytes **before** keying. Leaving that unstated is how one implementation ends
+#: up keying on 64 ASCII characters while the other keys on 32 bytes, and
+#: nothing authenticates — which no protocol vector catches, because vectors fix
+#: the key.
+INSTANCE_KEY_BYTES = 32
+
+
+def instance_key_from_hex(value: str) -> bytes:
+    key = bytes.fromhex(value.strip())
+    if len(key) < INSTANCE_KEY_BYTES:
+        raise ValueError("supervisor_instance_key_too_short")
+    return key
+
+
+def instance_key_to_hex(key: bytes) -> str:
+    if len(key) < INSTANCE_KEY_BYTES:
+        raise ValueError("supervisor_instance_key_too_short")
+    return key.hex()
+
 
 class SupervisorProtocolError(RuntimeError):
     pass
@@ -54,15 +76,47 @@ class SupervisorCodec:
         self._nonce_factory = nonce_factory or (lambda: secrets.token_hex(16))
         self._clock = clock or time.time
         self._max_clock_skew_seconds = max_clock_skew_seconds
-        self._seen_nonces: set[str] = set()
+        self._seen_nonces: dict[str, int] = {}
 
     @staticmethod
     def _canonical(value: dict[str, Any]) -> bytes:
-        return json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+        """The exact bytes both implementations authenticate.
+
+        ``ensure_ascii`` is the whole point of this method existing. Python's
+        default escapes every non-ASCII code point (``café`` becomes
+        ``caf\\u00e9``); Rust's ``serde_json`` emits raw UTF-8. Keyed over
+        different bytes, the two MACs disagree on any frame carrying non-ASCII
+        program output — that is, on real command output — and every such frame
+        fails authentication. Floats are refused rather than serialised because
+        their shortest round-trip representation is not identical across the two
+        languages, so a payload that authenticated once might not authenticate
+        twice.
+        """
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+
+    @staticmethod
+    def _reject_floats(value: Any) -> None:
+        if isinstance(value, bool):
+            return
+        if isinstance(value, float):
+            raise ValueError("supervisor_frame_float_unsupported")
+        if isinstance(value, dict):
+            for item in value.values():
+                SupervisorCodec._reject_floats(item)
+        elif isinstance(value, list | tuple):
+            for item in value:
+                SupervisorCodec._reject_floats(item)
 
     def encode(self, kind: str, payload: dict[str, Any]) -> bytes:
         if not kind or not isinstance(payload, dict):
             raise ValueError("supervisor_frame_invalid")
+        self._reject_floats(payload)
         authenticated = {
             "issued_at": int(self._clock()),
             "kind": kind,
@@ -108,7 +162,16 @@ class SupervisorCodec:
             raise AuthenticationFailed("supervisor_frame_version_unsupported")
         if abs(int(self._clock()) - issued_at) > self._max_clock_skew_seconds:
             raise AuthenticationFailed("supervisor_frame_expired")
+        # A frame older than the skew window is already refused above, so a
+        # nonce older than that window can never be replayed successfully and
+        # does not need remembering. Without this the set grows for as long as
+        # the process lives, which for a long-running supervisor connection is
+        # an unbounded allocation driven by the peer.
+        horizon = int(self._clock()) - self._max_clock_skew_seconds
+        self._seen_nonces = {
+            seen: seen_at for seen, seen_at in self._seen_nonces.items() if seen_at >= horizon
+        }
         if nonce in self._seen_nonces:
             raise ReplayRejected("supervisor_frame_replayed")
-        self._seen_nonces.add(nonce)
+        self._seen_nonces[nonce] = issued_at
         return SupervisorFrame(version, kind, nonce, issued_at, payload)

@@ -178,9 +178,9 @@ Status: ✅ at parity or beyond · 🟡 partial / designed · ❌ absent.
 | Local and exposed traffic have different trust posture | Codex defaults to local sandbox/no network; OpenClaw distinguishes direct loopback control from paired remote devices | Verified direct loopback reads bypass the DoS budget; writes and every public-bind request remain rate-limited, and proxy headers cannot forge loopback | ✅ |
 | Database encryption and key-memory lock are stated separately | None of the six reference products exposes this embedded-database distinction | Security reports **Encrypted** separately from **Locked in memory / Degraded**; the lock probe runs in a crash-contained child and never infers memory safety from encryption | ✅ beyond |
 
-Design contract:
-[`superpowers/specs/BUG_46_48_51_60_64_65_88_DESIGN.md`](superpowers/specs/BUG_46_48_51_60_64_65_88_DESIGN.md).
-Implemented and live-verified on Windows on 2026-08-11. Evidence is under
+Design contract and closure evidence:
+[`plans/FIXED_ITEMS.md`](plans/FIXED_ITEMS.md) — FIXED entries for BUG-46, 48,
+51, 60, 64, 65 and 88. Implemented and live-verified on Windows on 2026-08-11. Evidence is under
 [`plans/screenshots/working/`](plans/screenshots/working/); the SQLCipher host
 reports the expected degraded memory-lock posture while database encryption
 and application health remain independently verified.
@@ -239,8 +239,8 @@ capability because native sandboxing, PTY/background supervision, filtered
 egress, restart reattachment, credentials quarantine, and remote backends remain
 absent. These are tracked as defects rather than hidden behind a parity claim.
 
-Design contract:
-[`superpowers/specs/2026-08-14-governed-shell-sandbox-and-recovery-design.md`](superpowers/specs/2026-08-14-governed-shell-sandbox-and-recovery-design.md).
+Design contract and open work:
+[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194.
 
 ---
 

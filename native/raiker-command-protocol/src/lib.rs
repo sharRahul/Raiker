@@ -1,7 +1,7 @@
 use hmac::{Hmac, Mac};
 use serde_json::{Map, Value};
 use sha2::Sha256;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -42,7 +42,7 @@ pub struct Codec {
     key: Vec<u8>,
     max_frame_bytes: usize,
     max_clock_skew_seconds: u64,
-    seen_nonces: HashSet<String>,
+    seen_nonces: HashMap<String, u64>,
 }
 
 impl Codec {
@@ -54,7 +54,7 @@ impl Codec {
             key: key.to_vec(),
             max_frame_bytes: DEFAULT_MAX_FRAME_BYTES,
             max_clock_skew_seconds: 300,
-            seen_nonces: HashSet::new(),
+            seen_nonces: HashMap::new(),
         })
     }
 
@@ -72,6 +72,9 @@ impl Codec {
         payload: Value,
     ) -> Result<Vec<u8>, ProtocolError> {
         if kind.is_empty() || nonce.is_empty() || !payload.is_object() {
+            return Err(ProtocolError::ContractInvalid);
+        }
+        if contains_float(&payload) {
             return Err(ProtocolError::ContractInvalid);
         }
         let mut authenticated = Map::new();
@@ -145,7 +148,14 @@ impl Codec {
         if now.abs_diff(issued_at) > self.max_clock_skew_seconds {
             return Err(ProtocolError::Expired);
         }
-        if !self.seen_nonces.insert(nonce.clone()) {
+        if contains_float(&payload) {
+            return Err(ProtocolError::ContractInvalid);
+        }
+        // A nonce older than the skew window can no longer be replayed
+        // successfully, so remembering it is pure growth driven by the peer.
+        let horizon = now.saturating_sub(self.max_clock_skew_seconds);
+        self.seen_nonces.retain(|_, seen_at| *seen_at >= horizon);
+        if self.seen_nonces.insert(nonce.clone(), issued_at).is_some() {
             return Err(ProtocolError::ReplayRejected);
         }
         Ok(Frame {
@@ -156,6 +166,35 @@ impl Codec {
             payload,
         })
     }
+}
+
+/// Floats are outside the canonical form. The shortest round-trip
+/// representation of a float is not identical in Rust and Python, so a payload
+/// carrying one could authenticate on the sender and fail on the receiver — a
+/// failure that would look like tampering. Refusing them keeps "the MAC
+/// disagreed" a statement about the key, never about number formatting.
+fn contains_float(value: &Value) -> bool {
+    match value {
+        Value::Number(number) => number.as_f64().is_some() && number.as_i64().is_none()
+            && number.as_u64().is_none(),
+        Value::Array(items) => items.iter().any(contains_float),
+        Value::Object(entries) => entries.values().any(contains_float),
+        _ => false,
+    }
+}
+
+/// Decode the lowercase-hex instance key both implementations share.
+///
+/// The environment carries text, so the key is hex on the wire and raw bytes in
+/// the MAC. Keying on the hex text instead would silently produce a different
+/// MAC from the Python side, which authenticates nothing and is invisible to
+/// any vector that fixes the key.
+pub fn instance_key_from_hex(value: &str) -> Result<Vec<u8>, ProtocolError> {
+    let key = unhex(value.trim()).ok_or(ProtocolError::ContractInvalid)?;
+    if key.len() < 32 {
+        return Err(ProtocolError::ContractInvalid);
+    }
+    Ok(key)
 }
 
 pub fn unix_time() -> u64 {

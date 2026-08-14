@@ -13,18 +13,16 @@ REQUIRED_DOCS = [
 REQUIRED_MARKERS = {
     Path("docs/IMPLEMENTATION_STATUS.md"): [
         "Canonical Backend Capability Statuses",
-        "Approval resolution is `metadata_only` except for approved local file mutations",
+        "Approval resolution executes approved local file mutations",
         "CLI durable memory mutation is `implemented_approval_required`",
-        "SSH/Daytona command execution, and local email/calendar/reminder stores) are",
+        "container read tools, governed local commands",
         "Sensitive finance/investment/medical/pregnancy/CCTV/",
         "Phase 4 memory MVP is implemented",
     ],
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
         "implemented_approval_required",
         "metadata_only",
-        # BUG-06: resolution executes a file mutation through the relay and
-        # nothing else. The catalogue must keep saying which half is which.
-        "executed once through the governed approval execution relay",
+        "Each is executed once through its governed execution relay",
     ],
     Path("docs/EVENT_CATALOG.md"): [
         "approval_denied",

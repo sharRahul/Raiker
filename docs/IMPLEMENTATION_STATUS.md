@@ -20,12 +20,16 @@
 | `test_only` | Reserved for offline test support |
 | `disabled_deferred` | No usable executor; fails closed |
 
-Approval resolution is `metadata_only` except for approved local file mutations
-(`file_write_execution`, `patch_apply_execution`) and configured SSH/Daytona
-commands (`remote_execution_cap`, `cloud_execution_cap`). Those bounded actions
-execute once through the governed relay and are re-governed at execution time;
-file mutations are additionally checkpointed so they stay reversible.
-Approval remains metadata-only for every other capability.
+Approval resolution executes approved local file mutations
+(`file_write_execution`, `patch_apply_execution`) and approved `shell` and
+`process` actions. Shell/process execution and standing-grant `run_command`
+converge on the same durable `CommandService`; the runtime stores the authority
+identity and selected environment, redacts output before persistence, and
+requires an immutable receipt for every terminal state. File mutations are
+additionally checkpointed so they stay reversible. SSH and Daytona command
+profiles remain readiness-only and fail closed; they are not executable merely
+because a profile record exists. Approval remains metadata-only for every other
+capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
 Per-turn machine identity is `implemented_verified`. Every ordinary, resumed,
@@ -45,8 +49,8 @@ available; an unavailable billing adapter is explicit and retains the estimate.
 Scheduled task turns carry the same validated attachments as Chat and Build.
 
 Integrated real executors (including graph indexing, semantic/vector runtimes,
-plugin slices, channels, container, scheduled routines, model providers,
-SSH/Daytona command execution, and local email/calendar/reminder stores) are
+plugin slices, channels, container read tools, governed local commands,
+scheduled routines, model providers, and local email/calendar/reminder stores) are
 governed per action. Sensitive finance/investment/medical/pregnancy/CCTV/
 home-security/hardware domains remain `disabled_deferred` and fail closed.
 

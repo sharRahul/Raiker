@@ -128,6 +128,17 @@ tool, invalid bridge response, or failed cleanup is explicit; none silently runs
 on the host. Live evidence is recorded in `docs/WEB_APP_LIVE_TEST.md` and
 `output/playwright/add01-container-profile-live.png`.
 
+**Governed shell extension (2026-08-14).** The separate command backend now
+executes approval-gated `shell`/`process` and standing-grant `run_command`
+through one durable lifecycle. For a selected container profile it creates the
+exact digest-pinned, no-network worker and executes the approved argv directly
+without reconstructing shell source; command output is split-safe redacted
+before persistence, and completion is bound to an immutable
+authority/environment/output receipt. This does not turn
+the original read-tool bridge into an arbitrary shell, and it does not claim
+persistent PTY, restart reattachment, filtered egress, SSH, or Daytona support.
+Those controls remain explicitly partial/absent in the compatibility matrix.
+
 ---
 
 ## ADD-02 — A sequential tool queue with per-call approval gates

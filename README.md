@@ -258,19 +258,21 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-11:
+Raiker's documentation does not run ahead of its code. As of 2026-08-14:
 
-- **Approved network and process actions still do not run** — approval
-  resolution executes file changes and patches, bounded local `shell` commands,
-  and the owner-configured SSH and Daytona profiles. `network` and `process`
-  keep metadata-only resolution. This is deliberate, not an oversight: a file
-  write is checkpointed and reversible, and a shell command is parsed before it
-  runs — refused if it chains, pipes, redirects, substitutes, expands or reaches
-  an interpreter, held to an allowlist of binaries and to the workspace, denied
-  its own `.raiker` and `.git`, given a constructed environment rather than the
-  host's, and time- and output-bounded with secret-like output redacted. Those
-  two are none of that. Resolving one still continues the parked turn, with an
-  honest "approved, but not executed" result the agent can react to.
+- **The governed shell is real, but the complete sandbox matrix is not.**
+  Approved `shell` and `process` actions and session-granted `run_command` now
+  converge on one durable lifecycle with exact authority evidence, bounded
+  split-safe-redacted output, authoritative environment selection, stop, and an
+  immutable receipt. `local_native` is explicit host access with reduced
+  isolation. A ready digest-pinned container runs with no network, a read-only
+  root, dropped capabilities, `.raiker` masked, `.git` read-only, and resource
+  bounds; an unavailable daemon or image fails closed and never falls back to
+  the host. Native Windows sandboxing, PTY/input, background supervision,
+  filtered egress, credential quarantine, restart reattachment, SSH, and
+  Daytona command execution are still absent and tracked as BUG-194. Browser
+  reload restores durable output; a Raiker process restart marks an unprovable
+  active run `lost` rather than inventing success.
 - **A batch of tool calls runs in parallel only when nothing in it needs a
   decision.** Every validated read-only call in a batch is executed
   concurrently; the moment one call in the same batch requires approval, the

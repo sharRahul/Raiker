@@ -187,6 +187,62 @@ and application health remain independently verified.
 
 ---
 
+## Governed shell, sandbox, environment, and recovery control set
+
+Reviewed 2026-08-14 against the shell and sandbox controls documented by
+**Claude Code**, **Codex**, **OpenClaw**, and **Hermes Agent**, and the governed
+work surfaces of **Claude Cowork** and **ChatGPT**. Primary sources:
+[Codex sandbox design](https://openai.com/index/running-codex-safely/),
+[Codex Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/),
+[Claude Code sandboxing](https://www.anthropic.com/engineering/claude-code-sandboxing),
+[Claude Code containment](https://www.anthropic.com/engineering/how-we-contain-claude),
+[OpenClaw sandboxing](https://github.com/openclaw/openclaw/blob/main/docs/gateway/sandboxing.md),
+[OpenClaw exec approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md), and
+[Hermes tools](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/tools.md).
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent. A row is green only
+when the current product path and tests prove it; specification alone does not
+count. Docker was unavailable on the 2026-08-14 Windows live-test host, so the
+container command row remains partial even though its automated contract passes.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| Technical isolation separate from approval policy | Codex and Claude Code distinguish sandbox boundaries from permission decisions | Execution environment selection, capability policy, approval, and standing grants are independent and all are rechecked at execution | ✅ |
+| One governed route for commands | Mature coding agents do not expose an unaudited second shell path | Approved `shell`/`process` and granted `run_command` converge on one `CommandService`; no command-create API exists | ✅ beyond |
+| Runtime-authored authority proof | Approval history is visible in reference products | Every run stores its approval or standing-grant kind/id outside encrypted command material and binds it into the receipt digest | ✅ beyond |
+| Authoritative environment; no silent fallback | Codex/Claude/OpenClaw keep sandbox selection authoritative | Exact selected profile is probed and used; unavailable container/SSH/Daytona is refused, never rerouted to host | ✅ |
+| Explicit host-access posture | Codex exposes full-access/danger modes distinctly | `local_native` is argv-only and shown as **Host access — reduced isolation**, not called a sandbox | ✅ |
+| Native OS sandbox | Codex uses a Windows restricted token/AppContainer boundary; Claude Code uses OS sandbox primitives | No packaged Windows AppContainer/restricted-token runner or WFP policy service yet | ❌ |
+| Container command sandbox | Claude/OpenClaw support container isolation | Digest-pinned, no-network, read-only/capability-dropped worker with `.raiker` masked, `.git` read-only, and CPU/memory/PID bounds; automated only on this host | 🟡 |
+| Persistent environment | Claude Code and OpenClaw can retain a sandbox/session boundary between commands | Current command container is per run; cache identity and reset internals exist but persistence is not exposed or proven | ❌ |
+| Foreground output and exit status | All coding-agent references provide it | Split-safe redacted stdout/stderr, total byte counts, truncation, timeout, terminal state, and exit code | ✅ |
+| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | Durable poll/log and stop exist for a running foreground command; background start/wait/lease controls are absent | 🟡 |
+| PTY and raw input | Claude Code/Codex terminal workflows support interactive programs | Contracts refuse PTY/input and the UI does not show an input control | ❌ |
+| Process-tree stop and timeout | Coding agents must stop descendants, not only the launcher | Local runner creates a process group and kills its tree; container stop removes the worker; UI stop is owner-scoped and idempotent | ✅ |
+| Network denied by default | Codex and Claude Code sandbox network by default; OpenClaw supports sandbox network policy | Container worker uses `--network none`; local strict only permits policy-approved argv but has no OS egress boundary | 🟡 |
+| Filtered domain escalation and revocation | Claude Code supports domain/proxy policy; mature sandboxes can grant bounded egress | Tables and design exist; authenticated proxy, DNS/address enforcement, grant retry, and active revocation are not implemented | ❌ |
+| Secret-free child environment | Sandboxes should not inherit host credentials | Local and container launchers construct a minimal environment; literal/pattern credentials are rejected before persistence | ✅ |
+| Purpose-bound credential delivery and delta quarantine | Reference tools can use credentials; Raiker's target adds post-run local quarantine | Storage contracts exist, but delivery, scan, merge/discard UI, and cleanup saga are not connected to command execution | ❌ |
+| Redaction before storage or display | Coding agents suppress known secrets in logs | Incremental UTF-8 redaction covers all current patterns at every split, exact loaned secrets, PEM blocks, and fail-closed bounded pending data before persistence | ✅ beyond |
+| Durable output catch-up after browser reload | Reference desktop agents retain command history | Owner-scoped ordered chunks and receipts reload into Build without replaying a command | ✅ |
+| Immutable execution receipt | Reference products expose activity/history, generally without a canonical receipt digest | Canonical terminal receipt binds authority, environment, command-template digest, output truncation, and redaction count; replacement is refused | ✅ beyond |
+| Restart reattachment and honest uncertainty | Codex/OpenClaw supervise long-running work across UI/runtime churn | Browser reload works; a Raiker process restart cannot reattach and marks any unprovable active run `lost` with a receipt rather than inferring success | 🟡 |
+| SSH and managed cloud sandbox | Claude Code/Codex support remote/cloud execution patterns; Hermes supports remote tools | Profiles are selectable but command-supervisor readiness fails closed; no execution is claimed | ❌ |
+| Reset/recreate and recovery controls | Persistent sandboxes need an owner reset and cleanup path | Backend reset internals exist, but no owner-authorised API/UI or restart-safe cleanup saga is shipped | ❌ |
+| Capability truthfulness | Reference products vary in how unavailable controls are projected | API/UI derive features from proven backend support and disable/refuse unproved PTY, background, network, credential, persistence, and remote controls | ✅ beyond |
+
+The meaningful governance lead is already real: authority provenance, durable
+redacted catch-up, immutable receipts, exact environment choice, and honest
+`lost` outcomes. Raiker does **not** yet match the market leader's complete shell
+capability because native sandboxing, PTY/background supervision, filtered
+egress, restart reattachment, credentials quarantine, and remote backends remain
+absent. These are tracked as defects rather than hidden behind a parity claim.
+
+Design contract:
+[`superpowers/specs/2026-08-14-governed-shell-sandbox-and-recovery-design.md`](superpowers/specs/2026-08-14-governed-shell-sandbox-and-recovery-design.md).
+
+---
+
 ## Resilience and containment control set
 
 Reviewed 2026-08-10 while closing BUG-76 through BUG-81, against the failure

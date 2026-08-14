@@ -29,12 +29,12 @@ an acting principal. AI principals cannot hold human-only roles, including
 `capability_gate_state`; owner recovery is explicit, local, and audited.
 
 Approval resolution executes a narrow allowlist: local file mutations
-(`file_write_execution`, `patch_apply_execution`) and owner-configured
-SSH/Daytona commands (`remote_execution_cap`, `cloud_execution_cap`), only through the
-approval execution relay — a distinct, governed execution path that re-checks the
-target's capability gate, decision mode, policy review and the resolver's posture
-at execution time. File mutations additionally capture the pre-image so the
-change is reversible. For every other capability, approval
+(`file_write_execution`, `patch_apply_execution`) and governed local commands
+(`shell_execution`, `process_execution`), only through the approval execution relay —
+a distinct path that re-checks the target's capability gate, decision
+mode, policy review, authority id, and selected environment at execution time.
+SSH/Daytona profiles are readiness-only and cannot execute. File mutations
+additionally capture the pre-image so the change is reversible. For every other capability, approval
 resolution remains metadata-only: it records the decision and executes nothing.
 Which of the two applies is computed by the server and stated to the owner
 before they decide.

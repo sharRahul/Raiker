@@ -30,8 +30,10 @@ Policy evaluates the principal, capability, domain, risk, workspace scope,
 decision mode, and available executor. Strict non-allow blocking, role revoke
 governed, and capability gate per action are enforced. AI principals may propose
 work but cannot grant themselves authority. Approval resolution executes an
-approved local file mutation through the governed execution relay and is
-metadata-only for every other capability.
+approved local file mutation or a governed `shell`/`process` command through the
+execution relay and is metadata-only for every other capability. A command must
+carry its runtime-authored approval id or standing-grant id; selecting an
+execution environment is never authority.
 
 ## Per-turn machine identity boundary
 
@@ -79,6 +81,33 @@ and stdout. The bridge contains no dynamic import, shell, connector, credential,
 or arbitrary-command dispatch. Missing runtimes, disallowed images, unsupported
 tools, malformed responses, and cleanup failures are explicit and never cause a
 host fallback.
+
+## Governed command boundary
+
+Approved `shell`/`process` and standing-grant `run_command` share one
+owner-scoped durable lifecycle. There is no command-create API. The selected
+environment is authoritative: unavailable container, SSH, and Daytona profiles
+fail closed rather than running locally. Explicit `local_native` is a narrow
+argv-only host runner with a constructed secret-free environment and must be
+presented as reduced isolation, not as an OS sandbox.
+
+Command material is encrypted; the query surface exposes only safe display,
+digests, state, byte/redaction counters, environment, and authority provenance.
+Incremental UTF-8 redaction runs before any chunk is stored or shown, holds
+structured/partial secrets until decided, and replaces overlong undecidable
+input rather than allowing unbounded memory. Terminal state and receipt are
+committed together, and a receipt binds the authority, profile, backend,
+template digest, truncation, and redaction count. Browser reload reads ordered
+durable chunks. If process restart leaves no authenticatable backend handle,
+Raiker records `lost`; it never infers success.
+
+The selected container command path preserves the exact approved argv and
+requires a digest-pinned image, no network, read-only root, dropped
+capabilities, `no-new-privileges`, bounded resources, `.raiker` masking, and
+read-only `.git`. Native AppContainer/restricted-token isolation,
+PTY/background supervision, filtered egress, credential quarantine, restart
+reattachment, and remote command supervisors are not yet security boundaries;
+see BUG-194 and the compatibility matrix.
 
 
 ## Model supply and readiness controls

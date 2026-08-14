@@ -59,6 +59,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
+| [BUG-194](#bug-194--governed-shell-still-lacks-native-interactive-network-and-restart-parity) | High | Shell / sandbox / recovery | Open |
 | [OPT-01](#opt-01--adding-one-tool-takes-twelve-edits-across-seven-files) | Medium | Codebase structure | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
@@ -69,6 +70,54 @@ The memory audit of **2026-08-11** has its own document,
 standard. Its MEM-01 and MEM-02 are closed in
 [`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188; MEM-03 through
 MEM-09 are open there rather than duplicated here.
+
+---
+
+## BUG-194 — Governed shell still lacks native, interactive, network, and restart parity
+
+**Severity: High. Area: shell / sandbox / recovery. Status: Open.**
+
+**Observed.** The 2026-08-14 governed-shell work closes the dangerous routing
+and evidence gaps: approved shell/process actions and session-granted commands
+share one durable service, environment selection is authoritative, output is
+redacted before persistence, Build can catch up and stop a run, and every
+terminal outcome has an immutable authority-bound receipt. The feature matrix
+still correctly reports no native OS sandbox, PTY/input, background lifecycle,
+filtered egress, credential delivery/quarantine, restart reattachment, SSH, or
+Daytona command supervisor. Docker was installed but its daemon was unreachable
+on the live-test host, so the new container-shell path was not live-proven.
+
+**Reproduce.** Select `local_native` and inspect Runtime/Build: it is host access
+with reduced isolation, not an AppContainer/restricted-token boundary. Request
+interactive, background, network, credential, SSH, or Daytona execution and the
+backend fails closed with the corresponding `selected_environment_*_unsupported`
+or supervisor-unavailable reason. Restart Raiker during an active command: the
+durable run is reconciled to `lost`, because no authenticated backend handle can
+be reattached. Select a container profile while the daemon or pinned image is
+unavailable: readiness refuses it and does not use the host.
+
+**Root cause.** `CommandService` still owns process handles in the web process.
+The Rust protocol crate authenticates bounded frames but the packaged
+backend-resident supervisor, Windows sandbox runner/WFP service, egress proxy,
+durable encrypted handle, and remote adapters in the approved design are not
+connected. Container execution is a per-run `docker exec` client rather than a
+session supervisor. Credential-delta tables are storage contracts only.
+
+**Required fix.** Implement and package the versioned Rust supervisor and
+redaction vectors; Windows restricted-token/AppContainer runner with Job Object
+and WFP enforcement; persistent container/SSH/Daytona supervisor adapters;
+background start/poll/wait/log/input/kill and PTY; encrypted restart-safe handle
+and lease reconciliation; authenticated domain proxy with DNS/address checking
+and active revocation; purpose-bound credential delivery plus two-pass delta
+quarantine; and owner-authorised reset/recreate. Prove every backend independently
+and preserve the existing no-fallback and honest-`lost` rules.
+
+**Required user-interface outcome.** Runtime must show the exact probed boundary
+and only supported controls. Build must expose background/PTY/input/lease/reset,
+filtered-network approval and retry, restart reattachment, failure navigation,
+and credential-delta review only when the selected backend proves them. A
+degraded or unavailable backend must show the stable reason and remediation;
+no row may turn green from configuration or specification alone.
 
 ---
 

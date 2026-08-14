@@ -439,3 +439,27 @@ Specs: `bug-74-84-known-limits-live.spec.ts` and
 `containment-surface-live.spec.ts`, both re-runnable against an already-driven
 workspace. Screenshots `round0810-01` to `round0810-11` in
 `docs/plans/screenshots/working/`.
+
+## Result — 2026-08-14 (governed shell and provider matrix)
+
+A disposable loopback workspace was exercised through the built SPA in real
+Chromium. Each credential was entered through Models, was never placed in a
+command or document, and is absent from screenshots and repository state. The
+service and browser were stopped after the run.
+
+| Check | Result |
+|---|---|
+| Governed terminal | ✅ A real `git status --short` command produced durable redacted output and an immutable receipt; the same output/receipt survived two app reloads |
+| Authority path | ✅ Direct `POST /api/command-runs` is unavailable; approved `shell`/`process` and standing-grant `run_command` use the shared service and store their authority identity |
+| Selected environment | ✅ Local host access was explicit and labelled reduced isolation; an unavailable selected backend failed closed with no host fallback |
+| Container readiness | 🟡 Docker CLI was present but its daemon named pipe was unreachable, so the digest-pinned command backend remained unavailable and no live container-execution claim is made |
+| Ollama | ✅ Exact catalogue/readiness succeeded for `gemma4:31b-cloud` |
+| Anthropic | ✅ `claude-sonnet-4-6` passed the bounded hosted execution preflight |
+| OpenAI | ✅ The account correctly refused unavailable `gpt-5.6-terra`; `gpt-4o-mini` then passed readiness |
+| OpenRouter | ✅ `liquid/lfm-2.5-2.6b:free` passed readiness |
+| Visual review | ✅ `output/playwright/governed-terminal-live.png` and `output/playwright/provider-readiness-live.png` were inspected for legibility, truthful status, clipping, and secret absence |
+
+This run proves the foreground local shell, durability, governance evidence,
+and four-provider readiness surface. It does not prove PTY/background input,
+service-restart reattachment, filtered egress, credential quarantine, SSH,
+Daytona, or live Docker execution; those remain BUG-194.

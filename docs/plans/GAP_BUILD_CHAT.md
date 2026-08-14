@@ -104,11 +104,14 @@ The Approvals resolution path now invokes `ApprovalExecutionRelay` for
 is genuinely written, re-governed at execution time, and checkpointed first.
 Build is no longer a proposal generator for file work.
 
-**What is left of B1:** `shell` is still metadata-only on resolution, and that
-is deliberate — a command is neither local-only nor reversible, so it belongs
-with B5 (a narrow, owner-defined command allowlist under its own capability)
-rather than with the file relay. The executed/refused outcome is now threaded
-back into the transcript as a real tool result by B2 (FIXED-09).
+**B1 shell closure (2026-08-14):** approved `shell` and `process` actions now
+execute through the same durable `CommandService` as a standing-grant
+`run_command`. There is no owner-callable command-create API. Every accepted run
+stores the approval or standing-grant identity, bounded redacted output, exact
+selected environment, terminal outcome, and immutable receipt; a missing
+authority or unavailable selected backend fails closed. The executed/refused
+outcome is threaded back into the transcript as a real tool result by B2
+(FIXED-09).
 
 **B2. The turn resumes after an approval.** ✅ **Done — see FIXED-09.** The loop
 parks its working state against the approval and picks the same turn up on
@@ -146,12 +149,17 @@ than the batch, wherever in the batch it falls, and reaches the transcript as
 `model_tool_call_refused` — so `model_tool_calls_dropped` is left meaning only
 what it says.
 
-**B5. Test/command feedback channel.** ✅ **Done — see FIXED-44 and FIXED-47.**
+**B5. Test/command feedback channel.** ✅ **Done — see FIXED-44, FIXED-47, and
+the governed-shell implementation commits dated 2026-08-14.**
 A standing, expiring, revocable per-session
 command-prefix grant now returns bounded stdout/stderr and exit status with the
 workspace as cwd and a wall-clock cap. Anything outside the grant falls back to
-the approval-gated shell path. Granted commands execute in a no-network,
-resource-bounded container and never fall back to the host.
+the approval-gated shell path. Both paths converge on the same durable run and
+receipt lifecycle. The owner's selected environment is authoritative: a ready,
+pinned container runs there with no network and no host fallback; explicit
+`local_native` uses the narrow argv-only host runner and is labelled reduced
+isolation. Unsupported container, SSH, or Daytona features are refused rather
+than substituted.
 
 **B6. No task/plan state across the loop.** ✅ **Done — see FIXED-94.**
 `update_plan` writes an ordered checklist — one status per step, at most one
@@ -281,9 +289,14 @@ before accept, no partial rejection. **Work:** an inline side-by-side diff in
 the Build transcript with per-hunk accept/reject and an "edit then accept" path,
 resolving straight into the existing approval record.
 
-**B15. No terminal or output pane.** Command output, once B5 lands, has nowhere
-to stream. **Work:** a collapsible output pane with live streaming, exit status,
-and a jump-to-failure affordance.
+**B15. Terminal/output pane.** 🟡 **Partly complete (2026-08-14).** Build now has
+a responsive governed-terminal pane with selected-environment posture, durable
+redacted output catch-up, live status, process-tree stop, authority evidence,
+and immutable receipt inspection. It survives a browser reload because output
+and receipts are owner-scoped database records. PTY input, background-process
+controls, stream filters, failure-coordinate navigation, credential-delta
+review, and backend restart reattachment remain open and are tracked in the
+compatibility matrix and `TO_BE_FIXED.md`; the UI does not advertise them.
 
 **B16. Tool activity is buried.** Tool events render inside a collapsed
 governance `details`, so during a long turn the transcript looks idle.
@@ -312,10 +325,17 @@ transcript code (deliberately deferred in FIXED-06), no message edit-and-resend,
 no regenerate. Each is small; together they are most of the felt difference in
 daily use.
 
-**B20. Sandboxed execution environment.** review codebase and live test before marking this complete - 
-The local container slice is implemented; remote and cloud execution remain separate future capabilities.
-Owner-granted B5 commands now use the same Docker boundary principles with
-networking disabled and fail closed when its approved image is unavailable.
+**B20. Sandboxed execution environment.** 🟡 **Partly complete (2026-08-14).**
+The selected container command path is real rather than record-only: it requires
+a digest-pinned image, creates a non-networked read-only/capability-dropped
+worker with bounded CPU, memory, and PIDs, masks `.raiker`, mounts `.git`
+read-only, streams through the shared redactor, and never falls back to the
+host. Readiness probes the CLI, daemon, and exact image before selection is
+reported ready. The current test host had no reachable Docker daemon, so this
+path is automated-test proven but not live-container proven in this run.
+`local_native` is deliberately described as host access with reduced isolation;
+native OS sandboxing, persistent supervisor reattachment, filtered egress,
+SSH, and Daytona remain open and are not claimed as shipped.
 
 ### Found while closing B6, B7 and B8
 

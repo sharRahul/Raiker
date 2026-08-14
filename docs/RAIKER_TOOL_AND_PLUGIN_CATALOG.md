@@ -12,9 +12,9 @@ executor availability.
 Approval resolution is `metadata_only` except for an approved local file
 mutation (`write_file` / `edit_file` / `apply_patch`), an approved repository
 change (`git_branch` / `git_commit`), an approved push (`git_push`), an approved
-GitHub write (`github_write`),
-or an owner-configured
-SSH/Daytona command, which is executed once through the governed approval execution relay.
+GitHub write (`github_write`), or an approved governed local command (`shell` /
+`process`). Each is executed once through its governed execution relay.
+SSH/Daytona profiles remain readiness-only and fail closed.
 A supported durable mutation is
 `implemented_approval_required`; unsupported capabilities are disabled and
 fail-closed. Strict non-allow blocking, role revoke governed, and capability gate per action

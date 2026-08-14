@@ -110,6 +110,8 @@ _PREFIXES = {
     "grant_",
     # Immutable command credential-delta resolution receipt.
     "dres_",
+    # One durable governed command invocation.
+    "cmd_",
 }
 
 

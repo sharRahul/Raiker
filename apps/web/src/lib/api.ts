@@ -17,6 +17,9 @@ import type {
   ContainedSubject,
   ContextUsage,
   Checkpoint,
+  CommandChunkView,
+  CommandReceiptView,
+  CommandRunView,
   ComposerApprovalModeSettings,
   CodeMapStatus,
   CodeReposView,
@@ -1067,6 +1070,32 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ profile_id }),
       },
+    ),
+  commandRuns: (sessionId?: string) =>
+    request<{ runs: CommandRunView[] }>(
+      withQuery("/api/command-runs", { session_id: sessionId }),
+    ),
+  startCommand: (body: {
+    session_id: string;
+    command: string;
+    cwd?: string;
+    timeout_seconds?: number;
+    max_output_bytes?: number;
+  }) => postJson<{ ok: boolean; run: CommandRunView }>("/api/command-runs", body),
+  commandRun: (runId: string) =>
+    request<{ run: CommandRunView }>(`/api/command-runs/${encodeURIComponent(runId)}`),
+  commandOutput: (runId: string, after = 0) =>
+    request<{ chunks: CommandChunkView[]; next_after: number }>(
+      withQuery(`/api/command-runs/${encodeURIComponent(runId)}/output`, { after }),
+    ),
+  commandReceipt: (runId: string) =>
+    request<{ receipt: CommandReceiptView | null }>(
+      `/api/command-runs/${encodeURIComponent(runId)}/receipt`,
+    ),
+  stopCommand: (runId: string) =>
+    postJson<{ ok: boolean; run: CommandRunView }>(
+      `/api/command-runs/${encodeURIComponent(runId)}/stop`,
+      {},
     ),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(

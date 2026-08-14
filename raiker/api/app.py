@@ -19,6 +19,7 @@ from raiker.api.routes_approvals import router as approvals_router
 from raiker.api.routes_attachments import router as attachments_router
 from raiker.api.routes_auth import router as auth_router
 from raiker.api.routes_channels import router as channels_router
+from raiker.api.routes_commands import router as commands_router
 from raiker.api.routes_connectors import router as connectors_router
 from raiker.api.routes_control import router as control_router
 from raiker.api.routes_dashboard import router as dashboard_router
@@ -298,6 +299,10 @@ def create_app(
 
             app.state.managed_llama_runtime.stop()
 
+            command_service = getattr(app.state, "command_service", None)
+            if command_service is not None:
+                command_service.shutdown()
+
             invalidate_workspace_connections(app.state.workspace_root)
 
     app = FastAPI(
@@ -396,6 +401,7 @@ def create_app(
     app.include_router(attachments_router)
     app.include_router(approvals_router)
     app.include_router(channels_router)
+    app.include_router(commands_router)
     app.include_router(connectors_router)
     app.include_router(skills_router)
     app.include_router(language_router)

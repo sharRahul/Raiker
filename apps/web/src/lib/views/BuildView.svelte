@@ -73,6 +73,7 @@
   import ComposerChips from "../components/ComposerChips.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import TurnControl from "../components/TurnControl.svelte";
+  import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { thinkingSteps } from "../chatPresentation";
@@ -1040,6 +1041,8 @@
         </section>
       {/if}
     </div>
+
+    <CommandOutputPane {sessionId} />
 
     <form
       class="composer"

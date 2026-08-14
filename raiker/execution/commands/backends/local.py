@@ -5,7 +5,7 @@ from typing import Any
 
 from raiker.execution.commands.backends.base import CommandBackendError
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
-from raiker.execution.commands.runner import MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
 from raiker.runtime.command_policy import CommandRejected, sandbox_environment, validate_command
 from raiker.runtime.executors.sandbox import ALLOWED_SHELL_COMMANDS
 
@@ -16,7 +16,7 @@ class LocalStrictBackend:
     def __init__(self, *, runner: Callable[..., Any] | None = None) -> None:
         self._runner = runner or StreamingCommandRunner().start
 
-    def start(self, request: CommandRequest) -> Any:
+    def start(self, request: CommandRequest, sink: CommandSink | None = None) -> Any:
         if request.shell:
             raise CommandBackendError("local_strict_shell_source_denied")
         if request.background:
@@ -42,6 +42,6 @@ class LocalStrictBackend:
             list(request.argv_template),
             cwd,
             environment,
-            MemoryCommandSink(),
+            sink or MemoryCommandSink(),
             pty=False,
         )

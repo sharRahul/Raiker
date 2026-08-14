@@ -1668,6 +1668,61 @@ export interface ExecutionEnvironmentsView {
   };
 }
 
+export type CommandRunState =
+  | "queued"
+  | "starting"
+  | "running"
+  | "finalizing"
+  | "succeeded"
+  | "failed"
+  | "timed_out"
+  | "cancelled"
+  | "contained"
+  | "lost";
+
+export interface CommandRunView {
+  run_id: string;
+  session_id: string;
+  turn_id: string;
+  action_id: string;
+  state: CommandRunState;
+  profile_id: string;
+  backend: string;
+  safe_display: string;
+  started_at: string | null;
+  completed_at: string | null;
+  exit_code: number | null;
+  termination_reason: string | null;
+  stdout_bytes: number;
+  stderr_bytes: number;
+  truncated: boolean;
+  redaction_count: number;
+  receipt_digest: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CommandChunkView {
+  run_id: string;
+  sequence: number;
+  stream: "stdout" | "stderr" | "system";
+  text: string;
+  byte_count: number;
+  emitted_at: string;
+  start_byte_offset: number;
+  end_byte_offset: number;
+}
+
+export interface CommandReceiptView {
+  run_id: string;
+  state: CommandRunState;
+  exit_code: number | null;
+  termination_reason: string;
+  completed_at: string;
+  evidence: Record<string, unknown>;
+  digest: string;
+}
+
 export interface ModelCapacityEntry {
   profile_id: string;
   provider: string;

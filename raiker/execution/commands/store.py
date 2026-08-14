@@ -306,6 +306,36 @@ class CommandStore:
             ).fetchall()
         return [CommandChunk(**dict(row)) for row in rows]
 
+    def update_runtime_summary(
+        self,
+        owner_principal_id: str,
+        run_id: str,
+        *,
+        stdout_bytes: int,
+        stderr_bytes: int,
+        truncated: bool,
+        redaction_count: int,
+    ) -> None:
+        """Publish bounded runtime counters without exposing execution material."""
+        with self.sqlite.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE command_runs
+                   SET stdout_bytes = ?, stderr_bytes = ?, truncated = ?,
+                       redaction_count = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (
+                    max(0, stdout_bytes),
+                    max(0, stderr_bytes),
+                    int(truncated),
+                    max(0, redaction_count),
+                    utc_now(),
+                    owner_principal_id,
+                    run_id,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise CommandStoreError("command_run_not_found")
+
     def load(self, owner_principal_id: str, run_id: str) -> StoredCommandRun | None:
         with self.sqlite.connect() as connection:
             row = connection.execute(

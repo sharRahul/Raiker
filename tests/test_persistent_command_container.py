@@ -44,7 +44,7 @@ def request(tmp_path: Path, **overrides: object) -> CommandRequest:
         "credential_bindings": (),
         "shell": True,
         "interactive": False,
-        "background": True,
+        "background": False,
         "timeout_seconds": 30.0,
         "max_output_bytes": 100_000,
         "environment_profile_id": "container_a",
@@ -97,16 +97,22 @@ def test_container_name_is_stable_safe_and_run_specific() -> None:
     assert one != two
 
 
-def test_credential_worker_holds_exclusive_environment_lease(tmp_path: Path) -> None:
+def test_unproved_interactive_network_and_credential_features_fail_closed(tmp_path: Path) -> None:
     runtime = RecordingRuntime()
     backend = PersistentContainerBackend(runtime=runtime, workspace_root=tmp_path, profile=profile())
-    credentialed = request(
-        tmp_path,
-        credential_bindings=({"credential_id": "cred_1", "environment_name": "TOKEN"},),
-    )
-    backend.start(credentialed)
-    with pytest.raises(CommandBackendError, match="credential_environment_busy"):
-        backend.start(request(tmp_path, run_id="cmd_2", action_id="act_2"))
+    with pytest.raises(CommandBackendError, match="selected_environment_background_unsupported"):
+        backend.start(request(tmp_path, background=True))
+    with pytest.raises(CommandBackendError, match="selected_environment_pty_unsupported"):
+        backend.start(request(tmp_path, interactive=True))
+    with pytest.raises(CommandBackendError, match="selected_environment_network_unsupported"):
+        backend.start(request(tmp_path, network_policy_id="filtered"))
+    with pytest.raises(CommandBackendError, match="selected_environment_credential_unsupported"):
+        backend.start(
+            request(
+                tmp_path,
+                credential_bindings=({"credential_id": "cred_1", "environment_name": "TOKEN"},),
+            )
+        )
 
 
 def test_unresolved_delta_blocks_later_worker_until_discard(tmp_path: Path) -> None:

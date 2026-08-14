@@ -46,17 +46,7 @@ class ContainerCommandHandle:
 class PersistentContainerBackend:
     features = CommandFeatures(
         shell=True,
-        pty=True,
-        background=True,
-        input=True,
-        filtered_network=True,
-        persistent_environment=True,
-        persistent=True,
-        restart_recovery=True,
-        recoverable=True,
-        concurrent_runs=True,
-        credential_delivery=True,
-        credential_delta_quarantine=True,
+        process_tree_stop=False,
     )
 
     def __init__(
@@ -88,6 +78,14 @@ class PersistentContainerBackend:
             raise CommandBackendError("selected_environment_mismatch")
         if not request.shell:
             raise CommandBackendError("container_shell_template_required")
+        if request.background:
+            raise CommandBackendError("selected_environment_background_unsupported")
+        if request.interactive:
+            raise CommandBackendError("selected_environment_pty_unsupported")
+        if request.network_policy_id:
+            raise CommandBackendError("selected_environment_network_unsupported")
+        if request.credential_bindings:
+            raise CommandBackendError("selected_environment_credential_unsupported")
         if any(
             owner == request.owner_principal_id and profile == self.profile.profile_id
             for owner, profile, _run in self._blocked_deltas

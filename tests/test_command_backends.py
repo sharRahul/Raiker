@@ -193,3 +193,27 @@ def test_feature_contract_refuses_delivery_without_quarantine() -> None:
             credential_delivery=True,
             credential_delta_quarantine=False,
         )
+
+
+def test_container_profile_advertises_only_the_proven_foreground_shell() -> None:
+    features = ExecutionProfile(
+        "container_a",
+        "container",
+        runtime="docker",
+        image="raiker-command-sandbox@sha256:" + ("a" * 64),
+        tools=("shell",),
+        credential_delivery=True,
+        credential_delta_quarantine=True,
+    ).features
+
+    assert features.shell is True
+    assert features.process_tree_stop is False
+    assert features.pty is False
+    assert features.background is False
+    assert features.input is False
+    assert features.filtered_network is False
+    assert features.persistent is False
+    assert features.restart_recovery is False
+    assert features.concurrent_runs is False
+    assert features.credential_delivery is False
+    assert features.credential_delta_quarantine is False

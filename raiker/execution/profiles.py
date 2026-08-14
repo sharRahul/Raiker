@@ -46,19 +46,9 @@ class ExecutionProfile:
         if self.kind == "container":
             return CommandFeatures(
                 shell="shell" in self.tools,
-                pty=True,
-                background=True,
-                input=True,
-                filtered_network=True,
-                persistent_environment=True,
-                persistent=True,
-                restart_recovery=True,
-                recoverable=True,
-                concurrent_runs=True,
-                credential_delivery=self.credential_delivery,
-                credential_delta_quarantine=self.credential_delta_quarantine,
+                process_tree_stop=False,
             )
-        return CommandFeatures(shell=True, concurrent_runs=False)
+        return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
 
 
 @dataclass(frozen=True)

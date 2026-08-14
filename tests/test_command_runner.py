@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sys
 import time
+from itertools import product
 from pathlib import Path
 
 import pytest
@@ -116,7 +117,10 @@ def test_redactor_matches_whole_text_at_every_byte_boundary(payload: bytes, expe
         b"bearer\nabcdefghijklmnop",
         b"iban\nGB82WEST12345698765432",
         b"4111\n1111\n1111\n1111",
+        b"41111111\n11111111",
+        b"411111111111\n1111",
         b"123\n456\n7890",
+        b"123456\n7890",
     ),
 )
 def test_redactor_matches_whole_text_for_multiline_credentials_at_every_split(
@@ -131,6 +135,30 @@ def test_redactor_matches_whole_text_for_multiline_credentials_at_every_split(
         emitted += redactor.feed(payload[split:])
         emitted += redactor.finish()
         assert emitted == expected
+
+
+def test_redactor_matches_every_multiline_numeric_separator_grammar() -> None:
+    separators = ("", "-", " ", "\n")
+    card_payloads = (
+        f"4111{first}1111{second}1111{third}1111".encode()
+        for first, second, third in product(separators, repeat=3)
+        if "\n" in (first, second, third)
+    )
+    medical_payloads = (
+        f"123{first}456{second}7890".encode()
+        for first, second in product(separators, repeat=2)
+        if "\n" in (first, second)
+    )
+    from raiker.context.redaction import redact_text
+
+    for payload in (*card_payloads, *medical_payloads):
+        expected = redact_text(payload.decode())[0].encode()
+        for split in range(len(payload) + 1):
+            redactor = StreamingRedactor()
+            emitted = redactor.feed(payload[:split])
+            emitted += redactor.feed(payload[split:])
+            emitted += redactor.finish()
+            assert emitted == expected
 
 
 @pytest.mark.parametrize(

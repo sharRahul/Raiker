@@ -47,6 +47,13 @@ _MULTILINE_PATTERN_TRIGGERS = (
     "swift",
     "routing",
 )
+_MULTILINE_NUMERIC_PREFIXES = (
+    # Card: one, two, or three complete four-digit groups followed by LF;
+    # prior group separators are optional in the canonical rule.
+    re.compile(r"\b\d{4}(?:[-\s]?\d{4}){0,2}\n"),
+    # Medical id: one or two complete three-digit groups followed by LF.
+    re.compile(r"\b\d{3}(?:[-\s]?\d{3})?\n"),
+)
 
 
 class StreamingRedactor:
@@ -166,11 +173,13 @@ class StreamingRedactor:
             if (position := lowered.find(trigger)) != -1
         ]
         # The card and medical-id rules have no textual label to anchor them.
-        # A three/four-digit group followed by LF can begin either canonical
-        # multiline form, so it remains pending until later groups decide it.
+        # Hold the complete canonical prefixes rather than only their first
+        # group: separators between earlier groups are optional, so LF can be
+        # the first separator after 4/8/12 card digits or 3/6 medical-id digits.
         starts.extend(
             match.start()
-            for match in re.finditer(r"(?<!\d)(?:\d{4}|\d{3})\n", self._pending[:cut])
+            for pattern in _MULTILINE_NUMERIC_PREFIXES
+            for match in pattern.finditer(self._pending[:cut])
         )
         return min(cut, *starts) if starts else cut
 

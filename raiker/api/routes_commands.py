@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import os
-import shlex
 from dataclasses import asdict
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
-from pydantic import BaseModel, ConfigDict, Field
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.sessions import ApiSession
@@ -17,17 +14,6 @@ from raiker.runtime.authority.models import Principal
 router = APIRouter()
 
 
-class StartCommandRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    session_id: str = Field(min_length=1, max_length=200)
-    command: str = Field(min_length=1, max_length=8_192)
-    argv: list[str] | None = None
-    cwd: str = Field(default=".", min_length=1, max_length=1_024)
-    timeout_seconds: float = Field(default=30.0, gt=0, le=3_600)
-    max_output_bytes: int = Field(default=100_000, gt=0, le=5_000_000)
-
-
 def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(request.app.state.workspace_root).authenticate(request)
 
@@ -35,7 +21,7 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 def _service(request: Request) -> CommandService:
     service = getattr(request.app.state, "command_service", None)
     if service is None:
-        service = CommandService(request.app.state.workspace_root)
+        service = CommandService.for_workspace(request.app.state.workspace_root)
         request.app.state.command_service = service
     return service
 
@@ -67,31 +53,6 @@ def _raise_service(exc: CommandServiceError) -> NoReturn:
         status_code=code,
         detail={"ok": False, "reason_code": exc.reason_code},
     ) from exc
-
-
-@router.post("/api/command-runs", status_code=status.HTTP_202_ACCEPTED)
-def start_command(
-    body: StartCommandRequest,
-    request: Request,
-    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
-) -> dict[str, Any]:
-    session, principal = auth_data
-    try:
-        argv = body.argv if body.argv is not None else shlex.split(body.command, posix=os.name != "nt")
-        run = _service(request).start(
-            owner_principal_id=session.principal_id,
-            acting_principal_id=principal.principal_id,
-            session_id=body.session_id,
-            command=body.command,
-            argv=argv,
-            cwd=body.cwd,
-            timeout_seconds=body.timeout_seconds,
-            max_output_bytes=body.max_output_bytes,
-        )
-    except (CommandServiceError, ValueError) as exc:
-        reason = exc.reason_code if isinstance(exc, CommandServiceError) else str(exc)
-        _raise_service(CommandServiceError(reason))
-    return {"ok": True, "run": _run_view(run)}
 
 
 @router.get("/api/command-runs")

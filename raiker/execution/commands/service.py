@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+import weakref
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,11 @@ from raiker.execution.commands.models import (
     CommandState,
     StoredCommandRun,
 )
-from raiker.execution.commands.store import CommandStore, OutputQuotaExceeded
+from raiker.execution.commands.store import (
+    CommandStore,
+    OutputQuotaExceeded,
+    SecretMaterialRejected,
+)
 from raiker.execution.profiles import resolve_command_environment
 from raiker.storage.sqlite import SQLiteStore
 
@@ -100,6 +105,21 @@ class _StoreSink:
 class CommandService:
     """Owner-scoped lifecycle facade over the governed command runner."""
 
+    _instances: weakref.WeakValueDictionary[str, CommandService] = (
+        weakref.WeakValueDictionary()
+    )
+    _instances_lock = threading.Lock()
+
+    @classmethod
+    def for_workspace(cls, workspace_root: str | Path) -> CommandService:
+        key = str(Path(workspace_root).resolve())
+        with cls._instances_lock:
+            service = cls._instances.get(key)
+            if service is None:
+                service = cls(key)
+                cls._instances[key] = service
+            return service
+
     def __init__(self, workspace_root: str | Path) -> None:
         self.workspace_root = Path(workspace_root).resolve()
         self.sqlite = SQLiteStore(self.workspace_root)
@@ -113,6 +133,10 @@ class CommandService:
         owner_principal_id: str,
         acting_principal_id: str,
         session_id: str,
+        turn_id: str,
+        action_id: str,
+        authority_kind: str,
+        authority_id: str,
         command: str,
         argv: list[str],
         cwd: str = ".",
@@ -137,8 +161,8 @@ class CommandService:
             owner_principal_id=owner_principal_id,
             acting_principal_id=acting_principal_id,
             session_id=session_id,
-            turn_id=new_id("turn_"),
-            action_id=new_id("act_"),
+            turn_id=turn_id,
+            action_id=action_id,
             repository_id=None,
             workspace_root=self.workspace_root,
             cwd=cwd,
@@ -153,8 +177,13 @@ class CommandService:
             max_output_bytes=max_output_bytes,
             environment_profile_id=profile.profile_id,
             network_policy_id=None,
+            authority_kind=authority_kind,
+            authority_id=authority_id,
         )
-        self.store.create(request)
+        try:
+            self.store.create(request)
+        except SecretMaterialRejected as exc:
+            raise CommandServiceError(str(exc)) from None
         self.store.transition(owner_principal_id, request.run_id, CommandState.QUEUED, CommandState.STARTING)
 
         def complete(state: CommandState, returncode: int | None, sink: _StoreSink) -> None:
@@ -175,6 +204,30 @@ class CommandService:
             if handle.poll() is not None:
                 self._active.pop(request.run_id, None)
         return self.store.load(owner_principal_id, request.run_id)  # type: ignore[return-value]
+
+    def run_foreground(self, **kwargs: Any) -> dict[str, Any]:
+        run = self.start(**kwargs)
+        with self._lock:
+            handle = self._active.get(run.run_id)
+        if handle is not None:
+            handle.wait(float(kwargs.get("timeout_seconds", 30.0)) + 5.0)
+        owner = str(kwargs["owner_principal_id"])
+        current = self.store.load(owner, run.run_id)
+        if current is None:
+            raise CommandServiceError("command_run_not_found")
+        chunks = self.store.read_output(owner, run.run_id)
+        receipt = self.store.get_receipt(owner, run.run_id)
+        return {
+            "run_id": run.run_id,
+            "returncode": current.exit_code,
+            "stdout": "".join(chunk.text for chunk in chunks if chunk.stream == "stdout"),
+            "stderr": "".join(chunk.text for chunk in chunks if chunk.stream == "stderr"),
+            "stdout_bytes": current.stdout_bytes,
+            "stderr_bytes": current.stderr_bytes,
+            "truncated": current.truncated,
+            "state": current.state.value,
+            "receipt_digest": receipt.digest if receipt else None,
+        }
 
     def _contain_start_failure(self, request: CommandRequest, reason: str) -> None:
         self.store.transition(
@@ -212,6 +265,10 @@ class CommandService:
                 "backend": "local_strict",
                 "profile_id": request.environment_profile_id,
                 "template_digest": request.template_digest,
+                "authority": {
+                    "kind": request.authority_kind,
+                    "id": request.authority_id,
+                },
                 "output_truncated": sink.truncated,
                 "redaction_count": sink.redaction_count,
             },

@@ -77,7 +77,7 @@ def run_command(
     from raiker.runtime.command_policy import sandbox_environment
 
     child_env = sandbox_environment(workspace_root=cwd or Path.cwd(), extra=env)
-    launch_command = _portable_command(command)
+    launch_command = portable_command(command)
     try:
         proc = subprocess.run(
             launch_command,
@@ -107,7 +107,7 @@ def run_command(
     }
 
 
-def _portable_command(command: Sequence[str]) -> Sequence[str]:
+def portable_command(command: Sequence[str]) -> Sequence[str]:
     """Keep the small governed read surface usable on native Windows.
 
     Policy validation always runs against the owner's original argv first, so
@@ -115,7 +115,12 @@ def _portable_command(command: Sequence[str]) -> Sequence[str]:
     executable; use Raiker's interpreter only as an implementation detail for
     reading the already-contained file arguments.
     """
-    if os.name != "nt" or not command or command[0].lower() != "cat":
+    if os.name != "nt" or not command:
+        return command
+    if command[0].lower() == "echo":
+        writer = "import sys;sys.stdout.write(' '.join(sys.argv[1:])+'\\n')"
+        return (sys.executable, "-c", writer, *command[1:])
+    if command[0].lower() != "cat":
         return command
     reader = (
         "import pathlib,sys;"

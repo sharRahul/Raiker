@@ -60,4 +60,6 @@ it("shows the authoritative environment, redacted output, and immutable receipt"
   expect(await screen.findByText("clean")).toBeInTheDocument();
   expect(await screen.findByText(/Immutable receipt/)).toBeInTheDocument();
   expect(screen.getByText("local_strict")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Run" })).not.toBeInTheDocument();
+  expect(screen.getByText(/Commands start through the governed agent path/i)).toBeInTheDocument();
 });

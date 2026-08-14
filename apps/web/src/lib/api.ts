@@ -1075,13 +1075,6 @@ export const api = {
     request<{ runs: CommandRunView[] }>(
       withQuery("/api/command-runs", { session_id: sessionId }),
     ),
-  startCommand: (body: {
-    session_id: string;
-    command: string;
-    cwd?: string;
-    timeout_seconds?: number;
-    max_output_bytes?: number;
-  }) => postJson<{ ok: boolean; run: CommandRunView }>("/api/command-runs", body),
   commandRun: (runId: string) =>
     request<{ run: CommandRunView }>(`/api/command-runs/${encodeURIComponent(runId)}`),
   commandOutput: (runId: string, after = 0) =>

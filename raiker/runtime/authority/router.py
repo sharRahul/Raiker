@@ -196,6 +196,10 @@ class GovernedAction:
     # Internal broker-only override after the owner's per-turn approval mode has
     # already selected auto/skip. It changes the decision path, never the actor.
     decision_mode_override: str | None = None
+    # Runtime-authored proof for command execution. Model arguments can never
+    # populate these fields; the approval relay or standing-grant broker does.
+    authority_kind: str = ""
+    authority_id: str = ""
 
 
 @dataclass(frozen=True)

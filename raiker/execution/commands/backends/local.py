@@ -7,7 +7,7 @@ from raiker.execution.commands.backends.base import CommandBackendError
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
 from raiker.runtime.command_policy import CommandRejected, sandbox_environment, validate_command
-from raiker.runtime.executors.sandbox import ALLOWED_SHELL_COMMANDS
+from raiker.runtime.executors.sandbox import ALLOWED_SHELL_COMMANDS, portable_command
 
 
 class LocalStrictBackend:
@@ -39,7 +39,7 @@ class LocalStrictBackend:
         environment = sandbox_environment(workspace_root=request.workspace_root)
         return self._runner(
             request,
-            list(request.argv_template),
+            list(portable_command(request.argv_template)),
             cwd,
             environment,
             sink or MemoryCommandSink(),

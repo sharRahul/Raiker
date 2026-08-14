@@ -81,6 +81,7 @@ class CommandMaterialCipher:
 
 _SECRET_PATTERNS = (
     re.compile(r"\bsk-(?:proj|ant|or-v1)-[A-Za-z0-9_-]{16,}\b"),
+    re.compile(r"\bsk-ant-api\d+-[A-Za-z0-9_-]{16,}\b"),
     re.compile(r"\b(?:ghp|github_pat)_[A-Za-z0-9_]{16,}\b"),
     re.compile(r"\bAKIA[A-Z0-9]{16}\b"),
 )

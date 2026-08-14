@@ -10,6 +10,7 @@ from raiker.cli.commands import handle_slash_command
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
 from raiker.control.dashboard import DashboardService
+from raiker.execution.commands.store import CommandStore
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -147,7 +148,7 @@ def test_terminal_execution_redacts_secret_like_output_before_history(
     detail = DashboardService(workspace).get_approval("appr_terminal")
 
     assert "sk-ant-api03" not in result
-    assert "[REDACTED_TOKEN]" in result
+    assert "command_secret_pattern_rejected" in result
     assert detail is not None
-    assert detail.execution_evidence["output_redacted"] is True
-    assert "sk-ant-api03" not in str(detail.execution_evidence["stdout"])
+    assert store.load_approval("appr_terminal")["status"] == "execution_failed"  # type: ignore[index]
+    assert CommandStore(store).list_runs("principal_owner") == []

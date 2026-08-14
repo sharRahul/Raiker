@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.execution.commands.service import CommandService, CommandServiceError
 from raiker.execution.container_tools import ContainerToolExecutor
 from raiker.execution.profiles import (
     ExecutionProfile,
@@ -154,6 +156,7 @@ class ToolBroker:
         self.writer = writer
         self.hook_dispatcher = hook_dispatcher
         self.principal_id = principal_id
+        self.command_service = CommandService.for_workspace(self.workspace_root)
         self.memory_service = GovernedMemoryService(
             self.workspace_root,
             store=store or SQLiteStore(self.workspace_root),
@@ -391,7 +394,6 @@ class ToolBroker:
     ) -> dict[str, Any]:
         import shlex
 
-        from raiker.runtime.executors.containers import run_isolated_workspace_command
         from raiker.runtime.executors.sandbox import (
             ALLOWED_SHELL_COMMANDS,
             SandboxError,
@@ -425,14 +427,35 @@ class ToolBroker:
             }
         try:
             check_command_allowlist(command, ALLOWED_SHELL_COMMANDS)
-            result = run_isolated_workspace_command(
-                command,
-                workspace_root=self.workspace_root,
-                timeout=float(grant["timeout_seconds"]),
+            grant_identity = hashlib.sha256(
+                json.dumps(
+                    {
+                        "session_id": context.session_id,
+                        "principal_id": context.owner_principal_id,
+                        "commands": grant.get("commands", []),
+                        "expires_at": grant.get("expires_at"),
+                        "created_at": grant.get("created_at"),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode()
+            ).hexdigest()
+            result = self.command_service.run_foreground(
+                owner_principal_id=context.owner_principal_id,
+                acting_principal_id=context.acting_principal_id,
+                session_id=context.session_id,
+                turn_id=context.turn_id,
+                action_id=new_id("act_"),
+                authority_kind="session_command_grant",
+                authority_id=grant_identity,
+                command=str(args.get("command", "")),
+                argv=command,
+                timeout_seconds=float(grant["timeout_seconds"]),
                 max_output_bytes=100_000,
             )
-        except SandboxError as exc:
-            return {"status": "failed", "error": {"type": str(exc)}}
+        except (SandboxError, CommandServiceError) as exc:
+            reason = exc.reason_code if isinstance(exc, CommandServiceError) else str(exc)
+            return {"status": "failed", "error": {"type": reason}}
         return {"status": "success", **result}
 
     def _create_document(

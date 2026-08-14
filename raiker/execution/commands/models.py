@@ -78,6 +78,8 @@ class CommandRequest:
     max_output_bytes: int
     environment_profile_id: str
     network_policy_id: str | None
+    authority_kind: str = ""
+    authority_id: str = ""
     template_digest: str = field(init=False)
 
     def __post_init__(self) -> None:
@@ -96,6 +98,8 @@ class CommandRequest:
         )
         if any(not value.strip() for value in required):
             raise ValueError("command_identity_invalid")
+        if bool(self.authority_kind.strip()) != bool(self.authority_id.strip()):
+            raise ValueError("command_authority_invalid")
         if self.timeout_seconds <= 0:
             raise ValueError("command_timeout_invalid")
         if self.max_output_bytes <= 0:
@@ -137,6 +141,8 @@ class CommandRequest:
             "timeout_seconds": self.timeout_seconds,
             "max_output_bytes": self.max_output_bytes,
             "network_policy_id": self.network_policy_id,
+            "authority_kind": self.authority_kind,
+            "authority_id": self.authority_id,
         }
 
 

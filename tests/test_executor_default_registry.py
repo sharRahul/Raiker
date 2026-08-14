@@ -7,12 +7,14 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.execution.commands.service import CommandService
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
 from raiker.runtime.authority.models import Principal, RiskLevelValue
 from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     build_default_executor_registry,
 )
+from raiker.runtime.executors.tier2_shell import ShellExecutor
 from raiker.runtime.executors.tier6_domains import FinanceRuntimeExecutor, MedicalRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
 
@@ -113,3 +115,31 @@ def test_real_capability_enables_and_executes(tmp_path: Path) -> None:
     assert result.decision == "allow"
     assert result.message == "executed"
     assert (ws / "out.txt").read_text(encoding="utf-8") == "real work"
+
+
+def test_shell_executor_uses_durable_command_lifecycle(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    service = CommandService(ws)
+    executor = ShellExecutor(ws, command_service=service)
+    principal = Principal(**service.sqlite.get_principal("principal_owner"))  # type: ignore[arg-type]
+    action = GovernedAction(
+        action_id="act_approved_shell",
+        principal_id="principal_owner",
+        action_type="shell",
+        tool_or_service_name="shell",
+        arguments={"command": ["git", "--version"]},
+        session_id="sess_build",
+        turn_id="turn_build",
+        authority_kind="approval",
+        authority_id="approval_shell",
+    )
+
+    result = executor.execute(action, principal)
+
+    assert result.ok is True
+    run_id = str(result.artifacts["run_id"])
+    run = service.store.load("principal_owner", run_id)
+    assert run is not None
+    assert run.receipt_digest
+    assert service.store.get_receipt("principal_owner", run_id) is not None

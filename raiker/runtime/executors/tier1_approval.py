@@ -281,6 +281,8 @@ class ApprovalExecutionRelay:
             # human-approved critical action clears the deny floor while still
             # running under its own gate, policy review, and posture check.
             critical_confirmation=action.critical_confirmation,
+            authority_kind="approval",
+            authority_id=approval_id,
         )
         result = self._get_authority().route_action(target_action, principal)
         executed = result.decision == "allow" and result.error is None

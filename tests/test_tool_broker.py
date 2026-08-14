@@ -8,6 +8,7 @@ from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id
 from raiker.contracts.models import ClientMetadata, ToolAction
 from raiker.events.writer import EventLogWriter
+from raiker.execution.commands.store import CommandStore
 from raiker.execution.container_tools import ContainerToolExecutor
 from raiker.execution.profiles import ExecutionProfile, ProfileResolution
 from raiker.models.contracts import ToolCallProposal
@@ -177,24 +178,10 @@ def test_create_document_generates_and_attaches_without_approval(
 
 
 def test_run_command_returns_feedback_only_for_exact_active_session_grant(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     from datetime import UTC, datetime, timedelta
 
-    monkeypatch.setenv("RAIKER_COMMAND_SANDBOX_IMAGE", "python:3.12-alpine")
-    monkeypatch.setenv("RAIKER_CONTAINER_IMAGE_ALLOWLIST", "python:3.12-alpine")
-    captured: dict = {}
-
-    def isolated_runner(command, **kwargs):  # type: ignore[no-untyped-def]
-        captured["command"] = command
-        return {
-            "returncode": 0, "stdout": "42\n", "stderr": "",
-            "stdout_bytes": 3, "stderr_bytes": 0, "truncated": False,
-        }
-
-    monkeypatch.setattr(
-        "raiker.runtime.executors.containers.run_command", isolated_runner
-    )
     broker = _broker(tmp_path)
     session_id = new_id("sess_")
     broker.store.put_session_command_grant(  # type: ignore[union-attr]
@@ -203,7 +190,7 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(
         # RAIKER-2023: the grant names a command the policy will also allow;
         # `python -c` is an interpreter escape and is refused before any grant
         # is consulted.
-        commands=[["echo"]],
+        commands=[["git", "--version"]],
         timeout_seconds=5,
         expires_at=(datetime.now(UTC) + timedelta(minutes=5)).isoformat(),
     )
@@ -211,16 +198,16 @@ def test_run_command_returns_feedback_only_for_exact_active_session_grant(
         ToolCallProposal(
             call_id="call_command",
             tool_name="run_command",
-            arguments={"command": "echo 42"},
+            arguments={"command": "git --version"},
         )
     )
     result, decision = broker.execute(allowed, session_id=session_id, turn_id=new_id("turn_"))
     assert decision.decision == "allow"
     assert result.status == "success"
-    assert result.output["stdout"] == "42\n"  # type: ignore[index]
     assert result.output["returncode"] == 0  # type: ignore[index]
-    assert "--network" in captured["command"]
-    assert "none" in captured["command"]
+    assert result.output["run_id"].startswith("cmd_")  # type: ignore[index,union-attr]
+    runs = CommandStore(broker.store).list_runs("principal_owner")  # type: ignore[arg-type]
+    assert [row.run_id for row in runs] == [result.output["run_id"]]  # type: ignore[index,union-attr]
 
     denied, _ = broker.execute(
         allowed, session_id=new_id("sess_"), turn_id=new_id("turn_")

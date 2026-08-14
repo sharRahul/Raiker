@@ -12,7 +12,6 @@
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
   let open = $state(false);
-  let command = $state("git status --short");
   let environment = $state<ExecutionEnvironment | null>(null);
   let runs = $state<CommandRunView[]>([]);
   let selectedId = $state<string | null>(null);
@@ -53,26 +52,6 @@
       }
       error = null;
     } catch (exc) { error = reason(exc); }
-  }
-
-  async function run() {
-    if (command.trim() === "") return;
-    busy = true;
-    error = null;
-    try {
-      const result = await api.startCommand({
-        session_id: sessionId ?? "build_workspace",
-        command: command.trim(),
-      });
-      selectedId = result.run.run_id;
-      chunks = [];
-      receipt = null;
-      open = true;
-      await refresh();
-    } catch (exc) {
-      error = reason(exc);
-      await refresh();
-    } finally { busy = false; }
   }
 
   async function stop() {
@@ -119,15 +98,9 @@
         <span class:ready={receipt !== null}><i></i>Receipt</span>
       </div>
 
-      <div class="command-row">
-        <label for="governed-command" class="sr-only">Command arguments</label>
-        <span class="prompt" aria-hidden="true">$</span>
-        <input id="governed-command" bind:value={command} disabled={busy} onkeydown={(event) => {
-          if (event.key === "Enter") { event.preventDefault(); void run(); }
-        }} />
-        <button class="btn btn-primary btn-sm" type="button" onclick={() => void run()} disabled={busy || command.trim() === "" || environment?.available === false}>
-          <Icon name="play" size={13} /> Run
-        </button>
+      <div class="command-row command-notice">
+        <Icon name="shield" size={14} />
+        <span>Commands start through the governed agent path after an approval or bounded session grant.</span>
         {#if selected && !terminal}
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => void stop()} disabled={busy}>
             <Icon name="stop" size={13} /> Stop
@@ -183,8 +156,7 @@
   .receipt-rail span.ready i { border-color: var(--ok); background: var(--ok); }
   .receipt-rail b { height: 1px; background: var(--border); }
   .command-row { display: flex; align-items: center; gap: .45rem; padding: .42rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
-  .prompt { color: var(--accent); font: 700 .85rem var(--font-mono); }
-  .command-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: .75rem/1.4 var(--font-mono); }
+  .command-notice { color: var(--text-2); font-size: .72rem; }
   .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: .66rem; }
   .posture span { display: inline-flex; align-items: center; gap: .28rem; }
   .output-shell { min-height: 112px; overflow: hidden; border: 1px solid #30363b; border-radius: var(--r-md); background: #171a1c; color: #e8e8e2; color-scheme: dark; }

@@ -97,13 +97,35 @@ class CommandStore:
 
     def _reject_secrets(self, request: CommandRequest) -> None:
         material = json.dumps(request.execution_material(), sort_keys=True)
-        safe_display = request.safe_display
         for secret in self.registered_secrets:
-            if secret in material or secret in safe_display:
+            if secret in material or secret in request.safe_display:
                 raise SecretMaterialRejected("command_secret_literal_rejected")
-        _safe_material, material_changed = redact_text(material)
-        _safe_display, display_changed = redact_text(safe_display)
-        if material_changed or display_changed:
+
+        # Scan values with their declared meaning instead of scanning one JSON
+        # blob. Record ids, content digests, and workspace paths can be long by
+        # construction; treating those as free-form entropy rejects legitimate
+        # approval/grant evidence while adding no protection to command text.
+        # The contextual modes only relax the generic entropy fallback. Named
+        # token/password/key patterns and registered exact secrets still fail.
+        strict_values = (
+            request.executable_template,
+            *request.argv_template,
+            request.safe_display,
+            request.authority_kind,
+            *(binding.environment_name for binding in request.credential_bindings),
+        )
+        identifier_values = (
+            request.network_policy_id or "",
+            *(binding.credential_id for binding in request.credential_bindings),
+        )
+        locator_values = (str(request.workspace_root), request.cwd)
+        scans = (
+            *((value, {}) for value in strict_values),
+            *((value, {"identifier_value": True}) for value in identifier_values),
+            *((value, {"locator_value": True}) for value in locator_values),
+            (request.authority_id, {"digest_value": True}),
+        )
+        if any(redact_text(value, **mode)[1] for value, mode in scans if value):
             raise SecretMaterialRejected("command_secret_pattern_rejected")
 
     def create(self, request: CommandRequest) -> StoredCommandRun:

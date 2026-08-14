@@ -5,7 +5,7 @@ use std::io::{self, Read, Write};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let key_text = env::var("RAIKER_COMMAND_SUPERVISOR_KEY")?;
-    if key_text.as_bytes().len() < 32 {
+    if key_text.len() < 32 {
         return Err("RAIKER_COMMAND_SUPERVISOR_KEY must contain at least 32 bytes".into());
     }
     let mut input = Vec::new();

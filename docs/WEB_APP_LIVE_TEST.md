@@ -449,7 +449,7 @@ service and browser were stopped after the run.
 
 | Check | Result |
 |---|---|
-| Governed terminal | ✅ A real `git status --short` command produced durable redacted output and an immutable receipt; the same output/receipt survived two app reloads |
+| Governed terminal | ✅ A real exact-argv `git --version` command produced durable redacted output and an immutable receipt from the final rebuilt SPA; the earlier `git status --short` output/receipt also survived two app reloads |
 | Authority path | ✅ Direct `POST /api/command-runs` is unavailable; approved `shell`/`process` and standing-grant `run_command` use the shared service and store their authority identity |
 | Selected environment | ✅ Local host access was explicit and labelled reduced isolation; an unavailable selected backend failed closed with no host fallback |
 | Container readiness | 🟡 Docker CLI was present but its daemon named pipe was unreachable, so the digest-pinned command backend remained unavailable and no live container-execution claim is made |
@@ -457,7 +457,7 @@ service and browser were stopped after the run.
 | Anthropic | ✅ `claude-sonnet-4-6` passed the bounded hosted execution preflight |
 | OpenAI | ✅ The account correctly refused unavailable `gpt-5.6-terra`; `gpt-4o-mini` then passed readiness |
 | OpenRouter | ✅ `liquid/lfm-2.5-2.6b:free` passed readiness |
-| Visual review | ✅ `output/playwright/governed-terminal-live.png` and `output/playwright/provider-readiness-live.png` were inspected for legibility, truthful status, clipping, and secret absence |
+| Visual review | ✅ `output/playwright/governed-terminal-rerun-live.png` (expanded authority-bearing receipt) and `output/playwright/provider-readiness-live.png` were inspected for legibility, truthful status, clipping, and secret absence |
 
 This run proves the foreground local shell, durability, governance evidence,
 and four-provider readiness surface. It does not prove PTY/background input,

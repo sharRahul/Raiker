@@ -28,8 +28,8 @@ identity and selected environment, redacts output before persistence, and
 requires an immutable receipt for every terminal state. File mutations are
 additionally checkpointed so they stay reversible. SSH and Daytona command
 profiles remain readiness-only and fail closed; they are not executable merely
-because a profile record exists. Approval remains metadata-only for every other
-capability.
+because a profile record exists. Approval resolution remains
+metadata-only for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
 
 Per-turn machine identity is `implemented_verified`. Every ordinary, resumed,

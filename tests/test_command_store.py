@@ -87,6 +87,25 @@ def test_authority_evidence_is_queryable_without_decrypting_execution_material(s
     assert created.authority_id == "grant_a"
 
 
+def test_digest_authority_is_not_mistaken_for_secret_material(store: CommandStore) -> None:
+    digest = "a" * 64
+    created = store.create(
+        request(authority_kind="session_command_grant", authority_id=digest)
+    )
+
+    assert created.authority_id == digest
+
+
+def test_secret_shaped_authority_is_rejected_before_persistence(store: CommandStore) -> None:
+    with pytest.raises(SecretMaterialRejected, match="command_secret_pattern_rejected"):
+        store.create(
+            request(
+                authority_kind="approval",
+                authority_id="sk-examplecredentialvalue123456789",
+            )
+        )
+
+
 @pytest.mark.parametrize("cwd", ("../escape", "/absolute", "C:/absolute"))
 def test_request_rejects_uncontained_working_directory(cwd: str) -> None:
     with pytest.raises(ValueError, match="command_cwd_invalid"):

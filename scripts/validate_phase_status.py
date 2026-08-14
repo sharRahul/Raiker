@@ -22,7 +22,7 @@ REQUIRED_MARKERS = {
     Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
         "implemented_approval_required",
         "metadata_only",
-        "Each is executed once through its governed execution relay",
+        "Each is executed once through the governed approval execution relay",
     ],
     Path("docs/EVENT_CATALOG.md"): [
         "approval_denied",

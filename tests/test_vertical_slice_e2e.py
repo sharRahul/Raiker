@@ -559,6 +559,8 @@ def test_shell_executor_blocked_not_allowed(tmp_path: Path) -> None:
         action_id=new_id("act_"), principal_id="principal_owner",
         action_type="shell", tool_or_service_name="shell",
         arguments={"command": ["rm", "-rf", "/"]}, risk_level=RiskLevelValue.LOW,
+        authority_kind="approval", authority_id="approval_shell_denial",
+        session_id="sess_shell_denial", turn_id="turn_shell_denial",
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"

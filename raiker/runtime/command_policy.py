@@ -26,10 +26,17 @@ from __future__ import annotations
 
 import os
 import re
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
+
+ALLOWED_SHELL_COMMANDS: frozenset[str] = frozenset({
+    "ls", "cat", "head", "tail", "echo", "pwd", "which",
+    "git", "python", "pip", "node", "npm",
+    "diff", "grep", "find", "sort", "wc", "uniq",
+})
 
 
 class CommandRejected(ValueError):
@@ -443,3 +450,20 @@ def sandbox_environment(
     )
     environment.update(extra or {})
     return environment
+
+
+def portable_command(command: Sequence[str]) -> Sequence[str]:
+    """Adapt the narrow governed read surface to native Windows."""
+    if os.name != "nt" or not command:
+        return command
+    if command[0].lower() == "echo":
+        writer = "import sys;sys.stdout.write(' '.join(sys.argv[1:])+'\\n')"
+        return (sys.executable, "-c", writer, *command[1:])
+    if command[0].lower() != "cat":
+        return command
+    reader = (
+        "import pathlib,sys;"
+        "out=sys.stdout.buffer;"
+        "[out.write(pathlib.Path(name).read_bytes()) for name in sys.argv[1:]]"
+    )
+    return (sys.executable, "-c", reader, *command[1:])

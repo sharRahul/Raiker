@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -22,6 +24,23 @@ from raiker.execution.profiles import (
     resolve_command_environment,
 )
 from raiker.storage.sqlite import SQLiteStore
+
+
+def test_command_service_imports_without_executor_package_cycle() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "from raiker.execution.commands.service import CommandService; "
+            "assert CommandService.__name__ == 'CommandService'",
+        ],
+        cwd=Path(__file__).resolve().parents[1],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
 
 
 def request(workspace_root: Path, **overrides: object) -> CommandRequest:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 import shlex
 from dataclasses import asdict
-from typing import Any
+from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,7 +61,7 @@ def _receipt_view(receipt: CommandReceipt) -> dict[str, Any]:
     }
 
 
-def _raise_service(exc: CommandServiceError) -> None:
+def _raise_service(exc: CommandServiceError) -> NoReturn:
     code = status.HTTP_404_NOT_FOUND if exc.reason_code == "command_run_not_found" else status.HTTP_409_CONFLICT
     raise HTTPException(
         status_code=code,

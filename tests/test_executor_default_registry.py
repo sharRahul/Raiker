@@ -14,7 +14,7 @@ from raiker.runtime.executors import (
     REAL_EXECUTOR_CAPABILITIES,
     build_default_executor_registry,
 )
-from raiker.runtime.executors.tier2_shell import ShellExecutor
+from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
 from raiker.runtime.executors.tier6_domains import FinanceRuntimeExecutor, MedicalRuntimeExecutor
 from raiker.storage.sqlite import SQLiteStore
 
@@ -142,4 +142,32 @@ def test_shell_executor_uses_durable_command_lifecycle(tmp_path: Path) -> None:
     run = service.store.load("principal_owner", run_id)
     assert run is not None
     assert run.receipt_digest
+    assert service.store.get_receipt("principal_owner", run_id) is not None
+
+
+def test_process_executor_uses_same_durable_authority_path(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    service = CommandService(ws)
+    executor = ProcessExecutor(ws, command_service=service)
+    principal = Principal(**service.sqlite.get_principal("principal_owner"))  # type: ignore[arg-type]
+    action = GovernedAction(
+        action_id="act_approved_process",
+        principal_id="principal_owner",
+        action_type="process",
+        tool_or_service_name="process",
+        arguments={"executable": "git", "args": ["--version"]},
+        session_id="sess_build",
+        turn_id="turn_build",
+        authority_kind="approval",
+        authority_id="approval_process",
+    )
+
+    result = executor.execute(action, principal)
+
+    assert result.ok is True
+    run_id = str(result.artifacts["run_id"])
+    run = service.store.load("principal_owner", run_id)
+    assert run is not None
+    assert run.authority_id == "approval_process"
     assert service.store.get_receipt("principal_owner", run_id) is not None

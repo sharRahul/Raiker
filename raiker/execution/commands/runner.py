@@ -188,25 +188,31 @@ class RunningProcess:
         self._timer.start()
 
     def _pump(self) -> None:
-        redactors = {
-            "stdout": StreamingRedactor(registered=self._registered_secrets),
-            "stderr": StreamingRedactor(registered=self._registered_secrets),
-            "system": StreamingRedactor(registered=self._registered_secrets),
-        }
+        redactor = StreamingRedactor(registered=self._registered_secrets)
+        active_stream: str | None = None
         returncode: int | None = None
         try:
             for stream, data in self.process.iter_events():
-                selected = stream if stream in redactors else "system"
+                selected = stream if stream in {"stdout", "stderr", "system"} else "system"
                 self.sink.record_raw(selected, len(data))
-                safe = redactors[selected].feed(data)
+                if active_stream is not None and selected != active_stream:
+                    # stdout/stderr are one visual transcript. A visible,
+                    # non-whitespace boundary prevents two independently benign
+                    # fragments from reconstructing a canonical or registered
+                    # credential when a client concatenates ordered chunks.
+                    boundary = f"\n[stream:{selected}]\n".encode()
+                    safe = redactor.feed(boundary)
+                    if safe:
+                        self.sink.append_safe("system", safe)
+                active_stream = selected
+                safe = redactor.feed(data)
                 if safe:
                     self.sink.append_safe(selected, safe)
             returncode = self.process.wait()
-            for stream, redactor in redactors.items():
-                safe = redactor.finish()
-                if safe:
-                    self.sink.append_safe(stream, safe)
-                self.sink.mark_redactions(redactor.redaction_count)
+            safe = redactor.finish()
+            if safe:
+                self.sink.append_safe(active_stream or "system", safe)
+            self.sink.mark_redactions(redactor.redaction_count)
             with self._lock:
                 state = self._forced_state or (
                     CommandState.SUCCEEDED if returncode == 0 else CommandState.FAILED

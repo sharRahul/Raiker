@@ -113,7 +113,10 @@ def test_redactor_matches_whole_text_at_every_byte_boundary(payload: bytes, expe
     (
         b"password=\nsecretvalue12345",
         b"the token\nis abcdefghijklmnop",
+        b"bearer\nabcdefghijklmnop",
         b"iban\nGB82WEST12345698765432",
+        b"4111\n1111\n1111\n1111",
+        b"123\n456\n7890",
     ),
 )
 def test_redactor_matches_whole_text_for_multiline_credentials_at_every_split(
@@ -128,6 +131,36 @@ def test_redactor_matches_whole_text_for_multiline_credentials_at_every_split(
         emitted += redactor.feed(payload[split:])
         emitted += redactor.finish()
         assert emitted == expected
+
+
+@pytest.mark.parametrize(
+    "payload,registered",
+    (
+        (b"sk-proj-abcdefghijklmnop", ()),
+        (b"bearer\nabcdefghijklmnop", ()),
+        (
+            b"registered-secret-abcdefghijklmnop",
+            ("registered-secret-abcdefghijklmnop",),
+        ),
+    ),
+)
+def test_stream_changes_cannot_reconstruct_credentials_at_any_split(
+    tmp_path: Path,
+    payload: bytes,
+    registered: tuple[str, ...],
+) -> None:
+    for split in range(len(payload) + 1):
+        sink = MemoryCommandSink()
+        process = FakeProcess([("stdout", payload[:split]), ("stderr", payload[split:])])
+        handle = StreamingCommandRunner(
+            process_factory=lambda *_a, _process=process, **_k: _process,
+            registered_secrets=registered,
+        ).start(request(tmp_path), ["fake"], tmp_path, {}, sink, pty=False)
+
+        assert handle.wait() is CommandState.SUCCEEDED
+        captured = sink.captured_text.encode()
+        assert payload not in captured
+        assert b"[stream:stderr]" in captured
 
 
 class FakeProcess:

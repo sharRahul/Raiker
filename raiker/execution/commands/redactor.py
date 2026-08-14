@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import codecs
+import re
 from collections.abc import Iterable
 
 from raiker.context.redaction import (
@@ -31,6 +32,7 @@ _PRIVATE_KEY_END_TAIL = "PRIVATE KEY-----"
 _DEFAULT_MAX_PENDING_CHARACTERS = 64 * 1024
 _MULTILINE_PATTERN_TRIGGERS = (
     "authorization",
+    "bearer",
     "api_key",
     "api-key",
     "api key",
@@ -163,6 +165,13 @@ class StreamingRedactor:
             for trigger in _MULTILINE_PATTERN_TRIGGERS
             if (position := lowered.find(trigger)) != -1
         ]
+        # The card and medical-id rules have no textual label to anchor them.
+        # A three/four-digit group followed by LF can begin either canonical
+        # multiline form, so it remains pending until later groups decide it.
+        starts.extend(
+            match.start()
+            for match in re.finditer(r"(?<!\d)(?:\d{4}|\d{3})\n", self._pending[:cut])
+        )
         return min(cut, *starts) if starts else cut
 
     def finish(self) -> bytes:

@@ -65,6 +65,49 @@ def test_redactor_handles_utf8_and_private_key_boundaries() -> None:
         assert emitted.decode() == "before ☃ [REDACTED_PRIVATE_KEY] after"
 
 
+def test_redactor_streams_decided_lines_without_an_arbitrary_window() -> None:
+    redactor = StreamingRedactor()
+
+    assert redactor.feed(b"first safe line\n") == b"first safe line\n"
+    assert redactor.feed(b"sk-proj-abcdefghijklmnop") == b""
+    assert redactor.finish() == b"[REDACTED_TOKEN]"
+
+
+def test_redactor_fails_closed_when_an_undecidable_line_exceeds_its_limit() -> None:
+    redactor = StreamingRedactor(max_pending_characters=32)
+
+    assert redactor.feed(b"x" * 33) == b"[REDACTED_SECRET]"
+    assert redactor.feed(b"still-suppressed") == b""
+    assert redactor.feed(b"\nnext safe line\n") == b"\nnext safe line\n"
+    assert redactor.finish() == b""
+
+
+@pytest.mark.parametrize(
+    "payload,expected",
+    (
+        (b"github_pat_abcdefghijklmnopqrstuvwxyz", b"[REDACTED_TOKEN]"),
+        (b"ghp_abcdefghijklmnopqrstuvwxyz", b"[REDACTED_TOKEN]"),
+        (b"sk-proj-abcdefghijklmnop", b"[REDACTED_TOKEN]"),
+        (b"AKIA0123456789ABCDEF", b"[REDACTED_TOKEN]"),
+        (b"Authorization: Bearer abcdefghijklmnop", b"[REDACTED_TOKEN]"),
+        (b"password=correct-horse-battery-staple", b"[REDACTED_SECRET]"),
+        (b"the token is abcdefghijklmnop", b"the [REDACTED_SECRET]"),
+        (b"operator@example.test", b"[REDACTED_EMAIL]"),
+        (b"4111 1111 1111 1111", b"[REDACTED_CARD]"),
+        (b"iban GB82WEST12345698765432", b"[REDACTED_ACCOUNT]"),
+        (b"123-456-7890", b"[REDACTED_ID]"),
+        (b"A" * 40, b"[REDACTED_SECRET]"),
+    ),
+)
+def test_redactor_matches_whole_text_at_every_byte_boundary(payload: bytes, expected: bytes) -> None:
+    for split in range(len(payload) + 1):
+        redactor = StreamingRedactor()
+        emitted = redactor.feed(payload[:split])
+        emitted += redactor.feed(payload[split:])
+        emitted += redactor.finish()
+        assert emitted == expected
+
+
 class FakeProcess:
     def __init__(
         self,

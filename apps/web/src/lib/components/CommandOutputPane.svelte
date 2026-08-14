@@ -187,7 +187,7 @@
   .command-row input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--text); font: .75rem/1.4 var(--font-mono); }
   .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: .66rem; }
   .posture span { display: inline-flex; align-items: center; gap: .28rem; }
-  .output-shell { min-height: 112px; overflow: hidden; border: 1px solid color-mix(in srgb, var(--text) 18%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--text) 94%, #000); color: #e8e8e2; }
+  .output-shell { min-height: 112px; overflow: hidden; border: 1px solid #30363b; border-radius: var(--r-md); background: #171a1c; color: #e8e8e2; color-scheme: dark; }
   .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid #ffffff1a; color: #a9aaa4; font: .62rem var(--font-mono); }
   pre { margin: 0; min-height: 72px; max-height: 240px; overflow: auto; padding: .62rem; white-space: pre-wrap; word-break: break-word; font: .72rem/1.55 var(--font-mono); }
   .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: .7rem; }

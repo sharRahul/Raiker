@@ -138,6 +138,14 @@ The following invariants apply to every backend:
   backend without that proof advertises recovery, PTY, and background support
   as unavailable and never misreports an unknown outcome as success.
 
+“Purpose-bound” constrains who may request the loan, backend/destination,
+duration, audit scope, and revocation. Once a general command receives raw
+credential bytes it is explicitly inside that credential's trusted computing
+base: Raiker cannot prevent it from transforming, persisting, or externally
+exfiltrating the value. Private snapshots and exact/pattern scanning are
+defense-in-depth against accidental or direct persistence, not a DLP guarantee
+against a malicious recipient. The approval UI states this before any such loan.
+
 ## Architecture
 
 ### Command control plane
@@ -261,8 +269,8 @@ per-run AppContainer profile/SID. A remote host may use an equivalent transient
 unit/container. If a backend cannot prove this, `concurrent_runs=false`; while
 one run is alive the next start fails with `environment_busy`, and the backend
 cannot lend credentials or filtered-network authority to an overlapping run.
-`local_strict` is explicitly reduced isolation and never accepts credential or
-filtered-network grants.
+`local_strict` is explicitly reduced isolation, foreground-only, and never
+accepts credential or filtered-network grants.
 
 ### Authoritative environment resolution
 
@@ -336,9 +344,14 @@ endpoint. Filter ids and session identity are recorded; closing the dynamic
 session removes them.
 
 The service exposes a local named pipe restricted to LocalSystem and the
-installing owner SID, rejects remote clients, impersonates the caller to verify
-that SID, and authenticates a nonce-bound request with the vault-held Raiker
-instance key. Its HKLM configuration is administrator-writable only and pins
+installing owner SID, rejects remote clients, and impersonates the caller to
+verify that SID. Authentication is asymmetric: install creates an Ed25519
+instance key in the Raiker vault and the elevated installer pins only its public
+key in administrator-writable HKLM. Raiker signs protocol version, instance id,
+monotonic nonce, timestamp/expiry, owner SID, per-run AppContainer SID, proxy
+endpoint, grant id, and runner/proxy digests. The service verifies signature,
+SID, nonce replay window, expiry, and pinned values without possessing the
+private key. Its configuration pins
 the Authenticode publisher, runner/proxy digests, protocol version, allowed
 AppContainer profile prefix, and proxy loopback endpoint; the protocol cannot
 request arbitrary filters or destinations. On boot or service restart it opens
@@ -347,7 +360,11 @@ re-authenticates an active run/grant. A crash removes all dynamic filters and
 commands fail closed until readiness proves the service/session and required
 filters live. Installer, update, reset, and uninstall are transactional and
 remove profiles, ACL projections, filters, service registration, and pinned
-configuration on rollback. Readiness executes a
+configuration on rollback. Key rotation requires an owner-confirmed elevated
+transaction signed by the old key and atomically swaps the pinned public key;
+if the old private key is unavailable, reinstall/reset removes every active
+filter/profile before pinning a new key. Owner SID change also requires full
+reset. Corrupt/missing/revoked keys fail readiness. Readiness executes a
 real low-integrity child and proves Job membership, workspace write, outside-
 workspace denial, `.raiker` read/write denial, `.git` write denial, descendant
 network denial, and complete process-tree termination. Windows packaging and CI
@@ -363,7 +380,7 @@ strict host policy.
 
 Docker and Podman represent one owner/session/environment as labelled persistent
 state, not one shared process container. The state consists of the selected host
-workspace bind, a per-session `/sandbox-home` cache volume, an immutable image
+workspace, a committed per-session `/sandbox-home` cache snapshot, an immutable image
 digest, and a small Raiker-side coordinator record. Every run gets a separate
 worker container, PID namespace, non-root uid, supervisor instance, IPC mount,
 and network namespace. A foreground run and a background run may therefore
@@ -371,25 +388,37 @@ coexist without a shared uid, `/proc`, signal boundary, control socket, PTY, log
 credential descriptor, or proxy capability. The cache/workspace persist across
 workers; worker containers persist only while their run/lease needs them and
 are reattached after a Raiker restart. Reset processes removes workers but keeps
-session state; recreate also removes the cache volume.
+session state; recreate also removes the committed cache snapshot and private
+run volumes.
 
-The `/sandbox-home` volume is owned by the session identity and mounted into a
-worker only for the duration of that run. To prevent hostile concurrent workers
-from using it as a cross-run control channel, executable files, sockets, device
-nodes, FIFOs, and hard links are refused at the volume boundary; supervisor
-state, credentials, logs, and capabilities never enter it. Worker isolation is
-proven with a two-run hostile test that attempts sibling process discovery and
-signals, `/proc` and descriptor reads, control/log/socket access, credential
-recovery, and reuse of the other run's proxy grant.
+Workers never mount a session cache writable in common. A Raiker cache service
+copies the committed cache snapshot into a private per-run volume and, after
+exit, validates copy-out before atomically publishing the next snapshot. It
+copies directories and bounded regular files only, strips executable/setuid
+bits, rejects symlinks, hard links, sockets, devices, and FIFOs, and never copies
+supervisor state, credentials, logs, or capabilities. Concurrent workers may
+read the same committed snapshot but cannot signal through live cache writes;
+cache publication is serialized and conflicts are reported rather than merged
+implicitly. Ordinary workspace files remain intentional shared mutable session
+state for credential-free Build collaboration.
 
-Credential-bearing workers acquire an exclusive environment lease: no sibling
-worker may overlap them, and they cannot start while another worker is alive.
-This closes the remaining shared-workspace/cache exfiltration path in which a
-credentialed process could intentionally deposit its loan for a sibling. The
-approval preview states this serialization. Credential-free workers may overlap
-because their process, control, PTY, and network authority remain per-run;
-shared workspace/cache writes remain an explicit collaboration property of the
-session, not a process-authority channel.
+Credential-bearing workers acquire an exclusive environment lease and receive
+private ephemeral workspace and cache snapshots. The real workspace/cache are
+read-only and their `.git`/`.raiker` protections still apply. After exit, the
+exact registered credentials plus the full redaction/pattern rule set scan every
+changed path, file content, name, symlink target, xattr/alternate stream, and
+bounded binary strings. Any match quarantines the whole delta outside other
+workers and offers only **Discard credentialed changes**; no later worker starts
+until resolution. A clean delta is shown as a file/diagnostic summary and the
+owner may selectively merge paths. Raiker revalidates canonical containment and
+rescans bytes immediately before applying through the governed file/checkpoint
+path; cache merge uses the validated cache service. The approval and completion
+UI state that the recipient command is inside the credential TCB and may use or
+exfiltrate the loan externally, while the snapshot policy prevents it from
+silently persisting the value into later local runs. Tests make a credentialed
+worker write the value into workspace, cache, filename, xattr/ADS, symlink, and
+binary content and prove quarantine prevents any later worker from starting or
+reading it.
 
 The container has:
 
@@ -593,6 +622,8 @@ accepted model/API field. The read/control API exposes:
 - `POST /api/command-runs/{run_id}/input`;
 - `POST /api/command-runs/{run_id}/stop`;
 - `POST /api/command-runs/{run_id}/lease`; and
+- `POST /api/command-runs/{run_id}/delta/merge` for owner-selected clean paths;
+- `POST /api/command-runs/{run_id}/delta/discard`; and
 - `POST /api/execution-environments/{profile_id}/reset`.
 
 The existing turn stream emits metadata-only `command_started`,
@@ -671,6 +702,9 @@ The pane contains:
 - **Jump to first failure**, using recognised `path:line[:column]` coordinates
   to open the existing source inspector;
 - **Copy redacted output** and **Open execution receipt**; and
+- for credential-bearing runs, **Review clean changes**, per-path **Merge
+  selected**, or **Discard credentialed changes**; a secret match exposes no
+  preview of the matched bytes and permits discard only; and
 - an honest empty/unavailable state that links to Settings -> Runtime.
 
 Tool activity is also promoted into first-class transcript rows. A command row

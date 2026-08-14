@@ -299,12 +299,16 @@ git commit -m "feat: persist governed command runs"
 ### Task 2: Streaming runner, split-safe redaction, PTY, and process-tree stop
 
 **Files:**
+- Create: `native/Cargo.toml`
+- Create/update: `native/Cargo.lock`
+- Create: `native/raiker-command-protocol/Cargo.toml`
 - Create: `raiker/execution/commands/redactor.py`
 - Create: `raiker/execution/commands/supervisor_protocol.py`
 - Create: `raiker/execution/commands/runner.py`
 - Modify: `raiker/context/redaction.py`
 - Create: `native/raiker-command-protocol/src/lib.rs`
 - Create: `native/raiker-command-supervisor/src/main.rs`
+- Create: `native/raiker-command-supervisor/Cargo.toml`
 - Create: `native/raiker-command-protocol/tests/vectors.rs`
 - Create: `tests/test_command_runner.py`
 - Create: `tests/test_command_supervisor_protocol.py`
@@ -435,7 +439,7 @@ Run: `cargo test --manifest-path native/Cargo.toml -p raiker-command-protocol -p
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/redactor.py raiker/execution/commands/supervisor_protocol.py raiker/execution/commands/runner.py raiker/context/redaction.py native tests/test_command_runner.py tests/test_command_supervisor_protocol.py
+git add -- raiker/execution/commands/redactor.py raiker/execution/commands/supervisor_protocol.py raiker/execution/commands/runner.py raiker/context/redaction.py native/Cargo.toml native/Cargo.lock native/raiker-command-protocol native/raiker-command-supervisor tests/test_command_runner.py tests/test_command_supervisor_protocol.py
 git commit -m "feat: stream bounded command output"
 ```
 
@@ -444,9 +448,12 @@ git commit -m "feat: stream bounded command output"
 ### Task 3: Authoritative environment resolution, local strict, and native sandbox drivers
 
 **Files:**
+- Modify: `native/Cargo.toml`
+- Modify: `native/Cargo.lock`
 - Create: `raiker/execution/commands/backends/base.py`
 - Create: `raiker/execution/commands/backends/local.py`
 - Create: `raiker/execution/commands/backends/native.py`
+- Create: `native/raiker-command-runner/Cargo.toml`
 - Create: `native/raiker-command-runner/src/main.rs`
 - Create: `native/raiker-command-runner/src/token.rs`
 - Create: `native/raiker-command-runner/src/job.rs`
@@ -454,6 +461,7 @@ git commit -m "feat: stream bounded command output"
 - Create: `native/raiker-command-runner/src/appcontainer.rs`
 - Create: `native/raiker-command-runner/src/policy_client.rs`
 - Create: `native/raiker-windows-policy-service/src/main.rs`
+- Create: `native/raiker-windows-policy-service/Cargo.toml`
 - Create: `native/raiker-windows-policy-service/src/service.rs`
 - Create: `native/raiker-windows-policy-service/src/pipe.rs`
 - Create: `native/raiker-windows-policy-service/src/wfp.rs`
@@ -461,11 +469,15 @@ git commit -m "feat: stream bounded command output"
 - Create: `scripts/install_windows_runner.ps1`
 - Create: `scripts/uninstall_windows_runner.ps1`
 - Create: `.github/workflows/native-security-boundaries.yml`
+- Modify: `.github/workflows/release.yml`
+- Modify: `pyproject.toml`
+- Create: `raiker/execution/native_artifacts.py`
 - Modify: `raiker/execution/profiles.py`
 - Modify: `raiker/control/dashboard.py`
 - Modify: `raiker/runtime/command_policy.py`
 - Create: `tests/test_command_backends.py`
 - Create: `tests/test_windows_command_runner.py`
+- Create: `tests/test_native_artifact_packaging.py`
 - Create: `native/raiker-command-runner/tests/windows_boundary.rs`
 - Modify: `tests/test_execution_environments.py`
 
@@ -552,7 +564,11 @@ def test_native_probe_proves_protected_paths_descendants_and_network(boundary) -
 
 ```python
 class LocalStrictBackend:
-    features = CommandFeatures(True, True, False, False, False, False, False)
+    features = CommandFeatures(
+        shell=True, background=False, pty=False, input=False,
+        filtered_network=False, persistent=False, recoverable=False,
+        concurrent_runs=False,
+    )
 
     def start(self, request: CommandRequest) -> CommandHandle:
         if request.shell:
@@ -561,7 +577,8 @@ class LocalStrictBackend:
         return self.local_supervisor.start(request, list(request.argv_template), sandbox_environment(workspace_root=request.workspace_root))
 ```
 
-`local_strict` rejects credential bindings and filtered-network grants because
+`local_strict` is foreground-only and rejects credential bindings and
+filtered-network grants because
 it does not isolate commands from the Raiker/user process identity. For every
 other backend, readiness either proves distinct per-run principal/PID and
 private-process/control/log/PTY/network boundaries, or sets
@@ -571,7 +588,7 @@ concurrency, and busy/refusal tests for every serialized backend.
 
 Linux uses `bwrap`; macOS uses a generated Seatbelt profile. Windows builds a
 Rust helper whose versioned named pipe rejects remote clients, is ACL-limited to
-the owner SID/LocalSystem, authenticates requests with the vault instance key,
+the owner SID/LocalSystem, and verifies nonce-bound Ed25519-signed requests,
 opens/canonicalizes handles before applying ACLs, and inherits only an explicit
 supervisor/ConPTY handle list. It creates a per-run AppContainer SID under the
 owner/profile prefix, a
@@ -584,16 +601,22 @@ the Authenticode chain/digest and install the `RaikerCommandPolicy` service once
 with owner confirmation. The service runs under a least-privileged service SID
 and owns the long-lived WFP dynamic session. Its local named pipe is ACL-limited
 to LocalSystem and the installing owner SID, rejects remote clients,
-impersonates the caller, and authenticates nonce-bound frames with the vault
-instance key. Administrator-only HKLM configuration pins the publisher,
-protocol, runner/proxy digests, AppContainer prefix, and allowed proxy endpoint;
+impersonates the caller, and verifies owner SID, instance id, nonce replay
+window, timestamp/expiry, per-run AppContainer SID, proxy endpoint, grant id,
+and runner/proxy digests. Install creates the Ed25519 private key in Raiker's
+vault; the elevated installer pins only its public key. Administrator-only HKLM
+configuration pins that key, publisher, protocol, runner/proxy digests,
+AppContainer prefix, and allowed proxy endpoint;
 IPC cannot create arbitrary filters. ALE filters scoped to the AppContainer
 deny outbound and permit only that proxy. A crash closes the dynamic session
 and all filters; restart opens a clean session but requires Raiker to
 re-authenticate active grants before permits return. Readiness proves the
 service/session live. Installer/update/uninstall/profile reset roll back
 filters, profiles, ACLs, service registration, and configuration. Ordinary
-commands do not elevate.
+commands do not elevate. Owner-confirmed rotation atomically installs a new
+public key using a request signed by the old key; a lost/corrupt key or owner SID
+change requires full elevated reset, which removes active filters/profiles before
+pinning a replacement.
 
 Every advertised platform runs traversal, symlink/junction, nested-repository,
 Windows path/case, descendant, `.raiker` read/write denial, `.git` write denial,
@@ -601,9 +624,20 @@ outside-workspace denial, and direct-network probes. Windows CI builds the
 runner and policy service, runs protocol/unit tests, installs the service and
 test rules, proves a service crash removes filters and restart stays fail-closed
 until re-authentication, executes the boundary test, verifies uninstall/rollback,
-and publishes digest-checked artifacts. Any missing signature/digest/service/
+tests install/rotation/owner change/reset/replay/corrupt-key/uninstall, and
+publishes digest-checked artifacts. Any missing signature/digest/service/
 session/firewall/probe returns
 `native_sandbox_probe_failed`; native mode never degrades to local strict.
+
+Add runner/service crates to the Cargo workspace and lockfile. Release jobs
+build the supervisor, Windows runner, and policy service artifacts, record
+SHA-256/protocol metadata, include them
+as wheel package-data and Windows installer payloads, and
+`native_artifacts.py` resolves only a platform artifact whose manifest, digest,
+publisher, and protocol match. A clean-install test builds a wheel, installs it
+into an empty virtual environment, removes the source checkout from import/PATH
+resolution, and proves readiness finds the packaged helper. Missing or tampered
+artifacts fail closed.
 
 - [ ] **Step 6: Run focused tests and commit**
 
@@ -614,7 +648,7 @@ Run on Windows: `cargo test --manifest-path native/Cargo.toml -p raiker-command-
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends native/raiker-command-runner native/raiker-windows-policy-service scripts/install_windows_runner.ps1 scripts/uninstall_windows_runner.ps1 .github/workflows/native-security-boundaries.yml raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_windows_command_runner.py tests/test_execution_environments.py
+git add -- native/Cargo.toml native/Cargo.lock native/raiker-command-runner native/raiker-windows-policy-service scripts/install_windows_runner.ps1 scripts/uninstall_windows_runner.ps1 .github/workflows/native-security-boundaries.yml .github/workflows/release.yml pyproject.toml raiker/execution/native_artifacts.py raiker/execution/commands/backends raiker/execution/profiles.py raiker/control/dashboard.py raiker/runtime/command_policy.py tests/test_command_backends.py tests/test_windows_command_runner.py tests/test_native_artifact_packaging.py tests/test_execution_environments.py
 git commit -m "feat: enforce selected command environment"
 ```
 
@@ -624,11 +658,15 @@ git commit -m "feat: enforce selected command environment"
 
 **Files:**
 - Create: `raiker/execution/commands/backends/container.py`
+- Create: `raiker/execution/commands/cache_snapshots.py`
+- Create: `raiker/execution/commands/credential_delta.py`
 - Create: `containers/command-sandbox/Containerfile`
 - Modify: `raiker/runtime/executors/containers.py`
 - Modify: `raiker/execution/container_tools.py`
 - Modify: `raiker/execution/tool_bridge.py`
 - Create: `tests/test_persistent_command_container.py`
+- Create: `tests/test_command_cache_snapshots.py`
+- Create: `tests/test_credential_command_delta.py`
 - Modify: `tests/test_container_tool_bridge.py`
 
 **Interfaces:**
@@ -653,7 +691,8 @@ def test_session_state_is_reused_but_each_run_has_an_isolated_worker(tmp_path: P
     assert git_mount(create).readonly is True
     assert supervisor_digest(create) == EXPECTED_SUPERVISOR_DIGEST
     assert first.backend_handle.container_id != second.backend_handle.container_id
-    assert first.backend_handle.cache_volume == second.backend_handle.cache_volume
+    assert first.backend_handle.cache_base_digest == second.backend_handle.cache_base_digest
+    assert first.backend_handle.private_cache_volume != second.backend_handle.private_cache_volume
 
 
 def test_hostile_concurrent_workers_cannot_cross_run_boundaries(live_backend) -> None:
@@ -672,6 +711,18 @@ def test_credential_bound_worker_holds_exclusive_environment_lease(live_backend)
     victim = live_backend.start(run_with_credential())
     assert live_backend.start(hostile_inspection_run()).reason_code == "credential_environment_busy"
     victim.stop()
+
+
+@pytest.mark.parametrize("location", ["workspace", "cache", "filename", "xattr", "ads", "symlink", "binary"])
+def test_credential_delta_is_quarantined_before_later_worker(location, live_backend) -> None:
+    secret = live_backend.register_credential("credential-value-123456789")
+    run = live_backend.start(write_credential_to_delta(secret, location))
+    result = run.wait()
+    assert result.delta_state == "quarantined_secret_detected"
+    assert live_backend.start(request(run_id="later")).reason_code == "credential_delta_resolution_required"
+    live_backend.discard_delta(run.run_id, owner_decision())
+    later = live_backend.start(request(run_id="later"))
+    assert secret not in later.read_workspace_and_cache()
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -697,24 +748,37 @@ def supervisor_start(profile: ExecutionProfile, request: CommandRequest) -> Supe
 ```
 
 Build the supervisor into a digest-pinned non-root image. Persist session state
-as the host workspace plus one cache volume, but create a separate read-only-root
+as the host workspace plus a committed cache snapshot, but create a separate read-only-root
 worker container, non-root uid, PID namespace, supervisor/control mount, and
-network namespace for every run. The worker gets bounded tmpfs, the removable
-cache, and workspace bind; after that mount, over-mount `.git` read-only and
+network namespace for every run. A cache service copies the committed snapshot
+into a private per-run volume; no two workers share writable cache state. On
+copy-out it accepts bounded directories/regular files only, strips executable,
+setuid and setgid bits, rejects symlinks/hard links/sockets/devices/FIFOs, and
+atomically publishes a new snapshot after conflict detection. The worker gets
+bounded tmpfs, that private cache, and workspace bind; after that mount, over-mount `.git` read-only and
 mask `.raiker` with a Raiker-owned empty mode-`000`, unmapped-owner, read-only
 bind so listing and all access fail. Reject `.git`/`.raiker`
 symlink or reparse targets in preflight. Use no capabilities, no-new-privileges,
-CPU/memory/PID/lease labels, and no ambient environment. The cache boundary
-rejects executables, sockets, device nodes, FIFOs, and hard links; supervisor
-state, credentials, logs, and proxy capabilities never enter it. Advertise disk
+CPU/memory/PID/lease labels, and no ambient environment. Supervisor state,
+credentials, logs, and proxy capabilities never enter cache. Advertise disk
 quota only when proven. A short-lived `exec` may transport a control frame but
 never owns lifetime, logs, PTY, or kill.
 
-Credential-bearing workers acquire an exclusive environment lease and cannot
-overlap any sibling; another live worker likewise blocks a credential-bearing
-start. Add both ordering tests. Credential-free workers may overlap with their
-separate kernel/control/network identities; shared workspace/cache writes are
-an explicit session collaboration property.
+Credential-bearing workers acquire an exclusive environment lease and receive
+private ephemeral workspace and cache snapshots; the real state is read-only.
+After exit, scan every changed path/content/name/symlink target/xattr/ADS and
+bounded binary string for the exact registered values plus the full pattern
+manifest. A match quarantines the complete delta and blocks later workers until
+an owner-confirmed discard. A clean delta presents selective file merge; apply
+only owner-selected paths after canonical containment and a second byte-for-byte
+scan through governed file/checkpoint APIs. Cache merge uses the validated cache
+service. The UI warns that the recipient command is in the credential TCB and
+can transform, persist, or exfiltrate the value; quarantine is defense-in-depth
+for exact/pattern-detectable local persistence, not malicious-recipient DLP. Add both
+lease orderings, every location case above, clean selective merge, rescan race,
+and later-worker denial tests. Credential-free workers may overlap with separate
+kernel/control/network/cache identities; the host workspace remains explicit
+shared mutable session state.
 
 - [ ] **Step 4: Write failing reset, recovery, daemon-probe, and no-host-fallback tests**
 
@@ -765,12 +829,12 @@ worker but retains cache/workspace; recreate also removes cache state.
 
 - [ ] **Step 7: Run focused tests and commit**
 
-Run: `.venv\Scripts\python.exe -m pytest tests/test_persistent_command_container.py tests/test_container_tool_bridge.py tests/test_execution_profiles.py tests/test_execution_environments.py -q --basetemp .tmp/pytest-command-container`
+Run: `.venv\Scripts\python.exe -m pytest tests/test_persistent_command_container.py tests/test_command_cache_snapshots.py tests/test_credential_command_delta.py tests/test_container_tool_bridge.py tests/test_execution_profiles.py tests/test_execution_environments.py -q --basetemp .tmp/pytest-command-container`
 
 Expected: all tests pass.
 
 ```powershell
-git add -- raiker/execution/commands/backends/container.py containers/command-sandbox/Containerfile raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_container_tool_bridge.py
+git add -- raiker/execution/commands/backends/container.py raiker/execution/commands/cache_snapshots.py raiker/execution/commands/credential_delta.py containers/command-sandbox/Containerfile raiker/runtime/executors/containers.py raiker/execution/container_tools.py raiker/execution/tool_bridge.py tests/test_persistent_command_container.py tests/test_command_cache_snapshots.py tests/test_credential_command_delta.py tests/test_container_tool_bridge.py
 git commit -m "feat: add persistent command sandbox"
 ```
 
@@ -779,6 +843,9 @@ git commit -m "feat: add persistent command sandbox"
 ### Task 5: Filtered command-network grants and isolated proxy topology
 
 **Files:**
+- Modify: `native/Cargo.toml`
+- Modify: `native/Cargo.lock`
+- Create: `native/raiker-egress-proxy/Cargo.toml`
 - Create: `raiker/execution/commands/network.py`
 - Create: `native/raiker-egress-proxy/src/main.rs`
 - Create: `native/raiker-egress-proxy/src/http_connect.rs`
@@ -786,9 +853,14 @@ git commit -m "feat: add persistent command sandbox"
 - Create: `native/raiker-egress-proxy/src/policy.rs`
 - Modify: `raiker/execution/commands/backends/container.py`
 - Modify: `raiker/execution/commands/backends/native.py`
+- Modify: `containers/command-sandbox/Containerfile`
+- Modify: `pyproject.toml`
+- Modify: `.github/workflows/release.yml`
+- Modify: `raiker/execution/native_artifacts.py`
 - Modify: `raiker/api/schemas.py`
 - Create: `tests/test_command_network.py`
 - Create: `native/raiker-egress-proxy/tests/egress_boundary.rs`
+- Modify: `tests/test_native_artifact_packaging.py`
 
 **Interfaces:**
 - Consumes: command grant/attempt rows, vault instance key, public-address checks from `raiker.runtime.web_policy`, backend route/firewall adapters.
@@ -898,6 +970,14 @@ route/firewall permit, then durable revoked state. Startup recovery repeats
 cleanup idempotently. Tests cover teardown races, expired grants, DNS changes,
 redirects, wrong capabilities, direct socket denial, and sidecar crash/recovery.
 
+Add the proxy crate to the Cargo workspace/lockfile. Release builds package the
+proxy in platform wheel data and copy the exact digest-matching supervisor and
+proxy into `containers/command-sandbox/Containerfile`; the built image records
+both protocol versions/digests in labels checked by readiness. Extend the clean-
+wheel and clean-image smoke tests to remove source-tree artifacts, start from the
+installed package/image only, prove both artifacts resolve, and fail closed for
+missing or tampered bytes.
+
 - [ ] **Step 6: Run focused tests and commit**
 
 Run: `.venv\Scripts\python.exe -m pytest tests/test_command_network.py tests/test_web_fetch_policy.py -q --basetemp .tmp/pytest-command-network`
@@ -907,7 +987,7 @@ Run: `cargo test --manifest-path native/Cargo.toml -p raiker-egress-proxy`
 Expected: all tests pass and existing web policy remains unchanged.
 
 ```powershell
-git add -- raiker/execution/commands/network.py raiker/execution/commands/backends native/raiker-egress-proxy raiker/api/schemas.py tests/test_command_network.py
+git add -- native/Cargo.toml native/Cargo.lock native/raiker-egress-proxy raiker/execution/commands/network.py raiker/execution/commands/backends containers/command-sandbox/Containerfile pyproject.toml .github/workflows/release.yml raiker/execution/native_artifacts.py raiker/api/schemas.py tests/test_command_network.py tests/test_native_artifact_packaging.py
 git commit -m "feat: govern sandbox network grants"
 ```
 
@@ -1264,7 +1344,7 @@ Expected: all tests pass.
 - [ ] **Step 6: Commit runtime integration**
 
 ```powershell
-git add -- raiker/runtime/executors/tier2_shell.py raiker/runtime/executors/tier1_approval.py raiker/tools/broker.py raiker/models/tool_call_validation.py raiker/contracts/models.py raiker/policy/config.py raiker/runtime/authority/router.py raiker/runtime/orchestrator.py tests/test_approval_relay_general.py tests/test_tool_broker.py tests/test_command_tool_integration.py
+git add -- raiker/execution/commands/credential_broker.py raiker/runtime/executors/tier2_shell.py raiker/runtime/executors/tier1_approval.py raiker/tools/broker.py raiker/models/tool_call_validation.py raiker/contracts/models.py raiker/policy/config.py raiker/runtime/authority/router.py raiker/runtime/orchestrator.py tests/test_approval_relay_general.py tests/test_tool_broker.py tests/test_command_tool_integration.py
 git commit -m "feat: unify governed command tools"
 ```
 
@@ -1280,7 +1360,7 @@ git commit -m "feat: unify governed command tools"
 
 **Interfaces:**
 - Consumes: `CommandService`, current authenticated owner session dependency.
-- Produces: command list/detail/output/input/stop/lease and environment-reset endpoints.
+- Produces: command list/detail/output/input/stop/lease, credential-delta merge/discard, and environment-reset endpoints.
 
 - [ ] **Step 1: Write failing auth, ownership, pagination, and mutation tests**
 
@@ -1311,6 +1391,13 @@ def test_reset_requires_fresh_owner_decision(client, owner_headers) -> None:
     response = client.post("/api/execution-environments/container_a/reset", headers=owner_headers, json={"mode": "recreate"})
     assert response.status_code == 409
     assert response.json()["detail"]["reason_code"] == "owner_decision_required"
+
+
+def test_quarantined_delta_cannot_merge_and_discard_requires_owner_decision(client, owner_headers) -> None:
+    assert client.post("/api/command-runs/cmd_a/delta/merge", headers=owner_headers, json={"paths": ["safe.txt"]}).status_code == 409
+    response = client.post("/api/command-runs/cmd_a/delta/discard", headers=owner_headers, json={})
+    assert response.status_code == 409
+    assert response.json()["detail"]["reason_code"] == "owner_decision_required"
 ```
 
 - [ ] **Step 2: Run and verify RED**
@@ -1338,6 +1425,10 @@ chunks/safe receipts. Recheck current session and original grant for input,
 stop, and lease; require a fresh owner decision for reset. Apply per-owner/run
 rate limits to list/output polling, input bytes, stop, lease renewal, and reset,
 with bounded pagination and retry metadata.
+Delta merge accepts only paths from a clean reviewed manifest, rechecks owner
+decision and canonical containment, and invokes the second scan immediately
+before governed apply. Quarantined deltas cannot merge. Discard requires an
+owner decision and records the delta digest without secret content.
 
 - [ ] **Step 4: Run API and redaction tests and commit**
 
@@ -1357,9 +1448,11 @@ git commit -m "feat: expose governed command controls"
 **Files:**
 - Create: `apps/web/src/lib/components/CommandOutputPane.svelte`
 - Create: `apps/web/src/lib/components/CommandActivityRow.svelte`
+- Create: `apps/web/src/lib/components/CredentialDeltaReview.svelte`
 - Create: `apps/web/src/lib/commandPresentation.ts`
 - Create: `apps/web/src/lib/components/CommandOutputPane.test.ts`
 - Create: `apps/web/src/lib/components/CommandActivityRow.test.ts`
+- Create: `apps/web/src/lib/components/CredentialDeltaReview.test.ts`
 - Create: `apps/web/src/lib/commandPresentation.test.ts`
 - Modify: `apps/web/src/lib/api.ts`
 - Modify: `apps/web/src/lib/apiTypes.ts`
@@ -1394,6 +1487,15 @@ it("shows the effective boundary and only valid controls", async () => {
   expect(screen.getByText(/container.*no network/i)).toBeInTheDocument();
   expect(screen.getByRole("button", { name: /stop process/i })).toBeInTheDocument();
   expect(screen.queryByRole("textbox", { name: /send input/i })).not.toBeInTheDocument();
+});
+
+
+it("quarantines a secret-bearing delta and offers discard only", async () => {
+  render(CredentialDeltaReview, { delta: quarantinedDelta({ matched_paths: 2 }) });
+  expect(screen.getByText(/2 files quarantined/i)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /merge/i })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: /discard credentialed changes/i })).toBeInTheDocument();
+  expect(document.body.textContent).not.toContain("credential-value-123456789");
 });
 
 
@@ -1438,6 +1540,11 @@ below 768 px. Render all output/safe display with Svelte text interpolation,
 never `{@html}` or an HTML sink. `failureCoordinate(text)` recognises bounded
 `path:line[:column]` forms and calls the existing source inspector only after
 canonical workspace containment.
+Credentialed completion shows the TCB warning and delta state. A clean delta
+offers per-path selection, second-scan status, **Merge selected**, and **Discard**;
+a secret match shows only counts/reason code, no matched path bytes or value,
+and offers discard only. While resolution is pending, Build explains why new
+commands are blocked.
 
 - [ ] **Step 5: Write and satisfy Build, Approval, and Runtime integration tests**
 
@@ -1455,20 +1562,26 @@ it("approval names command boundary and requested domains", async () => {
   expect(await screen.findByText(/container.*persistent.*no host fallback/i)).toBeInTheDocument();
   expect(screen.getByText("registry.npmjs.org:443")).toBeInTheDocument();
 });
+
+
+it("warns that a general command receiving a credential is in its TCB", async () => {
+  render(ApprovalsView, { approval: credentialedCommandApproval() });
+  expect(screen.getByText(/can transform, persist, or exfiltrate this credential/i)).toBeInTheDocument();
+});
 ```
 
 Runtime cards show real probe time, features, persistence, protected paths, filtered network, and **Host access — reduced isolation**. Unsupported features are disabled with exact remediation.
 
 - [ ] **Step 6: Run web tests, Svelte checks, and commit**
 
-Run: `npm --prefix apps/web run test -- CommandOutputPane.test.ts CommandActivityRow.test.ts commandPresentation.test.ts BuildView.test.ts ApprovalsView.test.ts Runtime.test.ts`
+Run: `npm --prefix apps/web run test -- CommandOutputPane.test.ts CommandActivityRow.test.ts CredentialDeltaReview.test.ts commandPresentation.test.ts BuildView.test.ts ApprovalsView.test.ts Runtime.test.ts`
 
 Run: `npm --prefix apps/web run check`
 
 Expected: tests and checks pass.
 
 ```powershell
-git add -- apps/web/src/lib/components/CommandOutputPane.svelte apps/web/src/lib/components/CommandActivityRow.svelte apps/web/src/lib/commandPresentation.ts apps/web/src/lib/components/CommandOutputPane.test.ts apps/web/src/lib/components/CommandActivityRow.test.ts apps/web/src/lib/commandPresentation.test.ts apps/web/src/lib/api.ts apps/web/src/lib/apiTypes.ts apps/web/src/lib/views/BuildView.svelte apps/web/src/lib/views/BuildView.test.ts apps/web/src/lib/views/ApprovalsView.svelte apps/web/src/lib/views/ApprovalsView.test.ts apps/web/src/lib/views/settings/Runtime.svelte apps/web/src/lib/views/settings/Runtime.test.ts
+git add -- apps/web/src/lib/components/CommandOutputPane.svelte apps/web/src/lib/components/CommandActivityRow.svelte apps/web/src/lib/components/CredentialDeltaReview.svelte apps/web/src/lib/commandPresentation.ts apps/web/src/lib/components/CommandOutputPane.test.ts apps/web/src/lib/components/CommandActivityRow.test.ts apps/web/src/lib/components/CredentialDeltaReview.test.ts apps/web/src/lib/commandPresentation.test.ts apps/web/src/lib/api.ts apps/web/src/lib/apiTypes.ts apps/web/src/lib/views/BuildView.svelte apps/web/src/lib/views/BuildView.test.ts apps/web/src/lib/views/ApprovalsView.svelte apps/web/src/lib/views/ApprovalsView.test.ts apps/web/src/lib/views/settings/Runtime.svelte apps/web/src/lib/views/settings/Runtime.test.ts
 git commit -m "feat: add Build command workbench"
 ```
 
@@ -1577,6 +1690,12 @@ Run the Windows installer/firewall rollback integration in the Windows workflow
 and build the pinned command image twice, verifying supervisor/proxy protocol
 versions and artifact digests. Expected: all gates exit zero and the runtime
 refuses a tampered helper or image.
+
+Build the wheel and native artifacts from a clean checkout, install the wheel in
+a fresh environment with the source tree absent from import/PATH, build the
+command image only from release artifacts, and run readiness for supervisor,
+runner, Windows service where applicable, and proxy. This clean-install smoke is
+a required job in `native-security-boundaries.yml`.
 
 - [ ] **Step 4: Repeat and inspect the critical live scenarios**
 

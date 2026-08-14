@@ -85,6 +85,8 @@ from raiker.storage.migrations import (
     CODE_MAP_SQL,
     CODE_REPOS_MIGRATION_ID,
     CODE_REPOS_SQL,
+    COMMAND_RUNS_MIGRATION_ID,
+    COMMAND_RUNS_SQL,
     CONFIGURED_MODELS_MIGRATION_ID,
     CONFIGURED_MODELS_SQL,
     CONNECTOR_ECOSYSTEM_MIGRATION_ID,
@@ -1292,6 +1294,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 GIT_CREDENTIAL_GRANT_MIGRATION_ID, GIT_CREDENTIAL_GRANT_SQL, connection
             )
+            self._apply_migration(COMMAND_RUNS_MIGRATION_ID, COMMAND_RUNS_SQL, connection)
             self._rebuild_memory_fts(connection)
             self._backfill_conversation_fts(connection)
             for _alter_sql in (

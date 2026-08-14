@@ -2924,3 +2924,108 @@ CREATE TABLE IF NOT EXISTS git_credential_grants (
 CREATE INDEX IF NOT EXISTS idx_git_grants_active
   ON git_credential_grants(owner_principal_id, status, expires_at);
 """
+
+
+# ── Governed command runs (RAIKER-2030) ────────────────────────────────────
+#
+# Commands are durable governed records, not ephemeral subprocess return
+# values. Executable material stays encrypted; query surfaces receive only the
+# owner-safe display and its digest. Output is an ordered, owner-scoped stream,
+# and a terminal state cannot be published without its immutable receipt.
+COMMAND_RUNS_MIGRATION_ID = "RAIKER-2030-command-runs"
+
+COMMAND_RUNS_SQL = """
+CREATE TABLE IF NOT EXISTS command_runs (
+  run_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  acting_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  action_id TEXT NOT NULL,
+  state TEXT NOT NULL,
+  profile_id TEXT NOT NULL,
+  backend TEXT NOT NULL DEFAULT '',
+  safe_display TEXT NOT NULL,
+  template_digest TEXT NOT NULL,
+  encrypted_execution_material BLOB NOT NULL,
+  isolation_json TEXT NOT NULL DEFAULT '{}',
+  encrypted_backend_handle BLOB,
+  started_at TEXT,
+  completed_at TEXT,
+  lease_expires_at TEXT,
+  exit_code INTEGER,
+  termination_reason TEXT,
+  stdout_bytes INTEGER NOT NULL DEFAULT 0,
+  stderr_bytes INTEGER NOT NULL DEFAULT 0,
+  truncated INTEGER NOT NULL DEFAULT 0,
+  redaction_count INTEGER NOT NULL DEFAULT 0,
+  receipt_digest TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_command_runs_owner_session
+  ON command_runs(owner_principal_id, session_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_command_runs_owner_state
+  ON command_runs(owner_principal_id, state, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS command_output_chunks (
+  owner_principal_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  sequence INTEGER NOT NULL,
+  stream TEXT NOT NULL,
+  text TEXT NOT NULL,
+  start_byte_offset INTEGER NOT NULL,
+  end_byte_offset INTEGER NOT NULL,
+  byte_count INTEGER NOT NULL,
+  emitted_at TEXT NOT NULL,
+  PRIMARY KEY (run_id, sequence),
+  FOREIGN KEY (run_id) REFERENCES command_runs(run_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_command_chunks_owner_run
+  ON command_output_chunks(owner_principal_id, run_id, sequence);
+
+CREATE TABLE IF NOT EXISTS command_network_grants (
+  grant_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  session_id TEXT NOT NULL,
+  run_id TEXT,
+  scope_json TEXT NOT NULL,
+  decision_id TEXT NOT NULL,
+  status TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  uses INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL,
+  revoked_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_command_network_grants_owner
+  ON command_network_grants(owner_principal_id, session_id, status, expires_at);
+
+CREATE TABLE IF NOT EXISTS command_network_attempts (
+  attempt_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  grant_id TEXT NOT NULL,
+  requested_host TEXT NOT NULL,
+  requested_port INTEGER NOT NULL,
+  resolved_address_digest TEXT NOT NULL,
+  decision TEXT NOT NULL,
+  outcome TEXT NOT NULL,
+  bytes_sent INTEGER NOT NULL DEFAULT 0,
+  bytes_received INTEGER NOT NULL DEFAULT 0,
+  opened_at TEXT NOT NULL,
+  closed_at TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_command_network_attempts_owner_run
+  ON command_network_attempts(owner_principal_id, run_id, opened_at);
+
+CREATE TABLE IF NOT EXISTS command_receipts (
+  run_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  receipt_json TEXT NOT NULL,
+  digest TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES command_runs(run_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_command_receipts_owner_run
+  ON command_receipts(owner_principal_id, run_id);
+"""

@@ -1685,6 +1685,8 @@ export interface CommandRunView {
   session_id: string;
   turn_id: string;
   action_id: string;
+  authority_kind: string;
+  authority_id: string;
   state: CommandRunState;
   profile_id: string;
   backend: string;

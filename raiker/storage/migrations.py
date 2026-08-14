@@ -3072,3 +3072,14 @@ CREATE TABLE IF NOT EXISTS command_delta_receipts (
 CREATE INDEX IF NOT EXISTS idx_command_delta_receipts_owner_run
   ON command_delta_receipts(owner_principal_id, run_id);
 """
+
+
+# Public authority evidence lets the owner-facing command surface prove that a
+# run entered through an approval or standing grant without decrypting command
+# material. Historical rows remain visibly unverified rather than inferred.
+COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID = "RAIKER-2032-command-authority-evidence"
+
+COMMAND_AUTHORITY_EVIDENCE_SQL = """
+ALTER TABLE command_runs ADD COLUMN authority_kind TEXT NOT NULL DEFAULT '';
+ALTER TABLE command_runs ADD COLUMN authority_id TEXT NOT NULL DEFAULT '';
+"""

@@ -120,9 +120,9 @@ class CommandStore:
             connection.execute(
                 """INSERT INTO command_runs (
                     run_id, owner_principal_id, acting_principal_id, session_id, turn_id,
-                    action_id, state, profile_id, safe_display, template_digest,
+                    action_id, authority_kind, authority_id, state, profile_id, safe_display, template_digest,
                     encrypted_execution_material, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     request.run_id,
                     request.owner_principal_id,
@@ -130,6 +130,8 @@ class CommandStore:
                     request.session_id,
                     request.turn_id,
                     request.action_id,
+                    request.authority_kind,
+                    request.authority_id,
                     CommandState.QUEUED.value,
                     request.environment_profile_id,
                     request.safe_display,
@@ -341,7 +343,7 @@ class CommandStore:
         with self.sqlite.connect() as connection:
             row = connection.execute(
                 """SELECT run_id, owner_principal_id, acting_principal_id, session_id,
-                          turn_id, action_id, state, profile_id, backend, safe_display,
+                          turn_id, action_id, authority_kind, authority_id, state, profile_id, backend, safe_display,
                           template_digest, started_at, completed_at, lease_expires_at,
                           exit_code, termination_reason, stdout_bytes, stderr_bytes,
                           truncated, redaction_count, receipt_digest, created_at, updated_at
@@ -559,6 +561,8 @@ class CommandStore:
             session_id=row["session_id"],
             turn_id=row["turn_id"],
             action_id=row["action_id"],
+            authority_kind=row["authority_kind"],
+            authority_id=row["authority_id"],
             state=CommandState(row["state"]),
             profile_id=row["profile_id"],
             backend=row["backend"],

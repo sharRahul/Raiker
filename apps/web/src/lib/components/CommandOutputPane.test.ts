@@ -11,6 +11,8 @@ const run: CommandRunView = {
   session_id: "sess_1",
   turn_id: "turn_1",
   action_id: "act_1",
+  authority_kind: "approval",
+  authority_id: "approval_1",
   state: "succeeded",
   profile_id: "local_native",
   backend: "local_strict",

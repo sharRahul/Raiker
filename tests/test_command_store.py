@@ -80,6 +80,13 @@ def test_request_requires_exactly_one_command_representation() -> None:
         request(executable_template="", argv_template=())
 
 
+def test_authority_evidence_is_queryable_without_decrypting_execution_material(store: CommandStore) -> None:
+    created = store.create(request(authority_kind="standing_grant", authority_id="grant_a"))
+
+    assert created.authority_kind == "standing_grant"
+    assert created.authority_id == "grant_a"
+
+
 @pytest.mark.parametrize("cwd", ("../escape", "/absolute", "C:/absolute"))
 def test_request_rejects_uncontained_working_directory(cwd: str) -> None:
     with pytest.raises(ValueError, match="command_cwd_invalid"):

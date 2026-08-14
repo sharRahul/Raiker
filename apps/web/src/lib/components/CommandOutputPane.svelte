@@ -91,7 +91,7 @@
       <div class="receipt-rail" aria-label="Command governance path">
         <span class:ready={environment?.available}><i></i>Environment</span>
         <b aria-hidden="true"></b>
-        <span class:ready={selected !== null}><i></i>Policy</span>
+        <span class:ready={Boolean(selected?.authority_kind && selected?.authority_id)}><i></i>Authority</span>
         <b aria-hidden="true"></b>
         <span class:ready={selected !== null}><i></i>{statusLabel(selected)}</span>
         <b aria-hidden="true"></b>
@@ -128,6 +128,7 @@
             <div><dt>Outcome</dt><dd>{humanize(receipt.state)}</dd></div>
             <div><dt>Exit</dt><dd>{receipt.exit_code ?? "—"}</dd></div>
             <div><dt>Isolation</dt><dd>{String(receipt.evidence.backend ?? "recorded")}</dd></div>
+            <div><dt>Authority</dt><dd>{String(selected?.authority_kind ?? "unverified")}</dd></div>
             <div><dt>Completed</dt><dd>{receipt.completed_at}</dd></div>
           </dl>
         </details>

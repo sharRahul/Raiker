@@ -263,6 +263,8 @@ class StoredCommandRun:
     session_id: str
     turn_id: str
     action_id: str
+    authority_kind: str
+    authority_id: str
     state: CommandState
     profile_id: str
     backend: str

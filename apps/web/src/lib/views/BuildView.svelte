@@ -76,7 +76,6 @@
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { thinkingSteps } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -863,7 +862,6 @@
 
       {#each turns as turn (turn.id)}
         {@const answer = answerText(turn)}
-        {@const thinking = thinkingSteps(turn.events)}
         {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
         <article class="turn">
           <div class="user-message">
@@ -909,17 +907,15 @@
                 {/if}
               </div>
             {/if}
-            {#if turn.streaming}
+            <!-- BUG-207 slice A, as in Chat: the pseudo-thinking disclosure is
+                 gone, and the indicator ends at the first token rather than
+                 narrating that text which is visibly streaming is being
+                 written. -->
+            {#if turn.streaming && answer === ""}
               <p class="working" role="status">
                 <span class="pulse" aria-hidden="true"></span>
-                {answer === "" ? "Reading and planning…" : "Writing…"}
+                Reading and planning…
               </p>
-              {#if thinking.length > 0}
-                <details class="thinking">
-                  <summary>See what Raiker is thinking</summary>
-                  {#each thinking as step (step)}<p>{step}</p>{/each}
-                </details>
-              {/if}
             {/if}
 
             <!-- B17/C13 — as in Chat: a turn the owner stopped says so, rather
@@ -1471,17 +1467,6 @@
     50% {
       opacity: 1;
     }
-  }
-  .thinking {
-    font-size: 0.78rem;
-    color: var(--text-2);
-  }
-  .thinking summary {
-    cursor: pointer;
-    color: var(--text-3);
-  }
-  .thinking p {
-    margin: 0.3rem 0 0;
   }
   .governance {
     border-top: 1px dashed var(--border);

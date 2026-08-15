@@ -748,7 +748,13 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
   });
 
-  it("shows safe expandable thinking while Raiker prepares a response", async () => {
+  // BUG-207 slice A. The disclosure this used to open was labelled "See what
+  // Raiker is thinking" and held three fixed sentences keyed off lifecycle event
+  // type — not the model's reasoning, which is requested from the provider and
+  // then dropped by the stream parser. What the test was really protecting is
+  // the half that still matters and is asserted below: a lifecycle event's raw
+  // text never reaches the transcript.
+  it("shows one indicator before the first token, and never the raw lifecycle text", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;
     streamPromptMock.mockImplementation(
@@ -771,18 +777,16 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "help me plan this" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(await screen.findByText("Raiker is thinking…")).toBeInTheDocument();
-    const details = screen.getByLabelText("Raiker's thinking") as HTMLDetailsElement;
-    expect(details.open).toBe(false);
-    await fireEvent.click(screen.getByText("See what Raiker is thinking"));
-    expect(details.open).toBe(true);
-    expect(screen.getByText("Understanding what you need.")).toBeInTheDocument();
+    expect(await screen.findByText("Working…")).toBeInTheDocument();
     expect(screen.queryByText("internal intent payload")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Raiker's thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("See what Raiker is thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Understanding what you need.")).not.toBeInTheDocument();
 
     finishStream?.();
   });
 
-  it("uses conversation bubbles, typing status, and a reaction without runtime metadata", async () => {
+  it("uses conversation bubbles and a reaction, with no status line once text is streaming", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;
     streamPromptMock.mockImplementation(
@@ -812,7 +816,10 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "thanks" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(await screen.findByText("Raiker is typing…")).toBeInTheDocument();
+    // Streaming text is its own progress: the indicator ends at the first token
+    // rather than narrating that words visibly appearing are being written.
+    expect(await screen.findByText(/You're welcome/)).toBeInTheDocument();
+    expect(screen.queryByText("Working…")).not.toBeInTheDocument();
     finishStream?.();
 
     expect(await screen.findByLabelText("Raiker reacted with Heart")).toHaveTextContent("❤️");

@@ -8,6 +8,7 @@
 | Area | Status | Notes |
 |---|---|---|
 | Terminal client and loopback dashboard | implemented_verified | Share the governed backend |
+| In-product user guide | implemented_verified | Seven sections served read-only from the install, deep-linkable, reached from each page's own link; a build shipping no guide reports it rather than showing an empty list |
 | Model profiles and universal readiness | implemented_verified | Exact owner/profile/model/endpoint evidence gates Workbench, Chat, Build, Tasks, and Schedule; hosted checks include a bounded execution preflight |
 | Local model acquisition | implemented_verified | First-run setup, official Ollama/LM Studio sources, Ollama pull, approved-root GGUF discovery, and managed loopback llama.cpp deployment |
 | Hugging Face acquisition and conversion | implemented_policy_gated | Immutable GGUF-first snapshots; gated/licence review; explicit Safetensors conversion in a digest-pinned networkless worker |

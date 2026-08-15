@@ -16,6 +16,12 @@ evidence and [To be fixed](../plans/TO_BE_FIXED.md) for what does not work yet.
 | [Extensions and MCP](extensions-and-mcp.md) | Connectors and Model Context Protocol servers |
 | [Troubleshooting](troubleshooting.md) | You hit a reason code and want the fix |
 
+**You can read all of this inside Raiker.** Utilities → **Guide** serves these
+same sections from the install, and each page links to the one that explains it —
+Models to *Connecting a model*, Permissions to *Permissions and the runtime*. The
+product no longer explains itself on every screen, so this is where that
+explanation lives.
+
 For architecture, contracts, and the security model, start at
 [the documentation index](../README.md).
 

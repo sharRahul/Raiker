@@ -58,7 +58,9 @@ it("shows the authoritative environment, redacted output, and immutable receipt"
   render(CommandOutputPane, { sessionId: "sess_1" });
   await fireEvent.click(screen.getByRole("button", { name: /Governed terminal/i }));
 
-  expect(await screen.findByText("Selected environment is authoritative")).toBeInTheDocument();
+  // The posture line names the boundary that was measured, not a reassurance
+  // about the selection being authoritative.
+  expect(await screen.findByText("Host access — reduced isolation")).toBeInTheDocument();
   expect(await screen.findByText("clean")).toBeInTheDocument();
   expect(await screen.findByText(/Immutable receipt/)).toBeInTheDocument();
   expect(screen.getByText("local_strict")).toBeInTheDocument();

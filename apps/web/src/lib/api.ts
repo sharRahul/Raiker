@@ -33,6 +33,7 @@ import type {
   Diagnostics,
   DiagnosticsExport,
   EventEntry,
+  ExecutionEnvironment,
   ExecutionEnvironmentsView,
   ExtensionsOverview,
   InterruptRequestBody,
@@ -1061,6 +1062,11 @@ export const api = {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       },
+    ),
+  probeExecutionEnvironment: (profile_id: string) =>
+    postJson<{ ok: boolean; environment: ExecutionEnvironment }>(
+      `/api/execution-environments/${encodeURIComponent(profile_id)}/probe`,
+      {},
     ),
   selectExecutionEnvironment: (profile_id: string) =>
     request<{ ok: boolean; selected_profile_id: string }>(

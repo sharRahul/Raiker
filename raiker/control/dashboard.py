@@ -38,6 +38,7 @@ from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
 from raiker.execution.profiles import (
     CONTAINER_PROFILE_TOOLS,
+    DEFAULT_EXECUTION_PROFILES,
     ContainerRuntime,
     ExecutionProfile,
     RepositoryAccess,
@@ -1363,6 +1364,17 @@ class DashboardService:
             )
         )
         local_profile = ExecutionProfile("local_native", "local")
+        # The native boundary is measured, not declared: this probe runs the
+        # real sandbox over the real workspace before the card can say anything
+        # about it.
+        native_profile = next(
+            profile
+            for profile in DEFAULT_EXECUTION_PROFILES
+            if profile.profile_id == "native_sandbox"
+        )
+        native_probe = probe_execution_profile(
+            native_profile, workspace_root=self.store.paths.workspace_root
+        )
         environments: list[dict[str, Any]] = [
             {
                 "profile_id": "local_native", "kind": "local", "name": "Local strict",
@@ -1374,6 +1386,23 @@ class DashboardService:
                 "features": asdict(local_profile.features),
                 "probe_checked_at": utc_now(),
                 "availability_reason": None,
+                "boundary": "host_reduced_isolation",
+                "probe_observations": {},
+            },
+            {
+                "profile_id": "native_sandbox", "kind": "native", "name": "Native OS sandbox",
+                "enabled": True, "configured": True,
+                "available": native_probe.available,
+                "status": "ready" if native_probe.available else "unavailable",
+                "selected": selected == "native_sandbox",
+                "credential_configured": True, "budget": None, "cost": None,
+                "selected_for_commands": selected == "native_sandbox",
+                "assigned_tools": ["shell", "run_command"],
+                "features": asdict(native_probe.features or native_profile.features),
+                "probe_checked_at": native_probe.checked_at,
+                "availability_reason": native_probe.reason_code,
+                "boundary": native_probe.boundary,
+                "probe_observations": dict(native_probe.observations),
             },
             {
                 "profile_id": "container_default", "kind": "container", "name": "Local container",

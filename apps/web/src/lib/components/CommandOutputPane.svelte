@@ -8,6 +8,7 @@
     ExecutionEnvironment,
   } from "../apiTypes";
   import { humanize } from "../format";
+  import { boundaryLabel, posturaLine } from "../sandboxPosture";
   import Icon from "./Icon.svelte";
 
   let {
@@ -30,6 +31,12 @@
     selected !== null && ["succeeded", "failed", "timed_out", "cancelled", "contained", "lost"].includes(selected.state),
   );
   const output = $derived(chunks.map((chunk) => chunk.text).join(""));
+  // A failed run has to lead somewhere. Without this the owner sees a red
+  // state and no way to reach either the receipt or the decision that allowed
+  // the command to run at all.
+  const failed = $derived(
+    selected !== null && ["failed", "timed_out", "contained", "lost"].includes(selected.state),
+  );
 
   function reason(exc: unknown): string {
     if (exc instanceof ApiError) return humanize(exc.reasonCode ?? "command_request_failed");
@@ -140,8 +147,8 @@
       </div>
 
       <div class="posture" role="status">
-        <span><Icon name="shield" size={13} /> Selected environment is authoritative</span>
-        <span>{environment?.kind === "local" ? "Argv only · no credential inheritance · no PTY · foreground" : "No host fallback"}</span>
+        <span><Icon name="shield" size={13} /> {boundaryLabel(environment)}</span>
+        <span>{posturaLine(environment)}</span>
       </div>
 
       <div class="output-shell" aria-live="polite">
@@ -163,6 +170,15 @@
             <div><dt>Completed</dt><dd>{receipt.completed_at}</dd></div>
           </dl>
         </details>
+      {/if}
+      {#if selected && failed}
+        <p class="failure-nav" role="status">
+          <Icon name="warning" size={13} />
+          <span>
+            {humanize(selected.termination_reason ?? selected.state)}{selected.exit_code !== null ? ` · exit ${selected.exit_code}` : ""}
+          </span>
+          <a href="#/approvals">Open the {selected.authority_kind || "authority"} that allowed it</a>
+        </p>
       {/if}
       {#if error}<p class="pane-error" role="alert">{error}</p>{/if}
     </div>
@@ -200,6 +216,8 @@
   dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin: .55rem 0 0; }
   dl div { min-width: 0; } dt { color: var(--text-3); font-size: .62rem; text-transform: uppercase; } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
   .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: .7rem; }
+  .failure-nav { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin: .55rem 0 0; padding: .42rem .5rem; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--text-2); font-size: .7rem; }
+  .failure-nav a { margin-left: auto; color: var(--accent); }
   @media (max-width: 720px) { .command-pane { margin-inline: .75rem; } .receipt-rail { grid-template-columns: repeat(4, 1fr); } .receipt-rail b { display: none; } .receipt-rail span { justify-content: center; } .posture { display: grid; } dl { grid-template-columns: repeat(2, 1fr); } }
   @media (prefers-reduced-motion: reduce) { .live-dot { box-shadow: none; } }
 </style>

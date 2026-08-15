@@ -66,3 +66,36 @@ jobs:
       - name: Compile sources
         run: |
           python -m compileall -q raiker apps tests
+
+  native:
+    # The sandbox runner is the only part of Raiker that is not Python, and it
+    # is the part that builds the operating-system boundary. It is built and
+    # tested on both platforms that have one, because a boundary that compiles
+    # on the author's machine and nowhere else is not a boundary anyone ships.
+    name: Native runner (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        # actions/checkout v5.0.1 (Node 24 runtime)
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Show toolchain
+        working-directory: native
+        run: |
+          rustc --version
+          cargo --version
+      - name: Check formatting
+        working-directory: native
+        run: cargo fmt --check
+      - name: Lint
+        working-directory: native
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test
+        working-directory: native
+        run: cargo test --all
+      - name: Build and install into the package
+        run: python scripts/build_native_runner.py

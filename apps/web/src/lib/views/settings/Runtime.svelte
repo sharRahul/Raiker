@@ -23,6 +23,7 @@
   import { api, ApiError } from "../../api";
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
+  import { boundaryLabel, observationRows } from "../../sandboxPosture";
 
   let {
     principal = "—",
@@ -60,6 +61,7 @@
   let containerRuntime = $state<"docker" | "podman">("docker");
   let containerImage = $state("");
   let selectedContainerTools = $state<string[]>([]);
+  let probing = $state<string | null>(null);
 
   // The runtime is on unless the owner switched it off. An unreadable state is
   // never reported as running — the card says it could not be read instead.
@@ -111,6 +113,23 @@
       ? [...selectedContainerTools, tool]
       : selectedContainerTools.filter((item) => item !== tool);
   }
+  async function reprobe(profileId: string) {
+    // Re-measuring makes one outbound connection to the host's default gateway
+    // on a closed port. That is stated on the card rather than left for someone
+    // to discover in a firewall log.
+    probing = profileId;
+    notice = null;
+    try {
+      await api.probeExecutionEnvironment(profileId);
+      await load();
+      notice = { kind: "ok", text: "The boundary was re-measured." };
+    } catch {
+      notice = { kind: "error", text: "The boundary could not be measured on this host." };
+    } finally {
+      probing = null;
+    }
+  }
+
   async function selectEnvironment(profileId: string) {
     try { await api.selectExecutionEnvironment(profileId); await load(); }
     catch { notice = { kind: "error", text: "That environment is not ready. Complete its configuration and credential reference first." }; }
@@ -219,7 +238,38 @@
         <article class:selected={environment.selected}>
           <div>
             <strong>{environment.name}</strong>
-            {#if environment.kind === "container"}
+            {#if environment.kind === "native"}
+              <span class="container-runtime">{boundaryLabel(environment)}</span>
+              <ul class="observations">
+                {#each observationRows(environment.probe_observations) as observation}
+                  <li class={observation.verdict}>
+                    <span>{observation.label}</span>
+                    <strong>{observation.verdictLabel}</strong>
+                  </li>
+                {:else}
+                  <li class="indeterminate">
+                    <span>This host has not been measured</span>
+                    <strong>Not proven</strong>
+                  </li>
+                {/each}
+              </ul>
+              <small>
+                Foreground commands only. PTY, background execution, network grants and
+                persistence are not built for this boundary and are not offered.
+              </small>
+              {#if environment.availability_reason}
+                <small class="remediation">{explainReasonCode(environment.availability_reason)?.plain ?? environment.availability_reason.replaceAll("_", " ")}</small>
+              {/if}
+              <button
+                class="btn btn-ghost btn-sm reprobe"
+                type="button"
+                disabled={probing === environment.profile_id}
+                onclick={() => void reprobe(environment.profile_id)}
+              >
+                {probing === environment.profile_id ? "Measuring…" : "Re-measure boundary"}
+              </button>
+              <small>Re-measuring opens one connection to this host's default gateway on a closed port.</small>
+            {:else if environment.kind === "container"}
               <span class="container-runtime">{runtimeName(environment.runtime)} · {environment.image ?? "No approved image"}</span>
               <span class="boundary">Read-only repository → writable output</span>
               <small>{environment.assigned_tool_count ?? 0} tools</small>

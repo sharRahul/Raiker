@@ -1067,6 +1067,37 @@ async def configure_execution_environment(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/execution-environments/{profile_id}/probe")
+async def probe_execution_environment(
+    profile_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Re-measure a boundary on demand.
+
+    The measurement is what the environment card reports, and it can change
+    under the product's feet — stopping the firewall service takes the
+    AppContainer's egress enforcement with it. The owner therefore needs a way
+    to ask again rather than waiting for a cached answer to expire.
+    """
+    if profile_id != "native_sandbox":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "execution_environment_not_probeable"},
+        )
+    view = _service(request).execution_environments(auth_data[0].principal_id)
+    measured = next(
+        (item for item in view["environments"] if item["profile_id"] == profile_id),
+        None,
+    )
+    if measured is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "execution_environment_not_found"},
+        )
+    return {"ok": True, "environment": measured}
+
+
 @router.put("/api/execution-environments/selection")
 async def select_execution_environment(
     body: dict[str, Any],

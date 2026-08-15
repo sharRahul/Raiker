@@ -1617,7 +1617,7 @@ export interface BrainSourceReview {
 
 export interface ExecutionEnvironment {
   profile_id: string;
-  kind: "local" | "container" | "ssh" | "daytona";
+  kind: "local" | "native" | "container" | "ssh" | "daytona";
   name: string;
   enabled: boolean;
   configured: boolean;
@@ -1656,7 +1656,18 @@ export interface ExecutionEnvironment {
   writable_output?: boolean;
   assigned_tool_count?: number;
   availability_reason?: string | null;
+  /** The boundary this host was measured to build, not the one it was configured with. */
+  boundary?: string;
+  /**
+   * Per-observation verdicts from the readiness probe. `indeterminate` means the
+   * control arm failed, so the observation proves nothing and must never be
+   * rendered as enforcement.
+   */
+  probe_observations?: Record<string, ProbeVerdict>;
+  probe_checked_at?: string;
 }
+
+export type ProbeVerdict = "enforced" | "unenforced" | "indeterminate";
 
 export interface ExecutionEnvironmentsView {
   selected_profile_id: string;

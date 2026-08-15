@@ -11,7 +11,7 @@ from raiker.terminal.status_bar import StatusBarRenderer, StatusContext
 
 def _copy_config(tmp_path: Path) -> None:
     (tmp_path / "config").mkdir()
-    source_config = Path(__file__).resolve().parents[1] / "config"
+    source_config = Path(__file__).resolve().parents[1] / "raiker" / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
         (tmp_path / "config" / name).write_text(
             (source_config / name).read_text(encoding="utf-8"), encoding="utf-8"

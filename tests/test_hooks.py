@@ -104,7 +104,7 @@ def _setup(
     local: dict | None = None,
 ) -> None:
     (tmp_path / "config").mkdir(exist_ok=True)
-    source = Path(__file__).resolve().parents[1] / "config"
+    source = Path(__file__).resolve().parents[1] / "raiker" / "config"
     for name in ["model-profiles.json", "channel-connectors.json"]:
         (tmp_path / "config" / name).write_text(
             (source / name).read_text(encoding="utf-8"), encoding="utf-8"

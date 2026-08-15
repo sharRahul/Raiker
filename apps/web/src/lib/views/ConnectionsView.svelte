@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { ConnectorStoreView, StoreConnector } from "../apiTypes";
 
@@ -186,10 +187,7 @@
 </script>
 
 <div class="header">
-  <p class="page-lead">
-    Connect services, inspect their operations, and use governed actions in
-    chat.
-  </p>
+  <GuideLink route="connections" />
   <button class="btn" onclick={() => (showManifest = true)}
     ><Icon name="file" size={15} /> Import manifest</button
   >
@@ -514,11 +512,7 @@
   .header {
     margin-bottom: var(--space-4);
   }
-  .header .page-lead {
-    margin: 0;
-    max-width: 60ch;
-  }
-  .detail-head p,
+.detail-head p,
   .dialog > p,
   section p {
     color: var(--text-2);

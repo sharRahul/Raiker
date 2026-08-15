@@ -4162,9 +4162,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     @staticmethod
     def _match_terms(query: str) -> list[str]:
-        """FTS4-safe terms. Operators and punctuation are stripped, not escaped."""
+        """FTS4-safe terms. Operators and punctuation are stripped, not escaped.
+
+        Stripping punctuation removes the parenthesis and quote operators, but it
+        leaves the *keyword* operators, which FTS4 recognises only in upper case.
+        A prompt is ordinary prose, so `AND`, `OR`, `NOT`, and `NEAR` arrive as
+        words the owner typed, not as syntax: `NOT deployment` is a malformed
+        expression that raises, and `find NOT deployment` parses as an exclusion
+        and answers with the opposite of what was asked. Lower-casing every term
+        makes each one a literal, which is what the tokenizer already matches
+        case-insensitively — so the search means what the prompt says.
+        """
         cleaned = "".join(character if character.isalnum() else " " for character in query)
-        return [term for term in cleaned.split() if len(term) >= 3][:12]
+        return [term.lower() for term in cleaned.split() if len(term) >= 3][:12]
 
     def search_conversation_turns(
         self,
@@ -6083,11 +6093,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         self, query: str, scope: str | None = None, limit: int = 20,
         *, owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
-        terms = [term for term in query.replace('"', " ").replace("-", " ").split() if len(term) >= 3]
+        terms = self._match_terms(query)
         if not terms:
             return []
-        sql = """SELECT m.* FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
-        WHERE approved_memory_fts MATCH ? AND m.deleted_at IS NULL AND m.archived_at IS NULL
+        # Driving from the FTS index, not joining onto it. Written as a join, the
+        # planner picks `approved_memory` as the outer loop and re-runs the
+        # full-text match once per candidate row: at 800 memories the same match
+        # costs 16 ms on its own and 13 s through the join. `IN (SELECT …)`
+        # evaluates the index once and probes the table by primary key.
+        sql = """SELECT m.* FROM approved_memory m
+        WHERE m.memory_id IN (SELECT memory_id FROM approved_memory_fts
+                              WHERE approved_memory_fts MATCH ?)
+          AND m.deleted_at IS NULL AND m.archived_at IS NULL
           AND m.search_enabled = 1 AND m.sensitivity NOT IN ('secret_like', 'credential_like')
           AND (m.expires_at IS NULL OR m.expires_at > ?)
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)

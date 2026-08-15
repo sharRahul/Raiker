@@ -447,7 +447,7 @@ without recording the value.
 
 **Status: proposal. This is an owner decision before it is an engineering one.**
 
-**Today.** `config/channel-connectors.json` declares cli, tui, rest, web_ui,
+**Today.** `raiker/config/channel-connectors.json` declares cli, tui, rest, web_ui,
 desktop, dashboard, ide, apple_mobile, android_mobile and webhooks, and
 `raiker/channels/registry.py` loads them — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False` in

@@ -96,10 +96,19 @@ export async function connectHostedProvider(
   key: string,
 ): Promise<Locator> {
   const card = await hostedProviderCard(page, base, provider);
-  await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
+  // BUG-208 slice E moved Reconnect into Details — it is credential management,
+  // not what the card is for. A provider with no connection still offers Connect
+  // on the card, which is the path a fresh workspace takes.
+  const connect = card.getByRole("button", { name: "Connect", exact: true });
+  if (await connect.isVisible().catch(() => false)) {
+    await connect.click();
+  } else {
+    await card.getByRole("button", { name: "Details", exact: true }).click();
+    await page.getByRole("button", { name: "Reconnect", exact: true }).click();
+  }
   await page.getByLabel(keyLabel).fill(key);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   return card;
 }
 

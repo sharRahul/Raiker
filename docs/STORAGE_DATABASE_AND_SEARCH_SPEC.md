@@ -459,16 +459,28 @@ Raiker search combines:
 | Search type | Backend |
 |---|---|
 | file name | SQLite metadata + filesystem glob |
-| text grep | brokered grep tool + optional FTS5 index |
+| text grep | brokered grep tool + optional full-text index |
 | event search | SQLite events_index |
-| memory keyword search | SQLite FTS5 over memory_records |
+| memory keyword search | SQLite full-text index over memory_records (**FTS4** as shipped — see note below) |
 | semantic search | vector backend + metadata filters |
 | graph search | SQLite graph tables + recursive CTEs |
 | code symbols | LSP/symbol extraction + graph_nodes |
 
 ---
 
-## FTS5 Tables
+## Full-text tables
+
+> **As shipped this is FTS4, not FTS5.** The SQLCipher build Raiker bundles has
+> no FTS5 module, so `raiker/storage/sqlite.py` rewrites `USING fts5(` to
+> `USING fts4(` and the live tables are `approved_memory_fts` and
+> `conversation_fts`, both FTS4. The difference is not cosmetic: FTS4 has no
+> `rank`/`bm25()`, so lexical results are ordered by recency rather than
+> relevance — the open defect
+> [MEM-05](plans/MEMORY_RELIABILITY_PLAN.md#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped).
+> FTS4 also treats upper-case `AND`/`OR`/`NOT`/`NEAR` and parentheses as
+> operators, which is why every query reaching an index is sanitised through
+> `SQLiteStore._match_terms` (FIXED-201). The schema below is the target shape;
+> read it as FTS4 until the bundled build gains FTS5.
 
 ```sql
 CREATE VIRTUAL TABLE memory_fts USING fts5(

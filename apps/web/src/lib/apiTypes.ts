@@ -1282,6 +1282,25 @@ export interface AgentResponse {
 export type StreamKind =
   "lifecycle" | "text_delta" | "tool" | "final" | "error";
 
+/** One page of the user guide, as the product lists it (BUG-208 slice A). */
+export interface GuideSectionSummary {
+  slug: string;
+  title: string;
+  summary: string;
+}
+
+/** The sections this install carries. `available` is false when a build shipped none. */
+export interface GuideIndex {
+  available: boolean;
+  sections: GuideSectionSummary[];
+  reason_code: string;
+}
+
+/** One section's Markdown, rendered by the client with the shared component. */
+export interface GuideSection extends GuideSectionSummary {
+  markdown: string;
+}
+
 export interface StreamEvent {
   kind: StreamKind;
   text: string;

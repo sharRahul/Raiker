@@ -120,7 +120,7 @@ shipped preference is never counted as ready merely because it exists in the
 profile registry.
 
 Prices come from the provider where one publishes them, from the list prices
-shipped in `config/model-profiles.json` otherwise, and from your own override
+shipped in `raiker/config/model-profiles.json` otherwise, and from your own override
 above both. A model with no resolvable price reports its cost as unknown rather
 than as zero. To set your own rate:
 
@@ -157,6 +157,19 @@ provider data** makes the external checks explicit. An optional owner weekly
 token budget is advisory Raiker control, not a provider subscription limit and
 not a promise about billing or reset dates.
 
+## One instance, one default
+
+Each connection belongs only to this Raiker instance: a key entered here is
+encrypted in this instance's vault and is not shared with another install, a
+another workspace, or the terminal client running elsewhere. **One ready
+provider is enough to work** — nothing requires you to connect more than one.
+
+**Default model** is what serves any surface that does not choose its own,
+including every scheduled run at the moment it begins. Chat and Build can pick
+per prompt; Tasks and Schedule cannot, so the default is what they use.
+
+---
+
 ## Fallback sequence
 
 Below the provider grid, **Model fallback sequence** orders the backends Raiker
@@ -164,6 +177,11 @@ tries when the selected one is unavailable. Listing a hosted provider there
 grants nothing on its own — each candidate is still gated by the same policy.
 Point it at your local runtimes so a turn never dead-ends when a hosted API is
 down.
+
+"Unavailable" is four specific things: no network, a timeout, a host that does
+not respond, or a policy denial. Raiker tries the next candidate in your order
+for each of them, and with no fallback configured the turn fails closed rather
+than silently choosing a backend you did not pick.
 
 ---
 

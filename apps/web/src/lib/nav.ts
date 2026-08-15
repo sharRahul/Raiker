@@ -28,7 +28,10 @@ export const NAV_GROUPS: NavGroup[] = [
   { label: "Observe", items: [
     { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
-  { label: "Utilities", items: [{ id: "settings", label: "Settings", icon: "settings", hint: "Runtime, security posture, appearance" }] },
+  { label: "Utilities", items: [
+    { id: "guide", label: "Guide", icon: "info", hint: "How Raiker works, in the product" },
+    { id: "settings", label: "Settings", icon: "settings", hint: "Runtime, security posture, appearance" },
+  ] },
 ];
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const DEFAULT_ROUTE = "home";
@@ -109,6 +112,18 @@ export function routeFromHash(hash: string): string {
  * names a tab the hub does not have. An unknown tab falls back to the hub's
  * first panel rather than rendering nothing.
  */
+/**
+ * The `?section=` a guide deep link names, or null.
+ *
+ * Guide pages are not hub tabs — the set is whatever the install shipped, so it
+ * cannot be validated against a constant here. The view resolves it against the
+ * sections the API actually returned and falls back to the first one.
+ */
+export function sectionFromHash(hash: string): string | null {
+  const requested = new URLSearchParams(hash.split("?", 2)[1] ?? "").get("section");
+  return requested !== null && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requested) ? requested : null;
+}
+
 export function tabFromHash(hash: string): string | null {
   const raw = rawRoute(hash);
   const route = routeFromHash(hash);

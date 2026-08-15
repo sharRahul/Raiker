@@ -205,6 +205,15 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-195](#fixed-195--a-governed-command-had-no-operating-system-boundary) | High | Shell / sandbox | Fixed (was part of BUG-194) |
 | [FIXED-198](#fixed-198--registering-one-tool-meant-twelve-edits-across-seven-files) | Medium | Codebase structure | Fixed (was OPT-01) |
 | [FIXED-199](#fixed-199--the-rust-and-python-command-codecs-could-not-authenticate-each-other) | High | Command protocol | Fixed |
+| [FIXED-200](#fixed-200--memory-recall-re-ran-the-full-text-match-once-per-candidate-row) | **Critical** | Memory retrieval / performance | Fixed |
+| [FIXED-201](#fixed-201--an-ordinary-prompt-could-raise-a-sqlite-error-out-of-memory-recall) | High | Memory retrieval | Fixed |
+| [FIXED-202](#fixed-202--memories-with-no-similarity-to-the-prompt-were-recalled-into-context) | High | Memory retrieval / context | Fixed |
+| [FIXED-203](#fixed-203--chunk_text-looped-forever-when-the-overlap-reached-the-chunk-size) | Low | Vector chunking | Fixed |
+| [FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Fixed (was BUG-198) |
+| [FIXED-209](#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product) | Medium | Documentation surface | Fixed (BUG-208 slice A) |
+| [FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting) | Medium | UI density | Fixed (BUG-208 slices B, D, E) |
+| [FIXED-211](#fixed-211--the-last-three-teaching-surfaces-and-an-emoji-that-was-never-a-reaction) | Medium | UI density | Fixed (BUG-208 slices C, F — entry closed) |
+| [FIXED-212](#fixed-212--the-built-in-config-and-icon-had-two-copies-and-the-repository-one-silently-won) | Medium | Packaging / configuration | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -2688,6 +2697,12 @@ action first, including rapid set/clear changes made within one clock tick.
 ---
 
 ## FIXED-76 — The shipped model-profile copies and human review cadence stay in step *(was BUG-36)*
+
+> **Superseded in part by [FIXED-212](#fixed-212--the-built-in-config-and-icon-had-two-copies-and-the-repository-one-silently-won).**
+> The byte-for-byte comparison below guarded a duplication that has since been
+> removed: there is no repository-root `config/` to drift from the packaged copy,
+> and the test now fails if one reappears. The review-cadence half of this entry
+> stands unchanged.
 
 **Status: fixed in this change; found while fixing BUG-21 (see FIXED-57).**
 
@@ -7493,3 +7508,522 @@ recorded here because the defect would have surfaced as an authentication
 failure on the first frame of real output, and the fix is what makes the shared
 vector file meaningful.
 
+
+---
+
+## FIXED-200 — Memory recall re-ran the full-text match once per candidate row
+
+**Severity: Critical. Area: memory retrieval / performance. Found during the
+2026-08-15 cross-provider review, reading the retrieval path rather than running
+it.**
+
+**Observed.** Ambient recall runs on every turn, and its cost grew until it was
+the turn. Measured on a fresh SQLCipher workspace, one `retrieve_hybrid_memory`
+call with `limit=10`:
+
+| Approved memories | Before | After |
+|---|---|---|
+| 200 | 775 ms | 30 ms |
+| 1 000 | 20 969 ms | 124 ms |
+| 3 000 | 169 668 ms | 431 ms |
+
+At three thousand memories — a number a single owner reaches in ordinary use —
+one recall took **two minutes and fifty seconds** before the model was asked
+anything. Nothing surfaced this: the gatherer treats a slow source as a slow
+source, so the only symptom was a chat that got slower for months.
+
+**Reproduce.** Write *N* approved memories to one scope, then call
+`retrieve_hybrid_memory` once and time it. The curve above is on the encrypted
+store the product ships.
+
+**Root cause.** Not the embedding arithmetic, which profiling put at 166 ms of an
+11.5 s call — the whole cost was one SQL statement. `search_approved_memory`
+joined `approved_memory` *onto* the FTS index and ordered by a column on the
+table side:
+
+```sql
+FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
+WHERE approved_memory_fts MATCH ? AND … ORDER BY m.created_at DESC LIMIT ?
+```
+
+SQLite answered it by making `approved_memory` the outer loop — `SEARCH m USING
+INDEX idx_approved_memory_scope`, then `SCAN f VIRTUAL TABLE` — which re-executes
+the full-text match once for every candidate row. The same match costs 16 ms when
+evaluated on its own; through the join it cost 13 443 ms. A virtual table has no
+statistics for the planner to weigh, so the shape of the query decided the plan,
+and the shape said "filter the table, then ask the index about each row".
+
+**Fix.** Drive from the index and probe the table by primary key, which the
+planner cannot invert:
+
+```sql
+FROM approved_memory m
+WHERE m.memory_id IN (SELECT memory_id FROM approved_memory_fts
+                      WHERE approved_memory_fts MATCH ?) AND …
+```
+
+Same rows, same order, same governance predicates — the match is evaluated once.
+The measured result is the "After" column above: **594× at 800 memories, 394× at
+3 000**.
+
+**Not fixed here.** This is a cost fix, not a ranking fix. The retained set is
+still the *newest* matches rather than the best ones, which is
+[MEM-05](MEMORY_RELIABILITY_PLAN.md#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped)
+and remains open.
+
+**User-interface outcome.** No new surface. Chat, Search Chat and Memory answer
+in the time the rest of the product already implies, on workspaces where recall
+previously stalled the turn.
+
+---
+
+## FIXED-201 — An ordinary prompt could raise a SQLite error out of memory recall
+
+**Severity: High. Area: memory retrieval.**
+
+**Observed.** Four of eleven plain-English probe queries raised
+`sqlcipher3.dbapi2.OperationalError: malformed MATCH expression` from
+`search_approved_memory`: `NOT deployment`, `AND leading`, `unbalanced (paren`,
+`trailing paren)`. The prompt is passed to recall verbatim
+(`gatherer.py` → `retrieve_hybrid_memory(query=query, …)`), so the trigger is a
+sentence an owner would type — `do NOT delete the migration`, or any prompt
+naming a function with an unbalanced parenthesis.
+
+A second, quieter half: an expression that *parses* changes what was asked.
+`find NOT deployment` is a valid FTS4 exclusion, so recall answered by excluding
+the term the owner was asking about — 0 rows where `find not deployment`
+returns 1.
+
+**Reproduce.** `store.search_approved_memory("NOT deployment", scope=…)` against
+a populated store.
+
+**Root cause.** Two sanitizers for one index. `search_conversation_turns` used
+the repo's `_match_terms`, which strips every non-alphanumeric character;
+`search_approved_memory` hand-rolled a weaker one that removed only `"` and `-`,
+leaving parentheses and every FTS4 operator intact. Neither handled the *keyword*
+operators, which FTS4 recognises only in upper case — so `NOT`, `AND`, `OR` and
+`NEAR` survived both paths as syntax rather than as words.
+
+**Fix.** One sanitizer, and it lower-cases. `search_approved_memory` now calls
+`_match_terms`, and `_match_terms` lower-cases every term. The tokenizer already
+matches case-insensitively, so lower-casing costs no recall and makes a keyword a
+literal: the crash set is 0 of 11, and `find not deployment` matches the record
+the owner meant. Both call sites are covered, so the conversation index is
+protected against the keyword half it also had.
+
+**User-interface outcome.** A prompt containing an ordinary English `not`, or a
+parenthesis, returns recall instead of failing the source. No copy change: the
+correct behaviour was always the one without the error.
+
+---
+
+## FIXED-202 — Memories with no similarity to the prompt were recalled into context
+
+**Severity: High. Area: memory retrieval / context.**
+
+**Observed.** A query sharing no token with anything stored still returned every
+memory in scope. Four memories — an invoice, a build tool, a cat food brand, a
+server rack — came back for the query `zzzz qqqq wwww`, all scored `+0.000000`,
+all handed to the model in the `Recalled owner context` block as material to
+reason from.
+
+**Reproduce.** Store a handful of unrelated memories, then
+`retrieve_hybrid_memory(query="zzzz qqqq wwww", …)`. Before: 4 results, every one
+at zero. After: 0 results.
+
+**Root cause.** `VectorIndex.search` returns the top *k* by cosine with no floor.
+On a corpus smaller than the limit, "top 10" is "all of them", and a zero-overlap
+hash embedding scores exactly 0 rather than being excluded. `retrieve_hybrid_memory`
+admitted every returned hit as a candidate, so similarity was used to *order*
+results but never to decide whether there was a result at all. The sign-hashed
+embedding can also score below zero, in which case the vector arm *subtracted*
+from a genuine lexical hit.
+
+**Fix.** Skip vector hits at or below zero similarity when fusing. Applied at the
+point the hit is admitted, not to the fused score, so a real lexical match is
+never discarded because its vector arm disagreed.
+
+**User-interface outcome.** Recall that has nothing to offer offers nothing.
+Memory and the per-turn "How this turn was governed" disclosure stop listing
+unrelated owner records as recalled context, which is what made the block
+misleading: every line in it reads as evidence the model was given.
+
+---
+
+## FIXED-203 — `chunk_text` looped forever when the overlap reached the chunk size
+
+**Severity: Low. Area: vector chunking.**
+
+**Observed.** `VectorIndex.chunk_text(text, chunk_size=4, overlap=4)` does not
+return. The cursor advances by `chunk_size - overlap`, so at equal values it
+advances by zero and the chunk list grows until the process is killed.
+
+**Reproduce.** Call it on a background thread with a 3 s join; the thread is
+still running.
+
+**Root cause.** A public static helper with no argument validation. No shipped
+call site passes equal values today, which is why it had not been hit — but it is
+reachable by any caller, and the failure mode is an unkillable loop that exhausts
+memory rather than an exception.
+
+**Fix.** Reject `chunk_size <= 0` and any `overlap` outside `0 <= overlap <
+chunk_size` with `ValueError`, so a bad argument fails at the call instead of
+hanging the process.
+
+**User-interface outcome.** None — no shipped surface reaches it. Recorded
+because the defect is silent and terminal where every other argument error in
+this module is loud.
+
+---
+
+## FIXED-204 — The first screen an owner sees called five unreachable backends "Connected"
+
+**Severity: High. Area: first-run setup / Models honesty. Was BUG-198, found in
+the 2026-08-15 cross-provider review.**
+
+**Observed.** On a clean workspace, on a host with **no** llama.cpp binary, **no**
+Ollama process and nothing listening on `11434`, `1234` or `8080`, stage 02 of the
+first-run wizard — *Choose where Raiker thinks* — offered thirteen backends and
+labelled the five that could not answer `Connected`, while the ones that work as
+soon as a key is entered read `Connection required`:
+
+```
+llama.cpp · Local GGUF          Connected          ← nothing installed
+llama.cpp · Local GGUF 2/3/4    Connected          ← nothing installed
+Ollama · Gemma 4:31B Cloud      Connected          ← nothing installed
+Anthropic · <model>             Connection required ← works with a key
+```
+
+The label was exactly inverted against reality, on the first screen an owner ever
+sees, in a product whose stated principle is *"badges/copy always state what is
+real"*. The same inversion appeared after connecting: a card holding a stored
+OpenRouter credential read **`Connected`** directly above **`Provider
+unreachable — type a model id if you know it.`**
+
+**Root cause.** `dashboard.py:3820` computes `configured = effective_model !=
+"<model>"` — *"this profile names a concrete model string"* — and
+`ModelSetupView.svelte:117` rendered it as `Connected`. It is not a credential
+check, not a reachability check and not a readiness check. Five shipped registry
+profiles carry placeholder model names (`local-gguf`, `local-gguf-2/3/4`,
+`gemma4:31b-cloud`), so they satisfied it with nothing installed, while every
+hosted profile ships `<model>` and failed it while being one key away from
+working. `local-gguf` is not a model at all: it is the placeholder for a GGUF file
+the owner has yet to supply.
+
+The honest signal already existed on the same object — `ModelProfileView.readiness_state`,
+a twelve-state machine — and that view did not read it.
+
+**Fix.** The presentation layer, because the backend field was accurate and only
+its rendering lied. `readinessLabel` and `setupChoiceLabel` now live in one shared
+module and both surfaces read it, so the wizard and the provider cards cannot
+drift apart again:
+
+- **Stage 02** projects what is *known*. `Ready` is the only label that claims a
+  backend can answer and only a passed readiness check produces it; a measured
+  failure names itself (`Unreachable`, `Key rejected`, `No credit`, `Runtime
+  missing`); a profile that names a model nobody has checked reads **Not checked
+  yet**; one still carrying the `<model>` placeholder reads **Choose a model
+  first**. The header no longer says "pick an exact configured model" but states
+  that nothing on the screen has been contacted yet.
+- **Provider cards** say **Connection saved** rather than `Connected`, which is
+  what `connection_configured` has always meant. Reachability stays where it was
+  measured — the readiness chip — so a saved credential and an unreachable
+  provider read as two facts instead of a contradiction.
+- `ModelsView` dropped its private copy of the chip vocabulary for the shared one.
+
+**Verified live** on a fresh workspace with no local runtime. Stage 02 now reads
+`Not checked yet` for all five local profiles and `Choose a model first` for the
+eight placeholders — the string `Connected` appears nowhere, which the spec
+asserts rather than leaves to the screenshot. With a stored OpenRouter credential
+and its catalogue unreachable, the card reads `Connection saved · Not checked ·
+Provider unreachable`. Anthropic, reachable in the same run, still goes
+`Connection saved` → catalogue → `Ready · confirmed just now` → a real turn.
+0 console errors.
+
+Evidence:
+[`screenshots/not-working/bug198-first-run-connected-unreachable.png`](screenshots/not-working/bug198-first-run-connected-unreachable.png)
+(as found) and
+[`screenshots/working/fixed204-first-run-model-choice-labels.png`](screenshots/working/fixed204-first-run-model-choice-labels.png)
+(after). Specs:
+[`review-first-run-honesty-live.spec.ts`](../../apps/web/e2e/review-first-run-honesty-live.spec.ts),
+[`review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+
+**User-interface outcome.** No surface reports a backend as connected unless
+something was observed to answer. The first-run wizard is held to the same
+readiness rule the composer enforces two clicks later, and thirteen live specs
+were updated to the card's honest wording rather than left asserting the claim
+that was wrong.
+
+---
+
+## FIXED-209 — The guide the interface was explaining from is now inside the product
+
+**Severity: Medium. Area: documentation surface. BUG-208 slice A.**
+
+**Observed.** Raiker taught on the page instead of showing state: 23,236
+characters of static explanatory prose across 216 sentences in 53 components,
+counted on 2026-08-15. `ModelsView` alone carried 2,783 of them. Page headers
+read as documentation because they were documentation — *"A project is a named
+scope for an ongoing piece of work…"*, *"The recorder timeline: metadata
+snapshots taken at safe points…"*.
+
+`docs/guide/` already held that material in eight documents, and **the product
+could not reach a word of it**: no guide route, no help surface, no API serving
+it, no component linking to it. The only way in was the README's documentation
+list, which is not something a person running the app is reading. So the prose
+was on the page because the page was the only place it could be — and stripping
+it first would have deleted the only copy an owner could get to.
+
+**Fix.** The destination, so the rest of BUG-208 becomes possible.
+
+- `raiker/guide/` resolves the guide as a product asset: `RAIKER_GUIDE_DIR` when
+  set — **authoritatively**, because an owner who points Raiker at a guide and
+  silently gets a different one has been told something untrue — otherwise
+  `docs/guide` beside the package, which is both a source checkout and the layout
+  the release bundle lays down. A build carrying no guide resolves to `None`
+  rather than an empty list, so the surface says *"this build did not ship the
+  guide"* instead of implying there is nothing to read.
+- `GET /api/guide` and `GET /api/guide/{slug}` serve it read-only behind the same
+  authentication as every other read. A slug must match `^[a-z0-9]+(-[a-z0-9]+)*$`
+  and is resolved against the sections the module itself listed, so a path is
+  never built from caller input — the traversal question is answered by not
+  asking it. Eight traversal and malformed-slug inputs are covered.
+- `#/guide` renders with the same `Markdown` component the transcript uses, with
+  a section rail, per-section deep links, and a sidebar entry under Utilities.
+- `raiker/app/release.py` carries `docs/guide` into the bundle as
+  `service/docs/guide`, so an installed Raiker ships its own help rather than
+  pointing at a repository the owner does not have.
+
+**Two defects found by building it, both fixed here.** The view first rendered
+its own `<h1>Guide</h1>` beneath the shell's page title — a second heading no
+other view has, which is the exact duplication this ticket is about. And a deep
+link arriving while the guide was already open was ignored, because a same-route
+hash change does not remount a view and the section was loaded in `onMount`;
+loading is now driven by the route. That path is the one a contextual "Learn
+more" from another surface will use, so it had to work before slice B is built
+on it.
+
+Titles and summaries are read from each document rather than stored beside it, so
+a guide edit cannot leave the product describing a page as it used to be — and
+the summary skips fenced blocks, which is what stopped the section list
+describing *Getting started* as `git clone https://…`.
+
+**Verified live**: all seven sections listed in reading order, Markdown rendered
+as elements rather than source, `#/guide?section=troubleshooting` opening the
+section it names, 0 console errors. Evidence:
+[`screenshots/working/fixed209-guide-in-product.png`](screenshots/working/fixed209-guide-in-product.png).
+Spec: [`guide-surface-live.spec.ts`](../../apps/web/e2e/guide-surface-live.spec.ts).
+
+**User-interface outcome.** The product can open its own guide, so an owner who
+wants to know what a project *is* has somewhere to go that is not a page header.
+This adds a destination and removes nothing; the prose still on the surfaces is
+BUG-208 slices B–D, which are now unblocked.
+
+---
+
+## FIXED-210 — Nine pages stopped teaching, and the provider card stopped shouting
+
+**Severity: Medium. Area: UI density. BUG-208 slices B, D and E, plus the first
+pass of C.**
+
+**Observed.** Every page opened by explaining itself. `ProjectsView` spent 391
+characters on what a project *is* before listing any; `CapabilitiesView` spent
+298 explaining decision modes; the provider card carried five status chips, a
+three-clause cost sentence and five controls, thirteen times over on one page.
+Measured across the tree: 23,236 characters of static prose in 53 components.
+
+**Fix.**
+
+**Slice D — the rule, first, because it governs the rest.** `VISUAL_DESIGN_SPEC.md`
+§2b: *a component carries the state, the next action, and — when something failed
+— the reason with its remediation; everything else lives in `docs/guide/`.* With
+the test that makes it usable: **a sentence that would still be true if the owner
+had no data is documentation**; a sentence that changes with the workspace is
+state. Step 7 of "Building a new page" now names it, so the next surface is built
+to it rather than trimmed later.
+
+**Slice B — one way in.** `GuideLink` plus `guideSections.ts`, a single
+route → section map, so a renamed guide section breaks one file rather than
+fifteen templates. The label is stored whole rather than templated: `How ${x}
+works` produced *"How projects works"*, and a sentence that reads wrong on a page
+header is not worth the line it saves.
+
+**Slice C, first pass — move, do not delete.** Nine page leads replaced by that
+link — Models, Projects, Extensions, Checkpoints, Capabilities, Tasks,
+Connections, Search Chat, Approvals — after confirming the guide already carries
+each idea. It does: *"There is no silent fallback"* is `connecting-a-model.md:25`;
+checkpoints, restore, and approve-and-perform-versus-record are in
+`permissions-and-runtime-modes.md`. The static section leads on Models went the
+same way.
+
+**Slice E — the provider card.** The four posture chips were a fixed property of
+the profile sitting beside the readiness chip, which made configuration look like
+measurement; they are one quiet line now, and readiness is the only chip. The
+usage strip renders only where there is cost to report — a local runtime that
+cannot bill and a provider with no turns were both rendering a line and an em
+dash. Reconnect and Disconnect moved into Details: credential management is not
+what an owner opened the card to do.
+
+| Provider card | Before | After |
+|---|---|---|
+| Status chips | 5 | 1 (readiness) + one posture line |
+| Cost | always | only with turns to report |
+| Controls | 5 | 3 |
+
+**What the first pass taught, and why C is not finished here.** Two removals were
+wrong and their own tests caught them: the extensions empty state (*"Nothing is
+installed, and no plugin code runs in this browser"*) and the Projects privacy
+guarantee (*"Raiker shows what changed and who changed it, never the file's
+contents"*). Both are state, not documentation, and both were restored. A blanket
+character target would cut exactly those again — so the remaining surfaces
+(`ModelsView` sub-leads, `SecurityLogin`, `Runtime`) stay named in
+[BUG-208](TO_BE_FIXED.md#bug-208--the-product-explains-itself-on-every-screen)
+per surface rather than folded into a number to hit.
+
+**Measured:** 23,236 → **20,879 characters** (‑2,357, 10%), 216 → 202 sentences.
+Every character removed is present in `docs/guide/`.
+
+**Verified live** on a fresh workspace: the provider card reads `Anthropic ·
+Haiku 4.5 · Connection saved · Ready · confirmed just now · Needs network ·
+Egress-gated · Hosted models · Cache 5m · Test · Change model… · Details`; the
+Projects header reads `How projects work · Refresh`; connect → catalogue →
+readiness → turn still passes end to end with 0 console errors.
+
+**User-interface outcome.** Nine pages open with their own state and one quiet
+link to the guide section that explains them. The provider card states what is
+true and offers what the owner came for. Nothing that changes with the workspace
+was removed.
+
+---
+
+## FIXED-211 — The last three teaching surfaces, and an emoji that was never a reaction
+
+**Severity: Medium. Area: UI density. BUG-208 slices C and F. Closes the entry.**
+
+### Slice C, second pass
+
+[FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting)
+moved the page leads and stopped there deliberately, naming three surfaces rather
+than chasing a percentage. This is those three.
+
+| Surface | Moved | Kept, and why |
+|---|---|---|
+| `ModelsView` | One connection per instance; what the default model serves; how the fallback sequence decides "unavailable" | *"Model list unavailable — enter a custom model name"* (failure + remediation), *"No price configured, so cost is unknown"* (state), *"Your key is encrypted in this instance's vault"* (assurance at the point of typing one) |
+| `SecurityLogin` | What the vault key encrypts; that monitoring is redacted; what is watched; what a standing grant is | *"Add this to your authenticator app, then enter the current code"* (the next action), *"Changing your password signs out all your other devices"* (consequence of the action being taken), the empty state |
+| `Runtime` | That Raiker runs one runtime with nothing to select; how readiness expiry works; what choosing an execution environment means | *"Foreground commands only… not built for this boundary"* (what the selected boundary does), *"Re-measuring opens one connection to this host's default gateway"* (what the button will do) |
+
+**The guide gained what they lost, and four topics it did not previously carry.**
+`connecting-a-model.md` gained *One instance, one default* and the four things
+"unavailable" actually means; `permissions-and-runtime-modes.md` gained *Where
+work executes*, *Standing grants*, and *What monitoring records, and what it
+withholds*. Nothing was deleted that the guide could not already say — which is
+the rule this slice exists to keep, and the reason it was checked per sentence
+rather than per file.
+
+Both settings panels gained the `GuideLink` the nine pages already had.
+
+### Slice F — the emoji
+
+Chat appended an emoji to **the owner's own message**, labelled *"Raiker reacted
+with Heart"*. It is removed, and the deciding fact is not taste.
+
+It was computed from `turn.prompt` — the owner's text, by regular expression,
+**before the model had answered**. So it could not be a reaction to anything:
+typing "thanks" produced a heart whatever Raiker went on to do, or fail to do,
+and the same heart appeared on a turn that ended in a refusal. A label naming an
+actor and an act, for an act that did not happen, is the claim
+[FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected)
+removed from the provider cards and BUG-207 slice A removed from the streaming
+turn. This is the third instance of it, and the last one in the transcript.
+
+`reactionForPrompt`, its nine-pattern table, the `ChatReaction` type and the
+styling go with it.
+
+### Measured
+
+| | Characters | Sentences | Files |
+|---|---|---|---|
+| Before BUG-208 | 23,236 | 216 | 53 |
+| After FIXED-210 | 20,879 | 202 | 52 |
+| **After this** | **18,702** | **192** | **52** |
+
+**‑4,534 characters, 20%.** `SecurityLogin` and `Runtime` have left the top five
+entirely. What remains is copy `VISUAL_DESIGN_SPEC.md` §2b permits — empty
+states, failure reasons with remediation, and instructions at the point of
+action — and the rule is now in the build checklist so the next surface is made
+to it.
+
+**Verified live**: Runtime and Security each render one guide link, Chat renders
+no reaction node, 0 console errors.
+
+**User-interface outcome.** Every page states what is true now and what to do
+next, with one quiet link to the section that explains it. No surface claims an
+act that did not happen. BUG-208 is closed.
+
+---
+
+## FIXED-212 — The built-in config and icon had two copies, and the repository one silently won
+
+**Severity: Medium. Area: packaging / configuration.**
+
+**Observed.** Three files existed twice, byte for byte:
+
+| Repository root | Package | Bytes |
+|---|---|---|
+| `config/model-profiles.json` | `raiker/config/model-profiles.json` | identical |
+| `config/channel-connectors.json` | `raiker/config/channel-connectors.json` | identical |
+| `assets/icons/raiker-icon.png` | `raiker/assets/raiker-icon.png` | identical |
+
+`_config_path` resolves a given path, then the current directory, then the
+repository root beside the package, and only then falls back to the packaged
+resource. In any checkout the **root copy won**, so an edit applied to the
+packaged file alone appeared to do nothing — no error, no warning. That is
+recorded as [FIXED-76](#fixed-76--the-shipped-model-profile-copies-and-human-review-cadence-stay-in-step-was-bug-36),
+where the fix was a validation test comparing the two copies byte for byte so
+neither could move alone.
+
+**Why that is superseded.** Keeping two files in step is a guard against a
+duplication that did not need to exist. The packaged copy is the one that ships,
+resolves from any working directory, and is what every non-editable install has
+always used; the root copy served only repo checkouts and was identical to it.
+Removing it deletes the failure mode rather than policing it.
+
+**Fix.** `config/` and `assets/` are gone from the repository root. The
+byte-comparison test is replaced by the stronger invariant — **the duplicate must
+not come back** — which fails if either directory reappears, and names why.
+
+**Checked before deleting, not after.**
+
+- Both packaged copies are **tracked in git**, not generated: no build step
+  produces them from the root files, so nothing was the source of anything.
+- `icon_path()` tries the packaged file *before* the root one; with the root
+  directory removed it resolves to `raiker/assets/raiker-icon.png`.
+  `scripts/build_installer.py` already goes through `icon_path()` rather than
+  naming a path — the bug in
+  [FIXED-192](#fixed-192--the-tray-drew-its-own-icon-and-the-appimage-shipped-an-empty-one)
+  was precisely that it once did not.
+- The release bundle ships `raiker`, `apps`, four root files and `docs/guide`. It
+  never carried root `config/` or `assets/`, so a packaged install has always
+  relied on the copies that remain.
+- With both directories moved aside, `ModelProfileRegistry.load()` returns its 13
+  profiles, `ConnectorRegistry.load()` its 20, and the eight other suites that
+  reference `config/…` as a default argument all pass — they resolve through the
+  same fallback.
+- Exactly one test failed, and it was the byte-comparison itself, which is the
+  one whose subject no longer exists.
+
+**A workspace-local `config/` is a different thing and still wins.** That is the
+owner's override — drop a `config/model-profiles.json` beside a workspace and it
+takes priority over the packaged default, which `test_workspace_local_config_still_wins`
+continues to cover. What was removed was the *repository's* second copy, not that
+mechanism.
+
+**Documentation.** Eleven files named `config/model-profiles.json` or
+`config/channel-connectors.json` as the canonical path and now name
+`raiker/config/…`, including the user guide, the threat model, the requirements
+matrix and the README. `FIXED_ITEMS.md` keeps the old paths in the entries that
+were written when they were true.
+
+**User-interface outcome.** None — no surface reads these paths directly. The
+outcome is for whoever edits a provider price next: there is one file to edit,
+and editing it works.

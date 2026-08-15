@@ -38,7 +38,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
     await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
     await page.getByLabel(label).fill(key);
     await page.locator(".signin-connect").click();
-    await expect(card.getByText("Connected")).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 20_000 });
   }
 
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });

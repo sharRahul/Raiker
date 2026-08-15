@@ -4,6 +4,7 @@
   import type { ModelProfile, SetupState } from "../apiTypes";
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
+  import { setupChoiceLabel } from "../modelReadinessLabels";
 
   const stages = ["account", "model", "privacy", "backup", "finish"] as const;
   const labels = { account: "Account", model: "Model", privacy: "Privacy", backup: "Backup", finish: "Finish" };
@@ -107,14 +108,14 @@
       <header>
         <p class="eyebrow">02 · Model connection</p>
         <h2 id="setup-title">Choose where Raiker thinks</h2>
-        <p>Pick an exact configured model, or decide later. Raiker runs a readiness check before model-backed work.</p>
+        <p>Pick a model, or decide later. Nothing here has been contacted yet — Raiker runs a readiness check against the exact model before any model-backed work, and each choice says what is known about it so far.</p>
       </header>
       {#if profiles.length}
         <div class="choice-list">
           {#each profiles as profile (`${profile.profile_id}-${profile.model}`)}
             <button disabled={busy} onclick={() => chooseModel(profile)}>
               <strong>{providerName(profile.provider)} · {modelName(profile.model)}</strong>
-              <span>{profile.configured ? "Connected" : "Connection required"}</span>
+              <span class:choice-ready={profile.ready === true}>{setupChoiceLabel(profile)}</span>
             </button>
           {/each}
         </div>
@@ -171,6 +172,9 @@
   h2 { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
   .choice-list { display: grid; gap: var(--space-2); } .choice-list button, .empty-choice { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
   .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: .82rem; line-height: 1.45; }
+  /* Only a passed readiness check earns the affirmative colour, so the one
+     backend that has been proven to answer is the one that looks it. */
+  .choice-ready { color: var(--ok-text, var(--text-1)); font-weight: 600; }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--bg-2); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: .8rem; font-weight: 750; cursor: pointer; text-decoration: none; }

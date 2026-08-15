@@ -17,7 +17,7 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 | Checkpointing | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
 | Hooks | `docs/HOOKS_SPEC.md` |
 | Plugins | `docs/PLUGIN_SYSTEM_SPEC.md` |
-| Channels | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
+| Channels | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` |
 | Commands | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | TUI-first command reference | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
 | Session events | `docs/HOOKS_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
@@ -42,7 +42,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | `checkpointing` (snapshot before edit, rewind, restore code/convo) | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 write real; restore plan-only |
 | `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 📘 spec only, no code |
 | `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🔒 manifest validation only |
-| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` | 🔒 registry only |
+| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | 🔒 registry only |
 
 > Alignment notes: the Claude Code hooks reference documents **31 events** (incl.
 > `SessionStart`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PreCompact`, `PostCompact`,
@@ -56,12 +56,52 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 
 ---
 
+## Claude Cowork Coverage — delegated Tasks and Schedule
+
+Cowork's two organising ideas are a **Task** (work handed to the agent that
+outlives the message you handed it in) and a **Schedule** (that work re-armed on
+a cadence). Raiker has both, and the difference is where they run.
+
+| Cowork concept | Raiker behaviour | Code |
+|---|---|---|
+| Delegate work that outlives the turn | Task rows with progress, a safe-boundary stop, and a finished list stating how each run ended | `raiker/tasks/manager.py`, Tasks view |
+| Task parked on a decision | A run waiting on an approval reads as **blocked** with the reason and a link to the decision — not as failed | `raiker/tasks/scheduler.py`, Approvals |
+| Recurring schedule | Four named cadences — `continuous` (20 min), `hourly`, `daily`, `weekly` — re-armed after every cycle, so a standing agent keeps working until stopped | `RECURRING_INTERVALS`, `raiker/tasks/scheduler.py` |
+| Missed-slot behaviour | `next_run_after` steps from the owner's original slot and skips elapsed ones, so a host that was asleep does not wake owing a backlog | `raiker/tasks/scheduler.py` |
+| One cycle = one governed turn | Every cycle passes policy, gates and approvals exactly like a typed prompt; `continuous` is the floor, never an unbounded loop | `raiker/tasks/scheduler.py` |
+| Background agents in Build | Scheduled agents and a collapsible background-work rail | Build view |
+
+**Raiker difference.** A scheduled cycle is a governed turn with a named human
+owner, not a service account: it is attributable, approval-gated, and auditable
+on the same event log as a typed prompt, and an unknown cadence is refused rather
+than coerced.
+
+**Where Raiker is behind, and it is structural.** Cowork's schedules run on
+someone else's computer; Raiker's run on yours.
+
+- **A schedule only fires while `raiker-web` is running.** The 15-second tick
+  that calls `run_due` lives in the FastAPI app's lifespan
+  (`raiker/api/app.py`), so a closed laptop is a missed cadence — recorded
+  honestly by the skip-elapsed rule, but missed. There is no hosted runner and
+  no OS-level scheduled task registration.
+- **`scheduled_routines` has no runner at all.** That capability is on-demand by
+  construction — *"There is NO background daemon/thread/watcher — the owner (or
+  an external trigger) calls `run_due`"* — so it is a governed routine store with
+  a manual trigger, not a scheduler.
+- **Cadences are four names, not a time.** There is no arbitrary time-of-day, no
+  cron expression, no timezone binding, and no one-shot "run once at 17:00". A
+  daily task runs a day after whenever it was created.
+- **No notification out.** A cycle that finishes while nobody is looking updates
+  the Tasks view and the audit log; it does not reach the owner.
+
+---
+
 ## OpenClaw-Style Personal Agent Coverage
 
 | Concept | Raiker specification |
 |---|---|
 | Local-first gateway/control plane | `docs/ARCHITECTURE.md`, `docs/CHANNELS_SPEC.md` |
-| Multi-channel inbox | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json`, `docs/UI_UX_DESIGN_SPEC.md` |
+| Multi-channel inbox | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json`, `docs/UI_UX_DESIGN_SPEC.md` |
 | Channel pairing and sender allowlists | `docs/CHANNELS_SPEC.md`, `docs/SECURITY_AND_POLICY.md` |
 | Channel-to-agent routing | `docs/CHANNELS_SPEC.md`, `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Gateway daemon mode | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
@@ -79,7 +119,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | Concept | Raiker specification |
 |---|---|
 | Tool-using agent loop | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Model-router/provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
+| Model-router/provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `raiker/config/model-profiles.json` |
 | Global `raiker` TUI entry and in-TUI provider launch | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | Structured tool proposal | `docs/CONTRACTS.md`, `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Verification/reflection | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/VERIFICATION_PLAN.md` |
@@ -89,7 +129,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | Cross-channel conversation continuity | `docs/CHANNELS_SPEC.md`, `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 | Closed learning loop | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Skill creation and skill improvement | `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`, `docs/PLUGIN_SYSTEM_SPEC.md` |
-| FTS5 session search with summaries | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
+| Full-text session search with summaries | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | User modelling from confirmed facts | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
 | Scheduled automations | `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`, `docs/UI_UX_DESIGN_SPEC.md` |
 | Parallel subagents | `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
@@ -403,7 +443,7 @@ says why in the owner's words, and gives the state back in one press.
 
 | Concept | Raiker specification |
 |---|---|
-| Local inference profiles | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
+| Local inference profiles | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `raiker/config/model-profiles.json` |
 | Provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | TUI model launch | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Context windows | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
@@ -468,7 +508,7 @@ linking) and provenance.
 | mem0 concept | Raiker specification |
 |---|---|
 | `add` memory from interactions (candidate-first) | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + vector metadata) |
+| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS4 + vector metadata; no BM25) |
 | `retrieve` filtered by scope/metadata | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | User / session / agent memory scopes | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Provenance + confidence scoring | `docs/MEMORY_GOVERNANCE_RULES.md` |
@@ -492,7 +532,7 @@ history with a vector index.
 |---|---|
 | Embedding-backed memory index | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (vector metadata tables) |
 | Semantic retrieval over session history | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
-| Hybrid lexical + vector ranking | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + vector) |
+| Hybrid lexical + vector ranking | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS4 + vector; recency-ordered, not relevance-ranked) |
 | Sensitivity/provenance filters on retrieval | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
 | Vector store backend abstraction | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 

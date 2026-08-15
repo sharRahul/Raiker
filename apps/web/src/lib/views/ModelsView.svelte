@@ -6,6 +6,7 @@
   import ProviderLogo from "../components/ProviderLogo.svelte";
   import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
   import TabStrip from "../components/TabStrip.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
     ModelCapacitiesView,
@@ -21,6 +22,7 @@
     type ProviderErrorGuidance,
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
+  import { readinessLabel } from "../modelReadinessLabels";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
@@ -370,26 +372,10 @@
 
   // A short chip label for the exact readiness state, so a card says what a
   // check actually found instead of only whether a credential is stored.
-  const READINESS_CHIP: Record<string, string> = {
-    ready: "Ready",
-    checking: "Checking…",
-    not_configured: "Not checked",
-    stale: "Check expired",
-    runtime_missing: "Runtime missing",
-    runtime_stopped: "Runtime stopped",
-    model_missing: "Model missing",
-    policy_blocked: "Policy blocked",
-    authentication_failed: "Key rejected",
-    quota_exhausted: "No credit",
-    unreachable: "Unreachable",
-    unsupported: "Unsupported",
-  };
-
   function readinessChip(profile: ModelProfile): string | null {
-    const state = profile.readiness_state;
-    if (!state) return null;
-    const label = READINESS_CHIP[state] ?? null;
+    const label = readinessLabel(profile.readiness_state);
     if (label === null) return null;
+    const state = profile.readiness_state;
     // BUG-83 — a chip that says only "Ready" cannot be told apart from one that
     // said "Ready" an hour ago. Naming when the check was last confirmed is what
     // makes the expiry legible instead of surprising.
@@ -468,7 +454,7 @@
   let advisorChecking = $state(false);
   let advisorCheckNote = $state<string | null>(null);
   const advisorChip = $derived(
-    models?.advisor_profile_id ? (READINESS_CHIP[models.advisor_readiness_state ?? ""] ?? null) : null,
+    models?.advisor_profile_id ? readinessLabel(models.advisor_readiness_state) : null,
   );
 
   async function checkAdvisor() {
@@ -666,6 +652,23 @@
       ?.cost_currency ?? "USD",
   );
 
+  /**
+   * The profile's fixed posture as one line (BUG-208 slice E).
+   *
+   * These were four chips sitting beside the readiness chip, which made a
+   * property of the profile look like a measurement of it. None of them changes
+   * with the workspace, so none of them is state.
+   */
+  function posture(profile: ModelProfile): string {
+    const parts = [
+      profile.requires_network ? "Needs network" : "",
+      profile.requires_egress_policy ? "Egress-gated" : "",
+      profile.runtime_gate ? capabilityLabel(profile.runtime_gate) : "",
+      profile.prompt_cache_ttl ? `Cache ${profile.prompt_cache_ttl}` : "",
+    ].filter((part) => part !== "");
+    return parts.join(" · ");
+  }
+
   function usageLine(profile: ModelProfile): string {
     if (!profile.billable) return "No API cost — runs on this machine";
     const used = profile.models_used ?? 0;
@@ -805,11 +808,7 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    The model profiles Raiker can talk to. The choice of backend belongs to you
-    — local, home-lab, or hosted — and there is never a silent fallback between
-    them.
-  </p>
+  <GuideLink route="models" />
   <button
     type="button"
     class="btn btn-ghost btn-sm"
@@ -832,10 +831,6 @@
     <div>
       <p class="eyebrow">Model setup</p>
       <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-      <p class="sub">
-        Each connection belongs only to this Raiker instance. One ready
-        provider is enough to work.
-      </p>
     </div>
     <div class="setup-meter" aria-live="polite">
       <strong>{readyCount} {readyCount === 1 ? "model" : "models"} ready</strong>
@@ -857,10 +852,6 @@
     <div class="global-model-copy">
       <p class="eyebrow">Default</p>
       <h2 id="global-model-title">Global model</h2>
-      <p class="sub">
-        Used whenever a surface does not choose its own model, including
-        each scheduled run when it begins.
-      </p>
     </div>
     <label class="global-model-field">
       <span>Global model</span>
@@ -903,12 +894,6 @@
       id="panel-huggingface"
       aria-labelledby="tab-huggingface"
     >
-      <p class="tab-lead">
-        Search the Hub, compare variants, and download an exact revision. When
-        no ready-made GGUF fits, convert supported Safetensors locally — the
-        conversion runs offline in a bounded worker and never executes
-        repository code.
-      </p>
       <HuggingFacePanel />
     </div>{/if}
   {#if tab === "activity"}<div
@@ -917,11 +902,6 @@
       id="panel-activity"
       aria-labelledby="tab-activity"
     >
-      <p class="tab-lead">
-        Provider use over the last seven days, followed by installs, pulls,
-        downloads, conversions, and deployments. Observed use and provider
-        account data are always labeled separately.
-      </p>
       <ProviderUsagePanel />
       <DownloadsPanel />
     </div>{/if}
@@ -1170,8 +1150,14 @@
                           >{:else}<code>{modelName(p.model)}</code>{/if}
                       </p>
                       <p class="pc-status">
+                        <!-- BUG-198 — this line reports whether a connection is
+                             *saved*, which is not whether the provider answers:
+                             a card could read "Connected" directly above
+                             "Provider unreachable". Reachability is the
+                             readiness chip below, and only it may claim it. -->
                         {#if p.connection_configured}
-                          <span class="status-dot ok" aria-hidden="true"></span> Connected
+                          <span class="status-dot ok" aria-hidden="true"></span>
+                          Connection saved
                         {:else}
                           <span class="status-dot" aria-hidden="true"></span> Not
                           connected
@@ -1185,23 +1171,19 @@
                             title={p.readiness_summary ?? undefined}
                             >{readinessChip(p)}</span
                           >{/if}
-                        {#if p.requires_network}<span class="chip chip-warn"
-                            >Needs network</span
-                          >{/if}
-                        {#if p.requires_egress_policy}<span
-                            class="chip chip-warn">Egress-gated</span
-                          >{/if}
-                        {#if p.runtime_gate}<span
-                            class="chip"
-                            title="Runtime gate that must be enabled"
-                            >{capabilityLabel(p.runtime_gate)}</span
-                          >{/if}
-                        {#if p.prompt_cache_ttl}<span
-                            class="chip chip-ok"
-                            title="Prompt caching cuts cost and latency"
-                            >Cache {p.prompt_cache_ttl}</span
-                          >{/if}
                       </div>
+                      <!-- BUG-208 slice E — these four were chips beside the
+                           readiness chip, which made a fixed property of the
+                           profile look like something that had just been
+                           measured. Readiness is the only state on this card;
+                           the posture is one quiet line. -->
+                      {#if posture(p) !== ""}
+                        <p class="posture-line">{posture(p)}</p>
+                      {/if}
+                      <!-- Shown only where there is something to report: a
+                           local runtime that cannot bill and a provider with no
+                           turns yet were both rendering a line and an em dash. -->
+                      {#if p.billable && (p.turns_used ?? 0) > 0}
                       <div class="usage-strip">
                         <div class="usage-line">
                           <span>{usageLine(p)}</span>
@@ -1243,6 +1225,7 @@
                           </p>
                         {/if}
                       </div>
+                      {/if}
 
                       <div class="pc-actions">
                         {#if !p.connection_configured}
@@ -1253,22 +1236,10 @@
                             style={`--brand:${b.tint}`}>Connect</button
                           >
                         {:else}
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-sm"
-                            onclick={() => openSignIn(p.profile_id)}
-                            >Reconnect</button
-                          >
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-sm"
-                            aria-label={`Disconnect ${providerName(p.provider)}`}
-                            onclick={() => void disconnectConnection(p)}
-                            disabled={disconnecting[p.profile_id] === true}
-                            >{disconnecting[p.profile_id] === true
-                              ? "Disconnecting…"
-                              : "Disconnect"}</button
-                          >
+                          <!-- BUG-208 slice E — Reconnect and Disconnect are
+                               credential management, not the thing an owner came
+                               to this card to do. They live in Details, which is
+                               one click away and already open on this profile. -->
                           <button
                             type="button"
                             class="btn btn-ghost btn-sm"
@@ -1402,21 +1373,8 @@
       id="panel-routing"
       aria-labelledby="tab-routing"
     >
-      <p class="tab-lead">
-        What serves a turn when your first choice cannot, and which model a
-        local model may consult. Nothing here grants access: every candidate is
-        still gated by provider policy at call time.
-      </p>
       <section class="card fallback" aria-labelledby="fallback-h">
         <h2 id="fallback-h">Model fallback sequence</h2>
-        <p class="sub">
-          If the selected provider is unavailable — no network, a timeout, a
-          non-responsive host, or a policy denial — Raiker tries these backends
-          in order, top to bottom. Point it at your local runtimes (llama.cpp,
-          Ollama, LM Studio, vLLM) so a turn never dead-ends when a hosted API
-          is down. Each candidate is still gated by provider policy: listing a
-          hosted provider here never grants access on its own.
-        </p>
 
         {#if sequence.length === 0}
           <p class="fallback-empty">
@@ -1701,6 +1659,25 @@
           </dd>
         </div>
       </dl>
+      {#if detailsFor.connection_configured}
+        <div class="details-actions">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => openSignIn(detailsFor!.profile_id)}>Reconnect</button
+          >
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-label={`Disconnect ${providerName(detailsFor.provider)}`}
+            onclick={() => void disconnectConnection(detailsFor!)}
+            disabled={disconnecting[detailsFor.profile_id] === true}
+            >{disconnecting[detailsFor.profile_id] === true
+              ? "Disconnecting…"
+              : "Disconnect"}</button
+          >
+        </div>
+      {/if}
       {#if capacities?.can_override}<button
           class="btn btn-ghost btn-sm"
           onclick={() => void configureCapacity(detailsFor!)}
@@ -1950,6 +1927,16 @@
     color: var(--text-2);
     font-size: 0.78rem;
     margin: 0.35rem 0 0;
+  }
+  .posture-line {
+    margin: 0.1rem 0 0;
+    color: var(--text-3);
+    font-size: 0.74rem;
+  }
+  .details-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
   .usage-strip {
     border-top: 1px solid var(--border);
@@ -2580,8 +2567,6 @@
        and change the default. Stacked on a phone that pushed the tabs below the
        fold, so the explanatory copy — which the headline and the labelled
        select already carry — is dropped rather than the controls. */
-    .setup-overview .sub,
-    .global-model-card .sub,
     .global-model-field small {
       display: none;
     }

@@ -82,6 +82,37 @@ directly.
 The 44px touch-target floor below 1024px is not negotiable and is applied after
 density, so Compact on a phone is still tappable.
 
+## 2b. What a page may say
+
+**A component carries three things: the state, the next action, and — when
+something failed — the reason with its remediation. Everything else lives in
+`docs/guide/`.**
+
+This is the rule that was missing, and its absence was measurable. Counted across
+the component tree on 2026-08-15: **23,236 characters of static explanatory prose,
+216 sentences, in 53 components** — about 3,700 words of documentation compiled
+into the interface. `ModelsView` alone carried 2,783. Each sentence was
+individually defensible, which is how it accumulated; together they meant a
+returning owner read a paragraph to learn a state they already knew.
+
+The honesty principle — *badges and copy always state what is real* — had been
+read as *say all of it, on the card*. It does not follow. A page that explains
+what a project **is** every time it lists projects is not being more honest; it
+is teaching a reader who arrived to work.
+
+**The test.** A sentence that would still be true if the owner had no data —
+*"A project is a named scope for an ongoing piece of work…"*, *"The recorder
+timeline: metadata snapshots taken at safe points…"* — is documentation. It goes
+in the guide. A sentence that changes with the workspace — *"No sessions yet"*,
+*"Provider unreachable"*, *"No price configured, so cost is unknown"* — is state.
+It stays.
+
+**Where it goes instead.** Every page carries one `GuideLink`, which opens that
+page's section of the in-product guide (`#/guide?section=…`). Moving a paragraph
+means confirming the guide already says it and adding it if not — the guide gains
+what the interface loses, so the total stays truthful. Deleting the only copy an
+owner can reach is not a density fix.
+
 ## 3. Empty and loading states
 
 **An empty state is the first thing a new owner sees on almost every page.** It
@@ -209,4 +240,6 @@ neither theme can drift from the other without the other moving too.
    and error, before you give it data.
 5. Draw a proportion as a meter or a bar; mark compared numbers `.numeric`.
 6. Pick an icon by role and size, and use `filled` for selected.
-7. Check it at 375 / 768 / 1024 / 1440 px in both themes before you call it done.
+7. Give the page one `GuideLink` and no explanatory prose — see "What a page
+   may say". If the page needs to teach something, teach it in `docs/guide/`.
+8. Check it at 375 / 768 / 1024 / 1440 px in both themes before you call it done.

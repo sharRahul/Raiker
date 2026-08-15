@@ -19,6 +19,7 @@
   import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import Icon from "../components/Icon.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
     ApprovalView,
@@ -177,11 +178,7 @@
       <div class="overview-head">
         <div>
           <h2 id="lifecycle-h">Readiness</h2>
-          <p class="page-lead">
-            Installed, account connected, enabled for the session, and usable now are four separate
-            facts. An extension is usable only when the server confirms all four — never because it
-            appears in a catalogue.
-          </p>
+  <GuideLink route="extensions" />
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
           <Icon name="refresh" size={15} /> Refresh
@@ -349,8 +346,8 @@
         {/if}
         {#if plugins.plugins.length === 0}
           <p class="note">
-            Nothing is installed, and no plugin code runs in this browser. The posture above is
-            what a plugin installed today would be verified against.
+            Nothing is installed, and no plugin code runs in this browser. The
+            posture above is what a plugin installed today would meet.
           </p>
         {:else}
           <ul class="plugin-list">
@@ -464,8 +461,7 @@
     gap: var(--space-3);
   }
   .overview-head h2 { margin: 0 0 0.2rem; }
-  .overview-head .page-lead { margin-bottom: var(--space-4); }
-  .tiles {
+.tiles {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
     gap: var(--space-3);

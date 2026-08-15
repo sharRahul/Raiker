@@ -7,6 +7,7 @@
     DEFAULT_ROUTE,
     navItem,
     routeFromHash,
+    sectionFromHash,
     tabFromHash,
   } from "./lib/nav";
   import { routeStateFromHash } from "./lib/routeState";
@@ -35,6 +36,11 @@
   // tab strip all resolve to the same panel.
   let currentTab = $state(
     typeof window === "undefined" ? null : tabFromHash(window.location.hash),
+  );
+  // The guide page a deep link names, so "Learn more" from another surface can
+  // open the section it means rather than the guide's front page.
+  let currentSection = $state(
+    typeof window === "undefined" ? null : sectionFromHash(window.location.hash),
   );
   let chatVisited = $state(false);
   // Build keeps its transcript, its unsent draft, and its streaming turn alive
@@ -67,6 +73,7 @@
     const handler = () => {
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
+      currentSection = sectionFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
       // Route changes move focus to the main landmark so keyboard and screen
       //-reader users land on the new page content, not mid-shell.
@@ -232,6 +239,8 @@
               route="extensions"
               props={{ tab: currentTab ?? "connectors" }}
             />
+          {:else if current === "guide"}
+            <LazyRoute route="guide" props={{ section: currentSection }} />
           {:else if current === "observe"}
             <LazyRoute
               route="observe"
@@ -249,6 +258,7 @@
           {:else if
             current !== "new-chat" &&
             current !== "build" &&
+            current !== "guide" &&
             current !== "model-setup"}
             <LazyRoute
               route="settings"

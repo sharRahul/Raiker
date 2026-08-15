@@ -62,6 +62,53 @@ still resolves to the single runtime rather than failing.
 
 ---
 
+## Where work executes
+
+**Settings → Runtime configuration** also chooses where Chat, Build and
+scheduled work run: on this machine, or inside the native OS sandbox. Choosing a
+remote or container environment is not a way around a permission — remote
+commands still need the remote/cloud capability gate and its own credentials.
+
+What a boundary does *not* do is stated on the environment card rather than
+implied: the native sandbox is **foreground commands only**, with no PTY, no
+background execution, no network grants and no persistence between runs. Those
+are not switches waiting to be found; they are not built, and the card says so.
+Re-measuring the boundary opens one connection to this host's default gateway on
+a closed port, which is how the network claim is tested rather than asserted.
+
+---
+
+## Standing grants
+
+A standing grant answers a *class* of approval once instead of every time. It
+lets Raiker run a matching, sub-critical action shape without stopping to ask,
+inside the scope and expiry you set, and you can withdraw it at any point.
+
+It is bounded by design: a critical action is never covered by one, the grant
+names the tool and the scope pattern it matches, and every use is recorded
+against the grant so the record shows what it actually authorised. **Settings →
+Security** lists the grants you hold, their use count, and when each expires.
+
+---
+
+## What monitoring records, and what it withholds
+
+Connectors, plugins, subagents, providers, tools and local execution are watched
+the same way monitored MCP connections are: sessions, findings, and a pause
+control per subject.
+
+What is stored about them is deliberately thin. Lifecycle status and findings
+are **redacted** — the record keeps what happened and to which subject, not the
+content that passed through — and local scans read only the workspace paths you
+configured. The vault key encrypts stored connector credentials (API keys, OAuth
+tokens); if it is missing or invalid every connector **fails closed** rather than
+falling back to an unencrypted path.
+
+Nothing appears under monitoring until something happens: a subject is listed the
+first time it is contained or fails often enough to be watched.
+
+---
+
 ## Capability gates
 
 The Permissions page separates what you control from what the current Raiker

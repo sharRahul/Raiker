@@ -153,7 +153,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   await page.screenshot({
     path: join(SHOTS, "round0810-07-anthropic-connected.png"),
     fullPage: true,

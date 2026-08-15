@@ -54,6 +54,14 @@ def retrieve_hybrid_memory(
         if isinstance(vector, list) and len(vector) == 384:
             index.upsert(str(row["vector_id"]), vector, {"memory_id": str(row["memory_id"])})
     for hit in index.search(embed_text(query, 384), top_k=limit):
+        # `search` returns the top *k* by similarity with no floor, so on a small
+        # or unrelated corpus it returns every memory in scope, including the ones
+        # that share no token with the query at all. Admitting those puts
+        # unrelated owner memories into the model's context as "recalled", and a
+        # negative similarity would subtract from a genuine lexical hit. Only a
+        # positive similarity is evidence of anything.
+        if float(hit["score"]) <= 0.0:
+            continue
         memory_id = str(hit["metadata"]["memory_id"])
         score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
         contribution = float(hit["score"]) * weights.vector

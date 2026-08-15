@@ -6,6 +6,7 @@
   import PageState from "../components/PageState.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
     ProjectDetail,
@@ -274,13 +275,7 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    A project is a named scope for an ongoing piece of work: its own folder inside the workspace,
-    plus the sessions and checkpoints created while it is active. It is an organizing label, not an
-    authority — selecting a project grants nothing, and its folder can never leave the workspace.
-    Drag a recent chat onto a project to move it in, or use “New chat” to start a conversation in
-    that project.
-  </p>
+  <GuideLink route="projects" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh projects">
     <Icon name="refresh" size={15} />
     Refresh

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import GuideLink from "../../components/GuideLink.svelte";
   import { api, auth, getToken, health as runtimeHealth, setToken, ApiError } from "../../api";
   import type { HealthView } from "../../api";
   import type {
@@ -295,6 +296,7 @@
 </script>
 
 <section class="card" aria-labelledby="security-h">
+  <GuideLink route="settings" />
   <h2 id="security-h">Security &amp; Login</h2>
 
   {#if notice}
@@ -345,10 +347,6 @@
         {vaultState === "configured_valid" ? "Active / Valid" : "Missing / Fail-Closed Active"}
       </span>
     </div>
-    <p class="sub">
-      Encrypts your stored connector credentials (API keys, OAuth tokens). If missing or invalid,
-      all connectors fail closed. Changing it requires re-entering your password.
-    </p>
     <label>
       Vault key
       <input
@@ -421,7 +419,6 @@
 
   <div class="field">
     <div class="field-head"><h3>Credential security</h3></div>
-    <p class="sub">Lifecycle status and findings are redacted. Local scans use only configured workspace paths.</p>
     {#if credentials.length}
       <ul>{#each credentials as credential}<li>{credential.provider} — {credential.status} <button class="link" onclick={() => verifyCredential(credential.provider)}>Verify replacement</button></li>{/each}</ul>
     {:else}<p class="sub">No verified connector credentials yet.</p>{/if}
@@ -443,11 +440,6 @@
 
   <div class="field" data-testid="capability-containment">
     <div class="field-head"><h3>Monitored capabilities</h3></div>
-    <p class="sub">
-      Connectors, plugins, subagents, providers, tools and local execution are watched the same
-      way monitored MCP connections are: repeated failures or a high-severity anomaly contain the
-      subject with a stated reason, and every state is yours to clear in one call.
-    </p>
     {#if containment === null}
       <p class="sub">Containment state is unavailable right now.</p>
     {:else if containment.subjects.length === 0}
@@ -544,11 +536,6 @@
   <!-- Scoped standing approval grants (ZT-5) -->
   <div class="field">
     <div class="field-head"><h3>Standing approval grants</h3></div>
-    <p class="sub">
-      Answer a class of approval once instead of every time. A grant lets Raiker run a
-      matching, sub-critical action shape without a fresh prompt until it expires (default
-      7 days). Grants can never cover critical actions, and you can revoke any grant here.
-    </p>
     <div class="grant-form">
       <input
         placeholder="Action type (e.g. write_file)"

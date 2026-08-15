@@ -266,24 +266,6 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
-  it("places Raiker's greeting reaction on the user's message", async () => {
-    stubFetch(MODELS_ROUTE);
-    streamPromptMock.mockImplementation(
-      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
-        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Hello! How can I help?") } as StreamEvent);
-      },
-    );
-
-    render(ChatView);
-    const box = screen.getByRole("textbox", { name: /prompt/i });
-    await fireEvent.input(box, { target: { value: "Hello Raiker" } });
-    await fireEvent.keyDown(box, { key: "Enter" });
-
-    const reaction = await screen.findByLabelText("Raiker reacted with Waving hand");
-    expect(reaction.closest(".message-group-user")).not.toBeNull();
-    expect(reaction.closest(".message-group-raiker")).toBeNull();
-  });
-
   it("keeps model runtime metadata out of the conversation", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(
@@ -748,7 +730,13 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText(/context compacted/i)).not.toBeInTheDocument();
   });
 
-  it("shows safe expandable thinking while Raiker prepares a response", async () => {
+  // BUG-207 slice A. The disclosure this used to open was labelled "See what
+  // Raiker is thinking" and held three fixed sentences keyed off lifecycle event
+  // type — not the model's reasoning, which is requested from the provider and
+  // then dropped by the stream parser. What the test was really protecting is
+  // the half that still matters and is asserted below: a lifecycle event's raw
+  // text never reaches the transcript.
+  it("shows one indicator before the first token, and never the raw lifecycle text", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;
     streamPromptMock.mockImplementation(
@@ -771,18 +759,16 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "help me plan this" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(await screen.findByText("Raiker is thinking…")).toBeInTheDocument();
-    const details = screen.getByLabelText("Raiker's thinking") as HTMLDetailsElement;
-    expect(details.open).toBe(false);
-    await fireEvent.click(screen.getByText("See what Raiker is thinking"));
-    expect(details.open).toBe(true);
-    expect(screen.getByText("Understanding what you need.")).toBeInTheDocument();
+    expect(await screen.findByText("Working…")).toBeInTheDocument();
     expect(screen.queryByText("internal intent payload")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Raiker's thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("See what Raiker is thinking")).not.toBeInTheDocument();
+    expect(screen.queryByText("Understanding what you need.")).not.toBeInTheDocument();
 
     finishStream?.();
   });
 
-  it("uses conversation bubbles, typing status, and a reaction without runtime metadata", async () => {
+  it("uses conversation bubbles, with no status line once text is streaming", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;
     streamPromptMock.mockImplementation(
@@ -812,10 +798,16 @@ describe("ChatView streaming transcript", () => {
     await fireEvent.input(box, { target: { value: "thanks" } });
     await fireEvent.keyDown(box, { key: "Enter" });
 
-    expect(await screen.findByText("Raiker is typing…")).toBeInTheDocument();
+    // Streaming text is its own progress: the indicator ends at the first token
+    // rather than narrating that words visibly appearing are being written.
+    expect(await screen.findByText(/You're welcome/)).toBeInTheDocument();
+    expect(screen.queryByText("Working…")).not.toBeInTheDocument();
     finishStream?.();
 
-    expect(await screen.findByLabelText("Raiker reacted with Heart")).toHaveTextContent("❤️");
+    // BUG-208 slice F — the emoji this asserted was appended to the *owner's*
+    // message and computed from the prompt, so it could not be a reaction to
+    // anything Raiker did. What remains is the pair of bubbles.
+    expect(document.querySelector(".reaction")).toBeNull();
     expect(document.querySelector(".message-group-user .message-bubble-user")).not.toBeNull();
     expect(document.querySelector(".message-group-raiker .message-bubble-raiker")).not.toBeNull();
     expect(screen.queryByText(/governing this turn|cache hit|completed/i)).not.toBeInTheDocument();

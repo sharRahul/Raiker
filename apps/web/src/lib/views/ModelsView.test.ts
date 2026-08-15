@@ -319,8 +319,12 @@ describe("ModelsView state grammar", () => {
     });
     render(ModelsView, { tab: "hosted" });
 
-    expect(await screen.findByText("Not used yet")).toBeTruthy();
+    // BUG-208 slice E — a provider with no turns has no cost to report, so the
+    // usage strip is not rendered at all. What must never happen is the opposite
+    // claim, and that is what this test was really guarding.
+    await screen.findByRole("heading", { name: "Anthropic" });
     expect(screen.queryByText("No API cost — runs on this machine")).toBeNull();
+    expect(screen.queryByText("Not used yet")).toBeNull();
   });
 });
 
@@ -577,6 +581,9 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     vi.stubGlobal("confirm", vi.fn(() => true));
     render(ModelsView, { props: { tab: "hosted" } });
 
+    // BUG-208 slice E moved credential management into Details: it is not the
+    // thing an owner came to the card to do, and the card had five controls.
+    await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
     await fireEvent.click(await screen.findByRole("button", { name: "Disconnect Anthropic" }));
 
     await waitFor(() =>

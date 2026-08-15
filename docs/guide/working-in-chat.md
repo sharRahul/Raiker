@@ -369,7 +369,7 @@ under the figures:
 |---|---|---|
 | Owner | "administrator override" | A rate an administrator set, with a reason, on the Models → **Pricing** tab. Always wins. |
 | Provider | "provider-reported" | Published by the provider's own API. OpenRouter does this; most do not. |
-| Config | "list price, as of 2026-07" | A documented list price shipped in `config/model-profiles.json`. |
+| Config | "list price, as of 2026-07" | A documented list price shipped in `raiker/config/model-profiles.json`. |
 
 If none applies the panel says **Unknown** and offers **Configure →** rather
 than showing `$0.00` — a zero always means "this was free", never "we do not

@@ -37,7 +37,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
     await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
     await page.getByLabel(label).fill(key);
     await page.locator(".signin-connect").click();
-    await expect(card.getByText("Connected")).toBeVisible({ timeout: 20_000 });
+    await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 20_000 });
   }
 
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });

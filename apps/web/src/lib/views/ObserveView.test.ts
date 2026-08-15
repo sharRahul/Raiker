@@ -191,7 +191,11 @@ describe("ObserveView", () => {
       "aria-selected",
       "true",
     );
-    expect(await screen.findByText(/the recorder timeline/i)).toBeInTheDocument();
+    // BUG-208 slice C moved the panel's explanation into the guide, so the panel
+    // is identified by what it is rather than by the paragraph that described it.
+    expect(
+      await screen.findByRole("link", { name: /how checkpoints work/i }),
+    ).toHaveAttribute("href", "#/guide?section=permissions-and-runtime-modes");
   });
 
   it("exposes each section through the ARIA tabs pattern", async () => {

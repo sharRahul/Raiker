@@ -5,6 +5,7 @@
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, auth, getToken, setToken, ApiError } from "../api";
   import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
   import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
@@ -248,11 +249,7 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    Actions the agent proposed that need a human decision. Each one states whether approving
-    <strong>performs it</strong> or only <strong>records your decision</strong> — the server
-    decides which, from the capability gates you control.
-  </p>
+  <GuideLink route="approvals" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
     <Icon name="refresh" size={15} />
     Refresh

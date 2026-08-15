@@ -351,7 +351,7 @@ Dashboard widgets:
 
 ### Channels
 
-Connector profiles already exist in `config/channel-connectors.json`. Phase 4 wires the implementation packages for these connectors:
+Connector profiles already exist in `raiker/config/channel-connectors.json`. Phase 4 wires the implementation packages for these connectors:
 
 - REST webhooks;
 - Email;

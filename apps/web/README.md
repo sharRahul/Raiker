@@ -17,7 +17,14 @@ RuntimeAuthority, and append-only audit log as the terminal client.
   "How this turn was governed" disclosure, and the full event record lives on the Audit log page.
 - **Honest, fail-closed UX** — badges/copy always state what is real (`metadata-only`,
   `deferred`, `fails closed`); unknown backend codes and capabilities are surfaced raw, never
-  hidden; the UI adds no authority of its own.
+  hidden; the UI adds no authority of its own. A label never names an act that did not happen:
+  `Ready` means a readiness check passed, `Connection saved` means a credential is stored and
+  nothing more, and no surface reports a reaction, a thought, or a connection it did not observe.
+- **The page shows state; the guide explains it** — a component carries the state, the next
+  action, and a failure's reason with its remediation. Everything else lives in
+  [`docs/guide/`](../../docs/guide) and is reached from the page's own **How … works** link.
+  The rule, and the test that makes it usable, are in
+  [`VISUAL_DESIGN_SPEC.md`](../../docs/VISUAL_DESIGN_SPEC.md) §2b.
 
 ### Composer model picker
 
@@ -56,6 +63,7 @@ keyboard navigation.
 | Audit log | The append-only event record with session/type filters |
 | Diagnostics | Readiness checks, configuration gaps, counts, config-derived provider status |
 | Settings | Runtime mode activate/disable (step-up gated), appearance (light/dark/system), vault/MFA/session controls, and redacted credential lifecycle, bounded local scan, health, and opt-in breach posture |
+| Guide | The user guide, served read-only from the install and rendered with the same Markdown component the transcript uses. Seven sections in reading order, deep-linkable as `#/guide?section=…`, and reachable from each page's own **How … works** link. A build that shipped no guide says so rather than showing an empty list |
 
 A top-bar **STOP** switch requests safe-boundary cancellation of all active tasks via the governed
 interrupt path.

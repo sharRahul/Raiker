@@ -95,6 +95,13 @@ class VectorIndex:
 
     @staticmethod
     def chunk_text(text: str, chunk_size: int = 512, overlap: int = 64) -> list[str]:
+        # An overlap at or above the chunk size advances the cursor by zero or
+        # less, so the loop never reaches the end of the text and the chunk list
+        # grows until the process dies. Fail on the argument instead.
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if not 0 <= overlap < chunk_size:
+            raise ValueError("overlap must be non-negative and smaller than chunk_size")
         chunks: list[str] = []
         start = 0
         while start < len(text):

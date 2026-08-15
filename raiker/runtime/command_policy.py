@@ -416,6 +416,14 @@ _PASSTHROUGH = (
     "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY",
     "http_proxy", "https_proxy", "no_proxy",
     "SYSTEMROOT", "COMSPEC",  # Windows: sockets and process creation need them
+    # Windows again, and for a structural reason rather than a convenience one:
+    # an AppContainer process is created with a redirected local profile, and
+    # `CreateProcessW` resolves that from the environment it is given. Without
+    # `LOCALAPPDATA` the launch fails with ERROR_ENVVAR_NOT_FOUND — a error code
+    # that names nothing about what is actually missing. Found live: every
+    # sandboxed command refused to start while the same command run with the
+    # host's own environment worked.
+    "LOCALAPPDATA",
 )
 
 

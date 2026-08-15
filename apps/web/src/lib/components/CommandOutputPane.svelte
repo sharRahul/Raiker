@@ -78,6 +78,19 @@
     } catch (exc) { error = reason(exc); }
   }
 
+  async function select(runId: string | null) {
+    if (runId === null) return;
+    chunks = [];
+    receipt = null;
+    try {
+      const outputView = await api.commandOutput(runId, 0);
+      chunks = outputView.chunks;
+      const current = runs.find((run) => run.run_id === runId);
+      if (current?.receipt_digest) receipt = (await api.commandReceipt(runId)).receipt;
+      error = null;
+    } catch (exc) { error = reason(exc); }
+  }
+
   async function stop() {
     if (selectedId === null) return;
     busy = true;
@@ -151,6 +164,21 @@
         <span>{posturaLine(environment)}</span>
       </div>
 
+      {#if runs.length > 1}
+        <!-- The pane keeps the owner's selection across refreshes, which is
+             right — a new command must not yank the transcript they are
+             reading. It also means the newest run is not always the one on
+             screen, so the session's runs have to be reachable. -->
+        <label class="run-picker">
+          <span>Command</span>
+          <select bind:value={selectedId} onchange={() => void select(selectedId)}>
+            {#each runs as run}
+              <option value={run.run_id}>{run.safe_display} · {humanize(run.state)}</option>
+            {/each}
+          </select>
+        </label>
+      {/if}
+
       <div class="output-shell" aria-live="polite">
         <div class="output-head">
           <span>{selected?.safe_display ?? "No command selected"}</span>
@@ -216,6 +244,8 @@
   dl { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .45rem; margin: .55rem 0 0; }
   dl div { min-width: 0; } dt { color: var(--text-3); font-size: .62rem; text-transform: uppercase; } dd { margin: .12rem 0 0; overflow: hidden; text-overflow: ellipsis; }
   .pane-error { margin: .55rem 0 0; color: var(--danger); font-size: .7rem; }
+  .run-picker { display: flex; align-items: center; gap: .5rem; margin: .5rem 0 .35rem; color: var(--text-3); font-size: .68rem; }
+  .run-picker select { flex: 1; min-width: 0; font-family: var(--font-mono); font-size: .7rem; }
   .failure-nav { display: flex; align-items: center; gap: .45rem; flex-wrap: wrap; margin: .55rem 0 0; padding: .42rem .5rem; border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border)); border-radius: var(--r-md); background: color-mix(in srgb, var(--danger) 6%, transparent); color: var(--text-2); font-size: .7rem; }
   .failure-nav a { margin-left: auto; color: var(--accent); }
   @media (max-width: 720px) { .command-pane { margin-inline: .75rem; } .receipt-rail { grid-template-columns: repeat(4, 1fr); } .receipt-rail b { display: none; } .receipt-rail span { justify-content: center; } .posture { display: grid; } dl { grid-template-columns: repeat(2, 1fr); } }

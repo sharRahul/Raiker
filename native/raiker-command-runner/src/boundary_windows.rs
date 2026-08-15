@@ -366,17 +366,29 @@ fn pump(handle: usize, to_stdout: bool) -> std::thread::JoinHandle<()> {
 /// fail outright without a writable temp, and the alternative — a temp inside
 /// the workspace — would drop build scratch into the owner's repository.
 fn wide_environment(container: &AppContainer) -> Vec<u16> {
-    let mut block: Vec<u16> = Vec::new();
     let temp = container.package_directory();
     let _ = std::fs::create_dir_all(&temp);
-    for (name, value) in std::env::vars() {
-        if matches!(name.to_ascii_uppercase().as_str(), "TEMP" | "TMP") {
-            continue;
-        }
+    let mut entries: Vec<(String, String)> = std::env::vars()
+        .filter(|(name, value)| {
+            // An entry whose value is empty writes `NAME=` followed by the NUL
+            // that also terminates the block, and `CreateProcessW` answers that
+            // with ERROR_ENVVAR_NOT_FOUND rather than with anything that names
+            // the real problem. Raiker's constructed environment contains one
+            // such variable by design (`GIT_ASKPASS=`), so this is not a
+            // hypothetical.
+            !name.is_empty() && !value.is_empty() && !name.starts_with('=')
+        })
+        .filter(|(name, _)| !matches!(name.to_ascii_uppercase().as_str(), "TEMP" | "TMP"))
+        .collect();
+    entries.push(("TEMP".to_owned(), temp.to_string_lossy().into_owned()));
+    entries.push(("TMP".to_owned(), temp.to_string_lossy().into_owned()));
+    // A Unicode environment block must be sorted case-insensitively by name.
+    entries.sort_by_key(|(name, _)| name.to_uppercase());
+
+    let mut block: Vec<u16> = Vec::new();
+    for (name, value) in entries {
         block.extend(wide(&format!("{name}={value}")));
     }
-    block.extend(wide(&format!("TEMP={}", temp.to_string_lossy())));
-    block.extend(wide(&format!("TMP={}", temp.to_string_lossy())));
     block.push(0);
     block
 }
@@ -703,8 +715,26 @@ impl AppContainer {
         })
     }
 
+    /// The container's own writable temp.
+    ///
+    /// `LOCALAPPDATA` is absent from the constructed environment a governed
+    /// command runs with — that environment is deliberately minimal — so the
+    /// profile root is derived rather than read. Without the fallback the
+    /// resulting path is relative, `TEMP` points nowhere, and the failure
+    /// surfaces as an unrelated launch error.
     fn package_directory(&self) -> PathBuf {
-        PathBuf::from(std::env::var("LOCALAPPDATA").unwrap_or_default())
+        let root = std::env::var("LOCALAPPDATA")
+            .or_else(|_| {
+                std::env::var("USERPROFILE").map(|home| {
+                    PathBuf::from(home)
+                        .join("AppData")
+                        .join("Local")
+                        .to_string_lossy()
+                        .into_owned()
+                })
+            })
+            .unwrap_or_else(|_| std::env::temp_dir().to_string_lossy().into_owned());
+        PathBuf::from(root)
             .join("Packages")
             .join(&self.name)
             .join("AC")

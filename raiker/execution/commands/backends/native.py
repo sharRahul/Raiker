@@ -40,7 +40,6 @@ from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, Str
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
     CommandRejected,
-    portable_command,
     sandbox_environment,
     validate_command,
 )
@@ -308,18 +307,30 @@ class NativeSandboxBackend:
         policy_path.write_text(
             json.dumps(self.driver.policy_document(request), indent=2), encoding="utf-8"
         )
+        environment = sandbox_environment(workspace_root=request.workspace_root)
+        executable = shutil.which(request.argv_template[0], path=environment.get("PATH"))
+        if executable is None:
+            # `portable_command`'s Windows shim rewrites `echo` and `cat` into
+            # the interpreter Raiker itself runs on. That is right for the host
+            # backend and wrong here: the interpreter lives outside the
+            # boundary, so the container cannot load its libraries and the child
+            # dies with a status code that names nothing. A shell builtin has no
+            # program to run inside a sandbox, and saying so is the honest
+            # answer.
+            raise CommandBackendError("native_sandbox_executable_unreachable")
         argv = [
             str(binary),
             "--policy",
             str(policy_path),
             "--",
-            *portable_command(request.argv_template),
+            executable,
+            *request.argv_template[1:],
         ]
         process = self._runner(
             request,
             argv,
             request.workspace_root,
-            sandbox_environment(workspace_root=request.workspace_root),
+            environment,
             sink or MemoryCommandSink(),
             pty=False,
         )

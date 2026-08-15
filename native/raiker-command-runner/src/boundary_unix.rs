@@ -148,30 +148,62 @@ pub fn launch(policy: &LaunchPolicy, argv: &[String]) -> Result<i32, String> {
     let arguments = boundary_arguments(policy, argv)?;
     let mut command = Command::new(executable);
     command.args(arguments);
-    die_with_parent(&mut command);
-    let status = command
-        .status()
+    bound_child(&mut command, policy);
+    let mut child = command
+        .spawn()
+        .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
+
+    // The boundary's own deadline. Raiker keeps an outer timer, but a wedged
+    // relay must not be able to leave a command running past its bound — and on
+    // macOS, where there is no parent-death signal, this is the only bound.
+    let pid = child.id() as i32;
+    let deadline = policy.deadline_seconds;
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_secs(deadline));
+        // Negative pid: the whole process group, not just the launcher.
+        unsafe { libc::kill(-pid, libc::SIGKILL) };
+        unsafe { libc::kill(pid, libc::SIGKILL) };
+    });
+
+    let status = child
+        .wait()
         .map_err(|_| "native_sandbox_launch_failed".to_owned())?;
     Ok(status.code().unwrap_or(1))
 }
 
-/// On Linux the kernel reaps the runner when Raiker dies, with no pid to watch
-/// and nothing to poll. macOS has no equivalent, which is why the design says
-/// plainly that a killed Raiker can leave a command running there until its
-/// deadline.
-#[cfg(target_os = "linux")]
-fn die_with_parent(command: &mut Command) {
+/// Everything the kernel can be asked for before `exec`.
+///
+/// `RLIMIT_NPROC` and `RLIMIT_AS` are the same bounds the Windows Job Object
+/// carries, applied by the mechanism this platform has. Without them the launch
+/// contract's process and memory caps would be Windows-only fields that every
+/// other platform quietly ignored.
+///
+/// `PR_SET_PDEATHSIG` is how the runner dies with Raiker on Linux: the kernel
+/// reaps it, with no pid to watch and nothing to poll. macOS has no equivalent,
+/// which is why the design says plainly that a killed Raiker can leave a
+/// command running there until its deadline.
+fn bound_child(command: &mut Command, policy: &LaunchPolicy) {
     use std::os::unix::process::CommandExt;
+    let processes = policy.max_processes as libc::rlim_t;
+    let memory = policy.max_memory_bytes as libc::rlim_t;
     unsafe {
-        command.pre_exec(|| {
+        command.pre_exec(move || {
+            let procs = libc::rlimit {
+                rlim_cur: processes,
+                rlim_max: processes,
+            };
+            libc::setrlimit(libc::RLIMIT_NPROC, &procs);
+            let address_space = libc::rlimit {
+                rlim_cur: memory,
+                rlim_max: memory,
+            };
+            libc::setrlimit(libc::RLIMIT_AS, &address_space);
+            #[cfg(target_os = "linux")]
             libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGKILL);
             Ok(())
         });
     }
 }
-
-#[cfg(not(target_os = "linux"))]
-fn die_with_parent(_command: &mut Command) {}
 
 fn boundary_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>, String> {
     if cfg!(target_os = "macos") {
@@ -288,11 +320,29 @@ fn linux_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>
                 .into_owned(),
         );
     }
+    // The per-run profile name doubles as the namespace hostname, so `ps` and a
+    // core dump inside the sandbox name the run they belong to.
+    arguments.push("--hostname".to_owned());
+    arguments.push(sanitised_hostname(&policy.profile_name));
     arguments.push("--chdir".to_owned());
     arguments.push(policy.cwd.to_string_lossy().into_owned());
     arguments.push("--".to_owned());
     arguments.extend(argv.iter().cloned());
     Ok(arguments)
+}
+
+/// A hostname is not a free-form string: bounded length, and no separators.
+fn sanitised_hostname(name: &str) -> String {
+    name.chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .take(63)
+        .collect()
 }
 
 fn macos_arguments(policy: &LaunchPolicy, argv: &[String]) -> Result<Vec<String>, String> {
@@ -438,6 +488,14 @@ mod tests {
                 "deny_paths":[".raiker"],"readonly_paths":[".git"]}"#,
         )
         .unwrap()
+    }
+
+    #[test]
+    fn the_run_names_its_own_namespace() {
+        let arguments = linux_arguments(&sample(), &["echo".into()]).unwrap();
+        assert!(arguments.contains(&"--hostname".to_owned()));
+        assert_eq!(sanitised_hostname("raiker.cmd.ab_12"), "raiker-cmd-ab-12");
+        assert_eq!(sanitised_hostname(&"x".repeat(200)).len(), 63);
     }
 
     #[test]

@@ -73,12 +73,22 @@ class _JOBOBJECT_EXTENDED_LIMIT_INFORMATION(ctypes.Structure):
     ]
 
 
+def _kernel32() -> Any:
+    """`ctypes.WinDLL` exists only on Windows.
+
+    Every caller is already behind a `sys.platform` check, but this module is
+    imported — and type-checked — on every platform, so the attribute access is
+    isolated here rather than repeated at each call site.
+    """
+    return ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined]
+
+
 def _runtime_job() -> Any:
     """One job for the whole runtime, created on first use."""
     global _job, _unavailable_reason
     if _job is not None or _unavailable_reason is not None:
         return _job
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = _kernel32()
     handle = kernel32.CreateJobObjectW(None, None)
     if not handle:
         _unavailable_reason = "runtime_job_object_unavailable"
@@ -116,7 +126,7 @@ def bind_to_runtime_lifetime(pid: int | None) -> bool:
         job = _runtime_job()
         if job is None:
             return False
-        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32 = _kernel32()
         process = kernel32.OpenProcess(_PROCESS_SET_QUOTA | _PROCESS_TERMINATE, False, pid)
         if not process:
             return False

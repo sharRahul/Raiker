@@ -4,13 +4,14 @@ import json
 import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal, cast
 
 from raiker.execution.commands.models import CommandFeatures
 
-ExecutionKind = Literal["local", "container", "ssh", "daytona"]
+ExecutionKind = Literal["local", "native", "container", "ssh", "daytona"]
 ContainerRuntime = Literal["docker", "podman"]
 RepositoryAccess = Literal["none", "read_only"]
 
@@ -41,6 +42,12 @@ class ExecutionProfile:
 
     @property
     def features(self) -> CommandFeatures:
+        if self.kind == "native":
+            # Deliberately the empty set. A native profile's real capabilities
+            # come from the host probe in `probe_execution_profile`, because a
+            # boundary that has not been measured has not been proven — and a
+            # literal here would be a claim made before anything ran.
+            return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
         if self.kind == "local":
             return CommandFeatures(shell=False, concurrent_runs=False)
         if self.kind == "container":
@@ -63,6 +70,13 @@ class ProfileProbe:
     available: bool
     reason_code: str | None
     checked_at: str
+    #: What the boundary was measured to be, not what it was configured as.
+    boundary: str = ""
+    #: Per-observation verdicts: ``enforced`` / ``unenforced`` / ``indeterminate``.
+    #: An indeterminate observation never turns a capability on.
+    observations: Mapping[str, str] = field(default_factory=dict)
+    #: Present only when the probe measured the capabilities itself.
+    features: CommandFeatures | None = None
 
 
 @dataclass(frozen=True)
@@ -78,6 +92,14 @@ class CommandEnvironmentResolution:
 
 DEFAULT_EXECUTION_PROFILES = (
     ExecutionProfile("local_native", "local", "enabled_policy_gated", True),
+    ExecutionProfile(
+        "native_sandbox",
+        "native",
+        "enabled_policy_gated",
+        True,
+        name="Native OS sandbox",
+        tools=("shell", "run_command", "process"),
+    ),
     ExecutionProfile("container_default", "container"),
     ExecutionProfile("ssh_default", "ssh"),
     ExecutionProfile("daytona_default", "daytona"),
@@ -126,7 +148,7 @@ def execution_profiles_from_rows(
 def validate_execution_profile(profile: ExecutionProfile) -> str | None:
     if not profile.profile_id.strip():
         return "execution_profile_id_required"
-    if profile.kind not in {"local", "container", "ssh", "daytona"}:
+    if profile.kind not in {"local", "native", "container", "ssh", "daytona"}:
         return f"execution_profile_kind_invalid:{profile.profile_id}"
     if len(set(profile.tools)) != len(profile.tools):
         return f"execution_profile_tools_duplicated:{profile.profile_id}"
@@ -165,7 +187,9 @@ def _checked_at() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def probe_execution_profile(profile: ExecutionProfile) -> ProfileProbe:
+def probe_execution_profile(
+    profile: ExecutionProfile, *, workspace_root: str | Path | None = None
+) -> ProfileProbe:
     """Prove the selected profile's minimum command readiness.
 
     Container readiness includes a daemon and image probe, not merely the
@@ -177,7 +201,29 @@ def probe_execution_profile(profile: ExecutionProfile) -> ProfileProbe:
     if reason:
         return ProfileProbe(profile, False, reason, checked_at)
     if profile.kind == "local":
-        return ProfileProbe(profile, True, None, checked_at)
+        return ProfileProbe(
+            profile, True, None, checked_at, boundary="host_reduced_isolation"
+        )
+    if profile.kind == "native":
+        if workspace_root is None:
+            return ProfileProbe(
+                profile, False, "native_sandbox_workspace_unknown", checked_at, boundary="none"
+            )
+        # Imported here: the driver pulls in the command runner package, and
+        # profile resolution is on the import path of surfaces that never run a
+        # command.
+        from raiker.execution.commands.backends.native import NativeSandboxDriver
+
+        proof = NativeSandboxDriver(workspace_root).probe()
+        return ProfileProbe(
+            profile,
+            proof.available,
+            proof.reason_code,
+            proof.checked_at,
+            boundary=proof.boundary,
+            observations=dict(proof.observations),
+            features=proof.features,
+        )
     if profile.kind == "container":
         assert profile.runtime is not None and profile.image is not None
         if shutil.which(profile.runtime) is None:
@@ -205,10 +251,9 @@ def probe_execution_profile(profile: ExecutionProfile) -> ProfileProbe:
 
 
 def _selected_profile(store: Any, owner_principal_id: str, profile_id: str) -> ExecutionProfile | None:
-    if profile_id == "local_native":
-        return DEFAULT_EXECUTION_PROFILES[0]
-    if profile_id == "container_default":
-        return DEFAULT_EXECUTION_PROFILES[1]
+    known = {profile.profile_id: profile for profile in DEFAULT_EXECUTION_PROFILES}
+    if profile_id in {"local_native", "native_sandbox", "container_default"}:
+        return known[profile_id]
     row = store.load_remote_execution_profile(profile_id, owner_principal_id=owner_principal_id)
     if row is None:
         return None
@@ -269,16 +314,31 @@ def resolve_command_environment(
             profile.features,
             checked_at,
         )
-    proof = probe(profile)
+    proof = _probe_profile(probe, profile, store)
     return CommandEnvironmentResolution(
         profile,
         bool(proof.available),
         proof.reason_code,
         True,
         profile.tools,
-        profile.features,
+        # A measured feature set always wins over the profile's declared one:
+        # the whole point of probing is that configuration does not decide what
+        # the host enforces.
+        getattr(proof, "features", None) or profile.features,
         proof.checked_at,
     )
+
+
+def _probe_profile(probe: Any, profile: ExecutionProfile, store: Any) -> Any:
+    """Call the probe, handing it the workspace when it can use one."""
+    if profile.kind != "native":
+        return probe(profile)
+    workspace_root = getattr(getattr(store, "paths", None), "workspace_root", None)
+    try:
+        return probe(profile, workspace_root=workspace_root)
+    except TypeError:
+        # A caller-supplied probe that predates the workspace argument.
+        return probe(profile)
 
 
 def plan_remote_execution(profile_id: str, command: str) -> dict[str, object]:

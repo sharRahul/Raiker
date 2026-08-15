@@ -355,6 +355,46 @@ class CommandStore:
         if cursor.rowcount != 1:
             raise CommandStoreError("command_run_not_found")
 
+    def record_isolation(
+        self, owner_principal_id: str, run_id: str, evidence: dict[str, Any]
+    ) -> None:
+        """Record what boundary this run was actually given.
+
+        Kept in plaintext, deliberately. It is not secret — a profile name, a
+        list of protected paths, and what the host was measured to enforce — and
+        putting it behind the vault would make a locked vault unable to answer
+        "what contained this command", which is the one question a receipt has
+        to be able to answer.
+        """
+        with self.sqlite.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE command_runs SET isolation_json = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (
+                    json.dumps(evidence, sort_keys=True, separators=(",", ":")),
+                    utc_now(),
+                    owner_principal_id,
+                    run_id,
+                ),
+            )
+        if cursor.rowcount != 1:
+            raise CommandStoreError("command_run_not_found")
+
+    def load_isolation(self, owner_principal_id: str, run_id: str) -> dict[str, Any]:
+        with self.sqlite.connect() as connection:
+            row = connection.execute(
+                """SELECT isolation_json FROM command_runs
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (owner_principal_id, run_id),
+            ).fetchone()
+        if row is None:
+            return {}
+        try:
+            value = json.loads(str(row["isolation_json"] or "{}"))
+        except (TypeError, ValueError):
+            return {}
+        return value if isinstance(value, dict) else {}
+
     def load(self, owner_principal_id: str, run_id: str) -> StoredCommandRun | None:
         with self.sqlite.connect() as connection:
             row = connection.execute(

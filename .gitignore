@@ -23,6 +23,10 @@ build/
 *.lock
 !/native/Cargo.lock
 native/target/
+# The sandbox runner is native code built per platform by
+# `scripts/build_native_runner.py` and by the release workflow. The directory
+# and its `__init__.py` are tracked; the binaries never are.
+raiker/native/*/
 output/
 # Playwright writes its last-run marker beside the config unless outputDir
 # covers it; the evidence itself lives in output/ and docs/plans/screenshots.

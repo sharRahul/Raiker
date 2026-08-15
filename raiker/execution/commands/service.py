@@ -14,6 +14,7 @@ from raiker.execution.commands.backends.container import (
     SubprocessContainerRuntime,
 )
 from raiker.execution.commands.backends.local import LocalStrictBackend
+from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
     CommandChunk,
@@ -211,12 +212,22 @@ class CommandService:
 
         sink = _StoreSink(self.store, request, complete)
         backend_name = "local_strict" if profile.kind == "local" else profile.kind
+        isolation: dict[str, Any] = {}
         try:
             backend = (
                 self._backend_factory(profile)
                 if self._backend_factory is not None
                 else self._default_backend(profile)
             )
+            # Optional per backend, and validated rather than trusted: a
+            # backend that answers with something other than a mapping has not
+            # produced evidence, and recording a placeholder would be worse than
+            # recording nothing.
+            produced = getattr(backend, "isolation_evidence", None)
+            produced = produced(request) if callable(produced) else None
+            if isinstance(produced, dict):
+                isolation = dict(produced)
+                self.store.record_isolation(owner_principal_id, request.run_id, isolation)
             handle = backend.start(request, sink)
         except CommandBackendError as exc:
             self._contain_start_failure(request, exc.reason_code, backend_name)
@@ -234,6 +245,12 @@ class CommandService:
     def _default_backend(self, profile: ExecutionProfile) -> Any:
         if profile.kind == "local":
             return LocalStrictBackend()
+        if profile.kind == "native":
+            # The probe runs here rather than being cached from the environment
+            # list: a receipt must not assert "network denied" from a
+            # measurement taken before the firewall service was stopped.
+            driver = NativeSandboxDriver(self.workspace_root)
+            return NativeSandboxBackend(driver=driver, proof=driver.probe())
         if profile.kind == "container":
             return PersistentContainerBackend(
                 runtime=SubprocessContainerRuntime(self.workspace_root),
@@ -286,6 +303,7 @@ class CommandService:
                     "kind": request.authority_kind,
                     "id": request.authority_id,
                 },
+                **self.store.load_isolation(request.owner_principal_id, request.run_id),
             },
         )
         self.store.finalize_with_receipt(
@@ -323,6 +341,12 @@ class CommandService:
                 },
                 "output_truncated": sink.truncated,
                 "redaction_count": sink.redaction_count,
+                # Two different claims, kept apart. `boundary_constructed` is
+                # what this run's runner actually built; `probe_observations` is
+                # what the host was measured to enforce, and when. Blending them
+                # would let a receipt assert something about this command on the
+                # strength of an earlier measurement of a different process.
+                **self.store.load_isolation(request.owner_principal_id, request.run_id),
             },
         )
         self.store.finalize_with_receipt(request.owner_principal_id, request.run_id, state, receipt)

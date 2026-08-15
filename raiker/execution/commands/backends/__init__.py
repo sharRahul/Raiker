@@ -12,8 +12,8 @@ from raiker.execution.commands.backends.container import (
 )
 from raiker.execution.commands.backends.local import LocalStrictBackend
 from raiker.execution.commands.backends.native import (
+    NativeSandboxBackend,
     NativeSandboxDriver,
-    NativeSandboxPolicy,
     NativeSandboxProof,
 )
 
@@ -24,8 +24,8 @@ __all__ = [
     "ContainerBackendHandle",
     "ContainerCommandHandle",
     "LocalStrictBackend",
+    "NativeSandboxBackend",
     "NativeSandboxDriver",
-    "NativeSandboxPolicy",
     "NativeSandboxProof",
     "PersistentContainerBackend",
     "UnavailableBackend",

@@ -104,10 +104,40 @@ Raiker records `lost`; it never infers success.
 The selected container command path preserves the exact approved argv and
 requires a digest-pinned image, no network, read-only root, dropped
 capabilities, `no-new-privileges`, bounded resources, `.raiker` masking, and
-read-only `.git`. Native AppContainer/restricted-token isolation,
+read-only `.git`.
+
+The `native_sandbox` path is an operating-system boundary. On Windows each
+command runs in its own AppContainer, created before launch and deleted at reap
+— per run, because the container SID is a pure function of the profile name and
+a predictable name would let any local process enter a container the workspace
+already trusts. The profile holds **no network capability**, so egress is
+dropped by the Windows Filtering Platform rather than by a rule the command is
+asked to respect. The workspace is reachable through a single capability grant
+written once; `.raiker` and `.git` carry protected DACLs with explicit entries
+that are re-verified before every launch, because an explicit ACE is what beats
+an inherited one and a recreated `.raiker` would otherwise carry only the
+inherited allow. A Job Object with `KILL_ON_JOB_CLOSE` takes the whole process
+tree, and the runner itself is bound to a job the runtime owns so a hard kill of
+Raiker is reaped by the kernel. Linux uses bubblewrap with `--unshare-net`;
+macOS uses a generated Seatbelt profile and reports its weaker process-tree
+posture rather than inheriting the claim.
+
+**No capability is claimed that was not measured.** A probe builds the real
+boundary over the real workspace and runs a child inside it that attempts six
+things, each also attempted outside the boundary as a control arm: the stream
+relay, a write inside the workspace, a write to the workspace's parent and to
+the user profile, a read of masked `.raiker`, an outbound connection, and a
+detached grandchild. Only *outside succeeded and inside failed* counts as
+enforcement. *Outside failed* is `indeterminate` and never turns a capability
+on — without that rule an air-gapped host would report a network boundary it
+does not have, and a host whose firewall service is stopped would report
+AppContainer network isolation that is no longer being applied. The receipt
+keeps two claims apart: `boundary_constructed` is what this run's runner built,
+`probe_observations` is what the host was measured to enforce and when.
+
 PTY/background supervision, filtered egress, credential quarantine, restart
-reattachment, and remote command supervisors are not yet security boundaries;
-see BUG-194 and the compatibility matrix.
+reattachment, persistent sessions, and remote command supervisors are still not
+security boundaries; see BUG-194 and the compatibility matrix.
 
 
 ## Model supply and readiness controls

@@ -962,3 +962,50 @@ the model was handed "…we rotate the SQLCipher key every…". That is **FIXED-
 fixed and re-run in the same round; the regression test is written from the live
 transcript. 23.7 then recalled an 18 April 2022 conversation with the exact
 retention window, the verbatim sentence, the date and the reason.
+
+---
+
+## 24. Native OS sandbox round — 2026-08-15
+
+The round that closed the OS-boundary half of BUG-194 as **FIXED-195**. Run
+against the production web build on Windows 11, with all four providers
+connected **through the Models dialog**, never through the CLI.
+
+The question this round exists to answer: **is the boundary real, and does
+Raiker only claim what it measured?**
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| 24.1 | Register a fresh owner, take Balanced through setup, open the dashboard | Lock screen, then the dashboard mounts | ✅ |
+| 24.2 | Settings → **Runtime configuration** | **Native OS sandbox** is listed with `AppContainer · network denied` and six observations | ✅ `r0815-runtime-native-sandbox-observations.png` |
+| 24.3 | Read the six observations | Command output reaches Raiker / can write inside the workspace / cannot write outside it / cannot read Raiker's own state / cannot reach the network / stopping ends every descendant — all **Enforced** | ✅ `r0815-native-sandbox-card.png` |
+| 24.4 | Read what the card says it does *not* do | "Foreground commands only. PTY, background execution, network grants and persistence are not built for this boundary and are not offered." | ✅ |
+| 24.5 | Read the re-measure disclosure | "Re-measuring opens one connection to this host's default gateway on a closed port." | ✅ |
+| 24.6 | **Select** the native sandbox | The card reads **Selected**; `execution_environment_selection` records `native_sandbox` | ✅ |
+| 24.7 | Permissions → enable **Shell commands** and **Approval execution relay**, each with a reason and a confirmation token | Both gates record `enabled_runtime` against the principal | ✅ |
+| 24.8 | Models → Hosted → **Connect** Anthropic, OpenRouter and OpenAI, pasting each key in the dialog; **Test** each | Each card reads **Connected**, then "«provider» can reach «model»" | ✅ |
+| 24.9 | Build → send "Use the shell tool to run exactly: `git --version`" | The turn proposes a `shell` action and parks: "Waiting for your decision. Nothing has run yet." | ✅ |
+| 24.10 | **Accept** | The command runs inside a per-run AppContainer; `git version 2.55.0.windows.4` comes back through the relay; the model answers from it | ✅ `r0815-build-governed-terminal-appcontainer.png` |
+| 24.11 | Read the governed terminal | `AppContainer · network denied` · "OS boundary · foreground only · no PTY, background or network grant" · the output · **Immutable receipt** with outcome, exit, isolation and authority | ✅ |
+| 24.12 | Repeat 24.9–24.10 with **OpenRouter** (Gemini 3.7 Flash), **OpenAI** (GPT-4o Mini) and **Ollama** (gemma4:31b-cloud) | Each provider drives the same path to the same executed command | ✅ six `succeeded` runs in `command_runs` |
+| 24.13 | Run `echo x > ..\escape.txt` through the runner directly | **"Access is denied."** from the OS, exit 1 — not a policy refusal | ✅ |
+| 24.14 | Run `dir .raiker` through the runner directly | **"Access is denied."** from the OS | ✅ |
+| 24.15 | Read the receipt evidence for a completed run | `boundary_constructed` names this run's profile, `network_capability: false`, the protected paths and the runner digest; `probe_observations` carries the six host measurements **and** the time they were taken | ✅ |
+
+> 24.13 and 24.14 are the steps that separate this from the argv policy. The
+> allowlist would refuse those commands anyway; running them through the runner
+> directly is what shows the *operating system* refusing them.
+
+**Result: passed, after two defects this round found and fixed.** Every
+sandboxed command initially failed with `native_sandbox_launch_failed:203` while
+the same command run by hand succeeded: an AppContainer is created with a
+redirected local profile and `CreateProcessW` resolves it from the environment
+block, which Raiker's deliberately minimal environment did not carry. And
+`portable_command` rewrote `echo` into the interpreter Raiker itself runs on,
+which lives outside the boundary, so the child died with `STATUS_DLL_NOT_FOUND`
+— an exit code rather than an error. Both are in **FIXED-195**.
+
+One defect found and **not** fixed this round: every turn rendered
+**"The turn could not continue (409)."** beneath its own successful answer, in
+all four provider rounds. Filed as **BUG-196**.
+

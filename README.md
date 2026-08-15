@@ -258,19 +258,27 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-14:
+Raiker's documentation does not run ahead of its code. As of 2026-08-15:
 
-- **The governed shell is real, but the complete sandbox matrix is not.**
-  Approved `shell` and `process` actions and session-granted `run_command` now
-  converge on one durable lifecycle with exact authority evidence, bounded
-  split-safe-redacted output, authoritative environment selection, stop, and an
-  immutable receipt. `local_native` is explicit host access with reduced
-  isolation. A ready digest-pinned container runs with no network, a read-only
-  root, dropped capabilities, `.raiker` masked, `.git` read-only, and resource
-  bounds; an unavailable daemon or image fails closed and never falls back to
-  the host. Native Windows sandboxing, PTY/input, background supervision,
-  filtered egress, credential quarantine, restart reattachment, SSH, and
-  Daytona command execution are still absent and tracked as BUG-194. Browser
+- **A governed command now runs inside a real OS boundary, and that boundary is
+  measured rather than described.** Selecting **Native OS sandbox** runs each
+  command in its own Windows AppContainer holding no network capability, with
+  the workspace reachable through a single capability grant, `.raiker` denied,
+  `.git` read-only, and a Job Object that takes the whole process tree; Linux
+  uses bubblewrap and macOS Seatbelt. What the host actually enforces is not
+  taken on trust: a probe builds the real boundary over your real workspace and
+  runs a child inside it that attempts six things — each one also attempted
+  *outside* the boundary as a control. Only "worked outside, refused inside"
+  counts. If the control arm fails, the result is **not proven**, and nothing
+  turns green on it. All six, and the probe's own outbound destination, are on
+  the environment card with a **Re-measure boundary** button.
+- **That sandbox is foreground-only, and the card says so.** PTY and raw input,
+  background execution, filtered domain egress, persistent sessions, credential
+  quarantine, restart reattachment, SSH and Daytona are **not built**, and are
+  absent from the interface rather than shown disabled — a disabled control
+  implies it is one setting away. Each has its reason recorded in
+  `docs/plans/TO_BE_FIXED.md` → BUG-194. `local_native` remains explicit host
+  access with reduced isolation and is still the default selection. Browser
   reload restores durable output; a Raiker process restart marks an unprovable
   active run `lost` rather than inventing success.
 - **A batch of tool calls runs in parallel only when nothing in it needs a

@@ -200,10 +200,24 @@ work surfaces of **Claude Cowork** and **ChatGPT**. Primary sources:
 [OpenClaw exec approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md), and
 [Hermes tools](https://github.com/NousResearch/hermes-agent/blob/main/website/docs/user-guide/features/tools.md).
 
+Re-verified live on **2026-08-15** after the native OS sandbox landed
+(screenshots prefixed `r0815-` in [`plans/screenshots/working/`](plans/screenshots/working)).
+
 Status: ✅ at parity or beyond · 🟡 partial · ❌ absent. A row is green only
 when the current product path and tests prove it; specification alone does not
-count. Docker was unavailable on the 2026-08-14 Windows live-test host, so the
+count, and a **measurement whose control arm failed does not count either**.
+Docker was unavailable on the 2026-08-14 Windows live-test host, so the
 container command row remains partial even though its automated contract passes.
+
+**How the sandbox rows are proven.** `raiker-command-runner --probe` builds the
+real boundary over the real workspace and runs a child inside it that attempts
+six things, each against a control arm run *outside* the boundary: the stream
+relay, a write inside the workspace, a write to the workspace's parent and to
+the user profile, a read of the masked `.raiker`, an outbound connection, and a
+**detached** grandchild. Only *outside succeeded and inside failed* counts as
+enforcement; *outside failed* is `indeterminate` and never turns a row green.
+All six measured `enforced` on the 2026-08-15 Windows host, and the same six are
+shown to the owner on the environment card.
 
 | Control | Market bar | Raiker implementation | Status |
 |---|---|---|---|
@@ -212,35 +226,77 @@ container command row remains partial even though its automated contract passes.
 | Runtime-authored authority proof | Approval history is visible in reference products | Every run stores its approval or standing-grant kind/id outside encrypted command material and binds it into the receipt digest | ✅ beyond |
 | Authoritative environment; no silent fallback | Codex/Claude/OpenClaw keep sandbox selection authoritative | Exact selected profile is probed and used; unavailable container/SSH/Daytona is refused, never rerouted to host | ✅ |
 | Explicit host-access posture | Codex exposes full-access/danger modes distinctly | `local_native` is argv-only and shown as **Host access — reduced isolation**, not called a sandbox | ✅ |
-| Native OS sandbox | Codex uses a Windows restricted token/AppContainer boundary; Claude Code uses OS sandbox primitives | No packaged Windows AppContainer/restricted-token runner or WFP policy service yet | ❌ |
+| Native OS sandbox | Codex uses a Windows restricted token/AppContainer boundary; Claude Code uses OS sandbox primitives | Packaged `raiker-command-runner`: a **per-run** Windows AppContainer holding one workspace capability and no network capability, a Job Object with `KILL_ON_JOB_CLOSE`, `.raiker` denied and `.git` read-only with protected DACLs re-verified before every launch; bubblewrap on Linux and Seatbelt on macOS. Codex additionally layers a restricted token; Raiker does not yet, and says so rather than letting "AppContainer" stand in for the pair (`r0815-native-sandbox-card.png`) | ✅ |
 | Container command sandbox | Claude/OpenClaw support container isolation | Digest-pinned, no-network, read-only/capability-dropped worker with `.raiker` masked, `.git` read-only, and CPU/memory/PID bounds; automated only on this host | 🟡 |
 | Persistent environment | Claude Code and OpenClaw can retain a sandbox/session boundary between commands | Current command container is per run; cache identity and reset internals exist but persistence is not exposed or proven | ❌ |
 | Foreground output and exit status | All coding-agent references provide it | Split-safe redacted stdout/stderr, total byte counts, truncation, timeout, terminal state, and exit code | ✅ |
-| Provider-independent model-to-command path | Market leaders route tool calls consistently across supported model providers | Anthropic, OpenRouter, OpenAI, and Ollama each completed the same live Build → approval → exact-argv command → output → receipt scenario in Chromium | ✅ beyond |
-| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | Durable poll/log and stop exist for a running foreground command; background start/wait/lease controls are absent | 🟡 |
-| PTY and raw input | Claude Code/Codex terminal workflows support interactive programs | Contracts refuse PTY/input and the UI does not show an input control | ❌ |
+| Provider-independent model-to-command path | Market leaders route tool calls consistently across supported model providers | Anthropic (Haiku 4.5), OpenRouter (Gemini 3.7 Flash), OpenAI (GPT-4o Mini) and Ollama (gemma4:31b-cloud) each completed the same live Build → approval → exact-argv command **inside the AppContainer** → output → receipt on 2026-08-15 (`r0815-build-governed-terminal-appcontainer.png`) | ✅ beyond |
+| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | Durable poll/log and stop exist for a running foreground command; background start/wait/lease controls are absent and refused by name. A background run needs an enforcer that outlives the turn — see the BUG-194 remainder | 🟡 |
+| PTY and raw input | Claude Code/Codex terminal workflows support interactive programs | Contracts refuse PTY/input by name and the UI shows no input control. `CreatePseudoConsole` builds its console objects in the caller's context and they are not reachable from an AppContainer token; a PTY that only worked outside the sandbox would not be this control | ❌ |
 | Process-tree stop and timeout | Coding agents must stop descendants, not only the launcher | Local runner creates a process group and kills its tree; container stop removes the worker; UI stop is owner-scoped and idempotent | ✅ |
-| Network denied by default | Codex and Claude Code sandbox network by default; OpenClaw supports sandbox network policy | Container worker uses `--network none`; local strict only permits policy-approved argv but has no OS egress boundary | 🟡 |
+| Network denied by default | Codex and Claude Code sandbox network by default; OpenClaw supports sandbox network policy | ✅ **for `native_sandbox`**, where the container holds no network capability and the measured egress observation is `enforced`; container uses `--network none`. `local_native` is still the default selection and has no OS egress boundary, so the row is scoped rather than claimed for the product default | 🟡 |
 | Filtered domain escalation and revocation | Claude Code supports domain/proxy policy; mature sandboxes can grant bounded egress | Tables and design exist; authenticated proxy, DNS/address enforcement, grant retry, and active revocation are not implemented | ❌ |
 | Secret-free child environment | Sandboxes should not inherit host credentials | Local and container launchers construct a minimal environment; literal/pattern credentials are rejected before persistence | ✅ |
 | Purpose-bound credential delivery and delta quarantine | Reference tools can use credentials; Raiker's target adds post-run local quarantine | Storage contracts exist, but delivery, scan, merge/discard UI, and cleanup saga are not connected to command execution | ❌ |
 | Redaction before storage or display | Coding agents suppress known secrets in logs | Incremental UTF-8 redaction covers all current patterns at every split, exact loaned secrets, PEM blocks, explicit stdout/stderr boundaries that prevent cross-stream reconstruction, and fail-closed bounded pending data before persistence | ✅ beyond |
 | Durable output catch-up after browser/navigation reload | Reference desktop agents retain command history | Owner-scoped ordered chunks and receipts reload into Build without replaying a command; returning from Approvals refreshes open/collapsed panes and selects the current session's run | ✅ |
-| Immutable execution receipt | Reference products expose activity/history, generally without a canonical receipt digest | Canonical terminal receipt binds authority, environment, command-template digest, output truncation, and redaction count; replacement is refused | ✅ beyond |
-| Restart reattachment and honest uncertainty | Codex/OpenClaw supervise long-running work across UI/runtime churn | Browser reload works; a Raiker process restart cannot reattach and marks any unprovable active run `lost` with a receipt rather than inferring success | 🟡 |
+| Immutable execution receipt | Reference products expose activity/history, generally without a canonical receipt digest | Canonical terminal receipt binds authority, environment, command-template digest, output truncation, and redaction count; replacement is refused. It now separates two claims that are easy to blend and mean different things: `boundary_constructed` is what **this run's** runner built, `probe_observations` is what **the host** was measured to enforce, with the time it was measured | ✅ beyond |
+| Restart reattachment and honest uncertainty | Codex/OpenClaw supervise long-running work across UI/runtime churn | Browser reload works; a Raiker process restart cannot reattach and marks any unprovable active run `lost` with a receipt rather than inferring success. The runner is bound to a Job Object the runtime owns, so a hard kill of Raiker is reaped by the kernel rather than orphaning a sandboxed process | 🟡 |
 | SSH and managed cloud sandbox | Claude Code/Codex support remote/cloud execution patterns; Hermes supports remote tools | Profiles are selectable but command-supervisor readiness fails closed; no execution is claimed | ❌ |
 | Reset/recreate and recovery controls | Persistent sandboxes need an owner reset and cleanup path | Backend reset internals exist, but no owner-authorised API/UI or restart-safe cleanup saga is shipped | ❌ |
-| Capability truthfulness | Reference products vary in how unavailable controls are projected | API/UI derive features from proven backend support and disable/refuse unproved PTY, background, network, credential, persistence, and remote controls | ✅ beyond |
+| Capability truthfulness | Reference products vary in how unavailable controls are projected | Features come from a **differential measurement** against the real workspace, never from configuration: each observation is taken inside and outside the boundary, an unmatched control arm reports `indeterminate`, and no `CommandFeatures` field is true without its observation. The six results and the probe's own outbound destination are on the environment card, with **Re-measure boundary** (`r0815-runtime-native-sandbox-observations.png`) | ✅ beyond |
 
-The meaningful governance lead is already real: authority provenance, durable
-redacted catch-up, immutable receipts, exact environment choice, and honest
-`lost` outcomes. Raiker does **not** yet match the market leader's complete shell
-capability because native sandboxing, PTY/background supervision, filtered
-egress, restart reattachment, credentials quarantine, and remote backends remain
-absent. These are tracked as defects rather than hidden behind a parity claim.
+The governance lead is real and unchanged: authority provenance, durable
+redacted catch-up, immutable receipts, exact environment choice, honest `lost`
+outcomes — and now a boundary that is **measured rather than declared**, which no
+reference product exposes to its owner.
+
+Raiker still does **not** match the market leader's complete shell capability.
+PTY/background supervision, filtered domain egress, restart reattachment,
+persistent sessions, credential quarantine, a container session supervisor and
+remote backends remain absent, each with its reason recorded in
+[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. They are tracked as
+open work rather than hidden behind a parity claim.
 
 Design contract and open work:
 [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194.
+
+### For review — controls Raiker leads on, and controls it still lacks
+
+Raised 2026-08-15 while closing the native-sandbox half of BUG-194. Nothing here
+is implemented unless a row above says so; this is the list the owner asked for,
+kept separate from the parity table so an idea is never mistaken for a feature.
+
+**Where Raiker now leads, and why it is worth keeping.**
+
+| Control | Why no reference product has it | Where it is |
+|---|---|---|
+| A boundary that is **measured, not declared** | Codex, Claude Code, OpenClaw and Hermes all describe their sandbox in documentation and configuration. None runs a child inside the boundary and reports back what it could actually do. A sandbox whose enforcement silently stopped — a disabled firewall service, a restricted user namespace — looks identical to a working one | shipped: six differential observations on the environment card |
+| **Three-valued** capability reporting | Every reference product's sandbox is on or off. `indeterminate` — "the control arm failed, so this proves nothing" — is the state that stops an air-gapped machine reporting a network boundary it does not have | shipped |
+| Two claims kept apart in the receipt | `boundary_constructed` (this run) versus `probe_observations` (this host, at this time). Reference products expose activity history; none distinguishes what contained *this* command from what the machine was measured to do earlier | shipped |
+| An owner-visible **Re-measure**, with its own egress disclosed | The readiness check makes one outbound connection. A product whose posture is "no network by default" should say that out loud rather than let someone find it in a firewall log | shipped |
+
+**What a reference product does that Raiker does not.** Each is open work with a
+reason, not an oversight; the reasons are in `plans/TO_BE_FIXED.md` → BUG-194.
+
+| Missing control | Who has it | What it would take |
+|---|---|---|
+| PTY / interactive input | Claude Code, Codex, Hermes | ConPTY objects are built in the caller's context and are not reachable from an AppContainer token. Needs a spike, not a flag |
+| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, Hermes | A lease the runner owns, a durable runner identity that survives pid reuse, and reconciliation that works while the vault is locked |
+| An agent-facing `process` tool | Hermes | Backgrounding without it makes an agent re-run commands it cannot observe |
+| Filtered domain egress | Claude Code | The AppContainer loopback exemption needs elevation; a Linux proxy-only namespace is a separate build |
+| Persistent session boundary | Claude Code, OpenClaw, Hermes | Per-run profiles are deliberate. Persistence is a container-session change |
+| Restricted token beneath the AppContainer | Codex | Layering `CreateRestrictedToken` under the security-capabilities attribute is the fragile part of this FFI, and a LowBox token already carries most of it |
+| SSH / managed cloud sandbox | Hermes, Codex | Remote supervisor adapters |
+| VM-strength containment | Claude Cowork | A different class of boundary again |
+
+**Ideas that go beyond every reference product, not yet built.** Recorded so the
+list is a decision rather than a gap: a boundary-drift watcher that re-measures
+when the firewall service or a protected path's DACL changes rather than on a
+timer; a receipt that carries the probe's *failing* observations as first-class
+evidence when a run proceeds under a degraded boundary; and an owner-facing
+diff of what a command's boundary allowed compared with the previous run of the
+same command template.
 
 ---
 

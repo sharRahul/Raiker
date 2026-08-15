@@ -202,6 +202,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | FIXED-191 | Medium | Build / matching failed on whitespace the model mis-transcribed | Fixed (was a README known limit) |
 | FIXED-192 | Medium | Desktop / the tray drew its own icon and the AppImage shipped an empty one | Fixed |
 | FIXED-193 | Low | Visual consistency / eight views re-declared the same control styling | Fixed |
+| [FIXED-195](#fixed-195--a-governed-command-had-no-operating-system-boundary) | High | Shell / sandbox | Fixed (was part of BUG-194) |
+| [FIXED-198](#fixed-198--registering-one-tool-meant-twelve-edits-across-seven-files) | Medium | Codebase structure | Fixed (was OPT-01) |
+| [FIXED-199](#fixed-199--the-rust-and-python-command-codecs-could-not-authenticate-each-other) | High | Command protocol | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7326,3 +7329,167 @@ would have started the drift again.
 
 **Evidence.** `r0811b-15-memory-filters.png`, `r0811b-16-settings-dropdowns.png`
 and `r0811b-17-settings-dropdowns-dark.png` — the same control in both themes.
+
+---
+
+## FIXED-195 — A governed command had no operating-system boundary
+
+**Was the largest part of BUG-194. Severity: High. Area: shell / sandbox.**
+
+**Observed.** `local_native` was honest about being host access with reduced
+isolation, but that honesty was the whole of the protection. The argv policy
+decided what a command could *be*; nothing decided what it could *reach*. A
+command that passed the allowlist could read `.raiker`, write outside the
+workspace and open a socket, because no operating-system mechanism said
+otherwise.
+
+**Root cause.** Raiker had no packaged native runner. `NativeSandboxDriver`
+existed as a contract with a `probe` that checked whether a helper file was
+present, and no helper was ever built.
+
+**Fix.** `raiker-command-runner`, built per platform into the wheel, with three
+mechanisms answering three questions on Windows:
+
+* an **AppContainer** created per run and deleted at reap, holding **no network
+  capability**, so the Windows Filtering Platform drops the command's egress —
+  a property of the token, not a rule the command is asked to respect;
+* **one capability grant** on the workspace, written once rather than per run.
+  `.raiker` and `.git` carry protected DACLs with explicit entries, re-verified
+  before every launch. Relying on ACE ordering does not work: both the workspace
+  allow and the `.raiker` deny are inheritable, so a file underneath `.raiker`
+  holds two *inherited* entries whose order follows the order the parents were
+  written in rather than which parent is nearer. Measured on a real workspace,
+  the allow landed first and the sandboxed child read Raiker's own state;
+* a **Job Object** with `KILL_ON_JOB_CLOSE`, so a descendant cannot outlive the
+  command, and the runner itself is bound to a job the runtime owns so a hard
+  kill of Raiker is reaped by the kernel rather than orphaning a sandboxed
+  process.
+
+Linux uses bubblewrap with `--unshare-net` and the system binds a loader
+actually needs; macOS uses a generated Seatbelt profile and reports its weaker
+process-tree posture rather than inheriting the claim.
+
+**Why the row is trustworthy.** Nothing about it is declared. `--probe` builds
+the real boundary over the real workspace and takes six observations, each
+against a control arm run *outside* the boundary: the stream relay, a write
+inside, a write to the workspace's parent and to the user profile, a read of the
+masked `.raiker`, an outbound connection, and a **detached** grandchild. Only
+*outside succeeded and inside failed* counts as enforcement. *Outside failed* is
+`indeterminate`, which is not proof of anything and never turns a capability on
+— without that, an air-gapped machine would report a network boundary it does
+not have. `CommandFeatures` is built from those measurements, so
+`process_tree_stop` is true only where a detached grandchild was actually
+reaped.
+
+Two defects the first live run found, both of which made every sandboxed command
+fail while the same command run by hand succeeded:
+
+* an AppContainer process is created with a redirected local profile and
+  `CreateProcessW` resolves it from the environment block, so Raiker's
+  deliberately minimal environment — which did not carry `LOCALAPPDATA` — failed
+  every launch with `ERROR_ENVVAR_NOT_FOUND`, a code that names nothing about
+  what is missing;
+* `portable_command` maps `echo` and `cat` onto the interpreter Raiker itself
+  runs on, which lives outside the boundary, so the child died with
+  `STATUS_DLL_NOT_FOUND` — an exit code, not an error. The native backend now
+  resolves the executable on the sandbox `PATH` and refuses with
+  `native_sandbox_executable_unreachable` when there is none.
+
+**User-interface outcome.** Runtime lists **Native OS sandbox** as a selectable
+environment showing `AppContainer · network denied` and all six observations as
+enforced / not enforced / **not proven**, with **Re-measure boundary** and the
+disclosure that re-measuring opens one connection to the host's default gateway
+on a closed port. The card also states what the boundary does *not* do —
+foreground only, no PTY, background, network grant or persistence — because a
+surface that lists only what works reads as a complete sandbox. Build's governed
+terminal names the boundary a command actually ran in and links a failed run to
+its receipt and to the authority that allowed it.
+
+**Live verification, 2026-08-15 (Windows 11).** All six observations `enforced`.
+Anthropic (Haiku 4.5), OpenRouter (Gemini 3.7 Flash), OpenAI (GPT-4o Mini) and
+Ollama (gemma4:31b-cloud) each drove Build → approval → `git --version` executed
+inside a per-run AppContainer → `git version 2.55.0.windows.4` returned through
+the relay → immutable receipt. `echo x > ..\escape` and `dir .raiker` are
+refused by the OS with "Access is denied." Screenshots:
+`screenshots/working/r0815-runtime-native-sandbox-observations.png`,
+`r0815-native-sandbox-card.png`,
+`r0815-build-governed-terminal-appcontainer.png`.
+
+**What is still open** is in [`TO_BE_FIXED.md`](TO_BE_FIXED.md) → BUG-194: PTY,
+background, restart reattachment, persistence, filtered egress, credential
+quarantine, remote backends, and a container session supervisor.
+
+---
+
+## FIXED-198 — Registering one tool meant twelve edits across seven files
+
+**Was OPT-01. Severity: Medium. Area: codebase structure.**
+
+**Observed.** Registering `conversation_search` and `code_map_references` meant
+writing the same name into seven files at twelve sites — the risk band in one,
+the source kind in another, the capability in a third — and none of them failed
+when one was missed. A tool present in six of the seven behaved as an unknown
+tool, or as one with no description, or as one a subagent was not allowed to
+use. Completeness was not represented anywhere, so it could not be checked.
+
+**Root cause.** Each table was added where it was needed, by a change that was
+correct in isolation.
+
+**Fix.** `raiker/models/tool_registry.py` holds one `ToolDefinition` per tool
+with **no defaulted fields**, so a half-registered tool is a construction error
+rather than a runtime surprise, and every consumer table is a comprehension over
+it: the six dictionaries in `tool_call_validation.py`,
+`contracts/models.py::TOOLS`, `turn_sources.py::TOOL_SOURCE_KINDS`, the tool half
+of the authority router's capability map, the policy engine's read-shaped set,
+and `orchestration.py::DELEGABLE_TOOLS`. Every derived table was checked
+value-for-value against the table it replaces before the switch, so no behaviour
+changed. `tool_call_validation.py` went from 565 lines to 125; the descriptions
+and the explanatory comments — the files' actual value — were carried across
+verbatim to the definitions they explain.
+
+Two names deliberately stay written twice, with the reason recorded where it
+matters. `ToolBroker`'s executor map holds per-tool argument-adapting callables,
+and deriving it would import `raiker.tools` into `raiker.models` and close a
+cycle; a test asserts the key sets are equal instead. The authority router keeps
+its capability aliases and the policy config keeps its account-administration
+entries, because a capability name is a different vocabulary from a tool name
+and has no definition to come from.
+
+**User-interface outcome.** None directly. The outcome that matters is that a
+tool cannot ship half-registered: `tests/test_tool_registry.py` registers a fake
+tool and asserts all seven consumers observe it, and asserts that a definition
+missing a field, carrying an invalid risk band, or declaring one argument as both
+a string and a list fails at construction.
+
+---
+
+## FIXED-199 — The Rust and Python command codecs could not authenticate each other
+
+**Severity: High. Area: command protocol. Found while extending the supervisor
+contract.**
+
+**Observed.** Neither codec could authenticate any frame the other produced that
+carried a non-ASCII byte — which is to say, any frame carrying real command
+output. Each side's own tests passed.
+
+**Root cause.** Python's `json.dumps` escapes non-ASCII by default, so it MACed
+`caf\u00e9`; Rust's `serde_json` emits raw UTF-8, so it MACed the two code-point
+bytes. The MAC is computed over those bytes, so the two disagreed. Two smaller
+defects in the same contract: the instance key had no specified encoding, so the
+supervisor keyed on the hex text while the Python side keyed on raw bytes and a
+correctly generated key authenticated nothing; and the replay nonce set grew
+without bound for the life of the process.
+
+**Fix.** The canonical form is pinned in one place — UTF-8, keys sorted by code
+point, compact separators, integers only, `NaN`/`Infinity` refused — and both
+implementations read one shared vector file containing non-ASCII, astral-plane
+and control characters. An all-ASCII vector set, which is effectively what each
+side had, would have certified the defect as passing. The key is lowercase hex on
+the wire and raw bytes in the MAC on both sides, and a nonce older than the
+clock-skew window is no longer kept, because it can no longer be replayed.
+
+**User-interface outcome.** None yet — the codec has no shipped consumer. It is
+recorded here because the defect would have surfaced as an authentication
+failure on the first frame of real output, and the fix is what makes the shared
+vector file meaningful.
+

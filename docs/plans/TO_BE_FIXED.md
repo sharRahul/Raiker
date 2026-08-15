@@ -59,8 +59,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-194](#bug-194--governed-shell-still-lacks-native-interactive-network-and-restart-parity) | High | Shell / sandbox / recovery | Open |
-| [OPT-01](#opt-01--adding-one-tool-takes-twelve-edits-across-seven-files) | Medium | Codebase structure | Open |
+| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
+| [BUG-196](#bug-196--a-successful-turn-reports-that-it-could-not-continue) | Medium | Build / Chat turn resume | Open |
+| [BUG-197](#bug-197--a-command-runs-backend-column-is-never-written) | Low | Command store | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
@@ -73,119 +74,117 @@ MEM-09 are open there rather than duplicated here.
 
 ---
 
-## BUG-194 — Governed shell still lacks native, interactive, network, and restart parity
+## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution
 
-**Severity: High. Area: shell / sandbox / recovery. Status: Open.**
+**Severity: High. Area: shell / sandbox / recovery. Status: Open — reduced.**
 
-**Observed.** The 2026-08-14 governed-shell work closes the dangerous routing
-and evidence gaps: approved shell/process actions and session-granted commands
-share one durable service, environment selection is authoritative, output is
-redacted before persistence, Build can catch up and stop a run, and every
-terminal outcome has an immutable authority-bound receipt. The feature matrix
-still correctly reports no native OS sandbox, PTY/input, background lifecycle,
-filtered egress, credential delivery/quarantine, restart reattachment, SSH, or
-Daytona command supervisor. Docker was installed but its daemon was unreachable
-on the live-test host, so the new container-shell path was not live-proven. The
-model-to-command route itself is live-proven: Anthropic, OpenRouter, OpenAI, and
-Ollama each completed Build → approval → exact-argv execution → redacted output
-→ immutable receipt in the 2026-08-14 Chromium matrix.
+**What changed.** The 2026-08-15 work closes the largest item on this entry: a
+governed command now runs inside a real operating-system boundary, and what that
+boundary enforces is **measured rather than declared**. Closed as
+[FIXED-195](FIXED_ITEMS.md). The rest of this entry is what remains, with the
+reason each item was not attempted rather than a schedule.
 
-**Reproduce.** Select `local_native` and inspect Runtime/Build: it is host access
-with reduced isolation, not an AppContainer/restricted-token boundary. Request
-interactive, background, network, credential, SSH, or Daytona execution and the
-backend fails closed with the corresponding `selected_environment_*_unsupported`
-or supervisor-unavailable reason. Restart Raiker during an active command: the
+**Still observed.** Select `native_sandbox` and request interactive, background,
+network, credential, SSH or Daytona execution and the backend fails closed with
+the corresponding named reason. Restart Raiker during an active command: the
 durable run is reconciled to `lost`, because no authenticated backend handle can
-be reattached. Select a container profile while the daemon or pinned image is
-unavailable: readiness refuses it and does not use the host.
+be reattached. The container path is still a per-run `docker exec` client rather
+than a session supervisor, and Docker's daemon was reachable on the 2026-08-15
+host but the container row was not re-proven in that round.
 
-**Root cause.** `CommandService` still owns process handles in the web process.
-The Rust protocol crate authenticates bounded frames but the packaged
-backend-resident supervisor, Windows sandbox runner/WFP service, egress proxy,
-durable encrypted handle, and remote adapters in the approved design are not
-connected. Container execution is a per-run `docker exec` client rather than a
-session supervisor. Credential-delta tables are storage contracts only.
+**Root cause, per item.** Each of these is a component rather than a flag, which
+is why none of them was half-built:
 
-**Required fix.** Implement and package the versioned Rust supervisor and
-redaction vectors; Windows restricted-token/AppContainer runner with Job Object
-and WFP enforcement; persistent container/SSH/Daytona supervisor adapters;
-background start/poll/wait/log/input/kill and PTY; encrypted restart-safe handle
-and lease reconciliation; authenticated domain proxy with DNS/address checking
-and active revocation; purpose-bound credential delivery plus two-pass delta
-quarantine; and owner-authorised reset/recreate. Prove every backend independently
-and preserve the existing no-fallback and honest-`lost` rules.
+| Remaining item | Why it is not built |
+|---|---|
+| **Background start/poll/wait/log/kill** | A background run outlives the turn, so it needs an enforcer that outlives the turn: a lease the runner owns, a runner that dies with Raiker, a durable runner identity that distinguishes "still running" from "pid reused", and a reconciliation path that works while the vault is locked. Shipping the flag without them creates an orphan process holding a Job Object and a sandbox grant that nothing ever reclaims — strictly worse than refusing. The agent-facing half is a second missing piece: a `process` tool that can poll, log and kill what the agent started, without which `background` makes an agent re-run commands it cannot observe. |
+| **PTY and raw input** | `CreatePseudoConsole` builds its console objects in the caller's context; they are not reachable from an AppContainer token without an explicit capability, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as incompatible with the handle-list attribute the boundary requires. A PTY that only works outside the sandbox is not the control the row describes. |
+| **Restart reattachment** | Requires the process handle to live in a detached supervisor with an authenticated control channel — a second, larger component. Building it on an unproven boundary would have made both unfalsifiable. Restart continues to produce an honest `lost` receipt, and the runner is now bound to a runtime-owned Job Object so a hard kill of Raiker is reaped by the kernel rather than orphaning a sandboxed process. |
+| **Persistent environment** | Per-run AppContainer profiles are created and deleted around each command, deliberately: a predictable container name is a hole, because the container SID is a pure function of the name. Retaining a boundary is a container-session change, not a Windows one. |
+| **Filtered domain egress** | The AppContainer loopback exemption needs elevation, and a Linux proxy-only namespace is a separate netns build. Refused with a named reason on every backend rather than partially claimed. |
+| **Credential delivery and delta quarantine; SSH; Daytona** | Unchanged. None is a Codex or Claude Code control; all three remain storage contracts and selectable-but-refused profiles. |
+| **Container session supervisor** | The per-run `docker exec` client named in the original root cause is unchanged. |
+| **Signature verification of the runner** | The runner's SHA-256 is recorded at build time, checked before use, and carried into the receipt. That detects corruption and casual replacement; it is **not** protection against an attacker with write access to the install directory, who could replace Raiker itself. Authenticode chain verification is not implemented. |
 
-**Required user-interface outcome.** Runtime must show the exact probed boundary
-and only supported controls. Build must expose background/PTY/input/lease/reset,
-filtered-network approval and retry, restart reattachment, failure navigation,
-and credential-delta review only when the selected backend proves them. A
-degraded or unavailable backend must show the stable reason and remediation;
-no row may turn green from configuration or specification alone.
+**Required fix.** Unchanged for each remaining row: a packaged backend-resident
+supervisor with an authenticated control channel and an encrypted restart-safe
+handle; background start/poll/wait/log/input/kill with a lease the runner owns;
+PTY once the ConPTY/AppContainer question is settled by a spike; an
+authenticated domain proxy with DNS/address checking and active revocation;
+purpose-bound credential delivery plus two-pass delta quarantine; persistent
+container/SSH/Daytona supervisor adapters; and owner-authorised reset/recreate.
+Prove every backend independently and preserve the no-fallback and honest-`lost`
+rules.
+
+**Required user-interface outcome.** Unchanged, and partly met: Runtime shows
+the exact probed boundary and its six measured observations, and Build shows the
+boundary a command ran in plus failure navigation. Background, PTY, filtered
+network, persistence and reset controls remain **absent** rather than disabled —
+an absent control is the honest projection of an unbuilt capability, where a
+disabled one implies it is a setting away. No row may turn green from
+configuration or specification alone.
 
 ---
 
-## OPT-01 — Adding one tool takes twelve edits across seven files
+## BUG-196 — A successful turn reports that it could not continue
 
-**Severity: Medium. Area: codebase structure. This is the measured
-line-reduction opportunity, not a defect.**
+**Severity: Medium. Area: Build / Chat turn resume. Status: Open.**
 
-**Observed.** Registering `conversation_search` and `code_map_references` this
-round required the same tool name to be written into **seven files at twelve
-sites**, none of which fails loudly when one is missed:
+**Observed.** On 2026-08-15, in every one of the four provider rounds, a Build
+turn that approved a shell command executed it, streamed the model's answer
+containing the command's real output, and then rendered
+**"The turn could not continue (409)."** directly beneath that answer. The turn
+had in fact completed. The message is the only failure signal on screen, so a
+successful governed execution reads as a failed one.
 
-| File | What it decides | Sites |
-|---|---|---|
-| `models/tool_call_validation.py` | risk band, required args, list args, arg schemas, optional args, description | 5 |
-| `contracts/models.py` | the name is known at all | 1 |
-| `runtime/turn_sources.py` | what kind of source a result is | 2 |
-| `runtime/authority/router.py` | which capability the tool answers to | 1 |
-| `policy/config.py` | whether the proposal is read-shaped | 1 |
-| `agents/orchestration.py` | whether a subagent may be delegated it | 1 |
-| `tools/broker.py` | the executor | 1 |
+**Reproduce.** Build → send a prompt that proposes a `shell` action → **Accept**.
+The answer arrives; the error line arrives with it. Seen with Anthropic Haiku
+4.5, OpenRouter Gemini 3.7 Flash, OpenAI GPT-4o Mini and Ollama
+gemma4:31b-cloud, so it is not provider-specific.
 
-Inside `tool_call_validation.py` alone, **43 tools produce 148 key lines across
-six parallel dictionaries** keyed by the same string. Every tool appears in more
-than one. A tool registered in six of the seven files does not raise an error —
-it silently behaves as an unknown tool, or as one with no description, or as one
-a subagent may not use.
+**Root cause.** `BuildView`/`ChatView` treat any 409 from the resume route as a
+failure unless `alreadyResumedElsewhere(code)` matches, and that helper matches
+exactly one reason code, `suspended_turn_already_resumed`
+(`apps/web/src/lib/approvalResume.ts`). The resume route can answer 409 with
+`approval_not_resolved` and `suspended_turn_unreadable` as well
+(`raiker/api/routes_approvals.py::_RESUME_ERRORS`), and a second resume attempt —
+the approval click and the approvals poller both make one — loses the race. The
+BUG-24 comment beside the helper already states the principle: losing the race is
+a success, and saying "error" there would be a lie. The set of codes it accepts
+is what did not keep up.
 
-**Root cause.** Each table was added where it was needed, by a change that was
-correct in isolation. Nothing forces a new tool to be complete, because
-completeness is not represented anywhere.
+**Proposed fix.** Decide the outcome from the turn's state rather than from the
+race: if the turn has a completed response, a later 409 is a lost race and is
+silent. Widen the helper to the codes that mean "already done", and add a
+regression test that resolves one approval twice and asserts no error is shown.
 
-**Proposed fix.** One declarative `ToolDefinition` per tool in a single registry
-module — name, risk band, approval requirement, arguments (required, list,
-optional, schemas), description, capability, source kind, delegable, read-shaped
-— and derive the existing tables from it. Every current consumer keeps its
-current shape, so the change is additive and reviewable a file at a time; the
-tables become one-line comprehensions over the registry. A dataclass with
-required fields is what makes a half-registered tool a construction error rather
-than a runtime surprise.
+**Required user-interface outcome.** A turn that completed shows no error. A
+turn that genuinely could not continue still says so, with its reason.
 
-**Estimated reduction.** ~105 of the 148 key lines in
-`tool_call_validation.py`, and 11 of the 12 edit sites for each future tool. The
-descriptions and the explanatory comments are the file's value and are kept
-verbatim — the saving is duplication, not prose.
+---
 
-**Applied instance (proof the method works).** The same shape of problem in the
-web app was fixed this round as **FIXED-193**: eight views re-declared the same
-control styling four different ways, and thirty-seven `<select>` elements had
-twenty different appearances. Declaring the control appearance once against the
-*element* inside `:where()` — zero specificity, so nothing had to be unpicked —
-deleted all eight declarations and, more importantly, removed the drift for every
-view written after it. The principle both share: **when correctness depends on
-remembering to repeat something, move the requirement into one place that cannot
-be forgotten** — a registry that fails construction, or a rule that applies
-without being named.
+## BUG-197 — A command run's `backend` column is never written
 
-**Required user-interface outcome.** None directly; this is internal. The
-outcome that matters is that a tool cannot ship half-registered, which is what
-produced the `conversation` source kind and the delegable-set entry being
-separate manual steps this round.
+**Severity: Low. Area: command store. Status: Open.**
 
-**Not done in this session.** The registry touches the validation path every turn
-runs through, and this session's remaining budget was committed to verifying the
-memory work live. It is written up here rather than half-applied.
+**Observed.** Every row in `command_runs` carries `backend = ''`, including runs
+that completed inside the native sandbox. The receipt records the backend
+correctly (`evidence.backend = "native"`), so the two surfaces disagree: the
+immutable record knows what ran the command and the list the owner browses does
+not.
+
+**Reproduce.** Run any governed command and read `command_runs.backend`, or the
+`backend` field of `GET /api/command-runs`.
+
+**Root cause.** `CommandStore.create` never populates the column and nothing
+updates it later; `CommandService` computes `backend_name` for the receipt only
+(`raiker/execution/commands/service.py`).
+
+**Proposed fix.** Write it at start, beside the existing `record_isolation` call,
+so a run in flight already names its backend.
+
+**Required user-interface outcome.** The run list names the backend for every
+run, matching its receipt.
 
 ---
 

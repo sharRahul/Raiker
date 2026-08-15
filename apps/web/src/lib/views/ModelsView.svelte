@@ -831,10 +831,6 @@
     <div>
       <p class="eyebrow">Model setup</p>
       <h2 id="model-setup-title">Choose where Raiker thinks</h2>
-      <p class="sub">
-        Each connection belongs only to this Raiker instance. One ready
-        provider is enough to work.
-      </p>
     </div>
     <div class="setup-meter" aria-live="polite">
       <strong>{readyCount} {readyCount === 1 ? "model" : "models"} ready</strong>
@@ -856,10 +852,6 @@
     <div class="global-model-copy">
       <p class="eyebrow">Default</p>
       <h2 id="global-model-title">Global model</h2>
-      <p class="sub">
-        Used whenever a surface does not choose its own model, including
-        each scheduled run when it begins.
-      </p>
     </div>
     <label class="global-model-field">
       <span>Global model</span>
@@ -1383,14 +1375,6 @@
     >
       <section class="card fallback" aria-labelledby="fallback-h">
         <h2 id="fallback-h">Model fallback sequence</h2>
-        <p class="sub">
-          If the selected provider is unavailable — no network, a timeout, a
-          non-responsive host, or a policy denial — Raiker tries these backends
-          in order, top to bottom. Point it at your local runtimes (llama.cpp,
-          Ollama, LM Studio, vLLM) so a turn never dead-ends when a hosted API
-          is down. Each candidate is still gated by provider policy: listing a
-          hosted provider here never grants access on its own.
-        </p>
 
         {#if sequence.length === 0}
           <p class="fallback-empty">
@@ -2583,8 +2567,6 @@
        and change the default. Stacked on a phone that pushed the tabs below the
        fold, so the explanatory copy — which the headline and the labelled
        select already carry — is dropped rather than the controls. */
-    .setup-overview .sub,
-    .global-model-card .sub,
     .global-model-field small {
       display: none;
     }

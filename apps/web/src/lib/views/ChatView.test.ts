@@ -266,24 +266,6 @@ describe("ChatView streaming transcript", () => {
     expect(streamPromptMock).toHaveBeenCalledOnce();
   });
 
-  it("places Raiker's greeting reaction on the user's message", async () => {
-    stubFetch(MODELS_ROUTE);
-    streamPromptMock.mockImplementation(
-      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
-        onEvent({ kind: "final", text: "", event_type: "", payload: {}, response: finalResponse("Hello! How can I help?") } as StreamEvent);
-      },
-    );
-
-    render(ChatView);
-    const box = screen.getByRole("textbox", { name: /prompt/i });
-    await fireEvent.input(box, { target: { value: "Hello Raiker" } });
-    await fireEvent.keyDown(box, { key: "Enter" });
-
-    const reaction = await screen.findByLabelText("Raiker reacted with Waving hand");
-    expect(reaction.closest(".message-group-user")).not.toBeNull();
-    expect(reaction.closest(".message-group-raiker")).toBeNull();
-  });
-
   it("keeps model runtime metadata out of the conversation", async () => {
     stubFetch(MODELS_ROUTE);
     streamPromptMock.mockImplementation(
@@ -786,7 +768,7 @@ describe("ChatView streaming transcript", () => {
     finishStream?.();
   });
 
-  it("uses conversation bubbles and a reaction, with no status line once text is streaming", async () => {
+  it("uses conversation bubbles, with no status line once text is streaming", async () => {
     stubFetch(MODELS_ROUTE);
     let finishStream: (() => void) | undefined;
     streamPromptMock.mockImplementation(
@@ -822,7 +804,10 @@ describe("ChatView streaming transcript", () => {
     expect(screen.queryByText("Working…")).not.toBeInTheDocument();
     finishStream?.();
 
-    expect(await screen.findByLabelText("Raiker reacted with Heart")).toHaveTextContent("❤️");
+    // BUG-208 slice F — the emoji this asserted was appended to the *owner's*
+    // message and computed from the prompt, so it could not be a reaction to
+    // anything Raiker did. What remains is the pair of bubbles.
+    expect(document.querySelector(".reaction")).toBeNull();
     expect(document.querySelector(".message-group-user .message-bubble-user")).not.toBeNull();
     expect(document.querySelector(".message-group-raiker .message-bubble-raiker")).not.toBeNull();
     expect(screen.queryByText(/governing this turn|cache hit|completed/i)).not.toBeInTheDocument();

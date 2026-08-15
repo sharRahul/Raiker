@@ -20,6 +20,7 @@
   import Icon from "../../components/Icon.svelte";
   import StepUpDialog from "../../components/StepUpDialog.svelte";
   import type { StepUpValues } from "../../components/StepUpDialog.svelte";
+  import GuideLink from "../../components/GuideLink.svelte";
   import { api, ApiError } from "../../api";
   import type { ExecutionEnvironmentsView, RuntimeMode } from "../../apiTypes";
   import { explainReasonCode } from "../../reasonCodes";
@@ -162,12 +163,12 @@
 
 <header class="section-heading">
   <h2>Runtime configuration</h2>
-  <p>Raiker runs one governed runtime. There is nothing to select — every capability is decided by its own permission, not by a mode.</p>
 </header>
 
 {#if notice}<p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>{/if}
 
 <section class="settings-card">
+  <GuideLink route="settings" />
   <div class="card-heading">
     <span class="eyebrow">Agent runtime</span>
     <h3>
@@ -202,13 +203,6 @@
     <span class="eyebrow">Model readiness</span>
     <h3 id="model-readiness-heading">How long a model check stays good for</h3>
   </div>
-  <p class="description">
-    Raiker confirms the exact model can be reached before a surface will send. That confirmation
-    expires, and while a work surface is open Raiker quietly re-confirms the selected model
-    before it does — so a long session does not stop to ask. Connecting, switching model,
-    pulling, or changing an endpoint or credential still invalidates a check immediately,
-    whatever this is set to.
-  </p>
   <label>
     <span>Re-confirm after</span>
     <small>Between 1 and 120 minutes. The default is 5.</small>
@@ -231,7 +225,6 @@
 
 <section class="settings-card environment-settings">
   <div class="card-heading"><span class="eyebrow">Execution targets</span><h3>Local, remote, and cloud environments</h3></div>
-  <p class="description">Choose where Chat, Build, and scheduled work execute. Remote commands still require the remote/cloud capability gate and a per-command approval. Profiles store credential references, never credential values.</p>
   {#if environments}
     <div class="environment-grid">
       {#each environments.environments as environment}
@@ -333,7 +326,7 @@
 {/if}
 
 <style>
-  .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .section-heading p, .description, .danger-zone p { color: var(--text-2); }
+  .section-heading { margin-bottom: var(--space-4); } .section-heading h2, h3, h4 { margin: 0; } .description, .danger-zone p { color: var(--text-2); }
   /* The readiness window is the one editable field in this section, so it needs
      the same stacked label/hint/control shape the other settings sections use
      rather than the browser's inline default. */

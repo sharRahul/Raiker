@@ -45,7 +45,7 @@
   import { collectText } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { reactionForPrompt, refusedCalls } from "../chatPresentation";
+  import { refusedCalls } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -1026,7 +1026,6 @@
     {#each turns as turn (turn.id)}
       {@const answer = answerText(turn)}
       {@const refused = refusedCalls(turn.events)}
-      {@const reaction = reactionForPrompt(turn.prompt)}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
@@ -1035,9 +1034,14 @@
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           </div>
-          {#if !turn.streaming && reaction}
-            <span class="reaction" aria-label={`Raiker reacted with ${reaction.label}`}>{reaction.emoji}</span>
-          {/if}
+          <!-- BUG-208 slice F. An emoji used to be appended here, to the
+               *owner's own message*, labelled "Raiker reacted with …". It was
+               computed from `turn.prompt` by regex — before the model had
+               answered — so it could not be a reaction to anything: saying
+               "thanks" produced a heart whatever Raiker went on to do, or fail
+               to do. A label that names an actor and an act, for an act that did
+               not happen, is the same claim FIXED-204 removed from the provider
+               cards and BUG-207 removed from the streaming turn. -->
           {#if uploadedAttachments.length > 0}
             <div class="turn-attachments">
               {#each uploadedAttachments as a, i (a.attachmentId ?? a.path ?? i)}
@@ -1677,16 +1681,6 @@
     color: var(--text-3);
     font-size: 0.78rem;
     font-weight: 650;
-  }
-  .reaction {
-    margin: -0.25rem 0.75rem 0;
-    padding: 0.12rem 0.38rem;
-    border: 1px solid var(--border);
-    border-radius: var(--r-pill);
-    background: var(--surface);
-    box-shadow: var(--shadow-1);
-    font-size: 1rem;
-    line-height: 1.2;
   }
   .bubble-text {
     margin: 0;

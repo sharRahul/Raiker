@@ -65,7 +65,6 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-205](#bug-205--a-plain-pytest-tests-run-fails-because-cipher_memory_security-is-a-one-way-latch) | Low | Test isolation / SQLCipher posture | Open |
 | [BUG-206](#bug-206--a-tool-call-is-invisible-in-chat) | High | Chat / streaming surface | Open |
 | [BUG-207](#bug-207--the-models-real-reasoning-is-requested-discarded-and-replaced-with-three-canned-sentences) | Medium | Chat / streaming honesty | Open |
-| [BUG-208](#bug-208--the-product-explains-itself-on-every-screen) | Medium | UI density / documentation surface | Open — reduced; A, B, D, E closed |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
@@ -407,62 +406,3 @@ shows none — never a fixed list presented as reasoning. Where reasoning is sho
 it is the provider's, it is collapsed by default, and it never becomes the thing
 the eye lands on before the answer. Where reasoning is off or unsupported, the
 turn simply streams its answer with no chrome above it.
-
----
-
-## BUG-208 — The product explains itself on every screen
-
-**Severity: Medium. Area: UI density / documentation surface. Status: Open —
-reduced. Slices A, B, D and E are closed; C is partly done.**
-
-**What was observed.** Static sentences in the component tree, nothing
-interpolated, comments and styles excluded: **23,236 characters, 216 sentences,
-53 components** — about 3,700 words of documentation compiled into the
-interface. Page headers were plainly guide paragraphs: *"A project is a named
-scope for an ongoing piece of work…"*, *"The recorder timeline: metadata
-snapshots taken at safe points…"*. And `docs/guide/` — which already held that
-material — could not be reached from the product at all, so the prose was on the
-page because the page was the only place it could be.
-
-**What is closed.** [FIXED-209](FIXED_ITEMS.md#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product)
-(slice A, the guide as a destination) and
-[FIXED-210](FIXED_ITEMS.md#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting)
-(slices B, D, E and the first pass of C).
-
-| Slice | State |
-|---|---|
-| **A** — the guide inside the product | ✅ `#/guide`, seven sections, deep-linkable |
-| **B** — one contextual entry point per page | ✅ `GuideLink` + one route→section map, nine pages |
-| **C** — move, do not delete | 🟡 **partly**: page leads on nine views and the static section leads on Models are moved; three surfaces are untouched |
-| **D** — the rule, written down | ✅ `VISUAL_DESIGN_SPEC.md` §2b, and step 7 of the build checklist |
-| **E** — density that is not prose | ✅ provider card: 5 chips → 1 + a posture line, cost only where there is cost, 5 controls → 3 |
-| **F** — the auto emoji reaction | Open — a product call, deliberately not made here |
-
-**Measured after the first pass:** 23,236 → **20,879 characters** (‑2,357, 10%),
-216 → 202 sentences.
-
-**What is left, and why it is not a second sweep.** The remainder is not one
-category. Three surfaces still carry documentation-shaped copy and are the next
-pass:
-
-| Surface | Chars | What is there |
-|---|---|---|
-| `ModelsView` | 1,981 | Sub-section leads under Local/Hosted/Advanced, and the fallback-sequence explanation |
-| `SecurityLogin` | 1,342 | Vault, MFA, breach-watch and standing-grant explanations |
-| `Runtime` | 1,149 | Runtime-mode, readiness-expiry and execution-environment descriptions |
-
-Everything else counted is copy the rule in §2b **permits** and that removing
-would be a regression — empty states (*"No sessions yet — chats started while
-this project is active land here"*), failure reasons with remediation
-(*"Provider unreachable — type a model id if you know it"*), and instructions at
-the point of action (*"Add this to your authenticator app, then enter the current
-code"*). Two removals in the first pass proved this the hard way: the extensions
-empty state and the Projects privacy guarantee (*"Raiker shows what changed and
-who changed it, never the file's contents"*) were cut, and their own tests caught
-it. Both were restored. A blanket character-count target would cut exactly those
-sentences again, which is why the remaining work is named per surface rather than
-as a number to hit.
-
-**Required user-interface outcome, unchanged for what remains.** The three
-surfaces above lose their explanations to `docs/guide/`, keep their state, and
-gain the `GuideLink` the other nine already have. The guide gains what they lose.

@@ -1,19 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { StreamEvent } from "./apiTypes";
-import { reactionForPrompt, refusedCalls } from "./chatPresentation";
+import { refusedCalls } from "./chatPresentation";
 
 describe("chat presentation", () => {
-  it("adds Raiker's reaction to the user's greeting", () => {
-    expect(reactionForPrompt("Hello Raiker")).toEqual({
-      emoji: "👋",
-      label: "Waving hand",
-    });
-  });
-
-  it("does not attach a reaction to a neutral user prompt", () => {
-    expect(reactionForPrompt("What is the capital of France?")).toBeNull();
-  });
-
   // BUG-52 — a refused call no longer ends the turn, so Chat has to say it was
   // refused. Order is the model's own proposal order: an owner reading two
   // refusals needs them to line up with the calls they refused.

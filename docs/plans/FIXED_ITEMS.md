@@ -212,6 +212,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Fixed (was BUG-198) |
 | [FIXED-209](#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product) | Medium | Documentation surface | Fixed (BUG-208 slice A) |
 | [FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting) | Medium | UI density | Fixed (BUG-208 slices B, D, E) |
+| [FIXED-211](#fixed-211--the-last-three-teaching-surfaces-and-an-emoji-that-was-never-a-reaction) | Medium | UI density | Fixed (BUG-208 slices C, F — entry closed) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7885,3 +7886,69 @@ readiness → turn still passes end to end with 0 console errors.
 link to the guide section that explains them. The provider card states what is
 true and offers what the owner came for. Nothing that changes with the workspace
 was removed.
+
+---
+
+## FIXED-211 — The last three teaching surfaces, and an emoji that was never a reaction
+
+**Severity: Medium. Area: UI density. BUG-208 slices C and F. Closes the entry.**
+
+### Slice C, second pass
+
+[FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting)
+moved the page leads and stopped there deliberately, naming three surfaces rather
+than chasing a percentage. This is those three.
+
+| Surface | Moved | Kept, and why |
+|---|---|---|
+| `ModelsView` | One connection per instance; what the default model serves; how the fallback sequence decides "unavailable" | *"Model list unavailable — enter a custom model name"* (failure + remediation), *"No price configured, so cost is unknown"* (state), *"Your key is encrypted in this instance's vault"* (assurance at the point of typing one) |
+| `SecurityLogin` | What the vault key encrypts; that monitoring is redacted; what is watched; what a standing grant is | *"Add this to your authenticator app, then enter the current code"* (the next action), *"Changing your password signs out all your other devices"* (consequence of the action being taken), the empty state |
+| `Runtime` | That Raiker runs one runtime with nothing to select; how readiness expiry works; what choosing an execution environment means | *"Foreground commands only… not built for this boundary"* (what the selected boundary does), *"Re-measuring opens one connection to this host's default gateway"* (what the button will do) |
+
+**The guide gained what they lost, and four topics it did not previously carry.**
+`connecting-a-model.md` gained *One instance, one default* and the four things
+"unavailable" actually means; `permissions-and-runtime-modes.md` gained *Where
+work executes*, *Standing grants*, and *What monitoring records, and what it
+withholds*. Nothing was deleted that the guide could not already say — which is
+the rule this slice exists to keep, and the reason it was checked per sentence
+rather than per file.
+
+Both settings panels gained the `GuideLink` the nine pages already had.
+
+### Slice F — the emoji
+
+Chat appended an emoji to **the owner's own message**, labelled *"Raiker reacted
+with Heart"*. It is removed, and the deciding fact is not taste.
+
+It was computed from `turn.prompt` — the owner's text, by regular expression,
+**before the model had answered**. So it could not be a reaction to anything:
+typing "thanks" produced a heart whatever Raiker went on to do, or fail to do,
+and the same heart appeared on a turn that ended in a refusal. A label naming an
+actor and an act, for an act that did not happen, is the claim
+[FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected)
+removed from the provider cards and BUG-207 slice A removed from the streaming
+turn. This is the third instance of it, and the last one in the transcript.
+
+`reactionForPrompt`, its nine-pattern table, the `ChatReaction` type and the
+styling go with it.
+
+### Measured
+
+| | Characters | Sentences | Files |
+|---|---|---|---|
+| Before BUG-208 | 23,236 | 216 | 53 |
+| After FIXED-210 | 20,879 | 202 | 52 |
+| **After this** | **18,702** | **192** | **52** |
+
+**‑4,534 characters, 20%.** `SecurityLogin` and `Runtime` have left the top five
+entirely. What remains is copy `VISUAL_DESIGN_SPEC.md` §2b permits — empty
+states, failure reasons with remediation, and instructions at the point of
+action — and the rule is now in the build checklist so the next surface is made
+to it.
+
+**Verified live**: Runtime and Security each render one guide link, Chat renders
+no reaction node, 0 console errors.
+
+**User-interface outcome.** Every page states what is true now and what to do
+next, with one quiet link to the section that explains it. No surface claims an
+act that did not happen. BUG-208 is closed.

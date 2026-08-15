@@ -62,6 +62,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
 | [BUG-196](#bug-196--a-successful-turn-reports-that-it-could-not-continue) | Medium | Build / Chat turn resume | Open |
 | [BUG-197](#bug-197--a-command-runs-backend-column-is-never-written) | Low | Command store | Open |
+| [BUG-198](#bug-198--the-first-screen-an-owner-sees-calls-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
@@ -216,3 +217,82 @@ seven tabs on real data; Settings' six tabs; theme cycling system → light → 
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
+
+---
+
+## BUG-198 — The first screen an owner sees calls five unreachable backends "Connected"
+
+**Severity: High. Area: first-run setup / Models honesty. Status: Open.**
+
+**Observed.** On a clean workspace, on a host with **no** llama.cpp binary, **no**
+Ollama process and nothing listening on `11434`, `1234` or `8080`, stage 02 of the
+first-run wizard — *Choose where Raiker thinks* — offers:
+
+```
+llama.cpp · Local GGUF          Connected
+llama.cpp · Local GGUF 2        Connected
+llama.cpp · Local GGUF 3        Connected
+llama.cpp · Local GGUF 4        Connected
+Ollama · Gemma 4:31B Cloud      Connected
+Ollama Cloud · <model>          Connection required
+Anthropic · <model>             Connection required
+OpenAI · <model>                Connection required
+```
+
+The five that say **Connected** are the five that cannot answer. The three that
+say **Connection required** are the ones that work as soon as a key is entered.
+The label is exactly inverted against reality, on the first screen an owner ever
+sees, in a product whose stated principle is *"badges/copy always state what is
+real"* (`apps/web/README.md` → Design).
+
+The same inversion appears after connecting: with a stored OpenRouter credential
+and the provider unreachable, one card states both **`Connected`** and
+**`Provider unreachable — type a model id if you know it.`** at the same time.
+
+**Reproduce.** Start `raiker-web` on a fresh workspace, register an owner, and
+read stage 02. No model runtime is required — that is the point. Automated as
+[`apps/web/e2e/review-first-run-honesty-live.spec.ts`](../../apps/web/e2e/review-first-run-honesty-live.spec.ts),
+which records the label next to all thirteen offered backends rather than
+asserting one. Evidence:
+[`screenshots/not-working/bug198-first-run-connected-unreachable.png`](screenshots/not-working/bug198-first-run-connected-unreachable.png).
+
+**Root cause.** `dashboard.py:3820` computes
+
+```python
+configured=effective_model != "<model>"
+```
+
+and `ModelSetupView.svelte:117` renders it as
+
+```svelte
+{profile.configured ? "Connected" : "Connection required"}
+```
+
+`configured` means *this profile names a concrete model string*. It is not a
+credential check, not a reachability check, and not a readiness check. Five
+shipped registry profiles carry placeholder model names — `local-gguf`,
+`local-gguf-2/3/4`, `gemma4:31b-cloud` — so they satisfy it without anything
+being installed, while every hosted profile ships `<model>` and fails it while
+being one key away from working. `local-gguf` is not even a model: it is the
+placeholder for a GGUF file the owner has yet to supply.
+
+The honest signal already exists and is already on the same object:
+`ModelProfileView.readiness_state`, which this view does not read.
+
+**Required fix.** Render the state that was *measured*, not the one that was
+configured. Stage 02 and the provider cards should project `readiness_state` —
+`ready` only where a readiness check passed, and otherwise the state's own name
+(`not_configured`, `check expired`, `unreachable`) — and a card must never show
+`Connected` next to `Provider unreachable`. Where the distinction genuinely
+matters, say both things separately: *credential stored* and *not reachable* are
+two facts, and the card has room for two chips. A local profile that names a
+placeholder model file should say it needs a model file, because that is the step
+the owner has to take.
+
+**Required user-interface outcome.** No surface may report a backend as
+`Connected` unless something was observed to answer. On a host with no local
+runtime, the five local rows read as needing setup and name what is missing; a
+provider holding a credential it cannot use reads as *credential stored ·
+unreachable*, with the remediation it already computes. The first-run wizard must
+not be the one screen in the product exempt from the readiness rule the composer
+enforces two clicks later.

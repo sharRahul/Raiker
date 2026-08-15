@@ -14,6 +14,43 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-08-15 (cross-provider review round, hosted Anthropic Haiku 4.5)
+
+Fresh workspace, owner registered through the browser, every credential typed
+into the Models connect dialog — never given to the server as environment — so
+what this round proves is the product's connect → catalogue → readiness → turn
+chain rather than a fixture. Spec:
+[`apps/web/e2e/review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+
+| Check | Result |
+|---|---|
+| Owner registers and reaches the workbench | ✅ five-stage first-run wizard completed |
+| Anthropic key stored through the connect dialog | ✅ card shows `Connected`; the key is asserted absent from the DOM |
+| Live catalogue from the real provider | ✅ 11 models listed |
+| **Test** resolves the pinned model | ✅ `Anthropic can reach claude-haiku-4-5-20251001`; chip `Ready · confirmed just now`; `POST /api/model-readiness/check` → 200 |
+| Real governed turn in Chat | ✅ Raiker's own bubble returned `REVIEW CHAT OK` from Haiku 4.5 |
+| Browser console errors | ✅ 0 across both scenarios |
+| First-run wizard names unreachable local backends `Connected` | ❌ [BUG-198](plans/TO_BE_FIXED.md#bug-198--the-first-screen-an-owner-sees-calls-five-unreachable-backends-connected) |
+
+**Not exercisable in this environment, and not a Raiker result.** The sandbox
+this round ran in answers `403` to `CONNECT` for every host except
+`anthropic.com`, verified against the proxy directly
+(`curl -v https://openrouter.ai/…` → `CONNECT tunnel failed, response 403`). So:
+
+| Backend | Outcome |
+|---|---|
+| OpenRouter | Credential stored and accepted; catalogue unreachable. The card degraded honestly — *"Provider unreachable — type a model id if you know it"* — but simultaneously read `Connected`, which is the second half of BUG-198 |
+| OpenAI | Same egress denial; not reached |
+| Ollama `gemma4:31b-cloud` | No Ollama binary and nothing on `11434` on this host; `ollama.com` also denied. This is what surfaced BUG-198: the wizard offered it as `Connected` |
+
+Re-run on a host with open egress to complete the OpenRouter, OpenAI and Ollama
+rows. Nothing in this round distinguishes those three backends' code paths — only
+that the network they need was refused before Raiker was involved.
+
+Evidence: `output/playwright/review-01-signed-in.png`,
+`review-02-anthropic-readiness.png`, `review-03-chat.png`,
+`review-04-chat-answer.png`.
+
 ## Result — 2026-08-09 (BUG-69 reference-platform parity review, hosted Anthropic Haiku 4.5)
 
 Fresh temporary workspace, owner registered through the browser, one Anthropic

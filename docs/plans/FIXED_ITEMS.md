@@ -205,6 +205,10 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-195](#fixed-195--a-governed-command-had-no-operating-system-boundary) | High | Shell / sandbox | Fixed (was part of BUG-194) |
 | [FIXED-198](#fixed-198--registering-one-tool-meant-twelve-edits-across-seven-files) | Medium | Codebase structure | Fixed (was OPT-01) |
 | [FIXED-199](#fixed-199--the-rust-and-python-command-codecs-could-not-authenticate-each-other) | High | Command protocol | Fixed |
+| [FIXED-200](#fixed-200--memory-recall-re-ran-the-full-text-match-once-per-candidate-row) | **Critical** | Memory retrieval / performance | Fixed |
+| [FIXED-201](#fixed-201--an-ordinary-prompt-could-raise-a-sqlite-error-out-of-memory-recall) | High | Memory retrieval | Fixed |
+| [FIXED-202](#fixed-202--memories-with-no-similarity-to-the-prompt-were-recalled-into-context) | High | Memory retrieval / context | Fixed |
+| [FIXED-203](#fixed-203--chunk_text-looped-forever-when-the-overlap-reached-the-chunk-size) | Low | Vector chunking | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7493,3 +7497,168 @@ recorded here because the defect would have surfaced as an authentication
 failure on the first frame of real output, and the fix is what makes the shared
 vector file meaningful.
 
+
+---
+
+## FIXED-200 — Memory recall re-ran the full-text match once per candidate row
+
+**Severity: Critical. Area: memory retrieval / performance. Found during the
+2026-08-15 cross-provider review, reading the retrieval path rather than running
+it.**
+
+**Observed.** Ambient recall runs on every turn, and its cost grew until it was
+the turn. Measured on a fresh SQLCipher workspace, one `retrieve_hybrid_memory`
+call with `limit=10`:
+
+| Approved memories | Before | After |
+|---|---|---|
+| 200 | 775 ms | 30 ms |
+| 1 000 | 20 969 ms | 124 ms |
+| 3 000 | 169 668 ms | 431 ms |
+
+At three thousand memories — a number a single owner reaches in ordinary use —
+one recall took **two minutes and fifty seconds** before the model was asked
+anything. Nothing surfaced this: the gatherer treats a slow source as a slow
+source, so the only symptom was a chat that got slower for months.
+
+**Reproduce.** Write *N* approved memories to one scope, then call
+`retrieve_hybrid_memory` once and time it. The curve above is on the encrypted
+store the product ships.
+
+**Root cause.** Not the embedding arithmetic, which profiling put at 166 ms of an
+11.5 s call — the whole cost was one SQL statement. `search_approved_memory`
+joined `approved_memory` *onto* the FTS index and ordered by a column on the
+table side:
+
+```sql
+FROM approved_memory_fts f JOIN approved_memory m ON m.memory_id = f.memory_id
+WHERE approved_memory_fts MATCH ? AND … ORDER BY m.created_at DESC LIMIT ?
+```
+
+SQLite answered it by making `approved_memory` the outer loop — `SEARCH m USING
+INDEX idx_approved_memory_scope`, then `SCAN f VIRTUAL TABLE` — which re-executes
+the full-text match once for every candidate row. The same match costs 16 ms when
+evaluated on its own; through the join it cost 13 443 ms. A virtual table has no
+statistics for the planner to weigh, so the shape of the query decided the plan,
+and the shape said "filter the table, then ask the index about each row".
+
+**Fix.** Drive from the index and probe the table by primary key, which the
+planner cannot invert:
+
+```sql
+FROM approved_memory m
+WHERE m.memory_id IN (SELECT memory_id FROM approved_memory_fts
+                      WHERE approved_memory_fts MATCH ?) AND …
+```
+
+Same rows, same order, same governance predicates — the match is evaluated once.
+The measured result is the "After" column above: **594× at 800 memories, 394× at
+3 000**.
+
+**Not fixed here.** This is a cost fix, not a ranking fix. The retained set is
+still the *newest* matches rather than the best ones, which is
+[MEM-05](MEMORY_RELIABILITY_PLAN.md#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped)
+and remains open.
+
+**User-interface outcome.** No new surface. Chat, Search Chat and Memory answer
+in the time the rest of the product already implies, on workspaces where recall
+previously stalled the turn.
+
+---
+
+## FIXED-201 — An ordinary prompt could raise a SQLite error out of memory recall
+
+**Severity: High. Area: memory retrieval.**
+
+**Observed.** Four of eleven plain-English probe queries raised
+`sqlcipher3.dbapi2.OperationalError: malformed MATCH expression` from
+`search_approved_memory`: `NOT deployment`, `AND leading`, `unbalanced (paren`,
+`trailing paren)`. The prompt is passed to recall verbatim
+(`gatherer.py` → `retrieve_hybrid_memory(query=query, …)`), so the trigger is a
+sentence an owner would type — `do NOT delete the migration`, or any prompt
+naming a function with an unbalanced parenthesis.
+
+A second, quieter half: an expression that *parses* changes what was asked.
+`find NOT deployment` is a valid FTS4 exclusion, so recall answered by excluding
+the term the owner was asking about — 0 rows where `find not deployment`
+returns 1.
+
+**Reproduce.** `store.search_approved_memory("NOT deployment", scope=…)` against
+a populated store.
+
+**Root cause.** Two sanitizers for one index. `search_conversation_turns` used
+the repo's `_match_terms`, which strips every non-alphanumeric character;
+`search_approved_memory` hand-rolled a weaker one that removed only `"` and `-`,
+leaving parentheses and every FTS4 operator intact. Neither handled the *keyword*
+operators, which FTS4 recognises only in upper case — so `NOT`, `AND`, `OR` and
+`NEAR` survived both paths as syntax rather than as words.
+
+**Fix.** One sanitizer, and it lower-cases. `search_approved_memory` now calls
+`_match_terms`, and `_match_terms` lower-cases every term. The tokenizer already
+matches case-insensitively, so lower-casing costs no recall and makes a keyword a
+literal: the crash set is 0 of 11, and `find not deployment` matches the record
+the owner meant. Both call sites are covered, so the conversation index is
+protected against the keyword half it also had.
+
+**User-interface outcome.** A prompt containing an ordinary English `not`, or a
+parenthesis, returns recall instead of failing the source. No copy change: the
+correct behaviour was always the one without the error.
+
+---
+
+## FIXED-202 — Memories with no similarity to the prompt were recalled into context
+
+**Severity: High. Area: memory retrieval / context.**
+
+**Observed.** A query sharing no token with anything stored still returned every
+memory in scope. Four memories — an invoice, a build tool, a cat food brand, a
+server rack — came back for the query `zzzz qqqq wwww`, all scored `+0.000000`,
+all handed to the model in the `Recalled owner context` block as material to
+reason from.
+
+**Reproduce.** Store a handful of unrelated memories, then
+`retrieve_hybrid_memory(query="zzzz qqqq wwww", …)`. Before: 4 results, every one
+at zero. After: 0 results.
+
+**Root cause.** `VectorIndex.search` returns the top *k* by cosine with no floor.
+On a corpus smaller than the limit, "top 10" is "all of them", and a zero-overlap
+hash embedding scores exactly 0 rather than being excluded. `retrieve_hybrid_memory`
+admitted every returned hit as a candidate, so similarity was used to *order*
+results but never to decide whether there was a result at all. The sign-hashed
+embedding can also score below zero, in which case the vector arm *subtracted*
+from a genuine lexical hit.
+
+**Fix.** Skip vector hits at or below zero similarity when fusing. Applied at the
+point the hit is admitted, not to the fused score, so a real lexical match is
+never discarded because its vector arm disagreed.
+
+**User-interface outcome.** Recall that has nothing to offer offers nothing.
+Memory and the per-turn "How this turn was governed" disclosure stop listing
+unrelated owner records as recalled context, which is what made the block
+misleading: every line in it reads as evidence the model was given.
+
+---
+
+## FIXED-203 — `chunk_text` looped forever when the overlap reached the chunk size
+
+**Severity: Low. Area: vector chunking.**
+
+**Observed.** `VectorIndex.chunk_text(text, chunk_size=4, overlap=4)` does not
+return. The cursor advances by `chunk_size - overlap`, so at equal values it
+advances by zero and the chunk list grows until the process is killed.
+
+**Reproduce.** Call it on a background thread with a 3 s join; the thread is
+still running.
+
+**Root cause.** A public static helper with no argument validation. No shipped
+call site passes equal values today, which is why it had not been hit — but it is
+reachable by any caller, and the failure mode is an unkillable loop that exhausts
+memory rather than an exception.
+
+**Fix.** Reject `chunk_size <= 0` and any `overlap` outside `0 <= overlap <
+chunk_size` with `ValueError`, so a bad argument fails at the call instead of
+hanging the process.
+
+**User-interface outcome.** None — no shipped surface reaches it. Recorded
+because the defect is silent and terminal where every other argument error in
+this module is loud.

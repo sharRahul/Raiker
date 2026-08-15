@@ -426,6 +426,60 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-15:
   pricing page and override anything that has moved; an unpriced model reports
   its cost as unknown rather than as zero.
 
+### Where Raiker is behind the general standard for agent products
+
+The limits above are boundaries Raiker chose. These are the ones where it is
+simply behind, stated at the point they stop being theoretical. Each is measured
+on the shipped build, not estimated.
+
+- **Memory does not retrieve by meaning — it retrieves by shared words.** Both
+  halves of "hybrid" retrieval are lexical. The vector half
+  (`raiker/vector/__init__.py`) is a feature-hashing bag-of-tokens embedding
+  computed offline with no model: it scores word overlap, so a memory that
+  answers the question in different words scores zero and is not recalled. Ask
+  *"what theme does the user like"* and a stored *"the owner prefers dark
+  mode"* is reachable only through the one word the two sentences happen to
+  share. Products that advertise memory use a real embedding model here. Tracked
+  as MEM-03; the durable semantic/vector write path is disabled outright
+  (`raiker/memory/semantic.py`).
+- **Lexical results are ordered by recency, not relevance.** The bundled
+  SQLCipher build has no FTS5, so there is no BM25: matches are ordered newest
+  first and truncated. On a workspace with hundreds of partial matches, the exact
+  answer from two years ago is dropped before it is ranked. Tracked as MEM-05.
+- **Every recall reads every embedding.** Retrieval loads all active vectors for
+  the scope, rebuilds the index in memory, and scores them in Python on each
+  call. There is no approximate-nearest-neighbour index and no cache. After the
+  2026-08-15 fix to the query plan (FIXED-200) one recall costs ~30 ms at 200
+  memories, ~124 ms at 1 000 and ~431 ms at 3 000 — linear, paid on every turn,
+  before the model is asked anything. It is usable into the low thousands and
+  degrades steadily above that; the vector stores comparable products use are
+  sublinear and measured in millions. Raiker will not fall over at 10 000
+  memories, but recall will cost more than a second of every turn.
+- **A natural-language question drops the lexical half of retrieval
+  altogether.** Terms shorter than three characters are discarded and the rest
+  are combined with an implicit `AND`, so *"Kubernetes rollout"* matches and
+  *"how does the Kubernetes rollout work"* matches nothing — the longer and more
+  natural the question, the likelier every term must appear in one memory. The
+  vector half still answers, and it is lexical too.
+- **Nothing writes to the entity graph, and nothing expires.** The graph half of
+  hybrid retrieval has no extractor populating it (MEM-06), and no retention
+  sweep is ever started, so `expires_at` is enforced only at read time and
+  expired rows are never collected (MEM-07). Eidetic capture is specified and
+  implemented but never invoked by the runtime (MEM-04).
+- **The governed shell is foreground-only.** No background execution, no PTY, no
+  persistent session, no restart reattachment — the detail is above and in
+  BUG-194. A coding agent that cannot start a long-running process and poll it is
+  doing a materially smaller job than one that can.
+- **Hooks, plugins and channels are specified, not built.** The hooks reference
+  Raiker maps itself against documents 31 events and five handler types;
+  `docs/HOOKS_SPEC.md` has no code behind it, plugin support stops at manifest
+  validation, and the channel registry is a registry. These are the extension
+  points other agent platforms are largely defined by.
+
+The memory items are the ones to weigh first if you are choosing Raiker for its
+memory: the full audit, with reproductions, is
+[docs/plans/MEMORY_RELIABILITY_PLAN.md](docs/plans/MEMORY_RELIABILITY_PLAN.md).
+
 Where one of these is tracked as work rather than a deliberate boundary, it is
 written up with a reproduction and a proposed fix in
 [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md), which now lists only what

@@ -516,16 +516,31 @@ mod tests {
 
     #[test]
     fn raiker_state_is_masked_and_git_is_read_only() {
-        let arguments = linux_arguments(&sample(), &["echo".into()]).unwrap();
+        // The read-only bind is only emitted for a path that exists — binding a
+        // missing one is a bwrap error, not a stricter sandbox — so this test
+        // has to give it a real directory rather than a plausible string.
+        let root = std::env::temp_dir().join(format!("raiker-bwrap-{}", std::process::id()));
+        std::fs::create_dir_all(root.join(".git")).expect("git dir");
+        let text = format!(
+            r#"{{"workspace_root":"{root}","cwd":"{root}","profile_name":"raiker.cmd.test",
+                "deny_paths":[".raiker"],"readonly_paths":[".git"]}}"#,
+            root = root.to_string_lossy()
+        );
+        let policy = policy::parse(&text).unwrap();
+        let arguments = linux_arguments(&policy, &["echo".into()]).unwrap();
+        let masked = root.join(".raiker").to_string_lossy().into_owned();
+        let git = root.join(".git").to_string_lossy().into_owned();
+        let _ = std::fs::remove_dir_all(&root);
+
         assert!(
             arguments
                 .windows(2)
-                .any(|pair| pair[0] == "--tmpfs" && pair[1] == "/ws/.raiker")
+                .any(|pair| pair[0] == "--tmpfs" && pair[1] == masked)
         );
         assert!(
             arguments
                 .windows(3)
-                .any(|three| three[0] == "--ro-bind" && three[1] == "/ws/.git")
+                .any(|three| three[0] == "--ro-bind" && three[1] == git)
         );
     }
 

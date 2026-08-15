@@ -62,6 +62,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
 | [BUG-196](#bug-196--a-successful-turn-reports-that-it-could-not-continue) | Medium | Build / Chat turn resume | Open |
 | [BUG-197](#bug-197--a-command-runs-backend-column-is-never-written) | Low | Command store | Open |
+| [BUG-205](#bug-205--a-plain-pytest-tests-run-fails-because-cipher_memory_security-is-a-one-way-latch) | Low | Test isolation / SQLCipher posture | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
@@ -216,3 +217,74 @@ seven tabs on real data; Settings' six tabs; theme cycling system → light → 
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
+
+---
+
+## BUG-205 — A plain `pytest tests/` run fails, because `cipher_memory_security` is a one-way latch
+
+**Severity: Low. Area: test isolation / SQLCipher posture. Status: Open.**
+
+**Observed.** `python -m pytest tests/` — the command a contributor runs — fails:
+
+```
+FAILED tests/test_sqlcipher_memory_security.py::
+       test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe
+E       - 0
+E       + 1
+```
+
+CI is green on the same commit because `.github/workflows/ci.yml` sets
+`RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"` for the whole job, so nothing in that
+process ever turns the pragma on. The gate therefore cannot see this, and the
+failure lands only on whoever runs the suite the documented way.
+
+**Reproduce.** Two files are enough, and the pairing is what matters rather than
+any one test:
+
+```
+python -m pytest tests/test_memory_sqlcipher.py tests/test_sqlcipher_memory_security.py   # fails
+RAIKER_SQLCIPHER_MEMORY_SECURITY=off python -m pytest <same two files>                    # passes
+python -m pytest tests/test_sqlcipher_memory_security.py                                  # passes alone
+```
+
+Confirmed **pre-existing**: the same pairing fails identically with `raiker/` and
+`tests/` checked out at `ad3d84c`, before the 2026-08-15 memory work.
+
+**Root cause.** `PRAGMA cipher_memory_security` is process-global in the bundled
+SQLCipher build, and it latches one way. Measured directly:
+
+| Sequence in one process | Pragma reads |
+|---|---|
+| resolve `off` → open store | `0` |
+| resolve `off` → open → resolve `on` → open | `1` — the raise takes effect |
+| resolve `on` → open → resolve `off` → open | `1` — **the drop does not** |
+
+The test assumes the pragma is a per-connection property that each new
+connection sets from the resolved posture, so it opens a store on a fresh
+`tmp_path` after `close_cached_connections()` and expects `0`. A new connection
+and a new workspace do not help: once any connection in the process has enabled
+it, the process keeps it.
+
+**Security note, so this is not read as worse than it is.** The latch only sticks
+in the *safe* direction. A run that asks for `on` can never silently end up
+`off`; the failure mode is memory security remaining enabled after a request to
+disable it, which costs performance rather than protection. Nothing here weakens
+the posture FIXED-150 records.
+
+**Required fix.** The test is asserting a property the platform does not offer,
+so fix the test rather than the pragma. Either run it in its own process
+(`pytest-forked`, a subprocess, or a session-scoped marker that isolates the
+SQLCipher posture tests), or assert what is actually per-connection — that Raiker
+*issues* `PRAGMA cipher_memory_security = 0` on a connection it resolved `off`
+for — and assert the read-back value only in a process that has never enabled it.
+Whichever is chosen, the CI job should stop setting the env var globally, or
+should keep setting it and additionally run the posture file in a second,
+unset job: an env var that hides an order dependency is the reason this reached
+`main`.
+
+**Required user-interface outcome.** None directly — no shipped surface changes.
+The one product-facing consequence to keep honest: `GET /api/health` reports the
+posture Raiker *resolved*, not the pragma in force. Those can disagree only after
+a re-resolution inside one process, which today only tests do, so health stays
+truthful for a normal run. If re-resolution ever becomes a runtime feature, health
+must read the pragma back rather than report the intent.

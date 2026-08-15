@@ -21,6 +21,7 @@
     type ProviderErrorGuidance,
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
+  import { readinessLabel } from "../modelReadinessLabels";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
@@ -370,26 +371,10 @@
 
   // A short chip label for the exact readiness state, so a card says what a
   // check actually found instead of only whether a credential is stored.
-  const READINESS_CHIP: Record<string, string> = {
-    ready: "Ready",
-    checking: "Checking…",
-    not_configured: "Not checked",
-    stale: "Check expired",
-    runtime_missing: "Runtime missing",
-    runtime_stopped: "Runtime stopped",
-    model_missing: "Model missing",
-    policy_blocked: "Policy blocked",
-    authentication_failed: "Key rejected",
-    quota_exhausted: "No credit",
-    unreachable: "Unreachable",
-    unsupported: "Unsupported",
-  };
-
   function readinessChip(profile: ModelProfile): string | null {
-    const state = profile.readiness_state;
-    if (!state) return null;
-    const label = READINESS_CHIP[state] ?? null;
+    const label = readinessLabel(profile.readiness_state);
     if (label === null) return null;
+    const state = profile.readiness_state;
     // BUG-83 — a chip that says only "Ready" cannot be told apart from one that
     // said "Ready" an hour ago. Naming when the check was last confirmed is what
     // makes the expiry legible instead of surprising.
@@ -468,7 +453,7 @@
   let advisorChecking = $state(false);
   let advisorCheckNote = $state<string | null>(null);
   const advisorChip = $derived(
-    models?.advisor_profile_id ? (READINESS_CHIP[models.advisor_readiness_state ?? ""] ?? null) : null,
+    models?.advisor_profile_id ? readinessLabel(models.advisor_readiness_state) : null,
   );
 
   async function checkAdvisor() {
@@ -1170,8 +1155,14 @@
                           >{:else}<code>{modelName(p.model)}</code>{/if}
                       </p>
                       <p class="pc-status">
+                        <!-- BUG-198 — this line reports whether a connection is
+                             *saved*, which is not whether the provider answers:
+                             a card could read "Connected" directly above
+                             "Provider unreachable". Reachability is the
+                             readiness chip below, and only it may claim it. -->
                         {#if p.connection_configured}
-                          <span class="status-dot ok" aria-hidden="true"></span> Connected
+                          <span class="status-dot ok" aria-hidden="true"></span>
+                          Connection saved
                         {:else}
                           <span class="status-dot" aria-hidden="true"></span> Not
                           connected

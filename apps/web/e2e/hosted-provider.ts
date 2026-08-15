@@ -99,7 +99,7 @@ export async function connectHostedProvider(
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel(keyLabel).fill(key);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
   return card;
 }
 

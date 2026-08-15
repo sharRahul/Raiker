@@ -40,8 +40,12 @@ test("stage 02 labels every offered backend", async ({ page }) => {
   }
   console.log(`STAGE 02 OFFERS ${count} BACKENDS:\n` + rows.join("\n"));
 
+  // No label on this screen may claim a backend is connected: nothing here has
+  // contacted a provider or found a runtime.
+  expect(rows.some((row) => /\bConnected\b/.test(row))).toBe(false);
+
   await page.screenshot({
-    path: join(SHOTS, "bug198-first-run-connected-unreachable.png"),
+    path: join(SHOTS, "first-run-model-choice-labels.png"),
     fullPage: true,
   });
 });

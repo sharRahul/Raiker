@@ -61,7 +61,7 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
     await connect.click();
     await page.getByLabel("Anthropic API key").fill(KEY);
     await page.locator(".signin-connect").click();
-    await expect(card.getByText("Connected")).toBeVisible({ timeout: 120_000 });
+    await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 120_000 });
   }
 
   const pick = card.getByRole("button", { name: /Choose model|Change model/ });

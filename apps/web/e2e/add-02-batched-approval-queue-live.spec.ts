@@ -76,7 +76,7 @@ test("the batching model is connected through the product UI", async () => {
   await page.getByRole("button", { name: /Advanced: custom endpoint/ }).click();
   await page.getByPlaceholder("https://…").fill(STUB_ENDPOINT);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
 
   await card.getByRole("button", { name: /Choose model|Change model/ }).click();
   const catalogue = card.getByLabel("Available models");

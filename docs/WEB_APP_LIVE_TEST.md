@@ -30,7 +30,7 @@ chain rather than a fixture. Spec:
 | **Test** resolves the pinned model | ✅ `Anthropic can reach claude-haiku-4-5-20251001`; chip `Ready · confirmed just now`; `POST /api/model-readiness/check` → 200 |
 | Real governed turn in Chat | ✅ Raiker's own bubble returned `REVIEW CHAT OK` from Haiku 4.5 |
 | Browser console errors | ✅ 0 across both scenarios |
-| First-run wizard names unreachable local backends `Connected` | ❌ [BUG-198](plans/TO_BE_FIXED.md#bug-198--the-first-screen-an-owner-sees-calls-five-unreachable-backends-connected) |
+| First-run wizard names unreachable local backends `Connected` | ❌ as found → ✅ fixed in this round as [FIXED-204](plans/FIXED_ITEMS.md#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected); stage 02 now reads `Not checked yet` / `Choose a model first`, and the spec asserts `Connected` appears nowhere |
 
 **Not exercisable in this environment, and not a Raiker result.** The sandbox
 this round ran in answers `403` to `CONNECT` for every host except
@@ -39,7 +39,7 @@ this round ran in answers `403` to `CONNECT` for every host except
 
 | Backend | Outcome |
 |---|---|
-| OpenRouter | Credential stored and accepted; catalogue unreachable. The card degraded honestly — *"Provider unreachable — type a model id if you know it"* — but simultaneously read `Connected`, which is the second half of BUG-198 |
+| OpenRouter | Credential stored and accepted; catalogue unreachable. The card degraded honestly — *"Provider unreachable — type a model id if you know it"* — but simultaneously read `Connected`, the second half of BUG-198. After FIXED-204 the same state reads `Connection saved · Not checked · Provider unreachable` |
 | OpenAI | Same egress denial; not reached |
 | Ollama `gemma4:31b-cloud` | No Ollama binary and nothing on `11434` on this host; `ollama.com` also denied. This is what surfaced BUG-198: the wizard offered it as `Connected` |
 

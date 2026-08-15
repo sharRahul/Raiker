@@ -86,7 +86,7 @@ async function connectProvider(page: Page, leg: ProviderLeg): Promise<Locator> {
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel(leg.keyLabel).fill(leg.key);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 30_000 });
   return card;
 }
 

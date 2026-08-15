@@ -209,6 +209,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-201](#fixed-201--an-ordinary-prompt-could-raise-a-sqlite-error-out-of-memory-recall) | High | Memory retrieval | Fixed |
 | [FIXED-202](#fixed-202--memories-with-no-similarity-to-the-prompt-were-recalled-into-context) | High | Memory retrieval / context | Fixed |
 | [FIXED-203](#fixed-203--chunk_text-looped-forever-when-the-overlap-reached-the-chunk-size) | Low | Vector chunking | Fixed |
+| [FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Fixed (was BUG-198) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7662,3 +7663,83 @@ hanging the process.
 **User-interface outcome.** None — no shipped surface reaches it. Recorded
 because the defect is silent and terminal where every other argument error in
 this module is loud.
+
+---
+
+## FIXED-204 — The first screen an owner sees called five unreachable backends "Connected"
+
+**Severity: High. Area: first-run setup / Models honesty. Was BUG-198, found in
+the 2026-08-15 cross-provider review.**
+
+**Observed.** On a clean workspace, on a host with **no** llama.cpp binary, **no**
+Ollama process and nothing listening on `11434`, `1234` or `8080`, stage 02 of the
+first-run wizard — *Choose where Raiker thinks* — offered thirteen backends and
+labelled the five that could not answer `Connected`, while the ones that work as
+soon as a key is entered read `Connection required`:
+
+```
+llama.cpp · Local GGUF          Connected          ← nothing installed
+llama.cpp · Local GGUF 2/3/4    Connected          ← nothing installed
+Ollama · Gemma 4:31B Cloud      Connected          ← nothing installed
+Anthropic · <model>             Connection required ← works with a key
+```
+
+The label was exactly inverted against reality, on the first screen an owner ever
+sees, in a product whose stated principle is *"badges/copy always state what is
+real"*. The same inversion appeared after connecting: a card holding a stored
+OpenRouter credential read **`Connected`** directly above **`Provider
+unreachable — type a model id if you know it.`**
+
+**Root cause.** `dashboard.py:3820` computes `configured = effective_model !=
+"<model>"` — *"this profile names a concrete model string"* — and
+`ModelSetupView.svelte:117` rendered it as `Connected`. It is not a credential
+check, not a reachability check and not a readiness check. Five shipped registry
+profiles carry placeholder model names (`local-gguf`, `local-gguf-2/3/4`,
+`gemma4:31b-cloud`), so they satisfied it with nothing installed, while every
+hosted profile ships `<model>` and failed it while being one key away from
+working. `local-gguf` is not a model at all: it is the placeholder for a GGUF file
+the owner has yet to supply.
+
+The honest signal already existed on the same object — `ModelProfileView.readiness_state`,
+a twelve-state machine — and that view did not read it.
+
+**Fix.** The presentation layer, because the backend field was accurate and only
+its rendering lied. `readinessLabel` and `setupChoiceLabel` now live in one shared
+module and both surfaces read it, so the wizard and the provider cards cannot
+drift apart again:
+
+- **Stage 02** projects what is *known*. `Ready` is the only label that claims a
+  backend can answer and only a passed readiness check produces it; a measured
+  failure names itself (`Unreachable`, `Key rejected`, `No credit`, `Runtime
+  missing`); a profile that names a model nobody has checked reads **Not checked
+  yet**; one still carrying the `<model>` placeholder reads **Choose a model
+  first**. The header no longer says "pick an exact configured model" but states
+  that nothing on the screen has been contacted yet.
+- **Provider cards** say **Connection saved** rather than `Connected`, which is
+  what `connection_configured` has always meant. Reachability stays where it was
+  measured — the readiness chip — so a saved credential and an unreachable
+  provider read as two facts instead of a contradiction.
+- `ModelsView` dropped its private copy of the chip vocabulary for the shared one.
+
+**Verified live** on a fresh workspace with no local runtime. Stage 02 now reads
+`Not checked yet` for all five local profiles and `Choose a model first` for the
+eight placeholders — the string `Connected` appears nowhere, which the spec
+asserts rather than leaves to the screenshot. With a stored OpenRouter credential
+and its catalogue unreachable, the card reads `Connection saved · Not checked ·
+Provider unreachable`. Anthropic, reachable in the same run, still goes
+`Connection saved` → catalogue → `Ready · confirmed just now` → a real turn.
+0 console errors.
+
+Evidence:
+[`screenshots/not-working/bug198-first-run-connected-unreachable.png`](screenshots/not-working/bug198-first-run-connected-unreachable.png)
+(as found) and
+[`screenshots/working/fixed204-first-run-model-choice-labels.png`](screenshots/working/fixed204-first-run-model-choice-labels.png)
+(after). Specs:
+[`review-first-run-honesty-live.spec.ts`](../../apps/web/e2e/review-first-run-honesty-live.spec.ts),
+[`review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+
+**User-interface outcome.** No surface reports a backend as connected unless
+something was observed to answer. The first-run wizard is held to the same
+readiness rule the composer enforces two clicks later, and thirteen live specs
+were updated to the card's honest wording rather than left asserting the claim
+that was wrong.

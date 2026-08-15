@@ -130,7 +130,7 @@ test("owner registers and every backend reaches a classified readiness state", a
     await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
     await page.getByLabel(leg.keyLabel).fill(leg.key);
     await page.locator(".signin-connect").click();
-    await expect(card.getByText("Connected")).toBeVisible({ timeout: 120_000 });
+    await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 120_000 });
 
     // The credential must never be rendered back into the DOM.
     const dom = await page.content();
@@ -138,7 +138,23 @@ test("owner registers and every backend reaches a classified readiness state", a
 
     await card.getByRole("button", { name: /Choose model|Change model/ }).click();
     const catalogue = card.getByLabel("Available models");
-    await expect(catalogue).toBeVisible({ timeout: 120_000 });
+    const unreachable = card.getByText(/Provider unreachable/i);
+    await expect(catalogue.or(unreachable).first()).toBeVisible({ timeout: 120_000 });
+
+    // A provider whose catalogue cannot be fetched is one of this suite's
+    // outcomes, not a failure of it: the card degrades to a typed model id and
+    // says why. Record the state and move to the next leg rather than asserting
+    // a catalogue the network never allowed.
+    if (!(await catalogue.isVisible().catch(() => false))) {
+      const status = (await card.innerText()).replace(/\s+/g, " ");
+      verdicts.push(`${leg.provider}: catalogue unreachable — card reads "${status.slice(0, 160)}"`);
+      expect(status).not.toMatch(/\bConnected\b/);
+      await page.screenshot({
+        path: join(SHOTS, `review-02-${leg.provider.toLowerCase()}-unreachable.png`),
+        fullPage: true,
+      });
+      continue;
+    }
     const options = await catalogue.locator("option").allTextContents();
     const values = await catalogue.locator("option").evaluateAll((nodes) =>
       nodes.map((node) => (node as HTMLOptionElement).value),

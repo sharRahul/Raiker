@@ -212,7 +212,7 @@ test("a real hosted turn still answers on the host that served them", async () =
   await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
   await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
   await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 60_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
 
   await card.getByRole("button", { name: /Choose model|Change model/ }).click();
   const catalogue = card.getByLabel("Available models");

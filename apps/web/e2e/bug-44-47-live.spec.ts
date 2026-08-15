@@ -127,7 +127,7 @@ test("BUG-47 — a provider's test result stays under that provider, on its own 
   await page.goto(`${SOURCE}/#/models?tab=hosted`);
   const hostedCards = page.locator("article.provider-card");
   const anthropicCard = hostedCards.filter({ hasText: "Anthropic" });
-  await expect(anthropicCard.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+  await expect(anthropicCard.getByText("Connection saved")).toBeVisible({ timeout: 30_000 });
   // The scenario is only meaningful with a neighbour to contaminate.
   expect(await hostedCards.count()).toBeGreaterThan(1);
   await expect(page.locator("[data-test-result]")).toHaveCount(0);

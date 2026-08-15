@@ -19,7 +19,7 @@ async function connectProvider(provider: string, keyLabel: string, key: string):
   await page.getByLabel(keyLabel).fill(key);
   await page.locator(".signin-connect").click();
   await expect(page.getByRole("dialog", { name: `Connect to ${provider}` })).toBeHidden({ timeout: 30_000 });
-  await expect(card.getByText("Connected")).toBeVisible({ timeout: 30_000 });
+  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 30_000 });
   return card;
 }
 

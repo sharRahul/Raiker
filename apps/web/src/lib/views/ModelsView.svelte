@@ -6,6 +6,7 @@
   import ProviderLogo from "../components/ProviderLogo.svelte";
   import ModelPricingPanel from "../components/ModelPricingPanel.svelte";
   import TabStrip from "../components/TabStrip.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
     ModelCapacitiesView,
@@ -651,6 +652,23 @@
       ?.cost_currency ?? "USD",
   );
 
+  /**
+   * The profile's fixed posture as one line (BUG-208 slice E).
+   *
+   * These were four chips sitting beside the readiness chip, which made a
+   * property of the profile look like a measurement of it. None of them changes
+   * with the workspace, so none of them is state.
+   */
+  function posture(profile: ModelProfile): string {
+    const parts = [
+      profile.requires_network ? "Needs network" : "",
+      profile.requires_egress_policy ? "Egress-gated" : "",
+      profile.runtime_gate ? capabilityLabel(profile.runtime_gate) : "",
+      profile.prompt_cache_ttl ? `Cache ${profile.prompt_cache_ttl}` : "",
+    ].filter((part) => part !== "");
+    return parts.join(" · ");
+  }
+
   function usageLine(profile: ModelProfile): string {
     if (!profile.billable) return "No API cost — runs on this machine";
     const used = profile.models_used ?? 0;
@@ -790,11 +808,7 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    The model profiles Raiker can talk to. The choice of backend belongs to you
-    — local, home-lab, or hosted — and there is never a silent fallback between
-    them.
-  </p>
+  <GuideLink route="models" />
   <button
     type="button"
     class="btn btn-ghost btn-sm"
@@ -888,12 +902,6 @@
       id="panel-huggingface"
       aria-labelledby="tab-huggingface"
     >
-      <p class="tab-lead">
-        Search the Hub, compare variants, and download an exact revision. When
-        no ready-made GGUF fits, convert supported Safetensors locally — the
-        conversion runs offline in a bounded worker and never executes
-        repository code.
-      </p>
       <HuggingFacePanel />
     </div>{/if}
   {#if tab === "activity"}<div
@@ -902,11 +910,6 @@
       id="panel-activity"
       aria-labelledby="tab-activity"
     >
-      <p class="tab-lead">
-        Provider use over the last seven days, followed by installs, pulls,
-        downloads, conversions, and deployments. Observed use and provider
-        account data are always labeled separately.
-      </p>
       <ProviderUsagePanel />
       <DownloadsPanel />
     </div>{/if}
@@ -1176,23 +1179,19 @@
                             title={p.readiness_summary ?? undefined}
                             >{readinessChip(p)}</span
                           >{/if}
-                        {#if p.requires_network}<span class="chip chip-warn"
-                            >Needs network</span
-                          >{/if}
-                        {#if p.requires_egress_policy}<span
-                            class="chip chip-warn">Egress-gated</span
-                          >{/if}
-                        {#if p.runtime_gate}<span
-                            class="chip"
-                            title="Runtime gate that must be enabled"
-                            >{capabilityLabel(p.runtime_gate)}</span
-                          >{/if}
-                        {#if p.prompt_cache_ttl}<span
-                            class="chip chip-ok"
-                            title="Prompt caching cuts cost and latency"
-                            >Cache {p.prompt_cache_ttl}</span
-                          >{/if}
                       </div>
+                      <!-- BUG-208 slice E — these four were chips beside the
+                           readiness chip, which made a fixed property of the
+                           profile look like something that had just been
+                           measured. Readiness is the only state on this card;
+                           the posture is one quiet line. -->
+                      {#if posture(p) !== ""}
+                        <p class="posture-line">{posture(p)}</p>
+                      {/if}
+                      <!-- Shown only where there is something to report: a
+                           local runtime that cannot bill and a provider with no
+                           turns yet were both rendering a line and an em dash. -->
+                      {#if p.billable && (p.turns_used ?? 0) > 0}
                       <div class="usage-strip">
                         <div class="usage-line">
                           <span>{usageLine(p)}</span>
@@ -1234,6 +1233,7 @@
                           </p>
                         {/if}
                       </div>
+                      {/if}
 
                       <div class="pc-actions">
                         {#if !p.connection_configured}
@@ -1244,22 +1244,10 @@
                             style={`--brand:${b.tint}`}>Connect</button
                           >
                         {:else}
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-sm"
-                            onclick={() => openSignIn(p.profile_id)}
-                            >Reconnect</button
-                          >
-                          <button
-                            type="button"
-                            class="btn btn-ghost btn-sm"
-                            aria-label={`Disconnect ${providerName(p.provider)}`}
-                            onclick={() => void disconnectConnection(p)}
-                            disabled={disconnecting[p.profile_id] === true}
-                            >{disconnecting[p.profile_id] === true
-                              ? "Disconnecting…"
-                              : "Disconnect"}</button
-                          >
+                          <!-- BUG-208 slice E — Reconnect and Disconnect are
+                               credential management, not the thing an owner came
+                               to this card to do. They live in Details, which is
+                               one click away and already open on this profile. -->
                           <button
                             type="button"
                             class="btn btn-ghost btn-sm"
@@ -1393,11 +1381,6 @@
       id="panel-routing"
       aria-labelledby="tab-routing"
     >
-      <p class="tab-lead">
-        What serves a turn when your first choice cannot, and which model a
-        local model may consult. Nothing here grants access: every candidate is
-        still gated by provider policy at call time.
-      </p>
       <section class="card fallback" aria-labelledby="fallback-h">
         <h2 id="fallback-h">Model fallback sequence</h2>
         <p class="sub">
@@ -1692,6 +1675,25 @@
           </dd>
         </div>
       </dl>
+      {#if detailsFor.connection_configured}
+        <div class="details-actions">
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            onclick={() => openSignIn(detailsFor!.profile_id)}>Reconnect</button
+          >
+          <button
+            type="button"
+            class="btn btn-ghost btn-sm"
+            aria-label={`Disconnect ${providerName(detailsFor.provider)}`}
+            onclick={() => void disconnectConnection(detailsFor!)}
+            disabled={disconnecting[detailsFor.profile_id] === true}
+            >{disconnecting[detailsFor.profile_id] === true
+              ? "Disconnecting…"
+              : "Disconnect"}</button
+          >
+        </div>
+      {/if}
       {#if capacities?.can_override}<button
           class="btn btn-ghost btn-sm"
           onclick={() => void configureCapacity(detailsFor!)}
@@ -1941,6 +1943,16 @@
     color: var(--text-2);
     font-size: 0.78rem;
     margin: 0.35rem 0 0;
+  }
+  .posture-line {
+    margin: 0.1rem 0 0;
+    color: var(--text-3);
+    font-size: 0.74rem;
+  }
+  .details-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
   }
   .usage-strip {
     border-top: 1px solid var(--border);

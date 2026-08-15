@@ -3,6 +3,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import SidePanel from "../components/SidePanel.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { Checkpoint, RestorePlan } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
@@ -109,10 +110,7 @@
 </script>
 
 <div class="head-row">
-  <p class="page-lead">
-    The recorder timeline: metadata snapshots taken at safe points as sessions run. Nothing here
-    executes a restore — every entry is a record of where the runtime stood, not a lever.
-  </p>
+  <GuideLink route="checkpoints" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh checkpoints">
     <Icon name="refresh" size={15} />
     Refresh

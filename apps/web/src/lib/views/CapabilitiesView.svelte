@@ -6,6 +6,7 @@
   import StepUpDialog from "../components/StepUpDialog.svelte";
   import ToolControlBoard from "../components/ToolControlBoard.svelte";
   import type { StepUpValues } from "../components/StepUpDialog.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { CapabilityGate } from "../apiTypes";
   import {
@@ -286,12 +287,7 @@
   onMount(load);
 </script>
 
-<p class="page-lead">
-  Choose how the agent should handle each thing it can do. For every capability, pick whether an
-  AI-proposed action should <strong>ask you first</strong> (the default), be <strong>allowed</strong>
-  without prompting, run <strong>automatically</strong>, or always be <strong>denied</strong>. Every
-  choice is enforced server-side — this page adds no authority of its own.
-</p>
+  <GuideLink route="capabilities" />
 
 {#if notice}
   <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">{notice.text}</p>

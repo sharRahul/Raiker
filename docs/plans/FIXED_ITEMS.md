@@ -211,6 +211,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-203](#fixed-203--chunk_text-looped-forever-when-the-overlap-reached-the-chunk-size) | Low | Vector chunking | Fixed |
 | [FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Fixed (was BUG-198) |
 | [FIXED-209](#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product) | Medium | Documentation surface | Fixed (BUG-208 slice A) |
+| [FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting) | Medium | UI density | Fixed (BUG-208 slices B, D, E) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7809,3 +7810,78 @@ Spec: [`guide-surface-live.spec.ts`](../../apps/web/e2e/guide-surface-live.spec.
 wants to know what a project *is* has somewhere to go that is not a page header.
 This adds a destination and removes nothing; the prose still on the surfaces is
 BUG-208 slices B–D, which are now unblocked.
+
+---
+
+## FIXED-210 — Nine pages stopped teaching, and the provider card stopped shouting
+
+**Severity: Medium. Area: UI density. BUG-208 slices B, D and E, plus the first
+pass of C.**
+
+**Observed.** Every page opened by explaining itself. `ProjectsView` spent 391
+characters on what a project *is* before listing any; `CapabilitiesView` spent
+298 explaining decision modes; the provider card carried five status chips, a
+three-clause cost sentence and five controls, thirteen times over on one page.
+Measured across the tree: 23,236 characters of static prose in 53 components.
+
+**Fix.**
+
+**Slice D — the rule, first, because it governs the rest.** `VISUAL_DESIGN_SPEC.md`
+§2b: *a component carries the state, the next action, and — when something failed
+— the reason with its remediation; everything else lives in `docs/guide/`.* With
+the test that makes it usable: **a sentence that would still be true if the owner
+had no data is documentation**; a sentence that changes with the workspace is
+state. Step 7 of "Building a new page" now names it, so the next surface is built
+to it rather than trimmed later.
+
+**Slice B — one way in.** `GuideLink` plus `guideSections.ts`, a single
+route → section map, so a renamed guide section breaks one file rather than
+fifteen templates. The label is stored whole rather than templated: `How ${x}
+works` produced *"How projects works"*, and a sentence that reads wrong on a page
+header is not worth the line it saves.
+
+**Slice C, first pass — move, do not delete.** Nine page leads replaced by that
+link — Models, Projects, Extensions, Checkpoints, Capabilities, Tasks,
+Connections, Search Chat, Approvals — after confirming the guide already carries
+each idea. It does: *"There is no silent fallback"* is `connecting-a-model.md:25`;
+checkpoints, restore, and approve-and-perform-versus-record are in
+`permissions-and-runtime-modes.md`. The static section leads on Models went the
+same way.
+
+**Slice E — the provider card.** The four posture chips were a fixed property of
+the profile sitting beside the readiness chip, which made configuration look like
+measurement; they are one quiet line now, and readiness is the only chip. The
+usage strip renders only where there is cost to report — a local runtime that
+cannot bill and a provider with no turns were both rendering a line and an em
+dash. Reconnect and Disconnect moved into Details: credential management is not
+what an owner opened the card to do.
+
+| Provider card | Before | After |
+|---|---|---|
+| Status chips | 5 | 1 (readiness) + one posture line |
+| Cost | always | only with turns to report |
+| Controls | 5 | 3 |
+
+**What the first pass taught, and why C is not finished here.** Two removals were
+wrong and their own tests caught them: the extensions empty state (*"Nothing is
+installed, and no plugin code runs in this browser"*) and the Projects privacy
+guarantee (*"Raiker shows what changed and who changed it, never the file's
+contents"*). Both are state, not documentation, and both were restored. A blanket
+character target would cut exactly those again — so the remaining surfaces
+(`ModelsView` sub-leads, `SecurityLogin`, `Runtime`) stay named in
+[BUG-208](TO_BE_FIXED.md#bug-208--the-product-explains-itself-on-every-screen)
+per surface rather than folded into a number to hit.
+
+**Measured:** 23,236 → **20,879 characters** (‑2,357, 10%), 216 → 202 sentences.
+Every character removed is present in `docs/guide/`.
+
+**Verified live** on a fresh workspace: the provider card reads `Anthropic ·
+Haiku 4.5 · Connection saved · Ready · confirmed just now · Needs network ·
+Egress-gated · Hosted models · Cache 5m · Test · Change model… · Details`; the
+Projects header reads `How projects work · Refresh`; connect → catalogue →
+readiness → turn still passes end to end with 0 console errors.
+
+**User-interface outcome.** Nine pages open with their own state and one quiet
+link to the guide section that explains them. The provider card states what is
+true and offers what the owner came for. Nothing that changes with the workspace
+was removed.

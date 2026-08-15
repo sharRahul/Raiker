@@ -56,7 +56,7 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
   const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" }).first();
   await expect(card).toBeVisible({ timeout: 60_000 });
 
-  const connect = card.getByRole("button", { name: /^(Connect|Reconnect)$/ });
+  const connect = card.getByRole("button", { name: "Connect", exact: true });
   if (await connect.isVisible().catch(() => false)) {
     await connect.click();
     await page.getByLabel("Anthropic API key").fill(KEY);

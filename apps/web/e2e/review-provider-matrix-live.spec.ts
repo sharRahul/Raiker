@@ -127,7 +127,7 @@ test("owner registers and every backend reaches a classified readiness state", a
     const card = page.locator("article.provider-card").filter({ hasText: leg.provider }).first();
     await expect(card).toBeVisible({ timeout: 60_000 });
 
-    await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
+    await card.getByRole("button", { name: "Connect", exact: true }).click();
     await page.getByLabel(leg.keyLabel).fill(leg.key);
     await page.locator(".signin-connect").click();
     await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 120_000 });

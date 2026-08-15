@@ -175,8 +175,9 @@ impl Codec {
 /// disagreed" a statement about the key, never about number formatting.
 fn contains_float(value: &Value) -> bool {
     match value {
-        Value::Number(number) => number.as_f64().is_some() && number.as_i64().is_none()
-            && number.as_u64().is_none(),
+        Value::Number(number) => {
+            number.as_f64().is_some() && number.as_i64().is_none() && number.as_u64().is_none()
+        }
         Value::Array(items) => items.iter().any(contains_float),
         Value::Object(entries) => entries.values().any(contains_float),
         _ => false,

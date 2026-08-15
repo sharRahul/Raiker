@@ -60,11 +60,28 @@ def test_workspace_local_config_still_wins(
     assert registry.list_profiles() == []
 
 
-def test_packaged_config_resources_match_workspace_defaults() -> None:
+def test_the_builtin_config_has_exactly_one_copy() -> None:
+    """There is no repository-root `config/` to drift from the packaged one.
+
+    This used to compare the two byte for byte, because `config/` and
+    `raiker/config/` held the same JSON and `_config_path` preferred the
+    repository copy — so an edit applied to only one of them appeared to do
+    nothing, with no error and no warning (FIXED-59). Keeping them in step was a
+    guard against a duplication that did not need to exist: the packaged
+    resource is what ships, resolves from any working directory, and is what a
+    non-editable install has ever used.
+
+    The duplicate is gone, so the invariant is stronger and simpler — the copy
+    must not come back. A workspace-local `config/` is a different thing
+    entirely and still wins; that is the owner's override, covered above.
+    """
     package_config = resources.files("raiker.config")
-    assert json.loads(package_config.joinpath("model-profiles.json").read_text(encoding="utf-8")) == json.loads(
-        Path("config/model-profiles.json").read_text(encoding="utf-8")
-    )
-    assert json.loads(
-        package_config.joinpath("channel-connectors.json").read_text(encoding="utf-8")
-    ) == json.loads(Path("config/channel-connectors.json").read_text(encoding="utf-8"))
+    for name in ("model-profiles.json", "channel-connectors.json"):
+        assert json.loads(package_config.joinpath(name).read_text(encoding="utf-8"))
+
+    repo_root = Path(__file__).resolve().parent.parent
+    for stray in (repo_root / "config", repo_root / "assets"):
+        assert not stray.exists(), (
+            f"{stray.name}/ is back at the repository root. The built-in copy lives in "
+            "raiker/, and a second one silently wins over it for repo checkouts."
+        )

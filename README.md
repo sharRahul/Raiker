@@ -420,7 +420,7 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-15:
   `GET /api/health` reports the setting, the reason, and the allowance this
   machine would have given. Set `RAIKER_SQLCIPHER_MEMORY_SECURITY=on` to demand
   the stronger one; a refused lock then fails closed and names why.
-- **Shipped list prices are unverified defaults.** `config/model-profiles.json`
+- **Shipped list prices are unverified defaults.** `raiker/config/model-profiles.json`
   seeds prices only for the models whose published rate is recorded there, each
   stamped with an `as_of` date. Check them against your provider's current
   pricing page and override anything that has moved; an unpriced model reports

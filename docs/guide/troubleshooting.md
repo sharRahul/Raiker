@@ -26,7 +26,7 @@ itself. They remain below because they can still appear for a provider you have
 | `model_name_not_configured` | No model pinned on the profile | **Choose model…** on the provider card |
 | `missing_endpoint` / `missing_endpoint_env:<VAR>` | No endpoint configured | Use **Advanced: custom endpoint**, or set `<VAR>` |
 | `openrouter_requires_https` | OpenRouter needs HTTPS | Remove or fix the custom endpoint |
-| `unknown_provider:<name>` | Unrecognised provider in a profile | Fix the profile in `config/model-profiles.json` |
+| `unknown_provider:<name>` | Unrecognised provider in a profile | Fix the profile in `raiker/config/model-profiles.json` |
 | `test_provider_not_available` | Raiker ships no mock provider | Pick a real backend |
 | `model_not_checked` / `model_readiness_expired` | No fresh proof exists for this exact profile, model, and endpoint | Open **Models**, choose the model, and press **Check again**. |
 | `local_runtime_unreachable` / `local_runtime_missing` | The selected Ollama, LM Studio, or llama.cpp service is stopped or absent | Start/install the named runtime, pull or load the exact model, then check again. |

@@ -60,8 +60,8 @@ spoofing, replay, key-theft, delayed-approval, and recovery analysis.
 | Checkpoints/snapshots | high | `.raiker/checkpoints/` | Local storage, restore approval, retention. |
 | Tool outputs/artifacts | medium-high | `.raiker/artifacts/` | Output limits, redaction, provenance. |
 | Memory records | high | SQLite/vector index | Governance, provenance, correction/forgetting. |
-| Model profiles | medium | `config/model-profiles.json` and `.raiker/config/` | Local/hosted policy, endpoint validation. |
-| Connector profiles | medium-high | `config/channel-connectors.json` | Disabled by default, pairing and sender trust. |
+| Model profiles | medium | `raiker/config/model-profiles.json` and `.raiker/config/` | Local/hosted policy, endpoint validation. |
+| Connector profiles | medium-high | `raiker/config/channel-connectors.json` | Disabled by default, pairing and sender trust. |
 | Plugin manifests | high | plugin directories/registry | Trust and permission diff. |
 | Secrets | critical | environment/OS secret store references only | Never store raw values; redact logs. |
 

@@ -503,7 +503,7 @@ memories into a named, model-selectable skill set, injected only when relevant.
 
 ### Tier 2 — presence and continuity
 
-**C10. The assistant lives in one browser tab.** `config/channel-connectors.json`
+**C10. The assistant lives in one browser tab.** `raiker/config/channel-connectors.json`
 declares cli, tui, rest, web_ui, desktop, dashboard, ide, apple_mobile,
 android_mobile and webhooks — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False`

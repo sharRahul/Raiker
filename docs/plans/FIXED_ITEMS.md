@@ -213,6 +213,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-209](#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product) | Medium | Documentation surface | Fixed (BUG-208 slice A) |
 | [FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting) | Medium | UI density | Fixed (BUG-208 slices B, D, E) |
 | [FIXED-211](#fixed-211--the-last-three-teaching-surfaces-and-an-emoji-that-was-never-a-reaction) | Medium | UI density | Fixed (BUG-208 slices C, F — entry closed) |
+| [FIXED-212](#fixed-212--the-built-in-config-and-icon-had-two-copies-and-the-repository-one-silently-won) | Medium | Packaging / configuration | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -2696,6 +2697,12 @@ action first, including rapid set/clear changes made within one clock tick.
 ---
 
 ## FIXED-76 — The shipped model-profile copies and human review cadence stay in step *(was BUG-36)*
+
+> **Superseded in part by [FIXED-212](#fixed-212--the-built-in-config-and-icon-had-two-copies-and-the-repository-one-silently-won).**
+> The byte-for-byte comparison below guarded a duplication that has since been
+> removed: there is no repository-root `config/` to drift from the packaged copy,
+> and the test now fails if one reappears. The review-cadence half of this entry
+> stands unchanged.
 
 **Status: fixed in this change; found while fixing BUG-21 (see FIXED-57).**
 
@@ -7952,3 +7959,71 @@ no reaction node, 0 console errors.
 **User-interface outcome.** Every page states what is true now and what to do
 next, with one quiet link to the section that explains it. No surface claims an
 act that did not happen. BUG-208 is closed.
+
+---
+
+## FIXED-212 — The built-in config and icon had two copies, and the repository one silently won
+
+**Severity: Medium. Area: packaging / configuration.**
+
+**Observed.** Three files existed twice, byte for byte:
+
+| Repository root | Package | Bytes |
+|---|---|---|
+| `config/model-profiles.json` | `raiker/config/model-profiles.json` | identical |
+| `config/channel-connectors.json` | `raiker/config/channel-connectors.json` | identical |
+| `assets/icons/raiker-icon.png` | `raiker/assets/raiker-icon.png` | identical |
+
+`_config_path` resolves a given path, then the current directory, then the
+repository root beside the package, and only then falls back to the packaged
+resource. In any checkout the **root copy won**, so an edit applied to the
+packaged file alone appeared to do nothing — no error, no warning. That is
+recorded as [FIXED-76](#fixed-76--the-shipped-model-profile-copies-and-human-review-cadence-stay-in-step-was-bug-36),
+where the fix was a validation test comparing the two copies byte for byte so
+neither could move alone.
+
+**Why that is superseded.** Keeping two files in step is a guard against a
+duplication that did not need to exist. The packaged copy is the one that ships,
+resolves from any working directory, and is what every non-editable install has
+always used; the root copy served only repo checkouts and was identical to it.
+Removing it deletes the failure mode rather than policing it.
+
+**Fix.** `config/` and `assets/` are gone from the repository root. The
+byte-comparison test is replaced by the stronger invariant — **the duplicate must
+not come back** — which fails if either directory reappears, and names why.
+
+**Checked before deleting, not after.**
+
+- Both packaged copies are **tracked in git**, not generated: no build step
+  produces them from the root files, so nothing was the source of anything.
+- `icon_path()` tries the packaged file *before* the root one; with the root
+  directory removed it resolves to `raiker/assets/raiker-icon.png`.
+  `scripts/build_installer.py` already goes through `icon_path()` rather than
+  naming a path — the bug in
+  [FIXED-192](#fixed-192--the-tray-drew-its-own-icon-and-the-appimage-shipped-an-empty-one)
+  was precisely that it once did not.
+- The release bundle ships `raiker`, `apps`, four root files and `docs/guide`. It
+  never carried root `config/` or `assets/`, so a packaged install has always
+  relied on the copies that remain.
+- With both directories moved aside, `ModelProfileRegistry.load()` returns its 13
+  profiles, `ConnectorRegistry.load()` its 20, and the eight other suites that
+  reference `config/…` as a default argument all pass — they resolve through the
+  same fallback.
+- Exactly one test failed, and it was the byte-comparison itself, which is the
+  one whose subject no longer exists.
+
+**A workspace-local `config/` is a different thing and still wins.** That is the
+owner's override — drop a `config/model-profiles.json` beside a workspace and it
+takes priority over the packaged default, which `test_workspace_local_config_still_wins`
+continues to cover. What was removed was the *repository's* second copy, not that
+mechanism.
+
+**Documentation.** Eleven files named `config/model-profiles.json` or
+`config/channel-connectors.json` as the canonical path and now name
+`raiker/config/…`, including the user guide, the threat model, the requirements
+matrix and the README. `FIXED_ITEMS.md` keeps the old paths in the entries that
+were written when they were true.
+
+**User-interface outcome.** None — no surface reads these paths directly. The
+outcome is for whoever edits a provider price next: there is one file to edit,
+and editing it works.

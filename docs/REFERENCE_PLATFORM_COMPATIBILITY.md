@@ -17,7 +17,7 @@ Raiker is not a clone of any one system. It combines local-first agent runtime, 
 | Checkpointing | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` |
 | Hooks | `docs/HOOKS_SPEC.md` |
 | Plugins | `docs/PLUGIN_SYSTEM_SPEC.md` |
-| Channels | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` |
+| Channels | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` |
 | Commands | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | TUI-first command reference | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md` |
 | Session events | `docs/HOOKS_SPEC.md`, `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
@@ -42,7 +42,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | `checkpointing` (snapshot before edit, rewind, restore code/convo) | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 write real; restore plan-only |
 | `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 📘 spec only, no code |
 | `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🔒 manifest validation only |
-| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json` | 🔒 registry only |
+| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | 🔒 registry only |
 
 > Alignment notes: the Claude Code hooks reference documents **31 events** (incl.
 > `SessionStart`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PreCompact`, `PostCompact`,
@@ -101,7 +101,7 @@ someone else's computer; Raiker's run on yours.
 | Concept | Raiker specification |
 |---|---|
 | Local-first gateway/control plane | `docs/ARCHITECTURE.md`, `docs/CHANNELS_SPEC.md` |
-| Multi-channel inbox | `docs/CHANNELS_SPEC.md`, `config/channel-connectors.json`, `docs/UI_UX_DESIGN_SPEC.md` |
+| Multi-channel inbox | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json`, `docs/UI_UX_DESIGN_SPEC.md` |
 | Channel pairing and sender allowlists | `docs/CHANNELS_SPEC.md`, `docs/SECURITY_AND_POLICY.md` |
 | Channel-to-agent routing | `docs/CHANNELS_SPEC.md`, `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md` |
 | Gateway daemon mode | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md` |
@@ -119,7 +119,7 @@ someone else's computer; Raiker's run on yours.
 | Concept | Raiker specification |
 |---|---|
 | Tool-using agent loop | `docs/RUNTIME_ORCHESTRATION_SPEC.md` |
-| Model-router/provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
+| Model-router/provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `raiker/config/model-profiles.json` |
 | Global `raiker` TUI entry and in-TUI provider launch | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | Structured tool proposal | `docs/CONTRACTS.md`, `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | Verification/reflection | `docs/RUNTIME_ORCHESTRATION_SPEC.md`, `docs/VERIFICATION_PLAN.md` |
@@ -443,7 +443,7 @@ says why in the owner's words, and gives the state back in one press.
 
 | Concept | Raiker specification |
 |---|---|
-| Local inference profiles | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `config/model-profiles.json` |
+| Local inference profiles | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `raiker/config/model-profiles.json` |
 | Provider abstraction | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |
 | TUI model launch | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` |
 | Context windows | `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` |

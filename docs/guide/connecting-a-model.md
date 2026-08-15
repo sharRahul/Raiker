@@ -120,7 +120,7 @@ shipped preference is never counted as ready merely because it exists in the
 profile registry.
 
 Prices come from the provider where one publishes them, from the list prices
-shipped in `config/model-profiles.json` otherwise, and from your own override
+shipped in `raiker/config/model-profiles.json` otherwise, and from your own override
 above both. A model with no resolvable price reports its cost as unknown rather
 than as zero. To set your own rate:
 

@@ -1,7 +1,7 @@
 # Models and local inference
 
 > Profiles live in **two** files that must stay identical:
-> `config/model-profiles.json` (the repo/workspace copy) and
+> `raiker/config/model-profiles.json` (the repo/workspace copy) and
 > `raiker/config/model-profiles.json` (the copy that travels in the wheel, for
 > installs that have no repo root beside the package). Editing one without the
 > other is caught by

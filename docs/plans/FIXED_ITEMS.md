@@ -214,6 +214,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-210](#fixed-210--nine-pages-stopped-teaching-and-the-provider-card-stopped-shouting) | Medium | UI density | Fixed (BUG-208 slices B, D, E) |
 | [FIXED-211](#fixed-211--the-last-three-teaching-surfaces-and-an-emoji-that-was-never-a-reaction) | Medium | UI density | Fixed (BUG-208 slices C, F — entry closed) |
 | [FIXED-212](#fixed-212--the-built-in-config-and-icon-had-two-copies-and-the-repository-one-silently-won) | Medium | Packaging / configuration | Fixed |
+| [FIXED-213](#fixed-213--a-tool-call-was-invisible-in-chat-was-bug-206) | High | Chat / streaming surface | Fixed (was BUG-206 — entry closed) |
+| [FIXED-214](#fixed-214--the-models-real-reasoning-was-requested-discarded-and-replaced-with-three-canned-sentences-was-bug-207) | Medium | Chat / streaming honesty | Fixed (was BUG-207 — entry closed) |
+| [FIXED-215](#fixed-215--the-all-pages-evidence-sweep-photographed-the-setup-wizard-instead-of-the-pages) | Low | Live tests | Fixed (found while verifying FIXED-213/214) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -8027,3 +8030,293 @@ were written when they were true.
 **User-interface outcome.** None — no surface reads these paths directly. The
 outcome is for whoever edits a provider price next: there is one file to edit,
 and editing it works.
+
+---
+
+## FIXED-213 — A tool call was invisible in Chat *(was BUG-206)*
+
+**Severity: High. Area: Chat / streaming surface. Closes BUG-206, all five
+slices.**
+
+**Observed.** Chat never showed that a tool ran. A turn that listed a directory,
+read a file, fetched a page or wrote a document rendered exactly like a turn that
+did none of those: prompt bubble, answer bubble. Captured on 2026-08-15, every
+element an ordinary tool-using turn produced was:
+
+```
+message-group · message-bubble · bubble-text · reaction · markdown · copy-message
+```
+
+The only tool a conversation ever mentioned was one policy had **refused**
+(`refusal-card`, BUG-52). Refusal was therefore the single visible tool outcome,
+and success was silent.
+
+**Root cause.** Two halves, and the backend one was the blocker. `ToolBroker`
+emitted `tool_started` / `tool_completed` / `tool_failed` through `self.writer`
+and nothing else — readable afterwards on the Audit log, never during the turn —
+while `RuntimeOrchestrator._emit` appended to the writer *and* to `self._sink`.
+And `raiker/contracts/streaming.py` defined `TOOL = "tool"` that no code path
+ever constructed. The contract anticipated the surface, the runtime recorded the
+facts, and the two were never joined.
+
+### Slice A — the events reach the stream
+
+`ToolBroker` gained the orchestrator's optional sink and emits a
+`StreamEvent(kind=TOOL, …)` beside each durable event. It **shares** the
+orchestrator's list rather than keeping one of its own: a tool row and the
+lifecycle event beside it belong to the same turn in the order they happened, and
+two lists would have to be merged on a timestamp neither carries. With no sink —
+a non-streamed turn, the terminal client, a direct caller — the broker behaves
+exactly as before.
+
+### Slice B — what a row may say
+
+The governance question, and the reason the phrase is resolved server-side rather
+than assembled in the client. `raiker/tools/presentation.py` is the only place
+that decides, under three rules:
+
+1. **The label is the owner's language, never the identifier.** `read_file` is
+   *Read file*.
+2. **The action comes only from arguments the durable event already keeps
+   verbatim.** Where `_event_safe_arguments` drops a tool's argument *values* —
+   the advisor's question, a projected MCP tool's input — the row carries no
+   argument-derived phrase either. The transcript can never be the looser of the
+   two surfaces.
+3. **Two arguments are narrowed further than the event narrows them.** A URL is
+   reduced to its **host**, because a signed URL carries its credential in the
+   query string in a shape pattern-based redaction reads as ordinary base64; a
+   command is reduced to its **program name**, because an argument can be a
+   token or a password. Both stay in full in the event, where they are evidence.
+
+Everything that does reach a phrase passes `redact_text` first, with the
+`locator_value` / `identifier_value` modes the caller can honestly declare from
+the argument's own name — which is what keeps
+`docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md` from rendering as
+`[REDACTED_SECRET]` while a key embedded in a path still does.
+
+### Slice C — an icon per tool family
+
+Nine families — file read, file write, shell, web, repository, connector, memory,
+subagent, plan — plus a neutral `tool` fallback, so an unrecognised tool renders
+as a tool rather than as nothing. Four reuse a glyph the set already had and that
+means the same thing there (`file`, `branch`, `connections`, `tasks`); five are
+new (`file-edit`, `terminal`, `globe`, `memory`, `agent`) and one is the fallback
+spanner, deliberately not the `settings` gear.
+
+### Slice D — the row
+
+`[icon] [tool] [action]` on one line, in the transcript, above the answer,
+**in the model's proposal order**. That last part is not free: an independent
+read batch runs concurrently (B4), so the broker's events arrive in whatever
+order the worker threads finished, and a turn that asked to list a directory
+*and then* read a file rendered the read first. The rows are therefore opened by
+the runtime from the validated proposals (`_stream_tool_proposed`) and every
+later event for the same action id settles the row it already opened.
+
+A call still running shows a quiet pulse in the glyph's place, so the row does
+not resize when it settles. A call parked on the owner's decision says
+**waiting for your decision** rather than pulsing at something that is not
+running. A failed call states its named reason inline, with a remediation link
+where one exists.
+
+### Slice E — the refusal card is gone
+
+A refused call is that same row in a refused state, in the place it was refused,
+with its reasons and its remedy on the row. The card BUG-52 added at the bottom
+of the turn existed only because a refused call was the one call the transcript
+could speak about; it is removed, and so is its styling.
+
+**Two surfaces went with it.** The parked-turn placeholder bubble — *"Waiting for
+your decision — nothing has run yet."* — said what the approval card directly
+below it already said, and what the call's own row now says of the call it is
+actually about. Three statements of one fact, only one of them naming the call.
+Chat and Build both drop the bubble for the parked case and keep it for
+*"(No answer text was returned.)"*, which is a different state.
+
+**Accessibility.** The state is announced once. `running` and `success` are
+carried by the glyph, which a screen reader cannot see, so those are the two the
+`sr-only` copy states; every other state puts its own words on screen and the
+hidden copy is withheld rather than doubling it.
+
+**Verified live** against hosted Anthropic `claude-haiku-4-5-20251001` on a fresh
+workspace. A two-call turn renders `List folder · the workspace root · done` then
+`Read file · README.md · done`, in that order, with `tool-row` present in the
+turn's element list — the list BUG-206 captured and found empty. The transcript
+contains no `{`, no `read_file` and no `list_directory`. A `write_file` turn
+renders `Write file · notes.md · waiting for your decision` beside its approval
+card, and the phrase appears exactly once. Against the batching stub, a refused
+read renders `Read file · ../escape.md` with
+`refused — workspace_boundary_denied, outside_workspace:path`, directly above the
+`List folder` row that succeeded in the same batch. Build renders the identical
+rows from the identical data path.
+
+Evidence:
+[`screenshots/working/bug-206-live-tool-rows-settled.png`](screenshots/working/bug-206-live-tool-rows-settled.png),
+[`screenshots/working/bug-206-live-tool-row-waiting.png`](screenshots/working/bug-206-live-tool-row-waiting.png),
+[`screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png`](screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png),
+[`screenshots/working/bug-206-207-live-build-turn.png`](screenshots/working/bug-206-207-live-build-turn.png).
+Specs:
+[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
+[`bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts),
+[`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
+
+**User-interface outcome.** A tool-using turn reads as a sequence of what
+happened: each call one line, the icon telling you the kind at a glance, the tool
+named in the owner's language, and the action naming the object it acted on. A
+call still running says so; a call waiting on a decision says so; a call that
+failed says why on its own line. No raw argument JSON, no tool identifier, and no
+surface that is silent about work that ran. The Audit log stays the full record —
+the transcript is the summary, not a second copy of it.
+
+---
+
+## FIXED-214 — The model's real reasoning was requested, discarded, and replaced with three canned sentences *(was BUG-207)*
+
+**Severity: Medium. Area: Chat / streaming honesty. Closes BUG-207, all four
+slices.**
+
+**Observed.** While a turn streamed, Chat offered a disclosure labelled **"See
+what Raiker is thinking"**. Opening it showed, in every turn, some subset of
+exactly three fixed strings:
+
+```
+Understanding what you need.
+Reviewing the available context.
+Putting together a response.
+```
+
+They were a lookup table on three lifecycle event types, identical for a one-word
+question and a twenty-tool build. Slice A removed the disclosure on 2026-08-15
+and left one indicator that ends at the first token; this entry is the other
+three slices, and it puts the real thing back.
+
+**Root cause, and a second one found while fixing it.** The stream parser handled
+`text_delta` and `input_json_delta` only — there was no `thinking_delta` branch,
+so reasoning that did arrive was dropped on the floor.
+
+Underneath that, measured against the live Anthropic catalogue on 2026-08-15,
+**the reasoning request could not have succeeded for most models anyway**:
+
+| Model | `thinking.type.adaptive` | `thinking.type.enabled` + `budget_tokens` |
+|---|---|---|
+| `claude-opus-5`, `claude-sonnet-5`, `claude-fable-5`, `claude-opus-4-8`, `claude-opus-4-7` | accepted | **refused** |
+| `claude-sonnet-4-6`, `claude-opus-4-6` | accepted | accepted |
+| `claude-opus-4-5`, `claude-haiku-4-5`, `claude-sonnet-4-5` | **refused** | accepted |
+
+`model-profiles.json` carries one `reasoning_modes` list for every model behind
+`anthropic-hosted`, so no declaration is right for all of them — and the wrong one
+does not degrade quietly, it fails the whole turn with HTTP 400. The profile
+declared `adaptive`, which `claude-haiku-4-5` refuses.
+
+And a third: **reasoning was unreachable from a conversation at all.**
+`_turn_reasoning` accepted only an *effort*, and the composer offered the control
+only when `supports_reasoning_effort` was true. Anthropic declares a *mode*, not
+an effort, so the provider that ships in the box had no reasoning control on the
+composer and `payload["thinking"]` was never sent.
+
+### Slice B — consume `thinking_delta`, and ask in the spelling the model takes
+
+`reasoning_delta` is a new `ModelStreamEvent` type carrying its own field, and
+`REASONING_DELTA` a new `StreamEvent` kind. The separate field is the point: the
+runtime's stream loop keys on `text_delta` being non-empty, so reusing it would
+have appended the model's reasoning to its answer — worse than dropping it. The
+contract rejects a `reasoning_delta` payload on any other event type.
+
+The request shape is **negotiated rather than declared**. The first request for a
+model uses the profile's declared spelling; if the provider refuses it *and names
+the other one in its own refusal*, that answer is recorded for the process and
+the request is made once more. A 400 that names no alternative stays a real
+error. This is not a fallback in the sense the runtime forbids — no capability is
+substituted and nothing is silently downgraded; it is the spelling of one field,
+corrected by the only authority on it.
+
+`_turn_reasoning` now accepts an effort **or** a mode, which is the rule
+`ModelRouter.set_reasoning` has always applied, and asks for
+`display: summarized` wherever the profile declares the capability. The composer
+control is labelled **Thinking** and lists whichever the profile declares.
+
+The `signature_delta` that arrives on the same content block is deliberately not
+handled: it is an integrity marker for replaying a thinking block, not text, and
+it never reaches a surface. `_parse_chat` reads `thinking` blocks for the
+non-streamed path, and the OpenAI-compatible provider reads `reasoning_content`
+(DeepSeek, vLLM, Ollama) and `reasoning` (OpenRouter) for the servers that use
+those names.
+
+### Slices C and D — render it, and stop narrating
+
+A collapsed **Thinking** block above the answer, filling in as reasoning streams
+and collapsing the moment the answer starts — still openable afterwards, because
+it is the record of how the answer was reached. It is quieter than the answer on
+purpose: smaller, dimmer, against the sunken surface, so a long chain of thought
+never competes with what it produced. It renders as plain text rather than
+Markdown; giving the model's working the same typographic weight as its answer
+would invite it to be read as one.
+
+Where the turn produced no reasoning there is **no block** — not an empty one,
+and nothing standing in for it. The single indicator now ends at the first token
+*and* at the first tool row: once the transcript is saying what Raiker is doing,
+"Working…" is the less specific of the two and has nothing left to add.
+
+**Verified live** against `claude-haiku-4-5-20251001` — the model that refuses
+`adaptive`, so the same run proves the negotiation. With **Thinking: adaptive**
+selected, a turn asking for 17 × 23 streams the model's own working
+(*"The user is asking me to calculate 17 times 23… = 17 × 20 + 17 × 3 = 340 + 51
+= 391"*), which names the numbers the owner typed and no fixed string could. None
+of the three canned sentences appears, and neither does the old label. Once the
+answer starts the block is collapsed with `aria-expanded="false"`. With Thinking
+back at **default**, the same conversation renders no reasoning section at all.
+Build behaves identically.
+
+Evidence:
+[`screenshots/working/bug-207-live-reasoning-streaming.png`](screenshots/working/bug-207-live-reasoning-streaming.png),
+[`screenshots/working/bug-207-live-reasoning-settled.png`](screenshots/working/bug-207-live-reasoning-settled.png),
+[`screenshots/working/bug-207-live-no-reasoning.png`](screenshots/working/bug-207-live-no-reasoning.png).
+Specs:
+[`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
+[`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
+
+**Known limit, stated rather than implied.** Reasoning is a live-stream fact: it
+fills in as it arrives and is gone when the conversation is re-opened, because
+nothing persists it. No surface claims otherwise — a reloaded turn simply shows
+its answer. Persisting it is a storage change with a retention question attached,
+and it is recorded in
+[`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-215--reasoning-is-shown-live-and-then-forgotten).
+
+**User-interface outcome.** A turn shows the model's own reasoning or it shows
+none — never a fixed list presented as reasoning. Where reasoning is shown it is
+the provider's, it is collapsed by default, and it never becomes the thing the
+eye lands on before the answer. Where reasoning is off or unsupported, the turn
+simply streams its answer with no chrome above it.
+
+---
+
+## FIXED-215 — The all-pages evidence sweep photographed the setup wizard instead of the pages
+
+**Severity: Low. Area: live tests. Found while verifying FIXED-213/214.**
+
+**Observed.** `all-pages-live.spec.ts` — the sweep that captures all 24 routes
+and asserts **0 console errors** — could not get past sign-in on a fresh
+instance. It created the owner account and then waited 15 seconds for
+*"Welcome to your Work Dashboard"*, which was behind the modal five-stage setup
+wizard FIXED-172 introduced.
+
+**Root cause, in two parts.** The spec inlines its own sign-in rather than using
+`hosted-provider.ts`, so it never gained the wizard dismissal the eighteen specs
+that use the helper already had — the same staleness that helper was extracted to
+fix. And the helper alone was not enough: `dismissFirstRunModelSetup` *samples*
+for the sheet rather than waiting for it, while the sheet mounts only once the
+bootstrap reads resolve, which is after account creation returns. Calling it
+immediately finds nothing and returns false.
+
+**Fix.** Wait for **either** the sheet's *Decide later* or the workbench heading
+before dismissing — exactly the "either the tab or the sheet" pattern
+`openHostedProviders` already uses for the same race — then call the shared
+helper. Two lines, and the sweep stops having a private copy of a flow that has
+now gone stale twice.
+
+**Verified live** on a fresh workspace: 24/24 routes captured to
+`docs/plans/screenshots/pages/`, `0` console errors.
+
+**User-interface outcome.** None — no shipped surface changes. The outcome is
+that the sweep can once again fail a pull request that breaks a page, which is
+the only reason it exists.

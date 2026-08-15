@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
+from raiker.contracts.streaming import TOOL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.execution.commands.service import CommandService, CommandServiceError
@@ -67,6 +68,7 @@ from raiker.tools.memory_tools import (
     memory_list,
     memory_search,
 )
+from raiker.tools.presentation import tool_row
 from raiker.tools.search import glob, grep
 from raiker.tools.skill_tools import skill_load
 from raiker.tools.vector_tools import vector_get
@@ -156,6 +158,15 @@ class ToolBroker:
         self.writer = writer
         self.hook_dispatcher = hook_dispatcher
         self.principal_id = principal_id
+        # BUG-206 slice A — the live half of a tool call. `self.writer` makes a
+        # call readable *afterwards*, on the Audit log; without a sink the same
+        # facts never reach the turn that is running, which is why a tool-using
+        # conversation looked exactly like one that used no tools. The runtime
+        # owns this list for the length of a streamed turn and drains it beside
+        # its own lifecycle events (see `RuntimeOrchestrator._sink`); when it is
+        # None — a non-streamed turn, the terminal client, a direct caller — the
+        # broker behaves exactly as it did before.
+        self.stream_sink: list[StreamEvent] | None = None
         self.command_service = CommandService.for_workspace(self.workspace_root)
         self.memory_service = GovernedMemoryService(
             self.workspace_root,
@@ -662,6 +673,59 @@ class ToolBroker:
                 )
             )
 
+    def _stream_tool(
+        self,
+        action: ToolAction,
+        event_type: str,
+        *,
+        status: str,
+        reason: str = "",
+    ) -> None:
+        """Put one tool call on the live stream (BUG-206 slices A and B).
+
+        Emitted beside — never instead of — the durable event, and carrying
+        strictly less: the family, the owner-language label, and the one short
+        action phrase `raiker.tools.presentation` decided is safe to say. No
+        arguments, no result, no output. The durable log stays the full record;
+        this is the summary the owner watches arrive.
+        """
+        if self.stream_sink is None:
+            return
+        payload: dict[str, object] = {
+            "action_id": action.action_id,
+            **tool_row(action.tool_name, action.arguments).to_payload(),
+            "status": status,
+        }
+        if reason:
+            payload["reason"] = reason
+        self.stream_sink.append(
+            StreamEvent(kind=TOOL, event_type=event_type, payload=payload)
+        )
+
+    @staticmethod
+    def _failure_reason(result: ToolResult) -> str:
+        """The named reason a call failed, as the row will show it."""
+        error = result.error if isinstance(result.error, dict) else {}
+        reason = error.get("type")
+        if isinstance(reason, str) and reason:
+            return reason
+        reasons = error.get("reasons")
+        if isinstance(reasons, list) and reasons and isinstance(reasons[0], str):
+            return reasons[0]
+        return ""
+
+    def _stream_tool_result(self, action: ToolAction, result: ToolResult) -> None:
+        """The settled half of a row, from the result the broker just produced."""
+        if result.status == "success":
+            self._stream_tool(action, "tool_completed", status="success")
+            return
+        self._stream_tool(
+            action,
+            "tool_failed",
+            status="denied" if result.status == "denied" else "failed",
+            reason=self._failure_reason(result),
+        )
+
     def _unperformable_proposal(
         self,
         action: ToolAction,
@@ -699,6 +763,9 @@ class ToolBroker:
             payload=self._event_safe_result_payload(failed),
             client=client,
         )
+        # A proposal the runtime already knows it cannot honour never reaches
+        # `tool_started`, so its row is opened and settled by this one event.
+        self._stream_tool_result(action, failed)
         self._notify_hook(
             "PostToolUse",
             action,
@@ -1122,6 +1189,7 @@ class ToolBroker:
             payload={"action_id": action.action_id, "tool_name": action.tool_name},
             client=client,
         )
+        self._stream_tool(action, "tool_started", status="running")
         from raiker.runtime.authority.router import GovernedAction, RuntimeAuthority
         from raiker.runtime.executors import build_default_executor_registry
 
@@ -1174,6 +1242,7 @@ class ToolBroker:
                 payload=self._event_safe_result_payload(failed),
                 client=client,
             )
+            self._stream_tool_result(action, failed)
             return failed, blocked_decision
 
         executed_decision = PolicyDecision(
@@ -1220,6 +1289,7 @@ class ToolBroker:
             payload=self._event_safe_result_payload(result),
             client=client,
         )
+        self._stream_tool_result(action, result)
         self._notify_hook(
             "PostToolUse",
             action,
@@ -1584,6 +1654,7 @@ class ToolBroker:
             payload={"action_id": action.action_id, "tool_name": action.tool_name},
             client=client,
         )
+        self._stream_tool(action, "tool_started", status="running")
         context_executor = self.context_executors.get(action.tool_name)
         raw: dict[str, Any]
         profile_resolution = self._execution_profile(action.tool_name)
@@ -1638,6 +1709,7 @@ class ToolBroker:
                     payload=failed.to_dict(),
                     client=client,
                 )
+                self._stream_tool_result(action, failed)
                 return failed, decision
         else:
             try:
@@ -1677,6 +1749,7 @@ class ToolBroker:
             payload=self._event_safe_result_payload(result),
             client=client,
         )
+        self._stream_tool_result(action, result)
         self._notify_hook(
             "PostToolUse" if result.status == "success" else "PostToolUseFailure",
             action,

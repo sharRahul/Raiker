@@ -621,6 +621,12 @@ class ModelProfileView:
     supports_reasoning: bool = False
     supports_reasoning_effort: bool = False
     reasoning_effort_values: tuple[str, ...] = ()
+    # BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI) or
+    # as a *mode* (Anthropic). Sending only the effort values meant the composer
+    # could offer a reasoning control for one provider and none for the other,
+    # which is why the thinking the product asked for was never asked for.
+    reasoning_modes: tuple[str, ...] = ()
+    supports_reasoning_summary: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -3842,6 +3848,12 @@ class DashboardService:
                 reasoning_effort_values=tuple(
                     str(value)
                     for value in profile.raw.get("reasoning_effort_values", [])
+                ),
+                reasoning_modes=tuple(
+                    str(value) for value in profile.raw.get("reasoning_modes", [])
+                ),
+                supports_reasoning_summary=bool(
+                    profile.raw.get("supports_reasoning_summary", False)
                 ),
                 **_usage_fields(profile),
             )

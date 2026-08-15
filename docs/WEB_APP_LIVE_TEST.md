@@ -502,3 +502,33 @@ This run proves the foreground local shell, durability, governance evidence,
 and the complete four-provider model-to-command path. It does not prove PTY/background input,
 service-restart reattachment, filtered egress, credential quarantine, SSH,
 Daytona, or live Docker execution; those remain BUG-194.
+
+## Result — 2026-08-15 (BUG-206 tool rows, BUG-207 model reasoning)
+
+A disposable loopback workspace was created for each run and destroyed after it.
+The Anthropic credential was entered through Models by the spec, was never placed
+in a command, a document or a screenshot, and is absent from repository state.
+The service and browser were stopped after the run.
+
+| Check | Result |
+|---|---|
+| Tool rows in Chat | ✅ A two-call turn rendered `List folder · the workspace root · done` then `Read file · README.md · done`, one line each, in the model's proposal order |
+| Proposal order under concurrency | ✅ Independent reads run in parallel (B4) and settled out of order; the rows still read in the order the model asked, because they are opened from the validated proposals |
+| Nothing raw reaches the row | ✅ The turn's `.tool-activity` text contained no `{`, no `read_file` and no `list_directory` — no argument JSON and no tool identifier |
+| The element list BUG-206 found empty | ✅ `tool-activity`, `tool-row`, `tool-glyph`, `tool-label`, `tool-action` are now in it |
+| A call waiting on a decision | ✅ `Write file · notes.md · waiting for your decision`, beside its approval card; the phrase appears exactly once, so a screen reader hears it once |
+| A refused call (batching stub) | ✅ `Read file · ../escape.md` with `refused — workspace_boundary_denied, outside_workspace:path`, directly above the `List folder` row that succeeded in the same batch; the old `.refusal-card` is absent |
+| Model reasoning, live | ✅ With **Thinking: adaptive**, `claude-haiku-4-5-20251001` streamed its own working for 17 × 23 into the collapsed block; it names the numbers the owner typed, which no fixed string could |
+| The thinking spelling negotiated | ✅ Haiku 4.5 refuses `thinking.type.adaptive`; the provider read the alternative out of the refusal, re-issued once, and the turn thought rather than failing with a 400 |
+| The three canned sentences | ✅ Absent, as is the "See what Raiker is thinking" label |
+| Collapse on answer | ✅ `aria-expanded="false"` once the answer starts, still openable |
+| Reasoning off | ✅ No reasoning section at all, and no tool activity for a turn that called nothing |
+| Build parity | ✅ Same rows, same reasoning block, same collapse, from the same components and data path |
+| Browser suites | ✅ `bug-206-207-tool-rows-and-reasoning-live.spec.ts` 6/6; `bug-52-first-pass-denial-live.spec.ts` 4/4 against the batching stub; `composer.spec.ts` (mocked) 4/4 |
+| All-pages sweep | ✅ `all-pages-live.spec.ts` captured all 24 routes with **0 console errors**, after the sweep's own stale sign-in was fixed (FIXED-215) |
+| Visual review | ✅ `docs/plans/screenshots/working/bug-206-live-tool-rows-{streaming,settled}.png`, `bug-206-live-tool-row-waiting.png`, `bug-207-live-reasoning-{streaming,settled}.png`, `bug-207-live-no-reasoning.png`, `bug-206-207-live-build-turn.png` inspected at original resolution for row order, wrapping, state colour, and secret absence |
+
+This run proves the live transcript surface end to end on hosted Anthropic: what
+a turn did, what it thought, and what it refused. It does **not** prove that
+either survives a reload — neither is persisted, which is
+[BUG-215](plans/TO_BE_FIXED.md#bug-215--reasoning-is-shown-live-and-then-forgotten).

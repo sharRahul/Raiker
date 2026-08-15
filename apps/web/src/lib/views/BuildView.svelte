@@ -31,6 +31,8 @@
   import Markdown from "../components/Markdown.svelte";
   import RepoConnector from "../components/RepoConnector.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
+  import ReasoningBlock from "../components/ReasoningBlock.svelte";
+  import ToolActivity from "../components/ToolActivity.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
@@ -76,6 +78,7 @@
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
+  import { collectReasoning, toolActivity } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -316,9 +319,20 @@
     ) ?? selectedProfile,
   );
   const modelReadiness = $derived(readinessForSelection(activeProfile));
+  // BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI:
+  // low/medium/high) or as a *mode* (Anthropic: adaptive). Offering only the
+  // first meant the provider that ships in the box had no reasoning control at
+  // all, which is why the extended thinking the runtime asks for was never
+  // asked for. Both are offered, and neither is invented: an empty list means
+  // this profile declares no reasoning setting and the control is absent.
   const reasoningEfforts = $derived(
-    activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
-      ? (activeProfile.reasoning_effort_values ?? [])
+    activeProfile?.supports_reasoning === true
+      ? [
+          ...(activeProfile.supports_reasoning_effort === true
+            ? (activeProfile.reasoning_effort_values ?? [])
+            : []),
+          ...(activeProfile.reasoning_modes ?? []),
+        ]
       : [],
   );
 
@@ -862,6 +876,8 @@
 
       {#each turns as turn (turn.id)}
         {@const answer = answerText(turn)}
+        {@const toolRows = toolActivity(turn.events)}
+        {@const reasoning = collectReasoning(turn.events)}
         {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
         <article class="turn">
           <div class="user-message">
@@ -907,11 +923,17 @@
                 {/if}
               </div>
             {/if}
-            <!-- BUG-207 slice A, as in Chat: the pseudo-thinking disclosure is
-                 gone, and the indicator ends at the first token rather than
-                 narrating that text which is visibly streaming is being
-                 written. -->
-            {#if turn.streaming && answer === ""}
+            <!-- BUG-207 slices C and D, as in Chat: the model's own reasoning
+                 when the turn produced any, collapsed once the answer starts,
+                 and nothing at all when it produced none. -->
+            <ReasoningBlock text={reasoning} streaming={turn.streaming} />
+
+            <!-- BUG-206 slice D, as in Chat: every call this turn made, in call
+                 order. Build is where a turn makes the most of them, and where
+                 a silent one was hardest to account for. -->
+            <ToolActivity rows={toolRows} />
+
+            {#if turn.streaming && answer === "" && reasoning === "" && toolRows.length === 0}
               <p class="working" role="status">
                 <span class="pulse" aria-hidden="true"></span>
                 Reading and planning…
@@ -949,10 +971,11 @@
                   title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
               {/if}
-            {:else if !turn.streaming && turn.error === null && turn.response !== null}
-              <!-- BUG-73 — see ChatView: a parked turn reports its state, never a
-                   claim about whether anything ran. -->
-              <div class="answer"><p class="bubble-text muted">{turn.response.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p></div>
+            {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
+              <!-- BUG-73 / BUG-206 — see ChatView: a turn with no answer reports
+                   its state, never a claim about whether anything ran, and the
+                   parked case is left to the row and the card that state it. -->
+              <div class="answer"><p class="bubble-text muted">(No answer text was returned.)</p></div>
             {/if}
 
             <!-- C6 — everything this turn actually read, under the answer that
@@ -1076,12 +1099,12 @@
                 class="bar-select"
                 bind:value={reasoningEffort}
                 disabled={streaming}
-                aria-label="Thinking effort"
-                title="Thinking effort for this model"
+                aria-label="Thinking"
+                title="Ask this model to think before it answers. Default asks for nothing."
               >
                 <option value="">Thinking: default</option>
                 {#each reasoningEfforts as effort (effort)}
-                  <option value={effort}>{effort}</option>
+                  <option value={effort}>Thinking: {effort}</option>
                 {/each}
               </select>
             {/if}

@@ -289,11 +289,11 @@ describe("Build model picker", () => {
     expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" }));
     await fireEvent.click(screen.getByRole("menuitemradio", { name: /Opus Build Model/i }));
-    const effort = screen.getByLabelText("Thinking effort");
+    const effort = screen.getByLabelText("Thinking");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Thinking: default",
-      "medium",
-      "high",
+      "Thinking: medium",
+      "Thinking: high",
     ]);
     await fireEvent.change(effort, { target: { value: "high" } });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Use effort" } });
@@ -312,7 +312,7 @@ describe("Build model picker", () => {
     render(BuildView);
 
     expect(await screen.findByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Thinking")).not.toBeInTheDocument();
   });
 });
 

@@ -207,6 +207,17 @@ Highlights, each verified against a live instance:
   one-click export of a conversation to HTML, Markdown or PDF; at 90% of a known
   context capacity, older completed exchanges are compacted automatically while
   the transcript remains unchanged.
+- **What a turn did, and what it thought** — every tool call gets one line above
+  the answer, in the order the model asked: an icon for the family, the tool in
+  plain words, and what it acted on. A call still running says so, one waiting on
+  your decision says so beside the card that resolves it, and one refused says
+  why with a link to the page that would let it through. The phrase is resolved
+  on the server under the same redaction the audit record passes — a fetch is
+  named by its host and a command by its program — so a line can never say more
+  than the log does. Where the model can think before answering, the composer's
+  **Thinking** control turns it on and its own reasoning fills a collapsed block
+  above the answer, closing when the answer starts. A turn that produced no
+  reasoning shows no block at all.
 - **Recall** — a turn can read your own past conversations, not only the ones it
   can still see. `conversation_search` searches every exchange you have had,
   narrowed to a date range when the question is about a particular period, and
@@ -281,6 +292,14 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-15:
   access with reduced isolation and is still the default selection. Browser
   reload restores durable output; a Raiker process restart marks an unprovable
   active run `lost` rather than inventing success.
+- **What a turn did and what it thought are shown live, and are not kept in the
+  transcript.** The tool lines and the reasoning block are built from the running
+  turn. Re-open the conversation and you see the prompt, the answer and the
+  sources; the lines and the working are not rebuilt, because nothing persists
+  them. The full record of every call is permanent in **Observability → Audit
+  log**. Tracked as BUG-215; the retention question — whether a model's working
+  should be stored at all, and excluded from export and search if it is — is the
+  reason it was not simply added.
 - **A batch of tool calls runs in parallel only when nothing in it needs a
   decision.** Every validated read-only call in a batch is executed
   concurrently; the moment one call in the same batch requires approval, the

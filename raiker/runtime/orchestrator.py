@@ -5,7 +5,7 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -20,7 +20,14 @@ from raiker.contracts.models import (
     ToolAction,
     ToolResult,
 )
-from raiker.contracts.streaming import FINAL, LIFECYCLE, TEXT_DELTA, StreamEvent
+from raiker.contracts.streaming import (
+    FINAL,
+    LIFECYCLE,
+    REASONING_DELTA,
+    TEXT_DELTA,
+    TOOL,
+    StreamEvent,
+)
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
@@ -79,6 +86,7 @@ from raiker.security.containment import (
 from raiker.security.injection_scan import InjectionScanner
 from raiker.tools.broker import ToolBroker
 from raiker.tools.mcp_tools import mcp_tool_specs
+from raiker.tools.presentation import tool_row
 from raiker.verification.models import VerificationResult
 from raiker.verification.verifier import Verifier
 
@@ -596,6 +604,11 @@ class RuntimeOrchestrator:
         # so the transcript never has to guess.
         proposal_output = result.output or {}
         approval_id = str(proposal_output.get("approval_id", ""))
+        # BUG-206 — the row for a parked call says it is waiting rather than
+        # pulsing as though it were running. Nothing is running: the turn has
+        # stopped on the owner's decision, and the approval card beside it is
+        # where that decision is made.
+        self._stream_tool_waiting(action)
         resumable = self._suspend_turn(
             envelope,
             approval_id=approval_id,
@@ -966,6 +979,25 @@ class RuntimeOrchestrator:
             drained.append(self._sink.pop(0))
         return drained
 
+    def _open_sink(self, stream: bool) -> None:
+        """Start collecting this turn's out-of-band events, if anyone is watching.
+
+        BUG-206 slice A — the broker shares this list rather than keeping one of
+        its own. A tool row and the lifecycle event beside it belong to the same
+        turn in the order they happened, and two lists would have to be merged
+        afterwards on a timestamp neither of them carries. A non-streamed turn
+        opens no sink at all, so nothing accumulates for a client that is not
+        there to read it.
+        """
+        self._sink = [] if stream else None
+        self.tool_broker.stream_sink = self._sink
+
+    def _close_sink(self) -> None:
+        """Stop collecting. The gateway builds one orchestrator per turn, so this
+        is belt-and-braces rather than the thing that keeps two turns apart."""
+        self._sink = None
+        self.tool_broker.stream_sink = None
+
     @staticmethod
     def _context_prompt(
         bundle: ContextBundle, citation_markers: dict[str, str] | None = None
@@ -1161,6 +1193,67 @@ class RuntimeOrchestrator:
         if isinstance(remediation_route, str) and remediation_route:
             payload["remediation_route"] = remediation_route
         self._event(envelope, "model_tool_call_refused", payload)
+        self._stream_tool_refusal(action, reasons, payload.get("remediation_route"))
+
+    def _stream_tool_row(self, action: ToolAction, event_type: str, status: str) -> None:
+        """One transcript row for *action*, straight onto the live stream."""
+        if self._sink is None:
+            return
+        self._sink.append(
+            StreamEvent(
+                kind=TOOL,
+                event_type=event_type,
+                payload={
+                    "action_id": action.action_id,
+                    **tool_row(action.tool_name, dict(action.arguments)).to_payload(),
+                    "status": status,
+                },
+            )
+        )
+
+    def _stream_tool_proposed(self, actions: Sequence[ToolAction]) -> None:
+        """Open this batch's rows in the order the model asked for them.
+
+        BUG-206 — the required outcome is "each call one line … in call order",
+        and the broker cannot supply that on its own. An independent read batch
+        runs concurrently (B4), so the broker's `tool_started` events arrive in
+        the order the worker threads happened to be scheduled: a turn that asked
+        to list a directory *and then* read a file could show the read first.
+        Opening the rows here, from the validated proposals, makes first-seen
+        order proposal order; every later event for the same action id settles
+        the row it already opened rather than adding a second one.
+        """
+        for action in actions:
+            self._stream_tool_row(action, "tool_proposed", "running")
+
+    def _stream_tool_waiting(self, action: ToolAction) -> None:
+        """A call parked on the owner's decision, so its row stops pretending to run."""
+        self._stream_tool_row(action, "tool_waiting", "waiting")
+
+    def _stream_tool_refusal(
+        self, action: ToolAction, reasons: list[str], remediation_route: object = None
+    ) -> None:
+        """A refused call, as the same transcript row every other call gets.
+
+        BUG-206 slice E. A refusal used to be a separate card at the bottom of
+        the turn, because it was the *only* call the transcript could speak
+        about. Now that every call has a row, a refused one is that row in a
+        refused state, in the place it was refused — which is where the owner is
+        looking when they wonder what happened to it.
+        """
+        if self._sink is None:
+            return
+        payload: dict[str, Any] = {
+            "action_id": action.action_id,
+            **tool_row(action.tool_name, dict(action.arguments)).to_payload(),
+            "status": "refused",
+            "reasons": list(reasons),
+        }
+        if isinstance(remediation_route, str) and remediation_route:
+            payload["remediation_route"] = remediation_route
+        self._sink.append(
+            StreamEvent(kind=TOOL, event_type="tool_refused", payload=payload)
+        )
 
     def _verify_and_emit(
         self, envelope: PromptEnvelope, **kwargs: object
@@ -1204,24 +1297,45 @@ class RuntimeOrchestrator:
     def _turn_reasoning(
         self, envelope: PromptEnvelope, provider: str, model: str
     ) -> ReasoningOptions | None:
-        """Validate effort from the exact resolved provider/model capability.
+        """Validate the turn's reasoning setting against the resolved profile.
 
-        Absent effort remains absent. Unsupported, unknown, or undeclared effort
-        fails closed; this never substitutes a value or changes model selection.
+        Absent remains absent. Unsupported, unknown, or undeclared fails closed;
+        this never substitutes a value or changes model selection.
+
+        BUG-207 slice B — the setting is now accepted as an **effort** or as a
+        **mode**, which is the same rule ``ModelRouter.set_reasoning`` has always
+        applied and the reason reasoning was unreachable from a conversation. A
+        provider can declare one or the other: OpenAI declares
+        ``reasoning_effort_values``, Anthropic declares ``reasoning_modes``, and
+        a turn that could only name an effort could never turn reasoning on for
+        the provider that ships in the box.
         """
-        effort = envelope.options.reasoning_effort
-        if effort is None:
+        setting = envelope.options.reasoning_effort
+        if setting is None:
             return None
         try:
             profile = self.model_router.registry.resolve(provider, model)
         except Exception as exc:  # noqa: BLE001
             raise ProviderPolicyError("reasoning_effort_profile_unresolved") from exc
         capabilities = capabilities_from_profile(profile)
-        if not capabilities.supports_reasoning or not capabilities.supports_reasoning_effort:
+        if not capabilities.supports_reasoning:
             raise ProviderPolicyError("reasoning_effort_not_supported")
-        if effort not in capabilities.reasoning_effort_values:
-            raise ProviderPolicyError("reasoning_effort_not_allowed")
-        return ReasoningOptions(enabled=True, effort=effort)
+        # A summarized display is asked for wherever the profile declares it:
+        # the owner should see the provider's own summary of its reasoning
+        # rather than its raw scratch text.
+        summary = "summarized" if capabilities.supports_reasoning_summary else None
+        if capabilities.supports_reasoning_effort:
+            if setting in capabilities.reasoning_effort_values:
+                return ReasoningOptions(enabled=True, effort=setting, summary=summary)
+            if setting not in capabilities.reasoning_modes:
+                raise ProviderPolicyError("reasoning_effort_not_allowed")
+        elif setting not in capabilities.reasoning_modes:
+            raise ProviderPolicyError(
+                "reasoning_effort_not_supported"
+                if not capabilities.reasoning_modes
+                else "reasoning_effort_not_allowed"
+            )
+        return ReasoningOptions(enabled=True, summary=summary)
 
     def _image_attachments(self, envelope: PromptEnvelope) -> tuple[ModelImage, ...]:
         import base64
@@ -1528,6 +1642,7 @@ class RuntimeOrchestrator:
                 yield lifecycle
 
             text_parts: list[str] = []
+            reasoning_parts: list[str] = []
             tool_deltas: list[dict[str, object]] = []
             finish: str | None = None
             usage: dict[str, object] | None = None
@@ -1548,6 +1663,15 @@ class RuntimeOrchestrator:
                         output_committed = True
                         text_parts.append(provider_event.text_delta)
                         yield StreamEvent(kind=TEXT_DELTA, text=provider_event.text_delta)
+                    # BUG-207 slices B and C — the model's own reasoning, on its
+                    # own kind. Deliberately *not* `output_committed`: reasoning
+                    # is not an answer, so a provider that fails after producing
+                    # only reasoning may still be retried on the next candidate.
+                    if provider_event.reasoning_delta:
+                        reasoning_parts.append(provider_event.reasoning_delta)
+                        yield StreamEvent(
+                            kind=REASONING_DELTA, text=provider_event.reasoning_delta
+                        )
                     if provider_event.tool_call_delta:
                         output_committed = True
                         tool_deltas.append(provider_event.tool_call_delta)
@@ -1617,6 +1741,7 @@ class RuntimeOrchestrator:
                 finish_reason=finish if finish in FINISH_REASONS else "stop",
                 tool_calls=self._reconstruct_tool_calls(tool_deltas),
                 usage=usage,
+                reasoning="".join(reasoning_parts),
             )
             normalised_usage = summarize_model_usage(response.usage)
             self._event(
@@ -1664,14 +1789,14 @@ class RuntimeOrchestrator:
         stream: bool,
         identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        self._sink = [] if stream else None
+        self._open_sink(stream)
         try:
             async for event in self._aturn_events_inner(
                 envelope, stream=stream, identity=identity
             ):
                 yield event
         finally:
-            self._sink = None
+            self._close_sink()
 
     async def _aturn_events_inner(
         self,
@@ -1836,7 +1961,7 @@ class RuntimeOrchestrator:
         model already asked for, and asking it again would be paying twice for a
         question it has already answered.
         """
-        self._sink = [] if stream else None
+        self._open_sink(stream)
         try:
             machine = RuntimeStateMachine()
             self._state(machine, envelope, "NORMALISED")
@@ -1865,7 +1990,7 @@ class RuntimeOrchestrator:
             ):
                 yield event
         finally:
-            self._sink = None
+            self._close_sink()
 
     async def _aexecute_tool(
         self,
@@ -2035,6 +2160,9 @@ class RuntimeOrchestrator:
             requires_user_approval=False,
             timestamp=now,
         )
+        # BUG-206 — a contained call never reaches the broker, so it would have
+        # been the one kind of refusal with no row. It gets the same one.
+        self._stream_tool_refusal(action, ["capability_contained"], "capabilities")
         return result, decision
 
     async def _arun_agent_loop(
@@ -2102,6 +2230,7 @@ class RuntimeOrchestrator:
                 for pending in self._drain_sink():
                     yield pending
                 continue
+            self._stream_tool_proposed([action])
             queued_result, queued_decision = await self._aexecute_tool(
                 action, envelope, identity
             )
@@ -2300,6 +2429,10 @@ class RuntimeOrchestrator:
             # claims. The model receives one assistant message followed by one
             # result for every call id, as provider tool protocols require.
             read_only = all(not action.requires_approval for action in actions)
+            # BUG-206 — the rows open here, from the validated proposals, so the
+            # transcript reads in the order the model asked rather than in the
+            # order the worker threads below happened to finish.
+            self._stream_tool_proposed(actions)
             async def execute_one(action: ToolAction) -> tuple[ToolResult, PolicyDecision]:
                 # BUG-72 — always off the event loop, never only when the batch
                 # happens to hold more than one call. `ToolBroker.execute` is

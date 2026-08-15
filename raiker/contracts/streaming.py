@@ -17,11 +17,17 @@ from raiker.contracts.models import AgentResponse
 # StreamEvent kinds.
 LIFECYCLE = "lifecycle"  # a runtime state/event transition (event_type + payload)
 TEXT_DELTA = "text_delta"  # an incremental chunk of model answer text
+# BUG-207 slice B — an incremental chunk of the model's *own* reasoning, kept
+# apart from the answer so a client can render it as reasoning or not at all.
+# It is never merged into TEXT_DELTA: the answer is what the owner asked for and
+# the reasoning is how the model got there, and a surface that cannot tell them
+# apart cannot honestly label either.
+REASONING_DELTA = "reasoning_delta"
 TOOL = "tool"  # tool proposal/decision/result activity
 FINAL = "final"  # terminal event; carries the complete AgentResponse
 ERROR = "error"  # a safe error surfaced to the client
 
-STREAM_KINDS = (LIFECYCLE, TEXT_DELTA, TOOL, FINAL, ERROR)
+STREAM_KINDS = (LIFECYCLE, TEXT_DELTA, REASONING_DELTA, TOOL, FINAL, ERROR)
 
 
 @dataclass(frozen=True)

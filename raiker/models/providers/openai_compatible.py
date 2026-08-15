@@ -208,6 +208,24 @@ def _content_text(content: Any) -> tuple[str, bool]:
     return "".join(parts), refused
 
 
+def _reasoning_text(block: Any) -> str:
+    """The model's reasoning out of a delta or message, under either name.
+
+    OpenAI-compatible servers that expose extended thinking disagree on the key:
+    `reasoning_content` (DeepSeek, vLLM, Ollama) and `reasoning` (OpenRouter).
+    Both are read; anything that is not a plain string is ignored rather than
+    coerced, because a shape Raiker does not recognise is not reasoning it can
+    honestly label as such (BUG-207).
+    """
+    if not isinstance(block, dict):
+        return ""
+    for key in ("reasoning_content", "reasoning"):
+        value = block.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return ""
+
+
 def _finish_reason(raw: Any, *, has_tools: bool = False, refused: bool = False) -> str:
     if has_tools:
         return "tool_calls"
@@ -502,7 +520,13 @@ class AsyncOpenAICompatibleProvider:
             choice.get("finish_reason"), has_tools=bool(tool_calls), refused=refused
         )
         usage = data.get("usage") if isinstance(data.get("usage"), dict) else None
-        return ModelResponse(text=text, tool_calls=tool_calls, finish_reason=finish, usage=usage)
+        return ModelResponse(
+            text=text,
+            tool_calls=tool_calls,
+            finish_reason=finish,
+            usage=usage,
+            reasoning=_reasoning_text(message),
+        )
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         if not self.capabilities.supports_streaming:
@@ -560,6 +584,16 @@ class AsyncOpenAICompatibleProvider:
                         text = f"{text}{direct_refusal}"
                     if text:
                         yield ModelStreamEvent(event_type="text_delta", text_delta=text)
+                    # BUG-207 slice B, mirrored. An OpenAI-compatible server that
+                    # streams reasoning puts it beside the content under one of
+                    # two names — `reasoning_content` (DeepSeek, vLLM, Ollama)
+                    # or `reasoning` (OpenRouter). Neither is answer text, so
+                    # both are carried as reasoning or not at all.
+                    thought = _reasoning_text(delta)
+                    if thought:
+                        yield ModelStreamEvent(
+                            event_type="reasoning_delta", reasoning_delta=thought
+                        )
                     raw_tool_calls = delta.get("tool_calls")
                     if isinstance(raw_tool_calls, list):
                         for position, raw_call in enumerate(raw_tool_calls):

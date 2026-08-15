@@ -9,7 +9,18 @@ from uuid import uuid4
 
 MODEL_ROLES = {"system", "user", "assistant", "tool"}
 FINISH_REASONS = {"stop", "tool_calls", "length", "error"}
-MODEL_STREAM_EVENT_TYPES = {"text_delta", "tool_call_delta", "usage", "finish"}
+# BUG-207 slice B — `reasoning_delta` is the model's own extended thinking, and
+# it is deliberately a *separate* event type carrying a *separate* field. The
+# runtime's stream loop keys on `text_delta` being non-empty, so reusing that
+# field would have appended the model's reasoning to its answer — which is worse
+# than dropping it.
+MODEL_STREAM_EVENT_TYPES = {
+    "text_delta",
+    "reasoning_delta",
+    "tool_call_delta",
+    "usage",
+    "finish",
+}
 TOOL_CALL_MODES = {
     "native",
     "openai",
@@ -180,10 +191,16 @@ class ModelResponse:
     tool_calls: list[ToolCallProposal] = field(default_factory=list)
     finish_reason: str = "stop"
     usage: dict[str, Any] | None = None
+    # The model's own extended thinking for this turn, when it produced any and
+    # the provider returned it. Empty is the normal case and means exactly that:
+    # no reasoning, rather than reasoning withheld (BUG-207).
+    reasoning: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.text, str):
             raise ModelContractError("response_text_must_be_string")
+        if not isinstance(self.reasoning, str):
+            raise ModelContractError("response_reasoning_must_be_string")
         if self.finish_reason not in FINISH_REASONS:
             raise ModelContractError(f"invalid_finish_reason:{self.finish_reason}")
         if self.usage is not None and not isinstance(self.usage, dict):
@@ -278,6 +295,9 @@ class ModelRequest:
 class ModelStreamEvent:
     event_type: str
     text_delta: str = ""
+    # One chunk of the model's own reasoning. Its own field so the runtime can
+    # never mistake it for answer text (BUG-207 slice B).
+    reasoning_delta: str = ""
     finish_reason: str | None = None
     tool_call_delta: dict[str, object] | None = None
     metadata: dict[str, object] = field(default_factory=dict)
@@ -285,6 +305,8 @@ class ModelStreamEvent:
     def __post_init__(self) -> None:
         if self.event_type not in MODEL_STREAM_EVENT_TYPES:
             raise ModelContractError(f"invalid_stream_event_type:{self.event_type}")
+        if self.reasoning_delta and self.event_type != "reasoning_delta":
+            raise ModelContractError("reasoning_delta_requires_reasoning_event")
         if self.event_type == "finish":
             if self.finish_reason not in FINISH_REASONS:
                 raise ModelContractError(f"invalid_stream_finish_reason:{self.finish_reason}")

@@ -81,7 +81,21 @@ export type IconName =
   | "quote"
   // An unstarted plan step: an empty ring, deliberately the quietest glyph in
   // the set so a checklist reads by its *completed* marks rather than its gaps.
-  | "circle";
+  | "circle"
+  // BUG-206 slice C — one glyph per tool family, so a transcript row tells you
+  // the *kind* of work before you read the words. Four families reuse a glyph
+  // the set already had and means the same thing there (`file` for a read,
+  // `branch` for the repository, `connections` for a connector, `tasks` for the
+  // turn's own plan); these five are the ones nothing existing meant.
+  | "file-edit"
+  | "terminal"
+  | "globe"
+  | "memory"
+  | "agent"
+  // The neutral fallback. A tool with no family still renders as a tool, which
+  // is the difference between "Raiker did something you cannot name" and the
+  // silence BUG-206 was filed about.
+  | "tool";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -217,5 +231,43 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   quote: [
     "M9.5 6.5C7 7.6 5.5 9.8 5.5 12.5v5h5v-5h-3c0-1.8.8-3.2 2.6-4.1Z",
     "M18.5 6.5c-2.5 1.1-4 3.3-4 6v5h5v-5h-3c0-1.8.8-3.2 2.6-4.1Z",
+  ],
+  // BUG-206 slice C. A page with a nib over its lower corner: the file family
+  // that *changes* something, deliberately different at 16px from plain `file`.
+  "file-edit": [
+    "M13 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1v-8",
+    "M13 3v4h4",
+    "M20.5 6.5 15 12l-2.5.5.5-2.5 5.5-5.5a1.4 1.4 0 0 1 2 2Z",
+  ],
+  // A prompt inside a window: something ran.
+  terminal: [
+    "M3.5 5h17a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-17a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+    "M7 9.5 10 12l-3 2.5",
+    "M12.5 15h5",
+  ],
+  // Meridians: the call left this machine for the open web.
+  globe: [
+    "M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17Z",
+    "M3.5 12h17",
+    "M12 3.5c2.3 2.3 3.5 5.3 3.5 8.5s-1.2 6.2-3.5 8.5c-2.3-2.3-3.5-5.3-3.5-8.5s1.2-6.2 3.5-8.5Z",
+  ],
+  // Stacked bands with a mark on the top one: what Raiker kept, rather than
+  // what it read once. Distinct from `checkpoints`, which is rewinding.
+  memory: [
+    "M4 7.5c0-1.4 3.6-2.5 8-2.5s8 1.1 8 2.5-3.6 2.5-8 2.5-8-1.1-8-2.5Z",
+    "M4 7.5v9c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5v-9",
+    "M4 12c0 1.4 3.6 2.5 8 2.5s8-1.1 8-2.5",
+  ],
+  // A second, smaller figure behind the first: work delegated to another model.
+  agent: [
+    "M9.5 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z",
+    "M3 19.5c1.2-2.7 3.6-4.2 6.5-4.2s5.3 1.5 6.5 4.2",
+    "M16 6.2a2.6 2.6 0 0 1 0 5",
+    "M17.5 15.6c1.4.7 2.5 1.9 3.2 3.4",
+  ],
+  // The neutral fallback: a spanner. Not a gear — `settings` is a gear, and an
+  // unnamed tool row is not a settings row.
+  tool: [
+    "M14.8 3.6a5 5 0 0 0-6 6.6l-5.2 5.2a2 2 0 0 0 0 2.8l2.2 2.2a2 2 0 0 0 2.8 0l5.2-5.2a5 5 0 0 0 6.6-6l-3.1 3.1-3-.6-.6-3 3.1-3.1Z",
   ],
 };

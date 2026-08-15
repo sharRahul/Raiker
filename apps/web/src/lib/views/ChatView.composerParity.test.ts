@@ -104,11 +104,11 @@ describe("ChatView composer parity", () => {
     // Trigger, provider header, and model row all identify Anthropic.
     expect(screen.getAllByRole("img", { name: "Anthropic logo" })).toHaveLength(3);
     expect(screen.getByRole("menuitemradio", { name: /Claude Sonnet/ })).toBeInTheDocument();
-    const effort = screen.getByLabelText("Thinking effort");
+    const effort = screen.getByLabelText("Thinking");
     expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
       "Thinking: default",
-      "low",
-      "high",
+      "Thinking: low",
+      "Thinking: high",
     ]);
   });
 
@@ -123,7 +123,7 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
-    expect(screen.queryByLabelText("Thinking effort")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Thinking")).not.toBeInTheDocument();
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(screen.getByText("No model is set up.")).toBeInTheDocument();
@@ -140,8 +140,8 @@ describe("ChatView composer parity", () => {
     });
     render(ChatView, { projects });
 
-    await waitFor(() => expect(screen.getByLabelText("Thinking effort")).toBeInTheDocument());
-    await fireEvent.change(screen.getByLabelText("Thinking effort"), { target: { value: "high" } });
+    await waitFor(() => expect(screen.getByLabelText("Thinking")).toBeInTheDocument());
+    await fireEvent.change(screen.getByLabelText("Thinking"), { target: { value: "high" } });
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Reason" } });
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());

@@ -51,6 +51,68 @@ def _map_finish(stop_reason: str) -> str:
 ANTHROPIC_VERSION = "2023-06-01"
 EXTENDED_CACHE_TTL_BETA = "extended-cache-ttl-2025-04-11"
 
+# ── Extended thinking: two request shapes, and why one cannot be declared ────
+#
+# BUG-207 slice B. The Messages API accepts extended thinking in two spellings,
+# and which one a model accepts is a property of the *model*, not of the
+# provider. Measured against the live catalogue on 2026-08-15:
+#
+# | Model | `adaptive` | `enabled` + `budget_tokens` |
+# |---|---|---|
+# | opus-5, sonnet-5, fable-5, opus-4-8, opus-4-7 | accepted | refused |
+# | sonnet-4-6, opus-4-6 | accepted | accepted |
+# | opus-4-5, haiku-4-5, sonnet-4-5 | refused | accepted |
+#
+# `model-profiles.json` carries one `reasoning_modes` list for every model
+# behind `anthropic-hosted`, so no declaration is right for all of them — and
+# the wrong one does not degrade quietly, it fails the whole turn with a 400.
+# That is why the profile's declared `{"type": "adaptive"}` was never reached by
+# a real turn: the only models it fitted were not the ones being asked.
+#
+# So the shape is *negotiated* rather than declared. The first request for a
+# model uses the declared shape; if the provider refuses it **and names the
+# other one in the refusal**, that answer is recorded and the request is made
+# once more. This is not a fallback in the sense the runtime forbids — no
+# capability is substituted and nothing is silently downgraded. It is the
+# spelling of one field, corrected by the only authority on it.
+THINKING_ADAPTIVE = "adaptive"
+THINKING_BUDGETED = "enabled"
+# Used only for the budgeted spelling, where the API requires a number. Sized to
+# be useful on a hard question without dominating a short turn's cost; the
+# adaptive spelling lets the provider decide, which is why it is preferred.
+THINKING_BUDGET_TOKENS = 2048
+# What each model turned out to accept, keyed by model id and kept for the life
+# of the process. Cleared by `reset_thinking_negotiation()` in tests.
+_NEGOTIATED_THINKING: dict[str, str] = {}
+
+
+class _ThinkingShapeRejected(Exception):
+    """The provider refused this thinking spelling and named the other one."""
+
+    def __init__(self, shape: str) -> None:
+        super().__init__(f"thinking_shape_rejected:{shape}")
+        self.shape = shape
+
+
+def _rejected_thinking_shape(body: str) -> str | None:
+    """The spelling the provider asked for, read out of its own refusal.
+
+    Deliberately keyed on the provider's exact words rather than on "any 400
+    mentioning thinking": a refusal that does *not* name an alternative is a
+    real error and must stay one.
+    """
+    lowered = body.lower()
+    if "adaptive thinking is not supported" in lowered:
+        return THINKING_BUDGETED
+    if '"thinking.type.enabled" is not supported' in lowered:
+        return THINKING_ADAPTIVE
+    return None
+
+
+def reset_thinking_negotiation() -> None:
+    """Forget what every model was observed to accept (tests only)."""
+    _NEGOTIATED_THINKING.clear()
+
 
 def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
     if cache_ttl == "5m":
@@ -61,6 +123,12 @@ def _cache_control(cache_ttl: str | None) -> dict[str, Any] | None:
 
 
 def _map_status(status: int, *, model: str, body: str = "") -> Exception:
+    # Checked first, and only for a 400 that names the other thinking spelling:
+    # this is the one refusal the caller can answer itself (BUG-207 slice B).
+    if status == 400:
+        alternate = _rejected_thinking_shape(body)
+        if alternate is not None:
+            return _ThinkingShapeRejected(alternate)
     # Checked before auth and rate limiting: Anthropic answers an empty balance
     # with HTTP 400 on a perfectly valid key, so status alone would send the
     # owner to rotate a credential that is not the problem.
@@ -287,13 +355,41 @@ class AsyncAnthropicMessagesProvider:
                 }
                 for tool in request.tools
             ]
-        reasoning = request.reasoning
-        if reasoning and reasoning.enabled and self.capabilities.supports_reasoning:
-            thinking: dict[str, Any] = {"type": "adaptive"}
-            if reasoning.summary and self.capabilities.supports_reasoning_summary:
-                thinking["display"] = "summarized"
+        thinking = self._thinking(request)
+        if thinking is not None:
             payload["thinking"] = thinking
         return payload
+
+    def _thinking(self, request: ModelRequest) -> dict[str, Any] | None:
+        """The `thinking` block for this request, in the spelling this model takes.
+
+        Returns None when reasoning was not asked for, or when this profile does
+        not declare it — never a half-enabled block. The first request for a
+        model uses the adaptive spelling the profile declares; after a refusal
+        that named the other one, the recorded answer is used instead.
+        """
+        reasoning = request.reasoning
+        if not (reasoning and reasoning.enabled and self.capabilities.supports_reasoning):
+            return None
+        model = request.model or self.model
+        shape = _NEGOTIATED_THINKING.get(model, THINKING_ADAPTIVE)
+        if shape == THINKING_BUDGETED:
+            budget = reasoning.budget_tokens or THINKING_BUDGET_TOKENS
+            # The budget has to leave room for the answer, and `max_tokens`
+            # counts both. A budget that met or exceeded it would be refused.
+            limit = request.max_tokens or self.max_tokens
+            return {"type": "enabled", "budget_tokens": max(1024, min(budget, limit - 512))}
+        thinking: dict[str, Any] = {"type": THINKING_ADAPTIVE}
+        # `display: summarized` is what the owner should see: the provider's own
+        # summary of its reasoning rather than its raw scratch text. Asked for
+        # only where the profile declares the capability.
+        if reasoning.summary and self.capabilities.supports_reasoning_summary:
+            thinking["display"] = "summarized"
+        return thinking
+
+    @staticmethod
+    def _record_thinking_shape(model: str, shape: str) -> None:
+        _NEGOTIATED_THINKING[model] = shape
 
     @staticmethod
     def _cache_headers(request: ModelRequest) -> dict[str, str]:
@@ -302,13 +398,21 @@ class AsyncAnthropicMessagesProvider:
         return {}
 
     async def chat(self, request: ModelRequest) -> ModelResponse:
-        response = await self._request(
-            "POST",
-            self.chat_path,
-            json=self._payload(request, stream=False),
-            headers=self._cache_headers(request),
-        )
-        return self._parse_chat(_json(response))
+        for attempt in (0, 1):
+            try:
+                response = await self._request(
+                    "POST",
+                    self.chat_path,
+                    json=self._payload(request, stream=False),
+                    headers=self._cache_headers(request),
+                )
+            except _ThinkingShapeRejected as rejected:
+                if attempt:
+                    raise ProviderUnsupportedCapabilityError("reasoning_unsupported") from rejected
+                self._record_thinking_shape(request.model or self.model, rejected.shape)
+                continue
+            return self._parse_chat(_json(response))
+        raise ProviderUnsupportedCapabilityError("reasoning_unsupported")
 
     def _parse_chat(self, data: dict[str, Any]) -> ModelResponse:
         if data.get("type") == "error" or isinstance(data.get("error"), dict):
@@ -317,6 +421,7 @@ class AsyncAnthropicMessagesProvider:
         if not isinstance(content, list):
             raise ProviderResponseValidationError("missing_content")
         text_parts: list[str] = []
+        reasoning_parts: list[str] = []
         tool_calls: list[ToolCallProposal] = []
         for block in content:
             if not isinstance(block, dict):
@@ -324,6 +429,12 @@ class AsyncAnthropicMessagesProvider:
             block_type = block.get("type")
             if block_type == "text" and isinstance(block.get("text"), str):
                 text_parts.append(block["text"])
+            # BUG-207 — a `thinking` block is the model's own reasoning, kept
+            # apart from its answer. The block's `signature` is the provider's
+            # integrity marker for a thinking block that is replayed back to it;
+            # it is not text and never reaches a surface.
+            elif block_type == "thinking" and isinstance(block.get("thinking"), str):
+                reasoning_parts.append(block["thinking"])
             elif block_type == "tool_use":
                 raw_input = block.get("input")
                 arguments: dict[str, Any] = raw_input if isinstance(raw_input, dict) else {}
@@ -344,11 +455,27 @@ class AsyncAnthropicMessagesProvider:
             tool_calls=tool_calls,
             finish_reason=finish,
             usage=usage,
+            reasoning="".join(reasoning_parts),
         )
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         if not self.capabilities.supports_streaming:
             raise ProviderUnsupportedCapabilityError("streaming_unsupported")
+        try:
+            async for event in self._stream_once(request):
+                yield event
+        except _ThinkingShapeRejected as rejected:
+            # Nothing has been yielded yet: the refusal arrives on the response
+            # status, before the first SSE line. Record the spelling the
+            # provider named and make the request once more (BUG-207 slice B).
+            self._record_thinking_shape(request.model or self.model, rejected.shape)
+            try:
+                async for event in self._stream_once(request):
+                    yield event
+            except _ThinkingShapeRejected as again:
+                raise ProviderUnsupportedCapabilityError("reasoning_unsupported") from again
+
+    async def _stream_once(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:
         usage_acc: dict[str, Any] = {}
         tool_blocks: dict[int, dict[str, str]] = {}
         finish_emitted = False
@@ -410,6 +537,18 @@ class AsyncAnthropicMessagesProvider:
                             text = delta.get("text")
                             if isinstance(text, str) and text:
                                 yield ModelStreamEvent(event_type="text_delta", text_delta=text)
+                        # BUG-207 slice B — the branch that was missing. Raiker
+                        # asked for extended thinking, the provider sent it, and
+                        # every chunk fell through this chain unread. A
+                        # `signature_delta` arrives on the same block and is
+                        # deliberately *not* handled: it is an integrity marker
+                        # for replaying the block, not something to show anyone.
+                        elif delta.get("type") == "thinking_delta":
+                            thought = delta.get("thinking")
+                            if isinstance(thought, str) and thought:
+                                yield ModelStreamEvent(
+                                    event_type="reasoning_delta", reasoning_delta=thought
+                                )
                         elif delta.get("type") == "input_json_delta" and isinstance(index, int):
                             partial = delta.get("partial_json")
                             if isinstance(partial, str):
@@ -454,6 +593,12 @@ class AsyncAnthropicMessagesProvider:
         except asyncio.CancelledError:
             raise
         except ProviderStreamError:
+            raise
+        # BUG-207 slice B — this one is answerable by the caller, so it must
+        # reach it rather than being flattened into a generic stream failure.
+        # Nothing has been yielded when it is raised: the refusal arrives on the
+        # response status, before the first SSE line.
+        except _ThinkingShapeRejected:
             raise
         except Exception as exc:
             # BUG-72 — a failure the status mapper or the transport already

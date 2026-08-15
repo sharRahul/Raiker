@@ -65,7 +65,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-205](#bug-205--a-plain-pytest-tests-run-fails-because-cipher_memory_security-is-a-one-way-latch) | Low | Test isolation / SQLCipher posture | Open |
 | [BUG-206](#bug-206--a-tool-call-is-invisible-in-chat) | High | Chat / streaming surface | Open |
 | [BUG-207](#bug-207--the-models-real-reasoning-is-requested-discarded-and-replaced-with-three-canned-sentences) | Medium | Chat / streaming honesty | Open |
-| [BUG-208](#bug-208--the-surfaces-read-as-a-briefing-rather-than-a-product) | Medium | UI density | Open |
+| [BUG-208](#bug-208--the-product-explains-itself-on-every-screen-and-the-guide-it-should-be-explaining-from-is-unreachable) | Medium | UI density / documentation surface | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
@@ -410,51 +410,74 @@ turn simply streams its answer with no chrome above it.
 
 ---
 
-## BUG-208 — The surfaces read as a briefing rather than a product
+## BUG-208 — The product explains itself on every screen, and the guide it should be explaining from is unreachable
 
-**Severity: Medium. Area: UI density. Status: Open.**
+**Severity: Medium. Area: UI density / documentation surface. Status: Open.**
 
-**Observed.** The transcript itself is close to right — an ordinary settled turn
-is a prompt bubble, an answer, and a copy glyph. The weight is in everything
-around it, where explanation that belonged in a design review has been left on
-the screen.
+**Observed.** Raiker teaches on the page instead of showing state. Counted across
+the component tree on 2026-08-15 — static sentences only, nothing interpolated,
+comments and styles excluded:
 
-One provider card, read from the live page on 2026-08-15, renders as:
+> **23,236 characters of explanatory prose, 216 sentences, in 53 components.**
 
-```
-Anthropic · Haiku 4.5 · Connection saved · Ready · confirmed just now ·
-Needs network · Egress-gated · Hosted models · Cache 5m ·
-1 model used · 2 turns · $0.0007 · 100% of your total API spend ·
-list price, as of 2026-07 · Reconnect · Disconnect · Test · Change model… · Details
-```
+Roughly 3,700 words of documentation compiled into the interface. The heaviest
+surfaces, by characters of static prose:
 
-That is five status chips, a three-clause cost sentence and five controls on one
-card, and the Models page renders thirteen of them. Elsewhere the same habit:
-every card explains itself in a sentence under its own title (`"Generated
-document from this response, preserved in this conversation."`), and a decision
-card adds two notes to the decision (`"Nothing ran for it. The rest of this turn
-was decided separately."`, `"Decide here or in the Approvals inbox — this
-conversation continues on its own as soon as you do, in whichever tab you use."`).
+| Component | Chars | Sentences |
+|---|---|---|
+| `ModelsView.svelte` | 2,783 | 20 |
+| `SecurityLogin.svelte` | 1,342 | 11 |
+| `ProjectsView.svelte` | 1,220 | 9 |
+| `Runtime.svelte` | 1,149 | 7 |
+| `ExtensionsView.svelte` | 1,122 | 6 |
+| `CheckpointsView.svelte` | 927 | 9 |
 
-Each sentence is individually defensible, which is how it accumulated. Together
-they mean the owner reads a paragraph to learn a state.
+It reads as documentation because it is documentation:
 
-**Root cause.** No rule about where an explanation lives. The product's honesty
-principle — *"badges/copy always state what is real"* — has been read as *"say
-all of it, on the card"*, and nothing distinguishes the fact a glance needs from
-the reason a curious owner wants on demand.
+> *"A project is a named scope for an ongoing piece of work: its own folder inside
+> the workspace, plus the sessions and checkpoints created while it is active."*
+> — `ProjectsView`, above the list of projects
+
+> *"The recorder timeline: metadata snapshots taken at safe points as sessions
+> run. Nothing here executes a restore — every entry is a record of where the
+> workspace stood."* — `CheckpointsView`, page header
+
+> *"The model profiles Raiker can talk to. The choice of backend belongs to you —
+> local, home-lab, or hosted — and there is never a silent fallback between
+> them."* — `ModelsView`, page header
+
+Each is well written and true. None of it is state, and none of it is a next
+action; a returning owner reads the same paragraph on every visit to learn
+nothing they did not know the first time.
+
+**The blocker, and why the order matters.** `docs/guide/` already holds exactly
+this material in eight documents — `getting-started`, `connecting-a-model`,
+`permissions-and-runtime-modes`, `working-in-chat`, `tasks-and-projects`,
+`extensions-and-mcp`, `troubleshooting`. **The product cannot reach any of it.**
+There is no guide route, no help surface, no API that serves it, and no component
+that links to it; the only path in is the README's Documentation list, which a
+person running the app is not reading. So the prose is on the page because the
+page is the only place it can be.
+
+That fixes the sequence: **give the product somewhere to send people, then take
+the paragraphs off the screen.** Stripping first would delete the only copy an
+owner can actually get to.
 
 **Required fix, in slices.**
 
-| Slice | Work |
-|---|---|
-| **A — one rule, written down** | A card shows **state + the single next action**. Anything explaining *why* moves behind the disclosure that already exists (`Details`) or into the tooltip. Add it to `VISUAL_DESIGN_SPEC.md` so the next card is built to it rather than trimmed later. |
-| **B — the provider card** | Collapse the posture chips into one capability line, reveal cost only where there is cost to report, and demote three of the five controls into the existing `Details`. Highest-volume surface, so it is the one worth doing first. |
-| **C — self-describing cards** | Delete the sentence that restates the card's own title across artifact, approval and refusal cards. |
-| **D — decision copy** | One sentence per decision. The second note becomes a tooltip or goes. |
-| **E — the auto emoji reaction** | Raiker appends an emoji to the **owner's own message** by regex on its text (`"Thanks!"` → ❤️). It is not a reaction to anything Raiker did, and no comparable assistant does it. Decide deliberately whether it stays; if it does, it belongs on Raiker's message, not the owner's. |
+| Slice | Work | Why it is separable |
+|---|---|---|
+| **A — the guide becomes part of the product** | Ship `docs/guide/` with the app and serve it read-only over the governed API, rendered with the `Markdown` component the transcript already uses. One route, `#/guide`, plus deep links to a section. | Pure addition. Nothing is removed, so it cannot regress a surface. Also fixes that a packaged install has no help at all. |
+| **B — one contextual entry point** | A single quiet control per page — the `Details` disclosure pattern that already exists — resolving to that page's guide section. `Models` → `connecting-a-model`, `Permissions` → `permissions-and-runtime-modes`, `Projects`/`Tasks` → `tasks-and-projects`. | Needs A, and nothing else. Testable per route. |
+| **C — move, do not delete** | For each page header paragraph: confirm the sentence exists in the guide section, move it there if it does not, and only then remove it from the component. The guide gains what the UI loses, so the total stays truthful. | The discipline that keeps this from being a copy cull. Do it page by page, heaviest first — Models, Security, Projects, Runtime, Extensions, Checkpoints. |
+| **D — the rule, written down** | A component may carry: the state, the next action, and a failure's reason with its remediation. Everything else lives in the guide. Add it to `VISUAL_DESIGN_SPEC.md` so the next surface is built to it. | Independent of the code; without it the prose returns one card at a time. |
+| **E — the density that is not prose** | The provider card still renders five status chips, a three-clause cost sentence and five controls, thirteen times over on one page. Collapse the posture chips into one capability line, show cost only where there is cost, and demote three controls into `Details`. | Layout rather than words; separable from A–D. |
+| **F — the auto emoji reaction** | Raiker appends an emoji to the **owner's own message** by regex on its text (`"Thanks!"` → ❤️). It is not a reaction to anything Raiker did, and it is the one element of the transcript that is neither state nor content. Decide deliberately whether it stays. | A product call, not a cleanup; deliberately last. |
 
-**Required user-interface outcome.** Every card answers "what is this, and what
-do I do next" in one glance, with the reasoning one click away and no less
-truthful for being there. The measure to hold it to: a provider card fits its
-state in one line of chips, and no card explains what its own title already says.
+**Required user-interface outcome.** A page says what is true right now and what
+the owner can do next. Anything that begins *"A project is…"* or *"The recorder
+timeline is…"* lives in the guide, one click away from the surface it describes,
+and the app can open it without a browser tab or a repository checkout. The
+measure to hold this to is the one that produced the finding: re-run the count,
+and the static prose in `apps/web/src/lib` should be a small fraction of 23,236
+characters, with the difference **present in `docs/guide/`** rather than gone.

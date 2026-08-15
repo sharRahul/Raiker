@@ -3,92 +3,33 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from raiker.models.tool_registry import READ_SHAPED_TOOL_NAMES
+
 
 @dataclass(frozen=True)
 class StaticPolicyConfig:
     workspace_root: Path
     policy_id: str = "phase1-static"
     policy_version: str = "phase1-static-v1"
+    #: What the policy engine treats as read-shaped.
+    #:
+    #: The tool half is derived: a tool declares `read_shaped` once, in
+    #: `raiker.models.tool_registry`, rather than being remembered into this
+    #: set as well. What stays written out here are the entries that are not
+    #: tools at all — account and role administration, and the approval
+    #: execution relay — which have no registry entry to derive from because
+    #: no model ever proposes them.
     allowed_read_actions: frozenset[str] = field(
-        default_factory=lambda: frozenset(
+        default_factory=lambda: READ_SHAPED_TOOL_NAMES
+        | frozenset(
             {
-                "read_file",
-                "list_directory",
-                "glob",
-                "grep",
-                "stat_path",
-                "diff_files",
-                "git_status",
-                "git_diff",
-                "git_log",
-                "memory_search",
-                "memory_list",
-                "memory_get",
-                # B9 — reading the repository code map. Read-shaped for the same
-                # reason `connector_read` is: what governs it is enforced inside
-                # the tool — the `code_map_indexing` capability gate and the
-                # decision mode — and it returns coordinates into files the agent
-                # may already open with `read_file`, so it adds no authority.
-                "code_map_search",
-                "code_map_references",
-                # RAIKER-2020 — reading back the owner's own past
-                # conversations. Read-shaped for the same reason
-                # `memory_search` is: it returns records the owner already
-                # owns and can already open in Chat.
-                "conversation_search",
-                # Reading an installed skill is a local, owner-scoped read of
-                # the owner's own instruction document. Nothing is executed.
-                "skill_load",
-                "vector_get",
-                # The consult itself is gated inside the tool (advisor gate +
-                # decision mode + provider policy); the proposal is read-shaped.
-                "consult_advisor",
-                # Governed inside the tool (connector gate + decision mode +
-                # owner credential + egress allowlist); the proposal is read-shaped.
-                "github_read",
-                "gmail_read",
-                "gcal_read",
-                "slack_read",
-                # Governed inside the tool (connector gate + decision mode +
-                # owner credential + egress allowlist + manifest-driven
-                # operation allowlist); the proposal is read-shaped.
-                "connector_read",
-                # B12/C7 — the agent's own web reads. Read-shaped here for the
-                # same reason `connector_read` is: what governs them is enforced
-                # inside the tool — the `web_fetch` capability gate, the decision
-                # mode (default `ask` withholds), the owner egress allowlist, and
-                # HTTPS-only, public-address, re-governed-redirect URL checks.
-                #
-                # `web_fetch` names a *tool* here and a *capability* in
-                # `CAPABILITY_GATE_MAP`; the two vocabularies share the string on
-                # purpose, because one gate governs both paths. It is deliberately
-                # not also listed in `approval_required_actions` below: with the
-                # same name in both sets the read branch would silently win, which
-                # is the "two lists that have to agree" defect this codebase keeps
-                # finding. The capability path is unchanged by that — `route_action`
-                # gates it on the capability gate and on the decision mode, whose
-                # default `ask` forces approval for any AI-proposed action.
-                "web_fetch",
-                "web_search",
-                "create_document",
-                "run_command",
-                # B6 — recording the agent's plan writes one owner-scoped row of
-                # the model's own intentions. It executes nothing, so it is
-                # read-shaped here; every step it names is governed when it is
-                # actually attempted.
-                "update_plan",
-                # B7 — spawning a bounded subagent. Read-shaped for the same
-                # reason `connector_read` is: the subagent's steps are each
-                # re-brokered through this engine, and its delegable tool set is
-                # read-only with no egress, so the spawn adds no authority.
-                "spawn_subagent",
-                "user_create",
-                "user_deactivate",
+                "approval_execution_relay",
+                "principal_create",
                 "role_create",
                 "role_grant",
                 "role_revoke",
-                "approval_execution_relay",
-                "principal_create",
+                "user_create",
+                "user_deactivate",
             }
         )
     )

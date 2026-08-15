@@ -9,6 +9,7 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SubagentContract, TeamLedger, ToolAction
+from raiker.models.tool_registry import DELEGABLE_TOOL_NAMES
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.identity.lifecycle import (
@@ -22,19 +23,11 @@ from raiker.storage.sqlite import SQLiteStore
 # parent's authority, and any such step would still be policy- and
 # approval-gated per action regardless. Keeping the delegable set read-only is
 # what makes this in-process orchestration bounded and reviewable.
-DELEGABLE_TOOLS: frozenset[str] = frozenset({
-    "read_file", "list_directory", "glob", "grep", "stat_path", "diff_files",
-    "git_status", "git_diff", "git_log", "memory_search", "memory_list", "memory_get",
-    # B9 — a code map read is local, read-only and egress-free, which is exactly
-    # the delegable set's rule. It is also the tool a wide investigation most
-    # wants: finding where things are defined is the search a subagent is for.
-    "code_map_search",
-    "code_map_references",
-    # RAIKER-2020 — a read of the owner's own transcript: local, read-only
-    # and egress-free, which is exactly the delegable set's rule.
-    "conversation_search",
-    "vector_get", "skill_load",
-})
+#
+# Which tools those are is declared per tool in `raiker.models.tool_registry`,
+# so a new read-only tool cannot be added to the catalogue and silently left
+# out of — or silently dropped into — the delegable set.
+DELEGABLE_TOOLS: frozenset[str] = DELEGABLE_TOOL_NAMES
 
 # A subagent may only *propose* these mutations. The broker parks them in the
 # parent's approval queue; the subagent neither executes nor resolves them.

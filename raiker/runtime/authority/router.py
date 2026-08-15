@@ -8,6 +8,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.models.tool_registry import TOOL_CAPABILITY_BY_TOOL
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.authority import grants
@@ -47,7 +48,13 @@ NON_ALLOW_DECISIONS = frozenset({
 })
 
 # Maps action_type / tool_or_service_name to capability gate names
+# Tool -> capability, plus the capability aliases the runtime authority routes
+# on directly. The **tool** half is derived from `raiker.models.tool_registry`,
+# so a tool cannot be added to the catalogue and left answering to no gate; the
+# aliases below stay written out, because a capability name is a different
+# vocabulary from a tool name and has no registry entry to come from.
 CAPABILITY_GATE_MAP: dict[str, str] = {
+    **TOOL_CAPABILITY_BY_TOOL,
     "admin_mutation": "admin_mutation",
     "role_mutation": "role_mutation",
     "policy_mutation": "policy_mutation",

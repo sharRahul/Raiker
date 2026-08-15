@@ -4,7 +4,6 @@ import hashlib
 import json
 import subprocess
 import sys
-from dataclasses import replace
 from pathlib import Path
 from typing import Any
 from unittest.mock import Mock
@@ -332,7 +331,7 @@ def test_the_native_backend_refuses_unbuilt_capabilities_by_name(
     directory = _installed_runner(tmp_path)
     driver = NativeSandboxDriver(tmp_path, helper_root=directory, run_probe=_probe_reply())
     backend = NativeSandboxBackend(driver=driver, proof=driver.probe())
-    asked = replace(request(tmp_path), **{field: True})
+    asked = request(tmp_path, **{field: True})
     with pytest.raises(CommandBackendError) as raised:
         backend.start(asked)
     assert raised.value.reason_code == reason

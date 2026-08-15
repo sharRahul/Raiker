@@ -4,6 +4,8 @@ from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from typing import Any, ClassVar
 
+from raiker.models.tool_registry import CONTRACT_TOOL_NAMES
+
 SCHEMA_VERSION = "1.0"
 
 CLIENT_TYPES = {
@@ -448,30 +450,11 @@ INTENTS = {
     "unknown",
 }
 RISK_LEVELS = {"low", "medium", "high", "critical", "blocked"}
-TOOLS = {
-    "read_file",
-    "list_directory",
-    "glob",
-    "grep",
-    "stat_path",
-    "diff_files",
-    "write_file",
-    "edit_file",
-    "apply_patch",
-    "git_status",
-    "git_diff",
-    "git_log",
-    "memory_write",
-    "memory_search",
-    "code_map_search",
-    "code_map_references",
-    "conversation_search",
-    "memory_forget",
-    "memory_list",
-    "memory_get",
-    "skill_load",
-    "shell",
-}
+# Derived, not restated: a tool that is registered is a tool this contract
+# knows. The previous hand-maintained set was one of the twelve places a new
+# tool had to be written into, and the only symptom of forgetting was a
+# contract-validation failure a long way from the omission.
+TOOLS = set(CONTRACT_TOOL_NAMES)
 POLICY_DECISIONS = {"allow", "deny", "needs_approval", "allow_managed"}
 MANAGED_POLICY_EFFECTS = {"allow", "deny"}
 TOOL_STATUSES = {"success", "failed", "denied", "approval_required"}

@@ -126,9 +126,10 @@ def test_the_nonce_set_does_not_grow_past_the_clock_skew_window() -> None:
     clock = {"now": 1_800_000_000.0}
     codec = SupervisorCodec(b"k" * 32, clock=lambda: clock["now"], max_clock_skew_seconds=10)
     for index in range(5):
+        nonces = [f"n{index}"]
         codec.decode(
             SupervisorCodec(
-                b"k" * 32, nonce_factory=lambda index=index: f"n{index}", clock=lambda: clock["now"]
+                b"k" * 32, nonce_factory=nonces.pop, clock=lambda: clock["now"]
             ).encode("status", {})
         )
     clock["now"] += 60

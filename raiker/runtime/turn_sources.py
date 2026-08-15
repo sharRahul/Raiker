@@ -43,6 +43,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from raiker.models.tool_registry import TOOL_SOURCE_KIND_BY_TOOL
 from raiker.runtime.source_provenance import (
     MAX_EXCERPT_CHARS,
     build_excerpt,
@@ -65,35 +66,12 @@ MAX_PASSAGE_CHARS = 20_000
 # ledger states that it stopped counting rather than growing without limit.
 MAX_SOURCES_PER_TURN = 40
 
-#: Tools whose results are *material a turn read*, mapped to the source kind the
-#: transcript labels them with. A tool that changes something, records a plan,
-#: or answers about the runtime itself is deliberately absent: it produced no
-#: material for the answer to have come from.
-TOOL_SOURCE_KINDS: dict[str, str] = {
-    "read_file": "file",
-    "grep": "file",
-    "glob": "file",
-    "list_directory": "file",
-    "diff_files": "file",
-    "git_status": "repository",
-    "git_diff": "repository",
-    "git_log": "repository",
-    "code_map_search": "repository",
-    "code_map_references": "repository",
-    "conversation_search": "conversation",
-    "memory_search": "memory",
-    "memory_list": "memory",
-    "memory_get": "memory",
-    "skill_load": "skill",
-    "github_read": "repository",
-    "gmail_read": "email",
-    "gcal_read": "calendar",
-    "slack_read": "chat_tool",
-    "connector_read": "connector",
-    "web_fetch": "web",
-    "web_search": "web",
-    "spawn_subagent": "subagent",
-}
+#: Tools whose results are *material a turn read*, mapped to the source kind
+#: the transcript labels them with. A tool that changes something, records a
+#: plan, or answers about the runtime itself is deliberately absent: it
+#: produced no material for the answer to have come from. That distinction is
+#: declared once, per tool, in `raiker.models.tool_registry`.
+TOOL_SOURCE_KINDS: dict[str, str] = dict(TOOL_SOURCE_KIND_BY_TOOL)
 
 #: Attachment statuses that mean the file's material really entered the turn.
 #: An image is deliberately absent: its bytes travel as an image block and its

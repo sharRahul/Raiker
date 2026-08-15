@@ -490,7 +490,10 @@ and the interface outcome that had to be true first — in
 ## Documentation
 
 - **[User guide](docs/guide/README.md)** — install, connect a model, permissions,
-  Chat, tasks, extensions, troubleshooting.
+  Chat, tasks, extensions, troubleshooting. **Also inside the app**, under
+  Utilities → **Guide**: the same seven sections, served read-only from the
+  install, so a running Raiker carries its own help rather than sending you to a
+  repository. Set `RAIKER_GUIDE_DIR` to read a different checkout's copy.
 - **[Documentation index](docs/README.md)** — architecture, security model,
   commands, API contracts, capability status, verification.
 - **[Live manual test plan](docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — a

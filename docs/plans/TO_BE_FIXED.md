@@ -450,8 +450,12 @@ Each is well written and true. None of it is state, and none of it is a next
 action; a returning owner reads the same paragraph on every visit to learn
 nothing they did not know the first time.
 
-**The blocker, and why the order matters.** `docs/guide/` already holds exactly
-this material in eight documents — `getting-started`, `connecting-a-model`,
+**The blocker, now cleared.** Slice A is done: the guide is a destination in the
+product ([FIXED-209](FIXED_ITEMS.md#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product)),
+so every paragraph below has somewhere to move to. The rest of this entry is
+unchanged, and the observation that produced it stands.
+
+`docs/guide/` already holds exactly this material in eight documents — `getting-started`, `connecting-a-model`,
 `permissions-and-runtime-modes`, `working-in-chat`, `tasks-and-projects`,
 `extensions-and-mcp`, `troubleshooting`. **The product cannot reach any of it.**
 There is no guide route, no help surface, no API that serves it, and no component
@@ -459,15 +463,16 @@ that links to it; the only path in is the README's Documentation list, which a
 person running the app is not reading. So the prose is on the page because the
 page is the only place it can be.
 
-That fixes the sequence: **give the product somewhere to send people, then take
-the paragraphs off the screen.** Stripping first would delete the only copy an
-owner can actually get to.
+That fixed the sequence: **give the product somewhere to send people, then take
+the paragraphs off the screen.** Stripping first would have deleted the only copy
+an owner could actually get to. Slice B (a contextual entry point per page) is
+now the next unblocked step.
 
 **Required fix, in slices.**
 
 | Slice | Work | Why it is separable |
 |---|---|---|
-| **A — the guide becomes part of the product** | Ship `docs/guide/` with the app and serve it read-only over the governed API, rendered with the `Markdown` component the transcript already uses. One route, `#/guide`, plus deep links to a section. | Pure addition. Nothing is removed, so it cannot regress a surface. Also fixes that a packaged install has no help at all. |
+| ~~**A — the guide becomes part of the product**~~ | **Done** — closed as [FIXED-209](FIXED_ITEMS.md#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product). `#/guide` serves all seven sections read-only over the governed API, deep-linkable per section. | Pure addition. Nothing was removed, so it could not regress a surface. |
 | **B — one contextual entry point** | A single quiet control per page — the `Details` disclosure pattern that already exists — resolving to that page's guide section. `Models` → `connecting-a-model`, `Permissions` → `permissions-and-runtime-modes`, `Projects`/`Tasks` → `tasks-and-projects`. | Needs A, and nothing else. Testable per route. |
 | **C — move, do not delete** | For each page header paragraph: confirm the sentence exists in the guide section, move it there if it does not, and only then remove it from the component. The guide gains what the UI loses, so the total stays truthful. | The discipline that keeps this from being a copy cull. Do it page by page, heaviest first — Models, Security, Projects, Runtime, Extensions, Checkpoints. |
 | **D — the rule, written down** | A component may carry: the state, the next action, and a failure's reason with its remediation. Everything else lives in the guide. Add it to `VISUAL_DESIGN_SPEC.md` so the next surface is built to it. | Independent of the code; without it the prose returns one card at a time. |

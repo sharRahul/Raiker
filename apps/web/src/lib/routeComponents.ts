@@ -34,6 +34,7 @@ export type LazyRouteId =
   | "extensions"
   | "observe"
   | "settings"
+  | "guide"
   | "model-setup";
 
 // The props each route takes differ, so the map is typed at the loosest shape
@@ -45,6 +46,7 @@ type Loader = () => Promise<{ default: RouteComponent }>;
 
 const LOADERS: Record<LazyRouteId, Loader> = {
   "search-chat": () => import("./views/SearchChatView.svelte"),
+  guide: () => import("./views/GuideView.svelte"),
   memory: () => import("./views/MemoryView.svelte"),
   approvals: () => import("./views/ApprovalsView.svelte"),
   tasks: () => import("./views/TasksView.svelte"),

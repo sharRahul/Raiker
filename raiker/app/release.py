@@ -261,6 +261,13 @@ def collect_payload(
         candidate = root / name
         if candidate.is_file():
             entries.append(BundleEntry(f"service/{name}", candidate))
+    # The user guide travels with the service (BUG-208 slice A). `raiker.guide`
+    # resolves it as `docs/guide` beside the package, which is what this layout
+    # lays down — so an installed Raiker carries its own help instead of
+    # pointing at a repository the owner does not have.
+    guide = root / "docs" / "guide"
+    if guide.is_dir():
+        entries.extend(_iter_files(guide, "service/docs/guide"))
     if web_assets is not None:
         assets = Path(web_assets)
         if not (assets / "index.html").is_file():

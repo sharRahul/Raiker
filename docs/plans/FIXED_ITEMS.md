@@ -210,6 +210,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-202](#fixed-202--memories-with-no-similarity-to-the-prompt-were-recalled-into-context) | High | Memory retrieval / context | Fixed |
 | [FIXED-203](#fixed-203--chunk_text-looped-forever-when-the-overlap-reached-the-chunk-size) | Low | Vector chunking | Fixed |
 | [FIXED-204](#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected) | High | First-run setup / Models honesty | Fixed (was BUG-198) |
+| [FIXED-209](#fixed-209--the-guide-the-interface-was-explaining-from-is-now-inside-the-product) | Medium | Documentation surface | Fixed (BUG-208 slice A) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -7743,3 +7744,68 @@ something was observed to answer. The first-run wizard is held to the same
 readiness rule the composer enforces two clicks later, and thirteen live specs
 were updated to the card's honest wording rather than left asserting the claim
 that was wrong.
+
+---
+
+## FIXED-209 — The guide the interface was explaining from is now inside the product
+
+**Severity: Medium. Area: documentation surface. BUG-208 slice A.**
+
+**Observed.** Raiker taught on the page instead of showing state: 23,236
+characters of static explanatory prose across 216 sentences in 53 components,
+counted on 2026-08-15. `ModelsView` alone carried 2,783 of them. Page headers
+read as documentation because they were documentation — *"A project is a named
+scope for an ongoing piece of work…"*, *"The recorder timeline: metadata
+snapshots taken at safe points…"*.
+
+`docs/guide/` already held that material in eight documents, and **the product
+could not reach a word of it**: no guide route, no help surface, no API serving
+it, no component linking to it. The only way in was the README's documentation
+list, which is not something a person running the app is reading. So the prose
+was on the page because the page was the only place it could be — and stripping
+it first would have deleted the only copy an owner could get to.
+
+**Fix.** The destination, so the rest of BUG-208 becomes possible.
+
+- `raiker/guide/` resolves the guide as a product asset: `RAIKER_GUIDE_DIR` when
+  set — **authoritatively**, because an owner who points Raiker at a guide and
+  silently gets a different one has been told something untrue — otherwise
+  `docs/guide` beside the package, which is both a source checkout and the layout
+  the release bundle lays down. A build carrying no guide resolves to `None`
+  rather than an empty list, so the surface says *"this build did not ship the
+  guide"* instead of implying there is nothing to read.
+- `GET /api/guide` and `GET /api/guide/{slug}` serve it read-only behind the same
+  authentication as every other read. A slug must match `^[a-z0-9]+(-[a-z0-9]+)*$`
+  and is resolved against the sections the module itself listed, so a path is
+  never built from caller input — the traversal question is answered by not
+  asking it. Eight traversal and malformed-slug inputs are covered.
+- `#/guide` renders with the same `Markdown` component the transcript uses, with
+  a section rail, per-section deep links, and a sidebar entry under Utilities.
+- `raiker/app/release.py` carries `docs/guide` into the bundle as
+  `service/docs/guide`, so an installed Raiker ships its own help rather than
+  pointing at a repository the owner does not have.
+
+**Two defects found by building it, both fixed here.** The view first rendered
+its own `<h1>Guide</h1>` beneath the shell's page title — a second heading no
+other view has, which is the exact duplication this ticket is about. And a deep
+link arriving while the guide was already open was ignored, because a same-route
+hash change does not remount a view and the section was loaded in `onMount`;
+loading is now driven by the route. That path is the one a contextual "Learn
+more" from another surface will use, so it had to work before slice B is built
+on it.
+
+Titles and summaries are read from each document rather than stored beside it, so
+a guide edit cannot leave the product describing a page as it used to be — and
+the summary skips fenced blocks, which is what stopped the section list
+describing *Getting started* as `git clone https://…`.
+
+**Verified live**: all seven sections listed in reading order, Markdown rendered
+as elements rather than source, `#/guide?section=troubleshooting` opening the
+section it names, 0 console errors. Evidence:
+[`screenshots/working/fixed209-guide-in-product.png`](screenshots/working/fixed209-guide-in-product.png).
+Spec: [`guide-surface-live.spec.ts`](../../apps/web/e2e/guide-surface-live.spec.ts).
+
+**User-interface outcome.** The product can open its own guide, so an owner who
+wants to know what a project *is* has somewhere to go that is not a page header.
+This adds a destination and removes nothing; the prose still on the surfaces is
+BUG-208 slices B–D, which are now unblocked.

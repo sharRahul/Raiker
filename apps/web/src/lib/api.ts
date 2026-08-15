@@ -47,6 +47,8 @@ import type {
   MemoryControlView,
   MemoryProposal,
   MemoryHistoryEvent,
+  GuideIndex,
+  GuideSection,
   MemorySettingsView,
   ModelPricingView,
   ModelReadinessView,
@@ -349,6 +351,11 @@ export interface SettingsView {
 }
 
 export const api = {
+  // ── The user guide, served from the install rather than a repository ──
+  guide: () => request<GuideIndex>("/api/guide"),
+  guideSection: (slug: string) =>
+    request<GuideSection>(`/api/guide/${encodeURIComponent(slug)}`),
+
   // ── Local-account settings, vault key, MFA status ──
   settings: () => request<SettingsView>("/api/settings"),
   composerApprovalMode: () =>

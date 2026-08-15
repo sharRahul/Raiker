@@ -56,6 +56,46 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 
 ---
 
+## Claude Cowork Coverage — delegated Tasks and Schedule
+
+Cowork's two organising ideas are a **Task** (work handed to the agent that
+outlives the message you handed it in) and a **Schedule** (that work re-armed on
+a cadence). Raiker has both, and the difference is where they run.
+
+| Cowork concept | Raiker behaviour | Code |
+|---|---|---|
+| Delegate work that outlives the turn | Task rows with progress, a safe-boundary stop, and a finished list stating how each run ended | `raiker/tasks/manager.py`, Tasks view |
+| Task parked on a decision | A run waiting on an approval reads as **blocked** with the reason and a link to the decision — not as failed | `raiker/tasks/scheduler.py`, Approvals |
+| Recurring schedule | Four named cadences — `continuous` (20 min), `hourly`, `daily`, `weekly` — re-armed after every cycle, so a standing agent keeps working until stopped | `RECURRING_INTERVALS`, `raiker/tasks/scheduler.py` |
+| Missed-slot behaviour | `next_run_after` steps from the owner's original slot and skips elapsed ones, so a host that was asleep does not wake owing a backlog | `raiker/tasks/scheduler.py` |
+| One cycle = one governed turn | Every cycle passes policy, gates and approvals exactly like a typed prompt; `continuous` is the floor, never an unbounded loop | `raiker/tasks/scheduler.py` |
+| Background agents in Build | Scheduled agents and a collapsible background-work rail | Build view |
+
+**Raiker difference.** A scheduled cycle is a governed turn with a named human
+owner, not a service account: it is attributable, approval-gated, and auditable
+on the same event log as a typed prompt, and an unknown cadence is refused rather
+than coerced.
+
+**Where Raiker is behind, and it is structural.** Cowork's schedules run on
+someone else's computer; Raiker's run on yours.
+
+- **A schedule only fires while `raiker-web` is running.** The 15-second tick
+  that calls `run_due` lives in the FastAPI app's lifespan
+  (`raiker/api/app.py`), so a closed laptop is a missed cadence — recorded
+  honestly by the skip-elapsed rule, but missed. There is no hosted runner and
+  no OS-level scheduled task registration.
+- **`scheduled_routines` has no runner at all.** That capability is on-demand by
+  construction — *"There is NO background daemon/thread/watcher — the owner (or
+  an external trigger) calls `run_due`"* — so it is a governed routine store with
+  a manual trigger, not a scheduler.
+- **Cadences are four names, not a time.** There is no arbitrary time-of-day, no
+  cron expression, no timezone binding, and no one-shot "run once at 17:00". A
+  daily task runs a day after whenever it was created.
+- **No notification out.** A cycle that finishes while nobody is looking updates
+  the Tasks view and the audit log; it does not reach the owner.
+
+---
+
 ## OpenClaw-Style Personal Agent Coverage
 
 | Concept | Raiker specification |

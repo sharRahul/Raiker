@@ -279,6 +279,20 @@ class ExportSessionRequest(BaseModel):
     format: str = "html"
 
 
+class ConversationBranchRequest(BaseModel):
+    """A title for the branch, and nothing else (GAP-CHAT C14).
+
+    The checkpoint is in the path and the owner comes from the authenticated
+    session, so the only thing a caller may supply is what to call the new
+    conversation. An empty title lets the service derive one from the
+    checkpoint's own summary rather than accepting a caller-chosen default.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    title: str = ""
+
+
 class ModelPriceRequest(BaseModel):
     """An administrator's price override for one model, per million tokens.
 

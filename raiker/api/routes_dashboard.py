@@ -17,6 +17,7 @@ from raiker.api.schemas import (
     BulkDeleteSessionsRequest,
     ConnectCodeRepoRequest,
     ContainMcpServerRequest,
+    ConversationBranchRequest,
     CreateMcpServerRequest,
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
@@ -2032,6 +2033,84 @@ async def get_checkpoint_restore_plan(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
         )
     return plan
+
+
+@router.get("/api/checkpoints/{checkpoint_id}/branch-plan")
+async def get_conversation_branch_plan(
+    checkpoint_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What branching a conversation from this checkpoint would seed (C14).
+
+    Metadata-only, and deliberately not the restore preflight: a branch writes no
+    workspace file, so it is not an approval-gated mutation. It reports the state
+    summary and memory-candidate count the new conversation would start from.
+    """
+    session, principal = auth_data
+    plan = _read_models(request).conversation_branch_plan(
+        checkpoint_id, user_id=principal.delegated_by_user_id
+    )
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
+        )
+    return plan
+
+
+@router.post("/api/checkpoints/{checkpoint_id}/branch")
+async def branch_conversation(
+    checkpoint_id: str,
+    body: ConversationBranchRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Branch the conversation from this checkpoint into a second one (C14).
+
+    The original conversation is untouched: no turn is rewritten and nothing that
+    followed the checkpoint is discarded. The branch is a new session seeded from
+    the checkpoint's state summary and memory candidates, owned by the same user,
+    and every turn taken in it is governed exactly as one in the original.
+    """
+    session, principal = auth_data
+    result = _read_models(request).branch_conversation(
+        checkpoint_id,
+        title=(body.title or None),
+        user_id=principal.delegated_by_user_id,
+    )
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
+        )
+    return result
+
+
+@router.get("/api/sessions/{session_id}/branch-origin")
+async def get_conversation_branch_origin(
+    session_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Where a branched conversation came from, so two branches stay legible.
+
+    Answers `{"session_id": …, "source_session_id": null}` for a root
+    conversation rather than 404-ing: "this is not a branch" is a fact the
+    surface needs, not an error.
+    """
+    session, principal = auth_data
+    origin = _read_models(request).conversation_branch_origin(
+        session_id, user_id=principal.delegated_by_user_id
+    )
+    if origin is None:
+        return {
+            "session_id": session_id,
+            "source_session_id": None,
+            "source_title": None,
+            "forked_from_checkpoint_id": None,
+            "summary": "",
+            "created_at": "",
+        }
+    return origin
 
 
 @router.get("/api/projects/{project_id}/files")

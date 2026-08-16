@@ -82,6 +82,18 @@ _IDENTIFIER_KEY_SUFFIXES = ("_id", "_ids")
 _DIGEST_KEYS = frozenset({"revision", "sha", "commit_sha", "digest", "fingerprint"})
 _DIGEST_KEY_SUFFIXES = ("_revision", "_sha", "_digest", "_fingerprint")
 
+# Field names whose values are provider model names. Same failure as the
+# locators and the identifiers above, found live against OpenRouter's 413-model
+# catalogue: `mistralai/mistral-small-24b-instruct-2501` is 41 URL-safe
+# characters, so the generic entropy fallback replaced it — and two other ids
+# with it — with the identical `[REDACTED_SECRET]` string. The owner was offered
+# three models they could not tell apart and could never select, and because the
+# picker keys its options by the model id, the duplicate crashed the render.
+# A model name is a vendor-issued, slash-segmented identifier, so it gets the
+# segmented-path fallback; every specific credential shape still applies first.
+_MODEL_KEYS = frozenset({"model", "models"})
+_MODEL_KEY_SUFFIXES = ("_model", "_models")
+
 
 def is_locator_field(key: str) -> bool:
     """True when a field's name says its value is a URL or filesystem path."""
@@ -100,8 +112,19 @@ def is_digest_field(key: str) -> bool:
     return lower in _DIGEST_KEYS or lower.endswith(_DIGEST_KEY_SUFFIXES)
 
 
+def is_model_field(key: str) -> bool:
+    """True when a field's name says its value is a provider model name."""
+    lower = key.lower()
+    return lower in _MODEL_KEYS or lower.endswith(_MODEL_KEY_SUFFIXES)
+
+
 def _redact_value(
-    value: Any, *, locator: bool = False, identifier: bool = False, digest: bool = False
+    value: Any,
+    *,
+    locator: bool = False,
+    identifier: bool = False,
+    digest: bool = False,
+    model: bool = False,
 ) -> Any:
     if isinstance(value, dict):
         # A token *count* is an integer, never a credential. Without this the
@@ -118,6 +141,7 @@ def _redact_value(
                     locator=is_locator_field(k),
                     identifier=is_identifier_field(k),
                     digest=is_digest_field(k),
+                    model=is_model_field(k),
                 )
             )
             for k, v in value.items()
@@ -126,12 +150,16 @@ def _redact_value(
         # A list under a locator key (``attachment_urls``) is a list of locators;
         # one under an id key (``task_ids``) is a list of ids.
         return [
-            _redact_value(item, locator=locator, identifier=identifier, digest=digest)
+            _redact_value(item, locator=locator, identifier=identifier, digest=digest, model=model)
             for item in value
         ]
     if isinstance(value, str):
         redacted, _changed = redact_text(
-            value, locator_value=locator, identifier_value=identifier, digest_value=digest
+            value,
+            locator_value=locator,
+            identifier_value=identifier,
+            digest_value=digest,
+            model_value=model,
         )
         return redacted
     return value
@@ -153,6 +181,7 @@ def _check_no_secrets(
     locator: bool = False,
     identifier: bool = False,
     digest: bool = False,
+    model: bool = False,
 ) -> None:
     # Mirrors _redact_value exactly, so the guard proves what the middleware
     # emits rather than a stricter rule the middleware never applied.
@@ -168,15 +197,25 @@ def _check_no_secrets(
                 locator=is_locator_field(k),
                 identifier=is_identifier_field(k),
                 digest=is_digest_field(k),
+                model=is_model_field(k),
             )
     elif isinstance(value, list):
         for i, item in enumerate(value):
             _check_no_secrets(
-                item, f"{path}[{i}]", locator=locator, identifier=identifier, digest=digest
+                item,
+                f"{path}[{i}]",
+                locator=locator,
+                identifier=identifier,
+                digest=digest,
+                model=model,
             )
     elif isinstance(value, str):
         redacted, changed = redact_text(
-            value, locator_value=locator, identifier_value=identifier, digest_value=digest
+            value,
+            locator_value=locator,
+            identifier_value=identifier,
+            digest_value=digest,
+            model_value=model,
         )
         if changed:
             raise AssertionError(f"Secret-like string at {path}: {value[:80]}")

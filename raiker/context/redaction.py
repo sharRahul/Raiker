@@ -71,6 +71,22 @@ def _redact_high_entropy_in_locator(match: re.Match[str]) -> str:
     return _redact_high_entropy(match)
 
 
+def _redact_high_entropy_in_model(match: re.Match[str]) -> str:
+    """The fallback as applied to a value the caller has declared a model name.
+
+    A provider's model id is a vendor-issued, slash-segmented identifier of
+    exactly the shape the locator fallback already spares —
+    ``mistralai/mistral-small-24b-instruct-2501`` is 41 URL-safe characters and
+    tripped the generic entropy rule purely for being long. It is a separate mode
+    rather than a reuse of the locator one because a model is not a locator, and
+    the reason a family is relaxed has to stay readable.
+    """
+    token = match.group(0)
+    if _is_segmented_path(token):
+        return token
+    return _redact_high_entropy(match)
+
+
 def _redact_high_entropy_in_identifier(match: re.Match[str]) -> str:
     """The fallback as applied to a value the caller has declared an id.
 
@@ -186,6 +202,12 @@ _DIGEST_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | 
     _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_digest),)
 )
 
+# The same rules with a model-aware fallback, used only for values whose *key*
+# declares them a provider model name.
+_MODEL_PATTERNS: tuple[tuple[re.Pattern[str], Callable[[re.Match[str]], str] | str], ...] = (
+    _PATTERNS[:-1] + ((_PATTERNS[-1][0], _redact_high_entropy_in_model),)
+)
+
 
 # ── Exact secrets, registered while they are in use ──────────────────────────
 #
@@ -254,6 +276,7 @@ def redact_text(
     locator_value: bool = False,
     identifier_value: bool = False,
     digest_value: bool = False,
+    model_value: bool = False,
 ) -> tuple[str, bool]:
     """Mask obvious secrets/tokens/emails/private keys in ``text``.
 
@@ -261,11 +284,12 @@ def redact_text(
     unusual input and never removes the whole item, it only substitutes sensitive spans.
 
     ``locator_value`` says the caller knows this string is a URL or filesystem
-    path, and ``identifier_value`` that it is a server-issued record id — facts
-    only the caller has, from the field's key. Each relaxes the high-entropy
-    fallback for one shape and nothing else; every credential shape is still
-    matched. Both default off, so free-form text (model output, chat titles,
-    document excerpts) keeps the strict scan.
+    path, ``identifier_value`` that it is a server-issued record id, and
+    ``model_value`` that it is a provider's model name — facts only the caller
+    has, from the field's key. Each relaxes the high-entropy fallback for one
+    shape and nothing else; every credential shape is still matched. All default
+    off, so free-form text (model output, chat titles, document excerpts) keeps
+    the strict scan.
     """
 
     if not isinstance(text, str):
@@ -277,6 +301,8 @@ def redact_text(
         patterns = _IDENTIFIER_PATTERNS
     elif digest_value:
         patterns = _DIGEST_PATTERNS
+    elif model_value:
+        patterns = _MODEL_PATTERNS
     # Registered secrets come out first, and unconditionally. A value we knowingly
     # lent must not depend on a shape heuristic recognising it — this pass runs on
     # every mode, including the relaxed locator/identifier ones, because a token

@@ -317,6 +317,53 @@ class TestServerIssuedIdentifiersSurvive:
         assert_no_secrets_in_body(redact_response_body({"session_id": self.INBOX}))
 
 
+class TestProviderModelNamesSurvive:
+    """The same failure, one field family further along again.
+
+    Found live on 2026-08-16 against OpenRouter's 413-model catalogue.
+    ``mistralai/mistral-small-24b-instruct-2501`` is 41 URL-safe characters, so
+    the generic entropy fallback replaced it — and two other ids with it — with
+    the identical ``[REDACTED_SECRET]`` string. The owner was offered three
+    models they could not tell apart and could never select; and because the
+    picker keys its options by the model id, the duplicate crashed the render and
+    left the row stuck on "Asking OpenRouter…" forever.
+    """
+
+    CATALOGUE = [
+        "mistralai/mistral-small-24b-instruct-2501",
+        "cognitivecomputations/dolphin-mistral-24b-venice-edition",
+        "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+        "claude-haiku-4-5-20251001",
+    ]
+
+    def test_a_providers_own_catalogue_survives_intact(self) -> None:
+        body = {"provider": "openrouter", "models": self.CATALOGUE}
+        assert redact_response_body(body) == body
+
+    def test_no_two_models_are_flattened_into_the_same_string(self) -> None:
+        # The crash was a *collision*, not only a loss: two distinct ids became
+        # one value under a keyed each-block.
+        listed = redact_response_body({"models": self.CATALOGUE})["models"]
+        assert len(set(listed)) == len(self.CATALOGUE)
+
+    def test_the_singular_and_prefixed_spellings_survive_too(self) -> None:
+        body = {"model": self.CATALOGUE[0], "selected_model": self.CATALOGUE[1]}
+        assert redact_response_body(body) == body
+
+    def test_the_same_string_in_free_form_text_is_still_scanned_strictly(self) -> None:
+        answer = {"answer": self.CATALOGUE[1]}
+        assert redact_response_body(answer) != answer
+
+    def test_a_credential_under_a_model_key_is_still_destroyed(self) -> None:
+        # The exemption is the slash-segmented *shape*, not a blanket pass: a key
+        # pasted into a model field fails closed exactly as before.
+        leaked = {"models": ["sk-ant-api03-5RDtvlOIIlDCMynLAMOkwTjN3PwhJyog1TFr5EtlvzlKQZY3WKa"]}
+        assert redact_response_body(leaked) != leaked
+
+    def test_the_guard_accepts_what_the_middleware_emits_for_models(self) -> None:
+        assert_no_secrets_in_body(redact_response_body({"models": self.CATALOGUE}))
+
+
 def test_commit_revisions_and_digests_survive_only_in_named_fields() -> None:
     revision = "d" * 40
     digest = "a" * 64

@@ -401,6 +401,79 @@ class WebReadModels:
         )
         return dict(plan)
 
+    # ── Conversation branching (GAP-CHAT C14 — branch from here) ─────────
+    # A branch is the *opposite* of a restore, and the distinction is why they are
+    # separate endpoints rather than two modes of one. A restore rewrites the
+    # workspace and is therefore an approval-gated governed mutation. A branch
+    # writes no workspace file at all: it creates a second conversation seeded from
+    # the checkpoint's own state summary and memory candidates, and leaves the
+    # first one exactly as it was. Nothing about the original conversation is
+    # rewritten, which is the property that made "edit and resend" safe to ship
+    # and "replace the message and discard what followed" not.
+
+    def conversation_branch_plan(
+        self, checkpoint_id: str, *, user_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """What branching from this checkpoint would seed, without doing it.
+
+        ``None`` when the checkpoint does not exist or belongs to another owner.
+        """
+        if self.dashboard.get_checkpoint(checkpoint_id, user_id) is None:
+            return None
+        try:
+            return dict(CheckpointService(self.store).plan_fork(checkpoint_id))
+        except ValueError:
+            return None
+
+    def branch_conversation(
+        self, checkpoint_id: str, *, title: str | None = None, user_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """Materialise the branch, owned by the same user as the source.
+
+        The new session is created with the *source owner's* ``user_id``, so a
+        branch can never widen who can read a conversation. ``None`` when the
+        checkpoint does not exist or belongs to another owner.
+        """
+        checkpoint = self.dashboard.get_checkpoint(checkpoint_id, user_id)
+        if checkpoint is None:
+            return None
+        source = self.store.load_session(checkpoint.session_id)
+        owner = str(source.get("user_id")) if source and source.get("user_id") else user_id
+        try:
+            return dict(
+                CheckpointService(self.store).execute_fork(
+                    checkpoint_id, title=title, user_id=owner
+                )
+            )
+        except ValueError:
+            return None
+
+    def conversation_branch_origin(
+        self, session_id: str, *, user_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """Where a branched conversation came from, or ``None`` when it is a root.
+
+        The lineage is what makes two branches of one conversation legible: the
+        branch says which conversation and which checkpoint it grew from, and the
+        summary it was seeded with.
+        """
+        session = self.store.load_session(session_id)
+        if session is None or (user_id is not None and session.get("user_id") != user_id):
+            return None
+        seed = CheckpointService(self.store).load_fork_seed(session_id)
+        if seed is None:
+            return None
+        source_id = str(seed.get("source_session_id") or "")
+        source = self.store.load_session(source_id) if source_id else None
+        return {
+            "session_id": session_id,
+            "source_session_id": source_id,
+            "source_title": (str(source.get("title")) if source and source.get("title") else None),
+            "forked_from_checkpoint_id": str(seed.get("forked_from_checkpoint_id") or ""),
+            "summary": str(seed.get("summary") or ""),
+            "created_at": str(seed.get("created_at") or ""),
+        }
+
     # ── Project files ────────────────────────────────────────────────────
     def project_files(
         self, project_id: str, *, user_id: str | None = None

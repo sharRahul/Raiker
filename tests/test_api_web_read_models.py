@@ -208,6 +208,118 @@ class TestCheckpointRestorePlan:
         assert response.status_code == 404
 
 
+class TestConversationBranch:
+    """GAP-CHAT C14 — branch from here, held to what makes it safe.
+
+    A branch is a *second* conversation seeded from a checkpoint. The original is
+    never rewritten and nothing that followed the checkpoint is discarded, which
+    is the whole difference between this and the "edit the message and throw away
+    the rest of the thread" behaviour the entry deliberately refused.
+    """
+
+    def _seed(self, workspace: Path, *, owner: str | None = None) -> str:
+        store = SQLiteStore(workspace)
+        store.create_session("sess_branch", str(workspace), title="The original", user_id=owner)
+        checkpoint, _path = CheckpointService(store).write_turn_checkpoint(
+            session_id="sess_branch",
+            turn_id="turn_1",
+            runtime_state="considering the options",
+            summary="chose the first option",
+            last_event_id="evt_1",
+        )
+        return str(checkpoint.checkpoint_id)
+
+    def test_plan_states_the_seed_without_creating_anything(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        checkpoint_id = self._seed(workspace)
+        before = len(client.get("/api/sessions", headers=_headers(client)).json())
+
+        plan = client.get(
+            f"/api/checkpoints/{checkpoint_id}/branch-plan", headers=_headers(client)
+        )
+
+        assert plan.status_code == 200
+        body = plan.json()
+        assert body["status"] == "fork_plan"
+        assert body["source_session_id"] == "sess_branch"
+        assert body["summary"] == "chose the first option"
+        # A branch writes no workspace file, so unlike a restore it is not an
+        # approval-gated mutation — and the preview creates nothing.
+        assert body["requires_approval"] is False
+        assert len(client.get("/api/sessions", headers=_headers(client)).json()) == before
+
+    def test_branch_creates_a_second_conversation_and_leaves_the_first_alone(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers = _headers(client)
+        checkpoint_id = self._seed(workspace)
+        original = client.get("/api/sessions/sess_branch", headers=headers).json()
+
+        created = client.post(
+            f"/api/checkpoints/{checkpoint_id}/branch",
+            json={"title": "The other option"},
+            headers=headers,
+        )
+
+        assert created.status_code == 200
+        branch = created.json()
+        assert branch["status"] == "forked"
+        assert branch["session_id"] != "sess_branch"
+        assert branch["title"] == "The other option"
+        # The original keeps every turn it had. Nothing was rewritten or dropped.
+        assert client.get("/api/sessions/sess_branch", headers=headers).json() == original
+
+    def test_a_branch_names_the_conversation_it_grew_from(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers = _headers(client)
+        checkpoint_id = self._seed(workspace)
+        branch = client.post(
+            f"/api/checkpoints/{checkpoint_id}/branch", json={"title": ""}, headers=headers
+        ).json()
+
+        origin = client.get(
+            f"/api/sessions/{branch['session_id']}/branch-origin", headers=headers
+        )
+
+        assert origin.status_code == 200
+        assert origin.json()["source_session_id"] == "sess_branch"
+        assert origin.json()["source_title"] == "The original"
+        assert origin.json()["forked_from_checkpoint_id"] == checkpoint_id
+
+    def test_a_root_conversation_says_it_is_not_a_branch_rather_than_erroring(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        self._seed(workspace)
+        origin = client.get("/api/sessions/sess_branch/branch-origin", headers=_headers(client))
+
+        assert origin.status_code == 200
+        assert origin.json()["source_session_id"] is None
+
+    def test_unknown_checkpoint_cannot_be_branched(self, client: TestClient) -> None:
+        headers = _headers(client)
+        assert (
+            client.get("/api/checkpoints/ckpt_missing/branch-plan", headers=headers).status_code
+            == 404
+        )
+        assert (
+            client.post(
+                "/api/checkpoints/ckpt_missing/branch", json={"title": ""}, headers=headers
+            ).status_code
+            == 404
+        )
+
+    def test_response_carries_no_secret(self, client: TestClient, workspace: Path) -> None:
+        checkpoint_id = self._seed(workspace)
+        assert_no_secrets_in_body(
+            client.post(
+                f"/api/checkpoints/{checkpoint_id}/branch", json={"title": ""},
+                headers=_headers(client),
+            ).json()
+        )
+
+
 class TestProjectFiles:
     def test_lists_metadata_and_never_content(
         self, client: TestClient, workspace: Path

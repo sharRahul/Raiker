@@ -151,7 +151,7 @@ test("a real turn runs, and its prompt can be copied, edited and retried", async
   await expect(prompt).toBeVisible({ timeout: 30_000 });
 
   await prompt.fill("Reply with exactly the word: acknowledged");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText(/acknowledged/i).first()).toBeVisible({ timeout: 120_000 });
 
   // C14 — the three message actions on the owner's own prompt.
@@ -247,4 +247,73 @@ test("a governed command names the backend that ran it", async () => {
   await expect(page.getByText(/Commands start through the governed agent path/)).toBeVisible();
 
   await page.screenshot({ path: join(SHOTS, "r0816-build-governed-terminal.png") });
+});
+
+test("a thinking turn's working is kept, and a re-opened turn still shows it", async () => {
+  // BUG-215's whole point, end to end against a real model: reasoning that
+  // survives leaving the conversation and coming back. It runs after the
+  // retention test above has turned retention on.
+  test.setTimeout(300_000);
+  await setRetention(true);
+
+  await page.goto(`${BASE}/#/new-chat`);
+  const prompt = page.getByLabel("Prompt");
+  await expect(prompt).toBeVisible({ timeout: 30_000 });
+
+  // Ask this model to think. A profile that declares no reasoning setting shows
+  // no control, and there is nothing to prove here — say so rather than pass.
+  // Waited for rather than sampled: the control renders once the model profiles
+  // resolve, which is after the prompt box appears, so an immediate read skips a
+  // model that does declare one.
+  const thinking = page.getByLabel("Thinking");
+  const declared = await thinking
+    .waitFor({ state: "visible", timeout: 30_000 })
+    .then(() => true)
+    .catch(() => false);
+  test.skip(!declared, "the pinned model declares no reasoning setting");
+  const efforts = await thinking.locator("option").allTextContents();
+  const chosen = efforts.find((label) => !label.includes("default"));
+  test.skip(chosen === undefined, "the pinned model offers no reasoning effort");
+  await thinking.selectOption({ label: chosen as string });
+
+  await prompt.fill("Think it through, then answer in one word: is 91 prime?");
+  await page.getByRole("button", { name: "Send", exact: true }).click();
+
+  const thinkingBlock = page.getByRole("button", { name: /Thinking/ });
+  await expect(thinkingBlock.first()).toBeVisible({ timeout: 180_000 });
+  await page.screenshot({ path: join(SHOTS, "r0816-chat-thinking-live.png") });
+
+  // The turn has to *finish* before any of this means anything: the working is
+  // written when the turn closes, so re-opening a still-streaming turn would
+  // prove only that the stream was still attached. The steer field is the
+  // signal — the composer carries it only while a turn is running, where Send
+  // stays disabled either way because the prompt box is empty.
+  await expect(
+    page.getByPlaceholder("Add to this turn — it arrives at the next safe boundary"),
+  ).toBeHidden({ timeout: 180_000 });
+
+  // Re-open it the way a person does — from Recent chats, after going somewhere
+  // else — so the transcript is rebuilt from stored rows rather than from the
+  // component that watched it stream.
+  await page.goto(`${BASE}/#/home`);
+  const recent = page
+    .getByRole("link", { name: /Think it through/ })
+    .first();
+  await expect(recent).toBeVisible({ timeout: 30_000 });
+  await recent.click();
+  await expect(page.getByText("Think it through, then answer in one word: is 91 prime?").first())
+    .toBeVisible({ timeout: 30_000 });
+
+  // The block is there at all only because the working was retained: a turn
+  // whose working was not kept renders the "not kept" line instead, and a turn
+  // that produced none renders nothing.
+  const reopened = thinkingBlock.first();
+  await expect(reopened).toBeVisible({ timeout: 60_000 });
+  await expect(page.getByText(/It was not kept/)).toHaveCount(0);
+  // Open it if it settled closed — it collapses once the answer starts — and
+  // read the working back.
+  if ((await reopened.getAttribute("aria-expanded")) !== "true") await reopened.click();
+  await expect(page.locator(".reasoning-body").first()).not.toBeEmpty();
+
+  await page.screenshot({ path: join(SHOTS, "r0816-chat-thinking-retained.png") });
 });

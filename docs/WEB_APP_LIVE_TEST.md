@@ -524,6 +524,7 @@ The service and browser were stopped after the run.
 | Collapse on answer | ✅ `aria-expanded="false"` once the answer starts, still openable |
 | Reasoning off | ✅ No reasoning section at all, and no tool activity for a turn that called nothing |
 | Build parity | ✅ Same rows, same reasoning block, same collapse, from the same components and data path |
+| A decided call settles | 🟡 **Not proven live.** The approved call is not re-brokered on resume, so the runtime settles the row from the recorded outcome and the client merges rather than replaces — asserted in `test_turn_model_binding.py`, `resumed_call_row_status` and `chatPresentation.test.ts`, but watching it settle needs the running tab to stay mounted while the decision is made elsewhere, and that step was flaky rather than evidential |
 | Browser suites | ✅ `bug-206-207-tool-rows-and-reasoning-live.spec.ts` 6/6; `bug-52-first-pass-denial-live.spec.ts` 4/4 against the batching stub; `composer.spec.ts` (mocked) 4/4 |
 | All-pages sweep | ✅ `all-pages-live.spec.ts` captured all 24 routes with **0 console errors**, after the sweep's own stale sign-in was fixed (FIXED-215) |
 | Visual review | ✅ `docs/plans/screenshots/working/bug-206-live-tool-rows-{streaming,settled}.png`, `bug-206-live-tool-row-waiting.png`, `bug-207-live-reasoning-{streaming,settled}.png`, `bug-207-live-no-reasoning.png`, `bug-206-207-live-build-turn.png` inspected at original resolution for row order, wrapping, state colour, and secret absence |

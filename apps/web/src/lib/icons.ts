@@ -84,9 +84,9 @@ export type IconName =
   | "circle"
   // BUG-206 slice C — one glyph per tool family, so a transcript row tells you
   // the *kind* of work before you read the words. Four families reuse a glyph
-  // the set already had and means the same thing there (`file` for a read,
-  // `branch` for the repository, `connections` for a connector, `tasks` for the
-  // turn's own plan); these five are the ones nothing existing meant.
+  // the set already had, and that already means the same thing there: `file`
+  // for a read, `branch` for the repository, `connections` for a connector,
+  // `tasks` for the turn's own plan. These five are the ones nothing meant.
   | "file-edit"
   | "terminal"
   | "globe"

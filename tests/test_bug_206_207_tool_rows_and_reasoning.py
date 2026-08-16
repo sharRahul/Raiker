@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator, Callable
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -44,7 +45,12 @@ from raiker.models.providers.anthropic_messages import (
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
 from raiker.storage.sqlite import SQLiteStore
-from raiker.tools.presentation import tool_row
+from raiker.tools.presentation import (
+    _FAMILY_BY_TOOL,
+    _LABEL_BY_TOOL,
+    TOOL_FAMILIES,
+    tool_row,
+)
 from tests.machine_identity_helpers import IdentityBoundTestBroker as ToolBroker
 
 
@@ -434,3 +440,104 @@ def test_a_stream_refused_for_its_thinking_spelling_is_retried_before_a_token_la
     assert [event.reasoning_delta for event in events if event.event_type == "reasoning_delta"] == [
         "thought"
     ]
+
+
+# ── The two halves of the row, kept from drifting ────────────────────────────
+
+
+def _web_source(relative: str) -> str:
+    root = Path(__file__).resolve().parents[1] / "apps" / "web" / "src" / "lib"
+    return (root / relative).read_text(encoding="utf-8")
+
+
+def _between(text: str, after: str, until: str) -> str:
+    """The source between two markers, with line comments removed first.
+
+    These files are heavily commented by design, and a `;` or a quoted word
+    inside a comment would otherwise end the segment early — which is a parsing
+    bug that reads as a missing glyph.
+    """
+    import re
+
+    stripped = re.sub(r"//[^\n]*", "", text)
+    return stripped.split(after, 1)[1].split(until, 1)[0]
+
+
+def test_every_family_the_runtime_can_send_has_a_glyph_in_the_client() -> None:
+    """A family added on one side and not the other renders as the fallback.
+
+    Silently: an unknown family is *supposed* to fall back, which is exactly why
+    a missing glyph would not look like a bug. This is the check that fails
+    instead — the same directional guard `test_api_contract_schemas.py` applies
+    to the response DTOs.
+    """
+    import re
+
+    presentation = _web_source("chatPresentation.ts")
+    union = _between(presentation, "export type ToolFamily", ";")
+    declared = set(re.findall(r'"([a-z-]+)"', union))
+    icons = _between(presentation, "const FAMILY_ICON", "};")
+    mapped = dict(re.findall(r'^\s*"?([a-z-]+)"?:\s*"([a-z-]+)"', icons, re.M))
+
+    assert not set(TOOL_FAMILIES) - declared, (
+        f"ToolFamily is missing: {sorted(set(TOOL_FAMILIES) - declared)}"
+    )
+    assert not declared - set(TOOL_FAMILIES), (
+        f"ToolFamily names families the runtime never sends: {sorted(declared - set(TOOL_FAMILIES))}"
+    )
+    assert not set(TOOL_FAMILIES) - set(mapped), (
+        f"FAMILY_ICON has no glyph for: {sorted(set(TOOL_FAMILIES) - set(mapped))}"
+    )
+
+    # And every glyph it names is one the icon set actually declares, so a typo
+    # renders nothing rather than the fallback it was never asked for.
+    icon_names = set(re.findall(r'"([a-z-]+)"', _between(_web_source("icons.ts"), "export type IconName", ";")))
+    unknown = set(mapped.values()) - icon_names
+    assert not unknown, f"FAMILY_ICON names glyphs the set does not declare: {sorted(unknown)}"
+
+
+def test_every_model_exposed_tool_has_a_family_and_a_label() -> None:
+    """A tool added to the registry without a row entry still renders as a tool.
+
+    That is the fallback working, not the row being right: it would carry the
+    neutral spanner and a name derived from its identifier. This fails while the
+    entry is missing, which is when it is cheap to add.
+    """
+    from raiker.models.tool_registry import MODEL_EXPOSED_TOOLS
+
+    missing_family = sorted(set(MODEL_EXPOSED_TOOLS) - set(_FAMILY_BY_TOOL))
+    missing_label = sorted(set(MODEL_EXPOSED_TOOLS) - set(_LABEL_BY_TOOL))
+    assert not missing_family, f"tools with no icon family: {missing_family}"
+    assert not missing_label, f"tools with no owner-language label: {missing_label}"
+
+    # And nothing in the tables names a tool that no longer exists, which is how
+    # a rename leaves a label behind that can never be reached. `vector_get` is
+    # brokered but deliberately not advertised to the model, so it is named here
+    # rather than silently allowed by a looser comparison.
+    broker_only = {"vector_get"}
+    stale = sorted(
+        (set(_FAMILY_BY_TOOL) | set(_LABEL_BY_TOOL)) - set(MODEL_EXPOSED_TOOLS) - broker_only
+    )
+    assert not stale, f"row entries for tools that no longer exist: {stale}"
+
+
+def test_every_family_named_in_the_table_is_a_declared_family() -> None:
+    unknown = sorted(set(_FAMILY_BY_TOOL.values()) - set(TOOL_FAMILIES))
+    assert not unknown, f"tools mapped to families that do not exist: {unknown}"
+
+
+def test_a_model_that_will_not_think_says_what_to_do_about_it() -> None:
+    """The remediation for this one is on the composer, not on Models.
+
+    The default sentence sends the owner to run a readiness check, which will
+    pass — the model is reachable, it just will not think in either spelling the
+    provider offers. Naming the wrong remedy is the defect FIXED-01 removed from
+    the connection card, applied to the other end of the turn.
+    """
+    from raiker.models.exceptions import provider_failure_message
+
+    message = provider_failure_message("reasoning_unsupported")
+    assert "Set Thinking back to default" in message
+    assert "readiness check" not in message
+    # The machine code stays where support and the audit trail can read it.
+    assert "reasoning_unsupported" in message

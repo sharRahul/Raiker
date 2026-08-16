@@ -8168,6 +8168,41 @@ failed says why on its own line. No raw argument JSON, no tool identifier, and n
 surface that is silent about work that ran. The Audit log stays the full record —
 the transcript is the summary, not a second copy of it.
 
+**A parked row settles when the decision is made.** Found by reading the resume
+path rather than by running it, and covered the same way: the approved call is **not** re-brokered when the
+turn picks up — its result was produced when the approval resolved and is
+replayed to the model as a message — so nothing downstream would ever emit its
+`tool_completed`. The row would have gone on saying *waiting for your decision*
+after the decision had been made, which is precisely the class of false claim
+this entry exists to remove. The runtime now settles it from the outcome the
+approval already recorded: `success` when it ran, `not permitted` when the owner
+rejected it, `failed` for an approval that was recorded and deliberately not
+executed for its capability — the same three the model is told apart by. The
+event carries the action id and the state and nothing else, and the client
+**merges** rather than replaces, so the label and the action phrase the row
+already had survive the moment the owner looks to see what happened.
+
+This one is **not** in the live round, and the spec says so where a reader would
+look for it. Watching it settle needs the tab that ran the turn to stay mounted
+while the decision is made elsewhere, and driving that second surface from the
+spec produced a flaky step rather than evidence; rebuilding the conversation
+instead is not an option, because a reopened turn carries no rows at all
+(BUG-215). It is asserted where it can be asserted deterministically:
+`test_turn_model_binding.py` for the resolved call the gateway hands the runtime,
+`resumed_call_row_status` for all three outcomes, and `chatPresentation.test.ts`
+for the client merging the settled event into the row it already opened.
+
+**Guarded against drift.** The row exists in two languages, and the failure mode
+is silent: a family added server-side with no glyph in the client renders the
+*fallback*, which is what the fallback is supposed to do, so nothing looks wrong.
+Two tests fail instead — one comparing `TOOL_FAMILIES` against the client's
+`ToolFamily` union and `FAMILY_ICON` in both directions and checking every glyph
+it names is one `icons.ts` declares; one asserting every model-exposed tool has
+both a family and an owner-language label, and that neither table names a tool
+that no longer exists. Both were confirmed to fail when the drift they describe
+is introduced, rather than trusted to. This is the guard
+`test_api_contract_schemas.py` already applies to the response DTOs.
+
 ---
 
 ## FIXED-214 — The model's real reasoning was requested, discarded, and replaced with three canned sentences *(was BUG-207)*
@@ -8281,6 +8316,16 @@ nothing persists it. No surface claims otherwise — a reloaded turn simply show
 its answer. Persisting it is a storage change with a retention question attached,
 and it is recorded in
 [`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-215--reasoning-is-shown-live-and-then-forgotten).
+
+**And the one failure it can still produce says what to do about it.** If a model
+refuses both spellings — a profile declaring reasoning the model does not have in
+any form — the turn fails with `reasoning_unsupported` rather than quietly
+answering without the thinking the owner asked for. The default sentence for an
+unknown provider code sends the owner to run a readiness check, which would
+*pass*: the model is reachable. So the code has its own sentence — *"Set Thinking
+back to default, or choose a model that supports it"* — because naming the wrong
+remedy is the defect [FIXED-01](#fixed-01-model-connection-showed-a-raw-reason-codey-to-act-on-it)
+removed from the connection card, and this is the other end of the same turn.
 
 **User-interface outcome.** A turn shows the model's own reasoning or it shows
 none — never a fixed list presented as reasoning. Where reasoning is shown it is

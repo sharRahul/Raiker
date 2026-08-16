@@ -118,9 +118,25 @@ export function toolActivity(events: StreamEvent[]): ToolCallRow[] {
     if (existing === undefined) {
       byAction.set(actionId, rows.length);
       rows.push(row);
-    } else {
-      rows[existing] = row;
+      continue;
     }
+    // Merge, never replace. A later event can legitimately carry less than the
+    // one that opened the row — the event that settles a call after an approval
+    // names the action and its outcome and nothing else, because the row it is
+    // settling already knows the rest. Replacing would blank the label and the
+    // action phrase at the exact moment the owner looks to see what happened.
+    const before = rows[existing];
+    rows[existing] = {
+      ...before,
+      ...row,
+      family: row.family !== "tool" ? row.family : before.family,
+      label: str(payload.label) || before.label,
+      action: row.action || before.action,
+      reasons: row.reasons.length > 0 ? row.reasons : before.reasons,
+      ...(row.remediationRoute || before.remediationRoute
+        ? { remediationRoute: row.remediationRoute ?? before.remediationRoute }
+        : {}),
+    };
   }
   return rows;
 }

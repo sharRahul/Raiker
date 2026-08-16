@@ -78,7 +78,7 @@
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
-  import { collectReasoning, toolActivity } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -938,6 +938,11 @@
                 <span class="pulse" aria-hidden="true"></span>
                 Reading and planning…
               </p>
+            {:else if turn.streaming && answer === "" && hasRunningTool(toolRows)}
+              <!-- Parity with Chat. The pulsing row says this to anyone who can
+                   see it; without this line a screen reader hears "Reading and
+                   planning…" stop and then nothing until the answer arrives. -->
+              <span class="sr-only" role="status">Running a tool.</span>
             {/if}
 
             <!-- B17/C13 — as in Chat: a turn the owner stopped says so, rather

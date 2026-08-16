@@ -309,9 +309,17 @@ class TestTurnReasoningEffort:
         )
         assert gateway.store.record_suspended_turn_outcome(approval_id, json.dumps({"status": "success"}))
 
-        restored, _messages, _calls, _queue, _total = gateway._restore_suspended_turn(  # noqa: SLF001
-            approval_id
-        )
+        (
+            restored, _messages, _calls, _queue, _total, resolved
+        ) = gateway._restore_suspended_turn(approval_id)  # noqa: SLF001
 
         assert restored.options.approval_mode == "manual"
         assert restored.options.reasoning_effort == "high"
+        # BUG-206 — the row for the call this decision closed stops saying
+        # "waiting for your decision" when the turn resumes, because nothing
+        # downstream re-brokers the approved call.
+        assert resolved == {
+            "action_id": "act_effort",
+            "tool_name": "write_file",
+            "status": "success",
+        }

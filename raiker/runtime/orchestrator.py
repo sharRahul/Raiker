@@ -5,7 +5,7 @@ import contextlib
 import json
 import logging
 import time
-from collections.abc import AsyncIterator, Callable, Sequence
+from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -1230,6 +1230,34 @@ class RuntimeOrchestrator:
         """A call parked on the owner's decision, so its row stops pretending to run."""
         self._stream_tool_row(action, "tool_waiting", "waiting")
 
+    def _stream_resolved_call(self, resolved_call: Mapping[str, str] | None) -> None:
+        """Settle the row of the call a decision just closed (BUG-206).
+
+        Carries the action id and the state, and deliberately not the family, the
+        label or the action phrase: the client already has those from the row it
+        opened, and re-deriving them here would need the parked call's arguments
+        replayed out of storage for no gain. The client merges rather than
+        replaces, so what it already knows survives.
+        """
+        if self._sink is None or not resolved_call:
+            return
+        action_id = str(resolved_call.get("action_id", ""))
+        tool_name = str(resolved_call.get("tool_name", ""))
+        status = str(resolved_call.get("status", ""))
+        if not action_id or not tool_name or not status:
+            return
+        self._sink.append(
+            StreamEvent(
+                kind=TOOL,
+                event_type="tool_completed" if status == "success" else "tool_failed",
+                payload={
+                    "action_id": action_id,
+                    "tool_name": tool_name,
+                    "status": status,
+                },
+            )
+        )
+
     def _stream_tool_refusal(
         self, action: ToolAction, reasons: list[str], remediation_route: object = None
     ) -> None:
@@ -1946,6 +1974,7 @@ class RuntimeOrchestrator:
         pending_calls: list[ToolCallProposal] | None = None,
         queue_total: int = 1,
         identity: TrustedTurnIdentity | None = None,
+        resolved_call: Mapping[str, str] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Continue a turn that was parked for an approval (B2, ADD-02).
 
@@ -1960,6 +1989,13 @@ class RuntimeOrchestrator:
         drains it *before* it goes back to the model: those calls are what the
         model already asked for, and asking it again would be paying twice for a
         question it has already answered.
+
+        *resolved_call* names the call the decision closed — its action id, its
+        tool, and what happened to it (BUG-206). The approved call is **not**
+        re-brokered here: its result was produced when the approval resolved and
+        is replayed as a message. So nothing else would ever settle its row, and
+        it would keep saying *waiting for your decision* after the decision had
+        been made.
         """
         self._open_sink(stream)
         try:
@@ -1978,6 +2014,7 @@ class RuntimeOrchestrator:
                     "queued_calls": len(pending_calls or []),
                 },
             )
+            self._stream_resolved_call(resolved_call)
             async for event in self._arun_agent_loop(
                 envelope,
                 machine,

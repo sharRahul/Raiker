@@ -357,7 +357,7 @@ class TestProviderModelNamesSurvive:
     def test_a_credential_under_a_model_key_is_still_destroyed(self) -> None:
         # The exemption is the slash-segmented *shape*, not a blanket pass: a key
         # pasted into a model field fails closed exactly as before.
-        leaked = {"models": ["sk-ant-api03-5RDtvlOIIlDCMynLAMOkwTjN3PwhJyog1TFr5EtlvzlKQZY3WKa"]}
+        leaked = {"models": ["sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"]}
         assert redact_response_body(leaked) != leaked
 
     def test_the_guard_accepts_what_the_middleware_emits_for_models(self) -> None:

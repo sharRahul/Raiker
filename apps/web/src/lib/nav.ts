@@ -57,7 +57,22 @@ export const HUB_TABS: Record<string, string[]> = {
   ],
   extensions: ["connectors", "mcp", "skills", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
-  settings: ["general", "notification", "personalisation", "security", "account", "runtime"],
+  // Every section the settings rail renders, in rail order. The two lists have
+  // to agree: a section the rail shows but this list omits is a deep link that
+  // silently opens General instead, which reads as a working link to the wrong
+  // page. `web-access` and `git-credential` were in exactly that state before
+  // `privacy` joined them.
+  settings: [
+    "general",
+    "notification",
+    "personalisation",
+    "security",
+    "privacy",
+    "account",
+    "web-access",
+    "git-credential",
+    "runtime",
+  ],
 };
 
 /**

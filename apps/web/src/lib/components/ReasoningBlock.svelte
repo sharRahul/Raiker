@@ -26,11 +26,20 @@
   let {
     text,
     streaming = false,
+    notKeptChars = 0,
   }: {
     /** Reasoning received so far. Empty renders nothing at all. */
     text: string;
     /** True while this turn is still producing reasoning. */
     streaming?: boolean;
+    /**
+     * BUG-215 — how much working a *re-opened* turn produced when the text
+     * itself was not retained. Greater than zero with an empty `text` is the
+     * one case this component must not render as silence: the turn did think,
+     * and the owner watched it. Saying so is the alternative to a transcript
+     * that quietly shows less than it did five minutes earlier.
+     */
+    notKeptChars?: number;
   } = $props();
 
   // Open while reasoning is the only thing happening; closed from the moment
@@ -40,7 +49,15 @@
   const expanded = $derived(opened ?? streaming);
 </script>
 
-{#if text.trim() !== ""}
+{#if text.trim() === "" && notKeptChars > 0}
+  <p class="reasoning-absent">
+    <Icon name="shield" size={12} />
+    <span>
+      Raiker showed its working while this turn ran. It was not kept — retained
+      working is off. <a href="#/settings">Turn it on in Settings → Privacy.</a>
+    </span>
+  </p>
+{:else if text.trim() !== ""}
   <section class="reasoning" data-streaming={streaming ? "true" : "false"}>
     <button
       type="button"
@@ -102,6 +119,19 @@
   }
   /* Quieter than the answer on purpose: smaller, dimmer, and against the sunken
      surface, so a long chain of thought never competes with what it produced. */
+  /* The "it thought and that was not kept" line. Deliberately quieter than the
+     block it stands in for, and deliberately present: an absent control is
+     honest, an absent *fact* is not. */
+  .reasoning-absent {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin: 0 0 0.4rem;
+    color: var(--text-3);
+    font-size: 0.74rem;
+    line-height: 1.5;
+  }
+  .reasoning-absent a { color: var(--accent); }
   .reasoning-body {
     margin: 0;
     padding: 0.5rem 0.65rem;

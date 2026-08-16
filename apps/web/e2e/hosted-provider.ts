@@ -109,6 +109,17 @@ export async function connectHostedProvider(
   await page.getByLabel(keyLabel).fill(key);
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
+  // The Reconnect path opens **Model details** to reach the control, and saving
+  // a credential does not close it — so a spec run against a workspace that
+  // already had the provider connected left a modal over the card and every
+  // later click hit the overlay instead. Close it here rather than in each
+  // caller: the reconnect route is the one an already-configured workspace
+  // always takes, so this is the common case, not the edge one.
+  const detailsClose = page.getByRole("button", { name: "Close model details" });
+  if (await detailsClose.isVisible().catch(() => false)) {
+    await detailsClose.click();
+    await expect(detailsClose).toBeHidden({ timeout: 30_000 });
+  }
   return card;
 }
 

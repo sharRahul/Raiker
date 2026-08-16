@@ -399,3 +399,71 @@ def test_connecting_still_succeeds_when_the_map_cannot_be_built(tmp_path: Path) 
     assert result.ok
     assert result.data["code_map"] is None
     assert CodeMapService(tmp_path, store, principal_id="principal_owner").index_row("app") is None
+
+
+# ── B19: `@`-mention completion over the map the owner built ─────────────────
+
+
+def test_mention_completion_lists_paths_and_nothing_else(tmp_path: Path) -> None:
+    """The completion behind `@` is deliberately the narrowest read there is.
+
+    A menu needs a name to insert. Symbols, line numbers or content would make an
+    autocomplete a wider disclosure than the tool it feeds, so the shape is
+    asserted rather than assumed.
+    """
+    store = SQLiteStore(_repo(tmp_path))
+    _enable(store)
+    service = CodeMapService(tmp_path, store)
+    service.build()
+
+    result = service.complete_paths("alpha")
+
+    assert result["status"] == "success"
+    assert result["paths"], "the built map should offer at least one path"
+    for entry in result["paths"]:
+        assert set(entry) == {"path", "language"}
+        assert "alpha" in entry["path"]
+
+
+def test_mention_completion_offers_everything_for_an_empty_fragment(tmp_path: Path) -> None:
+    store = SQLiteStore(_repo(tmp_path))
+    _enable(store)
+    service = CodeMapService(tmp_path, store)
+    service.build()
+
+    assert service.complete_paths("")["count"] > 0
+
+
+def test_mention_completion_is_bounded(tmp_path: Path) -> None:
+    store = SQLiteStore(_repo(tmp_path))
+    _enable(store)
+    service = CodeMapService(tmp_path, store)
+    service.build()
+
+    assert service.complete_paths("", limit=1)["count"] == 1
+
+
+def test_mention_completion_says_the_map_was_never_built(tmp_path: Path) -> None:
+    """An empty menu and a menu that cannot be filled are different problems."""
+    store = SQLiteStore(_repo(tmp_path))
+    _enable(store)
+
+    result = CodeMapService(tmp_path, store).complete_paths("alpha")
+
+    assert result["status"] == "failed"
+    assert result["error"]["type"] == "code_map_not_built"
+
+
+def test_mention_completion_answers_the_same_gate_as_every_other_map_read(
+    tmp_path: Path,
+) -> None:
+    """A completion menu must never be a way around the capability gate."""
+    store = SQLiteStore(_repo(tmp_path))
+    _enable(store)
+    CodeMapService(tmp_path, store).build()
+    _disable(store)
+
+    result = CodeMapService(tmp_path, store).complete_paths("alpha")
+
+    assert result["status"] == "denied"
+    assert result["error"]["type"] == "code_map_gate_disabled"

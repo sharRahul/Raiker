@@ -937,6 +937,40 @@ class RuntimeOrchestrator:
                 return configured if configured > 0 else None
         return None
 
+    def _record_turn_reasoning(
+        self, envelope: PromptEnvelope, parts: Sequence[str]
+    ) -> None:
+        """Persist what the model's working amounted to, and keep it only if asked.
+
+        BUG-215 — a turn's reasoning was shown live and then forgotten, so a
+        conversation re-opened five minutes later silently showed less than it
+        had. Two facts are written, and only one of them is the working itself:
+
+        * **How much** working the turn produced is always recorded. It is a
+          count, not content, and it is what lets the transcript say *the working
+          was not kept* rather than imply there never was any.
+        * **The working** is written only when this owner has turned retention on
+          (Settings → Privacy). Off is the default and the safe direction: the
+          model's working can restate anything the prompt contained.
+
+        Best-effort by design. Reasoning is not the answer, and a turn that
+        genuinely completed must not be reported as failed because a note about
+        it could not be filed.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None:
+            return
+        text = "".join(parts)
+        try:
+            retained = bool(
+                text and store.reasoning_retention_enabled(self.tool_broker.principal_id)
+            )
+            store.record_turn_reasoning(
+                envelope.turn_id, chars=len(text), text=text if retained else None
+            )
+        except Exception:  # noqa: BLE001
+            return
+
     def _record_usage(
         self,
         envelope: PromptEnvelope,
@@ -2227,6 +2261,11 @@ class RuntimeOrchestrator:
         final_text: str | None = None
         last_action: ToolAction | None = None
         last_result: ToolResult | None = None
+        # BUG-215 — the working of every model call this turn makes, in order.
+        # A turn can call the model many times (once per tool round), and the
+        # owner saw all of it stream by, so keeping only the last round's would
+        # be a different turn than the one they watched.
+        turn_reasoning: list[str] = []
 
         for pending in self._drain_sink():
             yield pending
@@ -2397,6 +2436,9 @@ class RuntimeOrchestrator:
                 assert response is not None
             else:
                 response = await self._acall_model(envelope, messages)
+
+            if response.reasoning:
+                turn_reasoning.append(response.reasoning)
 
             for pending in self._drain_sink():
                 yield pending
@@ -2735,6 +2777,7 @@ class RuntimeOrchestrator:
                 status = "completed"
                 message = final_text or "Done."
 
+        self._record_turn_reasoning(envelope, turn_reasoning)
         self._event(
             envelope,
             "response_created",

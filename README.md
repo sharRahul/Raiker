@@ -217,7 +217,18 @@ Highlights, each verified against a live instance:
   than the log does. Where the model can think before answering, the composer's
   **Thinking** control turns it on and its own reasoning fills a collapsed block
   above the answer, closing when the answer starts. A turn that produced no
-  reasoning shows no block at all.
+  reasoning shows no block at all. Whether that working is **kept** is your
+  decision — off unless you turn it on in Settings → Privacy, because it can
+  restate anything your prompt contained. Kept working never enters chat search
+  and never leaves in an export; when it is not kept, a re-opened turn says so
+  rather than reading as a turn that never thought.
+- **A composer built for daily use** — `/` opens the commands each surface really
+  has (Chat has `/export`; Build has `/plan-mode`, `/edit-mode`, `/auto-mode`,
+  `/terminal` and `/repos`), `@` completes a path out of the code map you built,
+  the prompt box grows with what you write, and `/shortcuts` shows the keyboard
+  map. Your own messages carry **Copy**, **Edit** and **Retry** — and an edit
+  adds a new turn rather than rewriting what you asked, because the transcript is
+  a record. No command grants anything: each one opens a control you already have.
 - **Recall** — a turn can read your own past conversations, not only the ones it
   can still see. `conversation_search` searches every exchange you have had,
   narrowed to a date range when the question is about a particular period, and

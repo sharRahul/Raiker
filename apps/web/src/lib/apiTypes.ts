@@ -892,6 +892,24 @@ export interface CodeMapStatus {
   updated_at: string | null;
 }
 
+/**
+ * GET /api/code/map/paths — completion for an `@`-mention (B19).
+ *
+ * `status` is `"success"` with the matching paths, or a named refusal:
+ * `code_map_not_built` when the owner has never indexed the repository, or a
+ * governance reason when the `code_map_indexing` capability is off. The menu
+ * shows the reason rather than an empty list, because "nothing matched" and
+ * "nothing could match" send the owner to different places.
+ */
+export interface CodeMapPaths {
+  status: string;
+  repository?: string;
+  fragment?: string;
+  count?: number;
+  paths?: Array<{ path: string; language: string }>;
+  error?: { type?: string; message?: string } | null;
+}
+
 export interface ProjectDetail {
   project: ProjectView;
   sessions: SessionSummary[];
@@ -1108,6 +1126,17 @@ export interface TurnSummary {
   created_at: string;
   completed_at: string | null;
   summary: string | null;
+  /**
+   * BUG-215 — how much of its own working this turn produced, and the working
+   * itself when the owner has asked for it to be kept.
+   *
+   * The pair is what makes a re-opened turn honest. `reasoning_chars === 0`
+   * means the turn produced none; `reasoning_chars > 0` with `reasoning === null`
+   * means it did and the working was not retained — which the transcript says
+   * plainly instead of showing nothing and implying nothing happened.
+   */
+  reasoning_chars?: number;
+  reasoning?: string | null;
 }
 
 // GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()

@@ -60,13 +60,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
-| [BUG-196](#bug-196--a-successful-turn-reports-that-it-could-not-continue) | Medium | Build / Chat turn resume | Open |
-| [BUG-197](#bug-197--a-command-runs-backend-column-is-never-written) | Low | Command store | Open |
-| [BUG-205](#bug-205--a-plain-pytest-tests-run-fails-because-cipher_memory_security-is-a-one-way-latch) | Low | Test isolation / SQLCipher posture | Open |
-| [BUG-215](#bug-215--reasoning-is-shown-live-and-then-forgotten) | Low | Chat / reasoning retention | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
-| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17 complete; 10 items remain) |
-| GAP-CHAT | — | Chat — work-assistant parity | Analysis (14 items remain) |
+| GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
+| GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 complete; 13 items remain) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -85,6 +81,20 @@ governed command now runs inside a real operating-system boundary, and what that
 boundary enforces is **measured rather than declared**. Closed as
 [FIXED-195](FIXED_ITEMS.md). The rest of this entry is what remains, with the
 reason each item was not attempted rather than a schedule.
+
+**Reviewed again on 2026-08-16 and deliberately not advanced.** The round that
+closed BUG-196, BUG-197, BUG-215 and the composer parity work touched the command
+store — a run now names its backend from the moment it starts
+([FIXED-217](FIXED_ITEMS.md)) — but attempted none of the rows below, and the
+reason is the reason each row states: every one of them is a **component**, not a
+flag. The smallest of them, background execution, needs a supervisor that outlives
+the turn together with the agent-facing `process` tool that makes a background run
+observable; shipping either half alone is worse than refusing, because it leaves
+an orphan process holding a sandbox grant nothing reclaims, or an agent that
+starts work it cannot poll. Doing that properly is its own round with its own live
+proof, and pretending otherwise here would be the exact failure mode the rest of
+this document records. The rows stay red, and the controls stay **absent** from
+the interface rather than disabled.
 
 **Still observed.** Select `native_sandbox` and request interactive, background,
 network, credential, SSH or Daytona execution and the backend fails closed with
@@ -126,70 +136,6 @@ an absent control is the honest projection of an unbuilt capability, where a
 disabled one implies it is a setting away. No row may turn green from
 configuration or specification alone.
 
----
-
-## BUG-196 — A successful turn reports that it could not continue
-
-**Severity: Medium. Area: Build / Chat turn resume. Status: Open.**
-
-**Observed.** On 2026-08-15, in every one of the four provider rounds, a Build
-turn that approved a shell command executed it, streamed the model's answer
-containing the command's real output, and then rendered
-**"The turn could not continue (409)."** directly beneath that answer. The turn
-had in fact completed. The message is the only failure signal on screen, so a
-successful governed execution reads as a failed one.
-
-**Reproduce.** Build → send a prompt that proposes a `shell` action → **Accept**.
-The answer arrives; the error line arrives with it. Seen with Anthropic Haiku
-4.5, OpenRouter Gemini 3.7 Flash, OpenAI GPT-4o Mini and Ollama
-gemma4:31b-cloud, so it is not provider-specific.
-
-**Root cause.** `BuildView`/`ChatView` treat any 409 from the resume route as a
-failure unless `alreadyResumedElsewhere(code)` matches, and that helper matches
-exactly one reason code, `suspended_turn_already_resumed`
-(`apps/web/src/lib/approvalResume.ts`). The resume route can answer 409 with
-`approval_not_resolved` and `suspended_turn_unreadable` as well
-(`raiker/api/routes_approvals.py::_RESUME_ERRORS`), and a second resume attempt —
-the approval click and the approvals poller both make one — loses the race. The
-BUG-24 comment beside the helper already states the principle: losing the race is
-a success, and saying "error" there would be a lie. The set of codes it accepts
-is what did not keep up.
-
-**Proposed fix.** Decide the outcome from the turn's state rather than from the
-race: if the turn has a completed response, a later 409 is a lost race and is
-silent. Widen the helper to the codes that mean "already done", and add a
-regression test that resolves one approval twice and asserts no error is shown.
-
-**Required user-interface outcome.** A turn that completed shows no error. A
-turn that genuinely could not continue still says so, with its reason.
-
----
-
-## BUG-197 — A command run's `backend` column is never written
-
-**Severity: Low. Area: command store. Status: Open.**
-
-**Observed.** Every row in `command_runs` carries `backend = ''`, including runs
-that completed inside the native sandbox. The receipt records the backend
-correctly (`evidence.backend = "native"`), so the two surfaces disagree: the
-immutable record knows what ran the command and the list the owner browses does
-not.
-
-**Reproduce.** Run any governed command and read `command_runs.backend`, or the
-`backend` field of `GET /api/command-runs`.
-
-**Root cause.** `CommandStore.create` never populates the column and nothing
-updates it later; `CommandService` computes `backend_name` for the receipt only
-(`raiker/execution/commands/service.py`).
-
-**Proposed fix.** Write it at start, beside the existing `record_isolation` call,
-so a run in flight already names its backend.
-
-**Required user-interface outcome.** The run list names the backend for every
-run, matching its receipt.
-
----
-
 ## Verified working (no action needed)
 
 Recorded so the fixes above are read against the right baseline. Re-verified end
@@ -214,120 +160,7 @@ with the result marked untrusted; Build repository connect, code-map build and
 `code_map_search`; `update_plan` checklists and `spawn_subagent`; capability
 step-up (reason required, Confirm disabled until supplied); the deferred domains
 CCTV, finance, medical and home security offering no row at all; Observability's
-seven tabs on real data; Settings' six tabs; theme cycling system → light → dark;
+seven tabs on real data; Settings' sections; theme cycling system → light → dark;
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
-
----
-
-## BUG-205 — A plain `pytest tests/` run fails, because `cipher_memory_security` is a one-way latch
-
-**Severity: Low. Area: test isolation / SQLCipher posture. Status: Open.**
-
-**Observed.** `python -m pytest tests/` — the command a contributor runs — fails:
-
-```
-FAILED tests/test_sqlcipher_memory_security.py::
-       test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe
-E       - 0
-E       + 1
-```
-
-CI is green on the same commit because `.github/workflows/ci.yml` sets
-`RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"` for the whole job, so nothing in that
-process ever turns the pragma on. The gate therefore cannot see this, and the
-failure lands only on whoever runs the suite the documented way.
-
-**Reproduce.** Two files are enough, and the pairing is what matters rather than
-any one test:
-
-```
-python -m pytest tests/test_memory_sqlcipher.py tests/test_sqlcipher_memory_security.py   # fails
-RAIKER_SQLCIPHER_MEMORY_SECURITY=off python -m pytest <same two files>                    # passes
-python -m pytest tests/test_sqlcipher_memory_security.py                                  # passes alone
-```
-
-Confirmed **pre-existing**: the same pairing fails identically with `raiker/` and
-`tests/` checked out at `ad3d84c`, before the 2026-08-15 memory work.
-
-**Root cause.** `PRAGMA cipher_memory_security` is process-global in the bundled
-SQLCipher build, and it latches one way. Measured directly:
-
-| Sequence in one process | Pragma reads |
-|---|---|
-| resolve `off` → open store | `0` |
-| resolve `off` → open → resolve `on` → open | `1` — the raise takes effect |
-| resolve `on` → open → resolve `off` → open | `1` — **the drop does not** |
-
-The test assumes the pragma is a per-connection property that each new
-connection sets from the resolved posture, so it opens a store on a fresh
-`tmp_path` after `close_cached_connections()` and expects `0`. A new connection
-and a new workspace do not help: once any connection in the process has enabled
-it, the process keeps it.
-
-**Security note, so this is not read as worse than it is.** The latch only sticks
-in the *safe* direction. A run that asks for `on` can never silently end up
-`off`; the failure mode is memory security remaining enabled after a request to
-disable it, which costs performance rather than protection. Nothing here weakens
-the posture FIXED-150 records.
-
-**Required fix.** The test is asserting a property the platform does not offer,
-so fix the test rather than the pragma. Either run it in its own process
-(`pytest-forked`, a subprocess, or a session-scoped marker that isolates the
-SQLCipher posture tests), or assert what is actually per-connection — that Raiker
-*issues* `PRAGMA cipher_memory_security = 0` on a connection it resolved `off`
-for — and assert the read-back value only in a process that has never enabled it.
-Whichever is chosen, the CI job should stop setting the env var globally, or
-should keep setting it and additionally run the posture file in a second,
-unset job: an env var that hides an order dependency is the reason this reached
-`main`.
-
-**Required user-interface outcome.** None directly — no shipped surface changes.
-The one product-facing consequence to keep honest: `GET /api/health` reports the
-posture Raiker *resolved*, not the pragma in force. Those can disagree only after
-a re-resolution inside one process, which today only tests do, so health stays
-truthful for a normal run. If re-resolution ever becomes a runtime feature, health
-must read the pragma back rather than report the intent.
-
----
-
-## BUG-215 — Reasoning is shown live, and then forgotten
-
-**Severity: Low. Area: Chat / reasoning retention. Status: Open.**
-
-**Observed.** With **Thinking** on, a turn streams the model's own reasoning into
-a collapsed block above the answer ([FIXED-214](FIXED_ITEMS.md)). Re-open the
-conversation and the block is gone: the answer is there, the tool rows are gone
-with it, and nothing says reasoning was ever produced.
-
-**Reproduce.** Chat → set **Thinking** to the profile's mode or effort → send a
-prompt that makes the model think → confirm the block fills in → reload, or leave
-Chat and come back. The turn renders from stored messages and has no reasoning to
-render.
-
-**Root cause.** Reasoning is a *stream* fact and only a stream fact.
-`REASONING_DELTA` events accumulate in the client's in-memory turn
-(`collectReasoning`), and `ModelResponse.reasoning` carries the whole of it back
-to the runtime, where nothing stores it. A reloaded conversation is rebuilt from
-`messages`, which has no column for it. The same is true of the tool rows: they
-are rebuilt from the stream, not from the durable log the Audit view reads.
-
-**Why it was left.** Persisting reasoning is a storage change with a retention
-question attached, not a rendering one. The model's working can restate anything
-the prompt contained, and it is the one part of a turn an owner may specifically
-not want kept; a column that quietly retains it — under SQLCipher, in exports, in
-the conversation search index — is a decision to make deliberately rather than a
-side effect of showing it live. Nothing today claims it is kept, so the surface
-is honest as it stands.
-
-**Proposed fix.** Decide the retention posture first, in
-`docs/MEMORY_AND_CONTEXT_STRATEGY.md`: whether reasoning is retained at all, for
-how long, whether it is excluded from export and search, and whether the owner
-can turn retention off independently of Thinking itself. Then a per-turn column
-plus a rebuild path that hydrates both the reasoning block and the tool rows from
-the durable record, so a re-opened turn reads exactly as it did while it ran.
-
-**Required user-interface outcome.** Either a re-opened turn shows what it showed
-while it was running, or the surface says plainly that the working was not kept.
-It must not silently show less than it did five minutes earlier without either.

@@ -182,3 +182,128 @@ describe("ChatView composer parity", () => {
     );
   });
 });
+
+// B19 / C14 — the composer ergonomics that make daily use feel like a
+// class-leading assistant rather than a textarea with a Send button.
+describe("ChatView composer — commands, mentions and message actions", () => {
+  it("opens the command menu on a leading slash and lists only real commands", async () => {
+    stubFetch(routes());
+    render(ChatView, { projects });
+
+    await fireEvent.input(await screen.findByLabelText("Prompt"), { target: { value: "/" } });
+
+    const menu = await screen.findByRole("listbox", { name: "Commands" });
+    expect(within(menu).getByText("/new")).toBeInTheDocument();
+    expect(within(menu).getByText("/export")).toBeInTheDocument();
+    // Build's own commands must not appear in Chat: a menu entry that does
+    // nothing here is exactly the promise this work exists to stop making.
+    expect(within(menu).queryByText("/terminal")).not.toBeInTheDocument();
+  });
+
+  it("narrows the menu as the command is typed", async () => {
+    stubFetch(routes());
+    render(ChatView, { projects });
+
+    await fireEvent.input(await screen.findByLabelText("Prompt"), { target: { value: "/mod" } });
+
+    const menu = await screen.findByRole("listbox", { name: "Commands" });
+    expect(within(menu).getByText("/model")).toBeInTheDocument();
+    expect(within(menu).queryByText("/new")).not.toBeInTheDocument();
+  });
+
+  it("does not open a menu for a slash inside a sentence", async () => {
+    stubFetch(routes());
+    render(ChatView, { projects });
+
+    await fireEvent.input(await screen.findByLabelText("Prompt"), {
+      target: { value: "read https://example.com/docs" },
+    });
+
+    expect(screen.queryByRole("listbox", { name: "Commands" })).not.toBeInTheDocument();
+  });
+
+  it("running a command clears its token instead of sending it to the model", async () => {
+    stubFetch(routes());
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+
+    await fireEvent.input(prompt, { target: { value: "/shortcuts" } });
+    const menu = await screen.findByRole("listbox", { name: "Commands" });
+    await fireEvent.mouseDown(within(menu).getByText("/shortcuts"));
+
+    expect(await screen.findByRole("region", { name: "Keyboard shortcuts" })).toBeInTheDocument();
+    expect((prompt as HTMLTextAreaElement).value).toBe("");
+    expect(streamPromptMock).not.toHaveBeenCalled();
+  });
+
+  it("offers code-map paths for an @ mention and inserts the one chosen", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/code/map/paths": {
+        status: "success",
+        repository: "raiker",
+        count: 1,
+        paths: [{ path: "apps/web/src/main.ts", language: "typescript" }],
+      },
+    });
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+
+    await fireEvent.input(prompt, { target: { value: "look at @main" } });
+
+    const menu = await screen.findByRole("listbox", { name: "Files in the code map" });
+    await fireEvent.mouseDown(within(menu).getByText("apps/web/src/main.ts"));
+
+    await waitFor(() =>
+      expect((prompt as HTMLTextAreaElement).value).toBe("look at @apps/web/src/main.ts "),
+    );
+  });
+
+  it("says why an @ mention cannot be completed rather than showing an empty menu", async () => {
+    stubFetch({
+      ...routes(),
+      "GET /api/code/map/paths": {
+        status: "failed",
+        error: {
+          type: "code_map_not_built",
+          message: "No code map for raiker yet. Build one from Build → Repositories.",
+        },
+      },
+    });
+    render(ChatView, { projects });
+
+    await fireEvent.input(await screen.findByLabelText("Prompt"), { target: { value: "@main" } });
+
+    expect(await screen.findByText(/No code map for raiker yet/)).toBeInTheDocument();
+    expect(screen.queryByRole("listbox", { name: "Files in the code map" })).not.toBeInTheDocument();
+  });
+
+  it("puts a past prompt back in the composer without rewriting the transcript", async () => {
+    stubFetch(routes());
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      onEvent({
+        kind: "final", text: "", event_type: "", payload: {},
+        response: {
+          request_id: "request-1", session_id: "session-chat", turn_id: "turn-1",
+          status: "completed", message: "Done", events_path: null,
+          checkpoint_path: null, approval: null, last_event_id: null,
+        } satisfies AgentResponse,
+      });
+    });
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+
+    await fireEvent.input(prompt, { target: { value: "Draft the notes" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await screen.findByText("Done");
+
+    await fireEvent.click(
+      screen.getByRole("button", { name: "Edit this message and send it again" }),
+    );
+
+    expect((prompt as HTMLTextAreaElement).value).toBe("Draft the notes");
+    // The original turn is still in the transcript — an edit is a new turn, not
+    // a rewrite of what was asked.
+    expect(screen.getByText("Draft the notes")).toBeInTheDocument();
+  });
+});

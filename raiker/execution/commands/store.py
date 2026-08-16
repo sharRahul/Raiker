@@ -355,6 +355,25 @@ class CommandStore:
         if cursor.rowcount != 1:
             raise CommandStoreError("command_run_not_found")
 
+    def record_backend(self, owner_principal_id: str, run_id: str, backend: str) -> None:
+        """Name the backend that is about to run this command (BUG-197).
+
+        Written at start rather than at finalisation, because a run in flight is
+        exactly when the owner most needs to know where it is running — and
+        because a run that never reaches a receipt would otherwise never name its
+        backend at all. Plaintext for the same reason `record_isolation` is: a
+        backend name is not secret, and a locked vault must still be able to
+        answer "what ran this".
+        """
+        with self.sqlite.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE command_runs SET backend = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (backend, utc_now(), owner_principal_id, run_id),
+            )
+        if cursor.rowcount != 1:
+            raise CommandStoreError("command_run_not_found")
+
     def record_isolation(
         self, owner_principal_id: str, run_id: str, evidence: dict[str, Any]
     ) -> None:

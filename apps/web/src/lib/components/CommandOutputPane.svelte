@@ -14,8 +14,17 @@
   let {
     sessionId = null,
     visible = true,
-  }: { sessionId?: string | null; visible?: boolean } = $props();
-  let open = $state(false);
+    open = $bindable(false),
+  }: {
+    sessionId?: string | null;
+    visible?: boolean;
+    /**
+     * B19 — bindable so `/terminal` in the Build composer opens the same pane
+     * the header toggle opens. The slash command is a shortcut to this control,
+     * not a second terminal.
+     */
+    open?: boolean;
+  } = $props();
   let environment = $state<ExecutionEnvironment | null>(null);
   let runs = $state<CommandRunView[]>([]);
   let selectedId = $state<string | null>(null);
@@ -41,6 +50,18 @@
   function reason(exc: unknown): string {
     if (exc instanceof ApiError) return humanize(exc.reasonCode ?? "command_request_failed");
     return exc instanceof Error ? exc.message : "Command request failed";
+  }
+
+  /**
+   * What actually ran this command (BUG-197).
+   *
+   * Empty for a run recorded before the column was written, and empty is shown
+   * as nothing rather than as a guess — a run whose backend was never recorded
+   * genuinely does not know, and inventing "native" for it would put a claim on
+   * screen the receipt could contradict.
+   */
+  function backendLabel(run: CommandRunView | null): string {
+    return run === null || run.backend === "" ? "" : humanize(run.backend);
   }
 
   async function loadEnvironment() {
@@ -173,7 +194,7 @@
           <span>Command</span>
           <select bind:value={selectedId} onchange={() => void select(selectedId)}>
             {#each runs as run}
-              <option value={run.run_id}>{run.safe_display} · {humanize(run.state)}</option>
+              <option value={run.run_id}>{run.safe_display} · {humanize(run.state)}{backendLabel(run) ? ` · ${backendLabel(run)}` : ""}</option>
             {/each}
           </select>
         </label>
@@ -182,7 +203,14 @@
       <div class="output-shell" aria-live="polite">
         <div class="output-head">
           <span>{selected?.safe_display ?? "No command selected"}</span>
-          {#if selected}<span>{selected.stdout_bytes + selected.stderr_bytes} bytes{selected.truncated ? " · truncated" : ""}</span>{/if}
+          {#if selected}
+            <span>
+              <!-- BUG-197 — the run names its own backend from the moment it
+                   starts, so a command in flight already says where it is
+                   running rather than waiting for its receipt to say so. -->
+              {#if backendLabel(selected)}<b class="run-backend">{backendLabel(selected)}</b> · {/if}{selected.stdout_bytes + selected.stderr_bytes} bytes{selected.truncated ? " · truncated" : ""}
+            </span>
+          {/if}
         </div>
         <pre>{output || (selected ? `Command ${statusLabel(selected).toLowerCase()}…` : "Run a governed command to see redacted output here.")}</pre>
       </div>
@@ -237,6 +265,7 @@
   .posture span { display: inline-flex; align-items: center; gap: .28rem; }
   .output-shell { min-height: 112px; overflow: hidden; border: 1px solid #30363b; border-radius: var(--r-md); background: #171a1c; color: #e8e8e2; color-scheme: dark; }
   .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid #ffffff1a; color: #a9aaa4; font: .62rem var(--font-mono); }
+  .run-backend { color: #d6d7d1; font-weight: 600; }
   pre { margin: 0; min-height: 72px; max-height: 240px; overflow: auto; padding: .62rem; white-space: pre-wrap; word-break: break-word; font: .72rem/1.55 var(--font-mono); }
   .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: .7rem; }
   .receipt-card summary { cursor: pointer; }

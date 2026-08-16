@@ -337,6 +337,20 @@ the stated repair.
 and offers the rebuild, rather than the owner discovering it as a search that
 quietly stopped finding things.
 
+**Re-scoped on 2026-08-16, and it is larger than this entry says.** Adding the
+check is a few lines against `inspect_memory_integrity`. The blocker is that
+**the report it would join is not reachable from the product at all**:
+`run_one_memory_job` is the only caller of `inspect_memory_integrity`, and
+nothing calls `run_one_memory_job` — there is no API route, no scheduler entry
+and no Diagnostics panel. Adding a conversation-index count to a report nothing
+displays would satisfy the first paragraph of this entry and none of the last
+one, which is the invisible-surface failure this document exists to prevent. The
+real work is therefore: surface the existing report (route + Diagnostics panel +
+an owner-started rescan), *then* add the conversation-index check and
+`rebuild_conversation_fts()` as its stated repair. Related and now closed:
+[FIXED-222](FIXED_ITEMS.md) fixed the *audit* chain reporting a gap on an intact
+log, which is the same class of defect one layer down.
+
 ---
 
 ## Verified working (no action needed)

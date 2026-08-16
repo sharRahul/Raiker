@@ -327,6 +327,8 @@ from raiker.storage.migrations import (
     THREAT_MODEL_ACKS_SQL,
     TURN_CONTROLS_MIGRATION_ID,
     TURN_CONTROLS_SQL,
+    TURN_REASONING_MIGRATION_ID,
+    TURN_REASONING_SQL,
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
     WEB_BLOCKLIST_MIGRATION_ID,
@@ -456,11 +458,40 @@ def cached_connection_count() -> int:
 # the stronger posture sets ``RAIKER_SQLCIPHER_MEMORY_SECURITY=on``, and because
 # that is their decision it is honoured exactly — a refused lock then fails
 # **closed**, by name, instead of surfacing as a bare ``MemoryError``.
+#
+# BUG-205 — one property of the pragma is not a Raiker decision and has to be
+# recorded rather than assumed: in the bundled SQLCipher build it is
+# **process-global and latches one way**. Once any connection in the process has
+# opened with it ON, every later connection reads back ON, whatever it was told.
+# Measured directly:
+#
+#     resolve off → open                        → reads 0
+#     resolve off → open → resolve on  → open   → reads 1   (the raise takes)
+#     resolve on  → open → resolve off → open   → reads 1   (the drop does not)
+#
+# The latch only sticks in the *safe* direction — a run that asked for ``on``
+# can never quietly end up ``off`` — so it costs performance, never protection.
+# It is still a real divergence between what Raiker resolved and what the
+# process is doing, so the process remembers whether it has ever enabled the
+# pragma and says so on the health surface instead of letting intent stand in
+# for fact.
 _MEMORY_SECURITY_ENV = "RAIKER_SQLCIPHER_MEMORY_SECURITY"
 _MEMORY_SECURITY_LOCK = threading.Lock()
 _MEMORY_SECURITY: tuple[bool, str] | None = None
 _MEMORY_SECURITY_PROBE: MemorySecurityProbeResult | None = None
 _MEMORY_SECURITY_MODE = "auto"
+_MEMORY_SECURITY_EVER_ENABLED = False
+
+
+def memory_security_ever_enabled() -> bool:
+    """Has any connection in *this process* opened with the pragma enabled?
+
+    While this is false the resolved posture and the pragma in force are the
+    same thing. Once it is true the pragma cannot be lowered again for the life
+    of the process, so a later ``off`` resolution is an intent the build will
+    not honour — which the posture reports rather than hides (BUG-205).
+    """
+    return _MEMORY_SECURITY_EVER_ENABLED
 
 
 def memlock_allowance_bytes() -> int | None:
@@ -539,6 +570,16 @@ def memory_security_posture(workspace_root: str | Path | None = None) -> dict[st
     probe = _MEMORY_SECURITY_PROBE
     return {
         "cipher_memory_security": "on" if enabled else "off",
+        # BUG-205 — what the *process* is actually doing, kept beside what was
+        # resolved rather than replacing it. They are the same thing for any
+        # normal run, and can differ in exactly one direction: a process that has
+        # already enabled the pragma keeps it enabled for its lifetime, so an
+        # `off` resolved after that is an intent the build will not honour. The
+        # divergence costs performance, never protection — but reporting only the
+        # intent would let health say `off` while every connection was `on`.
+        "memory_security_in_force": (
+            "on" if enabled or _MEMORY_SECURITY_EVER_ENABLED else "off"
+        ),
         # Deliberately not "reason": the store's own reason travels beside this
         # one on the health view, and two keys of the same name would let the
         # posture overwrite the failure — the kind of quiet contradiction this
@@ -707,6 +748,12 @@ class SQLiteStore:
             connection.execute(
                 f"PRAGMA cipher_memory_security = {'ON' if memory_security else 'OFF'}"
             )
+            if memory_security:
+                # BUG-205 — from here on the process is latched ON and cannot be
+                # lowered. Recorded so the posture reports the pragma in force
+                # rather than the last thing that was resolved.
+                global _MEMORY_SECURITY_EVER_ENABLED
+                _MEMORY_SECURITY_EVER_ENABLED = True
             key_hex = hashlib.sha256(ensure_app_key(self.paths.workspace_root)).hexdigest()
             connection.execute(f"PRAGMA key = \"x'{key_hex}'\"")
             connection.row_factory = sqlite3.Row
@@ -1308,6 +1355,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID,
                 COMMAND_AUTHORITY_EVIDENCE_SQL,
                 connection,
+            )
+            self._apply_migration(
+                TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection
             )
             self._backfill_memory_fts(connection)
             self._backfill_conversation_fts(connection)
@@ -3972,6 +4022,40 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._sync_conversation_fts(connection, turn_id)
 
+    def record_turn_reasoning(self, turn_id: str, *, chars: int, text: str | None) -> None:
+        """Add to how much working a turn produced, and to the working if it is kept.
+
+        BUG-215 — the two are separate on purpose. ``chars`` is always written and
+        is not sensitive: it is what lets a re-opened turn distinguish "produced
+        no reasoning" from "produced reasoning that was not kept", which is the
+        difference between an honest surface and one that quietly shows less than
+        it did while the turn ran. ``text`` is written only when the owner has
+        turned retention on, and is deliberately **not** projected into
+        ``conversation_fts``: retained working must not become searchable
+        conversation content the owner never asked to index.
+
+        **Additive, because a turn can run its loop more than once.** A turn that
+        parks on an approval and resumes re-enters the same loop under the same
+        ``turn_id``; the owner watched both halves of its working stream by, so
+        replacing would keep only the half after the decision and silently drop
+        the reasoning that produced the proposal they approved.
+        """
+        added = max(0, int(chars))
+        if added == 0 and text is None:
+            return
+        with self.connect() as connection:
+            connection.execute(
+                """UPDATE turns
+                   SET reasoning_chars = COALESCE(reasoning_chars, 0) + ?,
+                       reasoning_text = CASE
+                           WHEN ? IS NULL THEN reasoning_text
+                           WHEN reasoning_text IS NULL OR reasoning_text = '' THEN ?
+                           ELSE reasoning_text || ?
+                       END
+                   WHERE turn_id = ?""",
+                (added, text, text, f"\n\n{text}", turn_id),
+            )
+
     # ── Conversation recall (RAIKER-2020) ────────────────────────────────────
     #
     # `conversation_fts` is a projection of `turns`, rebuilt from it and never
@@ -6538,9 +6622,24 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return dict(row) if row else None
 
     def get_last_event_sha256(self, session_id: str) -> str | None:
+        """The hash of the event this session's next event follows.
+
+        Ordered by ``jsonl_offset`` — the same key ``verify_session_events``
+        walks the chain by — and **not** by ``timestamp``, which is what this
+        used to do. `utc_now()` truncates to whole seconds, so every event a busy
+        turn writes inside one second shares a timestamp and `ORDER BY timestamp
+        DESC LIMIT 1` picked an arbitrary one of them as "the last". The write
+        path is properly serialised; what was missing is that the writer's notion
+        of *previous* and the verifier's notion of *previous* were different
+        keys, so a correctly written log could still report `chain_intact: false`.
+
+        `rowid` breaks any remaining tie, which covers legacy rows written before
+        an offset was recorded.
+        """
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT payload_sha256 FROM events_index WHERE session_id = ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT payload_sha256 FROM events_index WHERE session_id = ? "
+                "ORDER BY jsonl_offset DESC, rowid DESC LIMIT 1",
                 (session_id,),
             ).fetchone()
         return str(row["payload_sha256"]) if row else None
@@ -8409,6 +8508,33 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM user_settings WHERE principal_id = ?", (principal_id,)
             ).fetchone()
         return dict(row) if row is not None else None
+
+    def reasoning_retention_enabled(self, principal_id: str) -> bool:
+        """Has this owner asked for the model's working to be kept? (BUG-215)
+
+        Fail-closed in the privacy direction: an unreadable, missing, or
+        differently-shaped settings blob means *not retained*. The one place the
+        runtime and the API both read this from, so the turn that decides whether
+        to write reasoning and the screen that says whether it is kept can never
+        answer differently.
+        """
+        row = self.get_user_settings(principal_id)
+        if row is None:
+            return False
+        try:
+            parsed = json.loads(str(row["settings_json"]))
+        except (ValueError, TypeError):
+            return False
+        if not isinstance(parsed, dict):
+            return False
+        # Two shapes are in the blob for historical reasons: the settings screen
+        # writes flat dotted keys, the dedicated endpoints write nested objects.
+        # Both are read, because a setting the owner turned on in one place must
+        # not be invisible to the other.
+        if parsed.get("privacy.retain_reasoning") is True:
+            return True
+        privacy = parsed.get("privacy")
+        return isinstance(privacy, dict) and privacy.get("retain_reasoning") is True
 
     def put_user_settings(self, principal_id: str, settings_json: str, updated_at: str) -> None:
         with self.connect() as connection:

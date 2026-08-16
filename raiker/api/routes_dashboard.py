@@ -1208,6 +1208,26 @@ async def get_code_map_status(
     return _service(request).code_map_status(owner_principal_id=auth_data[0].principal_id)
 
 
+@router.get("/api/code/map/paths")
+async def get_code_map_paths(
+    request: Request,
+    q: str = "",
+    limit: int = 12,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """B19 — completion for an `@`-mention in the Build composer.
+
+    Paths and languages only, read out of the index the owner explicitly built,
+    behind the same `code_map_indexing` gate as every other code-map read. It
+    lists nothing the owner's own indexing run did not already accept, and a map
+    that was never built answers with a named reason and the control that fixes
+    it rather than an empty menu.
+    """
+    return _service(request).code_map_paths(
+        owner_principal_id=auth_data[0].principal_id, fragment=q, limit=limit
+    )
+
+
 @router.post("/api/code/map/rebuild")
 async def rebuild_code_map(
     request: Request,

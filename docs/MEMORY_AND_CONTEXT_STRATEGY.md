@@ -324,6 +324,47 @@ required provenance links.
 
 ---
 
+## Reasoning Retention
+
+The model's own working — the reasoning a turn streams into the collapsed block
+above its answer — is **not durable memory and not part of the transcript**. It
+is a per-turn record with its own retention decision, and the decision is the
+owner's.
+
+**Off by default.** Nothing is written unless the owner turns retention on in
+**Settings → Privacy**. The working can restate anything the prompt contained,
+and it is the one part of a turn an owner may specifically not want on disk, so
+keeping it is an explicit choice rather than a side effect of showing it live.
+
+**The amount is always recorded, the content is not.** Two columns on `turns`,
+because the honest surface needs two different facts and only one of them is
+sensitive:
+
+| Column | Written | What it is for |
+|---|---|---|
+| `reasoning_chars` | always | How much working the turn produced. A count, never content. It is what lets a re-opened turn say *the working was not kept* instead of reading as a turn that never thought. |
+| `reasoning_text` | only when retention is on | The working itself, under the same SQLCipher encryption as the rest of the conversation. |
+
+**Retained working is excluded from search and export by construction.**
+`conversation_fts` projects `prompt_text` and `summary` only, and
+`build_transcript` reads the same two fields. The exclusion is the shape of the
+code rather than a filter that can be forgotten: retention is a decision to keep
+the working *with its turn*, not a decision to make it searchable or to put it in
+a file the owner hands to someone else.
+
+**Recording it never fails a turn.** Reasoning is not the answer. A turn that
+genuinely completed must not be reported as failed because a note about its
+working could not be filed, so the write is best-effort and its failure is
+silent to the conversation.
+
+**Turning retention off does not erase what was kept, and does not hide that
+there was any.** A turn whose working was not retained says so in the transcript,
+with the control that changes it. The alternative — showing nothing — is a
+transcript that quietly shows less than it did five minutes earlier, which is the
+defect this posture exists to prevent (BUG-215 / FIXED-219).
+
+---
+
 ## Testing Requirements
 
 Tests must prove:

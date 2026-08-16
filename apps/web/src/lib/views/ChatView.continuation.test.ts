@@ -190,6 +190,55 @@ describe("ChatView — cross-tab approval continuation (BUG-24)", () => {
     expect(screen.queryByText(/could not continue/)).not.toBeInTheDocument();
   });
 
+  // BUG-196 — every one of these used to render "The turn could not continue
+  // (409)." directly beneath a turn that had completed, because the streaming
+  // path discarded the reason code and the classifier knew one code.
+  it("says nothing at all when the refusal lands on a turn that already finished", async () => {
+    stubFetch(baseRoutes({ "GET /api/approvals/resumable": { session_id: "sess_1", turns: [RESUMABLE] } }));
+    const { ApiError } = await import("../api");
+    streamResumeMock.mockImplementation(
+      async (_id: string, onEvent: (event: StreamEvent) => void) => {
+        onEvent({
+          kind: "final", text: "", event_type: "", payload: {},
+          response: { ...PARKED, status: "completed", message: "Wrote notes.md.", approval: null },
+        });
+        // The poller's attempt loses the race *after* the answer has landed.
+        throw new ApiError(409, "approval_not_resolved", "conflict");
+      },
+    );
+    render(ChatView, {});
+    await parkATurn();
+
+    expect(await screen.findByText("Wrote notes.md.")).toBeInTheDocument();
+    expect(screen.queryByText(/could not continue/)).not.toBeInTheDocument();
+  });
+
+  it("keeps waiting, without an error, when no decision has reached the runtime yet", async () => {
+    stubFetch(baseRoutes({ "GET /api/approvals/resumable": { session_id: "sess_1", turns: [RESUMABLE] } }));
+    const { ApiError } = await import("../api");
+    streamResumeMock.mockRejectedValue(new ApiError(409, "approval_not_resolved", "conflict"));
+    render(ChatView, {});
+    await parkATurn();
+
+    await waitFor(() => expect(streamResumeMock).toHaveBeenCalled());
+    expect(screen.queryByText(/could not continue/)).not.toBeInTheDocument();
+    expect(await screen.findByText("Waiting for approval")).toBeInTheDocument();
+  });
+
+  it("still says so when the parked state genuinely cannot be read", async () => {
+    stubFetch(baseRoutes({ "GET /api/approvals/resumable": { session_id: "sess_1", turns: [RESUMABLE] } }));
+    const { ApiError } = await import("../api");
+    streamResumeMock.mockRejectedValue(
+      new ApiError(409, "suspended_turn_unreadable", "conflict"),
+    );
+    render(ChatView, {});
+    await parkATurn();
+
+    expect(
+      await screen.findByText("The turn could not continue (suspended_turn_unreadable)."),
+    ).toBeInTheDocument();
+  });
+
   it("offers Continue now when the live channel cannot be relied on", async () => {
     // No resumable route: the poll fails, so automatic continuation cannot be
     // promised and the manual path has to appear.
@@ -246,5 +295,50 @@ describe("ChatView — conversation export (BUG-22)", () => {
     await fireEvent.click(screen.getByRole("menuitem", { name: "Export conversation…" }));
     expect(await screen.findByRole("dialog", { name: "Export conversation" })).toBeInTheDocument();
     expect(await screen.findByText("What will be included")).toBeInTheDocument();
+  });
+});
+
+// BUG-215 — a turn's own working was a stream fact and only a stream fact, so a
+// re-opened conversation silently showed less than it had five minutes earlier.
+describe("ChatView — retained reasoning (BUG-215)", () => {
+  function reloadedTurn(extra: Record<string, unknown>) {
+    return baseRoutes({
+      "GET /api/sessions/sess_1": {
+        session: { session_id: "sess_1", title: "Notes" },
+        turns: [{
+          turn_id: "turn_1", session_id: "sess_1", turn_type: "prompt",
+          status: "completed", prompt_text: "Plan the migration",
+          created_at: "2026-08-16T10:00:00Z", completed_at: "2026-08-16T10:00:05Z",
+          summary: "Here is the plan.", ...extra,
+        }],
+      },
+    });
+  }
+
+  it("shows the working a re-opened turn kept", async () => {
+    stubFetch(reloadedTurn({ reasoning_chars: 31, reasoning: "Check the schema before writing." }));
+    render(ChatView, { props: { sessionId: "sess_1" } });
+
+    await screen.findByText("Here is the plan.");
+    await fireEvent.click(screen.getByRole("button", { name: /Thinking/ }));
+    expect(screen.getByText("Check the schema before writing.")).toBeInTheDocument();
+  });
+
+  it("says the working was not kept rather than showing nothing", async () => {
+    stubFetch(reloadedTurn({ reasoning_chars: 420, reasoning: null }));
+    render(ChatView, { props: { sessionId: "sess_1" } });
+
+    await screen.findByText("Here is the plan.");
+    expect(screen.getByText(/It was not kept/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Thinking/ })).not.toBeInTheDocument();
+  });
+
+  it("says nothing at all about a turn that never produced any working", async () => {
+    stubFetch(reloadedTurn({ reasoning_chars: 0, reasoning: null }));
+    render(ChatView, { props: { sessionId: "sess_1" } });
+
+    await screen.findByText("Here is the plan.");
+    expect(screen.queryByText(/It was not kept/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Thinking/ })).not.toBeInTheDocument();
   });
 });

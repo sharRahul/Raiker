@@ -7,6 +7,7 @@
   import Notification from "./settings/Notification.svelte";
   import Personalisation from "./settings/Personalisation.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
+  import Privacy from "./settings/Privacy.svelte";
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
@@ -23,6 +24,7 @@
     { id: "notification", label: "Notifications", icon: "bell", group: "Personal" },
     { id: "personalisation", label: "Personalisation", icon: "spark", group: "Personal" },
     { id: "security", label: "Security & sign-in", icon: "lock", group: "Personal" },
+    { id: "privacy", label: "Privacy", icon: "shield", group: "Personal" },
     { id: "account", label: "Account", icon: "user", group: "Personal" },
     { id: "web-access", label: "Web access", icon: "connections", group: "System" },
     { id: "git-credential", label: "Git credential", icon: "branch", group: "System" },
@@ -163,6 +165,8 @@
       <Personalisation {settings} {save} />
     {:else if active === "security"}
       <SecurityLogin />
+    {:else if active === "privacy"}
+      <Privacy {settings} {save} />
     {:else if active === "account"}
       <Account {settings} {save} {status} />
     {:else if active === "web-access"}

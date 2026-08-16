@@ -265,6 +265,17 @@ test("a thinking turn's working is kept, and a re-opened turn still shows it", a
   const prompt = page.getByLabel("Prompt");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
 
+  // Start a genuinely new conversation. Chat stays mounted across routes, so a
+  // turn sent here otherwise lands in whichever conversation the suite was last
+  // in — and this scenario re-opens the turn *by its title*, which is the first
+  // prompt of its conversation. **New chat** is the control that makes the turn's
+  // own prompt that title.
+  const newChat = page.getByRole("button", { name: "New chat" });
+  if (await newChat.isEnabled().catch(() => false)) {
+    await newChat.click();
+    await expect(prompt).toBeVisible({ timeout: 30_000 });
+  }
+
   // Ask this model to think. The setting lives inside the model menu now, and a
   // profile that declares no reasoning setting has no Effort section at all — so
   // there is nothing to prove here, and this says so rather than passing quietly.

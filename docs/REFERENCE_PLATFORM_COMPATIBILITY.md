@@ -724,7 +724,148 @@ document review rather than a code review.
 
 ---
 
-## 2026-08-16 review — what was added, and whether it goes beyond the reference set
+---
+
+## First-run provider setup control set — how an owner gets a model at all
+
+Reviewed **2026-08-16 (second round)** against the onboarding of **Claude Code**
+(`/login`, then a model picker), **Claude Cowork** and **ChatGPT** (an account is
+the model), **Codex** (sign in, or an API key in the environment), **OpenClaw**
+(a connector wizard), **DeepSeek Harness** and **Hermes Agent** (a model list with
+a search box, keys in a config file).
+
+The first thing every one of these products does well is make "which model, and is
+it reachable" answerable in the place it is asked. Raiker's first-run stage asked
+the question and could not answer it — see
+[FIXED-223](plans/FIXED_ITEMS.md). What it has now:
+
+| Control | Raiker behaviour | Code |
+|---|---|---|
+| One row per provider, not per configured profile | Nine rows built from the registry: llama.cpp, Ollama, LM Studio, OpenAI-compatible, Anthropic, OpenAI, OpenRouter, Ollama Cloud, Hugging Face, Gemini | `ProviderMatrix.svelte` |
+| Local runtimes are **detected**, not configured | The row asks the runtime what it is serving and offers the answer; `llama.cpp` reads the approved-folder GGUF library and can start a server on one | `providerModels`, `modelLibrary`, `deployLocalModel` |
+| A key produces that provider's **own** catalogue | Store the credential, then `GET /api/models/{profile}/provider-models`; the dropdown is the provider's answer and no model name is ever invented | `list_provider_models` |
+| A credential is write-only from the interface | The row can report that a key is stored and can forget it; the value is never read back into the page, and a live run asserts the key appears nowhere in the DOM | `saveModelConnection`, vault |
+| Every failure names itself | Not running · refused the credential · blocked by provider policy · publishes no model list — four different sentences, because they send the owner to four different places | `catalogueNote` |
+| Pinning a model is still a governed act | Gate-manager only, enforced server-side, and readiness is measured against the exact model before any model-backed work | `set_model_selection`, `ModelReadinessService` |
+
+**Raiker difference.** In every reference product, connecting a provider is an
+account action and the model list is a consequence of it. Here the two are
+separate facts that the screen keeps separate: *a credential is stored*, *the
+provider answered with N models*, *this exact model has passed a readiness check*.
+An owner can be in the first state and not the third, and the interface says so
+rather than presenting a model that will fail at turn time.
+
+**Where Raiker is behind, found in the same review.**
+
+| Gap | Reference behaviour | Meaningful improvement if built? |
+|---|---|---|
+| A 413-model catalogue is a flat `<select>` | Hermes Agent and Cursor put a **search box** above the model list; Claude Code's menu keeps five models and hides the rest behind **More models ›** | **No — parity, and built in this round.** OpenRouter really does serve 413 models, and a native select of that length is technically honest and practically unusable. A catalogue past twelve models now carries a filter that matches on both the raw id and the displayed name — an owner reading "Sonnet 4.5" should not have to know it is `claude-sonnet-4-5-20250929` — and a filter matching nothing says so rather than presenting an empty picker. Below the threshold the control is absent rather than in the way. |
+| No usage or limit reading beside the model | Claude's composer shows plan usage — context window, 5-hour limit, weekly — under the model chip | **Yes, if each figure names its source.** Raiker already has a per-provider weekly token budget and a usage ledger; surfacing *the owner's own* budget and spend at the point of choosing a model would beat a hosted product's opaque "68% of weekly", because the number would be attributable to a ledger the owner can read. |
+| No automatic model choice | Claude Code and Cursor offer an "auto" model that the product picks | **No, and deliberately not.** A product that picks the model decides where the owner's content goes. The ordered fallback sequence is the governed version of the same convenience: the owner writes the order, and `no_silent_hosted_fallback` keeps a local-first posture from being quietly widened. |
+
+---
+
+## Live-work control set — what the product says is happening right now
+
+Reviewed **2026-08-16 (second round)** against **Claude Cowork** (a Tasks list and
+a Schedule), **Claude Code** (`/background`, the background-task chips),
+**Codex** (a queue of cloud tasks), **ChatGPT** (Tasks), **OpenClaw** (a live
+canvas), and **Hermes Agent**.
+
+Raiker's default screen used to open with a composer that could not send anything
+([FIXED-225](plans/FIXED_ITEMS.md)). It is now a board, and the board's
+contribution is a **taxonomy** the reference products do not draw:
+
+| Group | The fact it answers | Why it is separate |
+|---|---|---|
+| Running now | A governed cycle is in flight, or parked on a decision | This is the only group where **Stop** means "stop something happening" |
+| Standing agents | Work with a repeating cadence that re-arms after each cycle | An agent between cycles is *armed*, not running — the scheduler stores it as `queued` with its next slot, and counting it as running is the overcount BUG-09 was filed about |
+| Scheduled runs | One future run that has not fired | Cancelling this cancels a plan, not a process |
+
+Every reference product collapses at least two of these into one list called
+"Tasks". A row that is waiting, a row that is running, and a row that will run in
+a week are three different things to do something about, and naming them
+separately is what makes a stop button mean one thing.
+
+| Control | Raiker behaviour |
+|---|---|
+| Stop at a safe boundary, from the board | The same governed `POST /api/interrupts` every other surface uses — never a kill |
+| A blocked row names its blocker | `waiting_for_approval` reads as *"Blocked on a decision you have not made yet"* with a link to the decision, not as a failure |
+| A cadence reads as English | `Runs hourly`, `Keeps going until stopped`, plus the next cycle as a relative time |
+| Live without a reload | A 15-second poll, the same cadence the Tasks page uses on the same data |
+| No second send path | Starting work is a link to the one surface that owns a composer for that kind of work |
+
+**Where Raiker is behind, and it is unchanged and structural.** The board now makes
+the existing limitation *visible* rather than removing it, which is the honest
+intermediate step:
+
+| Gap | Reference behaviour | Meaningful improvement if built? |
+|---|---|---|
+| A schedule fires only while Raiker is running on this device | Cowork, ChatGPT and Codex run schedules on someone else's computer | **No — parity, and it is a deployment question, not a feature.** Raiker is local-first by construction. The nearest honest improvement is OS-level scheduled-task registration so a closed laptop wakes for its own cadence, with the audit trail staying local. |
+| Four named cadences, no time-of-day or cron | Cowork and ChatGPT take an arbitrary time and a timezone | **No — parity, and worth building.** A daily routine anchored to "whenever it was created" is a real limitation the board now displays as *next cycle …*, which makes it obvious rather than surprising. |
+| A cycle that finishes while nobody is looking reaches nobody | Cowork and ChatGPT notify | **Yes, if the notification carries the governed outcome.** Raiker has a notification centre and an event log; a notification that says *which* run ended, how, and links to the decision it needed would beat "your task is done" — but a notification that leaves the machine is an egress decision and has to be gated as one. |
+
+---
+
+## Composer parity — the second pass
+
+The [composer control set](#composer-control-set--how-a-prompt-is-written-corrected-and-re-run)
+above records the first pass (slash commands, `@` completion, message actions).
+This round changed the composer's **shape** to match the reference products and
+moved one control to where it belongs — see
+[FIXED-228](plans/FIXED_ITEMS.md).
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| One control bar under a full-width prompt | **Parity.** Claude, Claude Code, ChatGPT and Hermes all keep `+` at the left and the model chip at the right | Raiker kept its per-turn controls in a column beside the textarea, which cost the prompt a third of the card and put the model chip where no reader would look for it. |
+| The thinking budget inside the model menu | **Parity with Claude Code**, which nests **Effort ›** and a **Thinking** switch in its model menu | And it fixes a Raiker-specific incoherence: "Thinking: default" and "send no effort" were one fact spelled two ways. They are now one control. |
+| Effort levels are only ever the model's own | **Yes** | Claude Code offers Low…Max for every model in its list. Raiker offers exactly the values the backend advertises for that exact profile, and a model that publishes none has **no** Effort section rather than a disabled one. |
+| Build's posture as one chip and one Mode menu | **Parity with Claude Code's Mode menu** (Auto / Accept edits / Plan, with 1/2/3) | Raiker's three modes are server-enforced per turn and may only ever *tighten*, which Claude Code's cannot claim — but the control's shape is theirs, and three always-visible buttons made a posture look like a filter. |
+| A `Chat | Build` surface toggle that carries the draft | **Parity with Claude's `Chat | Cowork`**, with one difference worth naming | It moves the prompt and its staged files and **sends nothing**; neither surface's governance changes. Deciding which room a half-typed prompt belongs in used to mean abandoning it. |
+| Governance chips on the same bar | **Yes** | No reference composer carries an approval-mode chip, an execution-environment badge and a measured context-capacity badge at all, because none of them has a governed answer to put in one. |
+
+**Still absent, and named rather than mocked up.** There is no microphone and no
+dictation: ChatGPT and Claude both have one. GAP-CHAT C16 records it, and the
+control is absent rather than present-and-disabled.
+
+---
+
+## Conversation branching — the C14 remainder
+
+| Concept | Claude / ChatGPT | Raiker | Beyond? |
+|---|---|---|---|
+| Edit a past message | Replaces the message and discards everything after it | Adds a new turn; the original stays | **Yes** — for a governed agent the transcript is evidence |
+| Branch from a point | ChatGPT and Claude both fork a conversation | `POST /api/checkpoints/{id}/branch` seeds a second conversation from that turn's checkpoint | **Parity in capability, beyond in accounting** |
+| Say where a branch came from | Neither shows lineage in the transcript | A lineage band names and links the source conversation, and states that it kept every turn it had | **Yes** |
+| Branch what has no state | Both branch from any message | Absent on a turn with no checkpoint, with the reason stated | **Yes** — a seed invented from the transcript is not the state the turn actually ran in |
+
+Shipped as [FIXED-227](plans/FIXED_ITEMS.md); the last open row of GAP-CHAT C14 is
+closed.
+
+---
+
+## Safeguards reviewed this round
+
+Two safeguards were found to be *saying* more than they were doing. Both are
+recorded because a safeguard that reports success without acting is worse than an
+absent one — it teaches the owner to trust a signal that means nothing.
+
+| Safeguard | What it was doing | Now |
+|---|---|---|
+| Response redaction | Destroying three legitimate OpenRouter model ids for being 41 characters long, flattening them into one identical string | A named `model` field family with the segmented-path fallback; every credential shape still matched first ([FIXED-224](plans/FIXED_ITEMS.md)) |
+| The readiness dialog's **Check again** | Reporting "Check complete" when it had no profile and no model to check | Reports what it actually did ([FIXED-226](plans/FIXED_ITEMS.md)) |
+
+And one is failing in a way the product does not surface, recorded open as
+[BUG-216](plans/TO_BE_FIXED.md): on Windows, a workspace nested deeper than
+~170 characters cannot open its checkpoint locks, so pre-image capture fails and
+the only trace is a `checkpoint_capture_failed` event nothing displays. No
+reference product makes a reversibility promise of this kind, so there is nothing
+to be behind — but Raiker does make it, which is exactly why it has to be either
+kept or visibly broken.
+
+---
+
+## 2026-08-16 review (first round) — what was added, and whether it goes beyond the reference set
 
 Requested as a categorical answer rather than a narrative: for each control this
 round added or proposed, **does it take Raiker past Claude Cowork, Claude Code,
@@ -757,7 +898,7 @@ Each is recorded where the work is tracked rather than implied to exist.
 |---|---|---|
 | Owner-authored custom slash commands | **No — parity** (Claude Code, Codex, OpenClaw have them) | The skill store already holds owner-authored instructions with a review path. The honest version has to state what authority a command carries, which makes it a governance design task rather than a parser change. |
 | `@`-mention of a connector, a memory or a past conversation | **Yes**, if the menu names the authority each row would use | One completion menu over four governed reads becomes a way to reach a capability without noticing, unless the row says which one. That is the design work. |
-| Branch-a-conversation-from-here | **No — parity** (ChatGPT, Claude) | Needs a conversation fork over the existing checkpoint manifest plus a surface that makes two branches legible. |
+| Branch-a-conversation-from-here | **Built in the second round of the same day** — see [FIXED-227](plans/FIXED_ITEMS.md) | It needed a conversation fork over the existing checkpoint manifest plus a surface that makes two branches legible; both landed, and the lineage band is the part no reference product has. |
 | A slash command that shows the capability gate it would cross | **Yes** | No reference product's command surface is governed at all, so none can show this. It would make the governed shape of a shortcut visible before it runs. |
 | An `@`-mention that reports each file's index freshness | **Yes** | The code map already records when each path was last parsed; no reference product's completion can say how stale its answer is. |
 | Background execution, PTY, filtered egress, restart reattachment | **No — parity** (Claude Code, Codex, OpenClaw, Hermes) | Each is a component rather than a flag. See [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194 for the per-row reason; the controls are absent from the interface rather than disabled. |

@@ -60,9 +60,11 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
+| [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | Open — root cause identified 2026-08-16 |
+| [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
 | MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
-| GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 complete; 13 items remain) |
+| GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -164,3 +166,116 @@ seven tabs on real data; Settings' sections; theme cycling system → light → 
 the notification centre and Mark all read; the STOP switch; and adaptive
 navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 `aria-expanded`, and focus returned to the trigger.
+
+---
+
+## BUG-216 — Checkpoint capture fails silently on a deep Windows path, and only logs it
+
+**Severity: High. Area: checkpoints / Windows paths. Status: Open — root cause
+identified, not fixed in this round.**
+
+**Observed.** Running the documented `python -m pytest` on Windows fails:
+
+```
+FAILED tests/test_approval_execution_wiring.py::TestApprovedWriteExecutes::
+       test_the_previous_contents_are_checkpointed_before_the_overwrite
+E   AssertionError: assert 'checkpoint_captured' in {…, 'checkpoint_capture_failed', …}
+```
+
+The approved write *executes* — `notes.md` really does contain `replaced` — but the
+pre-image that makes it reversible was never stored. The event log says
+`checkpoint_capture_failed` and nothing else in the product says anything at all.
+
+**Confirmed pre-existing** against a pristine worktree at `33cfe9b`, so it is not a
+consequence of this round's work.
+
+**Root cause: `MAX_PATH`.** The failure is a function of how deep the workspace
+sits, not of the code path. Reproduced deterministically by pointing the same flow
+at a 175-character workspace root:
+
+```
+FileNotFoundError: [Errno 2] No such file or directory:
+'…\\test_the_previous_contents_are_checkpointed_before_the_overwrite0\\ws\\.raiker
+\\events\\.locks\\c2e3adc6715dca5d203f9296c39e7d96eb298aa62f49af4c2b2a93580e197253.lock'
+```
+
+`.raiker\events\.locks\<64 hex>.lock` is ~86 characters on its own. Add a workspace
+root over ~170 characters and the absolute path crosses Windows' 260-character
+limit, so the open fails with `FileNotFoundError` rather than anything that names
+the real problem. `pytest`'s `tmp_path` is derived from the *test function name*,
+which is why a long test name is what exposes it, and why CI — Linux, with no such
+limit — is green on the same commit.
+
+**Why it is more than a test problem.** `RuntimeAuthority._commit_pre_image` is
+deliberately best-effort: a capture failure is recorded as a metadata event and
+never propagates into the mutation result, so the write proceeds. That is the right
+call for a transient failure and the wrong one for a systematic one — on an install
+whose workspace is nested deeply enough, **every** governed write is irreversible
+and the only trace is an event type nothing surfaces. Checkpointing before a write
+is a promise the product makes; a promise that fails closed silently is worse than
+one that is absent.
+
+**Required fix.** Two parts, and neither is a one-line change, which is why this is
+recorded rather than half-done:
+
+1. **Reach the path.** Apply the Windows extended-length prefix (`\\?\`) at the
+   point Raiker opens files it constructs itself under `.raiker` — the event-log
+   locks, the checkpoint blob store, the operation store. Applying it to some of
+   those and not others would leave the class open while appearing to close it, so
+   it needs one audited helper and every internal writer moved onto it.
+2. **Stop it being silent.** A capture failure that is *systematic* rather than
+   transient must reach the owner: a diagnostics readiness row, and a named reason
+   on the approval receipt for the write that could not be checkpointed. The
+   best-effort behaviour stays — a write the owner approved should not be lost to a
+   bookkeeping failure — but "this change is not reversible, and here is why" is a
+   fact the owner is entitled to before they approve the next one.
+
+**Required user-interface outcome.** Runtime/diagnostics shows a readiness row that
+fails when pre-image capture is failing, naming the path limit as the reason; and an
+approval whose pre-image could not be captured says so on the receipt rather than
+presenting as an ordinary reversible write.
+
+---
+
+## BUG-217 — `test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved` overflows the stack on Windows
+
+**Severity: Low. Area: test isolation / SQLCipher posture. Status: Open.**
+
+**Observed.** A full `python -m pytest` run on Windows aborts the whole process at
+~87%:
+
+```
+Windows fatal exception: stack overflow
+
+Current thread (most recent call first):
+  File "raiker\storage\sqlite.py", line 832 in bootstrap
+  File "raiker\storage\sqlite.py", line 733 in __init__
+  File "tests\test_sqlcipher_memory_security.py", line 230 in
+       test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved
+```
+
+Deselecting that one test makes the entire suite pass. **Confirmed pre-existing**
+against a pristine worktree at `33cfe9b`.
+
+**Relationship to FIXED-218.** That entry closed the *ordering* half of this file's
+SQLCipher story — `cipher_memory_security` is a process-global one-way latch. This
+is a different failure with the same neighbours: opening a store that reads the
+pragma back, in a process where it has already been exercised, overflows the stack
+in the bundled Windows SQLCipher build rather than returning a value.
+
+**Why CI cannot see it.** The `python` job sets
+`RAIKER_SQLCIPHER_MEMORY_SECURITY=off` for the whole process, and its second step
+re-runs only `tests/test_sqlcipher_memory_security.py` and `test_memory_sqlcipher.py`
+in a *fresh* process where nothing has latched the pragma on. The overflow needs the
+combination this test only meets in a full local run: Windows, the bundled build,
+and a process that has already opened many stores.
+
+**Required fix.** Establish whether the overflow is in the bundled SQLCipher build's
+pragma read or in how the posture probe re-enters it, and isolate the posture test
+into its own process (as CI already does for its second step) so a contributor's
+documented `pytest` run cannot be aborted by it. Do not silence it with an env var:
+that is precisely what hid FIXED-218.
+
+**Required user-interface outcome.** None — this is a test-isolation defect on one
+platform. The product's memory-security posture is reported from a real probe and
+is unaffected.

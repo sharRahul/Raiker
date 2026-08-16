@@ -71,7 +71,7 @@ that proves it, what is missing, and the concrete work.
 | C7 | BUILD | TIER 0 | Done |
 | C8 | BUILD | TIER 0 | Done |
 | C13 | BUILD | TIER 0 | Done |
-| C14 | CHAT | TIER 3 | Done — copy, edit-and-resend, retry (FIXED-220); branch-from-here remains open |
+| C14 | CHAT | TIER 3 | **Complete** — copy, edit-and-resend, retry (FIXED-220); branch-from-here (FIXED-227) |
 
 ---
 
@@ -544,17 +544,22 @@ owner, so this is a genuine architectural decision rather than a missing screen 
 carries the same Stop and steer controls as Build's, on the same governed
 endpoint, and a stopped turn says so in the transcript instead of simply ending.
 
-**C14. No message-level actions.** ✅ **Done — see FIXED-220**, with one part
-deliberately left open. Copy, **Edit** and **Retry** are on the owner's own
+**C14. No message-level actions.** ✅ **Complete — see FIXED-220 and FIXED-227.** Copy, **Edit** and **Retry** are on the owner's own
 message in both Chat and Build. Edit puts the prompt back in the composer and
 **does not rewrite the transcript**: the original turn stays and the edited one
 is a new turn beneath it — ChatGPT and Claude replace the edited message and
 discard what followed it, which for a governed agent would mean a record that
 quietly changes what was asked.
 
-**Branch-from-here is still open**, and it is the one part of this entry that is
-not a composer change: it needs a conversation fork over the existing checkpoint
-manifest plus a surface that makes two branches of one conversation legible.
+**Branch-from-here has since landed — see FIXED-227.** It was the one part of this
+entry that was not a composer change, and it was built the way this entry
+described: a conversation fork over the existing checkpoint manifest (`plan_fork`
+/ `execute_fork`, previously CLI-only) exposed as
+`GET|POST /api/checkpoints/{id}/branch`, plus the surface that makes two branches
+legible — **Branch** on a completed turn, and a lineage band on the branch naming
+and linking the conversation it grew from. The conversation branched *from* keeps
+every turn it had, which is the same reason Edit does not rewrite history.
+
 Per-message feedback is not planned — there is no model to send it to, and a
 control that files a rating nowhere is the kind of surface this document exists
 to prevent.

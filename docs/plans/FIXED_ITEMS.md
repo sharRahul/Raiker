@@ -224,6 +224,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-220](#fixed-220--the-composer-was-a-textarea-and-a-send-button-gap-build-b19-gap-chat-c14) | Medium | Chat / Build composer | Fixed (GAP-BUILD B19, GAP-CHAT C14) |
 | [FIXED-221](#fixed-221--three-settings-sections-had-deep-links-that-silently-opened-general) | Low | Settings navigation | Fixed (found while shipping FIXED-219) |
 | [FIXED-222](#fixed-222--the-audit-chain-looked-for-an-events-predecessor-by-a-whole-second-timestamp) | High | Audit integrity | Fixed (found running the suite under load) |
+| [FIXED-223](#fixed-223--the-first-run-model-stage-could-not-answer-the-question-it-asked) | High | First-run setup / Models | Fixed |
+| [FIXED-224](#fixed-224--three-openrouter-models-became-one-string-and-froze-the-row-that-listed-them) | High | API redaction / model picker | Fixed |
+| [FIXED-225](#fixed-225--the-workbench-opened-with-a-composer-that-could-not-send) | Medium | Workbench | Fixed |
+| [FIXED-226](#fixed-226--check-again-reported-check-complete-when-it-had-checked-nothing) | Medium | Model readiness | Fixed |
+| [FIXED-227](#fixed-227--branch-from-here-the-last-open-part-of-c14) | — | Chat / checkpoints (GAP-CHAT C14) | Fixed |
+| [FIXED-228](#fixed-228--the-composer-hid-the-thinking-budget-behind-a-second-dropdown-and-lost-its-focus-ring) | Low | Composer | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -1597,8 +1603,8 @@ an in-card keyboard-hint footer. Build keeps Plan/Edit/Auto without detaching th
 send action. A committed Playwright test covers both accessible surfaces.
 
 **Verification.** `npm --prefix apps/web run test:e2e` passed in Chromium at
-1440×1000. Screenshots are `output/playwright/bug15-chat-composer.png` and
-`output/playwright/bug15-build-composer.png`.
+1440×1000. Screenshots are `docs/plans/screenshots/working/bug15-chat-composer.png` and
+`docs/plans/screenshots/working/bug15-build-composer.png`.
 
 ---
 
@@ -1677,8 +1683,8 @@ removing encrypted credential storage. Models keeps provider-backed selection
 but renders human model names instead of internal profile/model identifiers.
 
 **Verification.** Chromium screenshots are
-`output/playwright/settings-redesign.png` and
-`output/playwright/models-redesign.png` at 1440×1000.
+`docs/plans/screenshots/working/settings-redesign.png` and
+`docs/plans/screenshots/working/models-redesign.png` at 1440×1000.
 
 ---
 
@@ -8663,3 +8669,280 @@ an owner to discount the one signal that has to be believed.
 **User-interface outcome.** None visible on a healthy log, which is the point:
 Observability's integrity report and `verify_session_events` now agree with the
 writer, so a busy session stops reporting a tamper signal it does not have.
+
+---
+
+## FIXED-223 — The first-run model stage could not answer the question it asked
+
+**Severity: High. Area: first-run setup / Models. Status: Fixed.**
+
+**Observed.** On a brand-new instance, stage 02 of the setup wizard asks *"Choose
+where Raiker thinks"* and then renders **"No model connection yet — Add one in
+Models now, or continue and return later."** The two controls beneath it were a
+link to another page and **Decide later**. The screen asking the question was the
+one screen that could not answer it.
+
+**Root cause.** The stage listed `GET /api/models` → `profiles`, filtered to those
+with a concrete model. Every hosted profile ships with the placeholder model
+`<model>` and every llama.cpp slot ships with an alias, so on a fresh install the
+filtered list is empty *by construction* — it could only ever be populated by work
+the owner had already done somewhere else.
+
+**Fix — a row per provider, not a row per already-configured profile.** The stage
+now renders `ProviderMatrix`, which builds one row per **provider** from the
+registry and gives each row the thing that provider actually needs:
+
+| Group | Rows | What the row does |
+|---|---|---|
+| On this machine | Local GGUF, Ollama, LM Studio, OpenAI-compatible | *Detects*. Asks the runtime what it is serving and puts the answer in a dropdown. Local GGUF reads the approved-folder library and can start `llama-server` on one. |
+| With an API key | Anthropic, OpenAI, OpenRouter, Ollama Cloud, Hugging Face, Gemini | Takes the key through the same governed vault path the Models page uses, then asks that provider for **its own** catalogue and offers it as a dropdown. |
+
+Nothing about governance moved: saving a credential and pinning a model are
+gate-manager actions enforced server-side, a key's value is never read back (the
+row can only report that one is stored), and readiness is still measured against
+the exact model before any model-backed work.
+
+**Honesty rules the rows keep, each of which was a way to lie.** A runtime that is
+not running says *"LM Studio is not running on this device"* rather than offering
+an empty dropdown. A provider that refuses a key says so rather than listing
+nothing. A provider that publishes no catalogue says *"does not publish a model
+list. Type the exact model id instead."* A llama.cpp row shows **no** "Selected:"
+line, because that profile's `model` is the slot alias the runtime serves under —
+rendering it read *"Selected: Local GGUF"* for a GGUF that did not exist and a
+choice nobody had made.
+
+**Live evidence (2026-08-16, fresh workspace, keys typed into the product's own
+fields).** Ollama detected **9** local models; LM Studio and OpenAI-compatible
+each reported not running; Anthropic answered with **10** models, OpenRouter with
+**413**, OpenAI with **124**; Haiku 4.5 was pinned from Anthropic's own catalogue
+and the row reported `Selected: Haiku 4.5`. No key appeared anywhere in the DOM.
+`docs/plans/screenshots/working/r0816b-01-first-run-provider-matrix.png`,
+`r0816b-02-first-run-catalogues-listed.png`, `r0816b-03-first-run-model-pinned.png`, and
+`apps/web/e2e/wizard-workbench-composer-live.spec.ts`.
+
+**A catalogue too long to scroll.** OpenRouter serves 413 models, so a row past
+twelve of them carries a filter above its picker. It matches on both the raw id and
+the displayed name — an owner reading "Sonnet 4.5" should not have to know it is
+`claude-sonnet-4-5-20250929` — and a filter that matches nothing says *"No model
+matches that filter"* rather than presenting an empty picker. Below the threshold
+the control is absent rather than in the way.
+
+**User-interface outcome.** The first-run model question is answerable on the
+screen that asks it, for every provider Raiker supports, without leaving the
+wizard — and every row states what it found rather than what it hoped for.
+
+---
+
+## FIXED-224 — Three OpenRouter models became one string, and froze the row that listed them
+
+**Severity: High. Area: API redaction / model picker. Status: Fixed.**
+
+**Observed.** Live, on 2026-08-16: an OpenRouter key was stored, the catalogue
+read returned **200 OK** in 0.4 s, and the wizard's OpenRouter row sat on
+**"Asking OpenRouter…"** — disabled, forever. The browser console carried
+`https://svelte.dev/e/each_key_duplicate`.
+
+**Root cause, in two halves, and the first half is the interesting one.**
+
+1. **The redaction layer destroyed three legitimate model ids.** The response
+   scrubber's last-resort rule replaces any 40+ character run of URL-safe
+   characters, and a vendor model id is exactly that shape:
+   `mistralai/mistral-small-24b-instruct-2501` is 41 characters. Three of
+   OpenRouter's 413 ids were replaced with the *identical* string
+   `[REDACTED_SECRET]`. The owner was offered three models they could not tell
+   apart and could never select.
+2. **The duplicate then crashed the render.** The dropdown keys its options by the
+   model id, so two options with one key threw during the update — which left
+   `busy` on `detecting` and the row stuck on "Asking…". A 200 OK looked exactly
+   like a hung provider.
+
+This is the third instance of one documented failure class. FIXED-13 was locators
+(`events_path`, `pdf_url`) and FIXED-14 was record ids (`sess_inbox_…`): a field
+whose value is long *because its segments were joined*, scanned by a rule that
+only measures length.
+
+**Fix.** A **model** field family, alongside the locator, identifier and digest
+families that already exist: `model`, `models`, `*_model`, `*_models` are scanned
+with the segmented-path fallback, which spares a run whose every slash-separated
+segment is itself under the entropy threshold. Every specific credential shape
+(`sk-…`, `ghp_…`, `Bearer …`, `token=…`, PEM) is matched *before* the fallback and
+applies unchanged, so a key pasted into a model field is still destroyed — proven
+in `tests/test_over_broad_redaction.py::TestProviderModelNamesSurvive`. Free-form
+text keeps the strict scan.
+
+The second half is fixed too, because a provider may legitimately repeat an id and
+a crash is never the right answer: `ProviderMatrix` de-duplicates a catalogue on
+arrival, keeping the provider's own order. `ModelsView` already did this — which is
+how the symptom had been survivable there while the cause went unrecorded.
+
+**User-interface outcome.** OpenRouter's 413 models are all listed, all distinct,
+and all selectable. A catalogue read that succeeds never presents as a provider
+that will not answer.
+
+---
+
+## FIXED-225 — The Workbench opened with a composer that could not send
+
+**Severity: Medium. Area: Workbench. Status: Fixed.**
+
+**Observed.** The default screen opened with a large prompt box, four mode tabs, a
+model picker and a **Start build** button. Pressing it sent nothing: the text was
+handed to Chat, Build or Tasks, and *re-shown there* in that surface's own
+composer. The first thing the product asked the owner to do was type into a copy
+of the real control — and the only genuinely live information on the screen, what
+is running and what is waiting, was pushed into a 19rem rail beside it.
+
+**Fix.** The box is gone. The Workbench is a board over the work the backend
+already owns, in three groups that are three different facts rather than three
+names for one:
+
+| Group | What it holds | Classified by |
+|---|---|---|
+| **Running now** | A governed cycle in flight, or parked mid-flight | `running`, `continuing`, `waiting_for_approval`, `paused`, plus a `queued` row with no scheduled slot |
+| **Standing agents** | Work with a repeating cadence, which re-arms after every cycle | `recurrence` in `continuous`/`hourly`/`daily`/`weekly` |
+| **Scheduled runs** | A single future run that has not fired | `queued` with a `scheduled_at`, and no recurrence |
+
+The classification mirrors the scheduler rather than guessing: `reschedule_task`
+stores a re-armed cadence as `queued` with its next slot, so counting every queued
+row as *running* is exactly the overcount BUG-09 was filed about. A running agent
+appears in two groups deliberately — "a cycle is running" and "an agent is
+standing" are two questions and the board answers both.
+
+Every row carries its state badge, what it is waiting on, and the one control that
+changes it: a safe-boundary **Stop** on the same governed `POST /api/interrupts`
+every other surface uses, and **Decide** on a row blocked by an approval. Starting
+work is a **link** to the surface that owns the composer for that kind of work, so
+there is exactly one composer per kind and no second send path. The board polls on
+the same 15-second cadence as the Tasks page, because it is the same data.
+
+**Removed with it.** `TasksView` listened for `raiker:task-compose`, which only the
+Workbench composer ever dispatched. A listener for an event nothing sends is a
+handoff the product claims and never performs, so it went with its sender; planning
+a task is the form on the Tasks page.
+
+**Live evidence.** `docs/plans/screenshots/working/r0816b-04-workbench-board.png` and
+`r0816b-05-workbench-standing-agent.png` — five real daily routines listed under
+**Standing agents** with their next cycle and a Stop, **Running now** correctly
+reading "Nothing is running."
+
+**User-interface outcome.** The default screen answers "what is Raiker doing right
+now" from live data, offers no control that cannot do what it appears to do, and
+reaches every real composer in one click.
+
+---
+
+## FIXED-226 — "Check again" reported "Check complete" when it had checked nothing
+
+**Severity: Medium. Area: model readiness. Status: Fixed.**
+
+**Observed.** Found while building the live evidence for this round. The composer's
+readiness strip offers **Set up model**, which opens the readiness dialog, whose
+one action is **Check again**. Clicking it reported **"Check complete"** and the
+composer stayed blocked, because nothing had been checked.
+
+**Root cause.** `refreshModelReadiness` needs a profile id and a model, and returns
+`null` when it has neither. The dialog is most often opened from the
+`readinessForSelection(null)` fallback — *"No model is set up"* — which carries
+empty strings for both. `retry()` awaited the call, ignored the result, and set its
+status to "Check complete" unconditionally. The one control on the screen claimed
+to have proven a model it had never contacted.
+
+**Fix.** `retry()` reads the result and distinguishes the two outcomes: a real
+check reports "Check complete"; nothing to check reports **"There is no model to
+check yet. Choose one in Models first."** Guarded by
+`ModelSetupDialog.test.ts::does not claim a check happened when there is no model
+to check`.
+
+**User-interface outcome.** A readiness check reports what it actually did. A
+dialog opened with no model to check sends the owner to the one place that can give
+it one, instead of telling them the check passed.
+
+---
+
+## FIXED-227 — Branch from here: the last open part of C14
+
+**Area: Chat / checkpoints (GAP-CHAT C14). Status: Fixed.**
+
+**What was left open.** FIXED-220 shipped Copy, Edit and Retry on the owner's own
+message and deliberately stopped there: *"Branch-from-here is still open, and it is
+the one part of this entry that is not a composer change: it needs a conversation
+fork over the existing checkpoint manifest plus a surface that makes two branches
+of one conversation legible."*
+
+**What existed already.** `CheckpointService.plan_fork` / `execute_fork` /
+`load_fork_seed` — a metadata-only fork that creates a new session seeded from a
+checkpoint's state summary and memory candidates, writing no workspace file. It was
+reachable from the CLI only; neither the HTTP API nor the web app exposed it.
+
+**Fix, end to end.**
+
+| Layer | What was added |
+|---|---|
+| API | `GET /api/checkpoints/{id}/branch-plan`, `POST /api/checkpoints/{id}/branch`, `GET /api/sessions/{id}/branch-origin` |
+| Read model | `WebReadModels.conversation_branch_plan` / `branch_conversation` / `conversation_branch_origin`, owner-scoped: a branch is created with the **source session's** owner, so branching can never widen who may read a conversation |
+| Web | A fourth message action, **Branch**, on a completed turn; a lineage band at the top of a branched conversation naming and linking the conversation it grew from |
+
+**Why it is not a restore, and why that matters.** A restore rewrites workspace
+files and is therefore an approval-gated governed mutation. A branch writes no
+workspace file: the conversation it came from keeps **every turn it had**, and
+nothing after the branch point is discarded. That is the same principle Edit was
+built on — ChatGPT and Claude replace the edited message and drop what followed,
+which for a governed agent would be a record that quietly changes what was asked.
+`branch-plan` reports `requires_approval: false` for exactly this reason, and the
+API test asserts the source conversation is unchanged after a branch.
+
+**Honest absences.** Branch appears only on a turn that has a checkpoint — a turn
+with none says *"No checkpoint was written for that turn, so there is no point to
+branch from"* rather than inventing a seed from the transcript. It is absent in
+Build, where a workspace conversation has nowhere to open a branch as itself.
+
+**Cover.** `tests/test_api_web_read_models.py::TestConversationBranch` (six cases,
+including that a root conversation reports "not a branch" rather than 404-ing) and
+`apps/web/src/lib/views/ChatView.branch.test.ts` (four, including that the branch
+is taken from *that turn's* checkpoint and not the latest one). Live: the Branch
+control is asserted present on a completed turn in
+`wizard-workbench-composer-live.spec.ts`.
+
+**User-interface outcome.** Two lines of thought can exist side by side from a
+chosen point, each says where it came from, and neither overwrites the other.
+
+---
+
+## FIXED-228 — The composer hid the thinking budget behind a second dropdown, and lost its focus ring
+
+**Severity: Low. Area: composer. Status: Fixed.**
+
+**Observed.** Both composers put the model picker, the execution-environment badge,
+the capacity badge and a `Thinking: …` select in a **column to the right of the
+textarea**, costing the prompt a third of the card's width and putting the model
+chip somewhere no reference composer keeps it. The thinking budget was a separate
+control from the model whose budget it was, so a model with no published effort left
+an orphaned gap, and "Thinking: default" and "no effort sent" were the same fact
+spelled two ways.
+
+**Fix.** One control bar under a full-width prompt, matching where the reference
+composers keep each control:
+
+* **Chat** — `+`, the `Chat | Build` surface toggle, project, approval mode, and the
+  two governance badges on the left; model chip, context ring and **Send** on the
+  right.
+* **Build** — the same, with the posture as one chip and one **Mode** menu (Plan /
+  Edit / Auto, with the summary of each and the keyboard hint) in place of three
+  side-by-side buttons. Shift+Tab still cycles, and `BUILD_MODES` still owns the
+  per-turn `capability_modes` map that may only ever tighten.
+* **Effort** is a section *inside* the model menu, with a **Thinking** switch.
+  Thinking off and "no effort named" are one piece of state, so they are one
+  control; a model that publishes no levels has no section at all rather than a
+  disabled one.
+* The **surface toggle** is new: it moves a half-typed prompt between Chat and
+  Build, carrying its staged files, through the same handoff events the Workbench
+  used — and sends nothing.
+
+**Found on the way.** `.bar-select:focus-visible` had been left stranded on the
+front of the `.turn-attachments` selector, so focusing a composer select silently
+applied a flex layout and a top margin to it and never drew a focus ring at all. It
+now draws the shared ring.
+
+**User-interface outcome.** The prompt gets the whole card; every per-turn control
+is where a reader of any comparable product would reach for it; and the thinking
+budget belongs to the model it applies to.

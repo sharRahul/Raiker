@@ -24,8 +24,18 @@ that can list models but cannot execute because of access or billing. Evidence
 expires after five minutes and is invalidated when credentials, endpoints,
 catalogues, selections, or managed runtimes change. There is no silent fallback.
 
-The same gate protects Workbench, Chat, Build, Tasks, and Schedule. With no
-ready model, the primary action is disabled and **Set up models** opens Models.
+The same gate protects Chat, Build, Tasks, and Schedule. With no ready model, the
+primary action is disabled and **Set up model** opens the readiness dialog, whose
+**Check again** runs the exact-model check — or says there is no model to check
+yet, when that is the truth. (The Workbench is not in that list because it has no
+composer to gate: it is the board over work that is already running.)
+
+**The first-run screen can do all of this on its own.** Stage 02 of setup shows one
+row per provider. The three local runtimes are *asked* what they are serving and
+offer the answer in a dropdown; a runtime that is not running says so. Every
+API-key provider takes its key inline and then lists **that provider's own**
+catalogue — a long one carries a filter — so a model can be connected and pinned
+without leaving the wizard.
 
 ## Local discovery and acquisition
 

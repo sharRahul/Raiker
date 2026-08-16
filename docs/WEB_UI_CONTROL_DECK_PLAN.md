@@ -172,13 +172,21 @@ component layer needs no changes.
 
 ### 4.1 Colour
 
-**Dark ("deck", flagship):** app background `#0b0f14`, surfaces `#11161d` / `#182029`,
-hairline `#26303b`, text `#e8edf2` / `#98a6b3`, accent luminous teal `#2dd4bf` family.
+Reset on **2026-08-16** to the owner's three-colour palette. Three colours per
+theme, named on `:root` as `--brand-gold` `#ecd06f`, `--brand-blue` `#2779a7`,
+`--brand-grey` `#9c9c9c`, `--brand-black` `#000000`, `--brand-white` `#ffffff`;
+every other token derives from one of them.
 
-**Light ("paper", first-class peer):** paper `#f4f7f9`, surfaces white, ink `#16232c`,
-accent deep teal `#0f766e` family. The default follows `prefers-color-scheme`; the
-explicit choice persists in `localStorage` (theme preference only — the bearer token
-stays memory-only).
+**Dark ("deck", flagship):** app background `#000000`, surfaces `#0b0b0c` /
+`#17171a`, hairline `#2a2a2c`, text `#ffffff` / `#b6b6b8` / `#9c9c9c`, accent gold
+`#ecd06f` family with `--text-inverse` black.
+
+**Light ("paper", first-class peer):** paper `#f4f4f5`, surfaces white, ink
+`#1b1c1e`, neutral scaffold from grey `#9c9c9c`, accent steel blue `#2779a7`
+family with `--text-inverse` white; gold `#ecd06f` carries the brand mark and the
+pending/ask state. The default follows `prefers-color-scheme`; the explicit choice
+persists in `localStorage` (theme preference only — the bearer token stays
+memory-only).
 
 **Risk scale** (from `docs/foundation/06_SECURITY_MODEL.md`): low = neutral;
 medium = amber; high = orange; critical = red with a 2 px left rule and shield-alert

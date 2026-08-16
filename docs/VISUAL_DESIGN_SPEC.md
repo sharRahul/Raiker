@@ -215,9 +215,31 @@ first frame for an instant, which is enough to flash.
 Unchanged from the token pass that shipped with the first half of BUG-37, and
 restated here so this document is complete:
 
-- **One accent.** Teal is brand, primary action, and active state. Green, amber,
-  red and blue are semantic only — success, warning, danger, information — and
-  never decorative.
+- **Three colours per theme, named once.** The palette was reset on 2026-08-16 to
+  the owner's choice, and every other token is *derived* from one of the three
+  rather than introduced beside it:
+
+  | | Light ("paper") | Dark ("deck") |
+  |---|---|---|
+  | Action / active state | steel blue `#2779a7` | gold `#ecd06f` |
+  | Brand mark, pending / ask | gold `#ecd06f` | gold `#ecd06f` |
+  | Neutral scaffold — borders, muted text | grey `#9c9c9c` | grey `#9c9c9c` |
+  | Ground | near-white `#f4f4f5`, surfaces white | black `#000000` |
+  | Ink | `#1b1c1e` | white `#ffffff` |
+
+  `--brand-gold`, `--brand-blue`, `--brand-grey`, `--brand-black` and
+  `--brand-white` are declared on `:root` so the three are addressable by name and
+  a view cannot invent a fourth.
+- **Two hues survive outside the three, and they are facts rather than
+  decoration.** `--ok` (a run happened) and `--danger` (a run was refused) are how
+  the four governed states — allow, pending, deny, read-only — stay tellable apart
+  at a glance; they are mixed toward the palette so they read as part of it.
+  Pending/ask is gold, and read-only/info is the accent's quieter half, so neither
+  needs a hue of its own.
+- **`--text-inverse` is the contrast pair for the accent**, not a synonym for
+  white: white on light's blue, black on dark's gold. Every accent-backed control
+  reads it rather than hard-coding a colour, which is what let the accent change
+  hue without a single button becoming illegible.
 - **Radii climb with importance.** `--r-sm` for controls, `--r-md` for cards,
   `--r-lg`/`--r-xl` for panels that hold a whole object.
 - **Depth is a ladder.** Each `--shadow-*` level pairs a tight contact shadow

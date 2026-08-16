@@ -191,7 +191,7 @@ zero-trust verification is applied at every authority boundary.
 
 | Group | Destinations |
 |---|---|
-| Home | **Workbench** — resume work, see what needs attention |
+| Home | **Workbench** — the live board: what is running, which agents are standing, what is scheduled, and what needs a decision |
 | Work | **Chat**, **Build**, **Search Chat**, **Tasks**, **Projects** |
 | Knowledge | **Memory**, **Knowledge Map** |
 | Control | **Approvals**, **Permissions**, **Models**, **Extensions** |

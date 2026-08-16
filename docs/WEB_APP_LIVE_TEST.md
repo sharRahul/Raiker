@@ -14,6 +14,55 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-08-16 (first-run provider matrix, the Workbench board, both composers)
+
+Fresh workspace, owner registered through the browser, **every credential typed
+into the wizard's own field** — never given to the server as environment — so what
+this round proves is the product's store-key → catalogue → pin → readiness → turn
+chain from the very first screen. Spec:
+[`apps/web/e2e/wizard-workbench-composer-live.spec.ts`](../../apps/web/e2e/wizard-workbench-composer-live.spec.ts)
+(3 tests, 3 passed). Ollama was running locally; LM Studio was not installed, which
+is a *result* the rows are required to state.
+
+| Check | Result |
+|---|---|
+| One row per provider on the first-run model stage | ✅ Local GGUF, Ollama, LM Studio, OpenAI-compatible, Ollama Cloud, OpenRouter, Hugging Face, Anthropic, OpenAI, Gemini |
+| Local runtimes are asked without being clicked | ✅ **9 models from Ollama**, `gemma4:31b-cloud` pre-selected |
+| A runtime that is not running says so | ✅ *"LM Studio is not running on this device"*, and the same for OpenAI-compatible — no empty dropdown, no invented name |
+| No GGUF in an approved root is its own state | ✅ *"No complete GGUF found"* with **Scan**; no false `Selected:` line for the slot alias (FIXED-223) |
+| A key stored in the wizard produces that provider's own catalogue | ✅ Anthropic **10**, OpenRouter **413–414** (the catalogue moves), OpenAI **124** models, each read from the provider |
+| A catalogue too long to scroll carries a filter | ✅ `Filter 414 models` / `Filter 124 models`; absent on Anthropic's 10 |
+| No credential is rendered back into the page | ✅ asserted absent from `page.content()` after every save |
+| A model pinned from a real catalogue | ✅ `Haiku 4.5` → *"Selected: Haiku 4.5"*, and `PUT /api/model-selection` recorded |
+| Workbench has no composer | ✅ the prompt box, its mode tabs and its Start control are absent (FIXED-225) |
+| The board's three groups | ✅ **Running now** / **Standing agents** / **Scheduled runs**, each stating its own emptiness |
+| A real standing agent lands in the right group | ✅ a live daily routine reads `Runs daily · next cycle …` under **Standing agents**, and is **absent** from **Running now** — an armed cadence is not a running one |
+| Safe-boundary stop from the board | ✅ **Stop** on every row, on the same governed `POST /api/interrupts` |
+| Chat composer control set | ✅ `+`, `Chat | Build`, approval mode, execution environment, context capacity, model chip, context ring, Send — one bar under a full-width prompt |
+| Build composer control set | ✅ the same, with the posture as one chip and a **Mode** menu offering Plan / Edit / Auto |
+| The thinking budget lives in the model menu | ✅ **Effort** section with a **Thinking** switch; absent for a model that publishes no levels |
+| The restructured composer still sends | ✅ a real governed turn on `claude-haiku-4-5-20251001` returned the exact marker |
+| A completed turn offers **Branch** | ✅ FIXED-227, the last open row of GAP-CHAT C14 |
+| Both themes | ✅ light and dark captured; dark is `#000` ground, `#ffffff` ink, `#ecd06f` accent |
+| Console | ✅ 0 errors across all three tests |
+| Visual review | ✅ `docs/plans/screenshots/working/r0816b-01-first-run-provider-matrix.png`, `r0816b-02-first-run-catalogues-listed.png`, `r0816b-03-first-run-model-pinned.png`, `r0816b-04-workbench-board.png`, `r0816b-05-workbench-standing-agent.png`, `r0816b-06-chat-composer.png`, `r0816b-07-chat-live-turn.png`, `r0816b-08-build-composer-mode.png`, `r0816b-09-chat-dark.png` inspected at original resolution |
+
+**Two defects this round found and fixed, both of which a fixture could not have
+found.** OpenRouter's catalogue read returned 200 OK and the row still said
+"Asking OpenRouter…" forever, because the redaction layer had flattened three
+41-character model ids into one identical `[REDACTED_SECRET]` and the duplicate
+crashed a keyed render ([FIXED-224](plans/FIXED_ITEMS.md)). And the readiness
+dialog's **Check again** reported "Check complete" having checked nothing
+([FIXED-226](plans/FIXED_ITEMS.md)).
+
+**One defect found and left open.** On Windows, a workspace nested deeper than
+~170 characters cannot open its checkpoint locks, so pre-image capture fails and
+the only trace is an event nothing displays —
+[BUG-216](plans/TO_BE_FIXED.md). Confirmed pre-existing against a pristine
+worktree.
+
+---
+
 ## Result — 2026-08-15 (cross-provider review round, hosted Anthropic Haiku 4.5)
 
 Fresh workspace, owner registered through the browser, every credential typed
@@ -47,7 +96,7 @@ Re-run on a host with open egress to complete the OpenRouter, OpenAI and Ollama
 rows. Nothing in this round distinguishes those three backends' code paths — only
 that the network they need was refused before Raiker was involved.
 
-Evidence: `output/playwright/review-01-signed-in.png`,
+Evidence: `docs/plans/screenshots/working/review-01-signed-in.png`,
 `review-02-anthropic-readiness.png`, `review-03-chat.png`,
 `review-04-chat-answer.png`.
 
@@ -63,7 +112,7 @@ other link in the readiness chain was.
 | Check | Result |
 |---|---|
 | First run routes a new owner to `#/model-setup` | ✅ `Choose how to run models`, resumable, Skip explains the consequence |
-| Workbench / Chat / Tasks refuse to submit with no ready model | ✅ primary action disabled, draft preserved |
+| Chat / Build / Tasks refuse to submit with no ready model | ✅ primary action disabled, draft preserved (the Workbench has no composer to gate — it is the board over work already running) |
 | Connect dialog stores the key; value never rendered back | ✅ card shows `Connected`, no credential in the DOM |
 | Live catalogue from the real provider | ✅ 10 Anthropic models listed, `claude-haiku-4-5-20251001` pinned |
 | **Test** on the provider card runs the exact-model readiness check | ✅ FIXED-140 — was a catalogue listing that proved nothing |
@@ -274,8 +323,8 @@ gatherer → orchestrator → provider request) with no fabrication.
 | API-key restart regression | ✅ vault key restored from the workspace key file before model reads |
 | Node 25.6.1 Storage warning | ✅ focused test passes with no warning |
 
-Evidence: `output/playwright/bug15-chat-composer.png` and
-`output/playwright/bug15-build-composer.png`. The Playwright test serves the
+Evidence: `docs/plans/screenshots/working/bug15-chat-composer.png` and
+`docs/plans/screenshots/working/bug15-build-composer.png`. The Playwright test serves the
 production bundle and mocks only authenticated API data, so it exercises the
 real compiled Svelte UI without requiring live provider credentials.
 
@@ -292,8 +341,8 @@ real compiled Svelte UI without requiring live provider credentials.
 | English browser checking | ✅ `spellcheck` and `en-US` active in both composers |
 | Optional local LanguageTool adapter | ✅ authenticated, bounded, fail-soft when the operator-installed GPL/Java service is absent |
 
-Evidence: `output/playwright/settings-redesign.png` and
-`output/playwright/models-redesign.png`. The same committed Playwright suite
+Evidence: `docs/plans/screenshots/working/settings-redesign.png` and
+`docs/plans/screenshots/working/models-redesign.png`. The same committed Playwright suite
 opens the real dropdown controls instead of checking only that their triggers
 exist.
 
@@ -348,7 +397,7 @@ as BUG-42 and BUG-43 in `docs/plans/TO_BE_FIXED.md`.
 | Browser suite | ✅ `add-01-container-providers-live.spec.ts`; provider and Ollama response assertions plus container configuration, selection, and badge readiness |
 | Visual review | ✅ five 1440×1000 screenshots inspected; no credential value visible, no clipped controls blocking the tested flow |
 
-Evidence: `output/playwright/add01-providers-connected-live.png`,
+Evidence: `docs/plans/screenshots/working/add01-providers-connected-live.png`,
 `add01-anthropic-turn-live.png`, `add01-openrouter-turn-live.png`,
 `add01-ollama-turn-live.png`, and `add01-container-profile-live.png`. Live work
 also exposed and closed FIXED-117 (cold import / stdin), FIXED-118 (broken Runtime
@@ -442,7 +491,7 @@ Credentials were entered only through Models and were not persisted in evidence.
 | Check | Result |
 |---|---|
 | First-run setup | ✅ Provider/local setup is prompted before model-backed work |
-| Universal gate | ✅ Workbench, Chat, Build, Tasks, and Schedule share the exact readiness gate; actions are disabled and drafts preserved |
+| Universal gate | ✅ Chat, Build, Tasks, and Schedule share the exact readiness gate; actions are disabled and drafts preserved |
 | Ollama | ✅ Local `gemma4:31b-cloud` answered a bounded direct request and passed exact catalogue readiness |
 | OpenRouter | ✅ `openai/gpt-4o-mini` passed catalogue plus execution preflight; a full governed turn parked its local action for approval without execution |
 | Anthropic | ✅ Live catalogue/authentication succeeded; the account's insufficient-credit execution refusal was classified and Send remained disabled |
@@ -496,7 +545,7 @@ service and browser were stopped after the run.
 | OpenAI | ✅ `gpt-4o-mini` completed the same governed Build command path after removing unsupported explicit cache fields; OpenAI caching remains automatic |
 | OpenRouter | ✅ `openai/gpt-oss-20b:free` completed the same governed Build command path |
 | Browser suite | ✅ `governed-shell-provider-matrix-live.spec.ts`: 4/4 provider cases passed serially in 38.5 seconds |
-| Visual review | ✅ `output/playwright/governed-shell-{anthropic,openrouter,openai,ollama}-live.png` were inspected at original resolution for command/provider identity, authority, isolation, output, receipt, clipping, and secret absence |
+| Visual review | ✅ `docs/plans/screenshots/working/governed-shell-{anthropic,openrouter,openai,ollama}-live.png` were inspected at original resolution for command/provider identity, authority, isolation, output, receipt, clipping, and secret absence |
 
 This run proves the foreground local shell, durability, governance evidence,
 and the complete four-provider model-to-command path. It does not prove PTY/background input,

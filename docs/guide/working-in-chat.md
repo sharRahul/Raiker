@@ -14,11 +14,15 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **Attach → Document…** | `Add attachment` | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
-| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. |
+| **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |
+| **Chat / Build** | `Chat or Build` | Moves a half-typed prompt, and its staged files, to the other surface. It sends nothing and changes no governance. |
 | **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 | **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
 | **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
+
+Every control lives on one bar under the prompt: `+` and the scope controls on
+the left, the model chip and **Send** on the right.
 
 There is **no** planning chip and **no** voice-input control in the shipped
 composer; earlier drafts of this guide listed both.
@@ -84,9 +88,12 @@ something on your screen. **Observability → Audit log** is where you read that
 
 ### What Raiker was thinking
 
-Some models can think before they answer. When the model you have chosen offers
-it, the composer has a **Thinking** control; leave it at *default* and Raiker
-asks for nothing.
+Some models can think before they answer. The setting belongs to the model, so it
+lives inside the **model menu** as an **Effort** section: the levels are the exact
+ones that model publishes, and a **Thinking** switch decides whether any effort is
+sent at all. Leave the switch off and Raiker asks for nothing. A model that
+publishes no levels has no Effort section — the control is absent rather than
+present and useless.
 
 Turn it on and a collapsed **Thinking** block appears above the answer, filling
 in as the model works and closing as soon as the answer starts. You can open it

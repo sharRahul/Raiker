@@ -141,13 +141,13 @@ Two things worth knowing about how these rows behave elsewhere:
   you are asked. With the gate off — the shipped default — no turn can propose
   either, and the Memory page says so rather than promising proposals it cannot
   produce.
-- **Build's Plan / Edit / Auto chips do not change anything on this page.** They
-  are the posture of one conversation, sent with each prompt and applied to that
-  turn: Plan refuses file writes, patches and commands, Edit turns each one into
-  a decision. A turn may only ever tighten itself, so **Auto** adds no
+- **Build's Mode menu — Plan / Edit / Auto — does not change anything on this
+  page.** It is the posture of one conversation, sent with each prompt and applied
+  to that turn: Plan refuses file writes, patches and commands, Edit turns each one
+  into a decision. A turn may only ever tighten itself, so **Auto** adds no
   restriction of its own and does exactly as much as the modes here already
-  allow — which the Build composer states. Widening a permission happens here,
-  under the step-up.
+  allow — which the Build composer states. `Shift+Tab` cycles the three. Widening a
+  permission happens here, under the step-up.
 
 ### The step-up dialog
 

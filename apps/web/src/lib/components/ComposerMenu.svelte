@@ -15,6 +15,16 @@
    */
   import Icon from "./Icon.svelte";
 
+  /**
+   * Governed refusals are written with Markdown emphasis, because most surfaces
+   * that show them render Markdown. This one does not — it is a plain-text row
+   * above a textarea — so the markers have to come off rather than reach the
+   * owner as literal asterisks around the control they are being pointed at.
+   */
+  function plain(text: string): string {
+    return text.replace(/\*\*(.+?)\*\*/g, "$1").replace(/(^|\s)\*(\S.*?)\*/g, "$1$2");
+  }
+
   export interface MenuItem {
     /** Inserted or run when chosen. */
     id: string;
@@ -45,7 +55,7 @@
     <p class="menu-notice">
       <Icon name="info" size={13} />
       <span>
-        {notice.text}
+        {plain(notice.text)}
         {#if notice.href}<a href={notice.href}>{notice.linkLabel ?? "Open"}</a>{/if}
       </span>
     </p>

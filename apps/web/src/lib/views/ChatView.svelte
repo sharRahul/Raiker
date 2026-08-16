@@ -38,6 +38,8 @@
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import PlanChecklist from "../components/PlanChecklist.svelte";
+  import ReasoningBlock from "../components/ReasoningBlock.svelte";
+  import ToolActivity from "../components/ToolActivity.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import TurnControl from "../components/TurnControl.svelte";
@@ -45,7 +47,7 @@
   import { collectText } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
-  import { refusedCalls } from "../chatPresentation";
+  import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
     citedSourceIds,
     renderableCitations,
@@ -54,7 +56,6 @@
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
-  import { navItem } from "../nav";
 
   interface ChatTurn {
     id: number;
@@ -147,9 +148,20 @@
     profiles.find((p) => p.profile_id === modelProfile && (!model || p.model === model)) ?? selectedProfile,
   );
   const modelReadiness = $derived(readinessForSelection(activeProfile));
+  // BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI:
+  // low/medium/high) or as a *mode* (Anthropic: adaptive). Offering only the
+  // first meant the provider that ships in the box had no reasoning control at
+  // all, which is why the extended thinking the runtime asks for was never
+  // asked for. Both are offered, and neither is invented: an empty list means
+  // this profile declares no reasoning setting and the control is absent.
   const reasoningEfforts = $derived(
-    activeProfile?.supports_reasoning === true && activeProfile.supports_reasoning_effort === true
-      ? (activeProfile.reasoning_effort_values ?? [])
+    activeProfile?.supports_reasoning === true
+      ? [
+          ...(activeProfile.supports_reasoning_effort === true
+            ? (activeProfile.reasoning_effort_values ?? [])
+            : []),
+          ...(activeProfile.reasoning_modes ?? []),
+        ]
       : [],
   );
   let contextOpen = $state(false);
@@ -1025,7 +1037,8 @@
 
     {#each turns as turn (turn.id)}
       {@const answer = answerText(turn)}
-      {@const refused = refusedCalls(turn.events)}
+      {@const toolRows = toolActivity(turn.events)}
+      {@const reasoning = collectReasoning(turn.events)}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
@@ -1063,22 +1076,32 @@
         </div>
 
         <div class="message-group message-group-raiker">
-          <!-- BUG-207 slice A. Two things went from here. The disclosure was
-               labelled "See what Raiker is thinking" and held three fixed
+          <!-- BUG-207 slices C and D. What used to be here was a disclosure
+               labelled "See what Raiker is thinking" holding three fixed
                sentences chosen by lifecycle event type — the same words for a
                one-word question and a twenty-tool build, and not the model's
-               reasoning at all, which is requested from the provider and then
-               dropped by the stream parser. A careful placeholder is still a
-               false label, and the product does not get to claim on this side of
-               the turn what FIXED-204 stopped it claiming on the other. And
-               "Raiker is typing…" restated what the streaming text already
-               shows. What is left is one indicator, and it ends at the first
-               token. Real reasoning returns with slices B and C. -->
-          {#if turn.streaming && answer === ""}
+               reasoning at all. Slice A removed it. This is the real thing:
+               shown only when the turn produced reasoning, collapsed the moment
+               the answer starts, and absent entirely when there is none.
+
+               The one indicator below still ends at the first token, and now
+               ends at the first *tool row* too — once the transcript is saying
+               what Raiker is doing, "Working…" is the less specific of the two
+               and has nothing left to add. -->
+          <ReasoningBlock text={reasoning} streaming={turn.streaming} />
+
+          <!-- BUG-206 slice D. Every call this turn made, in call order, one
+               line each: what ran, what it acted on, and — when it did not run —
+               why. Above the answer because it happened before it. -->
+          <ToolActivity rows={toolRows} />
+
+          {#if turn.streaming && answer === "" && reasoning === "" && toolRows.length === 0}
             <p class="streaming-label" role="status">
               <span class="pulse" aria-hidden="true"></span>
               Working…
             </p>
+          {:else if turn.streaming && answer === "" && hasRunningTool(toolRows)}
+            <span class="sr-only" role="status">Running a tool.</span>
           {/if}
 
           <!-- B17/C13 — a turn the owner stopped says so. Without this the
@@ -1113,13 +1136,18 @@
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
               ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
             {/if}
-          {:else if !turn.streaming && turn.error === null && turn.response !== null}
-            <!-- BUG-73 — a turn parked on a decision has no answer yet; it has a
-                 state, and the approval card below says which. It used to store
-                 "No command was executed." as though that were the answer, which
-                 is how one conversation ended up denying, durably, a write that
-                 had happened. -->
-            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">{turn.response.status === "needs_approval" ? "Waiting for your decision — nothing has run yet." : "(No answer text was returned.)"}</p></div>
+          {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
+            <!-- BUG-73 — a turn with no answer has a state, not an answer. It
+                 used to store "No command was executed." as though that were
+                 the answer, which is how one conversation ended up denying,
+                 durably, a write that had happened.
+
+                 BUG-206 — the parked case no longer renders here. It used to
+                 read "Waiting for your decision — nothing has run yet.", which
+                 the approval card immediately below already says, and which the
+                 call's own row now says of the call it is actually about. Three
+                 statements of one fact, and only one of them named the call. -->
+            <div class="message-bubble message-bubble-raiker"><p class="bubble-text answer muted">(No answer text was returned.)</p></div>
           {/if}
 
           <!-- C6 — everything this turn actually read, under the answer that
@@ -1188,39 +1216,15 @@
             <p class="error-line" role="alert">{turn.error}</p>
           {/if}
 
-          {#if refused.length > 0}
-            <!-- BUG-52 — a refusal now ends its own call rather than the turn,
-                 so the turn goes on to answer. Said here because a refusal the
-                 owner is never told about is a call that silently disappeared:
-                 the model asked for it, policy would not run it, and everything
-                 else in the batch was decided on its own terms. -->
-            <div class="refusal-card">
-              <p class="refusal-title">
-                <Icon name="shield" size={15} />
-                {refused.length === 1
-                  ? "Policy refused one call in this turn"
-                  : `Policy refused ${refused.length} calls in this turn`}
-              </p>
-              <ul class="refusal-list">
-                {#each refused as call, i (i)}
-                  <li>
-                    <strong>{humanize(call.toolName)}</strong>{call.reasons.length > 0
-                      ? ` — ${call.reasons.join(", ")}`
-                      : ""}
-                    {#if call.remediationRoute}
-                      <a class="btn btn-soft btn-sm" href={`#/${call.remediationRoute}`}>
-                        Open {navItem(call.remediationRoute).label}
-                      </a>
-                    {/if}
-                  </li>
-                {/each}
-              </ul>
-              <p class="refusal-note">
-                Nothing ran for {refused.length === 1 ? "it" : "them"}. The rest of this turn was
-                decided separately.
-              </p>
-            </div>
-          {/if}
+          <!-- BUG-206 slice E. A refusal card used to sit here, listing the
+               calls policy would not run (BUG-52). It existed because a refused
+               call was the *only* call the transcript could speak about, which
+               made refusal the single visible tool outcome while every success
+               was silent. Now that each call has a row, a refused one is that
+               same row in a refused state, in the place it was refused — with
+               its reasons and its remediation link on the row rather than in a
+               block after the answer. This removes a surface instead of adding
+               one; nothing it said has been lost. -->
 
           {#if turn.response?.status === "needs_approval" && turn.response.approval}
             <!-- BUG-24 — this card is the parked turn's live state. Once a
@@ -1311,12 +1315,12 @@
               class="bar-select"
               bind:value={reasoningEffort}
               disabled={streaming}
-              aria-label="Thinking effort"
-              title="Thinking effort for this model"
+              aria-label="Thinking"
+              title="Ask this model to think before it answers. Default asks for nothing."
             >
               <option value="">Thinking: default</option>
               {#each reasoningEfforts as effort (effort)}
-                <option value={effort}>{effort}</option>
+                <option value={effort}>Thinking: {effort}</option>
               {/each}
             </select>
           {/if}
@@ -1745,35 +1749,8 @@
     gap: var(--space-2);
     flex-wrap: wrap;
   }
-  /* BUG-52 — a refusal, not a request. It carries no action because there is
-     nothing for the owner to decide: the call did not run and the turn moved on.
-     Danger rather than warn so it does not read as another pending decision. */
-  .refusal-card {
-    margin-top: 0.65rem;
-    border: 1px solid var(--danger-border);
-    background: var(--danger-soft);
-    border-radius: var(--r-sm);
-    padding: 0.65rem 0.85rem;
-  }
-  .refusal-title {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-weight: 650;
-    font-size: 0.86rem;
-    margin: 0 0 0.3rem;
-    color: var(--danger);
-  }
-  .refusal-list {
-    margin: 0 0 0.3rem;
-    padding-left: 1.1rem;
-    font-size: 0.85rem;
-  }
-  .refusal-note {
-    font-size: 0.76rem;
-    color: var(--text-2);
-    margin: 0;
-  }
+  /* BUG-206 slice E — the refusal card's styles went with it. A refused call is
+     now one `ToolActivity` row, which is where its colour lives. */
   /* A turn that is picking itself up again reads as progress, not as a warning
      still waiting on the owner. */
   .approval-card.continuing {

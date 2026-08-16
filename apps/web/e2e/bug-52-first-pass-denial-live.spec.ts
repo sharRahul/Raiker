@@ -64,9 +64,16 @@ async function signIn(target: Page) {
   ).toBeVisible({ timeout: 30_000 });
 }
 
-/** The "policy refused …" card for the most recent turn. */
-function refusalCard(target: Page) {
-  return target.locator(".refusal-card").last();
+/**
+ * The refused call's own transcript row, for the most recent turn.
+ *
+ * BUG-206 slice E replaced the "Policy refused …" card that used to sit at the
+ * bottom of the turn. It existed because a refused call was the *only* call the
+ * transcript could speak about; now that every call has a row, a refused one is
+ * that same row in a refused state, in the place it was refused.
+ */
+function refusedRow(target: Page) {
+  return target.locator('.tool-row[data-state="refused"]').last();
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {
@@ -124,11 +131,14 @@ test("a refused first call no longer ends the turn — the read behind it still 
 
   // And the refusal is stated in the transcript, named to its own call, so a
   // reader does not take it as a verdict on everything the batch asked for.
-  const card = refusalCard(page);
-  await expect(card).toBeVisible({ timeout: 30_000 });
-  await expect(card.getByText(/Policy refused one call in this turn/i)).toBeVisible();
-  await expect(card.getByText(/Read file/i)).toBeVisible();
-  await expect(card.getByText(/rest of this turn was\s+decided separately/i)).toBeVisible();
+  const row = refusedRow(page);
+  await expect(row).toBeVisible({ timeout: 30_000 });
+  await expect(row.locator(".tool-label")).toHaveText("Read file");
+  await expect(row.locator(".tool-reason")).toContainText("refused");
+  // The card it replaced is gone, and the other call in the batch kept its own
+  // row rather than being folded into a summary of the refusal.
+  await expect(page.locator(".refusal-card")).toHaveCount(0);
+  await expect(page.locator('.tool-row[data-state="success"]')).toHaveCount(1);
   await page.screenshot({
     path: join(SHOTS, "bug-52-chat-refusal-does-not-end-the-turn.png"),
     fullPage: true,
@@ -148,7 +158,9 @@ test("a refusal ahead of a write reaches decision 2 of 3 instead of dropping bot
   await expect(page.getByRole("main").getByText(/decision 2 of 3/i)).toBeVisible({
     timeout: 180_000,
   });
-  await expect(refusalCard(page).getByText(/Read file/i)).toBeVisible({ timeout: 30_000 });
+  await expect(refusedRow(page).locator(".tool-label")).toHaveText("Read file", {
+    timeout: 30_000,
+  });
   await page.screenshot({
     path: join(SHOTS, "bug-52-chat-decision-2-of-3-after-a-refusal.png"),
     fullPage: true,

@@ -8,6 +8,8 @@
 | Area | Status | Notes |
 |---|---|---|
 | Terminal client and loopback dashboard | implemented_verified | Share the governed backend |
+| Turn transparency in the transcript | implemented_verified | One line per tool call in proposal order — icon, tool in the owner's language, and what it acted on — with pending, waiting, failed and refused states; the phrase is resolved server-side under the durable event's own redaction, so a row can never say more than the audit log. Shown live and not retained (BUG-215) |
+| Model reasoning in the transcript | implemented_verified | The provider's own extended thinking, collapsed above the answer and absent when a turn produced none; the request spelling is negotiated with the model rather than declared. Shown live and not retained (BUG-215) |
 | In-product user guide | implemented_verified | Seven sections served read-only from the install, deep-linkable, reached from each page's own link; a build shipping no guide reports it rather than showing an empty list |
 | Model profiles and universal readiness | implemented_verified | Exact owner/profile/model/endpoint evidence gates Workbench, Chat, Build, Tasks, and Schedule; hosted checks include a bounded execution preflight |
 | Local model acquisition | implemented_verified | First-run setup, official Ollama/LM Studio sources, Ollama pull, approved-root GGUF discovery, and managed loopback llama.cpp deployment |

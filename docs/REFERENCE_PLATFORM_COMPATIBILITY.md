@@ -137,6 +137,58 @@ someone else's computer; Raiker's run on yours.
 
 ---
 
+## Turn transparency control set — what a turn says it did, and what it thought
+
+Reviewed 2026-08-15 while closing BUG-206 and BUG-207, against the transcript
+surfaces of **Claude Cowork**, **Claude Code**, **ChatGPT**, **Codex**,
+**OpenClaw** and **Hermes Agent**. Scope is only what a running turn shows about
+its own work: the calls it made, and the reasoning behind them. Nothing here is
+implemented unless the Raiker column says so.
+
+| Control | Reference behaviour | Raiker | Code |
+|---|---|---|---|
+| A line per tool call while the turn runs | Every reference product shows one | ✅ `[icon] [tool] [action]`, in the model's proposal order | `raiker/tools/broker.py::_stream_tool`, `ToolActivity.svelte` |
+| The tool named in the owner's language | Claude Code and Codex print the identifier (`Read`, `Bash`); ChatGPT and Cowork use a phrase | ✅ a phrase (`Read file`, `Run command`), never the identifier | `raiker/tools/presentation.py` |
+| What the call acted on | Claude Code shows the path and the full command line; ChatGPT shows a domain | ✅ path, host, program, query — **resolved server-side and redacted first** | `_action_phrase` |
+| An icon per tool family | Claude Code, Cowork, ChatGPT | ✅ nine families plus a neutral fallback, so an unknown tool renders as a tool | `icons.ts`, `FAMILY_ICON` |
+| A call still running says so | All | ✅ a quiet pulse in the glyph's place, so the row does not resize when it settles | `ToolActivity.svelte` |
+| A failed call says why, inline | Claude Code, Codex, Hermes | ✅ the named reason on the row, with a remediation link where one exists | `_failure_reason` |
+| A refused call is a row, not a separate block | Claude Code (`permission denied` inline) | ✅ the same row in a refused state, in the place it was refused | BUG-206 slice E |
+| A call waiting on a decision says so | Claude Code, Cowork | ✅ `waiting for your decision`, beside the approval card that resolves it | `_stream_tool_waiting` |
+| The model's own reasoning, live | ChatGPT (summarised), Claude Code (`thinking`), Codex, Cowork | ✅ collapsed block above the answer, collapsing when the answer starts | `ReasoningBlock.svelte` |
+| Reasoning is the provider's, not the product's | All | ✅ `display: summarized` asked for wherever the profile declares it | `AsyncAnthropicMessagesProvider._thinking` |
+| No reasoning ⇒ no block | ChatGPT, Claude Code | ✅ absent, never an empty one and never a placeholder | `collectReasoning` |
+
+**Where Raiker leads, and why it is worth keeping.**
+
+| Control | Why no reference product has it | Where it is |
+|---|---|---|
+| A transcript row that **cannot say more than the audit log** | Every reference product assembles its row in the client from the raw tool arguments it already has in memory. Raiker resolves the phrase server-side, through the same redaction the durable event passes, so the two surfaces cannot drift and a leak cannot be a client bug | shipped: `raiker/tools/presentation.py` is the only place that decides |
+| A URL narrowed to its **host**, and a command to its **program** | Claude Code prints the whole command line and ChatGPT the whole URL. A signed URL carries its credential in the query string, in a shape pattern-based redaction reads as ordinary base64; a command argument can be a password. Both stay in full in the event, where they are evidence, and out of the line an over-the-shoulder reader sees | shipped |
+| A tool whose **arguments are dropped from the event** derives no phrase either | `consult_advisor` and projected MCP tools have their argument values scrubbed from the durable record. The transcript is held to the same rule rather than being the looser surface | shipped |
+| **Proposal order**, not completion order | Independent reads run concurrently (B4), so the events arrive in whatever order the worker threads finished. The rows are opened from the validated proposals, so the turn reads in the order the model asked | shipped: `_stream_tool_proposed` |
+| The thinking request shape **negotiated with the model**, not declared | A provider profile declares one reasoning mode for every model behind it. Measured against the live Anthropic catalogue on 2026-08-15, five models refuse `thinking.type.enabled` and three refuse `thinking.type.adaptive`; a static declaration fails the whole turn with a 400 for whichever half it is wrong about | shipped: the provider records the spelling the refusal names and re-issues once |
+
+**What a reference product does that Raiker does not.** Each is open work with a
+reason rather than an oversight; each is recorded in `plans/TO_BE_FIXED.md`.
+
+| Missing control | Who has it | What it would take |
+|---|---|---|
+| Reasoning that survives a reload | ChatGPT, Claude Code, Cowork | Reasoning is a live-stream fact today: it fills in as it arrives and is gone when the conversation is re-opened. Persisting it is a storage change — a per-turn column and a retention rule for text the owner may not want kept — not a rendering one |
+| A tool row that expands into its result | Claude Code, Codex | The row is deliberately a summary; the result is in the Audit log. An expander would need a governed read-back of the redacted result payload, not the raw one the model saw |
+| Live output from a long-running command | Claude Code, Codex, Hermes | Blocked on the same background execution BUG-194 describes: there is no run to stream from until a supervisor owns it |
+| Token and time cost per call on the row | Codex | Per-call attribution needs the provider to report it, which none of Raiker's do at call granularity; per-turn cost is already shown |
+
+**Ideas that go beyond every reference product, not yet built.** Recorded so the
+list is a decision rather than a gap: a row that names the **capability** a call
+crossed rather than only the tool, so an owner reading a turn sees the governed
+shape of it; a per-turn *diff* of what the calls changed, assembled from the
+checkpoints already written before each write; and a reasoning block that marks
+the sentences the answer actually acted on, since the runtime already ledgers the
+sources a turn read.
+
+---
+
 ## Model readiness and acquisition control set
 
 Reviewed 2026-08-09 while closing BUG-69, against the model-selection and

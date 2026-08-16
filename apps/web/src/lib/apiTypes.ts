@@ -517,6 +517,15 @@ export interface ModelProfile {
   supports_reasoning_effort?: boolean;
   /** Backend-advertised effort values; never inferred by the client. */
   reasoning_effort_values?: string[];
+  /**
+   * Backend-advertised reasoning *modes* (BUG-207 slice B). A provider declares
+   * reasoning as an effort (OpenAI: low/medium/high) or as a mode (Anthropic:
+   * adaptive). Offering only the first is why the composer had no reasoning
+   * control at all for the provider that ships in the box.
+   */
+  reasoning_modes?: string[];
+  /** Whether the provider can return a *summary* of its reasoning rather than raw text. */
+  supports_reasoning_summary?: boolean;
   models_used?: number;
   turns_used?: number;
   total_tokens?: number;
@@ -1280,7 +1289,7 @@ export interface AgentResponse {
 
 // raiker.contracts.streaming.StreamEvent serialized over SSE (see routes_prompts._sse).
 export type StreamKind =
-  "lifecycle" | "text_delta" | "tool" | "final" | "error";
+  "lifecycle" | "text_delta" | "reasoning_delta" | "tool" | "final" | "error";
 
 /** One page of the user guide, as the product lists it (BUG-208 slice A). */
 export interface GuideSectionSummary {

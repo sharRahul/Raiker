@@ -92,6 +92,38 @@ No silent remote fallback is allowed.
 
 ---
 
+## Reasoning
+
+A provider declares reasoning as an **effort** (`supports_reasoning_effort` with
+`reasoning_effort_values`) or as a **mode** (`reasoning_modes`), and the runtime
+accepts either. A profile that declares neither offers no reasoning control at
+all rather than one that does nothing.
+
+**A provider adapter must keep reasoning apart from the answer.** Reasoning
+streams as `ModelStreamEvent(event_type="reasoning_delta")` carrying its own
+`reasoning_delta` field, and arrives on a non-streamed response as
+`ModelResponse.reasoning`. It is never appended to `text` or `text_delta`: the
+answer is what the owner asked for and the reasoning is how the model got there,
+and a runtime that cannot tell them apart cannot honestly label either. The
+contract rejects a `reasoning_delta` payload on any other event type.
+
+**An adapter may negotiate the request's *shape*, and only its shape.** Where a
+provider accepts more than one spelling of the same capability and which one a
+*model* takes is not knowable from the profile, the adapter may use the declared
+spelling, read the alternative out of the provider's own refusal, record it for
+that model, and re-issue once. This is not the remote fallback forbidden above:
+no capability is substituted, nothing is downgraded, and a refusal that names no
+alternative stays a real error. `AsyncAnthropicMessagesProvider` does this for
+`thinking.type.adaptive` versus `thinking.type.enabled`, which no single
+`reasoning_modes` declaration can be right about across one provider's catalogue.
+
+Where the profile declares `supports_reasoning_summary`, the runtime asks for the
+provider's **summary** of its reasoning rather than its raw notes. What reaches a
+surface is what the provider returned; integrity markers that accompany a
+reasoning block (Anthropic's `signature_delta`) are not text and must not.
+
+---
+
 ## Required Events
 
 - `model_profile_loaded`

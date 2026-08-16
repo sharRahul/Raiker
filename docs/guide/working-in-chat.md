@@ -1,10 +1,10 @@
 # Working in Chat
 
 Chat is a normal conversation: your prompt right-aligned in a teal bubble,
-Raiker's reply left-aligned in a quiet neutral one, with *"Raiker is thinking…"*
-then *"Raiker is typing…"* while it works. Governance panels, phase labels, and
-event traces deliberately stay out of the transcript — they live in **Sessions**,
-**Approvals**, and **Observability**.
+Raiker's reply left-aligned in a quiet neutral one, with one quiet *Working…*
+indicator that ends as soon as there is something real to show. Governance
+panels, phase labels, and event traces deliberately stay out of the transcript —
+they live in **Sessions**, **Approvals**, and **Observability**.
 
 ## The composer
 
@@ -59,6 +59,47 @@ Highlighting is produced entirely on your machine from a grammar shipped inside
 Raiker. Nothing is fetched to colour a keyword, and a code block can never
 execute — the renderer escapes every character of model output before it emits
 any markup.
+
+### What Raiker did
+
+When a turn uses a tool, each call gets one line above the answer, in the order
+the model asked for it:
+
+| Part | What it tells you |
+|---|---|
+| The icon | The kind of work — a file, a command, the web, the repository, one of your connected accounts, memory, a subagent, or the plan |
+| The name | The tool in plain words: *Read file*, *Run command*, *Search the web* |
+| The rest | What it acted on: the path, the host, the program, the search you asked for |
+
+A call still running shows a small pulse. A call waiting on your decision says
+*waiting for your decision*, beside the card where you make it. A call that
+failed or was refused says why on its own line, with a link to the page that
+would let it through where one exists.
+
+**The line is deliberately a summary.** A page it fetched is named by its host
+and never its full address, and a command by the program it ran and never its
+arguments — both can carry a credential in a place that looks ordinary. The
+whole of each is kept in the audit record, where it is evidence rather than
+something on your screen. **Observability → Audit log** is where you read that.
+
+### What Raiker was thinking
+
+Some models can think before they answer. When the model you have chosen offers
+it, the composer has a **Thinking** control; leave it at *default* and Raiker
+asks for nothing.
+
+Turn it on and a collapsed **Thinking** block appears above the answer, filling
+in as the model works and closing as soon as the answer starts. You can open it
+again afterwards.
+
+Two things it is not. It is never a summary Raiker wrote — it is the model's
+own working, in the model's own words, and where the provider can return a
+summary of that working rather than its raw notes, that is what Raiker asks for.
+And when a turn produces no reasoning, there is **no block at all**: nothing
+stands in for it.
+
+Thinking is shown while the turn runs and is not kept. Re-open the conversation
+later and you will see the answer, not the working.
 
 ### Where the answer came from
 
@@ -265,8 +306,14 @@ from.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-11, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-15, these
 are the edges a Chat user can still hit:
+
+- **What a turn did is shown while it runs, and is not kept in the transcript.**
+  The tool lines and the Thinking block are built from the live turn. Re-open the
+  conversation later and you see your prompt, the answer, and the sources — the
+  lines and the working are not rebuilt. The full record of every call is in
+  **Observability → Audit log**, which is permanent.
 
 - **An approved network or process action is recorded, not run.** Approving a
   proposed file change, patch, bounded `shell` command, or an owner-configured

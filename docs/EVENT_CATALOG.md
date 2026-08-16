@@ -66,6 +66,37 @@ human authorizer, runtime authority, or other literal actor.
 | `phase3.remote_container_cloud_readiness.summary_viewed` | A local readiness summary was viewed |
 | `phase3.remote_container_cloud_readiness.exported` | A redacted readiness export was produced |
 
+## The live stream, and how it relates to this catalogue
+
+The events above are the **durable** record: append-style local audit evidence,
+written by the writer and read afterwards in **Observability → Audit log**.
+Beside them, a streamed turn carries a second, strictly smaller channel —
+`raiker/contracts/streaming.py::StreamEvent` — which is what a client can watch
+while the turn is still running. It grants no authority and adds no record.
+
+| Stream kind | Carries |
+|---|---|
+| `lifecycle` | A runtime state or event transition, mirroring the durable event beside it |
+| `text_delta` | One incremental chunk of the model's answer |
+| `reasoning_delta` | One incremental chunk of the model's *own* reasoning, kept apart from the answer so a client can render it as reasoning or not at all (BUG-207) |
+| `tool` | One tool call opening, settling, waiting on a decision, or refused — `tool_proposed`, `tool_started`, `tool_completed`, `tool_failed`, `tool_waiting`, `tool_refused` (BUG-206) |
+| `final` | The terminal event, carrying the complete `AgentResponse` |
+| `error` | A safe error surfaced to the client |
+
+**A `tool` stream event carries strictly less than the durable event beside it.**
+Its payload is the action id, an icon family, the tool's name in the owner's
+language, and one short action phrase — never arguments, never a result, never
+output. All of it is resolved in `raiker/tools/presentation.py`, through the same
+redaction the durable event passes, and two arguments are narrowed further than
+the event narrows them: a URL to its host and a command to its program name. A
+tool whose argument *values* are dropped from the durable event derives no phrase
+from them either. The transcript can therefore never say more than the audit
+trail does.
+
+**`reasoning_delta` is never merged into `text_delta`.** The answer is what the
+owner asked for and the reasoning is how the model got there; a surface that
+cannot tell them apart cannot honestly label either.
+
 Every event type a runtime component emits must be declared in
 `raiker/contracts/models.py::EVENT_TYPES`. `AgentEvent` validates against that
 set and raises inside the turn otherwise, which surfaces as a failed turn rather

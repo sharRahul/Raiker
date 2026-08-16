@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 const pages = [
   ["01-workbench", "workbench"],
@@ -38,7 +39,19 @@ test("capture every application page from a live fresh instance", async ({ page 
   await page.getByLabel("Password", { exact: true }).fill("All-pages-review-password-1!");
   await page.getByLabel("Confirm password").fill("All-pages-review-password-1!");
   await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 15_000 });
+  // FIXED-172 put the five-stage setup wizard over the workbench on a brand-new
+  // instance, and it is modal: without dismissing it this sweep photographs the
+  // sheet twenty-four times instead of the pages underneath. The shared helper
+  // is what eighteen other live specs already use for exactly this — but it
+  // *samples* rather than waits, and the sheet only mounts once the bootstrap
+  // reads resolve, which is after account creation returns. So wait for either
+  // the sheet or the workbench first, exactly as `openHostedProviders` does.
+  const workbenchHeading = page.getByRole("heading", { name: "Welcome to your Work Dashboard" });
+  await expect(
+    page.getByRole("button", { name: "Decide later" }).or(workbenchHeading).first(),
+  ).toBeVisible({ timeout: 60_000 });
+  await dismissFirstRunModelSetup(page);
+  await expect(workbenchHeading).toBeVisible({ timeout: 30_000 });
 
   for (const [name, route] of pages) {
     await page.goto(`http://127.0.0.1:8765/#/${route}`);

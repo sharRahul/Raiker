@@ -155,6 +155,21 @@ clock-with-a-rewind-arrow as `checkpoints`; `capabilities` was the sun with four
 rays instead of eight; `projects` was the same folder outline as `folder`. All
 three are now distinct, and `icons.test.ts` fails on any new collision.
 
+**A glyph may be reused where the meaning really is the same.** The tool-family
+icons (BUG-206) map nine families to a glyph each, and four of them reuse one the
+set already had *for the same idea*: `file` for a file read, `branch` for the
+repository, `connections` for a connector, `tasks` for the turn's own plan. The
+rule the collision test enforces is that no two glyphs are identical, not that no
+two names may point at one — pointing a second name at an existing glyph is how a
+family stays legible, where drawing a near-duplicate is how a set stops being
+one. The five new ones (`file-edit`, `terminal`, `globe`, `memory`, `agent`) exist
+because nothing in the set already meant them.
+
+**A fallback is part of the set, not an omission.** `tool` — a spanner,
+deliberately not the `settings` gear — renders a tool Raiker does not recognise.
+A row with no glyph would read as an empty line, which is the silence BUG-206
+was filed about.
+
 ## 5. Data-visual language
 
 Three things all meant "a proportion of a whole" and looked like three unrelated

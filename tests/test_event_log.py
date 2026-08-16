@@ -116,3 +116,51 @@ def test_secret_like_memory_arguments_are_redacted_from_event_log(tmp_path) -> N
     event_text = writer.path_for_session(session_id).read_text(encoding="utf-8")
     assert "supersecret123456789" not in event_text
     assert "[REDACTED_SECRET]" in event_text
+
+
+def test_the_previous_event_is_found_by_position_not_by_a_whole_second_timestamp(
+    tmp_path: Path,
+) -> None:
+    """The writer's *previous* and the verifier's *previous* must be one key.
+
+    Found while running the suite under load on 2026-08-16, as an intermittent
+    ``chain_intact: false`` on a log whose writes were correctly serialised.
+    ``get_last_event_sha256`` ordered by ``timestamp DESC LIMIT 1`` while
+    ``verify_session_events`` walks by ``jsonl_offset ASC`` — and `utc_now()`
+    truncates to whole seconds, so every event a busy turn writes inside one
+    second shares a timestamp and "the last one" was whichever row the scan
+    happened to reach. Nothing was wrong with the log; the two halves of the
+    chain simply disagreed about what *previous* meant.
+    """
+    store = SQLiteStore(tmp_path)
+    session_id = new_id("sess_")
+    client = ClientMetadata(type="tui", name="raiker-terminal", version="0.0.0")
+    writer = EventLogWriter(store)
+
+    # Every event carries the same whole-second timestamp, which is what a busy
+    # turn produces anyway — here it is made certain rather than hoped for.
+    for index in range(12):
+        writer.append(
+            make_event(
+                session_id=session_id,
+                turn_id=new_id("turn_"),
+                event_type="prompt_received",
+                actor="test",
+                payload={"index": index},
+                client=client,
+            )
+        )
+    with store.connect() as connection:
+        connection.execute(
+            "UPDATE events_index SET timestamp = ? WHERE session_id = ?",
+            ("2026-08-16T00:00:00Z", session_id),
+        )
+
+    # With one shared timestamp the previous event is unresolvable by time, so
+    # this is exactly the case the old ordering got wrong.
+    rows = store.list_session_events_for_integrity(session_id)
+    assert store.get_last_event_sha256(session_id) == rows[-1]["payload_sha256"]
+
+    integrity = verify_session_events(store, session_id)
+    assert integrity["chain_intact"] is True
+    assert integrity["failed"] == 0

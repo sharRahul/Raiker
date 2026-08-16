@@ -6622,9 +6622,24 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return dict(row) if row else None
 
     def get_last_event_sha256(self, session_id: str) -> str | None:
+        """The hash of the event this session's next event follows.
+
+        Ordered by ``jsonl_offset`` — the same key ``verify_session_events``
+        walks the chain by — and **not** by ``timestamp``, which is what this
+        used to do. `utc_now()` truncates to whole seconds, so every event a busy
+        turn writes inside one second shares a timestamp and `ORDER BY timestamp
+        DESC LIMIT 1` picked an arbitrary one of them as "the last". The write
+        path is properly serialised; what was missing is that the writer's notion
+        of *previous* and the verifier's notion of *previous* were different
+        keys, so a correctly written log could still report `chain_intact: false`.
+
+        `rowid` breaks any remaining tie, which covers legacy rows written before
+        an offset was recorded.
+        """
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT payload_sha256 FROM events_index WHERE session_id = ? ORDER BY timestamp DESC LIMIT 1",
+                "SELECT payload_sha256 FROM events_index WHERE session_id = ? "
+                "ORDER BY jsonl_offset DESC, rowid DESC LIMIT 1",
                 (session_id,),
             ).fetchone()
         return str(row["payload_sha256"]) if row else None

@@ -92,9 +92,17 @@ describe("@ mentions", () => {
     const token = mentionAt("check @app then run", 10);
     expect(token).not.toBeNull();
     const applied = applyMention("check @app then run", token!, "apps/web/src/main.ts");
-    expect(applied.text).toBe("check @apps/web/src/main.ts  then run");
+    // One space, not two: the token's own trailing space is consumed.
+    expect(applied.text).toBe("check @apps/web/src/main.ts then run");
     // The caret lands after the inserted path, ready for the next word.
     expect(applied.text.slice(0, applied.caret)).toBe("check @apps/web/src/main.ts ");
+  });
+
+  it("leaves a trailing space when the mention ends the line", () => {
+    const token = mentionAt("look at @main", 13);
+    const applied = applyMention("look at @main", token!, "src/main.ts");
+    expect(applied.text).toBe("look at @src/main.ts ");
+    expect(applied.caret).toBe(applied.text.length);
   });
 });
 

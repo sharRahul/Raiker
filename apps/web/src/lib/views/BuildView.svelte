@@ -640,6 +640,9 @@
     ];
     const turn = turns[turns.length - 1];
     promptText = "";
+    // B19 — shrink the box back with the prompt that grew it.
+    menuKind = "none";
+    queueMicrotask(() => autoGrow(promptEl ?? null));
     attachStore.clear();
     streaming = true;
     stopping = false;

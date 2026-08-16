@@ -154,14 +154,21 @@ export function mentionAt(text: string, caret: number): MentionToken | null {
   return { start: at, end: caret, fragment };
 }
 
-/** Put the chosen path where the `@`-token was, and leave a trailing space. */
+/**
+ * Put the chosen path where the `@`-token was, and leave one trailing space.
+ *
+ * Exactly one: completing a mention in the middle of a sentence must not leave a
+ * double space behind the caret, and completing at the end must still leave the
+ * owner able to keep typing without reaching for the space bar.
+ */
 export function applyMention(
   text: string,
   token: MentionToken,
   path: string,
 ): { text: string; caret: number } {
   const head = `${text.slice(0, token.start)}@${path} `;
-  return { text: head + text.slice(token.end), caret: head.length };
+  const tail = text.slice(token.end).replace(/^[ \t]/, "");
+  return { text: head + tail, caret: head.length };
 }
 
 /**

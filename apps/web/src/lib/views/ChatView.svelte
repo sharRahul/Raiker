@@ -649,6 +649,11 @@
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
     promptText = "";
+    // B19 — a box that grew to hold a long prompt has to shrink back when the
+    // prompt leaves it, or the composer keeps the height of the longest thing
+    // ever typed into it.
+    menuKind = "none";
+    queueMicrotask(() => autoGrow(promptEl ?? null));
     attachStore.clear();
     streaming = true;
     stopping = false;

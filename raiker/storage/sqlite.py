@@ -4023,7 +4023,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._sync_conversation_fts(connection, turn_id)
 
     def record_turn_reasoning(self, turn_id: str, *, chars: int, text: str | None) -> None:
-        """Record how much working a turn produced, and the working if it is kept.
+        """Add to how much working a turn produced, and to the working if it is kept.
 
         BUG-215 — the two are separate on purpose. ``chars`` is always written and
         is not sensitive: it is what lets a re-opened turn distinguish "produced
@@ -4033,11 +4033,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         turned retention on, and is deliberately **not** projected into
         ``conversation_fts``: retained working must not become searchable
         conversation content the owner never asked to index.
+
+        **Additive, because a turn can run its loop more than once.** A turn that
+        parks on an approval and resumes re-enters the same loop under the same
+        ``turn_id``; the owner watched both halves of its working stream by, so
+        replacing would keep only the half after the decision and silently drop
+        the reasoning that produced the proposal they approved.
         """
+        added = max(0, int(chars))
+        if added == 0 and text is None:
+            return
         with self.connect() as connection:
             connection.execute(
-                "UPDATE turns SET reasoning_chars = ?, reasoning_text = ? WHERE turn_id = ?",
-                (max(0, int(chars)), text, turn_id),
+                """UPDATE turns
+                   SET reasoning_chars = COALESCE(reasoning_chars, 0) + ?,
+                       reasoning_text = CASE
+                           WHEN ? IS NULL THEN reasoning_text
+                           WHEN reasoning_text IS NULL OR reasoning_text = '' THEN ?
+                           ELSE reasoning_text || ?
+                       END
+                   WHERE turn_id = ?""",
+                (added, text, text, f"\n\n{text}", turn_id),
             )
 
     # ── Conversation recall (RAIKER-2020) ────────────────────────────────────

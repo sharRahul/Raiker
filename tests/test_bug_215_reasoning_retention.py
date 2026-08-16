@@ -141,3 +141,52 @@ def test_kept_working_never_leaves_in_an_exported_transcript(tmp_path: Path) -> 
     rendered = json.dumps(transcript.manifest())
     assert "Internal working" not in rendered
     assert "Here is the plan." in rendered
+
+
+def test_a_resumed_turn_keeps_both_halves_of_its_working(tmp_path: Path) -> None:
+    """A parked turn re-enters the same loop under the same turn id.
+
+    The owner watched the reasoning that produced the proposal they approved, and
+    the reasoning that followed the decision. Replacing would keep only the
+    second half and quietly drop the first.
+    """
+    store = SQLiteStore(tmp_path)
+    _session_id, turn_id = _turn(store)
+
+    store.record_turn_reasoning(turn_id, chars=20, text="Before the approval.")
+    store.record_turn_reasoning(turn_id, chars=19, text="After the approval.")
+
+    row = store.load_turn(turn_id)
+    assert row is not None
+    assert row["reasoning_chars"] == 39
+    assert row["reasoning_text"] == "Before the approval.\n\nAfter the approval."
+
+
+def test_a_resumed_turn_that_thought_only_before_the_decision_keeps_that(
+    tmp_path: Path,
+) -> None:
+    """The second half producing nothing must not erase the first."""
+    store = SQLiteStore(tmp_path)
+    _session_id, turn_id = _turn(store)
+    store.record_turn_reasoning(turn_id, chars=20, text="Before the approval.")
+
+    store.record_turn_reasoning(turn_id, chars=0, text=None)
+
+    row = store.load_turn(turn_id)
+    assert row is not None
+    assert row["reasoning_chars"] == 20
+    assert row["reasoning_text"] == "Before the approval."
+
+
+def test_the_count_still_grows_when_the_text_is_not_kept(tmp_path: Path) -> None:
+    """Retention off, twice: the amount is cumulative and the text stays absent."""
+    store = SQLiteStore(tmp_path)
+    _session_id, turn_id = _turn(store)
+
+    store.record_turn_reasoning(turn_id, chars=100, text=None)
+    store.record_turn_reasoning(turn_id, chars=250, text=None)
+
+    row = store.load_turn(turn_id)
+    assert row is not None
+    assert row["reasoning_chars"] == 350
+    assert row["reasoning_text"] is None

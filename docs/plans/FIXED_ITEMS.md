@@ -223,6 +223,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-219](#fixed-219--reasoning-was-shown-live-and-then-forgotten-was-bug-215) | Low | Chat / reasoning retention | Fixed (was BUG-215 — entry closed) |
 | [FIXED-220](#fixed-220--the-composer-was-a-textarea-and-a-send-button-gap-build-b19-gap-chat-c14) | Medium | Chat / Build composer | Fixed (GAP-BUILD B19, GAP-CHAT C14) |
 | [FIXED-221](#fixed-221--three-settings-sections-had-deep-links-that-silently-opened-general) | Low | Settings navigation | Fixed (found while shipping FIXED-219) |
+| [FIXED-222](#fixed-222--the-audit-chain-looked-for-an-events-predecessor-by-a-whole-second-timestamp) | High | Audit integrity | Fixed (found running the suite under load) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -8609,3 +8610,56 @@ while an unknown tab still falls back to General.
 
 **User-interface outcome.** Every settings section is reachable by link, and the
 Privacy section that FIXED-219 depends on opens where it is pointed.
+
+---
+
+## FIXED-222 — The audit chain looked for an event's predecessor by a whole-second timestamp
+
+**Severity: High. Area: audit integrity. Status: Fixed (found running the suite under load).**
+
+**Observed.** `tests/test_event_log.py::test_concurrent_writer_instances_keep_jsonl_and_hash_chain_intact`
+failed intermittently — `chain_intact: false` — during a full-suite run on
+2026-08-16 while the machine was also running the web suite and a browser. It
+passed every time in isolation, which is exactly why it had not been caught: it
+is a *contention* failure, and a quiet machine does not produce the contention.
+
+**Reproduced** 3 times in 15 runs with six busy cores against it, and 0 times in
+25 runs after the fix.
+
+**Root cause, and the log was never wrong.** `EventLogWriter.append` holds a
+per-session lock across the whole read-previous-hash → append → index sequence,
+so writes really are serialised and the JSONL file really is in order. What was
+wrong is that the two halves of the chain used **different keys for the same
+idea**:
+
+| Half | Ordered by |
+|---|---|
+| `get_last_event_sha256` — what the writer records as `prev_event_sha256` | `timestamp DESC LIMIT 1` |
+| `verify_session_events` — what the reader walks the chain by | `jsonl_offset ASC` |
+
+`utc_now()` truncates to whole seconds. Every event a busy turn writes inside one
+second therefore carries the same timestamp, and `ORDER BY timestamp DESC LIMIT 1`
+returned whichever of them the scan happened to reach. The recorded predecessor
+was then a real event from the right second but not the one immediately before,
+and verification — walking by position — reported a gap.
+
+This is the same defect class the rest of this document keeps recording: two
+lists, or here two orderings, that have to agree, with nothing holding them
+together.
+
+**Fix.** The writer orders by `jsonl_offset DESC, rowid DESC` — the same key the
+verifier walks, with `rowid` as a tie-break for legacy rows written before an
+offset was recorded. The regression test does not rely on contention to
+reproduce it: it writes twelve events, sets them all to one timestamp, and
+asserts that the predecessor the writer would record is the last row *by
+position*.
+
+**Why it matters more than the flake did.** A false `chain_intact: false` is not
+a cosmetic test problem. The chain is what the product offers as evidence that
+the audit log has not been tampered with, and an integrity check that reports a
+gap on an intact log — under exactly the load a real session produces — teaches
+an owner to discount the one signal that has to be believed.
+
+**User-interface outcome.** None visible on a healthy log, which is the point:
+Observability's integrity report and `verify_session_events` now agree with the
+writer, so a busy session stops reporting a tamper signal it does not have.

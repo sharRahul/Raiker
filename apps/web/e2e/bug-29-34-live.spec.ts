@@ -91,7 +91,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByLabel("Upload document").setInputFiles(attachment);
   await expect(page.locator(".attachment-row > .attachment-card").filter({ hasText: "governance-note.txt" })).toBeVisible({ timeout: 20_000 });
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: CHAT LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("CHAT LIVE", { exact: true })).toBeVisible({ timeout: 180_000 });
   const chatCard = page.locator(".message-group-user .attachment-card").first();
   await expect(chatCard).toBeVisible();
@@ -103,7 +103,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByLabel("Upload document").setInputFiles(attachment);
   await expect(page.locator(".attachment-row > .attachment-card").filter({ hasText: "governance-note.txt" })).toBeVisible({ timeout: 20_000 });
   await page.getByLabel("Describe the change").fill("Reply without tools with exactly: BUILD LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("BUILD LIVE", { exact: true })).toBeVisible({ timeout: 180_000 });
   const buildCard = page.locator(".user-message .attachment-card").first();
   await expect(buildCard).toBeVisible();
@@ -119,7 +119,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByPlaceholder("How can I help you today?").fill(
     "Use the write_file tool now to create approval-reload-live.txt containing exactly reload approval live.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 180_000 });
   const login = await request.post(`${BASE}/api/auth/login`, { data: { username: "owner", password: PASSWORD } });
   expect(login.ok()).toBeTruthy();

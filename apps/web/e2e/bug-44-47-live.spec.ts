@@ -105,7 +105,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
 
   await page.goto(`${SOURCE}/#/new-chat`);
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: RELEASE LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   // Exact, and scoped to the transcript: the prompt is echoed in the sent
   // bubble and in the recent-chat rail, and neither of those is an answer.
   await expect(page.getByRole("main").getByText("RELEASE LIVE", { exact: true }))

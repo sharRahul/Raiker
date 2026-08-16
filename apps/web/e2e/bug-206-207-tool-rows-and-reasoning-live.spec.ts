@@ -78,7 +78,7 @@ test("the provider key is added through the UI and a real turn answers", async (
 
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: ROWS LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("ROWS LIVE", { exact: true })).toBeVisible({
     timeout: 240_000,
   });
@@ -93,7 +93,7 @@ test("BUG-206 — a tool-using turn shows one row per call, naming what it acted
     "List the files in the workspace root with list_directory, then read README.md " +
       "with read_file. Then reply with one short sentence and stop.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   const rows = page.locator(".tool-activity .tool-row");
   await expect(rows.first()).toBeVisible({ timeout: 240_000 });
@@ -154,7 +154,7 @@ test("BUG-206 slice E — a call that stops for a decision is that same row, wai
     "Use write_file to create a file called notes.md containing exactly the line " +
       "'hello from the tool row test'. Then stop.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The write needs a decision, so the row says so instead of pulsing as though
   // something were running. The approval card below it is where the decision is
@@ -209,7 +209,7 @@ test("BUG-207 — the turn shows the model's own reasoning, not three canned sen
   await prompt.fill(
     "What is 17 times 23? Work it out carefully, then give the number and stop.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   const reasoning = page.locator("section.reasoning").last();
   await expect(reasoning).toBeVisible({ timeout: 240_000 });
@@ -294,7 +294,7 @@ test("BUG-207 — a turn with reasoning off streams its answer with no block abo
   await setThinkingEffort(composer, page, "");
 
   await prompt.fill("Reply with exactly: NO REASONING");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   await expect(page.getByRole("main").getByText("NO REASONING", { exact: true })).toBeVisible({
     timeout: 240_000,

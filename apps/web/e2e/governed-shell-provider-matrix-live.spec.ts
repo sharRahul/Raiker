@@ -150,7 +150,7 @@ async function runGovernedBuildCommand(leg: ProviderLeg): Promise<void> {
       `Do not use another tool and do not answer without proposing that exact command. ` +
       `This is the ${leg.provider} governed-shell verification.`,
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 240_000 });
 
   await newestShellApproval();

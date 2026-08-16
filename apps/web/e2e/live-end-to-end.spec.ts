@@ -55,7 +55,7 @@ test("a real governed turn answers, and the copy action is a glyph", async () =>
     "Reply with exactly one short sentence about governed agents, then a fenced " +
       "python code block containing: print('raiker')",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The model's own answer, not a fixture.
   await expect(page.getByRole("button", { name: "Copy response" })).toBeVisible({
@@ -79,7 +79,7 @@ test("an attached image opens with working zoom, rotate and reset controls", asy
   await expect(page.getByTitle(/pixel\.png/)).toBeVisible({ timeout: 20_000 });
 
   await page.getByPlaceholder("How can I help you today?").fill("Describe this image in one line.");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 120_000,
   });

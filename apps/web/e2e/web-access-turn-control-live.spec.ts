@@ -142,7 +142,7 @@ test("the provider key is added through the UI and a real turn answers", async (
 
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: WEB LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("WEB LIVE", { exact: true })).toBeVisible({
     timeout: 180_000,
   });
@@ -158,7 +158,7 @@ test("B12/C7 — a web read is withheld with its reason before the owner enables
     `Call the web_fetch tool once with url ${ALLOWED_PAGE} and then tell me, in one ` +
       "sentence, exactly what the tool returned — including any refusal reason.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 240_000,
   });
@@ -188,7 +188,7 @@ test("B12/C7 — once enabled and allowed, the agent reads a real page", async (
     `Call the web_fetch tool once with url ${ALLOWED_PAGE} and then quote back, ` +
       "word for word, the one-line summary that page gives for the httpx project.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 240_000,
   });
@@ -209,7 +209,7 @@ test("B12/C7 — a host outside the owner's allowlist is still refused", async (
     `Call the web_fetch tool once with url ${DENIED_PAGE} and then tell me in one ` +
       "sentence exactly what the tool returned, including any refusal reason.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 240_000,
   });
@@ -229,7 +229,7 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
     "First call the list_directory tool with arguments {}. Then, before you answer, " +
       "read the most recent user message in this conversation and follow it exactly.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The composer becomes the turn's control surface while it streams.
   const control = page.getByTestId("turn-control");
@@ -260,7 +260,7 @@ test("B17/C13 — the owner stops a running turn, and it ends as stopped", async
     "Call list_directory with arguments {}, then call glob with arguments " +
       '{"pattern": "*"}, then write a very long essay about the workspace.',
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   const control = page.getByTestId("turn-control");
   await expect(control).toBeVisible({ timeout: 60_000 });

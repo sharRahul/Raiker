@@ -138,7 +138,7 @@ async function ask(prompt: string) {
   const composer = page.getByPlaceholder("How can I help you today?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
 }
 
@@ -217,7 +217,7 @@ test("the git tools read the repository connected as a sub-folder", async () => 
   await composer.fill(
     "Call git_log once with limit 3, then tell me exactly what the tool returned.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
   // The sub-folder repository's own history, not the workspace's.
   await expect(page.getByRole("main")).toContainText(/initial service commit/i, {

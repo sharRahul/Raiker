@@ -96,7 +96,7 @@ test("a three-mutation batch parks as decision 1 of 3, not as one call and two l
   await page
     .getByPlaceholder("How can I help you today?")
     .fill("Write one.md, two.md and three.md.");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The transcript states which decision of the batch it is waiting on, so the
   // owner reads three approvals as one plan rather than as a repeated proposal.

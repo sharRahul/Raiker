@@ -77,7 +77,7 @@ test("what the transcript shows back is what the composer showed", async () => {
   await page
     .getByPlaceholder("How can I help you today?")
     .fill("In one short line: what is happening in this photo?");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" })).toBeVisible({
     timeout: 150_000,
   });

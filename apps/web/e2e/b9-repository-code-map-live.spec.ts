@@ -117,7 +117,7 @@ async function ask(prompt: string) {
   const before = await answers.count();
   const composer = await buildComposer();
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
   await expect.poll(async () => answers.count(), { timeout: 60_000 }).toBeGreaterThan(before);
   return answers.last();

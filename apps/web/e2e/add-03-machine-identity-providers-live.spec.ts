@@ -48,7 +48,7 @@ async function runAttributedTurn(marker: string, screenshotName: string): Promis
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(`Reply with exactly: ${marker}`);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({ timeout: 240_000 });
   await expect(page.locator(".message-group-raiker").last()).toContainText(marker, { timeout: 240_000 });
 
@@ -91,7 +91,7 @@ async function runGovernedProposal(marker: string, screenshotName: string): Prom
   await prompt.fill(
     `Use the write_file tool now to create add03-${marker.toLowerCase()}.txt containing exactly ${marker}. Do not answer without calling the tool.`,
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 240_000 });
 
   await page.goto(`${BASE}/#/approvals`);

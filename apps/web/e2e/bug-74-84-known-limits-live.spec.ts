@@ -191,7 +191,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await visit(page, "new-chat");
   const prompt = page.getByPlaceholder("How can I help you today?");
   await prompt.fill("Reply with exactly: ROUND0810 LIVE");
-  const send = page.getByRole("button", { name: "Send" });
+  const send = page.getByRole("button", { name: "Send", exact: true });
   await expect(send).toBeEnabled({ timeout: 60_000 });
   await send.click();
   await expect(page.locator(".message-group-raiker").last()).toContainText(

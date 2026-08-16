@@ -41,7 +41,7 @@ async function runTurn(marker: string) {
   const prompt = page.getByPlaceholder("How can I help you today?");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
   await prompt.fill(`Reply with exactly: ${marker}`);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 240_000,
   });

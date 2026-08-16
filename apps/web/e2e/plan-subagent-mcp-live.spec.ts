@@ -74,7 +74,7 @@ test("the provider key is added through the UI and a real turn answers", async (
 
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByPlaceholder("How can I help you today?").fill("Reply with exactly: PLAN LIVE");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("main").getByText("PLAN LIVE", { exact: true })).toBeVisible({
     timeout: 180_000,
   });
@@ -246,7 +246,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
     'Call the tool named mcp__echo__echo with arguments {"text": "MCP REACHED"} ' +
       "and then quote back exactly what it returned.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 180_000,
   });

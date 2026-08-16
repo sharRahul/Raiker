@@ -141,7 +141,7 @@ async function driveReadiness(
   await modelButton.click();
   const prompt = page.getByPlaceholder("How can I help you today?");
   await prompt.fill(`Reply with exactly: ${leg.marker}`);
-  const send = page.getByRole("button", { name: "Send" });
+  const send = page.getByRole("button", { name: "Send", exact: true });
 
   if (await send.isDisabled()) {
     await modelButton.click();
@@ -231,7 +231,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   // running — so the readiness gate lives where a prompt is actually written.
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByLabel("Prompt", { exact: true }).fill("Draft a short project brief");
-  await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Set up model" })).toBeVisible();
   await page.screenshot({
     path: join(SHOTS, "bug69-composer-readiness-gate-live.png"),

@@ -66,7 +66,7 @@ async function ask(prompt: string) {
   const composer = page.getByPlaceholder("How can I help you today?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
 }
 
@@ -193,7 +193,7 @@ test("Build gets the same account, opened where the citation is", async () => {
     "Read contracts/meridian.md with read_file, then state in one sentence when the " +
       "Meridian licence renews. Cite the source.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 300_000 });
 
   const strip = page.getByRole("region", { name: "Sources this answer used" }).last();

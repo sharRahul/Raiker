@@ -87,7 +87,7 @@ async function ask(prompt: string) {
   const composer = page.getByPlaceholder("How can I help you today?");
   await expect(composer).toBeVisible({ timeout: 30_000 });
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 240_000 });
 }
 

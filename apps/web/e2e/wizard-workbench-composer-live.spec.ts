@@ -94,7 +94,7 @@ async function modelsFor(target: Locator, provider: string): Promise<string[] | 
 async function proveModelReady(page: Page): Promise<boolean> {
   await page.goto(`${BASE}/#/new-chat`);
   await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible({ timeout: 60_000 });
-  const send = page.getByRole("button", { name: "Send" });
+  const send = page.getByRole("button", { name: "Send", exact: true });
   const setUp = page.getByRole("button", { name: "Set up model" });
   // The composer opens on the "no model at all" fallback for the moment before
   // its model snapshot arrives, and the dialog opened in *that* state has no
@@ -325,7 +325,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   await page.goto(`${BASE}/#/new-chat`);
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await prompt.fill(`Reply with exactly: ${marker}`);
-  const send = page.getByRole("button", { name: "Send" });
+  const send = page.getByRole("button", { name: "Send", exact: true });
   // `isEnabled` is a snapshot, and the composer is legitimately disabled for the
   // moment between mount and the model snapshot arriving. Waiting for the state
   // is the difference between "this host has no ready model" and "the assertion

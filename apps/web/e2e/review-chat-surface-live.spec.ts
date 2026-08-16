@@ -42,7 +42,7 @@ test("a single turn's transcript, mid-stream and settled", async ({ page }) => {
 
   // Readiness resolves after the composer mounts, so Send is briefly disabled on
   // a page that is perfectly ready. Wait for the gate rather than sampling it.
-  const send = page.getByRole("button", { name: "Send" }).first();
+  const send = page.getByRole("button", { name: "Send", exact: true }).first();
   try {
     await expect(send).toBeEnabled({ timeout: 60_000 });
   } catch {

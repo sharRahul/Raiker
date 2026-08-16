@@ -55,7 +55,7 @@ async function ask(prompt: string) {
   await expect(composer).toBeVisible({ timeout: 30_000 });
   const before = await page.locator(".message-bubble-raiker").count();
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 240_000 });
   await expect
     .poll(async () => page.locator(".message-bubble-raiker").count(), { timeout: 60_000 })

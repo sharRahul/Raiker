@@ -75,7 +75,7 @@ async function ask(prompt: string) {
   await expect(composer).toBeVisible({ timeout: 30_000 });
   const before = await page.locator(".message-bubble-raiker").count();
   await composer.fill(prompt);
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 240_000 });
   await expect
     .poll(async () => page.locator(".message-bubble-raiker").count(), { timeout: 60_000 })
@@ -238,7 +238,7 @@ test("BUG-70 — Plan really refuses the write it is presented as refusing", asy
     "Use the write_file tool to create plan-mode-probe.md containing the word BLOCKED. " +
       "If the tool is refused, say exactly what the refusal was.",
   );
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByTestId("turn-control")).toBeHidden({ timeout: 240_000 });
 
   // The posture is enforced by the runtime, not by prompt wording: the turn

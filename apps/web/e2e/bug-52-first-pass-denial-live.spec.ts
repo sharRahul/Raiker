@@ -113,7 +113,7 @@ test("a refused first call no longer ends the turn — the read behind it still 
   await page
     .getByPlaceholder("How can I help you today?")
     .fill("Read ../escape.md and list the workspace.");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The turn answers. Before BUG-52 it ended on the refused read with
   // "Action denied by policy" and the listing behind it was dropped.
@@ -151,7 +151,7 @@ test("a refusal ahead of a write reaches decision 2 of 3 instead of dropping bot
   await page
     .getByPlaceholder("How can I help you today?")
     .fill("Run the batch: read ../escape.md, then write one.md and three.md.");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByRole("button", { name: "Send", exact: true }).click();
 
   // The refused read is call 1 of 3 and there is no approval ahead of it. The
   // turn now carries on to the write's approval, which is decision 2 of 3.

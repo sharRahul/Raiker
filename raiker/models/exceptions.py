@@ -255,6 +255,15 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "provider_http_error",
         "the provider refused the request. Run the readiness check on Models to see why.",
     ),
+    # BUG-207 — the remediation for this one is on the composer, not on Models.
+    # The default sentence sends the owner to run a readiness check, which will
+    # pass: the model is reachable, it just will not think in either spelling
+    # this provider offers.
+    (
+        "reasoning_unsupported",
+        "this model would not think before answering, in any form this provider "
+        "offers. Set Thinking back to default, or choose a model that supports it.",
+    ),
 )
 
 

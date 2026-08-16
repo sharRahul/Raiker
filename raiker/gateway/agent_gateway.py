@@ -45,6 +45,7 @@ from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
     deserialize_messages,
     deserialize_pending_calls,
+    resumed_call_row_status,
 )
 from raiker.sessions.manager import SessionManager
 from raiker.storage.sqlite import SQLiteStore
@@ -513,7 +514,9 @@ class AgentGateway:
 
     def _restore_suspended_turn(
         self, approval_id: str
-    ) -> tuple[PromptEnvelope, list[ModelMessage], int, list[ToolCallProposal], int]:
+    ) -> tuple[
+        PromptEnvelope, list[ModelMessage], int, list[ToolCallProposal], int, dict[str, str]
+    ]:
         """Rebuild the parked turn's envelope, conversation, budget, and queue.
 
         Raises :class:`TurnSuspensionError` when the row is missing, already
@@ -593,11 +596,21 @@ class AgentGateway:
             int(row.get("tool_calls_made", 0)),
             deserialize_pending_calls(row.get("pending_calls_json")),
             int(row.get("queue_total") or 1),
+            # BUG-206 — the call this decision closed. Its row said "waiting for
+            # your decision" while the turn was parked, and nothing downstream
+            # would settle it: the approved call is not re-brokered here, its
+            # result was produced when the approval resolved and is replayed as
+            # the message above.
+            {
+                "action_id": str(row["action_id"]),
+                "tool_name": str(row["tool_name"]),
+                "status": resumed_call_row_status(outcome),
+            },
         )
 
     async def aresume_after_approval(self, approval_id: str) -> AgentResponse:
         (
-            envelope, messages, tool_calls_made, pending_calls, queue_total
+            envelope, messages, tool_calls_made, pending_calls, queue_total, resolved_call
         ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
@@ -613,6 +626,7 @@ class AgentGateway:
                 pending_calls=pending_calls,
                 queue_total=queue_total,
                 identity=identity,
+                resolved_call=resolved_call,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response
@@ -634,7 +648,7 @@ class AgentGateway:
         the way the interrupted turn would have.
         """
         (
-            envelope, messages, tool_calls_made, pending_calls, queue_total
+            envelope, messages, tool_calls_made, pending_calls, queue_total, resolved_call
         ) = self._restore_suspended_turn(approval_id)
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
@@ -650,6 +664,7 @@ class AgentGateway:
                 pending_calls=pending_calls,
                 queue_total=queue_total,
                 identity=identity,
+                resolved_call=resolved_call,
             ):
                 if event.kind == FINAL and event.response is not None:
                     final = event.response

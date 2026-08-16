@@ -239,3 +239,22 @@ def approval_outcome(
             "effect happened."
         ),
     }
+
+
+def resumed_call_row_status(outcome: dict[str, Any]) -> str:
+    """The transcript row's state for the call a decision just closed (BUG-206).
+
+    The row said *waiting for your decision* while the turn was parked. Once the
+    decision is made it must stop saying that: it either ran, it was refused, or
+    it was recorded and deliberately not executed. `approval_outcome` already
+    distinguishes all three for the model; this maps them to the three states the
+    row can render, so the two never disagree.
+    """
+    status = str(outcome.get("status", ""))
+    if status == "success":
+        return "success"
+    if status == "rejected":
+        return "denied"
+    # `not_executed` — approved, recorded, and not carried out for this
+    # capability. "failed" is the honest row: nothing happened.
+    return "failed"

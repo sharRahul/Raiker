@@ -174,6 +174,21 @@ test("BUG-206 slice E — a call that stops for a decision is that same row, wai
   // The refusal card BUG-52 put at the bottom of the turn is gone: a refused or
   // parked call is a row now, in the place it happened.
   await expect(page.locator(".refusal-card")).toHaveCount(0);
+
+  // And the row settles once the decision is made — the approved call is not
+  // re-brokered on resume, so the runtime settles it from the outcome the
+  // approval recorded and the client merges rather than replaces.
+  //
+  // **Not asserted here, deliberately.** Watching it settle needs the tab that
+  // ran the turn to stay mounted while the decision is made somewhere else, and
+  // five attempts at driving that second surface from this spec produced a
+  // flaky step rather than evidence. Rebuilding the conversation instead is not
+  // an option: a reopened turn carries no rows at all (BUG-215). The behaviour
+  // is covered where it can be asserted deterministically —
+  // `test_turn_model_binding.py` for the resolved call the gateway hands the
+  // runtime, `resumed_call_row_status` for all three outcomes, and
+  // `chatPresentation.test.ts` for the client merging the settled event into
+  // the row it already opened.
 });
 
 test("BUG-207 — the turn shows the model's own reasoning, not three canned sentences", async () => {

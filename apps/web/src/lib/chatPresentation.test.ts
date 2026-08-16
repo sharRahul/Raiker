@@ -159,3 +159,54 @@ describe("reasoning", () => {
     expect(collectReasoning(events)).toBe("");
   });
 });
+
+describe("a call the owner decided on", () => {
+  // BUG-206 — the approved call is not re-brokered when the turn resumes: its
+  // result was produced when the approval resolved and is replayed as a
+  // message. So the runtime settles the row itself, with the action id and the
+  // outcome and nothing else — and the row keeps what it already knew.
+  it("settles the waiting row without blanking what it already said", () => {
+    const rows = toolActivity([
+      toolEvent({
+        action_id: "act_7",
+        tool_name: "write_file",
+        family: "file-write",
+        label: "Write file",
+        action: "notes.md",
+        status: "running",
+      }),
+      toolEvent({
+        action_id: "act_7",
+        tool_name: "write_file",
+        family: "file-write",
+        label: "Write file",
+        action: "notes.md",
+        status: "waiting",
+      }),
+      // What `_stream_resolved_call` sends: identity and outcome only.
+      toolEvent({ action_id: "act_7", tool_name: "write_file", status: "success" }),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      state: "success",
+      family: "file-write",
+      label: "Write file",
+      action: "notes.md",
+    });
+  });
+
+  it("shows a rejected call as not permitted, keeping its name", () => {
+    const rows = toolActivity([
+      toolEvent({
+        action_id: "act_8",
+        tool_name: "git_push",
+        family: "repository",
+        label: "Push",
+        action: "origin · main",
+        status: "waiting",
+      }),
+      toolEvent({ action_id: "act_8", tool_name: "git_push", status: "denied" }),
+    ]);
+    expect(rows[0]).toMatchObject({ state: "denied", label: "Push", action: "origin · main" });
+  });
+});

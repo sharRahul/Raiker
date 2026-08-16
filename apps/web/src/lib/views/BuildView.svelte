@@ -38,7 +38,7 @@
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import {
-    alreadyResumedElsewhere,
+    classifyResumeFailure,
     publishApprovalResolved,
     watchForResumableTurns,
     type ResumeWatcher,
@@ -77,6 +77,17 @@
   import TurnControl from "../components/TurnControl.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
+  import MessageActions from "../components/MessageActions.svelte";
+  import ShortcutSheet from "../components/ShortcutSheet.svelte";
+  import {
+    applyMention,
+    autoGrow,
+    matchCommands,
+    mentionAt,
+    slashFragment,
+    stripSlashToken,
+  } from "../composerCommands";
   import { collectText, groupPhases, summarizeEvent } from "../turnPhases";
   import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
@@ -404,7 +415,184 @@
     if (next === "auto" && standingModes === null) void readStandingModes();
   }
 
+  // ── B19 — composer ergonomics, shared with Chat through composerCommands.ts ──
+  //
+  // Build's set is the coding agent's: the three modes the runtime really
+  // enforces, the governed terminal, the repository list, plus everything Chat
+  // has. `@` completes against the code map the owner built for the selected
+  // repository, so pointing the agent at a file is a keystroke rather than a
+  // path typed exactly.
+  let modelPickerOpen = $state(false);
+  let commandPaneOpen = $state(false);
+  let menuKind = $state<"none" | "slash" | "mention">("none");
+  let menuActive = $state(0);
+  let mentionItems = $state<MenuItem[]>([]);
+  let mentionNotice = $state<{ text: string; href?: string; linkLabel?: string } | null>(null);
+  let shortcutsOpen = $state(false);
+  let mentionRequest = 0;
+
+  const slashItems = $derived.by<MenuItem[]>(() => {
+    const fragment = menuKind === "slash" ? slashFragment(promptText, caret()) : null;
+    if (fragment === null) return [];
+    return matchCommands("build", fragment).map((command) => ({
+      id: command.name,
+      label: `/${command.name}`,
+      detail: command.summary,
+    }));
+  });
+  const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
+
+  function caret(): number {
+    return promptEl?.selectionStart ?? promptText.length;
+  }
+
+  function onPromptInput() {
+    autoGrow(promptEl ?? null);
+    menuActive = 0;
+    const position = caret();
+    if (slashFragment(promptText, position) !== null) {
+      menuKind = "slash";
+      return;
+    }
+    const mention = mentionAt(promptText, position);
+    if (mention !== null) {
+      menuKind = "mention";
+      void loadMentions(mention.fragment);
+      return;
+    }
+    menuKind = "none";
+    mentionNotice = null;
+  }
+
+  async function loadMentions(fragment: string) {
+    const request = ++mentionRequest;
+    try {
+      const view = await api.codeMapPaths(fragment);
+      if (request !== mentionRequest) return;
+      if (view.status !== "success") {
+        // An unbuilt map and a search that matched nothing look identical as an
+        // empty list and are not the same problem, so the reason is shown with
+        // the control that fixes it.
+        mentionItems = [];
+        mentionNotice = {
+          text: view.error?.message ?? "Workspace file mentions are unavailable.",
+          href: view.error?.type === "code_map_gate_disabled" ? "#/capabilities" : "#/build?tab=repositories",
+          linkLabel: view.error?.type === "code_map_gate_disabled" ? "Permissions" : "Repositories",
+        };
+        return;
+      }
+      mentionNotice = null;
+      mentionItems = (view.paths ?? []).map((entry) => ({
+        id: entry.path,
+        label: entry.path,
+        detail: entry.language,
+      }));
+    } catch {
+      if (request !== mentionRequest) return;
+      mentionItems = [];
+      mentionNotice = { text: "Could not reach the local runtime to look up files." };
+    }
+  }
+
+  function chooseMenuItem(item: MenuItem) {
+    if (menuKind === "slash") {
+      promptText = stripSlashToken(promptText);
+      menuKind = "none";
+      runSlashCommand(item.id);
+      return;
+    }
+    const mention = mentionAt(promptText, caret());
+    if (mention === null) return;
+    const applied = applyMention(promptText, mention, item.id);
+    promptText = applied.text;
+    menuKind = "none";
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(applied.caret, applied.caret);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  /** Run one command. Each is a control this surface already has. */
+  function runSlashCommand(name: string) {
+    switch (name) {
+      case "new": newConversation(); break;
+      case "model": modelPickerOpen = true; break;
+      case "attach": attachOpen = true; break;
+      case "context": contextOpen = true; void refreshContextUsage(); break;
+      case "approvals": window.location.hash = "#/approvals"; break;
+      case "plan": planCollapsed = false; void loadPlan(); break;
+      case "stop": if (streaming) void stopRunningTurn(); break;
+      case "shortcuts": shortcutsOpen = true; break;
+      case "mode-plan": setMode("plan"); break;
+      case "mode-edit": setMode("edit"); break;
+      case "mode-auto": setMode("auto"); break;
+      case "terminal": commandPaneOpen = true; break;
+      case "repos": window.location.hash = "#/build?tab=repositories"; break;
+    }
+  }
+
+  /** C14 — a past prompt back in the composer, leaving the transcript intact. */
+  function editPrompt(text: string) {
+    if (streaming) return;
+    promptText = text;
+    menuKind = "none";
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(text.length, text.length);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  /** Send the same prompt again, under the mode that is selected now. */
+  function retryPrompt(text: string) {
+    if (streaming || text.trim() === "") return;
+    promptText = text;
+    void submit();
+  }
+
+  async function stopRunningTurn() {
+    if (sessionId === null) return;
+    try {
+      await api.interrupt({
+        session_id: sessionId,
+        all: true,
+        action_type: "cancel",
+        reason: "user stopped this turn (/stop)",
+      });
+      stopping = true;
+    } catch {
+      /* The composer's own Stop control reports its failures; a slash command
+         that could not reach the runtime leaves the turn exactly as it was. */
+    }
+  }
+
   function onKeydown(event: KeyboardEvent) {
+    // An open menu owns the arrows, Enter, Tab and Escape.
+    if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        menuKind = "none";
+        return;
+      }
+      if (menuItems.length > 0) {
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          menuActive = (menuActive + 1) % menuItems.length;
+          return;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          menuActive = (menuActive - 1 + menuItems.length) % menuItems.length;
+          return;
+        }
+        if (event.key === "Enter" || (event.key === "Tab" && !event.shiftKey)) {
+          event.preventDefault();
+          chooseMenuItem(menuItems[menuActive]);
+          return;
+        }
+      }
+    }
     // Shift+Tab cycles Plan → Edit → Auto without leaving the prompt.
     if (event.key === "Tab" && event.shiftKey) {
       event.preventDefault();
@@ -523,8 +711,44 @@
     }
   }
 
+  /**
+   * Decide what a refused continuation means for the turn that asked (BUG-196).
+   *
+   * Mirrors ChatView exactly: the turn's own state decides, then the reason. A
+   * turn already carrying a finished response continued, so a later refusal is a
+   * duplicate and stays silent.
+   */
+  function applyResumeFailure(turn: BuildTurn, error: unknown, code: string | null) {
+    const finished = turn.response !== null && turn.response.status !== "needs_approval";
+    const outcome = classifyResumeFailure(code);
+    if (finished) {
+      turn.resumeState = null;
+      turn.resumeNote = null;
+      return;
+    }
+    if (outcome === "continued-elsewhere") {
+      turn.resumeState = "elsewhere";
+      turn.resumeNote = "Continued in another tab. Reload to see the result here.";
+      return;
+    }
+    if (outcome === "not-yet-resolved") {
+      turn.resumeState = "waiting";
+      turn.resumeNote = null;
+      return;
+    }
+    turn.resumeState = "waiting";
+    turn.resumeNote = null;
+    turn.error =
+      error instanceof ApiError
+        ? `The turn could not continue (${code ?? error.status}).`
+        : "Could not reach the local runtime to continue the turn.";
+  }
+
   /** Continue the turn this approval parked, streaming into its own transcript row. */
   async function resumeTurn(approvalId: string, outcomeStatus = "") {
+    // BUG-196 — claim the id before the request, so the poller cannot start the
+    // same continuation and report losing that race as a failed turn.
+    resumeWatcher?.claim(approvalId);
     const parked = turns.findLast((candidate) => candidate.response?.status === "needs_approval");
     const turn =
       parked ??
@@ -563,20 +787,10 @@
         void scrollToEnd();
       });
     } catch (error) {
+      // BUG-24 — losing the race is a success: the turn did continue, in the
+      // client that claimed it first. Saying "error" here would be a lie.
       const code = error instanceof ApiError ? error.reasonCode : null;
-      if (alreadyResumedElsewhere(code)) {
-        // BUG-24 — losing the race is a success: the turn did continue, in the
-        // tab that claimed it first. Saying "error" here would be a lie.
-        turn.resumeState = "elsewhere";
-        turn.resumeNote = "Continued in another tab. Reload to see the result here.";
-      } else {
-        turn.resumeState = "waiting";
-        turn.resumeNote = null;
-        turn.error =
-          error instanceof ApiError
-            ? `The turn could not continue (${code ?? error.status}).`
-            : "Could not reach the local runtime to continue the turn.";
-      }
+      applyResumeFailure(turn, error, code);
     } finally {
       turn.streaming = false;
       streaming = false;
@@ -885,6 +1099,17 @@
               <span class="mode-tag">{buildMode(turn.mode).label}</span>
               <p class="bubble-text">{turn.prompt}</p>
             </div>
+            <!-- C14/B19 — the same three actions Chat carries. A retried prompt
+                 is a new turn under the current mode, never a replay of the
+                 governed actions the first one took. -->
+            {#if turn.prompt !== ""}
+              <MessageActions
+                text={turn.prompt}
+                disabled={streaming}
+                onedit={editPrompt}
+                onretry={retryPrompt}
+              />
+            {/if}
             {#if turn.attachments.length > 0}
               <!-- The same cards the composer showed, so what you sent looks
                    like what you attached. Build has no file inspector of its
@@ -1066,7 +1291,7 @@
       {/if}
     </div>
 
-    <CommandOutputPane {sessionId} {visible} />
+    <CommandOutputPane {sessionId} {visible} bind:open={commandPaneOpen} />
 
     <form
       class="composer"
@@ -1079,24 +1304,40 @@
         <ComposerChips store={attachStore} disabled={streaming} />
         <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
         <SkillLinkNotice text={promptText} />
+
+        {#if shortcutsOpen}
+          <ShortcutSheet surface="build" onclose={() => (shortcutsOpen = false)} />
+        {/if}
+        {#if menuKind !== "none"}
+          <ComposerMenu
+            items={menuItems}
+            active={menuActive}
+            heading={menuKind === "slash" ? "Commands" : "Files in the code map"}
+            notice={menuKind === "mention" ? mentionNotice : null}
+            onchoose={chooseMenuItem}
+          />
+        {/if}
+
         <label for="build-prompt" class="sr-only">Describe the change</label>
         <div class="composer-upper">
           <textarea
             id="build-prompt"
             bind:this={promptEl}
             bind:value={promptText}
+            oninput={onPromptInput}
             onkeydown={onKeydown}
+            onblur={() => (menuKind = "none")}
             rows="2"
             placeholder={activeRepo === null
               ? "Describe what you want built…"
               : `Describe the change in ${activeRepo.label}…`}
-            title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode"
+            title="Enter to send, Shift+Enter for a new line, Shift+Tab to change mode, / for commands, @ to mention a file"
             spellcheck="true"
             lang="en-US"
             disabled={streaming}
           ></textarea>
           <div class="upper-controls">
-            <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)} disabled={streaming} />
+            <ModelPicker bind:profileId={modelProfile} bind:model bind:open={modelPickerOpen} {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)} disabled={streaming} />
             <ExecutionEnvironmentBadge />
             <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
             {#if reasoningEfforts.length > 0}
@@ -1229,7 +1470,13 @@
             </button>
           </div>
         </div>
-        <p class="shortcut-hint">Shift+Tab changes mode · Enter sends · Shift+Enter adds a line</p>
+        <p class="shortcut-hint">
+          Shift+Tab changes mode · Enter sends · <code>/</code> for commands ·
+          <code>@</code> to mention a file ·
+          <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
+            all shortcuts
+          </button>
+        </p>
       </div>
     </form>
   </div>
@@ -1808,6 +2055,22 @@
     font-size: 0.72rem;
     color: var(--text-3);
     line-height: 1.35;
+  }
+  .shortcut-hint code {
+    padding: 0 0.22rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+  }
+  .hint-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
   }
 
   /* Below the split-view breakpoint the rail stacks under the composer. Pinning

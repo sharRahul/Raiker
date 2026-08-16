@@ -11,6 +11,7 @@ its own status strip called the runtime operational.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import threading
@@ -134,18 +135,111 @@ def test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe(
 ) -> None:
     """Set on every connection, so the posture never depends on the build.
 
-    Read back from the connection rather than timed: the cost is real — 0.17 s
-    against 1.14 s for a bootstrap plus two hundred reads — but a stopwatch is
-    not a property a test should rest on.
+    BUG-205 — this used to read the pragma back and demand ``0``. That is not a
+    property the platform offers: ``cipher_memory_security`` is process-global in
+    the bundled SQLCipher build and latches one way, so any earlier test in the
+    same process that enabled it leaves this reading ``1`` however many fresh
+    connections and fresh workspaces come after. The assertion here is therefore
+    what *is* per-connection and what *is* Raiker's to guarantee: the exact
+    statement it issues, before the key is derived. The read-back is asserted
+    below, in a process that has never enabled the pragma.
     """
     close_cached_connections()
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
     resolve_memory_security(refresh=True)
+
+    issued: list[str] = []
+    real_connect = sqlite_module.sqlite3.connect
+
+    def recording_connect(*args: Any, **kwargs: Any) -> Any:
+        connection = real_connect(*args, **kwargs)
+        # The driver's own statement trace, because the connection object refuses
+        # attribute assignment. Key material is never retained — only that a key
+        # was set, and where in the order it happened.
+        connection.set_trace_callback(
+            lambda statement: issued.append(
+                "PRAGMA key = <redacted>"
+                if statement.startswith("PRAGMA key =")
+                else statement
+            )
+        )
+        return connection
+
+    monkeypatch.setattr(sqlite_module.sqlite3, "connect", recording_connect)
     store = SQLiteStore(tmp_path)
-    assert str(store.connect().execute("PRAGMA cipher_memory_security").fetchone()[0]) == "0"
+    store.connect()
+    monkeypatch.undo()
+
+    pragmas = [statement for statement in issued if "cipher_memory_security" in statement]
+    assert pragmas, "no memory-security pragma was issued on a keyed connection"
+    assert all(statement == "PRAGMA cipher_memory_security = OFF" for statement in pragmas)
+    # And it is issued *before* the key, because the pragma governs how the key
+    # material about to be derived is held.
+    first_pragma = next(i for i, s in enumerate(issued) if "cipher_memory_security" in s)
+    first_key = next(i for i, s in enumerate(issued) if s.startswith("PRAGMA key ="))
+    assert first_pragma < first_key
 
     close_cached_connections()
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    resolve_memory_security(refresh=True)
+
+
+def test_a_process_that_never_enabled_the_pragma_really_reads_it_back_off(
+    tmp_path: Path,
+) -> None:
+    """The read-back assertion the test above cannot make in a shared process.
+
+    Run in a pristine interpreter with the variable unset, so it measures the
+    platform rather than the order the suite happened to run in (BUG-205). This
+    is the check that would catch Raiker silently opening keyed connections with
+    memory security on when the owner asked for it off.
+    """
+    script = (
+        "import sys\n"
+        "from pathlib import Path\n"
+        "from raiker.storage.sqlite import SQLiteStore, resolve_memory_security\n"
+        "assert resolve_memory_security(refresh=True) == (False, 'requested_off'), 'unexpected posture'\n"
+        "store = SQLiteStore(Path(sys.argv[1]))\n"
+        "print(store.connect().execute('PRAGMA cipher_memory_security').fetchone()[0])\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script, str(tmp_path)],
+        capture_output=True,
+        text=True,
+        env={**os.environ, "RAIKER_SQLCIPHER_MEMORY_SECURITY": "off"},
+    )
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "0", result.stdout
+
+
+def test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A latched process must not report ``off`` while every connection is ``on``.
+
+    BUG-205 — the latch sticks only in the safe direction, so this can never
+    understate protection. It can overstate a *change*: an owner who set the
+    variable to ``off`` and restarted nothing would otherwise read ``off`` on the
+    health surface while the process kept locking pages. Health says which of the
+    two it is.
+    """
+    close_cached_connections()
+    monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
+    resolve_memory_security(refresh=True)
+    SQLiteStore(tmp_path)
+    assert sqlite_module.memory_security_ever_enabled() is True
+
+    close_cached_connections()
+    monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "off")
+    resolve_memory_security(refresh=True)
+    posture = memory_security_posture()
+    # What the owner asked for, and — separately — what the process is doing.
+    assert posture["cipher_memory_security"] == "off"
+    assert posture["memory_security_reason"] == "requested_off"
+    assert posture["memory_security_in_force"] == "on"
+
+    close_cached_connections()
     resolve_memory_security(refresh=True)
 
 

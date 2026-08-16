@@ -312,6 +312,12 @@ class TurnView:
     created_at: str
     completed_at: str | None
     summary: str | None
+    # BUG-215 — how much working this turn produced, and the working itself when
+    # the owner has asked for it to be kept. `reasoning_chars > 0` with
+    # `reasoning is None` is the honest "it thought, and that was not kept" case
+    # a re-opened turn has to be able to state.
+    reasoning_chars: int = 0
+    reasoning: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -1818,6 +1824,16 @@ class DashboardService:
         return CodeMapService(
             self.workspace_root, self.store, principal_id=owner_principal_id
         ).status()
+
+    def code_map_paths(
+        self, *, owner_principal_id: str, fragment: str, limit: int = 12
+    ) -> dict[str, Any]:
+        """Paths matching an `@`-mention fragment, from the index the owner built."""
+        from raiker.graph.codemap_service import CodeMapService
+
+        return CodeMapService(
+            self.workspace_root, self.store, principal_id=owner_principal_id
+        ).complete_paths(fragment, limit=limit)
 
     def rebuild_code_map(
         self, *, owner_principal_id: str, user_id: str | None = None
@@ -5126,6 +5142,8 @@ class DashboardService:
             created_at=str(row.get("created_at", "")),
             completed_at=row.get("completed_at"),
             summary=row.get("summary"),
+            reasoning_chars=int(row.get("reasoning_chars") or 0),
+            reasoning=row.get("reasoning_text"),
         )
 
     @staticmethod

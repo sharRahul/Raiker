@@ -201,17 +201,22 @@ class CommandService:
             authority_kind=authority_kind,
             authority_id=authority_id,
         )
+        backend_name = "local_strict" if profile.kind == "local" else profile.kind
         try:
             self.store.create(request)
         except SecretMaterialRejected as exc:
             raise CommandServiceError(str(exc)) from None
+        # BUG-197 — name the backend on the row before anything is started, so a
+        # run in flight already says what is running it. The receipt has always
+        # carried this; the list the owner browses read an empty column, and two
+        # surfaces describing the same run disagreed.
+        self.store.record_backend(owner_principal_id, request.run_id, backend_name)
         self.store.transition(owner_principal_id, request.run_id, CommandState.QUEUED, CommandState.STARTING)
 
         def complete(state: CommandState, returncode: int | None, sink: _StoreSink) -> None:
             self._finalize(request, state, returncode, sink, backend_name)
 
         sink = _StoreSink(self.store, request, complete)
-        backend_name = "local_strict" if profile.kind == "local" else profile.kind
         isolation: dict[str, Any] = {}
         try:
             backend = (

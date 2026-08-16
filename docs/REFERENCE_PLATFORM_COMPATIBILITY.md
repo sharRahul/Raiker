@@ -158,6 +158,7 @@ implemented unless the Raiker column says so.
 | The model's own reasoning, live | ChatGPT (summarised), Claude Code (`thinking`), Codex, Cowork | ✅ collapsed block above the answer, collapsing when the answer starts | `ReasoningBlock.svelte` |
 | Reasoning is the provider's, not the product's | All | ✅ `display: summarized` asked for wherever the profile declares it | `AsyncAnthropicMessagesProvider._thinking` |
 | No reasoning ⇒ no block | ChatGPT, Claude Code | ✅ absent, never an empty one and never a placeholder | `collectReasoning` |
+| Reasoning survives a reload | ChatGPT, Claude Code, Cowork all retain it, and none asks | ✅ retained **on the owner's decision** (Settings → Privacy), and a turn whose working was not kept says so rather than showing nothing | BUG-215: `record_turn_reasoning`, `ReasoningBlock.svelte` |
 
 **Where Raiker leads, and why it is worth keeping.**
 
@@ -169,13 +170,15 @@ implemented unless the Raiker column says so.
 | **Proposal order**, not completion order | Independent reads run concurrently (B4), so the events arrive in whatever order the worker threads finished. The rows are opened from the validated proposals, so the turn reads in the order the model asked | shipped: `_stream_tool_proposed` |
 | A row surface **guarded against silent drift** | The row exists in two languages and the failure is silent: a family with no glyph renders the fallback, which is what the fallback is for. No reference product can check this, because none resolves the row on the server in the first place | shipped: two tests comparing the family tables in both directions, confirmed to fail when the drift is introduced |
 | The thinking request shape **negotiated with the model**, not declared | A provider profile declares one reasoning mode for every model behind it. Measured against the live Anthropic catalogue on 2026-08-15, five models refuse `thinking.type.enabled` and three refuse `thinking.type.adaptive`; a static declaration fails the whole turn with a 400 for whichever half it is wrong about | shipped: the provider records the spelling the refusal names and re-issues once |
+| Retention of the model's working is the **owner's decision**, and its absence is **stated** | ChatGPT, Claude Code and Cowork all keep the reasoning they show, and none offers a way not to. The model's working can restate anything the prompt contained and is the one part of a turn an owner may specifically not want on disk, so Raiker keeps it only on an explicit setting — and records *how much* working a turn produced either way, so a re-opened turn says **the working was not kept** rather than reading as a turn that never thought | shipped (BUG-215): `turns.reasoning_chars` is always written, `turns.reasoning_text` only when Settings → Privacy says so |
+| Retained working is **excluded from search and export by construction** | A product that retains reasoning generally indexes and exports it with the rest of the conversation | shipped: `conversation_fts` projects `prompt_text` and `summary` only, and `build_transcript` reads the same two fields — the exclusion is the shape of the code, not a filter that can be forgotten |
 
 **What a reference product does that Raiker does not.** Each is open work with a
 reason rather than an oversight; each is recorded in `plans/TO_BE_FIXED.md`.
 
 | Missing control | Who has it | What it would take |
 |---|---|---|
-| Reasoning that survives a reload | ChatGPT, Claude Code, Cowork | Reasoning is a live-stream fact today: it fills in as it arrives and is gone when the conversation is re-opened. Persisting it is a storage change — a per-turn column and a retention rule for text the owner may not want kept — not a rendering one |
+| Tool rows that survive a reload | ChatGPT, Claude Code, Cowork | Reasoning now rehydrates from the turn row (BUG-215); the tool rows still rebuild from the stream. The durable events the Audit view reads already hold them, so this is a governed read-back of the per-turn event slice rather than a new record |
 | A tool row that expands into its result | Claude Code, Codex | The row is deliberately a summary; the result is in the Audit log. An expander would need a governed read-back of the redacted result payload, not the raw one the model saw |
 | Live output from a long-running command | Claude Code, Codex, Hermes | Blocked on the same background execution BUG-194 describes: there is no run to stream from until a supervisor owns it |
 | Token and time cost per call on the row | Codex | Per-call attribution needs the provider to report it, which none of Raiker's do at call granularity; per-turn cost is already shown |
@@ -187,6 +190,96 @@ shape of it; a per-turn *diff* of what the calls changed, assembled from the
 checkpoints already written before each write; and a reasoning block that marks
 the sentences the answer actually acted on, since the runtime already ledgers the
 sources a turn read.
+
+---
+
+## Composer control set — how a prompt is written, corrected and re-run
+
+Reviewed 2026-08-16 while closing GAP-BUILD **B19** and GAP-CHAT **C14**,
+against the composer surfaces of **Claude Cowork**, **Claude Code**,
+**ChatGPT**, **Codex**, **OpenClaw** and **Hermes Agent**. Scope is only the box
+a prompt is written in and the actions on a message already sent. Nothing here
+is a claim about the rest of those products, and nothing is implemented unless
+the Raiker column says so.
+
+Two composers, two reference bars, deliberately: **Chat** is measured against
+the Claude and ChatGPT assistant composer, **Build** against the Claude Code and
+Codex coding-agent composer. They share one implementation
+(`apps/web/src/lib/composerCommands.ts`) so the two keyboards cannot drift into
+two different products, and differ only where the surfaces genuinely differ.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Reference behaviour | Raiker | Status |
+|---|---|---|---|
+| Slash commands | Claude Code (`/model`, `/clear`), Codex, ChatGPT, OpenClaw all open a command menu on `/` | `/` at the start of the prompt opens a filtered menu; each entry runs a control the surface already has. Chat carries `/export`, Build carries the three modes, `/terminal` and `/repos` | ✅ |
+| A listed command that really runs | Reference products list only working commands | Every entry dispatches to an existing control, checked by a test that walks the whole set. There is no "coming soon" row — an inert menu item is a promise the product does not keep | ✅ beyond |
+| `@`-mention file completion | Claude Code and Codex complete workspace paths; ChatGPT and Cowork complete uploaded files and connectors | `@` completes against the **code map the owner built**, paths and languages only, behind the same `code_map_indexing` gate as every other map read | ✅ |
+| A completion that cannot become a listing surface | Claude Code and Codex read the working tree directly | `GET /api/code/map/paths` reads the index the owner explicitly built, never the filesystem, and returns no symbols, no line numbers and no content. It can name nothing the owner's own indexing run did not already accept | ✅ beyond |
+| An empty menu that says which emptiness it is | None distinguish them | A map that was never built answers `code_map_not_built` with the control that fixes it; a gate that is off answers `code_map_gate_disabled` with the Permissions link. "Nothing matched" and "nothing could match" send the owner to different places | ✅ beyond |
+| Auto-growing prompt box | Claude, ChatGPT, Claude Code | Grows with the text to a ceiling, then scrolls | ✅ |
+| Keyboard map, in the product | Claude Code (`/help`), Codex, OpenClaw | `/shortcuts` and a composer link open a per-surface sheet built from `shortcuts()`, which lists only bindings the handlers implement | ✅ |
+| Mode cycling from the prompt | Claude Code cycles plan / accept-edits with Shift+Tab | Shift+Tab cycles Plan → Edit → Auto, and the modes are enforced by the runtime rather than by prompt wording | ✅ |
+| Stop a running turn from the composer | Claude Code (Esc), Codex, ChatGPT | Stop and steer controls plus `/stop`, all on the same governed `POST /api/interrupts` | ✅ |
+| Copy a message | All | Copy on the owner's own message, and per-code-block copy in the answer | ✅ |
+| Edit a prompt and send it again | ChatGPT, Claude, Cowork | Edit puts the prompt back in the composer. It does **not** rewrite the transcript: the original turn stays and the edited one is a new turn | ✅ beyond |
+| Retry / regenerate | ChatGPT, Claude, Claude Code | Retry sends the same prompt again as a new turn, under whatever mode is selected now | ✅ |
+| Attachments from the composer | All | Upload, workspace path, drag-and-drop, with the same governed store both surfaces share | ✅ |
+| Queue a message while a turn runs | Claude Code, Codex | Steer queues the owner's words into the running turn, arriving as a user message before the model is asked anything else | ✅ |
+| `!` bash prefix and `#` memory prefix | Claude Code | ❌ absent. Both would be a second route into governed execution and governed memory writes, beside the approval path that exists — the "one governed route" rule the shell control set is built on | ❌ by decision |
+| Branch a conversation from a message | ChatGPT, Claude | ❌ absent. Checkpoints already record the point to branch from; the missing part is a conversation-fork surface, tracked as C14 | ❌ |
+| Voice input | ChatGPT, Claude mobile | ❌ absent, and labelled as absent rather than "coming soon" (C16) | ❌ |
+
+**Where Raiker leads, and why it is worth keeping.**
+
+| Control | Why no reference product has it | Where it is |
+|---|---|---|
+| A completion menu that **reads an index, not a disk** | Every reference coding agent completes `@` against the live working tree, so the completion surface is as wide as the process's filesystem access. Raiker completes against the map the owner chose to build, under the same gate, and returns paths only — so the autocomplete cannot be a wider read than the tool it feeds | shipped: `CodeMapService.complete_paths` |
+| **One command vocabulary** across an assistant and a coding agent | Claude and Claude Code are separate products with separate keyboards; ChatGPT and Codex likewise. Raiker's two surfaces resolve their commands through one module, so `/model` and `@` behave identically and a test proves each surface offers only commands it can run | shipped: `composerCommands.ts` |
+| An edit that **adds a turn instead of replacing one** | ChatGPT and Claude replace the edited message and discard what followed it. For a governed agent the transcript is evidence — a record that quietly changes what was asked is not one — so the original turn stays and the edit is a new turn beneath it | shipped: `MessageActions.svelte` |
+| A slash command that **grants nothing** | In every reference product a command is a privileged path into the harness. Here each one opens a control the owner already has; there is no command that raises a capability, skips an approval, or reaches the model with more authority than typing would | shipped, by construction |
+
+**What a reference product does that Raiker does not.** Each is open work with a
+reason, not an oversight.
+
+| Missing control | Who has it | What it would take |
+|---|---|---|
+| Custom, owner-authored slash commands | Claude Code, Codex, OpenClaw | The skill store already holds owner-authored instructions with a review path. A command is that plus a trigger token, and the honest version has to state what authority the command carries — which is what makes it a design task rather than a parser change |
+| `@`-mention of a connector, a memory or a past conversation | ChatGPT, Cowork | Each is a different governed read with its own gate. One completion menu over four authorities needs the menu to say which one a row would use, or it becomes a way to reach a capability without noticing |
+| Inline file preview from a mention | Claude Code, Cowork | Chat has an inspector for attachments; Build has none, and giving it one is B13 rather than a composer change |
+| Branch-from-here | ChatGPT, Claude | A conversation fork over the existing checkpoint manifest, plus a surface that makes two branches of one conversation legible |
+
+**Ideas that go beyond every reference product, not yet built.** Recorded so the
+list is a decision rather than a gap: a slash command that shows **which
+capability gate** it would cross before it runs, so an owner sees the governed
+shape of a shortcut; an `@`-mention that reports the file's **index freshness**
+beside it, since the code map already records when each path was last parsed;
+and a composer that names the **standing grants in force** for the mode selected,
+rather than leaving the owner to read Permissions in another route.
+
+---
+
+## Turn continuation and command attribution control set
+
+Reviewed 2026-08-16 while closing BUG-196 and BUG-197, against the
+long-running-work surfaces of **Claude Cowork**, **Claude Code**, **ChatGPT**,
+**Codex**, **OpenClaw** and **Hermes Agent**. Scope is only what a surface says
+about a turn that parked on a decision, and what a command run says about where
+it ran.
+
+| Control | Reference behaviour | Raiker | Status |
+|---|---|---|---|
+| A decision made elsewhere continues the turn | Cowork and Claude Code continue work approved from another surface | ✅ broadcast plus an authenticated poll; the server's atomic claim decides | ✅ |
+| Losing the race to continue is **not an error** | Reference products generally serialise on one client and do not surface the race | ✅ a refusal that means "already acted on" is reported as continued, never as a failed turn | ✅ beyond |
+| A refused stream carries its **reason**, not just a status | Reference products surface a generic failure for a refused stream | ✅ the streaming path parses the same `reason_code` the plain path does, so a lost race, an unrecorded decision and an unreadable parked state are told apart | ✅ beyond (BUG-196) |
+| The turn's own state decides what the owner is told | — | ✅ a turn already carrying a finished response reports nothing, whatever refused a later duplicate attempt | ✅ beyond |
+| A run names where it ran, while it is running | Claude Code and Codex name the sandbox in their activity view | ✅ the backend is written to the run at start, so the browsable row and the immutable receipt agree from the first moment | ✅ (BUG-197) |
+
+Raiker difference: the race a parked turn creates is **designed for rather than
+avoided**. Every reference product with cross-surface approval serialises on a
+single client and treats a conflict as an error; Raiker lets both clients try,
+resolves it atomically in the store, and holds the interface to the rule that a
+turn which completed must never report that it could not.
 
 ---
 

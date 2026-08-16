@@ -217,6 +217,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-213](#fixed-213--a-tool-call-was-invisible-in-chat-was-bug-206) | High | Chat / streaming surface | Fixed (was BUG-206 — entry closed) |
 | [FIXED-214](#fixed-214--the-models-real-reasoning-was-requested-discarded-and-replaced-with-three-canned-sentences-was-bug-207) | Medium | Chat / streaming honesty | Fixed (was BUG-207 — entry closed) |
 | [FIXED-215](#fixed-215--the-all-pages-evidence-sweep-photographed-the-setup-wizard-instead-of-the-pages) | Low | Live tests | Fixed (found while verifying FIXED-213/214) |
+| [FIXED-216](#fixed-216--a-successful-turn-reported-that-it-could-not-continue-was-bug-196) | Medium | Build / Chat turn resume | Fixed (was BUG-196 — entry closed) |
+| [FIXED-217](#fixed-217--a-command-runs-backend-column-was-never-written-was-bug-197) | Low | Command store | Fixed (was BUG-197 — entry closed) |
+| [FIXED-218](#fixed-218--a-plain-pytest-tests-run-failed-because-cipher_memory_security-is-a-one-way-latch-was-bug-205) | Low | Test isolation / SQLCipher posture | Fixed (was BUG-205 — entry closed) |
+| [FIXED-219](#fixed-219--reasoning-was-shown-live-and-then-forgotten-was-bug-215) | Low | Chat / reasoning retention | Fixed (was BUG-215 — entry closed) |
+| [FIXED-220](#fixed-220--the-composer-was-a-textarea-and-a-send-button-gap-build-b19-gap-chat-c14) | Medium | Chat / Build composer | Fixed (GAP-BUILD B19, GAP-CHAT C14) |
+| [FIXED-221](#fixed-221--three-settings-sections-had-deep-links-that-silently-opened-general) | Low | Settings navigation | Fixed (found while shipping FIXED-219) |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -8365,3 +8371,241 @@ now gone stale twice.
 **User-interface outcome.** None — no shipped surface changes. The outcome is
 that the sweep can once again fail a pull request that breaks a page, which is
 the only reason it exists.
+
+---
+
+## FIXED-216 — A successful turn reported that it could not continue *(was BUG-196)*
+
+**Severity: Medium. Area: Build / Chat turn resume. Status: Fixed.**
+
+**Observed.** On 2026-08-15, in every one of the four provider rounds, a Build
+turn that approved a shell command executed it, streamed the model's answer
+containing the command's real output, and then rendered **"The turn could not
+continue (409)."** directly beneath that answer. The turn had in fact completed,
+so a successful governed execution read as a failed one.
+
+**Root cause, and it was not the one the entry recorded.** BUG-196 named the
+client's `alreadyResumedElsewhere` helper, which matched exactly one reason code.
+That was real but second-order. The first-order cause is one line in
+`apps/web/src/lib/api.ts`: `streamSse` threw
+`new ApiError(resp.status, **null**, …)` — the streaming path never parsed the
+error body at all, while the plain `request()` path beside it did. Every refused
+stream arrived at the interface with no reason code, whatever the server said.
+That is why the message showed the literal number `409` rather than a code: there
+was nothing else to show.
+
+Two contributing causes sat behind it. The owner's own **Approve** click
+continues the turn directly, without going through the resume watcher, so the
+watcher's poll saw the same resolved-and-unclaimed row and raced its own surface
+— one attempt streamed the answer, the other lost and was the only thing on
+screen. And the classifier knew one code where the route can answer three.
+
+**Fix, in three parts.**
+
+1. `reasonCodeFrom` is shared by the plain and the streaming paths, so a refused
+   stream carries the same `reason_code` a refused request does.
+2. `classifyResumeFailure` tells the three facts a 409 carries apart:
+   `continued-elsewhere` (already acted on — say so quietly),
+   `not-yet-resolved` (no decision has reached the runtime yet, so the waiting
+   state it was already in is the truthful surface), and `failed` (a genuinely
+   unreadable parked state, which still says so with its reason).
+3. The watcher gained `claim(approvalId)`, called before the request goes out, so
+   the poll cannot start a second continuation of the same decision. The race is
+   closed rather than reported politely.
+
+**Above all of it, the turn's own state decides.** A turn already carrying a
+finished response reports nothing at all, whatever refused a later duplicate
+attempt. Saying "could not continue" beneath a finished answer is the single most
+misleading thing this surface can do.
+
+**Verified.** Three regression tests in `ChatView.continuation.test.ts` — a
+refusal landing on a finished turn is silent, an unresolved approval keeps
+waiting without an error, and an unreadable parked state still names its reason —
+plus the classifier and claim tests in `approvalResume.test.ts`.
+
+**User-interface outcome.** A turn that completed shows no error. A turn that
+genuinely could not continue still says so, with its reason.
+
+---
+
+## FIXED-217 — A command run's `backend` column was never written *(was BUG-197)*
+
+**Severity: Low. Area: command store. Status: Fixed.**
+
+**Observed.** Every row in `command_runs` carried `backend = ''`, including runs
+that completed inside the native sandbox. The receipt recorded the backend
+correctly (`evidence.backend = "native"`), so the immutable record knew what ran
+the command and the list the owner browses did not.
+
+**Root cause.** `CommandStore.create` never populated the column and nothing
+updated it later; `CommandService` computed `backend_name` for the receipt only.
+
+**Fix.** `CommandStore.record_backend` is called at start, beside the existing
+`record_isolation`, so a run **in flight** already names its backend rather than
+waiting for a receipt that a contained or lost run may never produce. Written in
+plaintext for the same reason the isolation evidence is: a backend name is not
+secret, and a locked vault must still be able to answer "what ran this".
+
+**Verified.** `test_command_store.py` covers the write, the owner scoping and the
+fail-closed unknown-run case; `test_command_backends.py` proves a run read back
+out of the store names the same backend its receipt will.
+
+**User-interface outcome.** The governed terminal names the backend beside every
+run — in the run picker and in the output header — from the moment it starts. A
+run recorded before the column existed shows nothing rather than a guess.
+
+---
+
+## FIXED-218 — A plain `pytest tests/` run failed, because `cipher_memory_security` is a one-way latch *(was BUG-205)*
+
+**Severity: Low. Area: test isolation / SQLCipher posture. Status: Fixed.**
+
+**Observed.** `python -m pytest tests/` — the command a contributor runs — failed
+on `test_the_pragma_is_set_explicitly_to_off_without_an_unsafe_parent_probe`. CI
+was green on the same commit because `.github/workflows/ci.yml` set
+`RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"` for the whole job, so nothing in that
+process ever turned the pragma on and the gate could not see it.
+
+**Root cause.** `PRAGMA cipher_memory_security` is process-global in the bundled
+SQLCipher build and latches one way: once any connection has enabled it, the
+process keeps it. The test asserted a per-connection property the platform does
+not offer.
+
+**Fix, in three parts.**
+
+1. The test now asserts what **is** per-connection and what **is** Raiker's to
+   guarantee: the exact statement issued (`PRAGMA cipher_memory_security = OFF`),
+   and that it is issued *before* the key, read through the driver's own
+   statement trace with key material redacted.
+2. A second test makes the read-back assertion in a **pristine subprocess** with
+   the variable unset, so it measures the platform rather than the order the
+   suite happened to run in.
+3. CI keeps the job-wide variable for speed, and adds a step that runs the
+   posture file the way a contributor does — same process, variable unset. An
+   env var that hides an order dependency is the reason this reached `main`.
+
+**The latch is now reported rather than assumed.** The process records whether it
+has ever enabled the pragma, and `memory_security_posture()` carries
+`memory_security_in_force` beside the resolved value. They are the same for any
+normal run and can differ in exactly one direction — the safe one — but reporting
+only the intent would let health say `off` while every connection was `on`.
+
+**User-interface outcome.** None directly. The one product-facing consequence is
+that `GET /api/health` now states both what was resolved and what is in force,
+rather than letting intent stand in for fact.
+
+---
+
+## FIXED-219 — Reasoning was shown live, and then forgotten *(was BUG-215)*
+
+**Severity: Low. Area: Chat / reasoning retention. Status: Fixed.**
+
+**Observed.** With **Thinking** on, a turn streamed the model's own reasoning
+into a collapsed block above the answer (FIXED-214). Re-opening the conversation
+lost it: the answer was there and nothing said reasoning had ever been produced.
+A re-opened turn silently showed less than it had five minutes earlier.
+
+**Root cause.** Reasoning was a *stream* fact and only a stream fact.
+`REASONING_DELTA` events accumulated in the client's in-memory turn, and
+`ModelResponse.reasoning` carried the whole of it back to the runtime, where
+nothing stored it. A reloaded conversation is rebuilt from stored turns, which
+had no column for it.
+
+**The retention decision, made first.** Persisting reasoning is a storage change
+with a retention question attached. The model's working can restate anything the
+prompt contained and it is the one part of a turn an owner may specifically not
+want on disk, so:
+
+* **Off by default.** `turns.reasoning_text` is written only when the owner has
+  turned retention on in **Settings → Privacy**.
+* **The amount is always recorded.** `turns.reasoning_chars` is a count, not
+  content, and it is what lets a re-opened turn say *the working was not kept*
+  rather than read as a turn that never thought.
+* **Retained working is excluded from search and export by construction.**
+  `conversation_fts` projects `prompt_text` and `summary` only, and
+  `build_transcript` reads the same two fields — the exclusion is the shape of
+  the code, not a filter that can be forgotten.
+* **Recording it never fails a turn.** Reasoning is not the answer; a turn that
+  genuinely completed must not report as failed because a note about it could not
+  be filed.
+
+**Verified.** `tests/test_bug_215_reasoning_retention.py` covers the default, both
+settings shapes, the fail-closed unreadable-settings case, survival across a
+reload, and the two exclusions. `ChatView.continuation.test.ts` covers the three
+transcript states, and `Privacy.test.ts` covers the control in both directions.
+
+**User-interface outcome.** A re-opened turn shows the working it showed while it
+ran, when retention is on. When it is off, it says so in one line with the
+control that changes it. A turn that produced no working says nothing at all —
+never an empty block, never a placeholder.
+
+---
+
+## FIXED-220 — The composer was a textarea and a Send button *(GAP-BUILD B19, GAP-CHAT C14)*
+
+**Severity: Medium. Area: Chat / Build composer. Status: Fixed.**
+
+**Observed.** Neither composer had slash commands, `@`-mention completion, a
+keyboard map, an auto-growing prompt box, or any per-message action. Correcting a
+typo in a prompt meant retyping the whole prompt; asking for a second attempt
+meant the same; attaching a workspace path meant typing it exactly. Each absence
+is small; together they are most of the felt difference in daily use against
+Claude, ChatGPT, Claude Code and Codex.
+
+**Fix.** One shared module, `apps/web/src/lib/composerCommands.ts`, so the
+assistant composer and the coding-agent composer cannot drift into two different
+keyboards. Chat is measured against the Claude/ChatGPT bar and Build against the
+Claude Code/Codex bar; they differ only where the surfaces genuinely differ.
+
+* **Slash commands.** `/` at the start of the prompt opens a filtered menu. Chat
+  carries `/export`; Build carries `/plan-mode`, `/edit-mode`, `/auto-mode`,
+  `/terminal` and `/repos`. Every entry dispatches to a control the surface
+  already has — there is no "coming soon" row, and a test walks the whole set.
+  **No command grants anything**: each one opens a control the owner already has.
+* **`@`-mention completion**, backed by the new `GET /api/code/map/paths`. It
+  reads the index the owner explicitly built, never the filesystem, returns paths
+  and languages only, and answers the same `code_map_indexing` gate as every
+  other code-map read. A map that was never built and a gate that is off each say
+  which one it is, with the control that fixes it — "nothing matched" and
+  "nothing could match" send the owner to different places.
+* **Message actions.** Copy, Edit and Retry on the owner's own prompt. Edit
+  **does not rewrite the transcript**: the original turn stays and the edited one
+  is a new turn. For a governed agent the transcript is evidence, and a record
+  that quietly changes what was asked is not one.
+* **An auto-growing prompt box**, a per-surface **keyboard map** built from the
+  bindings the handlers actually implement, and `Shift+Tab` mode cycling kept
+  where it already was.
+
+**Verified live** against hosted Anthropic on 2026-08-16, seven scenarios in
+`apps/web/e2e/composer-parity-and-turn-honesty-live.spec.ts`
+([`screenshots/working/`](screenshots/working) prefixed `r0816-`), plus twelve
+unit tests over the parsing rules and eight over the two composers.
+
+**User-interface outcome.** Both composers carry the commands, completion,
+shortcuts and message actions above, and neither offers a control it cannot
+perform.
+
+---
+
+## FIXED-221 — Three settings sections had deep links that silently opened General
+
+**Severity: Low. Area: settings navigation. Status: Fixed (found while shipping FIXED-219).**
+
+**Observed.** Adding **Privacy** to the settings rail was not enough to make
+`#/settings?tab=privacy` open it: the page opened **General** instead. The same
+was already true of **Web access** and **Git credential** — both had been in the
+rail and unreachable by link since they were added.
+
+**Root cause.** The same "two lists that have to agree" defect this document
+keeps recording. `HUB_TABS.settings` in `nav.ts` is the vocabulary
+`tabFromHash` validates against, and `SECTIONS` in `SettingsView.svelte` is what
+the rail renders. A section in one and not the other produces a link that looks
+like it works and lands on the wrong page — worse than a broken link, which at
+least announces itself.
+
+**Fix.** `HUB_TABS.settings` now lists every section the rail renders, in rail
+order, and a test walks the rail asserting each section has a working deep link
+while an unknown tab still falls back to General.
+
+**User-interface outcome.** Every settings section is reachable by link, and the
+Privacy section that FIXED-219 depends on opens where it is pointed.

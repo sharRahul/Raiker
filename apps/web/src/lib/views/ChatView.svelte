@@ -17,7 +17,7 @@
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import {
-    alreadyResumedElsewhere,
+    classifyResumeFailure,
     watchForResumableTurns,
     type ResumableTurn,
     type ResumeWatcher,
@@ -44,6 +44,17 @@
   import SourceChips from "../components/SourceChips.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
+  import MessageActions from "../components/MessageActions.svelte";
+  import ShortcutSheet from "../components/ShortcutSheet.svelte";
+  import {
+    applyMention,
+    autoGrow,
+    matchCommands,
+    mentionAt,
+    slashFragment,
+    stripSlashToken,
+  } from "../composerCommands";
   import { collectText } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
   import { hasSteps, planFromEvent } from "../agentPlan";
@@ -72,6 +83,12 @@
     //   "elsewhere" — another tab won the race and is streaming the continuation
     resumeState?: "waiting" | "continuing" | "elsewhere" | null;
     resumeNote?: string | null;
+    // BUG-215 — a re-opened turn rebuilds from stored rows, not from the stream
+    // it was watched on, so its working has to come from the record or be
+    // accounted for. `retainedReasoning` is the kept text; `reasoningChars` is
+    // how much there was, which stays true whether it was kept or not.
+    retainedReasoning?: string | null;
+    reasoningChars?: number;
   }
 
   let {
@@ -601,6 +618,8 @@
       error: null,
       resumeState: parked ? "waiting" : null,
       resumeNote: null,
+      retainedReasoning: t.reasoning ?? null,
+      reasoningChars: t.reasoning_chars ?? 0,
     };
   }
 
@@ -717,7 +736,188 @@
     }
   }
 
+  // ── C14/B19 — composer ergonomics: slash commands, `@` mentions, auto-grow ──
+  //
+  // Shared with Build through `composerCommands.ts`, so the two composers cannot
+  // drift into two different keyboards. Every command listed runs a control this
+  // surface already has; none of them grants anything.
+  let promptEl = $state<HTMLTextAreaElement | undefined>();
+  let modelPickerOpen = $state(false);
+  let menuKind = $state<"none" | "slash" | "mention">("none");
+  let menuActive = $state(0);
+  let mentionItems = $state<MenuItem[]>([]);
+  let mentionNotice = $state<{ text: string; href?: string; linkLabel?: string } | null>(null);
+  let shortcutsOpen = $state(false);
+  let mentionRequest = 0;
+
+  const slashItems = $derived.by<MenuItem[]>(() => {
+    const fragment = menuKind === "slash" ? slashFragment(promptText, caret()) : null;
+    if (fragment === null) return [];
+    return matchCommands("chat", fragment).map((command) => ({
+      id: command.name,
+      label: `/${command.name}`,
+      detail: command.summary,
+    }));
+  });
+  const menuItems = $derived(menuKind === "slash" ? slashItems : mentionItems);
+
+  function caret(): number {
+    return promptEl?.selectionStart ?? promptText.length;
+  }
+
+  /** Re-read what the caret is sitting in after every edit. */
+  function onPromptInput() {
+    autoGrow(promptEl ?? null);
+    menuActive = 0;
+    const position = caret();
+    if (slashFragment(promptText, position) !== null) {
+      menuKind = "slash";
+      return;
+    }
+    const mention = mentionAt(promptText, position);
+    if (mention !== null) {
+      menuKind = "mention";
+      void loadMentions(mention.fragment);
+      return;
+    }
+    menuKind = "none";
+    mentionNotice = null;
+  }
+
+  async function loadMentions(fragment: string) {
+    const request = ++mentionRequest;
+    try {
+      const view = await api.codeMapPaths(fragment);
+      if (request !== mentionRequest) return;
+      if (view.status !== "success") {
+        // A refusal is not an empty menu. Say which one it is, and offer the
+        // control that changes it — an owner who has never built the index and
+        // an owner whose search matched nothing need different next steps.
+        mentionItems = [];
+        mentionNotice = {
+          text: view.error?.message ?? "Workspace file mentions are unavailable.",
+          href: view.error?.type === "code_map_gate_disabled" ? "#/capabilities" : "#/build",
+          linkLabel: view.error?.type === "code_map_gate_disabled" ? "Permissions" : "Build",
+        };
+        return;
+      }
+      mentionNotice = null;
+      mentionItems = (view.paths ?? []).map((entry) => ({
+        id: entry.path,
+        label: entry.path,
+        detail: entry.language,
+      }));
+    } catch {
+      if (request !== mentionRequest) return;
+      mentionItems = [];
+      mentionNotice = { text: "Could not reach the local runtime to look up files." };
+    }
+  }
+
+  function chooseMenuItem(item: MenuItem) {
+    if (menuKind === "slash") {
+      promptText = stripSlashToken(promptText);
+      menuKind = "none";
+      runSlashCommand(item.id);
+      return;
+    }
+    const mention = mentionAt(promptText, caret());
+    if (mention === null) return;
+    const applied = applyMention(promptText, mention, item.id);
+    promptText = applied.text;
+    menuKind = "none";
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(applied.caret, applied.caret);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  /** Run one command. Each of these is a control the owner already has. */
+  function runSlashCommand(name: string) {
+    switch (name) {
+      case "new": newConversation(); break;
+      case "model": modelPickerOpen = true; break;
+      case "attach": attachOpen = true; break;
+      case "context": contextOpen = true; void refreshContextUsage(); break;
+      case "approvals": window.location.hash = "#/approvals"; break;
+      case "export": if (sessionId !== null) exportOpen = true; break;
+      case "plan": planCollapsed = false; void loadPlan(); break;
+      // The same governed `POST /api/interrupts` the composer's Stop button and
+      // the top-bar STOP switch use. It does nothing when nothing is running,
+      // which is the honest outcome rather than a message about it.
+      case "stop": if (streaming) void stopRunningTurn(); break;
+      case "shortcuts": shortcutsOpen = true; break;
+    }
+  }
+
+  /**
+   * C14 — put a past prompt back in the composer to change and send again.
+   *
+   * The transcript is left exactly as it was. An assistant that edits what the
+   * owner asked, in place, is no longer a record of the conversation — so the
+   * original turn stays and the edited one arrives as a new turn beneath it.
+   */
+  function editPrompt(text: string) {
+    if (streaming) return;
+    promptText = text;
+    menuKind = "none";
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(text.length, text.length);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  /** Send the same prompt again, unchanged, as a new turn. */
+  function retryPrompt(text: string) {
+    if (streaming || text.trim() === "") return;
+    promptText = text;
+    void submit();
+  }
+
+  async function stopRunningTurn() {
+    if (sessionId === null) return;
+    try {
+      await api.interrupt({
+        session_id: sessionId,
+        all: true,
+        action_type: "cancel",
+        reason: "user stopped this turn (/stop)",
+      });
+      stopping = true;
+    } catch {
+      exportNotice = "Could not reach the local runtime to stop the turn.";
+    }
+  }
+
   function onKeydown(e: KeyboardEvent) {
+    // An open menu owns the arrows, Enter, Tab and Escape — otherwise Enter
+    // would send the half-typed `/mo` the owner is picking from.
+    if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        menuKind = "none";
+        return;
+      }
+      if (menuItems.length > 0) {
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+          menuActive = (menuActive + 1) % menuItems.length;
+          return;
+        }
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+          menuActive = (menuActive - 1 + menuItems.length) % menuItems.length;
+          return;
+        }
+        if (e.key === "Enter" || e.key === "Tab") {
+          e.preventDefault();
+          chooseMenuItem(menuItems[menuActive]);
+          return;
+        }
+      }
+    }
     // Enter submits; Shift+Enter inserts a newline.
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -830,6 +1030,44 @@
   });
 
   /**
+   * Decide what a refused continuation means for the turn that asked (BUG-196).
+   *
+   * The turn's own state is the authority, not the refusal: a turn that already
+   * carries a finished response *continued*, so whatever refused this attempt
+   * refused a duplicate. Only a turn still parked can honestly report a failure,
+   * and only for reasons that really are failures.
+   */
+  function applyResumeFailure(turn: ChatTurn, error: unknown, code: string | null) {
+    const finished = turn.response !== null && turn.response.status !== "needs_approval";
+    const outcome = classifyResumeFailure(code);
+    if (finished) {
+      // The answer is on screen. Saying "could not continue" beneath it is the
+      // single most misleading thing this surface can do.
+      turn.resumeState = null;
+      turn.resumeNote = null;
+      return;
+    }
+    if (outcome === "continued-elsewhere") {
+      turn.resumeState = "elsewhere";
+      turn.resumeNote = "Continued in another tab. Reload to see the result here.";
+      return;
+    }
+    if (outcome === "not-yet-resolved") {
+      // Still genuinely parked: no decision has reached the runtime yet. The
+      // waiting state it was already in is the truthful surface.
+      turn.resumeState = "waiting";
+      turn.resumeNote = null;
+      return;
+    }
+    turn.resumeState = "waiting";
+    turn.resumeNote = null;
+    turn.error =
+      error instanceof ApiError
+        ? `The turn could not continue (${code ?? error.status}).`
+        : "Could not reach the local runtime to continue the turn.";
+  }
+
+  /**
    * Stream the continuation of a parked turn into its own transcript row.
    *
    * The row is the one that parked, so the resumed work lands in the same
@@ -838,6 +1076,10 @@
    * server replays the same suspended state.
    */
   async function resumeParkedTurn(approvalId: string, outcomeStatus = "") {
+    // BUG-196 — tell the poller this id is ours before the request goes out, so
+    // it cannot start a second continuation of the same decision and turn its
+    // own loss into an error line under a perfectly good answer.
+    resumeWatcher?.claim(approvalId);
     const turn = turns.findLast((candidate) => candidate.response?.status === "needs_approval");
     if (turn === undefined || turn.streaming) return;
     turn.resumeState = "continuing";
@@ -867,18 +1109,7 @@
       });
     } catch (error) {
       const code = error instanceof ApiError ? error.reasonCode : null;
-      if (alreadyResumedElsewhere(code)) {
-        // Not a failure: the decision did continue the turn, in another tab.
-        turn.resumeState = "elsewhere";
-        turn.resumeNote = "Continued in another tab. Reload to see the result here.";
-      } else {
-        turn.resumeState = "waiting";
-        turn.resumeNote = null;
-        turn.error =
-          error instanceof ApiError
-            ? `The turn could not continue (${code ?? error.status}).`
-            : "Could not reach the local runtime to continue the turn.";
-      }
+      applyResumeFailure(turn, error, code);
     } finally {
       turn.streaming = false;
       streaming = false;
@@ -1038,7 +1269,10 @@
     {#each turns as turn (turn.id)}
       {@const answer = answerText(turn)}
       {@const toolRows = toolActivity(turn.events)}
-      {@const reasoning = collectReasoning(turn.events)}
+      <!-- BUG-215 — the stream first, because a turn that is running has the
+           freshest working; the stored text when there is no stream to read,
+           which is every re-opened turn. -->
+      {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
@@ -1047,6 +1281,17 @@
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
           </div>
+          <!-- C14 — the owner's own message, with the three actions that make
+               correcting a prompt cheap. Neither rewrites the transcript: an
+               edited or retried prompt is a new turn. -->
+          {#if turn.prompt !== ""}
+            <MessageActions
+              text={turn.prompt}
+              disabled={streaming}
+              onedit={editPrompt}
+              onretry={retryPrompt}
+            />
+          {/if}
           <!-- BUG-208 slice F. An emoji used to be appended here, to the
                *owner's own message*, labelled "Raiker reacted with …". It was
                computed from `turn.prompt` by regex — before the model had
@@ -1088,7 +1333,11 @@
                ends at the first *tool row* too — once the transcript is saying
                what Raiker is doing, "Working…" is the less specific of the two
                and has nothing left to add. -->
-          <ReasoningBlock text={reasoning} streaming={turn.streaming} />
+          <ReasoningBlock
+            text={reasoning}
+            streaming={turn.streaming}
+            notKeptChars={turn.reasoningChars ?? 0}
+          />
 
           <!-- BUG-206 slice D. Every call this turn made, in call order, one
                line each: what ran, what it acted on, and — when it did not run —
@@ -1292,22 +1541,38 @@
       <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
       <SkillLinkNotice text={promptText} />
 
+      {#if shortcutsOpen}
+        <ShortcutSheet surface="chat" onclose={() => (shortcutsOpen = false)} />
+      {/if}
+      {#if menuKind !== "none"}
+        <ComposerMenu
+          items={menuItems}
+          active={menuActive}
+          heading={menuKind === "slash" ? "Commands" : "Files in the code map"}
+          notice={menuKind === "mention" ? mentionNotice : null}
+          onchoose={chooseMenuItem}
+        />
+      {/if}
+
       <label for="prompt-input" class="sr-only">Prompt</label>
       <div class="composer-upper">
         <textarea
           id="prompt-input"
           class="prompt-input"
+          bind:this={promptEl}
           bind:value={promptText}
+          oninput={onPromptInput}
           onkeydown={onKeydown}
+          onblur={() => (menuKind = "none")}
           rows="2"
           placeholder="How can I help you today?"
-          title="Enter to send, Shift+Enter for a new line"
+          title="Enter to send, Shift+Enter for a new line, / for commands, @ to mention a file"
           spellcheck="true"
           lang="en-US"
           disabled={streaming}
         ></textarea>
         <div class="upper-controls">
-          <ModelPicker bind:profileId={modelProfile} bind:model {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)} disabled={streaming} />
+          <ModelPicker bind:profileId={modelProfile} bind:model bind:open={modelPickerOpen} {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)} disabled={streaming} />
           <ExecutionEnvironmentBadge />
           <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
           {#if reasoningEfforts.length > 0}
@@ -1400,7 +1665,13 @@
           </button>
         </div>
       </div>
-      <p class="shortcut-hint">Enter sends · Shift+Enter adds a line</p>
+      <p class="shortcut-hint">
+        Enter sends · Shift+Enter adds a line · <code>/</code> for commands ·
+        <code>@</code> to mention a file ·
+        <button type="button" class="hint-link" onclick={() => (shortcutsOpen = !shortcutsOpen)}>
+          all shortcuts
+        </button>
+      </p>
     </div>
   </form>
   {#if projectNotice}<p class="project-notice" role="status">{projectNotice}</p>{/if}
@@ -1807,6 +2078,22 @@
     line-height: 1.35;
     margin: 0;
     text-align: right;
+  }
+  .shortcut-hint code {
+    padding: 0 0.22rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+  }
+  .hint-link {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--accent);
+    font: inherit;
+    cursor: pointer;
+    text-decoration: underline;
   }
   /* One clean card: prompt on top, "+" and the per-turn controls at the bottom. */
   /* One composer surface, defined identically in Chat and Build so the two

@@ -62,6 +62,7 @@ that proves it, what is missing, and the concrete work.
 | B11 | BUILD | TIER 2 | Complete |
 | B12 | BUILD | TIER 2 | Done |
 | B17 | BUILD | TIER 2 | Done |
+| B19 | BUILD | TIER 3 | Done — composer commands, `@` mentions, keyboard map, message actions (FIXED-220) |
 | C1 | BUILD | TIER 0 | Done |
 | C2 | BUILD | TIER 0 | Complete |
 | C3 | BUILD | TIER 0 | Done |
@@ -70,6 +71,7 @@ that proves it, what is missing, and the concrete work.
 | C7 | BUILD | TIER 0 | Done |
 | C8 | BUILD | TIER 0 | Done |
 | C13 | BUILD | TIER 0 | Done |
+| C14 | CHAT | TIER 3 | Done — copy, edit-and-resend, retry (FIXED-220); branch-from-here remains open |
 
 ---
 
@@ -318,12 +320,22 @@ this turn" — the one control that makes an autonomous agent safe to let run.
 **Work:** a per-turn rewind in the transcript, restoring workspace and
 conversation state from the existing checkpoint manifest.
 
-**B19. Composer ergonomics.** No `@`-mention autocomplete for workspace files
-(attaching a path means typing it exactly), no slash commands, no keyboard
-shortcut map, no copy button on code blocks, no syntax highlighting in
-transcript code (deliberately deferred in FIXED-06), no message edit-and-resend,
-no regenerate. Each is small; together they are most of the felt difference in
-daily use.
+**B19. Composer ergonomics.** ✅ **Done — see FIXED-220.** Both composers share
+one module (`apps/web/src/lib/composerCommands.ts`), so the assistant composer
+and the coding-agent composer cannot drift into two different keyboards. Build
+carries `/plan-mode`, `/edit-mode`, `/auto-mode`, `/terminal` and `/repos`
+alongside the shared set; `@` completes workspace paths out of the code map the
+owner built, through `GET /api/code/map/paths` under the same `code_map_indexing`
+gate — never a filesystem scan, and paths only. Copy, **Edit** and **Retry** sit
+on the owner's own message, and an edit adds a turn rather than rewriting the
+transcript. The prompt box grows with what is written, and `/shortcuts` opens a
+per-surface keyboard map built from the bindings the handlers implement.
+
+Two pieces of the original entry are deliberately still open and are *not*
+claimed here: syntax highlighting in transcript code (deferred in FIXED-06 —
+per-code-block copy already ships) and owner-authored custom slash commands,
+which is a governance design task rather than a parser change, because an
+honest custom command has to state what authority it carries.
 
 **B20. Sandboxed execution environment.** 🟡 **Partly complete (2026-08-14).**
 The selected container command path is real rather than record-only: it requires
@@ -389,7 +401,10 @@ while it runs rather than waiting it out. **B9 has landed**: the agent can find
 where something is defined instead of guessing a search pattern, and the index
 follows the code as the agent changes it. B10 is the natural next step in the
 same tier — a code map says where a declaration *is*, an LSP says what refers to
-it. B13–B16 make the result reviewable. Everything else is depth. B20 is a *policy* decision before it
+it. **B19 has landed**, which is the tier-3 item that changes daily use most: the
+composer has commands, `@`-mention completion over the code map, a keyboard map,
+and per-message edit and retry. B13–B16 make the result reviewable and are the
+remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---
@@ -529,9 +544,20 @@ owner, so this is a genuine architectural decision rather than a missing screen 
 carries the same Stop and steer controls as Build's, on the same governed
 endpoint, and a stopped turn says so in the transcript instead of simply ending.
 
-**C14. No message-level actions.** No copy, no edit-and-resend, no regenerate,
-no branch-from-here, no per-message feedback. Editing a prompt and re-running is
-the most-used control in an assistant of this kind.
+**C14. No message-level actions.** ✅ **Done — see FIXED-220**, with one part
+deliberately left open. Copy, **Edit** and **Retry** are on the owner's own
+message in both Chat and Build. Edit puts the prompt back in the composer and
+**does not rewrite the transcript**: the original turn stays and the edited one
+is a new turn beneath it — ChatGPT and Claude replace the edited message and
+discard what followed it, which for a governed agent would mean a record that
+quietly changes what was asked.
+
+**Branch-from-here is still open**, and it is the one part of this entry that is
+not a composer change: it needs a conversation fork over the existing checkpoint
+manifest plus a surface that makes two branches of one conversation legible.
+Per-message feedback is not planned — there is no model to send it to, and a
+control that files a rating nowhere is the kind of surface this document exists
+to prevent.
 
 **C15. Attachments are one-way.** The composer uploads; the transcript cannot
 hand a file back (C1), preview one (C4), or let the owner drag one out.
@@ -556,10 +582,11 @@ threads a routine is advancing.
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
 leaving document output; C3 makes it feel like it knows the owner;
 C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
-the daily-use polish that determines whether any of it gets used; **C4, C6, C7
-and C13 have landed** — an answer says what it was drawn from and opens it at the
-passage used, Chat can look something up instead of guessing, and a turn can be
-stopped or steered while it runs. C2, C3(3), C10 and C12 are owner policy
+the daily-use polish that determines whether any of it gets used; **C4, C6, C7,
+C13 and C14 have landed** — an answer says what it was drawn from and opens it at
+the passage used, Chat can look something up instead of guessing, a turn can be
+stopped or steered while it runs, and a prompt can be corrected and re-run
+without retyping it. C2, C3(3), C10 and C12 are owner policy
 decisions before they are implementation tasks.
 
 ---

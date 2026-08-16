@@ -159,3 +159,35 @@ describe("nav model", () => {
     expect(NAV_ITEMS.some((item) => item.id === "model-setup")).toBe(false);
   });
 });
+
+// BUG-215 shipped a Privacy section and found the same defect this file already
+// guards for Models: the settings rail renders sections `HUB_TABS.settings` does
+// not list, so `#/settings?tab=web-access` silently opened General. A deep link
+// that lands on the wrong page looks exactly like one that works.
+describe("settings sections and their deep links", () => {
+  // The rail's own order, read from SettingsView. Kept here rather than imported
+  // because the point is that two independent lists agree.
+  const RAIL = [
+    "general",
+    "notification",
+    "personalisation",
+    "security",
+    "privacy",
+    "account",
+    "web-access",
+    "git-credential",
+    "runtime",
+  ];
+
+  it("gives every settings section a working deep link", () => {
+    expect(HUB_TABS.settings).toEqual(RAIL);
+    for (const section of RAIL) {
+      expect(tabFromHash(`#/settings?tab=${section}`)).toBe(section);
+    }
+  });
+
+  it("still falls back to General for a section that does not exist", () => {
+    expect(tabFromHash("#/settings?tab=nonsense")).toBe("general");
+    expect(tabFromHash("#/settings")).toBe("general");
+  });
+});

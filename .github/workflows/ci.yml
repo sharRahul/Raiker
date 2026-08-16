@@ -57,6 +57,17 @@ jobs:
         # BUG-46 tests exercise enabled and fail-closed behavior directly.
         env:
           RAIKER_SQLCIPHER_MEMORY_SECURITY: "off"
+      # BUG-205 — the job-wide variable above is what stopped CI from ever seeing
+      # a failure that landed on every contributor running the suite the
+      # documented way. `cipher_memory_security` is process-global and latches
+      # one way, so a test that reads it back depends on what ran before it; the
+      # variable meant nothing in the job ever turned it on, and the order
+      # dependency was invisible. This step runs the posture file the way a
+      # contributor does — same process, variable unset — so the gate sees what
+      # they see.
+      - name: Run the SQLCipher posture tests without the job-wide override
+        run: |
+          python -m pytest tests/test_sqlcipher_memory_security.py tests/test_memory_sqlcipher.py -vv
       - name: Run ruff
         run: |
           python -m ruff check .

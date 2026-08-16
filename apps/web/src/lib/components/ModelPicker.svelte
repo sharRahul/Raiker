@@ -17,6 +17,7 @@
     model = $bindable(""),
     disabled = false,
     onchosen,
+    open = $bindable(false),
   }: {
     profiles: ModelProfile[];
     selectedProfile?: ModelProfile | null;
@@ -31,9 +32,13 @@
      * preference, not a new one.
      */
     onchosen?: (profileId: string, model: string) => void;
+    /**
+     * B19 — bindable so `/model` in the composer can open the same menu the
+     * trigger opens. The slash command is a shortcut to this control, not a
+     * second way of choosing a model.
+     */
+    open?: boolean;
   } = $props();
-
-  let open = $state(false);
   let rootEl: HTMLDivElement | undefined = $state();
   const sameChoice = (left: ModelProfile, right: ModelProfile) =>
     left.profile_id === right.profile_id && left.model === right.model;

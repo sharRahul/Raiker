@@ -3083,3 +3083,26 @@ COMMAND_AUTHORITY_EVIDENCE_SQL = """
 ALTER TABLE command_runs ADD COLUMN authority_kind TEXT NOT NULL DEFAULT '';
 ALTER TABLE command_runs ADD COLUMN authority_id TEXT NOT NULL DEFAULT '';
 """
+
+
+# BUG-215 — a turn's own reasoning, and whether it was kept.
+#
+# Reasoning was a stream fact and only a stream fact: it filled a collapsed
+# block while the turn ran and was gone on reload, so a re-opened conversation
+# silently showed less than it had shown five minutes earlier.
+#
+# Two columns rather than one, because the honest surface needs two different
+# facts and only one of them is sensitive:
+#
+# * `reasoning_chars` — how much working the turn produced. Never null, never
+#   secret, always written. This is what lets a re-opened turn say "the working
+#   was not kept" instead of implying there never was any.
+# * `reasoning_text` — the working itself. NULL unless the owner turned
+#   retention on. The model's working can restate anything the prompt contained,
+#   so keeping it is the owner's decision, not a side effect of showing it live.
+TURN_REASONING_MIGRATION_ID = "RAIKER-2033-turn-reasoning"
+
+TURN_REASONING_SQL = """
+ALTER TABLE turns ADD COLUMN reasoning_text TEXT;
+ALTER TABLE turns ADD COLUMN reasoning_chars INTEGER NOT NULL DEFAULT 0;
+"""

@@ -21,6 +21,7 @@ import type {
   CommandReceiptView,
   CommandRunView,
   ComposerApprovalModeSettings,
+  CodeMapPaths,
   CodeMapStatus,
   CodeReposView,
   CredentialLifecycle,
@@ -128,6 +129,22 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Read the machine-readable reason out of a failed response.
+ *
+ * Every governed refusal answers with `{"detail": {"reason_code": …}}`, and that
+ * code is the only part of a failure the interface can reason about — the status
+ * number alone cannot tell a lost race from a broken turn. Shared by the plain
+ * and the streaming paths, because BUG-196 was exactly the streaming path
+ * throwing the code away and leaving the UI to guess from `409`.
+ */
+function reasonCodeFrom(body: unknown): string | null {
+  const envelope = body as { detail?: { reason_code?: unknown }; reason_code?: unknown } | null;
+  const detail = envelope?.detail ?? envelope;
+  const code = (detail as { reason_code?: unknown } | null)?.reason_code;
+  return typeof code === "string" ? code : null;
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (token !== null) {
@@ -137,9 +154,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
-      const body = await resp.json();
-      const detail = body?.detail ?? body;
-      reasonCode = detail?.reason_code ?? null;
+      reasonCode = reasonCodeFrom(await resp.json());
     } catch {
       /* non-JSON error response */
     }
@@ -1395,6 +1410,12 @@ export const api = {
   // metadata only; rebuilding fails closed with a reason when the owner has the
   // `code_map_indexing` capability turned off.
   codeMap: () => request<CodeMapStatus>("/api/code/map"),
+  // B19 — completion behind an `@`-mention in the composer. Paths and languages
+  // only, out of the index the owner built, behind the same capability gate.
+  codeMapPaths: (fragment: string, limit = 12) =>
+    request<CodeMapPaths>(
+      withQuery("/api/code/map/paths", { q: fragment, limit: String(limit) }),
+    ),
   rebuildCodeMap: () =>
     postJson<{
       ok: boolean;
@@ -1736,9 +1757,21 @@ async function streamSse(
     signal,
   });
   if (!resp.ok || resp.body === null) {
+    // BUG-196 — a refused stream carries the same `reason_code` a refused plain
+    // request does. Dropping it here is what made a lost resume race read as
+    // "The turn could not continue (409)" underneath a turn that had in fact
+    // completed: the surface had a status number and no way to tell why.
+    let reasonCode: string | null = null;
+    if (!resp.ok) {
+      try {
+        reasonCode = reasonCodeFrom(await resp.json());
+      } catch {
+        /* non-JSON error response */
+      }
+    }
     throw new ApiError(
       resp.status,
-      null,
+      reasonCode,
       `Stream failed: ${resp.status} ${url}`,
     );
   }

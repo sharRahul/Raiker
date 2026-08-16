@@ -40,6 +40,19 @@ def _load(ws: str | Path, principal_id: str) -> dict[str, Any]:
         return {}
 
 
+def load_reasoning_retention(ws: str | Path, principal_id: str) -> bool:
+    """Whether this owner has asked for the model's working to be kept (BUG-215).
+
+    **Off by default, and that default is the posture rather than an oversight.**
+    Reasoning can restate anything the prompt contained and it is the one part of
+    a turn an owner may specifically not want on disk, so it is retained only on
+    an explicit decision. Off does not mean the surface pretends there was none:
+    the turn still records *how much* working it produced, so a re-opened turn
+    says the working was not kept rather than showing nothing.
+    """
+    return SQLiteStore(ws).reasoning_retention_enabled(principal_id)
+
+
 def load_composer_approval_mode(ws: str | Path, principal_id: str) -> str:
     composer = _load(ws, principal_id).get("composer")
     if not isinstance(composer, dict):

@@ -102,6 +102,17 @@ export interface ResumeWatcher {
   /** Check right now — used the moment a turn parks, so a decision already
    *  recorded elsewhere is acted on immediately rather than up to a poll late. */
   checkNow: () => void;
+  /**
+   * Record that this surface has already started continuing `approvalId`, so
+   * the poll does not start it a second time.
+   *
+   * BUG-196 — the owner's own **Approve** click continues the turn directly,
+   * without going through the watcher. The poll knew nothing about that, saw the
+   * same resolved-and-unclaimed row, and raced its own surface: one attempt got
+   * the stream, the other got a 409, and the 409 was the only thing on screen.
+   * Claiming the id closes the race rather than reporting it politely.
+   */
+  claim: (approvalId: string) => void;
   stop: () => void;
 }
 
@@ -152,6 +163,7 @@ export function watchForResumableTurns(options: WatcherOptions): ResumeWatcher {
 
   return {
     checkNow: () => void check(),
+    claim: (approvalId: string) => started.add(approvalId),
     stop: () => {
       disposed = true;
       clearInterval(timer);
@@ -165,7 +177,43 @@ export function watchForResumableTurns(options: WatcherOptions): ResumeWatcher {
  *
  * That is a success, not a failure: the turn continued, just not here. It is
  * reported to the owner as such so a race never reads as a broken conversation.
+ *
+ * BUG-196 widened this beyond the single code it started with. A parked turn is
+ * claimed atomically (`suspended → resuming`) and finalised to `resumed`, so a
+ * losing client sees whichever of those two states it happened to read; and a
+ * row that has been reaped altogether is not a turn this surface can continue
+ * either. All three mean the same thing to the owner: this decision was already
+ * acted on.
  */
+const CONTINUED_ELSEWHERE = new Set([
+  // The claim was lost, or the row had already moved past `suspended`.
+  "suspended_turn_already_resumed",
+  // The parked row is gone. Nothing here can continue it, and nothing here
+  // failed to: it ran, and its state was cleaned up.
+  "suspended_turn_not_found",
+]);
+
 export function alreadyResumedElsewhere(reasonCode: string | null | undefined): boolean {
-  return reasonCode === "suspended_turn_already_resumed";
+  return reasonCode !== null && reasonCode !== undefined && CONTINUED_ELSEWHERE.has(reasonCode);
+}
+
+/**
+ * What a refused resume means for the surface that asked.
+ *
+ * Three outcomes, because a 409 is three different facts (BUG-196):
+ *
+ * - `continued-elsewhere` — the decision was already acted on. Say so, quietly.
+ * - `not-yet-resolved` — the approval has no recorded outcome *yet*. The turn is
+ *   genuinely still parked, so the honest surface is the waiting state it was
+ *   already in. The watcher will come back when there is something to continue;
+ *   an error line here would be a lie about a turn that is fine.
+ * - `failed` — everything else, including an unreadable parked state. This is a
+ *   real failure and must still say so, with its reason.
+ */
+export type ResumeFailure = "continued-elsewhere" | "not-yet-resolved" | "failed";
+
+export function classifyResumeFailure(reasonCode: string | null | undefined): ResumeFailure {
+  if (alreadyResumedElsewhere(reasonCode)) return "continued-elsewhere";
+  if (reasonCode === "approval_not_resolved") return "not-yet-resolved";
+  return "failed";
 }

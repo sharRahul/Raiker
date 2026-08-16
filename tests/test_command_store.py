@@ -14,6 +14,7 @@ from raiker.execution.commands import (
     CommandRequest,
     CommandState,
     CommandStore,
+    CommandStoreError,
     MaterialUnavailable,
     OutputQuotaExceeded,
     ReceiptImmutable,
@@ -289,3 +290,31 @@ def test_receipt_canonical_json_matches_digest() -> None:
     payload = json.loads(receipt.canonical_json)
     assert payload["run_id"] == "cmd_1"
     assert len(receipt.digest) == 64
+
+
+def test_the_backend_column_names_what_ran_the_command(store: CommandStore) -> None:
+    """BUG-197 — the row the owner browses must agree with the receipt.
+
+    Every ``command_runs`` row carried ``backend = ''`` while the receipt
+    recorded the real backend, so the immutable record knew what ran a command
+    and the list did not.
+    """
+    created = store.create(request())
+    assert created.backend == ""
+
+    store.record_backend("owner_a", "cmd_1", "native")
+
+    loaded = store.load("owner_a", "cmd_1")
+    assert loaded is not None and loaded.backend == "native"
+    assert store.list_runs("owner_a", session_id="sess_a")[0].backend == "native"
+
+
+def test_recording_a_backend_for_an_unknown_run_fails_closed(store: CommandStore) -> None:
+    with pytest.raises(CommandStoreError, match="command_run_not_found"):
+        store.record_backend("owner_a", "cmd_missing", "native")
+
+
+def test_a_backend_is_scoped_to_its_owner(store: CommandStore) -> None:
+    store.create(request())
+    with pytest.raises(CommandStoreError, match="command_run_not_found"):
+        store.record_backend("owner_b", "cmd_1", "native")

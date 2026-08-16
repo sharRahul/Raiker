@@ -361,6 +361,57 @@ class CodeMapService:
             "updated_at": str(index["updated_at"]) if index else None,
         }
 
+    def complete_paths(self, fragment: str, *, limit: int = 12) -> dict[str, Any]:
+        """Paths in the built map that match *fragment*, for `@`-mention completion.
+
+        B19 — attaching a file to a Build prompt meant typing its path exactly.
+        This is the completion behind `@`, and it is deliberately the *narrowest*
+        thing that makes that work:
+
+        * It reads the index the owner explicitly built, never the filesystem, so
+          it can name nothing the owner's own indexing run did not already accept.
+        * It answers the same capability gate and decision mode as every other
+          code-map read, so an owner who has not turned the map on gets a named
+          refusal rather than a listing of their tree.
+        * It returns **paths and languages only** — no symbols, no content, no
+          line numbers. A completion menu needs a name to insert; anything more
+          would make an autocomplete into a disclosure surface.
+
+        An unbuilt map answers `code_map_not_built` with the control that fixes
+        it, because an empty menu and a menu that cannot be filled look identical
+        and mean very different things.
+        """
+        refusal = self.governance_refusal("Workspace file mentions")
+        if refusal is not None:
+            return refusal
+        target = self.target()
+        index = self.store.load_code_map_index(self.owner, target.repo_path)
+        if index is None or int(index.get("file_count") or 0) == 0:
+            return _failed(
+                "code_map_not_built",
+                f"No code map for {target.label} yet. Build one from Build → Repositories.",
+            )
+        needle = (fragment or "").strip().casefold()
+        bounded = max(1, min(int(limit or 12), 50))
+        rows = self.store.list_code_map_files(self.owner, target.repo_path)
+        matches: list[dict[str, Any]] = []
+        for row in rows:
+            path = str(row.get("path") or "")
+            if not path:
+                continue
+            if needle and needle not in path.casefold():
+                continue
+            matches.append({"path": path, "language": str(row.get("language") or "")})
+            if len(matches) >= bounded:
+                break
+        return {
+            "status": "success",
+            "repository": target.label,
+            "fragment": fragment or "",
+            "count": len(matches),
+            "paths": matches,
+        }
+
     def search(self, query: str, *, limit: int = 10) -> dict[str, Any]:
         """Rank the map against *query* and return coordinates, never file content."""
         refusal = self.governance_refusal("Code map search")

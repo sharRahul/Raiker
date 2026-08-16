@@ -20,7 +20,7 @@
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { useHostedModel } from "./hosted-provider";
+import { setThinkingEffort, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -200,9 +200,11 @@ test("BUG-207 — the turn shows the model's own reasoning, not three canned sen
   // Reasoning is off unless the owner asks for it, so the control has to exist
   // for Anthropic at all — which it did not, because the composer only offered
   // an *effort* and Anthropic declares a *mode*.
-  const thinking = page.locator("form").filter({ has: prompt }).getByLabel("Thinking");
-  await expect(thinking).toBeVisible({ timeout: 60_000 });
-  await thinking.selectOption("adaptive");
+  const chatComposer = page.locator("form").filter({ has: prompt });
+  expect(
+    await setThinkingEffort(chatComposer, page, "adaptive"),
+    "Anthropic must publish a reasoning setting for this composer to offer one",
+  ).toBe(true);
 
   await prompt.fill(
     "What is 17 times 23? Work it out carefully, then give the number and stop.",
@@ -257,7 +259,7 @@ test("BUG-206 and BUG-207 — Build shows the same rows and the same reasoning",
   // every unscoped selector below would match both. `article.turn` is Build's
   // own transcript element; Chat's is a `div`.
   const composer = page.locator("form").filter({ has: prompt });
-  await composer.getByLabel("Thinking").selectOption("adaptive");
+  await setThinkingEffort(composer, page, "adaptive");
   await prompt.fill(
     "Read README.md with read_file, then say in one sentence what this project is. Then stop.",
   );
@@ -289,7 +291,7 @@ test("BUG-207 — a turn with reasoning off streams its answer with no block abo
   // is put back deliberately — an earlier test turned it on. Scoped to Chat's
   // own composer: Build stays mounted behind it and has one of its own.
   const composer = page.locator("form").filter({ has: prompt });
-  await composer.getByLabel("Thinking").selectOption("");
+  await setThinkingEffort(composer, page, "");
 
   await prompt.fill("Reply with exactly: NO REASONING");
   await page.getByRole("button", { name: "Send" }).click();

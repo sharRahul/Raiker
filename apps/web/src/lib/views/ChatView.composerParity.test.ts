@@ -104,12 +104,15 @@ describe("ChatView composer parity", () => {
     // Trigger, provider header, and model row all identify Anthropic.
     expect(screen.getAllByRole("img", { name: "Anthropic logo" })).toHaveLength(3);
     expect(screen.getByRole("menuitemradio", { name: /Claude Sonnet/ })).toBeInTheDocument();
-    const effort = screen.getByLabelText("Thinking");
-    expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Thinking: default",
-      "Thinking: low",
-      "Thinking: high",
-    ]);
+    // The effort lives inside the model menu, because it is the model's own
+    // setting; the levels are the exact ones this model publishes.
+    await fireEvent.click(screen.getByRole("button", { name: /^Effort/ }));
+    const effortSection = screen.getByRole("group", { name: "Effort" });
+    expect(
+      within(effortSection)
+        .getAllByRole("menuitemradio")
+        .map((option) => option.textContent?.trim()),
+    ).toEqual(["Low", "High"]);
   });
 
   it("shows Not selected and blocks the prompt when no model is active", async () => {
@@ -123,7 +126,9 @@ describe("ChatView composer parity", () => {
     render(ChatView, { projects });
 
     await waitFor(() => expect(screen.getByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument());
-    expect(screen.queryByLabelText("Thinking")).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Not selected" }));
+    expect(screen.queryByRole("group", { name: "Effort" })).not.toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Not selected" }));
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Hello" } });
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
     expect(screen.getByText("No model is set up.")).toBeInTheDocument();
@@ -140,8 +145,17 @@ describe("ChatView composer parity", () => {
     });
     render(ChatView, { projects });
 
-    await waitFor(() => expect(screen.getByLabelText("Thinking")).toBeInTheDocument());
-    await fireEvent.change(screen.getByLabelText("Thinking"), { target: { value: "high" } });
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /^Model for this turn:/ })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /^Model for this turn:/ }));
+    await fireEvent.click(screen.getByRole("button", { name: /^Effort/ }));
+    await fireEvent.click(
+      within(screen.getByRole("group", { name: "Effort" })).getByRole("menuitemradio", {
+        name: "High",
+      }),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /^Model for this turn:/ }));
     await fireEvent.input(screen.getByLabelText("Prompt"), { target: { value: "Reason" } });
     await fireEvent.click(screen.getByRole("button", { name: "Send" }));
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());

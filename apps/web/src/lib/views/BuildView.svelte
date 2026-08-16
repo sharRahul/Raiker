@@ -56,7 +56,6 @@
     TurnSourceView,
   } from "../apiTypes";
   import {
-    BUILD_MODES,
     BUILD_WRITE_CAPABILITIES,
     buildMode,
     DEFAULT_BUILD_MODE,
@@ -74,6 +73,8 @@
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
+  import SurfaceToggle from "../components/SurfaceToggle.svelte";
+  import BuildModePicker from "../components/BuildModePicker.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
@@ -1339,25 +1340,6 @@
             lang="en-US"
             disabled={streaming}
           ></textarea>
-          <div class="upper-controls">
-            <ModelPicker bind:profileId={modelProfile} bind:model bind:open={modelPickerOpen} {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)} disabled={streaming} />
-            <ExecutionEnvironmentBadge />
-            <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
-            {#if reasoningEfforts.length > 0}
-              <select
-                class="bar-select"
-                bind:value={reasoningEffort}
-                disabled={streaming}
-                aria-label="Thinking"
-                title="Ask this model to think before it answers. Default asks for nothing."
-              >
-                <option value="">Thinking: default</option>
-                {#each reasoningEfforts as effort (effort)}
-                  <option value={effort}>Thinking: {effort}</option>
-                {/each}
-              </select>
-            {/if}
-          </div>
         </div>
 
         <!-- BUG-70 — what this mode does, stated where it is chosen. The chip no
@@ -1388,20 +1370,13 @@
         <div class="composer-bar">
           <div class="bar-left">
             <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
-            <div class="mode-picker" role="group" aria-label="How much Raiker may do">
-              {#each BUILD_MODES as option (option.id)}
-                <button
-                  type="button"
-                  class="mode-option"
-                  aria-pressed={mode === option.id}
-                  disabled={streaming}
-                  title={option.summary}
-                  onclick={() => setMode(option.id)}
-                >
-                  {option.label}
-                </button>
-              {/each}
-            </div>
+            <SurfaceToggle
+              surface="build"
+              draft={promptText}
+              attachments={() => attachStore.take()}
+              disabled={streaming}
+            />
+            <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
             <button
               type="button"
               class="mode-help"
@@ -1435,9 +1410,22 @@
               </label>
             {/if}
             <ApprovalModeControl />
+            <ExecutionEnvironmentBadge />
+            <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
           </div>
 
           <div class="bar-right">
+            <ModelPicker
+              bind:profileId={modelProfile}
+              bind:model
+              bind:open={modelPickerOpen}
+              bind:effort={reasoningEffort}
+              efforts={reasoningEfforts}
+              {profiles}
+              {selectedProfile}
+              onchosen={(profileId, chosen) => void rememberSurfaceModel("build", profileId, chosen)}
+              disabled={streaming}
+            />
             <div class="context-wrap" bind:this={contextControlEl}>
               <button
                 type="button"
@@ -1884,12 +1872,6 @@
     flex: 1;
     min-width: 0;
   }
-  .upper-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.3rem;
-  }
   .composer-card textarea {
     width: 100%;
     border: none;
@@ -1966,37 +1948,6 @@
     gap: 0.35rem;
     flex-wrap: wrap;
     min-width: 0;
-  }
-  .mode-picker {
-    display: inline-flex;
-    background: var(--sunken);
-    border-radius: var(--r-pill);
-    padding: 0.15rem;
-    gap: 0.15rem;
-  }
-  .mode-option {
-    border: none;
-    background: transparent;
-    color: var(--text-2);
-    font: inherit;
-    font-size: 0.78rem;
-    font-weight: 650;
-    padding: 0.25rem 0.75rem;
-    border-radius: var(--r-pill);
-    cursor: pointer;
-  }
-  .mode-option[aria-pressed="true"] {
-    background: var(--surface);
-    color: var(--accent);
-    box-shadow: var(--shadow-1);
-  }
-  .mode-option:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-  .mode-option:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 1px;
   }
   .bar-right {
     margin-left: auto;
@@ -2096,20 +2047,10 @@
     .composer-upper {
       flex-direction: column;
     }
-    .upper-controls {
-      flex-direction: row;
-      align-items: center;
-      flex-wrap: wrap;
-    }
   }
   @media (max-width: 30rem) {
     .composer-upper {
       flex-direction: column;
-    }
-    .upper-controls {
-      flex-direction: row;
-      align-items: center;
-      flex-wrap: wrap;
     }
   }
 </style>

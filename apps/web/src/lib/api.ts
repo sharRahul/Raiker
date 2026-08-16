@@ -16,6 +16,9 @@ import type {
   CapabilityGate,
   ContainedSubject,
   ContextUsage,
+  ConversationBranch,
+  ConversationBranchOrigin,
+  ConversationBranchPlan,
   Checkpoint,
   CommandChunkView,
   CommandReceiptView,
@@ -1132,6 +1135,25 @@ export const api = {
   checkpointRestorePlan: (id: string) =>
     request<RestorePlan>(
       `/api/checkpoints/${encodeURIComponent(id)}/restore-plan`,
+    ),
+  // ── Branch from here (GAP-CHAT C14) ──────────────────────────────────
+  // A branch is a *second* conversation seeded from a checkpoint's state summary
+  // and memory candidates. It rewrites nothing: the original conversation keeps
+  // every turn it had, which is why — unlike a restore — it writes no workspace
+  // file and needs no approval. `branchOrigin` answers "is this a branch, and of
+  // what", and reports a root conversation as such rather than as an error.
+  conversationBranchPlan: (checkpointId: string) =>
+    request<ConversationBranchPlan>(
+      `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch-plan`,
+    ),
+  branchConversation: (checkpointId: string, title = "") =>
+    postJson<ConversationBranch>(
+      `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch`,
+      { title },
+    ),
+  conversationBranchOrigin: (sessionId: string) =>
+    request<ConversationBranchOrigin>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/branch-origin`,
     ),
   // ── Installed skills (Extensions → Skills) ───────────────────────────
   // A skill is instruction text the owner installs; it grants no capability and

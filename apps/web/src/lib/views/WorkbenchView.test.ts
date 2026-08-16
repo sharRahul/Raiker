@@ -1,7 +1,8 @@
-// The Workbench is the default screen and the start of the common journey. Its
-// composer must carry its own scope (session, project, model) and must hand the
-// prompt to the one governed send path rather than calling the API itself.
-import { render, screen, waitFor } from "@testing-library/svelte";
+// The Workbench is the default screen. It is a board, not a composer: it must
+// answer "what is Raiker doing right now" from the tasks the backend already
+// owns, classify them the way the scheduler does, and never become a second send
+// path for a prompt.
+import { render, screen, waitFor, within } from "@testing-library/svelte";
 import { fireEvent } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import WorkbenchView from "./WorkbenchView.svelte";
@@ -25,23 +26,43 @@ const SESSION = {
   tags: [],
 };
 
-const LOCAL_PROFILE = {
-  profile_id: "local-default",
-  provider: "ollama",
-  model: "qwen2.5",
-  default_state: "enabled",
-  local_only: true,
-  requires_network: false,
-  endpoint_kind: "loopback",
-  requires_egress_policy: false,
-  requires_budget_policy: false,
-  runtime_gate: null,
-  off_machine: false,
-  selected: true,
-  configured: true,
-  ready: true,
-  readiness_state: "ready",
-};
+function task(partial: Record<string, unknown>) {
+  return {
+    task_id: "task_1",
+    session_id: "sess_inbox_prin_owner",
+    status: "running",
+    title: "A task",
+    objective: "Do the thing",
+    current_step: null,
+    progress_percent: null,
+    created_at: "2026-07-24T00:00:00Z",
+    updated_at: "2026-07-24T00:05:00Z",
+    completed_at: null,
+    summary: null,
+    recurrence: null,
+    scheduled_at: null,
+    project_id: null,
+    ...partial,
+  };
+}
+
+// The three facts the board separates, in the shapes the scheduler produces: a
+// run in flight, a repeating task re-armed as `queued` with its next slot, and a
+// one-off future run.
+const RUNNING = task({ task_id: "t_run", title: "Reindex the code map", status: "running", current_step: "Walking src/" });
+const AGENT = task({
+  task_id: "t_agent",
+  title: "Watch the release branch",
+  status: "queued",
+  recurrence: "hourly",
+  scheduled_at: "2099-01-01T00:00:00Z",
+});
+const SCHEDULED = task({
+  task_id: "t_sched",
+  title: "Post the weekly summary",
+  status: "queued",
+  scheduled_at: "2099-01-01T00:00:00Z",
+});
 
 function routes(overrides: Record<string, unknown> = {}) {
   return {
@@ -65,30 +86,119 @@ function routes(overrides: Record<string, unknown> = {}) {
       ],
       active_project_id: "proj_1",
     },
-    "GET /api/models": { profiles: [LOCAL_PROFILE] },
     ...overrides,
   };
 }
 
 describe("WorkbenchView", () => {
-  it("preserves the draft and disables every handoff when the selected model is unready", async () => {
-    stubFetch(routes({
-      "GET /api/models": { profiles: [{ ...LOCAL_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." }] },
-    }));
+  it("has no composer at all — starting work is a link to the surface that owns one", async () => {
+    stubFetch(routes());
     render(WorkbenchView);
-    const draft = screen.getByLabelText(/what would you like raiker to do/i);
-    await fireEvent.input(draft, { target: { value: "keep this draft" } });
-    await waitFor(() => expect(screen.getByRole("button", { name: /start build/i })).toBeDisabled());
-    expect(await screen.findByText("Ollama is not reachable.")).toBeInTheDocument();
-    expect(draft).toHaveValue("keep this draft");
+
+    await waitFor(() => expect(screen.getByText("Running now")).toBeInTheDocument());
+    // The removed box: a prompt field, its mode tabs, and its send control.
+    expect(screen.queryByLabelText(/what would you like raiker to do/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Build" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start build/i })).not.toBeInTheDocument();
+    const start = screen.getByRole("navigation", { name: "Start work" });
+    expect(within(start).getByRole("link", { name: /start a conversation/i })).toHaveAttribute(
+      "href",
+      "#/new-chat",
+    );
+    expect(within(start).getByRole("link", { name: /start a build/i })).toHaveAttribute("href", "#/build");
+    expect(within(start).getByRole("link", { name: /plan a task or agent/i })).toHaveAttribute("href", "#/tasks");
+    // The active project is named on the board rather than picked on it.
+    expect(within(start).getByText("Quarterly note")).toBeInTheDocument();
   });
+
+  it("separates a run in flight from a standing agent from a scheduled run", async () => {
+    stubFetch(routes({ "GET /api/tasks": [RUNNING, AGENT, SCHEDULED] }));
+    render(WorkbenchView);
+
+    const running = await screen.findByRole("region", { name: "Running now" });
+    const agents = screen.getByRole("region", { name: "Standing agents" });
+    const schedules = screen.getByRole("region", { name: "Scheduled runs" });
+
+    expect(within(running).getByText("Reindex the code map")).toBeInTheDocument();
+    expect(within(running).getByText("Walking src/")).toBeInTheDocument();
+    // An armed task is `queued` with a future slot. Listing it as running was the
+    // overcount this classification exists to prevent.
+    expect(within(running).queryByText("Watch the release branch")).not.toBeInTheDocument();
+    expect(within(running).queryByText("Post the weekly summary")).not.toBeInTheDocument();
+
+    expect(within(agents).getByText("Watch the release branch")).toBeInTheDocument();
+    expect(within(agents).getByText("Runs hourly")).toBeInTheDocument();
+    expect(within(agents).queryByText("Post the weekly summary")).not.toBeInTheDocument();
+
+    expect(within(schedules).getByText("Post the weekly summary")).toBeInTheDocument();
+    expect(within(schedules).queryByText("Watch the release branch")).not.toBeInTheDocument();
+  });
+
+  it("says each group is empty rather than leaving a blank card", async () => {
+    stubFetch(routes());
+    render(WorkbenchView);
+
+    expect(await screen.findByText("Nothing is running.")).toBeInTheDocument();
+    expect(screen.getByText("No agent is standing.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing is scheduled.")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Nothing is running, standing, or scheduled/),
+    ).toBeInTheDocument();
+  });
+
+  it("stops a run at its safe boundary through the governed interrupt", async () => {
+    const fetchMock = stubFetch(
+      routes({
+        "GET /api/tasks": [RUNNING],
+        "POST /api/interrupts": { applied: [{ task_id: "t_run", result: "cancelling" }], safe_boundary: true },
+      }),
+    );
+    render(WorkbenchView);
+
+    const running = await screen.findByRole("region", { name: "Running now" });
+    await fireEvent.click(within(running).getByRole("button", { name: "Stop" }));
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/interrupts")),
+      ).toBe(true),
+    );
+    const body = JSON.parse(
+      String(
+        fetchMock.mock.calls.find(([url]) => String(url).endsWith("/api/interrupts"))?.[1]?.body,
+      ),
+    );
+    expect(body).toMatchObject({ task_id: "t_run", action_type: "cancel" });
+    expect(await screen.findByText(/stop at its next safe boundary/)).toBeInTheDocument();
+  });
+
+  it("names the decision a blocked run is waiting on and links to it", async () => {
+    stubFetch(
+      routes({
+        "GET /api/tasks": [task({ task_id: "t_block", title: "Apply the patch", status: "waiting_for_approval" })],
+      }),
+    );
+    render(WorkbenchView);
+
+    const running = await screen.findByRole("region", { name: "Running now" });
+    expect(
+      within(running).getByText("Blocked on a decision you have not made yet."),
+    ).toBeInTheDocument();
+    expect(within(running).getByRole("link", { name: "Decide" })).toHaveAttribute(
+      "href",
+      "#/approvals",
+    );
+  });
+
   it("counts each actionable runtime configuration gap once", async () => {
-    stubFetch(routes({
-      "GET /api/diagnostics": {
-        missing_config: ["No model profile is selected.", "No runtime mode is active."],
-        production_ready_local_single_user_runtime: false,
-      },
-    }));
+    stubFetch(
+      routes({
+        "GET /api/diagnostics": {
+          missing_config: ["No model profile is selected.", "No runtime mode is active."],
+          production_ready_local_single_user_runtime: false,
+        },
+      }),
+    );
     render(WorkbenchView);
 
     const tile = (await screen.findByText("Runtime issues")).closest("article");
@@ -99,156 +209,22 @@ describe("WorkbenchView", () => {
   it("shows a loading state for live status before it is known", async () => {
     stubFetchPending();
     render(WorkbenchView);
-    expect(await screen.findByText(/loading status/i)).toBeInTheDocument();
+    expect(await screen.findAllByText(/loading status/i)).not.toHaveLength(0);
   });
 
   it("says status is unavailable rather than reporting zeroes", async () => {
     stubFetch({});
     render(WorkbenchView);
-    const alert = await screen.findByText(/workbench status is unavailable/i);
-    expect(alert).toHaveTextContent(/workbench status is unavailable/i);
-    expect(screen.getByText(/no work was started or changed/i)).toBeInTheDocument();
+    expect(await screen.findByText(/workbench status is unavailable/i)).toBeInTheDocument();
+    expect(screen.getAllByText(/no work was started or changed/i)).not.toHaveLength(0);
   });
 
-  it("names the project scope and the model that will serve the turn", async () => {
-    stubFetch(routes());
-    render(WorkbenchView);
-
-    await waitFor(() => expect(screen.getByText("Quarterly note")).toBeInTheDocument());
-    expect(await screen.findByRole("button", { name: /model for this turn: qwen 2.5/i })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Build" })).toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Run work" })).not.toBeInTheDocument();
-  });
-
-  it("labels a hosted model as leaving the machine", async () => {
-    stubFetch(
-      routes({
-        "GET /api/models": {
-          profiles: [
-            { ...LOCAL_PROFILE, profile_id: "hosted", provider: "anthropic", off_machine: true },
-          ],
-        },
-      }),
-    );
-    render(WorkbenchView);
-    await fireEvent.click(await screen.findByRole("button", { name: /model for this turn: qwen/i }));
-    expect(screen.getByRole("group", { name: /anthropic models/i })).toBeInTheDocument();
-  });
-
-  it("says no model is selected instead of implying one is ready", async () => {
-    stubFetch(routes({ "GET /api/models": { profiles: [] } }));
-    render(WorkbenchView);
-    await waitFor(() =>
-      expect(screen.getByText(/no model is set up/i)).toBeInTheDocument(),
-    );
-  });
-
-  it("hands the prompt to the governed chat send path instead of posting it", async () => {
-    vi.useFakeTimers();
+  it("offers only conversations to resume, never a task's own server-owned session", async () => {
     const fetchMock = stubFetch(routes());
-    const composed = vi.fn();
-    window.addEventListener("raiker:compose", composed);
     render(WorkbenchView);
 
-    await vi.waitFor(() => expect(screen.getByLabelText(/what would you like raiker to do/i)).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("tab", { name: "Chat" }));
-    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
-      target: { value: "Summarise the open approvals" },
-    });
-    await vi.waitFor(() => expect(screen.getByRole("button", { name: /start conversation/i })).toBeEnabled());
-    await fireEvent.click(screen.getByRole("button", { name: /start conversation/i }));
-    vi.runAllTimers();
-
-    expect(composed).toHaveBeenCalledTimes(1);
-    const detail = (composed.mock.calls[0][0] as CustomEvent).detail;
-    expect(detail.text).toBe("Summarise the open approvals");
-    expect(detail.sessionId).toBeNull();
-    // The Workbench must not be a second send path.
-    expect(
-      fetchMock.mock.calls.some(([input]) => String(input).includes("/api/prompts")),
-    ).toBe(false);
-    window.removeEventListener("raiker:compose", composed);
-  });
-
-  it("continues the chosen conversation when one is selected", async () => {
-    vi.useFakeTimers();
-    stubFetch(routes());
-    const composed = vi.fn();
-    window.addEventListener("raiker:compose", composed);
-    render(WorkbenchView);
-    await fireEvent.click(await screen.findByRole("tab", { name: "Chat" }));
-
-    // Wait for the saved conversation to become a real option — selecting a
-    // value a <select> does not yet offer would silently leave it empty.
-    await vi.waitFor(() =>
-      expect(screen.getByRole("option", { name: SESSION.title })).toBeInTheDocument(),
-    );
-    await fireEvent.change(screen.getByLabelText(/conversation to continue/i), {
-      target: { value: "sess_1" },
-    });
-    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), {
-      target: { value: "Continue from here" },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: /start conversation/i }));
-    vi.runAllTimers();
-
-    expect((composed.mock.calls[0][0] as CustomEvent).detail.sessionId).toBe("sess_1");
-    window.removeEventListener("raiker:compose", composed);
-  });
-
-  it("hands Build its own exact provider and model choice", async () => {
-    vi.useFakeTimers();
-    stubFetch(routes({
-      "GET /api/models": {
-        profiles: [LOCAL_PROFILE],
-        chat_profiles: [
-          LOCAL_PROFILE,
-          { ...LOCAL_PROFILE, profile_id: "anthropic", provider: "anthropic", model: "opus", selected: false },
-        ],
-      },
-    }));
-    const composed = vi.fn();
-    window.addEventListener("raiker:build-compose", composed);
-    render(WorkbenchView);
-
-    await fireEvent.click(await screen.findByRole("button", { name: /model for this turn: qwen/i }));
-    await fireEvent.click(screen.getByRole("menuitemradio", { name: /opus/i }));
-    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), { target: { value: "Build the release" } });
-    await fireEvent.click(screen.getByRole("button", { name: /start build/i }));
-    vi.runAllTimers();
-
-    expect((composed.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
-      profileId: "anthropic",
-      model: "opus",
-    });
-    window.removeEventListener("raiker:build-compose", composed);
-  });
-
-  it("hands Schedule its own exact provider and model choice", async () => {
-    vi.useFakeTimers();
-    stubFetch(routes());
-    const composed = vi.fn();
-    window.addEventListener("raiker:task-compose", composed);
-    render(WorkbenchView);
-    await fireEvent.click(await screen.findByRole("tab", { name: "Schedule" }));
-    expect(await screen.findByRole("button", { name: /model for this turn: qwen/i })).toBeInTheDocument();
-    await fireEvent.input(screen.getByLabelText(/what would you like raiker to do/i), { target: { value: "Run later" } });
-    await fireEvent.input(screen.getByLabelText(/scheduled start time/i), { target: { value: "2026-08-03T09:30" } });
-    await fireEvent.click(screen.getByRole("button", { name: /review schedule/i }));
-    vi.runAllTimers();
-    expect((composed.mock.calls[0][0] as CustomEvent).detail).toMatchObject({
-      cadence: "once",
-      profileId: LOCAL_PROFILE.profile_id,
-      model: LOCAL_PROFILE.model,
-    });
-    window.removeEventListener("raiker:task-compose", composed);
-  });
-
-  it("keeps the start control disabled until something is written", async () => {
-    stubFetch(routes());
-    render(WorkbenchView);
-    await waitFor(() =>
-      expect(screen.getByRole("button", { name: /start build/i })).toBeDisabled(),
-    );
+    await waitFor(() => expect(screen.getByText(SESSION.title)).toBeInTheDocument());
+    const sessionCall = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/sessions"));
+    expect(String(sessionCall?.[0])).toContain("origin=chat");
   });
 });

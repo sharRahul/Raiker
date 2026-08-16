@@ -51,4 +51,27 @@ describe("ModelSetupDialog", () => {
     expect(trigger).toHaveFocus();
     trigger.remove();
   });
+
+  it("does not claim a check happened when there is no model to check", async () => {
+    // The dialog is most often opened from a composer whose readiness is the
+    // "no model at all" fallback, which carries no profile and no model. The
+    // check then has nothing to contact — and used to report "Check complete"
+    // regardless, so the one control on the screen claimed to have proven a model
+    // it had never reached.
+    render(ModelSetupDialog);
+    openModelSetup(null, {
+      ...missing,
+      profile_id: "",
+      model: "",
+      state: "not_configured",
+      summary: "No model is set up.",
+    });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Check again" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("status")).toHaveTextContent("There is no model to check yet."),
+    );
+    expect(screen.getByRole("status")).not.toHaveTextContent("Check complete");
+  });
 });

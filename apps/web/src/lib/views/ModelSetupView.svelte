@@ -2,9 +2,8 @@
   import { onMount } from "svelte";
   import { api } from "../api";
   import type { ModelProfile, SetupState } from "../apiTypes";
-  import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
-  import { setupChoiceLabel } from "../modelReadinessLabels";
+  import ProviderMatrix from "../components/ProviderMatrix.svelte";
 
   const stages = ["account", "model", "privacy", "backup", "finish"] as const;
   const labels = { account: "Account", model: "Model", privacy: "Privacy", backup: "Backup", finish: "Finish" };
@@ -13,6 +12,8 @@
   let backupTarget = $state("");
   let busy = $state(false);
   let error = $state("");
+  /** The model this screen just pinned, so the stage can say so before moving on. */
+  let picked = $state<string | null>(null);
 
   function body(update: Partial<SetupState>) {
     if (!setup) throw new Error("setup_not_loaded");
@@ -46,18 +47,38 @@
     finally { busy = false; }
   }
 
-  async function chooseModel(profile: ModelProfile) {
+  async function loadProfiles() {
+    try {
+      ({ profiles } = await api.models());
+    } catch {
+      // The rows keep the snapshot they already have rather than emptying: a
+      // failed refresh is not evidence that a provider went away.
+    }
+  }
+
+  /**
+   * A row pinned a model. The wizard records the owner's choice on the setup
+   * state, but does not jump the stage — the owner may want to connect a second
+   * provider before moving on, and a screen that navigates itself out from under
+   * a half-finished job is the reason the old one-shot list was frustrating.
+   */
+  async function chooseModel(profileId: string, model: string) {
+    picked = modelName(model);
     await save({
       status: "in_progress",
-      stage: "privacy",
-      selected_profile_id: profile.profile_id,
-      selected_model: profile.model,
+      selected_profile_id: profileId,
+      selected_model: model,
       model_deferred: false,
     });
+    await loadProfiles();
   }
 
   async function deferModel() {
-    await save({ status: "in_progress", stage: "privacy", model_deferred: true });
+    await save({
+      status: "in_progress",
+      stage: "privacy",
+      model_deferred: picked === null,
+    });
   }
 
   async function choosePrivacy(privacy_mode: "local_first" | "balanced") {
@@ -108,21 +129,20 @@
       <header>
         <p class="eyebrow">02 · Model connection</p>
         <h2 id="setup-title">Choose where Raiker thinks</h2>
-        <p>Pick a model, or decide later. Nothing here has been contacted yet — Raiker runs a readiness check against the exact model before any model-backed work, and each choice says what is known about it so far.</p>
+        <p>One row per provider. The three on this device are asked what they are serving; the rest take an API key and then answer with their own catalogue. Nothing is contacted until you ask a row to, and Raiker still runs a readiness check against the exact model before any model-backed work.</p>
       </header>
-      {#if profiles.length}
-        <div class="choice-list">
-          {#each profiles as profile (`${profile.profile_id}-${profile.model}`)}
-            <button disabled={busy} onclick={() => chooseModel(profile)}>
-              <strong>{providerName(profile.provider)} · {modelName(profile.model)}</strong>
-              <span class:choice-ready={profile.ready === true}>{setupChoiceLabel(profile)}</span>
-            </button>
-          {/each}
-        </div>
-      {:else}
-        <div class="empty-choice"><strong>No model connection yet</strong><span>Add one in Models now, or continue and return later.</span></div>
+      <ProviderMatrix
+        {profiles}
+        onchanged={() => void loadProfiles()}
+        onselected={(profileId, model) => void chooseModel(profileId, model)}
+      />
+      {#if picked !== null}
+        <p class="picked" role="status">{picked} is selected. Continue to set your privacy boundary.</p>
       {/if}
-      <div class="actions"><a class="quiet" href="#/models">Open model connections</a><button class="primary" disabled={busy} onclick={deferModel}>Decide later</button></div>
+      <div class="actions">
+        <a class="quiet" href="#/models">Open the full Models page</a>
+        <button class="primary" disabled={busy} onclick={deferModel}>{picked === null ? "Decide later" : "Continue"}</button>
+      </div>
     {:else if setup.stage === "privacy"}
       <header>
         <p class="eyebrow">03 · Privacy boundary</p>
@@ -170,11 +190,9 @@
   .setup-content { min-width: 0; display: grid; align-content: start; gap: var(--space-4); }
   header { max-width: 45rem; } .eyebrow { margin: 0 0 .4rem; color: var(--accent); font-family: var(--font-mono); font-size: .7rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
   h2 { margin: 0; color: var(--text-1); font-family: var(--font-serif); font-size: clamp(1.7rem, 4vw, 2.6rem); } header p:last-child { color: var(--text-2); line-height: 1.6; }
-  .choice-list { display: grid; gap: var(--space-2); } .choice-list button, .empty-choice { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
+  .choice-list { display: grid; gap: var(--space-2); } .choice-list button { display: grid; gap: .3rem; padding: var(--space-4); border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); text-align: left; }
   .choice-list button { cursor: pointer; } .choice-list button:hover { border-color: var(--accent-border); background: var(--accent-soft); } strong { color: var(--text-1); } span { font-size: .82rem; line-height: 1.45; }
-  /* Only a passed readiness check earns the affirmative colour, so the one
-     backend that has been proven to answer is the one that looks it. */
-  .choice-ready { color: var(--ok-text, var(--text-1)); font-weight: 600; }
+  .picked { margin: 0; color: var(--accent); font-size: .85rem; font-weight: 650; }
   label { display: grid; gap: var(--space-2); max-width: 36rem; color: var(--text-1); } input { padding: .75rem .9rem; border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--surface); color: var(--text-1); }
   .summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); margin: 0; } .summary div { padding: var(--space-3); border: 1px solid var(--neutral-border); border-radius: var(--r-md); background: var(--bg-2); } dt { color: var(--text-3); font-family: var(--font-mono); font-size: .7rem; text-transform: uppercase; } dd { margin: .35rem 0 0; color: var(--text-1); }
   .actions { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; } .quiet, .primary { width: max-content; border-radius: var(--r-pill); padding: .55rem .9rem; font: inherit; font-size: .8rem; font-weight: 750; cursor: pointer; text-decoration: none; }

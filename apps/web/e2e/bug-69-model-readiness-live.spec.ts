@@ -226,15 +226,15 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   }
 
   // The gate holds before any provider is reachable, whichever keys this run has.
-  await page.goto(`${BASE}/#/workbench`);
-  await page
-    .getByLabel(/What would you like Raiker to do/)
-    .fill("Draft a short project brief");
-  await expect(
-    page.getByRole("button", { name: "Start build" }),
-  ).toBeDisabled();
+  // It is asserted in Chat rather than on the Workbench: the Workbench no longer
+  // has a composer to gate — it is the board over the work that is already
+  // running — so the readiness gate lives where a prompt is actually written.
+  await page.goto(`${BASE}/#/new-chat`);
+  await page.getByLabel("Prompt", { exact: true }).fill("Draft a short project brief");
+  await expect(page.getByRole("button", { name: "Send" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Set up model" })).toBeVisible();
   await page.screenshot({
-    path: join(SHOTS, "bug69-workbench-readiness-gate-live.png"),
+    path: join(SHOTS, "bug69-composer-readiness-gate-live.png"),
     fullPage: true,
   });
 

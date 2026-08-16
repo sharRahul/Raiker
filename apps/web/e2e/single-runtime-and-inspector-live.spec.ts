@@ -98,9 +98,9 @@ test("Chat and Build offer the same composer affordances", async () => {
   await page.screenshot({ path: join(SHOTS, "162-chat-composer-attach-live.png"), fullPage: true });
 
   await page.goto(`${BASE}/#/build`);
-  await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(
+    page.getByRole("button", { name: /^How much Raiker may do this turn:/ }),
+  ).toBeVisible({ timeout: 20_000 });
   // BUG-35 — Build carries files too now, through the same control.
   const buildAttach = page.getByRole("button", { name: "Add attachment" });
   await expect(buildAttach).toBeVisible();
@@ -115,9 +115,9 @@ test("Build shows what a turn carried, the same way the composer did", async () 
   test.skip(process.env.RAIKER_E2E_IMAGE === undefined, "set RAIKER_E2E_IMAGE");
   test.setTimeout(120_000);
   await page.goto(`${BASE}/#/build`);
-  await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible({
-    timeout: 20_000,
-  });
+  await expect(
+    page.getByRole("button", { name: /^How much Raiker may do this turn:/ }),
+  ).toBeVisible({ timeout: 20_000 });
   // The panel may already be open from the previous test — Build stays mounted
   // across navigations — so open it only when it is actually shut.
   const upload = page.getByLabel("Upload image");

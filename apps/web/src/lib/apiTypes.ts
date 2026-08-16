@@ -965,6 +965,43 @@ export interface Checkpoint {
 }
 
 /**
+ * What branching a conversation from one checkpoint would seed (GAP-CHAT C14).
+ * `requires_approval` is always false: a branch writes no workspace file, which
+ * is the property that separates it from a restore.
+ */
+export interface ConversationBranchPlan {
+  status: string;
+  checkpoint_id: string;
+  source_session_id: string;
+  summary: string;
+  memory_candidate_count: number;
+  can_execute: boolean;
+  requires_approval: boolean;
+}
+
+/** The branch that was created. The source conversation is unchanged. */
+export interface ConversationBranch {
+  status: string;
+  checkpoint_id: string;
+  source_session_id: string;
+  session_id: string;
+  title: string;
+  summary: string;
+  memory_candidate_count: number;
+  seed_manifest_path: string;
+}
+
+/** Where a conversation came from. `source_session_id` is null for a root. */
+export interface ConversationBranchOrigin {
+  session_id: string;
+  source_session_id: string | null;
+  source_title: string | null;
+  forked_from_checkpoint_id: string | null;
+  summary: string;
+  created_at: string;
+}
+
+/**
  * Metadata-only preflight for a checkpoint restore. `files` carries content
  * addresses and sizes; the server never sends file content to the browser, and
  * computing a plan performs no restore.

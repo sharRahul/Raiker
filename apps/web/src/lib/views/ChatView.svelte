@@ -27,6 +27,7 @@
     AgentResponse,
     AttachmentPreview,
     ContextUsage,
+    ConversationBranchOrigin,
     ProjectsList,
     SessionDetail,
     SourceExcerptView,
@@ -42,6 +43,7 @@
   import ToolActivity from "../components/ToolActivity.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
+  import SurfaceToggle from "../components/SurfaceToggle.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
@@ -144,6 +146,7 @@
     untrack(() => {
       sessionId = id;
       void loadHistory(id);
+      void loadBranchOrigin(id);
     });
   });
   let nextId = 1;
@@ -881,6 +884,57 @@
     void submit();
   }
 
+  // ── C14 — branch from here ───────────────────────────────────────────
+  // The last open part of C14. Edit and Retry both continue *this* conversation;
+  // branching opens a second one from a chosen point, so two lines of thought can
+  // exist side by side without either overwriting the other. It is deliberately
+  // not "edit the message and throw away what followed": this conversation keeps
+  // every turn it had, and the branch says where it grew from.
+  let branchingTurn = $state<string | null>(null);
+  /** Where this conversation came from, when it is itself a branch. */
+  let branchOrigin = $state<ConversationBranchOrigin | null>(null);
+
+  async function loadBranchOrigin(id: string | null) {
+    if (id === null) {
+      branchOrigin = null;
+      return;
+    }
+    try {
+      const origin = await api.conversationBranchOrigin(id);
+      branchOrigin = origin.source_session_id ? origin : null;
+    } catch {
+      // Lineage is context, not content: a failed read leaves the banner off
+      // rather than claiming the conversation is a root when that is unknown.
+      branchOrigin = null;
+    }
+  }
+
+  async function branchFromTurn(turnId: string) {
+    if (sessionId === null || streaming) return;
+    branchingTurn = turnId;
+    projectNotice = null;
+    try {
+      const checkpoints = await api.checkpoints(sessionId);
+      const point = checkpoints.find((checkpoint) => checkpoint.turn_id === turnId);
+      if (point === undefined) {
+        // No checkpoint means no state to seed a branch from. Saying so is the
+        // honest answer; inventing a seed from the transcript is not.
+        projectNotice =
+          "No checkpoint was written for that turn, so there is no point to branch from.";
+        return;
+      }
+      const branch = await api.branchConversation(point.checkpoint_id);
+      window.location.hash = `#/new-chat?session=${encodeURIComponent(branch.session_id)}`;
+    } catch (error) {
+      projectNotice =
+        error instanceof ApiError
+          ? `That conversation could not be branched (${error.reasonCode ?? error.status}).`
+          : "That conversation could not be branched.";
+    } finally {
+      branchingTurn = null;
+    }
+  }
+
   async function stopRunningTurn() {
     if (sessionId === null) return;
     try {
@@ -1250,6 +1304,21 @@
     </div>
   </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
+  <!-- C14 — a branch says where it grew from, which is what makes two branches of
+       one conversation legible rather than two unrelated chats that happen to
+       start the same way. The original is reachable and unchanged. -->
+  {#if branchOrigin !== null}
+    <p class="branch-origin">
+      <Icon name="branch" size={14} />
+      <span>
+        Branched from
+        <a href={`#/new-chat?session=${encodeURIComponent(branchOrigin.source_session_id ?? "")}`}
+          >{branchOrigin.source_title ?? "an earlier conversation"}</a
+        >{#if branchOrigin.summary}, at “{branchOrigin.summary}”{/if}. That conversation kept every
+        turn it had.
+      </span>
+    </p>
+  {/if}
   {#if plan !== null}
     <div class="plan-slot">
       <PlanChecklist {plan} bind:collapsed={planCollapsed} />
@@ -1295,6 +1364,10 @@
               disabled={streaming}
               onedit={editPrompt}
               onretry={retryPrompt}
+              onbranch={turn.response?.turn_id
+                ? () => void branchFromTurn(turn.response?.turn_id ?? "")
+                : undefined}
+              branching={branchingTurn === turn.response?.turn_id}
             />
           {/if}
           <!-- BUG-208 slice F. An emoji used to be appended here, to the
@@ -1576,25 +1649,6 @@
           lang="en-US"
           disabled={streaming}
         ></textarea>
-        <div class="upper-controls">
-          <ModelPicker bind:profileId={modelProfile} bind:model bind:open={modelPickerOpen} {profiles} {selectedProfile} onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)} disabled={streaming} />
-          <ExecutionEnvironmentBadge />
-          <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
-          {#if reasoningEfforts.length > 0}
-            <select
-              class="bar-select"
-              bind:value={reasoningEffort}
-              disabled={streaming}
-              aria-label="Thinking"
-              title="Ask this model to think before it answers. Default asks for nothing."
-            >
-              <option value="">Thinking: default</option>
-              {#each reasoningEfforts as effort (effort)}
-                <option value={effort}>Thinking: {effort}</option>
-              {/each}
-            </select>
-          {/if}
-        </div>
       </div>
 
       {#if attachOpen}
@@ -1613,6 +1667,12 @@
       <div class="composer-bar">
         <div class="bar-left">
           <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
+          <SurfaceToggle
+            surface="chat"
+            draft={promptText}
+            attachments={() => attachStore.take()}
+            disabled={streaming}
+          />
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
               <span class="sr-only">Project for this chat</span>
@@ -1631,9 +1691,22 @@
             </label>
           {/if}
           <ApprovalModeControl />
+          <ExecutionEnvironmentBadge />
+          <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
         </div>
 
         <div class="bar-right">
+          <ModelPicker
+            bind:profileId={modelProfile}
+            bind:model
+            bind:open={modelPickerOpen}
+            bind:effort={reasoningEffort}
+            efforts={reasoningEfforts}
+            {profiles}
+            {selectedProfile}
+            onchosen={(profileId, chosen) => void rememberSurfaceModel("chat", profileId, chosen)}
+            disabled={streaming}
+          />
           <div class="context-control" bind:this={contextControlEl}>
             <button
               type="button"
@@ -1802,22 +1875,12 @@
     .composer-upper {
       flex-direction: column;
     }
-    .upper-controls {
-      flex-direction: row;
-      align-items: center;
-      flex-wrap: wrap;
-    }
   }
   /* On narrow screens the model picker wraps under the textarea even when the
      page layout hasn't hit the split-view breakpoint yet. */
   @media (max-width: 30rem) {
     .composer-upper {
       flex-direction: column;
-    }
-    .upper-controls {
-      flex-direction: row;
-      align-items: center;
-      flex-wrap: wrap;
     }
   }
   /* Below the split breakpoint the inspector is a sheet over the conversation
@@ -1843,6 +1906,22 @@
     order: -1;
     margin-right: auto;
   }
+  /* Lineage, not a warning: the quietest possible band that still says this
+     conversation has a parent and links to it. */
+  .branch-origin {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.4rem;
+    margin: 0 0 var(--space-2);
+    padding: 0.45rem 0.6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+    color: var(--text-2);
+    font-size: var(--text-xs);
+    line-height: 1.45;
+  }
+  .branch-origin > :global(svg) { flex: none; margin-top: 0.15rem; color: var(--accent); }
   .copy-message {
     display: inline-flex;
     align-items: center;
@@ -2126,10 +2205,10 @@
   @media (prefers-reduced-motion: reduce) {
     .composer-card { transition: none; }
   }
-  /* Upper area: textarea on the left, model + effort on the right. The
-     controls column stays top-aligned so it doesn't drift as the textarea
-     grows. Below the split-view breakpoint the column wraps under the
-     textarea rather than squeezing it. */
+  /* Upper area: the prompt, and nothing else. The per-turn controls used to sit
+     in a column to the right of it, which cost the prompt a third of the card's
+     width and put the model chip somewhere no other composer keeps it. They are
+     all on the control bar below now, so the prompt gets the whole card. */
   .composer-upper {
     display: flex;
     align-items: flex-start;
@@ -2138,12 +2217,6 @@
   .composer-upper .prompt-input {
     flex: 1;
     min-width: 0;
-  }
-  .upper-controls {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0.3rem;
   }
   .prompt-input {
     width: 100%;
@@ -2214,7 +2287,13 @@
   .bar-select:disabled {
     opacity: 0.6;
   }
-  .bar-select:focus-visible,
+  /* The focus ring was previously stranded on the front of the
+     `.turn-attachments` selector, so focusing a bar select silently applied a
+     flex layout and a top margin to it and never drew a ring at all. */
+  .bar-select:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
   .turn-attachments {
     margin: 0.5rem 0 0;
     display: flex;

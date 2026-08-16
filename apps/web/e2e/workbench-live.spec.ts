@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 async function unlock(page: import("@playwright/test").Page) {
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
@@ -9,6 +10,9 @@ async function unlock(page: import("@playwright/test").Page) {
 }
 
 test("live empty-account Workbench review", async ({ page }) => {
+  // Registering an owner, walking the five-stage first-run wizard, and reading a
+  // board that polls its own data does not fit the 30-second default.
+  test.setTimeout(180_000);
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -22,19 +26,33 @@ test("live empty-account Workbench review", async ({ page }) => {
     const createAccount = page.getByRole("button", { name: "Create a User Account", exact: true });
     await expect(createAccount).toBeEnabled();
     await createAccount.click();
-    await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 15_000 });
+    // A brand-new instance opens the five-stage first-run wizard over the
+    // Workbench, and it is modal: this review is about the screen underneath.
+    await dismissFirstRunModelSetup(page);
+    await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 30_000 });
   } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
     await unlock(page);
   }
-  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 15_000 });
+  await dismissFirstRunModelSetup(page);
+  await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText("Pick up where you left off", { exact: true })).toHaveCount(0);
   await expect(page.getByText("Resume a conversation", { exact: true })).toHaveCount(0);
-  await expect(page.getByLabel(/What would you like Raiker to do/)).toBeVisible();
-  await expect(page.getByRole("tab", { name: "Run work" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("button", { name: "Start work" })).toBeDisabled();
+  // The composer is gone. The Workbench answers "what is Raiker doing right now"
+  // in three groups that are three different facts, and starting work is a link
+  // to the surface that owns a composer for it.
+  await expect(page.getByLabel(/What would you like Raiker to do/)).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
+  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
+    await expect(page.getByRole("region", { name: group })).toBeVisible();
+  }
+  await expect(page.getByText("Nothing is running.")).toBeVisible();
+  const start = page.getByRole("navigation", { name: "Start work" });
+  for (const action of ["Start a conversation", "Start a build", "Plan a task or agent"]) {
+    await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
+  }
   await expect(page.getByRole("link", { name: /Review issues/ })).toBeVisible();
   await page.screenshot({
-    path: "../../docs/plans/screenshots/working/workbench-dashboard-live.png",
+    path: "../../docs/plans/screenshots/working/workbench-board-live.png",
     fullPage: true,
   });
   expect(consoleErrors).toEqual([]);

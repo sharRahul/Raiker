@@ -210,18 +210,26 @@ test("composer parity — Chat, Build, and Workbench agree on what they offer", 
   for (const control of ["Context window", "Conversation actions"]) {
     await expect(page.getByRole("button", { name: control })).toBeVisible();
   }
-  await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /^How much Raiker may do this turn:/ }),
+  ).toBeVisible();
+  // Both composers carry the surface toggle, so a half-typed prompt moves between
+  // them without being sent or retyped.
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
   await page.screenshot({ path: join(SHOTS, "126-build-composer-parity-live.png"), fullPage: true });
 
   await page.goto(`${BASE}/#/workbench`);
-  // The Workbench composer starts work elsewhere; it must not claim an attach
-  // affordance it does not have.
-  await expect(page.getByText(/start in Chat and attach it there/)).toBeVisible();
-  // "Start as" is a real continuation only in Chat mode.
-  await page.getByRole("tab", { name: "Chat" }).click();
-  await expect(page.getByLabel("Conversation to continue")).toBeVisible();
-  await page.getByRole("tab", { name: "Build" }).click();
-  await expect(page.getByLabel("Conversation to continue")).toHaveCount(0);
-  await expect(page.getByText("A new build conversation")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "127-workbench-composer-parity-live.png"), fullPage: true });
+  // The Workbench has no composer at all now: it could not send anything, and it
+  // re-showed every prompt in the destination surface's own composer. It is the
+  // live board over what is running, and starting work is a link to the one
+  // surface that owns a composer for that kind of work.
+  await expect(page.getByLabel(/What would you like Raiker to do/)).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
+  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
+    await expect(page.getByRole("region", { name: group })).toBeVisible();
+  }
+  const start = page.getByRole("navigation", { name: "Start work" });
+  await expect(start.getByRole("link", { name: /Start a conversation/ })).toBeVisible();
+  await expect(start.getByRole("link", { name: /Start a build/ })).toBeVisible();
+  await page.screenshot({ path: join(SHOTS, "127-workbench-board-live.png"), fullPage: true });
 });

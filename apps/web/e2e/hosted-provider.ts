@@ -40,14 +40,28 @@ export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
   // wizard. Live provider scenarios deliberately defer model selection here,
   // choose the hosted-compatible privacy posture, and defer backup; the model
   // itself is still connected through Models in the next step.
-  const decideLater = page.getByRole("button", { name: "Decide later" });
-  if (!(await decideLater.isVisible().catch(() => false))) return false;
-  await decideLater.click();
+  //
+  // The model stage's own controls arrive with `GET /api/setup`, and the stage
+  // now carries a provider row per backend which it populates afterwards. A
+  // sampled `isVisible()` therefore returned false on a wizard that was simply
+  // still loading, and the caller went on to assert against a screen it had not
+  // actually left. The wizard is *waited for* rather than sampled, and a run that
+  // was never on it says so by the wait expiring.
+  //
+  // "Continue" is the same button once a model has been pinned on this screen,
+  // which a spec that connects a provider in the wizard will have done.
+  const advance = page.getByRole("button", { name: /^(Decide later|Continue)$/ });
+  const onWizard = await advance
+    .waitFor({ state: "visible", timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!onWizard) return false;
+  await advance.click();
   await page.getByRole("button", { name: "Balanced" }).click();
   await page.getByRole("button", { name: "Set up later" }).click();
   await page.getByRole("button", { name: "Open Workbench" }).click();
   await expect(page).toHaveURL(/#\/home$/, { timeout: 30_000 });
-  await expect(decideLater).toBeHidden({ timeout: 30_000 });
+  await expect(advance).toBeHidden({ timeout: 30_000 });
   return true;
 }
 
@@ -184,4 +198,73 @@ export async function refreshHostedReadiness(
 ): Promise<void> {
   const card = await hostedProviderCard(page, base, provider);
   await checkModelReady(page, card);
+}
+
+/**
+ * Set (or clear) the thinking budget for one composer.
+ *
+ * The effort used to be a `<select>` beside the model chip. It is now a section
+ * *inside* the model menu, because the values a provider publishes belong to the
+ * model rather than to the composer — and because "Thinking off" and "no effort
+ * sent" are the same wire fact, so they are one control instead of two.
+ *
+ * `level` is one of the values the active model publishes (an effort like
+ * `high`, or a mode like `adaptive`); `""` turns thinking off. Returns false
+ * when this model publishes no reasoning setting at all, which is a state rather
+ * than a failure: the section is then absent rather than empty.
+ */
+export async function setThinkingEffort(
+  composer: Locator,
+  page: Page,
+  level: string,
+): Promise<boolean> {
+  const trigger = composer.getByRole("button", { name: /^Model for this turn:/ });
+  await trigger.click();
+  const effortRow = page.getByRole("button", { name: /^Effort/ });
+  if (!(await effortRow.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.keyboard.press("Escape");
+    return false;
+  }
+  await effortRow.click();
+  const section = page.getByRole("group", { name: "Effort" });
+  if (level === "") {
+    const thinking = section.getByRole("switch", { name: /Thinking/ });
+    if ((await thinking.getAttribute("aria-checked")) === "true") await thinking.click();
+  } else {
+    await section
+      .getByRole("menuitemradio", { name: new RegExp(`^${level}`, "i") })
+      .click();
+  }
+  await page.keyboard.press("Escape");
+  return true;
+}
+
+/**
+ * Turn thinking on at whatever level this model publishes, and say which.
+ *
+ * Returns the level chosen, or null when the model publishes none — the caller
+ * decides whether that is a skip or a failure. Used where a spec needs *some*
+ * reasoning rather than a particular amount of it.
+ */
+export async function pickAnyThinkingLevel(
+  composer: Locator,
+  page: Page,
+): Promise<string | null> {
+  const trigger = composer.getByRole("button", { name: /^Model for this turn:/ });
+  await trigger.click();
+  const effortRow = page.getByRole("button", { name: /^Effort/ });
+  if (!(await effortRow.isVisible({ timeout: 5_000 }).catch(() => false))) {
+    await page.keyboard.press("Escape");
+    return null;
+  }
+  await effortRow.click();
+  const levels = page.getByRole("group", { name: "Effort" }).getByRole("menuitemradio");
+  if ((await levels.count()) === 0) {
+    await page.keyboard.press("Escape");
+    return null;
+  }
+  const chosen = (await levels.last().textContent())?.trim() ?? null;
+  await levels.last().click();
+  await page.keyboard.press("Escape");
+  return chosen;
 }

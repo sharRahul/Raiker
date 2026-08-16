@@ -223,32 +223,15 @@
   // Tasks run outside this page: a queued run is claimed, works, and finishes
   // while the list sits still. Without this the page kept showing "queued" long
   // after the run had ended (BUG-09), and only a manual Refresh disagreed.
+  // The `raiker:task-compose` handoff this used to listen for came from the
+  // Workbench composer, which no longer exists: the Workbench is a board over the
+  // work that is already running, and planning a task happens in the form on this
+  // page. A listener for an event nothing dispatches is a handoff the product
+  // claims and never performs, so it is gone with its sender.
   onMount(() => {
     void refreshModels();
-    const onCompose = (event: Event) => {
-      const detail = (event as CustomEvent<{
-        text: string;
-        cadence?: "now" | "once";
-        scheduledAt?: string;
-        profileId?: string | null;
-        model?: string | null;
-        attachments?: ComposerAttachment[];
-      }>).detail;
-      if (!detail?.text.trim()) return;
-      objective = detail.text;
-      title = detail.text.slice(0, 80);
-      cadence = detail.cadence ?? "now";
-      // The Workbench schedule composer picks the time; carrying it through
-      // means the handoff arrives complete rather than as a half-filled form
-      // whose required field the owner has to notice.
-      scheduledAt = detail.scheduledAt ?? "";
-      modelProfile = detail.profileId ?? "";
-      model = detail.model ?? "";
-      if (detail.attachments?.length) attachStore.set([...detail.attachments]);
-    };
-    window.addEventListener("raiker:task-compose", onCompose);
     const timer = window.setInterval(() => void load(), 15_000);
-    return () => { window.clearInterval(timer); window.removeEventListener("raiker:task-compose", onCompose); };
+    return () => window.clearInterval(timer);
   });
 </script>
 

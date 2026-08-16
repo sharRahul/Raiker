@@ -56,8 +56,16 @@
     checking = true;
     retryStatus = "Checking model reachability…";
     try {
-      await (onRetry ? onRetry() : refreshModelReadiness());
-      retryStatus = "Check complete";
+      const result = await (onRetry ? onRetry() : refreshModelReadiness());
+      // `refreshModelReadiness` returns null when there is no profile *and* no
+      // model to check — which is the state this dialog is most often opened in.
+      // It used to report "Check complete" anyway, so the one control on the
+      // screen claimed to have proven a model it had never contacted. Saying what
+      // actually happened is the difference between a check and a placebo.
+      retryStatus =
+        result === null && !onRetry
+          ? "There is no model to check yet. Choose one in Models first."
+          : "Check complete";
     } catch {
       retryStatus = "Check failed. Open Models to review the connection.";
     } finally {

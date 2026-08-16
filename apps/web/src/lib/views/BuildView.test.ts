@@ -144,7 +144,22 @@ function respondWith(message: string) {
   });
 }
 
+// The mode is one chip and one menu now (it was three side-by-side buttons), so
+// choosing it is: open the chip, click the option. The trigger names the current
+// posture, which is also how these tests assert what was chosen.
+async function pickMode(label: string) {
+  await fireEvent.click(
+    await screen.findByRole("button", { name: /^How much Raiker may do this turn:/ }),
+  );
+  await fireEvent.click(await screen.findByRole("menuitemradio", { name: new RegExp(`^${label}`) }));
+}
+
+function modeTrigger() {
+  return screen.getByRole("button", { name: /^How much Raiker may do this turn:/ });
+}
+
 describe("Build composer modes", () => {
+
   it("preserves the change and disables Send when the exact model is unready", async () => {
     const stopped = { ...REASONING_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "The local runtime is stopped.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start it, then check again." };
     stubFetch(baseRoutes({ "GET /api/models": { ...MODELS, profiles: [stopped], chat_profiles: [stopped] } }));
@@ -164,8 +179,8 @@ describe("Build composer modes", () => {
     const fetchMock = stubFetch(baseRoutes());
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
-    expect(await screen.findByRole("button", { name: "Plan" })).toHaveAttribute("aria-pressed", "true");
+    await pickMode("Plan");
+    expect(modeTrigger()).toHaveAccessibleName("How much Raiker may do this turn: Plan");
 
     const written = fetchMock.mock.calls
       .map(([url]) => String(url))
@@ -179,9 +194,9 @@ describe("Build composer modes", () => {
     const fetchMock = stubFetch(baseRoutes());
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+    await pickMode("Auto");
 
-    expect(await screen.findByRole("button", { name: "Auto" })).toHaveAttribute("aria-pressed", "true");
+    expect(modeTrigger()).toHaveAccessibleName("How much Raiker may do this turn: Auto");
     expect(
       fetchMock.mock.calls.map(([url]) => String(url)).filter((u) => u.includes("/api/capability-modes/")),
     ).toEqual([]);
@@ -193,7 +208,7 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes({ "GET /api/capability-gates": gates("ask") }));
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+    await pickMode("Auto");
 
     expect(await screen.findByText(/still be proposed/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /change in permissions/i })).toBeInTheDocument();
@@ -203,7 +218,7 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes({ "GET /api/capability-gates": undefined }));
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+    await pickMode("Auto");
 
     expect(await screen.findByText(/could not read your standing permissions/i)).toBeInTheDocument();
   });
@@ -212,7 +227,7 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes());
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
+    await pickMode("Plan");
 
     expect(await screen.findByText(/for this turn only/i)).toBeInTheDocument();
     expect(screen.getByText(/standing permissions are not changed/i)).toBeInTheDocument();
@@ -223,7 +238,7 @@ describe("Build composer modes", () => {
     respondWith("Here is the plan.");
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
+    await pickMode("Plan");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
@@ -245,7 +260,7 @@ describe("Build composer modes", () => {
     respondWith("Done.");
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Auto" }));
+    await pickMode("Auto");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
@@ -260,7 +275,7 @@ describe("Build composer modes", () => {
     respondWith("Here is the plan.");
     render(BuildView);
 
-    await fireEvent.click(await screen.findByRole("button", { name: "Plan" }));
+    await pickMode("Plan");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
       target: { value: "Add a settings page" },
     });
@@ -289,13 +304,22 @@ describe("Build model picker", () => {
     expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument();
     await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" }));
     await fireEvent.click(screen.getByRole("menuitemradio", { name: /Opus Build Model/i }));
-    const effort = screen.getByLabelText("Thinking");
-    expect(within(effort).getAllByRole("option").map((option) => option.textContent)).toEqual([
-      "Thinking: default",
-      "Thinking: medium",
-      "Thinking: high",
-    ]);
-    await fireEvent.change(effort, { target: { value: "high" } });
+    // The thinking budget belongs to the model, so it is a section of the model
+    // menu rather than a second dropdown beside it, and it offers only the
+    // levels this exact model publishes.
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Opus Build Model" }));
+    await fireEvent.click(screen.getByRole("button", { name: /^Effort/ }));
+    const effortSection = screen.getByRole("group", { name: "Effort" });
+    expect(
+      within(effortSection)
+        .getAllByRole("menuitemradio")
+        .map((option) => option.textContent?.trim()),
+    ).toEqual(["Medium", "High"]);
+    await fireEvent.click(within(effortSection).getByRole("menuitemradio", { name: "High" }));
+    expect(within(effortSection).getByRole("switch", { name: /Thinking/ })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Use effort" } });
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
@@ -312,7 +336,10 @@ describe("Build model picker", () => {
     render(BuildView);
 
     expect(await screen.findByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Thinking")).not.toBeInTheDocument();
+    // No model means no published effort levels, so the Effort section is absent
+    // rather than present and empty.
+    await fireEvent.click(screen.getByRole("button", { name: "Model for this turn: Not selected" }));
+    expect(screen.queryByRole("group", { name: "Effort" })).not.toBeInTheDocument();
   });
 });
 

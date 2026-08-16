@@ -61,21 +61,33 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("Username").fill("owner");
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: /unlock/i }).click();
-  await expect(page.getByLabel("Prompt")).toBeVisible();
+  await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
 });
 
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
-  const chat = page.getByLabel("Prompt");
+  const chat = page.getByLabel("Prompt", { exact: true });
   await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");
+  // Both composers carry the surface toggle, so a half-typed prompt can move
+  // between them without being sent or retyped.
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
   await expect(page.getByRole("button", { name: /Model for this turn/ })).toBeVisible();
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.getByRole("menuitemradio", { name: /Sonnet 4\.5/i }).click();
   await page.screenshot({ path: join(shots, "bug15-chat-composer.png"), fullPage: true });
 
-  await page.getByRole("link", { name: "Build" }).click();
+  await page.getByRole("navigation", { name: "All navigation" }).getByRole("link", { name: "Build" }).click();
   await expect(page.getByLabel("Describe the change")).toBeVisible();
-  await expect(page.getByRole("group", { name: "How much Raiker may do" })).toBeVisible();
+  // The posture is one chip and one menu now, matching where every reference
+  // coding agent keeps the same control.
+  const mode = page.getByRole("button", { name: /^How much Raiker may do this turn:/ });
+  await expect(mode).toBeVisible();
+  await mode.click();
+  await expect(page.getByRole("menu", { name: "Mode" })).toBeVisible();
+  for (const option of ["Plan", "Edit", "Auto"]) {
+    await expect(page.getByRole("menuitemradio", { name: new RegExp(`^${option}`) })).toBeVisible();
+  }
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.screenshot({ path: join(shots, "bug15-build-composer.png"), fullPage: true });
@@ -126,29 +138,34 @@ test("Models names providers in plain language and offers a real model list", as
   await page.screenshot({ path: join(shots, "models-redesign.png"), fullPage: true });
 });
 
-test("new-account Workbench is welcoming and action oriented", async ({ page }) => {
+test("new-account Workbench is a board over the work, not a second composer", async ({ page }) => {
   await page.goto("http://raiker.test/#/workbench");
   await expect(page.getByRole("heading", { name: "Welcome to your Work Dashboard" })).toBeVisible();
-  await expect(page.getByText("Pick up where you left off", { exact: true })).toHaveCount(0);
 
-  // One composer with a mode per destination — the redesign that replaced the
-  // old "Start a new chat" / "Schedule a task" link list.
-  const modes = page.getByRole("tablist", { name: "Work mode" });
-  for (const mode of ["Chat", "Build", "Create task", "Schedule"]) {
-    await expect(modes.getByRole("tab", { name: mode, exact: true })).toBeVisible();
+  // The removed box. The Workbench composer could not send anything: it handed
+  // the prompt to Chat, Build or Tasks, which re-showed it in that surface's own
+  // composer. What is left is the live answer to "what is Raiker doing".
+  await expect(page.getByLabel("What would you like Raiker to do?")).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "Work mode" })).toHaveCount(0);
+  for (const group of ["Running now", "Standing agents", "Scheduled runs"]) {
+    await expect(page.getByRole("heading", { name: group })).toBeVisible();
   }
+  await expect(page.getByText("Nothing is running.")).toBeVisible();
+  await expect(page.getByText("No agent is standing.")).toBeVisible();
+  await expect(page.getByText("Nothing is scheduled.")).toBeVisible();
 
-  const quick = page.getByRole("navigation", { name: "Quick actions" });
+  // Starting work is a link to the surface that owns a composer, so there is
+  // exactly one composer per kind of work.
+  const start = page.getByRole("navigation", { name: "Start work" });
   for (const action of [
-    "Create a project",
-    "Upload or review a file",
-    "Create a task",
-    "Schedule work",
+    "Start a conversation",
+    "Start a build",
+    "Plan a task or agent",
+    "Open a project",
   ]) {
-    await expect(quick.getByRole("link", { name: new RegExp(action) })).toBeVisible();
+    await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
   }
 
-  await expect(page.getByText("Resume a conversation", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
   await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
   await page.screenshot({ path: join(shots, "workbench-dashboard-redesign.png"), fullPage: true });

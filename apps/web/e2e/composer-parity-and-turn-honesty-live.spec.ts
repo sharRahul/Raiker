@@ -13,7 +13,12 @@
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
+import {
+  dismissFirstRunModelSetup,
+  pickAnyThinkingLevel,
+  setThinkingEffort,
+  useHostedModel,
+} from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
@@ -260,21 +265,23 @@ test("a thinking turn's working is kept, and a re-opened turn still shows it", a
   const prompt = page.getByLabel("Prompt");
   await expect(prompt).toBeVisible({ timeout: 30_000 });
 
-  // Ask this model to think. A profile that declares no reasoning setting shows
-  // no control, and there is nothing to prove here — say so rather than pass.
-  // Waited for rather than sampled: the control renders once the model profiles
-  // resolve, which is after the prompt box appears, so an immediate read skips a
-  // model that does declare one.
-  const thinking = page.getByLabel("Thinking");
-  const declared = await thinking
-    .waitFor({ state: "visible", timeout: 30_000 })
-    .then(() => true)
-    .catch(() => false);
+  // Ask this model to think. The setting lives inside the model menu now, and a
+  // profile that declares no reasoning setting has no Effort section at all — so
+  // there is nothing to prove here, and this says so rather than passing quietly.
+  // Waited for rather than sampled: the model chip resolves after the prompt box
+  // appears, and an immediate read would skip a model that does declare one.
+  const composer = page.locator("form").filter({ has: prompt });
+  await expect
+    .poll(
+      async () =>
+        (await composer.getByRole("button", { name: /^Model for this turn:/ }).textContent()) ?? "",
+      { timeout: 30_000 },
+    )
+    .not.toMatch(/Not selected/);
+  const declared = await setThinkingEffort(composer, page, "");
   test.skip(!declared, "the pinned model declares no reasoning setting");
-  const efforts = await thinking.locator("option").allTextContents();
-  const chosen = efforts.find((label) => !label.includes("default"));
-  test.skip(chosen === undefined, "the pinned model offers no reasoning effort");
-  await thinking.selectOption({ label: chosen as string });
+  const chosen = await pickAnyThinkingLevel(composer, page);
+  test.skip(chosen === null, "the pinned model offers no reasoning level");
 
   await prompt.fill("Think it through, then answer in one word: is 91 prime?");
   await page.getByRole("button", { name: "Send", exact: true }).click();

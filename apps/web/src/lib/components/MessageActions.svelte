@@ -14,10 +14,16 @@
    *   transcript, and the edited one is a new turn. A transcript that quietly
    *   changes what was asked is not a record.
    * * **Retry** — sends the same prompt again, unchanged, as a new turn.
+   * * **Branch** — starts a *second* conversation from this point, seeded from
+   *   this turn's checkpoint. The conversation you are in keeps every turn it
+   *   had; nothing after the branch point is discarded. Absent, rather than
+   *   disabled, when the surface cannot branch — a Build workspace conversation
+   *   has nowhere to open a branch as itself, and a turn with no checkpoint has
+   *   no point to branch from.
    *
    * None of them re-runs a tool, re-uses an approval, or replays a governed
-   * action. They put text in a box or send text: everything that follows is
-   * governed exactly as it was the first time.
+   * action. They put text in a box, send text, or open a second conversation:
+   * everything that follows is governed exactly as it was the first time.
    */
   import Icon from "./Icon.svelte";
 
@@ -26,11 +32,16 @@
     disabled = false,
     onedit,
     onretry,
+    onbranch,
+    branching = false,
   }: {
     text: string;
     disabled?: boolean;
     onedit: (text: string) => void;
     onretry: (text: string) => void;
+    /** Omitted where branching is not possible, so the control is absent. */
+    onbranch?: () => void;
+    branching?: boolean;
   } = $props();
 
   let copied = $state<"idle" | "copied" | "failed">("idle");
@@ -69,6 +80,17 @@
   >
     <Icon name="refresh" size={13} /><span>Retry</span>
   </button>
+  {#if onbranch}
+    <button
+      type="button"
+      class="msg-action"
+      disabled={disabled || branching}
+      onclick={() => onbranch()}
+      aria-label="Branch a second conversation from this point"
+    >
+      <Icon name="branch" size={13} /><span>{branching ? "Branching…" : "Branch"}</span>
+    </button>
+  {/if}
 </div>
 {#if copied === "failed"}
   <p class="copy-error" role="status">Could not copy — your browser blocked clipboard access.</p>

@@ -153,110 +153,164 @@
   --card-pad-x: var(--space-5);
 }
 
+/* ── The three-colour palette ──
+   The whole interface is built from three owner-chosen colours per theme, and
+   every other token is derived from one of them rather than introduced beside
+   them. Naming them once here is what stops a view inventing a fourth.
+
+   Light ("paper"): steel blue is the action, gold is the brand and the pending
+   state, grey is the whole neutral scaffold.
+   Dark ("deck"): black is the ground, white is the ink, gold is the action.
+
+   The four semantic states (allow / pending / deny / read-only) still need to
+   be told apart at a glance, so `--ok` and `--danger` remain: a green that
+   means "this ran" and a red that means "this was refused" are facts about a
+   governed action, not decoration. They are the only hues outside the three,
+   and they are mixed toward the palette so they read as part of it. */
+:root {
+  --brand-gold: #ecd06f;
+  --brand-blue: #2779a7;
+  --brand-grey: #9c9c9c;
+  --brand-black: #000000;
+  --brand-white: #ffffff;
+}
+
 /* ── Light theme tokens ("paper") ── */
 :root,
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f4f7f9;
+  --bg: #f4f4f5;
   --surface: #ffffff;
-  --sunken: #eaf0f3;
+  --sunken: #ececed;
   --raised: #ffffff;
-  --border: #dde5ea;
-  --border-strong: #c2cfd7;
+  --border: #dcdcdd;
+  --border-strong: #9c9c9c;
 
-  --text-1: #16232c;
-  --text-2: #51626f;
-  --text-3: #6f7e89;
+  --text-1: #1b1c1e;
+  --text-2: #575859;
+  --text-3: #7c7d7e;
   --text-inverse: #ffffff;
 
-  /* Teal — the one accent; brand, primary action, active state */
-  --accent: #0f766e;
-  --accent-strong: #0d5f59;
-  --accent-soft: #d9f2ee;
-  --accent-border: #9fdcd2;
+  /* Steel blue — the one accent; primary action and active state */
+  --accent: #2779a7;
+  --accent-strong: #1d5d81;
+  --accent-soft: #e7f1f7;
+  --accent-border: #a9cde1;
+
+  /* Gold — the brand mark, and the pending/ask state it also carries */
+  --brand: #ecd06f;
+  --brand-strong: #c9a63d;
+  --brand-soft: #fdf6e2;
+  --brand-border: #ecd06f;
 
   /* Green — success / enabled / allow */
-  --ok: #177a4c;
-  --ok-soft: #ddf3e6;
-  --ok-border: #b0e0c6;
+  --ok: #1c7049;
+  --ok-soft: #e3f1e9;
+  --ok-border: #aed3bf;
 
-  /* Amber — warning / ask / pending */
-  --warn: #8f5d0a;
-  --warn-soft: #fdf0da;
-  --warn-border: #f0d7a5;
+  /* Gold — warning / ask / pending */
+  --warn: #866412;
+  --warn-soft: #fdf6e2;
+  --warn-border: #ecd06f;
 
   /* Red — danger / deny / critical risk */
-  --danger: #c22f36;
-  --danger-strong: #a52830;
-  --danger-soft: #fbe3e4;
-  --danger-border: #f2bfc2;
+  --danger: #b4292f;
+  --danger-strong: #942127;
+  --danger-soft: #f8e3e4;
+  --danger-border: #e6b6b8;
 
-  /* Blue — info / read-only / authenticated trust */
-  --info: #22648f;
-  --info-soft: #e1eff8;
-  --info-border: #b7d8ec;
+  /* Blue — info / read-only / authenticated trust; the accent's quieter half */
+  --info: #2779a7;
+  --info-soft: #e7f1f7;
+  --info-border: #a9cde1;
 
-  --neutral-soft: #eceff2;
-  --neutral-border: #d5dce2;
+  --neutral-soft: #efefef;
+  --neutral-border: #d3d3d4;
+
+  /* Aliases for the names a handful of views reached for before the token set
+     was settled. They resolve to the palette rather than to a hard-coded
+     fallback, so a colour that used to escape the theme now follows it. Both
+     themes define them; nothing may read one of these without the other. */
+  --success: var(--ok);
+  --warning: var(--warn);
+  --ok-text: var(--ok);
+  --warn-text: var(--warn);
+  --surface-raised: var(--raised);
+  --accent-contrast: var(--text-inverse);
 
   /* A depth ladder, not two copies of the same blur. Each level pairs a tight
      contact shadow (the edge that grounds the surface) with a wider ambient one
      (the room it sits in). The old --shadow-1 was two near-identical mid blurs,
      which read as haze rather than elevation. */
-  --shadow-0: 0 1px 1px rgba(22, 35, 44, 0.04);
-  --shadow-1: 0 1px 1px rgba(22, 35, 44, 0.04), 0 2px 6px -1px rgba(22, 35, 44, 0.07);
-  --shadow-2: 0 2px 4px -1px rgba(22, 35, 44, 0.06), 0 12px 28px -6px rgba(22, 35, 44, 0.16);
-  --overlay: rgba(22, 35, 44, 0.42);
-  --focus-ring: #0f766e;
+  --shadow-0: 0 1px 1px rgba(27, 28, 30, 0.04);
+  --shadow-1: 0 1px 1px rgba(27, 28, 30, 0.04), 0 2px 6px -1px rgba(27, 28, 30, 0.07);
+  --shadow-2: 0 2px 4px -1px rgba(27, 28, 30, 0.06), 0 12px 28px -6px rgba(27, 28, 30, 0.16);
+  --overlay: rgba(27, 28, 30, 0.42);
+  --focus-ring: #2779a7;
 }
 
-/* ── Dark theme tokens ("deck") ── */
+/* ── Dark theme tokens ("deck") ──
+   Defined once here and reused verbatim by the `prefers-color-scheme` default
+   below through `@import`-free duplication; the appCss test pins the two blocks
+   to the same values so they cannot drift apart. */
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #0b0f14;
-  --surface: #11161d;
-  --sunken: #0d1218;
-  --raised: #182029;
-  --border: #26303b;
-  --border-strong: #354350;
+  --bg: #000000;
+  --surface: #0b0b0c;
+  --sunken: #050506;
+  --raised: #17171a;
+  --border: #2a2a2c;
+  --border-strong: #454547;
 
-  --text-1: #e8edf2;
-  --text-2: #9aa7b4;
-  --text-3: #75848f;
-  --text-inverse: #06231f;
+  --text-1: #ffffff;
+  --text-2: #b6b6b8;
+  --text-3: #9c9c9c;
+  --text-inverse: #000000;
 
-  --accent: #2dd4bf;
-  --accent-strong: #5eead4;
-  --accent-soft: rgba(45, 212, 191, 0.13);
-  --accent-border: rgba(45, 212, 191, 0.38);
+  --accent: #ecd06f;
+  --accent-strong: #f4e2a4;
+  --accent-soft: rgba(236, 208, 111, 0.14);
+  --accent-border: rgba(236, 208, 111, 0.42);
 
-  --ok: #7ed8a8;
-  --ok-soft: rgba(126, 216, 168, 0.12);
-  --ok-border: rgba(126, 216, 168, 0.35);
+  --brand: #ecd06f;
+  --brand-strong: #f4e2a4;
+  --brand-soft: rgba(236, 208, 111, 0.14);
+  --brand-border: rgba(236, 208, 111, 0.42);
 
-  --warn: #f5b942;
-  --warn-soft: rgba(245, 185, 66, 0.12);
-  --warn-border: rgba(245, 185, 66, 0.35);
+  --ok: #6fcf97;
+  --ok-soft: rgba(111, 207, 151, 0.13);
+  --ok-border: rgba(111, 207, 151, 0.36);
 
-  --danger: #f47174;
-  --danger-strong: #f88d8f;
-  --danger-soft: rgba(229, 72, 77, 0.14);
-  --danger-border: rgba(229, 72, 77, 0.4);
+  --warn: #ecd06f;
+  --warn-soft: rgba(236, 208, 111, 0.13);
+  --warn-border: rgba(236, 208, 111, 0.36);
 
-  --info: #6aa9f0;
-  --info-soft: rgba(106, 169, 240, 0.12);
-  --info-border: rgba(106, 169, 240, 0.35);
+  --danger: #f0797c;
+  --danger-strong: #f59a9c;
+  --danger-soft: rgba(240, 121, 124, 0.14);
+  --danger-border: rgba(240, 121, 124, 0.4);
 
-  --neutral-soft: rgba(154, 167, 180, 0.1);
-  --neutral-border: rgba(154, 167, 180, 0.28);
+  --info: #7ab6d8;
+  --info-soft: rgba(122, 182, 216, 0.13);
+  --info-border: rgba(122, 182, 216, 0.36);
 
-  --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.3);
-  --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.32), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
-  --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -6px rgba(0, 0, 0, 0.55);
-  --overlay: rgba(3, 6, 9, 0.62);
-  --focus-ring: #5eead4;
+  --neutral-soft: rgba(156, 156, 156, 0.11);
+  --neutral-border: rgba(156, 156, 156, 0.3);
+
+  --success: var(--ok);
+  --warning: var(--warn);
+  --ok-text: var(--ok);
+  --warn-text: var(--warn);
+  --surface-raised: var(--raised);
+  --accent-contrast: var(--text-inverse);
+
+  --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
+  --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
+  --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
+  --overlay: rgba(0, 0, 0, 0.68);
+  --focus-ring: #ecd06f;
 }
 
 /* System preference drives the default when the user hasn't chosen. */
@@ -264,48 +318,60 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #0b0f14;
-    --surface: #11161d;
-    --sunken: #0d1218;
-    --raised: #182029;
-    --border: #26303b;
-    --border-strong: #354350;
+    --bg: #000000;
+    --surface: #0b0b0c;
+    --sunken: #050506;
+    --raised: #17171a;
+    --border: #2a2a2c;
+    --border-strong: #454547;
 
-    --text-1: #e8edf2;
-    --text-2: #9aa7b4;
-    --text-3: #75848f;
-    --text-inverse: #06231f;
+    --text-1: #ffffff;
+    --text-2: #b6b6b8;
+    --text-3: #9c9c9c;
+    --text-inverse: #000000;
 
-    --accent: #2dd4bf;
-    --accent-strong: #5eead4;
-    --accent-soft: rgba(45, 212, 191, 0.13);
-    --accent-border: rgba(45, 212, 191, 0.38);
+    --accent: #ecd06f;
+    --accent-strong: #f4e2a4;
+    --accent-soft: rgba(236, 208, 111, 0.14);
+    --accent-border: rgba(236, 208, 111, 0.42);
 
-    --ok: #7ed8a8;
-    --ok-soft: rgba(126, 216, 168, 0.12);
-    --ok-border: rgba(126, 216, 168, 0.35);
+    --brand: #ecd06f;
+    --brand-strong: #f4e2a4;
+    --brand-soft: rgba(236, 208, 111, 0.14);
+    --brand-border: rgba(236, 208, 111, 0.42);
 
-    --warn: #f5b942;
-    --warn-soft: rgba(245, 185, 66, 0.12);
-    --warn-border: rgba(245, 185, 66, 0.35);
+    --ok: #6fcf97;
+    --ok-soft: rgba(111, 207, 151, 0.13);
+    --ok-border: rgba(111, 207, 151, 0.36);
 
-    --danger: #f47174;
-    --danger-strong: #f88d8f;
-    --danger-soft: rgba(229, 72, 77, 0.14);
-    --danger-border: rgba(229, 72, 77, 0.4);
+    --warn: #ecd06f;
+    --warn-soft: rgba(236, 208, 111, 0.13);
+    --warn-border: rgba(236, 208, 111, 0.36);
 
-    --info: #6aa9f0;
-    --info-soft: rgba(106, 169, 240, 0.12);
-    --info-border: rgba(106, 169, 240, 0.35);
+    --danger: #f0797c;
+    --danger-strong: #f59a9c;
+    --danger-soft: rgba(240, 121, 124, 0.14);
+    --danger-border: rgba(240, 121, 124, 0.4);
 
-    --neutral-soft: rgba(154, 167, 180, 0.1);
-    --neutral-border: rgba(154, 167, 180, 0.28);
+    --info: #7ab6d8;
+    --info-soft: rgba(122, 182, 216, 0.13);
+    --info-border: rgba(122, 182, 216, 0.36);
 
-    --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.3);
-    --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.32), 0 2px 6px -1px rgba(0, 0, 0, 0.4);
-    --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.4), 0 14px 32px -6px rgba(0, 0, 0, 0.55);
-    --overlay: rgba(3, 6, 9, 0.62);
-    --focus-ring: #5eead4;
+    --neutral-soft: rgba(156, 156, 156, 0.11);
+    --neutral-border: rgba(156, 156, 156, 0.3);
+
+    --success: var(--ok);
+    --warning: var(--warn);
+    --ok-text: var(--ok);
+    --warn-text: var(--warn);
+    --surface-raised: var(--raised);
+    --accent-contrast: var(--text-inverse);
+
+    --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
+    --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
+    --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
+    --overlay: rgba(0, 0, 0, 0.68);
+    --focus-ring: #ecd06f;
   }
 }
 

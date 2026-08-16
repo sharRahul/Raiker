@@ -724,6 +724,54 @@ document review rather than a code review.
 
 ---
 
+## 2026-08-16 review — what was added, and whether it goes beyond the reference set
+
+Requested as a categorical answer rather than a narrative: for each control this
+round added or proposed, **does it take Raiker past Claude Cowork, Claude Code,
+ChatGPT, Codex, OpenClaw, DeepSeek Harness and Hermes Agent — yes or no** — and
+why. "Parity" is not a failure: some of these are table stakes that Raiker simply
+did not have, and saying so is more useful than calling everything a
+differentiator.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| A refused stream carrying its `reason_code` | **Yes** | Reference products surface a generic failure for a refused stream. Raiker tells a lost race, an unrecorded decision and an unreadable parked state apart, and only the last is an error. |
+| A finished turn never reporting that it could not continue | **Yes** | No reference product resolves a cross-surface approval race at all — they serialise on one client. Raiker lets both try, resolves it atomically in the store, and holds the interface to the rule that state, not the race, decides what the owner is told. |
+| A run naming its backend while in flight | **Parity** | Claude Code and Codex name the sandbox in their activity view. This closes a gap where Raiker's own two surfaces disagreed; it does not pass them. |
+| Owner-decided retention of the model's working | **Yes** | ChatGPT, Claude Code and Cowork all keep the reasoning they show and none offers a way not to. Raiker makes it a decision, defaults it off, and excludes retained working from search and export by the shape of the code. |
+| Saying *the working was not kept* | **Yes** | The alternative every product takes is showing nothing, which reads as a turn that never thought. Recording the amount without the content is what makes the honest sentence possible. |
+| Slash commands, `@` completion, keyboard map, auto-grow | **Parity** | Straightforwardly the bar Claude, ChatGPT, Claude Code and Codex set. Raiker did not have it; now it does. |
+| A command menu where every entry runs and none grants | **Yes** | In every reference product a slash command is a privileged path into the harness. Here each one opens a control the owner already has, and a test walks the whole set. |
+| `@` completion that reads an index, not a disk | **Yes** | Reference coding agents complete against the live working tree, so the completion surface is as wide as the process's filesystem access. Raiker completes against the map the owner chose to build, under the same gate, returning paths only. |
+| An empty menu that says *which* emptiness it is | **Yes** | None of them distinguishes "nothing matched" from "nothing could match", and the two send the owner to different places. |
+| Edit-and-resend that adds a turn rather than replacing one | **Yes** | ChatGPT and Claude replace the edited message and discard what followed. For a governed agent the transcript is evidence; a record that quietly changes what was asked is not one. |
+| An event's predecessor found by position, not by a whole-second timestamp | **Parity, and load-bearing** | Not a feature any reference product advertises. It is the difference between an integrity report that can be believed and one that cries tamper on an intact log under ordinary load. Recorded as [FIXED-222](plans/FIXED_ITEMS.md). |
+
+### Proposed and deliberately not built
+
+Each is recorded where the work is tracked rather than implied to exist.
+
+| Proposal | Beyond the reference set? | Why it was not built now |
+|---|---|---|
+| Owner-authored custom slash commands | **No — parity** (Claude Code, Codex, OpenClaw have them) | The skill store already holds owner-authored instructions with a review path. The honest version has to state what authority a command carries, which makes it a governance design task rather than a parser change. |
+| `@`-mention of a connector, a memory or a past conversation | **Yes**, if the menu names the authority each row would use | One completion menu over four governed reads becomes a way to reach a capability without noticing, unless the row says which one. That is the design work. |
+| Branch-a-conversation-from-here | **No — parity** (ChatGPT, Claude) | Needs a conversation fork over the existing checkpoint manifest plus a surface that makes two branches legible. |
+| A slash command that shows the capability gate it would cross | **Yes** | No reference product's command surface is governed at all, so none can show this. It would make the governed shape of a shortcut visible before it runs. |
+| An `@`-mention that reports each file's index freshness | **Yes** | The code map already records when each path was last parsed; no reference product's completion can say how stale its answer is. |
+| Background execution, PTY, filtered egress, restart reattachment | **No — parity** (Claude Code, Codex, OpenClaw, Hermes) | Each is a component rather than a flag. See [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194 for the per-row reason; the controls are absent from the interface rather than disabled. |
+| Surfacing the memory integrity report at all | **Parity, and a prerequisite** | `inspect_memory_integrity` has no route, no scheduler entry and no panel, so MEM-09's conversation-index check would join a report nothing displays. Re-scoped in [`plans/MEMORY_RELIABILITY_PLAN.md`](plans/MEMORY_RELIABILITY_PLAN.md). |
+
+**The pattern worth keeping.** Every row marked *Yes* is the same move: the
+reference product shows a result, and Raiker shows the result **plus what it
+rests on** — the reason behind a refusal, the authority behind a command, the
+index behind a completion, the decision behind what is kept. None of them is a
+new capability. They are the same capability, made accountable, which is the only
+axis on which a governed agent can beat a faster one.
+
+---
+
 ## Rule For New References
 
 When Raiker adopts a concept from another platform, the docs must add concept name, Raiker behaviour, contract/schema, lifecycle, storage, security rules, events, tests, UI surface, and build phase.

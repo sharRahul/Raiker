@@ -237,6 +237,14 @@ Highlights, each verified against a live instance:
   offers the conversations that match this prompt rather than the eight most
   recent ones. What it returns is your own transcript, treated as data rather
   than as instruction; **Incognito** switches the whole path off.
+- **A reference graph over your own citations** — every source a turn used is
+  recorded with the text it contributed, and that record reads both ways. A turn
+  can ask which of your conversations cited a file, what was cited alongside it,
+  and what the file said *at the time* it was read — without re-opening
+  anything. A citation whose file has since been deleted is reported as missing
+  rather than dropped, and drawn on the Knowledge Map as a hollow node, because
+  work grounded in something gone is a different thing from work grounded in
+  nothing.
 - **Tasks** — four work types: run now, schedule once, daily routine, and a
   persistent background agent; nestable, prioritised, and stoppable at a safe
   boundary.

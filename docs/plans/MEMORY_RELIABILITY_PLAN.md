@@ -375,7 +375,7 @@ leg of hybrid retrieval contributes zero on every workspace.
 the retrieval path already advertises the leg.
 
 **Proposed fix.** Extract candidate entities and relationships from approved
-memories only (never from raw conversation), require evidence IDs and a
+memories and from raw conversation, require evidence IDs and a
 confidence on every edge, and route every inference through the human review
 queue the plan already specifies — sensitive, uncertain or conflicting
 inferences must never auto-promote.

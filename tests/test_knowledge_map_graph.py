@@ -175,6 +175,41 @@ def test_the_map_shows_what_an_answer_was_grounded_in(service: DashboardService)
     assert {e.source for e in grounded} == {"session:sess_a", "session:sess_b"}
 
 
+def test_a_citation_whose_file_is_gone_says_so_rather_than_vanishing(
+    service: DashboardService,
+) -> None:
+    """MEM-14 — the unresolved half of the reference graph, on the map.
+
+    Dropping the node would leave the conversation looking as though it were
+    grounded in nothing, when what actually happened is that it was grounded in
+    something since deleted. That is a different fact and the more useful one.
+    """
+    (service.workspace_root / "docs").mkdir(parents=True, exist_ok=True)
+    (service.workspace_root / "docs" / "kept.md").write_text("here", encoding="utf-8")
+    _session(service.store, "sess_r", "Restore drill", "chat")
+    service.store.insert_turn("sess_r", "turn_r", "What does it say?")
+    service.store.record_turn_sources(
+        session_id="sess_r",
+        turn_id="turn_r",
+        principal_id=OWNER,
+        rows=[
+            {
+                "source_id": f"s{ordinal + 1}", "ordinal": ordinal, "kind": "file",
+                "title": path, "locator": path, "tool_name": "read_file",
+                "detail": "", "attachment_id": "", "passage": "",
+            }
+            for ordinal, path in enumerate(["docs/kept.md", "docs/deleted.md"])
+        ],
+    )
+
+    view = service.brain_view(principal_id=OWNER, user_id=USER)
+
+    status = {
+        n.label: n.status for n in view.nodes if n.node_id.startswith("context:")
+    }
+    assert status == {"docs/kept.md": "cited", "docs/deleted.md": "missing"}
+
+
 def test_an_attached_file_appears_as_a_file(service: DashboardService) -> None:
     _session(service.store, "sess_att", "Read this", "chat")
     attachment_id = new_id("att_")

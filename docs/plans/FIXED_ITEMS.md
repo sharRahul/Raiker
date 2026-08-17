@@ -237,6 +237,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-233](#fixed-233--the-graph-leg-of-hybrid-retrieval-never-ran-on-a-real-turn) | High | Retrieval quality (MEM-12) | Fixed |
 | [FIXED-234](#fixed-234--the-knowledge-graph-could-be-looked-at-but-not-asked) | Medium | Agent reach (MEM-13) | Fixed |
 | [FIXED-235](#fixed-235--the-knowledge-map-was-a-map-of-the-runtimes-bookkeeping-not-the-owners-work) | High | Knowledge Map (BUG-218) | Fixed |
+| [FIXED-236](#fixed-236--the-citation-ledger-recorded-every-reference-and-could-only-be-read-forwards) | Medium | Reference graph (MEM-14) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -9447,3 +9448,102 @@ Build sessions have their own colour.
 workspace that produced the 20/22 figure above: the twenty tool nodes are gone
 and the session is typed `conversation`. That workspace genuinely ran no tools,
 so zero tool nodes is the correct answer rather than a smaller wrong one.
+
+---
+
+## FIXED-236 — The citation ledger recorded every reference and could only be read forwards
+
+**Severity: Medium. Area: Reference graph.**
+
+**Observed.** `knowledge_graph` gave a model two actions — find an entity, walk
+its relationships — over the governed memory graph. Both answer questions about
+**claims**: approved sentences, and the typed edges between the things they
+name. Neither answers the question a model actually hits while working in an
+unfamiliar workspace: *what material has this workspace already read, what work
+used it, and what did it say?*
+
+Raiker had the answer and never read it back. `turn_sources` holds one row per
+source a turn used, with the target's `locator`, the tool that fetched it, and
+`passage` — the bounded text that really reached the model. It was read in
+exactly one direction: `load_turn_sources(session_id, …)`, for the citation
+chips under a single answer.
+
+**Reproduce (before).** Ask a model, in a workspace with a dozen conversations
+behind it, "what other work has touched `docs/runbook.md`, and what did it say
+about it?". Every path available to it re-reads the file from disk. The three
+earlier conversations that argued about it are not reachable, and neither is
+the passage the file had *at the time* those conversations read it.
+
+**Root cause.** No missing data and no bug — a table read from one end. Every
+fact needed was already stored and indexed only by the turn that wrote it
+(`idx_turn_sources_turn` on `(session_id, turn_id, ordinal)`), so reading it by
+target meant a full scan and nobody had written the read.
+
+**The reference model, and what was borrowed.**
+[`obsidianmd/obsidian-developer-docs`](https://github.com/obsidianmd/obsidian-developer-docs)
+was reviewed at the owner's suggestion. Obsidian's `MetadataCache` describes
+precisely the reading Raiker was not doing — `resolvedLinks` as
+*source → target → count*, `unresolvedLinks` as its equally first-class other
+half, `getBacklinksForFile()` for the inverse, and block references that resolve
+to a paragraph rather than a document. Three of its properties were taken
+deliberately, each because the obvious build gets it wrong:
+
+* **A link carries a count.** One passing mention and nine references are
+  different facts, and an uncounted edge set ranks them the same.
+* **An unresolved link is reported.** A citation whose file has been deleted is
+  marked, not dropped: "the answer rested on something that is gone" is more
+  useful than a shorter list, and omitting the row makes the work look
+  *ungrounded* rather than grounded in something missing.
+* **A reference resolves to text.** A backlink without a passage is a rumour.
+
+**Fix.** Four owner-scoped reads over the ledger, and two actions over them.
+
+* `list_source_backlinks` — which conversations cited a source, each with its
+  surface (Chat or Build), its reference count, its turn count and whether any
+  stored passage exists.
+* `list_source_outlinks` — what one conversation rested on, one entry per
+  target with a count.
+* `list_co_cited_sources` — what was cited alongside it, weighted by how many
+  conversations needed both.
+* `list_source_passages` — the bounded text the source handed earlier turns.
+* `knowledge_graph action=references` (anchored on a `locator` or a
+  `session_id`) and `action=passages` expose them. Each target is marked
+  `resolved`, `unresolved`, `external` or `attachment`.
+* `RAIKER-2035-turn-source-locator-index` adds `(locator, principal_id)`, since
+  every one of these reads is by target and scoped to one principal.
+
+**Two things deliberately refused.**
+
+*Inferred edges do not touch retrieval.* Co-citation says some work needed both
+of two things, which is much weaker than an authored link. Wiring it into
+scoring would let "these were open together once" reorder a search — topology
+outranking evidence, the exact failure MEM-12's `max`-not-sum rule exists to
+prevent. The reference graph offers a model somewhere to look; it does not
+change what a search returns.
+
+*Passages are dated, not presented as current.* Every one says it is what
+reached a turn at that moment. Left unsaid, a model would quote a months-old
+passage as the present contents of a file it never opened.
+
+**Found while fixing.** Resolution was first gated on the source *kind*, which
+would have reported a deleted document on every repository read: `git_status`
+records kind `repository` with the tool's own name as its locator, so
+`workspace_root / "git_status"` never exists. It is gated on the tool as well
+now — the same pair `resolve_source_excerpt` re-reads from disk — and a test
+holds the case.
+
+Also, in the first live screenshot of the fix: the Knowledge Map's summary pill
+read **"1 nodes • 0 relationships"**. Same defect as the "1 turns" found in the
+previous round's chat-search evidence, in a different view. Both counts are
+pluralized now, in the pill and in the graph's `aria-label`.
+
+**User-interface outcome.** The Knowledge Map draws the unresolved half too. A
+cited file that no longer exists renders hollow with a dashed outline, the way
+an unresolved link renders in a vault, reads **Missing** in the inspector, and
+is searchable as `status:missing`. Previously it was drawn identically to a file
+still on disk.
+
+**Evidence.** `tests/test_reference_graph.py` (16 cases, including the
+cross-account passage read that would be a disclosure rather than a wrong
+answer) and the unresolved-citation case in
+`tests/test_knowledge_map_graph.py`.

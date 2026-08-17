@@ -331,6 +331,8 @@ from raiker.storage.migrations import (
     TURN_CONTROLS_SQL,
     TURN_REASONING_MIGRATION_ID,
     TURN_REASONING_SQL,
+    TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
+    TURN_SOURCE_LOCATOR_INDEX_SQL,
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
     WEB_BLOCKLIST_MIGRATION_ID,
@@ -1398,6 +1400,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
                 MEMORY_EMBEDDING_BACKEND_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
+                TURN_SOURCE_LOCATOR_INDEX_SQL,
                 connection,
             )
             # Before the backfills: converting an index and then deciding it is
@@ -4958,6 +4965,149 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id, turn_id, source_id, principal_id),
             ).fetchone()
         return dict(row) if row is not None else None
+
+    # ── the citation ledger read as a reference graph (MEM-14) ───────────────
+    #
+    # `turn_sources` is a link table that was only ever read forwards: "what did
+    # this turn use". Read backwards and sideways it is the graph Obsidian's
+    # metadata cache exposes over a vault — `getBacklinksForFile` (who cites
+    # this), `resolvedLinks` (what this cites, with a count per target), and the
+    # block reference (the exact passage, not the whole document). Raiker
+    # already stored all three facts per row; nothing here derives anything new,
+    # it reads what the ledger recorded from the other end.
+    #
+    # Every method is owner-scoped in the query. `principal_id` is optional only
+    # so the Knowledge Map can render an unfiltered workspace view; the
+    # model-facing tool always passes it.
+
+    def list_source_backlinks(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 25
+    ) -> list[dict[str, Any]]:
+        """Which conversations cited this source, and how often.
+
+        The reference count is per target-and-conversation, matching what
+        Obsidian reports for a backlink: one entry per citing document, carrying
+        how many references it holds.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT s.session_id,
+                        COALESCE(NULLIF(TRIM(sess.title), ''), 'Untitled') AS session_title,
+                        COALESCE(sess.origin, '') AS session_origin,
+                        MIN(s.kind) AS kind,
+                        MIN(s.title) AS title,
+                        MIN(s.tool_name) AS tool_name,
+                        COUNT(*) AS refs,
+                        COUNT(DISTINCT s.turn_id) AS turns,
+                        SUM(CASE WHEN TRIM(s.passage) != '' THEN 1 ELSE 0 END) AS passages,
+                        MAX(s.created_at) AS last_referenced_at
+                 FROM turn_sources s
+                 LEFT JOIN sessions sess ON sess.session_id = s.session_id
+                 WHERE s.locator = ?"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND s.principal_id = ?"
+            params.append(principal_id)
+        sql += (
+            " GROUP BY s.session_id ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_source_outlinks(
+        self, session_id: str, *, principal_id: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """What this conversation cited, one entry per target with a count."""
+        if not session_id.strip():
+            return []
+        sql = """SELECT locator, kind, tool_name, attachment_id,
+                        MIN(title) AS title,
+                        COUNT(*) AS refs,
+                        COUNT(DISTINCT turn_id) AS turns,
+                        SUM(CASE WHEN TRIM(passage) != '' THEN 1 ELSE 0 END) AS passages,
+                        MAX(created_at) AS last_referenced_at
+                 FROM turn_sources
+                 WHERE session_id = ?"""
+        params: list[Any] = [session_id.strip()]
+        if principal_id:
+            sql += " AND principal_id = ?"
+            params.append(principal_id)
+        sql += (
+            " GROUP BY locator, kind, tool_name, attachment_id"
+            " ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_co_cited_sources(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 25
+    ) -> list[dict[str, Any]]:
+        """What else was cited by the conversations that cited this.
+
+        The edge a graph view actually draws. Two sources used to answer the
+        same question are related in the only sense Raiker can evidence — some
+        work needed both — and that is a weaker claim than a hyperlink, so it is
+        reported with the number of conversations behind it rather than as a
+        bare edge.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT other.locator,
+                        MIN(other.kind) AS kind,
+                        MIN(other.title) AS title,
+                        COUNT(DISTINCT other.session_id) AS shared_sessions,
+                        COUNT(*) AS refs,
+                        MAX(other.created_at) AS last_referenced_at
+                 FROM turn_sources mine
+                 JOIN turn_sources other
+                   ON other.session_id = mine.session_id
+                  AND other.locator != mine.locator
+                 WHERE mine.locator = ? AND TRIM(other.locator) != ''"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND mine.principal_id = ? AND other.principal_id = ?"
+            params.extend([principal_id, principal_id])
+        sql += (
+            " GROUP BY other.locator"
+            " ORDER BY shared_sessions DESC, refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_source_passages(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """The bounded text this source actually contributed, most recent first.
+
+        This is the half a reference graph is useless without. A backlink says
+        *something over there mentioned this*; the passage is the sentence, and
+        it is the copy that really reached the model rather than whatever the
+        file says today.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT session_id, turn_id, source_id, kind, title, tool_name,
+                        attachment_id, passage, created_at
+                 FROM turn_sources
+                 WHERE locator = ? AND TRIM(passage) != ''"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND principal_id = ?"
+            params.append(principal_id)
+        sql += " ORDER BY created_at DESC, ordinal ASC LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
 
     # ── turn controls (B17/C13 — stop or steer a turn that is running) ───────
 

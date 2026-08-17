@@ -745,6 +745,45 @@ the model. Everything on it is reachable through `conversation_search`,
 path would add no capability — and a second path to the same facts is exactly
 the defect MEM-11 was.
 
+### The reference graph — material a model can read, not just a picture
+
+Added **2026-08-17**, third pass, after reviewing
+[`obsidianmd/obsidian-developer-docs`](https://github.com/obsidianmd/obsidian-developer-docs)
+at the owner's suggestion. The question it settled: the knowledge graph Raiker
+had exposed to models was a graph of **claims** — entities and approved
+sentences about them — and a model building an understanding of a workspace also
+needs the graph of **material**: which work used which source, what was used
+beside it, and what that source actually said.
+
+Obsidian's `MetadataCache` turned out to describe exactly the reading Raiker was
+not doing. `turn_sources` already records one row per source a turn used,
+carrying the target's locator and the bounded passage that reached the model —
+`resolvedLinks`, `getBacklinksForFile` and a block reference in one table, read
+only ever forwards, for the chips under a single answer. Nothing was derived;
+the ledger was read from the other end.
+
+Three properties were borrowed deliberately, each because Raiker would have got
+it wrong without them.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| A model can ask what else used a source | Cowork and ChatGPT show citations *under a message*; none exposes the inverse | `knowledge_graph action=references locator=…` returns the conversations that cited it, each with the surface it ran on (Chat or Build) and its own reference count | ✅ beyond |
+| A reference carries a count, not just existence | Obsidian counts references per link; no agent product does | Every edge reports `refs` and `turns`. A conversation that leaned on a file across nine turns and one that glanced at it once are different facts, and collapsing them discards the only signal that says which matters | ✅ beyond |
+| A broken reference is reported, not dropped | `unresolvedLinks` is a first-class half of Obsidian's cache; agent products silently omit dead citations | Resolution is `resolved`, `unresolved`, `external` or `attachment`. A citation whose file has been deleted comes back marked, because "the answer rested on something that is gone" is more useful than a shorter list — and omitting it would make the work look ungrounded rather than grounded in something missing | ✅ beyond |
+| A reference resolves to text, not a document | A citation elsewhere is a link the model must re-open | `action=passages` returns the bounded text the source handed an earlier turn, with its session, turn and capture time. A backlink without a passage is a rumour | ✅ beyond |
+| The text is dated as a snapshot | — | Every passage says it is what reached a turn *then*. Unsaid, a model would quote a year-old passage as the present contents of a file it never opened | ✅ beyond |
+| Related material is weighted by its evidence | A vault's links are authored; Raiker's are inferred | Co-cited sources report `shared_sessions` — the number of conversations that needed both. Nobody wrote these edges, so the strength of the claim travels with it rather than hiding behind a line on a picture | ✅ beyond |
+| Reading references opens nothing new | — | `references` and `passages` re-run no tool, re-read no file, and reach only material that already entered one of this owner's turns. Both are owner-scoped in SQL, and a test asserts another account's passages are unreadable | ✅ |
+| The map shows unresolved references too | Obsidian renders unresolved links distinctly; no agent product draws them | A cited file that no longer exists is drawn hollow with a dashed outline and reads **Missing** in the inspector, searchable as `status:missing` | ✅ beyond |
+
+**Where Raiker's graph is weaker than a vault's, stated rather than papered
+over.** Obsidian's edges are authored: a person wrote `[[deploy]]` and meant it.
+Raiker's are inferred from co-citation, which is the much weaker claim that some
+work needed both things. That is why co-citation edges are labelled
+`shared_sessions` rather than presented as links, and why the reference graph is
+not fed into retrieval scoring — an inferred edge is good enough to *offer a
+model somewhere to look* and not good enough to *change what a search returns*.
+
 ---
 
 ### Categorical confirmation — does this go beyond the reference platforms?
@@ -759,6 +798,11 @@ Asked and answered per addition, rather than assumed.
 | Naming the embedding space on every reply | **Yes, beyond.** | Reference products do not disclose which embedding answered, because they have one and it does not change. Raiker's is owner-selected and may be a labelled lexical fallback, so not saying would be a claim of semantics it may not have. |
 | Bounded, reported graph anchoring | **Yes, beyond.** | Products with graph retrieval do not disclose *what the traversal started from*. Naming the anchors turns "the graph leg ran" into "it ran from *helios*", which is the difference between a fact a reader can check and one they must accept. |
 | A model-facing graph traversal tool | **Parity.** | Hermes exposes graph tools and Cowork surfaces connected work. Raiker had the data and not the tool; this closes a gap rather than opening a lead. The *governance* of that tool — capability gate, evidence per edge, sensitivity filtering inherited from memory — is where the lead is, and it is listed separately above. |
+| Backlinks over the citation ledger (MEM-14) | **Yes, beyond.** | Cowork, ChatGPT, Codex and Claude Code all show a model what *this* turn used, and none lets it ask what *other* work used the same thing. The inverse is where the value is: it is how a model discovers that a file it just read is the one three earlier conversations argued about, which is a fact no forward citation list can produce. Obsidian has it for a vault of authored notes; no agent product has it for a work history. |
+| Reference counts and co-citation weights | **Yes, beyond.** | Borrowed from Obsidian rather than invented, and beyond the agent field because no reference product models the citation record as a graph at all. Counting matters for the same reason it does in a vault: presence is nearly free and frequency is not, so an uncounted edge set ranks a passing mention with a dependency. |
+| Unresolved references reported rather than dropped | **Yes, beyond.** | The reference platforms drop dead citations silently, which is the failure mode that looks like success — the work reads as ungrounded rather than as grounded in something deleted. Raiker reports four resolution states and refuses to guess about targets it never held, calling a web page `external` rather than `unresolved`. |
+| Stored passages, dated as snapshots | **Yes, beyond.** | Two claims at once. That a reference resolves to *text* rather than to a document is Obsidian's block reference applied to a citation record. That the text is labelled as what reached a turn at a moment is Raiker's own: it is the difference between a quotation and an unchecked assertion about a file's present contents, and a model given the first without the second will make the second. |
+| Refusing to feed inferred edges into retrieval | **A restraint, not a capability.** | Recorded because the opposite is the tempting build. Co-citation edges are inferred, and wiring them into scoring would let "these two files were open together once" reorder a search — topology outranking evidence, which is the failure MEM-12's `max`-not-sum rule already exists to prevent. The reference graph offers a model somewhere to look; it does not change what a search returns. |
 
 **Deliberately not built, with the reason.** The **Knowledge Map** page stays a
 human surface. It is a visualisation of sessions, tasks, approvals, memories and

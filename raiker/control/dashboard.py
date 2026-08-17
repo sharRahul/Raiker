@@ -80,6 +80,7 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
+from raiker.tools.graph_tools import reference_resolution
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -2191,12 +2192,25 @@ class DashboardService:
             # drawing the same file twice.
             if node_id not in context_nodes:
                 context_nodes.add(node_id)
+                # MEM-14 — a citation whose file has since been deleted is drawn
+                # as `missing` rather than omitted. Obsidian keeps its
+                # unresolved links for the same reason: "this answer rested on
+                # something that is gone" is more useful than a tidier map, and
+                # dropping the node would leave the work looking ungrounded
+                # instead of grounded in something that has moved.
+                status = reference_resolution(
+                    self.workspace_root,
+                    kind=kind,
+                    locator=locator,
+                    attachment_id=str(cited["attachment_id"] or ""),
+                    tool_name=str(cited["tool_name"] or ""),
+                )
                 nodes.append(
                     BrainNodeView(
                         node_id,
                         CONTEXT_NODE_TYPES.get(kind, "source"),
                         title[:80],
-                        "cited",
+                        "missing" if status == "unresolved" else "cited",
                         f"{kind}" + (f" · via {cited['tool_name']}" if cited["tool_name"] else ""),
                     )
                 )

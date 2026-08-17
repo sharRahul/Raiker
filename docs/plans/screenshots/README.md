@@ -24,16 +24,22 @@ running `raiker-web` in Chromium.
 
 ## The 2026-08-17 round
 
-Three screenshots, prefix `r0817-`, captured by
-[`apps/web/e2e/fts5-mem03-bug194-live.spec.ts`](../../../apps/web/e2e/fts5-mem03-bug194-live.spec.ts)
-against a fresh workspace, with the Anthropic credential entered through
-Raiker's own connect dialog rather than an environment variable.
+Five screenshots, prefix `r0817-`, captured against fresh workspaces. The first
+three come from
+[`apps/web/e2e/fts5-mem03-bug194-live.spec.ts`](../../../apps/web/e2e/fts5-mem03-bug194-live.spec.ts),
+with the Anthropic credential entered through Raiker's own connect dialog rather
+than an environment variable; the last two are the Knowledge Map, from
+[`knowledge-map-work-live.spec.ts`](../../../apps/web/e2e/knowledge-map-work-live.spec.ts)
+and
+[`reference-graph-live.spec.ts`](../../../apps/web/e2e/reference-graph-live.spec.ts).
 
 | File | Shows |
 |---|---|
 | `r0817-01-memory-recall-backend.png` | FIXED-230 — Memory's **Recall backend** card naming the embedding space recall searches, and saying in one sentence that this one matches words rather than meaning |
 | `r0817-02-anthropic-connected-via-ui.png` | The provider connected and its pinned model reporting reachable, from the credential typed into the product |
 | `r0817-03-chat-search-bm25-ranked.png` | FIXED-231 — chat search answered by the FTS5 index, each hit carrying a snippet quoting the matched term |
+| `r0817-04-knowledge-map-work-graph.png` | FIXED-235 — the Knowledge Map's filter row naming the owner's own material, where it once listed six types for a graph that was mostly event rows |
+| `r0817-05-knowledge-map-unresolved-reference.png` | FIXED-236 — a cited file that has since been deleted, drawn hollow with a dashed outline and reading **Missing** in the inspector. Before the fix it was indistinguishable from a file still on disk |
 
 The whole `pages/` sweep was re-captured in the same round, with zero console
 errors across all 23 pages.

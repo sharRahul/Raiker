@@ -422,7 +422,7 @@
 
     <div class="graph-workspace" bind:this={graphElement} use:graphInteractions role="application" aria-label="Interactive force-directed knowledge graph">
       <div class="vignette"></div>
-      <svg class="graph-stage" width={graphWidth} height={graphHeight} aria-label={`${renderedNodes.length} nodes and ${renderedLinks.length} relationships`}>
+      <svg class="graph-stage" width={graphWidth} height={graphHeight} aria-label={`${renderedNodes.length} node${renderedNodes.length === 1 ? "" : "s"} and ${renderedLinks.length} relationship${renderedLinks.length === 1 ? "" : "s"}`}>
         <defs><marker id="arrow" viewBox="0 -5 10 10" refX="16" refY="0" markerWidth="5" markerHeight="5" orient="auto"><path d="M0,-5L10,0L0,5" fill="rgba(180,188,205,.55)" /></marker></defs>
         <g transform={`translate(${transform.x},${transform.y}) scale(${transform.k})`}>
           {#each renderedLinks as edge (`${nodeId(edge.source)}:${nodeId(edge.target)}:${edge.relationship}`)}
@@ -437,7 +437,11 @@
           {#each renderedNodes as node (node.node_id)}
             <g class="graph-node" class:dimmed={highlighted.size > 0 && !highlighted.has(node.node_id)} class:selected={selectedIds.includes(node.node_id)} class:virtual={node.node_id.startsWith("starter:")} transform={`translate(${node.x ?? 0},${node.y ?? 0})`} role="button" tabindex="0" aria-label={`${node.label}, ${node.node_type} record, ${node.degree} connections`} onpointerenter={() => hoveredId = node.node_id} onpointerleave={() => hoveredId = null} onpointerdown={(event) => dragStart(event, node)} onpointermove={(event) => dragMove(event, node)} onpointerup={(event) => dragEnd(event, node)} onclick={(event) => selectNode(event, node)} ondblclick={(event) => { event.stopPropagation(); centreNode(node); }} oncontextmenu={(event) => { event.preventDefault(); event.stopPropagation(); contextMenu = { x: event.clientX, y: event.clientY, node }; }} onkeydown={(event) => { if (event.key === "Enter") selectNode(event as unknown as MouseEvent, node); }}>
               <circle class="halo" r={radius(node) + 7} fill={node.color} />
-              <circle class="node-circle" r={radius(node)} fill={node.color} stroke={node.status === "failed" ? "#ef4444" : node.node_type === "approval" ? "#facc15" : node.color} />
+              <!-- A cited source whose file is gone is drawn hollow with a dashed
+                   outline, the way an unresolved link renders in a vault: the work
+                   was grounded in something, and that something has been deleted.
+                   Hiding it would make the conversation look ungrounded instead. -->
+              <circle class="node-circle" class:unresolved={node.status === "missing"} r={radius(node)} fill={node.status === "missing" ? "transparent" : node.color} stroke={node.status === "failed" ? "#ef4444" : node.node_type === "approval" ? "#facc15" : node.color} />
               {#if showLabels && (transform.k >= labelThreshold || node.degree >= 4 || selectedIds.includes(node.node_id) || hoveredId === node.node_id)}<text class="node-label" y={radius(node) + 15} text-anchor="middle">{node.label}</text>{/if}
             </g>
           {/each}
@@ -448,7 +452,7 @@
         <div class="empty-copy"><strong>Build your knowledge graph</strong><span>Add sources, complete conversations, approve memories, or create tasks. Relationships will appear automatically.</span></div>
       {/if}
 
-      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if showingStarter}<span>Starter view</span><i></i><span>nothing recorded yet</span>{:else}<span>{renderedNodes.length} nodes</span><i></i><span>{renderedLinks.length} relationships</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
+      <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if showingStarter}<span>Starter view</span><i></i><span>nothing recorded yet</span>{:else}<span>{renderedNodes.length} node{renderedNodes.length === 1 ? "" : "s"}</span><i></i><span>{renderedLinks.length} relationship{renderedLinks.length === 1 ? "" : "s"}</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
       {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
@@ -542,7 +546,7 @@
   .graph-stage { position:absolute; inset:0; z-index:2; overflow:visible; }
   line { stroke:rgba(180,188,205,.22); stroke-width:calc(var(--link-width) * 1px); transition:opacity .15s, stroke .15s; } line.highlighted { stroke:rgba(137,180,250,.9); stroke-width:calc(var(--link-width) * 1.8px); } line.instruction { stroke-dasharray:3 7; stroke:rgba(180,188,205,.36); }
   .particle { filter:drop-shadow(0 0 3px currentColor); opacity:.8; }
-  .graph-node { cursor:pointer; outline:none; transition:opacity .15s; } .graph-node.dimmed { opacity:.12; } .node-circle { stroke-width:1.2px; filter:drop-shadow(0 0 3px rgba(255,255,255,.12)); transition:r .15s, filter .15s, stroke-width .15s; } .halo { opacity:.06; transition:opacity .15s; } .graph-node:hover .halo,.graph-node.selected .halo { opacity:.24; } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:#dbeafe; stroke-width:2px; filter:drop-shadow(0 0 8px rgba(137,180,250,.72)); } .graph-node.virtual .node-circle { opacity:.8; }
+  .graph-node { cursor:pointer; outline:none; transition:opacity .15s; } .graph-node.dimmed { opacity:.12; } .node-circle { stroke-width:1.2px; filter:drop-shadow(0 0 3px rgba(255,255,255,.12)); transition:r .15s, filter .15s, stroke-width .15s; } .halo { opacity:.06; transition:opacity .15s; } .graph-node:hover .halo,.graph-node.selected .halo { opacity:.24; } .graph-node:hover .node-circle,.graph-node.selected .node-circle { stroke:#dbeafe; stroke-width:2px; filter:drop-shadow(0 0 8px rgba(137,180,250,.72)); } .graph-node.virtual .node-circle { opacity:.8; } .node-circle.unresolved { stroke-dasharray:2.5 2.5; stroke-width:1.6px; }
   .node-label { fill:rgba(238,240,246,.88); paint-order:stroke; stroke:#17181c; stroke-width:3px; stroke-linejoin:round; font-size:11px; font-family:var(--font-sans); pointer-events:none; }
   .empty-copy { position:absolute; z-index:4; left:50%; top:20px; transform:translateX(-50%); display:grid; gap:4px; width:min(520px, 80%); text-align:center; pointer-events:none; } .empty-copy strong { font-size:.92rem; } .empty-copy span { color:rgba(210,215,228,.56); font-size:.75rem; line-height:1.45; }
   .summary-pill,.viewport-controls,.graph-meta,.depth-control { position:absolute; z-index:5; display:flex; align-items:center; border:1px solid rgba(180,188,205,.14); background:rgba(20,21,25,.82); backdrop-filter:blur(14px); color:#b9c0cf; box-shadow:0 8px 24px #0005; }

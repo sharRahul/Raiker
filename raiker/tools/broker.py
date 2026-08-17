@@ -233,6 +233,8 @@ class ToolBroker:
                 str(args.get("action", "")),
                 query=str(args.get("query", "")),
                 entity_id=str(args.get("entity_id", "")),
+                locator=str(args.get("locator", "")),
+                session_id=str(args.get("session_id", "")),
                 scope=args.get("scope"),
                 max_results=int(args.get("max_results", 50)),
                 owner_principal_id=self.owner_scope,

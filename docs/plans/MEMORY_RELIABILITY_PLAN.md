@@ -61,6 +61,7 @@ onwards are open.
 | [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
 | [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-13](#mem-13--the-knowledge-graph-was-drawn-for-a-person-and-unreachable-from-a-turn) | Medium | Agent reach | Fixed 2026-08-17 |
+| [MEM-14](#mem-14--the-citation-ledger-could-only-be-read-forwards) | Medium | Agent reach | Fixed 2026-08-17 |
 
 ---
 
@@ -626,6 +627,62 @@ other recalled material, labelled untrusted.
 **Evidence.** `tests/test_model_facing_memory_graph.py` — the discover-then-walk
 sequence, name resolution, and the test that archiving the evidence removes the
 edge.
+
+---
+
+## MEM-14 — The citation ledger could only be read forwards
+
+**Severity: Medium. Area: agent reach. Status: fixed 2026-08-17.**
+
+**Observed.** MEM-13 gave a model a graph of **claims**. A model working in an
+unfamiliar workspace also needs the graph of **material**: which work used which
+source, what was used beside it, and what that source said at the time. Raiker
+recorded all three and read none of them back.
+
+`turn_sources` holds one row per source a turn used — the target's `locator`,
+the tool that fetched it, and `passage`, the bounded text that really reached
+the model. It was read in exactly one direction, `load_turn_sources(session_id,
+…)`, for the citation chips under a single answer.
+
+**Reproduce (before).** In a workspace with a dozen conversations behind it, ask
+a turn what other work has touched `docs/runbook.md` and what it said. Every
+available path re-reads the file from disk. The earlier conversations are
+unreachable, and so is the version of the passage those conversations saw.
+
+**Root cause.** No missing data and no bug — a table read from one end. Every
+fact was stored, indexed only by the turn that wrote it, so reading by target
+meant a full scan and nobody had written the read.
+
+**Reference model.** `obsidianmd/obsidian-developer-docs`, reviewed at the
+owner's suggestion. Obsidian's `MetadataCache` names the reading Raiker was not
+doing: `resolvedLinks` as *source → target → count*, `unresolvedLinks` as its
+equally first-class other half, `getBacklinksForFile()` for the inverse, and
+block references that resolve to a paragraph rather than a document. Three
+properties were taken deliberately — a link carries a count, an unresolved link
+is reported rather than dropped, and a reference resolves to text.
+
+**Fix.** Four owner-scoped reads (`list_source_backlinks`,
+`list_source_outlinks`, `list_co_cited_sources`, `list_source_passages`), a
+`(locator, principal_id)` index, and two `knowledge_graph` actions over them:
+`references`, anchored on a locator or a session, and `passages`. Each target is
+marked `resolved`, `unresolved`, `external` or `attachment` — four states, not
+two, because calling a web page unresolved for not being on this disk would be a
+claim about the internet.
+
+**Deliberately not built.** Co-citation edges are **not** fed into retrieval
+scoring. They say some work needed both of two things, which is far weaker than
+an authored link, and letting that reorder a search would put topology above
+evidence — the failure MEM-12's `max`-not-sum rule already exists to prevent.
+
+**User-interface outcome.** The Knowledge Map draws the unresolved half. A cited
+file that no longer exists renders hollow with a dashed outline, reads
+**Missing** in the inspector, and is searchable as `status:missing`; it used to
+be indistinguishable from a file still on disk.
+
+**Evidence.** `tests/test_reference_graph.py`, including the cross-account
+passage read — the one case here that would be a disclosure rather than a wrong
+answer — and the unresolved-citation case in
+`tests/test_knowledge_map_graph.py`.
 
 
 Recorded so the entries above are read against the right baseline. Confirmed by

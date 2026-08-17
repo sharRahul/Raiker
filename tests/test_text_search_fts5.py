@@ -151,6 +151,37 @@ def test_operator_shaped_prose_is_read_as_words_not_as_syntax(tmp_path: Path) ->
         assert found == [memory_id], query
 
 
+def test_a_build_without_fts5_keeps_fts4_and_still_answers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The fallback branch, exercised rather than assumed.
+
+    A build without FTS5 is the case the probe exists for, and it is the case
+    no CI runner has — every platform Raiker targets ships FTS5, so without
+    forcing it this path would be dead code that only fails on someone else's
+    machine. The `snippet()` assertion is the point: FTS4 numbers the column
+    *after* the markers, and the wrong order returns NULL for every row rather
+    than raising, so a non-empty snippet is what proves the order is right.
+    """
+    monkeypatch.setattr(SQLiteStore, "_text_search_engine", "fts4")
+    store = SQLiteStore(tmp_path)
+    assert store.resolved_text_search_engine() == "fts4"
+
+    memory_id = _write(store, tmp_path, "The deployment runbook lives in the ops repository.")
+    assert [row["memory_id"] for row in store.search_approved_memory("deployment")] == [memory_id]
+
+    store.create_session("sess_fts4", str(tmp_path), title="Deploys")
+    store.insert_turn("sess_fts4", "turn_fts4", "How do we handle deployment?")
+    store.complete_turn("turn_fts4", "completed", "Read the runbook.")
+    hits = store.search_conversation_turns("deployment")
+    assert [hit["turn_id"] for hit in hits] == ["turn_fts4"]
+    assert "deployment" in str(hits[0]["snippet"]).lower()
+
+    with store.connect() as connection:
+        for table in ("approved_memory_fts", "conversation_fts"):
+            assert SQLiteStore._index_engine(connection, table) == "fts4", table
+
+
 @pytest.mark.parametrize("query", ("a (b", 'quote"', "*", "  "))
 def test_a_query_with_no_indexable_term_answers_empty_rather_than_raising(
     tmp_path: Path, query: str

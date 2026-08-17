@@ -57,6 +57,7 @@ onwards are open.
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
+| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium | Retrieval quality | Open — raised 2026-08-17 |
 
 ---
 
@@ -435,6 +436,52 @@ log, which is the same class of defect one layer down.
 ---
 
 ## Verified working (no action needed)
+
+---
+
+## MEM-10 — Semantic recall is selectable, but a default install has nothing to select
+
+**Severity: Medium. Area: retrieval quality. Raised 2026-08-17 while closing
+MEM-03.**
+
+**Observed.** Memory → **Recall backend** offers **Automatic** and nothing else
+on a workspace that has never been configured, and states plainly that
+`raiker-local-hash-v1` "matches words, not meaning". That sentence is true and
+it is the honest thing to say — but it is also the whole story for every owner
+who has not accepted provider egress. The paraphrase case MEM-03 opened with,
+"where should backups go" recalling "the owner prefers the encrypted NAS
+target", still does not work out of the box.
+
+**Reproduce.** Install fresh, approve a memory, search it with a synonym-only
+query. The lexical leg misses; the vector leg is the labelled fallback and
+misses identically. The interface says why, which is the MEM-03 fix — but the
+recall does not happen.
+
+**Root cause.** MEM-03 built the *selection* mechanism, not a thing to select.
+`resolve_embedding_backend` is evidence-led: a space is offered exactly when
+the workspace holds vectors in it, and a default install holds none. Producing
+them needs an embedding model, and the two honest ways to get one — a download,
+or a provider call — are both owner decisions rather than defaults. Making
+either the default would be the thing this codebase does not do.
+
+**Proposed fix.** Serve a small sentence-embedding model through the local
+runtime Raiker already manages. `raiker/models/providers/llama_cpp_server.py`
+speaks the OpenAI-compatible `/v1/embeddings` shape and
+`raiker/models/gguf.py` already handles revision-pinned, dry-run-capable
+downloads, so the missing pieces are a curated GGUF embedding model in the
+library, a Memory-page action that offers the download with its size stated
+before anything is fetched, and a governed backfill that projects existing
+approved memories into the new space. Record model, revision and dimension on
+every vector — the columns exist and `list_embedding_spaces` already reads them
+— and keep `raiker-local-hash-v1` as the labelled fallback for an owner who
+declines.
+
+**Required user-interface outcome.** The Recall backend card offers the
+download as an owner choice with its cost stated, never fetches on its own, and
+after a backfill says which space is in force and how many memories are
+reachable in it. An owner who declines sees exactly what they see today,
+including the sentence about what the fallback cannot do.
+
 
 Recorded so the entries above are read against the right baseline. Confirmed by
 reading the code and its tests on **2026-08-11**:

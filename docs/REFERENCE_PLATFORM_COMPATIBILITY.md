@@ -721,9 +721,9 @@ returns one leg fewer instead.
 because the honest options are a model download or provider egress, and both are
 the owner's decision rather than a default. A bundled local sentence-embedding
 model reachable through the existing llama.cpp runtime is the next step and is
-tracked in [`plans/MEMORY_RELIABILITY_PLAN.md`](plans/MEMORY_RELIABILITY_PLAN.md)
-→ MEM-03. `MEM-04`, `MEM-06`, `MEM-07`, `MEM-08` and `MEM-09` are unchanged by
-this round.
+tracked as **MEM-10**, raised in this round in
+[`plans/MEMORY_RELIABILITY_PLAN.md`](plans/MEMORY_RELIABILITY_PLAN.md).
+`MEM-04`, `MEM-06`, `MEM-07`, `MEM-08` and `MEM-09` are unchanged by this round.
 
 ---
 

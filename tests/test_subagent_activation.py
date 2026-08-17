@@ -182,9 +182,15 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
     # the set is — not a constant the production code can quietly grow.
     # `conversation_search` and `code_map_references` (RAIKER-2020) are both
     # local, read-only and egress-free, which is the rule this list encodes.
+    # `knowledge_graph` (MEM-13) joins under that same rule and no other: it
+    # reads SQLite, mutates nothing, makes no network call, and inherits
+    # memory's own scoping — an edge is visible only while the approved memory
+    # evidencing it is active and non-sensitive. It widens what a subagent can
+    # *see* by exactly the relationships whose evidence it could already read
+    # through `memory_search`.
     assert json.loads(contract["allowed_tools_json"]) == sorted(
         ["code_map_references", "code_map_search", "conversation_search", "diff_files",
-         "git_diff", "git_log", "git_status", "glob", "grep",
+         "git_diff", "git_log", "git_status", "glob", "grep", "knowledge_graph",
          "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
          "skill_load", "stat_path", "vector_get"]
     )

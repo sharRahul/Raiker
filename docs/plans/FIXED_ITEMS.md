@@ -236,6 +236,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-232](#fixed-232--the-agents-memory-search-and-the-runtimes-recall-were-two-different-searches) | High | Retrieval consistency (MEM-11) | Fixed |
 | [FIXED-233](#fixed-233--the-graph-leg-of-hybrid-retrieval-never-ran-on-a-real-turn) | High | Retrieval quality (MEM-12) | Fixed |
 | [FIXED-234](#fixed-234--the-knowledge-graph-could-be-looked-at-but-not-asked) | Medium | Agent reach (MEM-13) | Fixed |
+| [FIXED-235](#fixed-235--the-knowledge-map-was-a-map-of-the-runtimes-bookkeeping-not-the-owners-work) | High | Knowledge Map (BUG-218) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -9362,3 +9363,87 @@ recalled material, labelled untrusted.
 
 **Evidence.** `tests/test_model_facing_memory_graph.py` — discover-then-walk,
 name resolution, and the archived-evidence case.
+
+
+---
+
+## FIXED-235 — The Knowledge Map was a map of the runtime's bookkeeping, not the owner's work
+
+**Severity: High. Area: Knowledge Map.**
+
+**Observed.** The Knowledge Map showed tools. Not chats, not Build sessions, not
+context, not files or folders — tools, and mostly not even real ones.
+
+Measured rather than described. A workspace after a single live round produced
+**22 nodes: 20 typed `tool`, one session, one user.** None of the twenty was a
+tool. They were rows of the event index — "turn started", "model request
+completed", "prompt received" — because `brain_view` emitted one node per event
+and typed every one of them `tool`.
+
+**Reproduce (before).** Hold one conversation, open Knowledge Map. The graph is
+a fan of orange dots labelled with event names hanging off a single green dot.
+Nothing on it is a thing the owner made.
+
+**Root cause.** Four separate omissions that read as one symptom.
+
+*The flood.* `list_event_index(limit=250)` was the map's main input, and every
+row became `BrainNodeView(..., "tool", event.event_type.replace("_", " "), ...)`.
+Events outnumber everything else in a workspace by an order of magnitude, so
+whatever else the map drew was buried under them.
+
+*Chat and Build were the same dot.* `sessions.origin` already distinguishes
+them and `brain_view` never read it. The frontend even defined a `conversation`
+colour that nothing ever emitted.
+
+*Context was never read at all.* `turn_sources` — the citation record, the file
+or page an answer was actually grounded in — is not referenced anywhere in
+`brain_view`. Neither are `session_attachment_refs`, so a file the owner
+uploaded to a chat did not appear either.
+
+*Projects were never drawn.* `project` had a colour, sessions carry a
+`project_id`, and no project node was ever emitted.
+
+A fifth, smaller: a memory whose `source_event_id` fell outside the 250-event
+page was drawn **with no edge at all** — a fact floating free of the work that
+produced it.
+
+**Fix.** The map is built from what the owner did.
+
+* **Tools, aggregated.** `summarize_session_tool_use` groups `tool_actions` by
+  `(session, tool)` in SQL. Forty runs of `read_file` is one node reading "40
+  uses", not forty nodes; a tool whose every run failed says so.
+* **Chat and Build are different nodes.** `origin` selects the node type —
+  `conversation`, `build`, `task_run` — and an origin the map has not been
+  taught about still draws as a generic `session` rather than vanishing.
+* **Context is drawn as what it is.** `turn_sources` becomes nodes typed by
+  kind, so a cited file looks like a file and a fetched page looks like a
+  source. A file cited in three sessions is **one** node with three edges,
+  which is the shared dependency a map exists to reveal.
+* **Attachments appear.** Metadata only — the stored blob is never read to draw
+  a node.
+* **Projects hold their sessions**, and the principal owns the project.
+* **Nothing floats.** A memory whose source event has aged out is anchored by
+  resolving that event to its session in one batch query, and failing that, to
+  the owner. A test asserts no node in the graph is edgeless.
+
+**Found while fixing.** Adding `knowledge_graph` to the delegable set tripped
+`test_subagent_activation`, whose comment says the list is written out longhand
+precisely so a widening must be a deliberate edit rather than something the
+production constant grows quietly. That is the guard working; the edit was made
+with the reason recorded, since the tool is local, read-only, egress-free and
+inherits memory's own scoping.
+
+Also: the first version of the context loop emitted a duplicate node when two
+sessions cited one file — same `node_id`, drawn twice. Caught by the test that
+asserts a shared citation is a single node.
+
+**User-interface outcome.** The filter row lists what the map now contains —
+Chats, Build, Projects, Folders, Files, Context, Tasks, Memories, Tools,
+Approvals — rather than the six types it listed when the map was mostly event
+rows. The counters read "Chats & builds", "Files & folders" and "Context used".
+Build sessions have their own colour.
+
+**Evidence.** `tests/test_knowledge_map_graph.py`. Re-measured on the same
+workspace that produced the 20/22 figure above: the twenty tool nodes are gone
+and the session is typed `conversation`. That workspace genuinely ran no tools,
+so zero tool nodes is the correct answer rather than a smaller wrong one.

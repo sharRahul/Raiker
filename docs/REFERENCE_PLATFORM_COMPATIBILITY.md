@@ -716,6 +716,37 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Hybrid retrieval actually runs all its legs | Reference products do not describe their retrieval as legged | **MEM-12.** The graph leg was gated on an `entity_id` the only production caller never passed, so the third leg never ran on a real turn. Anchors are now resolved from the query by whole-term match, bounded to three, and reported. Two paths to one memory take `max`, not a sum, so a densely connected entity cannot outrank an exact match on topology | ✅ |
 | Graph anchoring cannot fire on a coincidence | — | Matching is on whole normalized terms with space padding, never `LIKE '%term%'`: "nas" must not anchor on "nasty business". A traversal seeded from a coincidence is worse than no traversal, because it adds unrelated memories to a turn wearing the label "recalled". Asserted by test | ✅ beyond |
 
+### The Knowledge Map — what a map of your work should show
+
+Added **2026-08-17** after the map was found to be showing the runtime's own
+bookkeeping. Measured: 20 of 22 nodes on a real workspace were typed `tool`, and
+none of them was a tool. Compared against how **Claude Cowork**, **ChatGPT**,
+**OpenClaw** and **Hermes Agent** surface the relationship between a
+conversation, the material it used, and the files it touched.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| Conversations are distinguishable by kind | Cowork and ChatGPT separate chats from delegated work in their lists | Chat, Build and task runs are three node types with three colours. `sessions.origin` always knew; the map did not read it. An unknown origin still draws rather than vanishing | ✅ |
+| Work is grouped by project | Cowork groups by project; ChatGPT by folder | Sessions hang from their project node, and the project from the owner | ✅ |
+| The map shows what an answer was grounded in | ChatGPT shows per-message citations; none of the reference products draws them as a **shared graph** | `turn_sources` becomes typed nodes — a cited file looks like a file, a fetched page like a source. A file cited in three sessions is one node with three edges | ✅ beyond |
+| Files the owner attached are visible | Cowork and ChatGPT list attachments per thread | Attachment nodes edged from their session, metadata only — the stored blob is never read to draw a node | ✅ |
+| Tool use is summarised, not enumerated | Reference products show a per-turn activity list, not a graph | One node per `(session, tool)` carrying its use count and whether every run failed. Forty runs of `read_file` is one node reading "40 uses" | ✅ beyond |
+| Nothing on the map floats | Not a control any reference product states | Every node has an anchor. A memory whose source event has aged out of the page is resolved to its session in one batch query, and failing that to the owner. Asserted by a test that walks the whole graph | ✅ beyond |
+
+**Raiker difference.** The reference products present this material as *lists*:
+a thread list, a citation list under a message, an attachment tray. Raiker
+presents it as one graph in which the same file cited by three different
+conversations is visibly one file — which is the question a list cannot answer
+and the reason a map is worth having at all.
+
+**Deliberately still a human surface.** The Knowledge Map page is not exposed to
+the model. Everything on it is reachable through `conversation_search`,
+`memory_search`, `knowledge_graph` and the task and approval tools, so a second
+path would add no capability — and a second path to the same facts is exactly
+the defect MEM-11 was.
+
+---
+
 ### Categorical confirmation — does this go beyond the reference platforms?
 
 Asked and answered per addition, rather than assumed.

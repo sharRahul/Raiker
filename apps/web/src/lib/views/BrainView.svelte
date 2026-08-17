@@ -11,13 +11,28 @@
   type GraphLink = BrainEdge & { source: string | GraphNode; target: string | GraphNode };
   type Group = { name: string; query: string; color: string };
 
+  // BUG-218 — Chat and Build are different work and now say so. `build` and
+  // `task_run` are new node types; `session` stays for anything whose origin
+  // the store does not recognise, so an unknown surface still draws.
   const COLORS: Record<string, string> = {
     user: "#f3f5fa", workspace: "#77d5ee", project: "#a78bfa", source: "#60a5fa",
     folder: "#818cf8", file: "#60a5fa", session: "#58d68d", conversation: "#58d68d",
+    build: "#38bdf8", task_run: "#f5b942",
     task: "#f5b942", memory: "#2dd4bf", tool: "#fb923c", approval: "#facc15",
     agent: "#c084fc", schedule: "#f5b942", backup: "#60a5fa",
   };
-  const FILTER_TYPES = ["folder", "file", "session", "task", "memory", "tool"];
+  // The filter row is what an owner reaches for to answer "show me only my
+  // files". It lists what the map now actually contains rather than what it
+  // contained when the map was mostly event rows.
+  const FILTER_TYPES = [
+    "conversation", "build", "project", "folder", "file", "source",
+    "task", "memory", "tool", "approval",
+  ];
+  const FILTER_LABELS: Record<string, string> = {
+    conversation: "Chats", build: "Build", project: "Projects", folder: "Folders",
+    file: "Files", source: "Context", task: "Tasks", memory: "Memories",
+    tool: "Tools", approval: "Approvals",
+  };
 
   let brain = $state<BrainData | null>(null);
   let loadError = $state<string | null>(null);
@@ -442,7 +457,7 @@
       {#if settingsOpen}
         <aside class="settings-panel" aria-label="Graph settings">
           <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
-          <details open><summary>Filters</summary><label class="panel-search"><Icon name="search" size={14} /><input bind:value={search} placeholder="Search records…" /></label>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{type === "session" ? "Conversations" : type === "memory" ? "Approved memories" : type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
+          <details open><summary>Filters</summary><label class="panel-search"><Icon name="search" size={14} /><input bind:value={search} placeholder="Search records…" /></label>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{FILTER_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
           <details open><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
           <details open><summary>Display</summary><label class="check-row"><input type="checkbox" bind:checked={showArrows} /><span>Direction arrows</span></label><label class="check-row"><input type="checkbox" bind:checked={showLabels} /><span>Node labels</span></label><label class="check-row"><input type="checkbox" bind:checked={showParticles} /><span>Relationship particles</span></label><label class="range-row"><span>Text fade threshold</span><input type="range" min="0.35" max="1.5" step="0.05" bind:value={labelThreshold} /></label><label class="range-row"><span>Node size</span><input type="range" min="0.7" max="1.7" step="0.1" bind:value={nodeScale} /></label><label class="range-row"><span>Link thickness</span><input type="range" min="0.5" max="2.5" step="0.1" bind:value={linkThickness} /></label></details>
           <details open><summary>Forces</summary><label class="range-row"><span>Centre force</span><input type="range" min="0" max="0.3" step="0.01" bind:value={centerStrength} /></label><label class="range-row"><span>Repel force</span><input type="range" min="-500" max="-40" step="10" bind:value={chargeStrength} /></label><label class="range-row"><span>Link force</span><input type="range" min="0" max="1" step="0.05" bind:value={linkStrength} /></label><label class="range-row"><span>Link distance</span><input type="range" min="30" max="220" step="5" bind:value={linkDistance} /></label><label class="range-row"><span>Collision radius</span><input type="range" min="0" max="30" step="1" bind:value={collisionPadding} /></label></details>

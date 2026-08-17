@@ -602,6 +602,28 @@ def memory_security_posture(workspace_root: str | Path | None = None) -> dict[st
     }
 
 
+def text_search_posture(store: SQLiteStore) -> dict[str, Any]:
+    """Which text-search engine is really in force, and what it costs.
+
+    Three keys rather than one, because "fts4" alone means nothing to a reader
+    who has not read the migration: `text_search_ranking` says what they will
+    actually notice, and `text_search_reason` says whether the fallback is a
+    problem to fix or simply what this platform has.
+    """
+    engine = store.resolved_text_search_engine()
+    ranked = engine == TEXT_SEARCH_FTS5
+    return {
+        "text_search_engine": engine,
+        "text_search_ranking": "bm25_relevance" if ranked else "recency",
+        "text_search_reason": (
+            ""
+            if ranked
+            else "this SQLite build has no FTS5, so search ranks by recency rather "
+            "than relevance (sqlcipher3-wheels 0.5.6 or newer provides it)"
+        ),
+    }
+
+
 def store_health(workspace_root: str | Path) -> dict[str, Any]:
     """Whether the encrypted store can actually be opened and read, right now.
 
@@ -611,7 +633,15 @@ def store_health(workspace_root: str | Path) -> dict[str, Any]:
     """
     posture = memory_security_posture(workspace_root)
     try:
-        SQLiteStore(workspace_root).connect().execute("SELECT 1")
+        store = SQLiteStore(workspace_root)
+        store.connect().execute("SELECT 1")
+        # RAIKER-2025 — reported for the same reason `cipher_memory_security`
+        # is: it is a property of the build this process loaded, not of any
+        # configuration, and the degraded case is *silent*. An FTS4 fallback
+        # breaks nothing and answers everything — it just ranks by recency
+        # instead of relevance, which is indistinguishable from working unless
+        # something says so.
+        posture = {**posture, **text_search_posture(store)}
     except StoreUnavailableError as exc:
         return {"store": "unavailable", "reason": exc.reason, "detail": exc.detail, **posture}
     except MemoryError:
@@ -6417,45 +6447,62 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         # before it was ranked. `bm25()` returns a *negative* score that is more
         # negative the better the match, so ascending order is best-first.
         #
-        # Driving from the FTS index, not joining onto it. Written as a join, the
-        # planner picks `approved_memory` as the outer loop and re-runs the
-        # full-text match once per candidate row: at 800 memories the same match
-        # costs 16 ms on its own and 13 s through the join. `IN (SELECT …)`
-        # evaluates the index once and probes the table by primary key.
+        # **The index is evaluated exactly once**, and that constraint is older
+        # than the ranking. The pre-FTS5 comment here recorded why: written so
+        # that the planner picks `approved_memory` as the outer loop, the
+        # full-text match re-runs once per candidate row, and at 800 memories the
+        # same match costs 16 ms alone and 13 s that way.
+        #
+        # The first FTS5 attempt broke that rule and paid for it. Scoring with a
+        # *correlated scalar subquery* — `(SELECT bm25(…) WHERE memory_id = m.…
+        # AND … MATCH ?)` — put the rank on the row but re-scanned the index per
+        # row, measured at **5.2 s** for the same 800 memories. Selecting the
+        # rank alongside `memory_id` in a single subquery and joining on it
+        # keeps one `SCAN approved_memory_fts` in the plan and a primary-key
+        # probe per hit: **23 ms**, and the ranking is free.
+        #
+        # Written as a derived table rather than a `WITH … AS MATERIALIZED` CTE
+        # on purpose: both plan identically here, and the hint needs SQLite 3.35
+        # while FTS5 itself only needs 3.9 — so the CTE would narrow the set of
+        # builds this path works on for no measured gain.
         ranked = self.resolved_text_search_engine() == TEXT_SEARCH_FTS5
-        rank = (
+        if ranked:
             # `bm25()` resolves its first argument as the FTS table's own name,
-            # not as a query alias, so this subquery deliberately does not alias
-            # the table. Weights are one per declared column: `memory_id` is
-            # UNINDEXED and can never match, `text` carries the answer, `tags`
-            # are a weaker signal than the sentence the owner approved.
-            """(SELECT bm25(approved_memory_fts, 0.0, 1.0, 0.4) FROM approved_memory_fts
-                 WHERE approved_memory_fts.memory_id = m.memory_id
-                   AND approved_memory_fts MATCH ?)"""
-            if ranked
-            else "0.0"
-        )
-        sql = f"""SELECT m.*, {rank} AS relevance FROM approved_memory m
-        WHERE m.memory_id IN (SELECT memory_id FROM approved_memory_fts
-                              WHERE approved_memory_fts MATCH ?)
-          AND m.deleted_at IS NULL AND m.archived_at IS NULL
+            # never a query alias, so the inner select does not alias the table.
+            # One weight per declared column: `memory_id` is UNINDEXED and can
+            # never match, `text` carries the answer, and `tags` are a weaker
+            # signal than the sentence the owner actually approved.
+            source = """approved_memory m
+        JOIN (SELECT memory_id, bm25(approved_memory_fts, 0.0, 1.0, 0.4) AS relevance
+              FROM approved_memory_fts WHERE approved_memory_fts MATCH ?) AS ranked
+          ON ranked.memory_id = m.memory_id"""
+            selected = "m.*, ranked.relevance AS relevance"
+            ordering = "ranked.relevance ASC, m.created_at DESC"
+        else:
+            # No relevance score to order by, so recency is the only
+            # deterministic order available — MEM-05's original situation, kept
+            # working for a build that really has no FTS5.
+            source = """approved_memory m
+        JOIN (SELECT memory_id FROM approved_memory_fts
+              WHERE approved_memory_fts MATCH ?) AS ranked
+          ON ranked.memory_id = m.memory_id"""
+            selected = "m.*, 0.0 AS relevance"
+            ordering = "m.created_at DESC"
+        sql = f"""SELECT {selected} FROM {source}
+        WHERE m.deleted_at IS NULL AND m.archived_at IS NULL
           AND m.search_enabled = 1 AND m.sensitivity NOT IN ('secret_like', 'credential_like')
           AND (m.expires_at IS NULL OR m.expires_at > ?)
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
           AND m.superseded_at IS NULL"""
         now = utc_now()
-        expression = " ".join(terms)
-        params: list[Any] = [*([expression] if ranked else []), expression, now, now, now]
+        params: list[Any] = [" ".join(terms), now, now, now]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
         if owner_principal_id:
             sql += " AND m.owner_principal_id = ?"
             params.append(owner_principal_id)
-        # `relevance` is NULL only if the correlated match found nothing, which
-        # the outer `IN` has already excluded; COALESCE keeps such a row from
-        # sorting ahead of every real hit if it ever happens.
-        sql += " ORDER BY COALESCE(relevance, 0.0) ASC, m.created_at DESC LIMIT ?"
+        sql += f" ORDER BY {ordering} LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()

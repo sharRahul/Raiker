@@ -28,6 +28,36 @@ jobs:
       - name: Verify real httpx import
         run: |
           python -c "import httpx; print(httpx.__file__)"
+      # RAIKER-2025 — the runtime probe degrades to FTS4 honestly when a build
+      # has no FTS5, which is right for a user on an unusual platform and wrong
+      # for this repository's own dependency floor. Without this step a wheel
+      # that lost FTS5 would leave every test passing and every search silently
+      # back on recency ordering, because the fallback is designed not to break
+      # anything. So the floor is asserted here, where it can fail loudly.
+      - name: Verify the SQLCipher build provides FTS5
+        run: |
+          python - <<'PY'
+          from importlib.metadata import version
+
+          from sqlcipher3 import dbapi2 as sqlcipher
+
+          connection = sqlcipher.connect(":memory:")
+          print(
+              "sqlcipher3-wheels", version("sqlcipher3-wheels"),
+              "| SQLite", sqlcipher.sqlite_version,
+          )
+          try:
+              connection.execute("CREATE VIRTUAL TABLE probe USING fts5(text)")
+          except Exception as exc:  # noqa: BLE001 - the message is the report
+              raise SystemExit(
+                  "This SQLCipher build has no FTS5, so Raiker's text indexes "
+                  f"would fall back to FTS4 and recency ordering: {exc}. "
+                  "FTS5 arrived in sqlcipher3-wheels 0.5.6; check the floor in "
+                  "pyproject.toml."
+              ) from None
+          print("FTS5: available")
+          PY
+
       - name: Verify SQLCipher memory-security probe
         run: |
           python - <<'PY'

@@ -9111,13 +9111,29 @@ ordered by `created_at DESC` and truncated at the limit. On a workspace holding
 years of history, the exact answer from 2023 sat behind hundreds of newer partial
 matches and was discarded before it was ranked.
 
-**Root cause — and the root cause was false.** MEM-05 recorded it as: *"The
-SQLCipher distribution Raiker ships provides FTS4, not FTS5, so there is no
-BM25."* That sentence was written down, carried forward through several rounds,
-and never checked. It is wrong. `sqlcipher3-wheels` compiles with `ENABLE_FTS5`,
-and so does CPython's bundled SQLite on every platform Raiker targets. An entire
-workaround — a hand-rolled relevance score above the index — had been designed
-around a constraint that did not exist.
+**Root cause — the recorded one was true, and went stale.** MEM-05 recorded it
+as: *"The SQLCipher distribution Raiker ships provides FTS4, not FTS5, so there
+is no BM25."* Measured across every published version of the wheel:
+
+| `sqlcipher3-wheels` | SQLite | FTS5 |
+|---|---|---|
+| 0.5.2 | 3.44.2 | no such module |
+| 0.5.4 | 3.46.1 | no such module |
+| 0.5.6 | 3.50.4 | ✅ |
+| 0.5.7 | 3.51.1 | ✅ |
+
+So the sentence was **correct when it was written** — and stopped being correct
+when the wheel moved underneath it. That is a more useful thing to record than
+"nobody checked": a property of a dependency had been written down once and
+then treated as a property of the project.
+
+Two things let it persist. The declared floor was `>=0.5.0`, a version that was
+**never published at all** (PyPI starts at 0.5.2), so the specifier looked
+deliberate while permitting any FTS5-less wheel. And the fallback is by design
+invisible: an FTS4 index answers every query, so the only symptom was ordering,
+which is exactly what nobody was measuring. An entire workaround — a hand-rolled
+relevance score above the index — had by then been designed around a constraint
+that had already lifted.
 
 **Fix (RAIKER-2025).** The one the false constraint had ruled out.
 
@@ -9145,15 +9161,60 @@ row. The order is derived from the probe. `memory_evaluation_runs.backend_versio
 is written from it too, so an FTS4 measurement and an FTS5 one are never compared
 as though they were the same thing.
 
-**Found on the way.** `bm25()` resolves its first argument as the FTS table's own
-name, not as a query alias, so the correlated ranking subquery deliberately does
-not alias the table — an aliased first attempt failed with `no such column: f`.
+**The dependency, so this cannot silently regress.** The floor moved to
+`sqlcipher3-wheels>=0.5.6` with the measurements above recorded beside it, and
+CI now asserts FTS5 with `bm25()` before the suite runs. Both were needed: the
+runtime probe degrades honestly, which is right for a user on an unusual
+platform and precisely wrong as a repository's own guarantee — without the gate
+a wheel that lost FTS5 would leave every test passing and every search back on
+recency ordering. `scripts/packaging_smoke_test.py` asserts the same of the
+*packaged* build, which is where a frozen bundle would carry the regression to
+someone else's machine.
+
+**Surfaced, because a silent fallback needs a surface.** `/api/health` reports
+`text_search_engine`, `text_search_ranking` and, when degraded,
+`text_search_reason`; the memory integrity report carries `text_search_engine`
+and an `index_engine_mismatch_count` that is non-zero — and makes the report
+*not clean* — when a workspace has been carried to an older host and back.
+
+**Found on the way — and it is the most instructive part of this entry.** The
+first working version of the ranked query scored each row with a *correlated
+scalar subquery*: `(SELECT bm25(…) FROM approved_memory_fts WHERE memory_id =
+m.memory_id AND … MATCH ?)`. Every test passed, every result was correctly
+ranked, and it re-scanned the whole FTS index **once per candidate row** — the
+exact pathology a comment three lines above it had documented and the previous
+`IN (SELECT …)` form existed to avoid.
+
+Measured at 800 memories: **5.2 s**, against **23 ms** for the same query
+written as a single-evaluation join. It was caught not by a test but by CI's
+Python job running past 35 minutes when this repository's history is 15–23, and
+the plan confirmed it: `CORRELATED SCALAR SUBQUERY` → `SCAN
+approved_memory_fts`.
+
+Selecting the rank alongside `memory_id` in one subquery and joining on it keeps
+a single `SCAN approved_memory_fts` and a primary-key probe per hit. A derived
+table rather than `WITH … AS MATERIALIZED`: both plan identically here, and the
+hint needs SQLite 3.35 while FTS5 needs only 3.9, so the CTE would have narrowed
+the builds this path works on for no measured gain.
+
+`tests/test_text_search_fts5.py` now asserts the *plan shape* — one FTS scan, no
+correlated subquery, a primary-key probe — because the defect produces correct
+answers and a timing budget on a shared runner would be flaky.
+
+`bm25()` also resolves its first argument as the FTS table's own name, never a
+query alias, so neither form aliases the table — an aliased first attempt failed
+with `no such column: f`.
 
 **User-interface outcome.** Memory search and chat search return the best match
 first rather than the most recent, and a conversation snippet is marked at the
 matched term on both engines instead of coming back empty on one of them.
 
-**Evidence.** `tests/test_text_search_fts5.py` — including the case MEM-05
-describes: the best answer is the oldest row, five newer rows mention the term
-once each, and it ranks first at `limit=2`. The FTS4→FTS5 conversion is driven
-from a real FTS4 index and asserted to answer the same query afterwards.
+**Evidence.** `tests/test_text_search_fts5.py` — thirteen cases, including the
+one MEM-05 describes (the best answer is the oldest row, five newer rows mention
+the term once each, and it ranks first at `limit=2`) and the upgrade an owner
+will actually perform: a workspace built the way a 0.5.4 release would have left
+it, reopened on this build, with every memory still findable, the best match
+first, the conversation snippet still marked, and the integrity report clean.
+The FTS4 fallback is exercised rather than assumed, because no runner Raiker
+targets has an FTS5-less build and it would otherwise be dead code that fails
+only on someone else's machine.

@@ -474,13 +474,22 @@ Raiker search combines:
 > `approved_memory_fts` and `conversation_fts`.
 >
 > This note used to say the opposite — that the bundled SQLCipher build had no
-> FTS5 module, so `USING fts5(` was rewritten to `USING fts4(`. That was
-> written down, carried forward through several rounds, and never checked, and
-> it was false: `sqlcipher3-wheels` compiles with `ENABLE_FTS5`, and so does
-> CPython's bundled SQLite on every platform Raiker targets. The consequence
-> was real — lexical results were ordered by recency rather than relevance, so
-> the oldest exact answer was the first row a limit discarded (MEM-05, closed
-> as [FIXED-231](plans/FIXED_ITEMS.md)).
+> FTS5 module, so `USING fts5(` was rewritten to `USING fts4(`. **That was true
+> when it was written, and stopped being true without anyone noticing.**
+> Measured across every published version, the wheel gained FTS5 at **0.5.6**:
+> 0.5.2 ships SQLite 3.44.2 and 0.5.4 ships 3.46.1, neither with the module;
+> 0.5.6 ships 3.50.4 and 0.5.7 ships 3.51.1, both with it. The declared
+> floor was `>=0.5.0` — a version that was never published at all — so the
+> specifier resolved happily to a wheel with no FTS5 long after one with it
+> existed.
+>
+> That is the more useful failure to record than "nobody checked": the claim was
+> measured once and then treated as a property of the project rather than of a
+> dependency that moves. The consequence was real — lexical results were ordered
+> by recency rather than relevance, so the oldest exact answer was the first row
+> a limit discarded (MEM-05, closed as [FIXED-231](plans/FIXED_ITEMS.md)) — and
+> the fix is two things, not one: the floor is now `>=0.5.6`, and CI asserts
+> FTS5 so the next silent wheel change fails a build instead of a search.
 >
 > **The engine is now probed rather than declared.**
 > `SQLiteStore.text_search_engine` creates a throwaway `fts5` virtual table in

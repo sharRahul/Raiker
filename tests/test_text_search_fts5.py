@@ -14,9 +14,10 @@ from pathlib import Path
 
 import pytest
 
+from raiker.memory.integrity import inspect_memory_integrity
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.migrations import TEXT_SEARCH_FTS5_MIGRATION_ID
-from raiker.storage.sqlite import SQLiteStore
+from raiker.storage.sqlite import SQLiteStore, store_health
 
 
 def _governance() -> MemoryGovernance:
@@ -180,6 +181,130 @@ def test_a_build_without_fts5_keeps_fts4_and_still_answers(
     with store.connect() as connection:
         for table in ("approved_memory_fts", "conversation_fts"):
             assert SQLiteStore._index_engine(connection, table) == "fts4", table
+
+
+def test_a_workspace_written_by_an_fts5_less_release_upgrades_without_losing_anything(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The upgrade an owner will actually perform, rehearsed end to end.
+
+    `sqlcipher3-wheels` gained FTS5 at 0.5.6; 0.5.2 and 0.5.4 have none. So a
+    workspace created by an earlier Raiker release genuinely holds FTS4 indexes,
+    and the question that matters is not whether the DDL converts but whether
+    the owner loses anything: every memory still findable, the best match still
+    first, the conversation snippet still marked, integrity still clean, and
+    health saying which engine answered.
+    """
+    monkeypatch.setattr(SQLiteStore, "_text_search_engine", "fts4")
+    older = SQLiteStore(tmp_path)
+    memory_ids = [
+        _write(older, tmp_path, text)
+        for text in (
+            "Rotation: rotation of the key is quarterly, and rotation is logged.",
+            "A note mentioning rotation once.",
+            "Backups go to the encrypted NAS target.",
+        )
+    ]
+    older.create_session("sess_upgrade", str(tmp_path), title="Ops")
+    older.insert_turn("sess_upgrade", "turn_upgrade", "How often is rotation done?")
+    older.complete_turn("turn_upgrade", "completed", "Quarterly, and it is logged.")
+    with older.connect() as connection:
+        for table in ("approved_memory_fts", "conversation_fts"):
+            assert SQLiteStore._index_engine(connection, table) == "fts4", table
+
+    # The same files, opened by a build that has FTS5.
+    monkeypatch.setattr(SQLiteStore, "_text_search_engine", None)
+    upgraded = SQLiteStore(tmp_path)
+    with upgraded.connect() as connection:
+        for table in ("approved_memory_fts", "conversation_fts"):
+            assert SQLiteStore._index_engine(connection, table) == "fts5", table
+
+    ranked = [row["memory_id"] for row in upgraded.search_approved_memory("rotation")]
+    assert set(ranked) == {memory_ids[0], memory_ids[1]}, "no memory may be lost"
+    assert ranked[0] == memory_ids[0], "and the best match now ranks first"
+    assert [
+        row["memory_id"] for row in upgraded.search_approved_memory("NAS")
+    ] == [memory_ids[2]]
+    hits = upgraded.search_conversation_turns("rotation")
+    assert [hit["turn_id"] for hit in hits] == ["turn_upgrade"]
+    assert "rotation" in str(hits[0]["snippet"]).lower()
+
+    report = inspect_memory_integrity(store=upgraded, workspace_root=tmp_path)
+    assert report.clean
+    assert report.text_search_engine == "fts5"
+    assert report.index_engine_mismatch_count == 0
+    assert report.fts_count == len(memory_ids)
+
+
+def test_an_index_left_on_the_wrong_engine_is_reported_rather_than_answered_silently(
+    tmp_path: Path,
+) -> None:
+    """A workspace carried to an older host, and back.
+
+    An FTS4 index on an FTS5 build answers every query, so nothing surfaces it
+    except a check that looks. The integrity report is where an owner can act on
+    it — upgrade, or accept recency ordering — so it must not read as clean.
+    """
+    store = SQLiteStore(tmp_path)
+    _write(store, tmp_path, "The deployment runbook lives in the ops repository.")
+    with store.connect() as connection:
+        connection.execute("DROP TABLE conversation_fts")
+        connection.execute(
+            "CREATE VIRTUAL TABLE conversation_fts USING fts4("
+            "turn_id UNINDEXED, session_id UNINDEXED, role UNINDEXED, text)"
+        )
+
+    report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert report.index_engine_mismatch_count == 1
+    assert report.clean is False
+
+
+def test_the_ranked_query_evaluates_the_index_once(tmp_path: Path) -> None:
+    """A performance invariant old enough to predate the ranking, asserted.
+
+    Scoring with a correlated scalar subquery puts BM25 on the row and re-scans
+    the FTS table *per candidate row*: measured at 5.2 s against 800 memories
+    where the joined form costs 23 ms. It is not a wrong answer, so no
+    correctness test catches it — the only symptom is a slow suite, which is
+    how it reached CI in the first place.
+
+    The plan is the assertion rather than a stopwatch: a timing budget on a
+    shared runner is a flaky test, while "how many times is the index scanned"
+    is exactly the property that regressed and does not vary with load.
+    """
+    store = SQLiteStore(tmp_path)
+    for index in range(25):
+        _write(store, tmp_path, f"Memory {index} about deployment and the ops runbook.")
+
+    with store.connect() as connection:
+        plan = "\n".join(
+            str(row[-1])
+            for row in connection.execute(
+                "EXPLAIN QUERY PLAN "
+                "SELECT m.*, ranked.relevance FROM approved_memory m "
+                "JOIN (SELECT memory_id, bm25(approved_memory_fts, 0.0, 1.0, 0.4) AS relevance "
+                "      FROM approved_memory_fts WHERE approved_memory_fts MATCH ?) AS ranked "
+                "  ON ranked.memory_id = m.memory_id "
+                "ORDER BY ranked.relevance ASC LIMIT 20",
+                ("deployment",),
+            )
+        )
+    assert plan.count("approved_memory_fts") == 1, f"the index must be scanned once:\n{plan}"
+    assert "CORRELATED" not in plan.upper(), f"no per-row re-evaluation:\n{plan}"
+    assert "SEARCH m USING INDEX" in plan, f"and each hit probed by primary key:\n{plan}"
+
+    # And the query the store actually issues still answers correctly.
+    assert len(store.search_approved_memory("deployment", limit=5)) == 5
+
+
+def test_health_names_the_engine_and_what_it_costs(tmp_path: Path) -> None:
+    """A silent fallback needs a surface, or it is indistinguishable from working."""
+    SQLiteStore(tmp_path)
+    health = store_health(tmp_path)
+    assert health["store"] == "ok"
+    assert health["text_search_engine"] == "fts5"
+    assert health["text_search_ranking"] == "bm25_relevance"
+    assert health["text_search_reason"] == ""
 
 
 @pytest.mark.parametrize("query", ("a (b", 'quote"', "*", "  "))

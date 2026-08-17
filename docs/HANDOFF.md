@@ -424,13 +424,17 @@ npm run build     # exit 0
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
   per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
   or load/chaos proof exists yet.
-- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`). It
-  **does** provide FTS5 — an earlier note here said it did not, which was never
-  checked and was wrong — so both text indexes are encrypted FTS5 with BM25
-  relevance ordering (RAIKER-2025). The engine is still probed at runtime rather
-  than assumed, and a build without FTS5 falls back to FTS4 and recency order
-  and says so. Legacy plaintext databases are converted once and the transient
-  plaintext source is removed after success.
+- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`),
+  floored at **0.5.6** — the version where the wheel gained FTS5. Earlier
+  versions genuinely have none (0.5.2 → SQLite 3.44.2, 0.5.4 → 3.46.1), which is
+  why an earlier note here said Raiker used FTS4: it was true at the time and
+  went stale when the wheel moved. Both text indexes are now encrypted FTS5 with
+  BM25 relevance ordering (RAIKER-2025). The engine is still probed at runtime
+  rather than assumed — a build without FTS5 falls back to FTS4 and recency
+  order and says so on `/api/health` — and CI asserts FTS5 so a wheel that lost
+  it fails the build rather than quietly degrading search. Legacy plaintext
+  databases are converted once and the transient plaintext source is removed
+  after success.
 - SQLCipher derives its key when a connection is opened, so `raiker/storage/sqlite.py`
   keeps one keyed connection per workspace and worker thread rather than paying
   that per short-lived `SQLiteStore`. The cache is bounded and least-recently-used

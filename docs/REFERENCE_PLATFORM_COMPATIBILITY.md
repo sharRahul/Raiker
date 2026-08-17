@@ -414,7 +414,7 @@ shown to the owner on the environment card.
 | Explicit host-access posture | Codex exposes full-access/danger modes distinctly | `local_native` is argv-only and shown as **Host access — reduced isolation**, not called a sandbox | ✅ |
 | Native OS sandbox | Codex uses a Windows restricted token/AppContainer boundary; Claude Code uses OS sandbox primitives | Packaged `raiker-command-runner`: a **per-run** Windows AppContainer holding one workspace capability and no network capability, a Job Object with `KILL_ON_JOB_CLOSE`, `.raiker` denied and `.git` read-only with protected DACLs re-verified before every launch; bubblewrap on Linux and Seatbelt on macOS. Codex additionally layers a restricted token; Raiker does not yet, and says so rather than letting "AppContainer" stand in for the pair (`r0815-native-sandbox-card.png`) | ✅ |
 | Container command sandbox | Claude/OpenClaw support container isolation | Digest-pinned, no-network, read-only/capability-dropped worker with `.raiker` masked, `.git` read-only, and CPU/memory/PID bounds; automated only on this host | 🟡 |
-| Persistent environment | Claude Code and OpenClaw can retain a sandbox/session boundary between commands | Current command container is per run; cache identity and reset internals exist but persistence is not exposed or proven | ❌ |
+| Persistent environment | Claude Code and OpenClaw can retain a sandbox/session boundary between commands | ✅ **for the container backend** (2026-08-17): the container's name is a function of owner, session and profile rather than of the run, so a session's second command lands in the boundary its first one left behind — what it installed, wrote to `/tmp`, or left in the private cache is still there. Liveness is asked of the runtime rather than assumed from Raiker's own map, so a container removed underneath the runtime is rebuilt rather than `exec`-ed into. `native_sandbox` still creates and deletes a profile around each command and says so, because a predictable AppContainer name is a hole — the container SID is a pure function of the name | ✅ |
 | Foreground output and exit status | All coding-agent references provide it | Split-safe redacted stdout/stderr, total byte counts, truncation, timeout, terminal state, and exit code | ✅ |
 | Provider-independent model-to-command path | Market leaders route tool calls consistently across supported model providers | Anthropic (Haiku 4.5), OpenRouter (Gemini 3.7 Flash), OpenAI (GPT-4o Mini) and Ollama (gemma4:31b-cloud) each completed the same live Build → approval → exact-argv command **inside the AppContainer** → output → receipt on 2026-08-15 (`r0815-build-governed-terminal-appcontainer.png`) | ✅ beyond |
 | Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | `run_command background:true` returns a `run_id` without waiting; `background_run` polls, pages the log from a resumable sequence, waits with a bounded timeout, and kills. The enforcer that makes this offerable ships with it: every background run holds a **lease** the supervising thread renews only while the process is alive, and `reconcile_leases` terminates and finalises any run whose lease lapsed with a receipt naming `command_background_lease_expired` — so a crashed supervisor produces a reclaimed run, never an orphan holding a sandbox grant. A foreground run holds no lease and is never swept | ✅ |
@@ -427,9 +427,9 @@ shown to the owner on the environment card.
 | Redaction before storage or display | Coding agents suppress known secrets in logs | Incremental UTF-8 redaction covers all current patterns at every split, exact loaned secrets, PEM blocks, explicit stdout/stderr boundaries that prevent cross-stream reconstruction, and fail-closed bounded pending data before persistence | ✅ beyond |
 | Durable output catch-up after browser/navigation reload | Reference desktop agents retain command history | Owner-scoped ordered chunks and receipts reload into Build without replaying a command; returning from Approvals refreshes open/collapsed panes and selects the current session's run | ✅ |
 | Immutable execution receipt | Reference products expose activity/history, generally without a canonical receipt digest | Canonical terminal receipt binds authority, environment, command-template digest, output truncation, and redaction count; replacement is refused. It now separates two claims that are easy to blend and mean different things: `boundary_constructed` is what **this run's** runner built, `probe_observations` is what **the host** was measured to enforce, with the time it was measured | ✅ beyond |
-| Restart reattachment and honest uncertainty | Codex/OpenClaw supervise long-running work across UI/runtime churn | Browser reload works; a Raiker process restart cannot reattach and marks any unprovable active run `lost` with a receipt rather than inferring success. The runner is bound to a Job Object the runtime owns, so a hard kill of Raiker is reaped by the kernel rather than orphaning a sandboxed process | 🟡 |
+| Restart reattachment and honest uncertainty | Codex/OpenClaw supervise long-running work across UI/runtime churn | ✅ **on POSIX** (2026-08-17): a background run is started inside a detached supervisor — its own session, its own deadline, its own redactor, an append-only journal, and an `AF_UNIX` control channel speaking the authenticated frames the cross-language protocol vectors already cover. Raiker keeps the socket path and the instance key encrypted in `command_runs.encrypted_backend_handle`, so reattachment is an **authentication**, not a pid lookup: a socket that answers a frame the stored key verifies is this run's supervisor, and a pid — which can be reused by a stranger — never was. `recover_owner` reattaches before it recovers, and the lease reconciler asks the same question before reclaiming, so a live run is never killed because the runtime that was watching it restarted. Every case the runtime cannot *prove* — no handle, a locked vault, a socket that is gone, a socket that fails the key — still produces the honest `lost` receipt. ❌ **on Windows**: a named pipe is reachable by name from any session on the machine, so its authorisation story needs its own design and its own proof; `command_supervisor_platform_unsupported` says so by name rather than a weaker thing shipping under the same label | ✅ |
 | SSH and managed cloud sandbox | Claude Code/Codex support remote/cloud execution patterns; Hermes supports remote tools | Profiles are selectable but command-supervisor readiness fails closed; no execution is claimed | ❌ |
-| Reset/recreate and recovery controls | Persistent sandboxes need an owner reset and cleanup path | Backend reset internals exist, but no owner-authorised API/UI or restart-safe cleanup saga is shipped | ❌ |
+| Reset/recreate and recovery controls | Persistent sandboxes need an owner reset and cleanup path | ✅ **for the container backend** (2026-08-17): persistence and reset shipped as one control, because an environment that accumulates state and can never be cleared is worse than one that never persists — the owner has no way back to a known state. `POST /api/execution-environments/{profile_id}/reset` takes **Reset environment** (discard the boundary, keep the private cache) and **Reset and clear cache** (discard both), and refuses `execution_environment_not_persistent` on a profile that rebuilds itself around every command rather than offering an action with no effect. The control appears on the environment card only where `persistent_environment` is true | ✅ |
 | Capability truthfulness | Reference products vary in how unavailable controls are projected | Features come from a **differential measurement** against the real workspace, never from configuration: each observation is taken inside and outside the boundary, an unmatched control arm reports `indeterminate`, and no `CommandFeatures` field is true without its observation. The six results and the probe's own outbound destination are on the environment card, with **Re-measure boundary** (`r0815-runtime-native-sandbox-observations.png`) | ✅ beyond |
 
 The governance lead is real and unchanged: authority provenance, durable
@@ -437,14 +437,25 @@ redacted catch-up, immutable receipts, exact environment choice, honest `lost`
 outcomes — and now a boundary that is **measured rather than declared**, which no
 reference product exposes to its owner.
 
-**Updated 2026-08-17.** Background supervision, the agent-facing observation
-tool, and PTY/raw input on POSIX are now shipped and proven — see the rows above
-and `tests/test_background_execution.py`. Raiker still does **not** match the
-market leader's complete shell capability: Windows PTY, filtered domain egress,
-restart reattachment, persistent sessions, credential quarantine, a container
-session supervisor and remote backends remain absent, each with its reason
-recorded in [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. They are
-tracked as open work rather than hidden behind a parity claim.
+**Updated 2026-08-17 (first pass).** Background supervision, the agent-facing
+observation tool, and PTY/raw input on POSIX shipped and were proven — see the
+rows above and `tests/test_background_execution.py`.
+
+**Updated 2026-08-17 (second pass).** Restart reattachment, the persistent
+session boundary and the owner's reset control shipped together, and the three
+were built together for the same reason the first pass built the lease with the
+observation tool: each alone is worse than none of them. A boundary that
+persists with no reset is a boundary the owner cannot get back to a known state;
+a supervisor that outlives Raiker with no authenticated reattachment is an
+orphan. Proven by `tests/test_command_supervisor_reattach.py` — which restarts
+the service for real and asserts that the half of the output the first one never
+saw arrives exactly once — and `tests/test_persistent_command_container.py`.
+
+Raiker still does **not** match the market leader's complete shell capability:
+Windows PTY, Windows restart reattachment, filtered domain egress, credential
+quarantine and remote backends remain absent, each with its reason recorded in
+[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. They are tracked as
+open work rather than hidden behind a parity claim.
 
 Design contract and open work:
 [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194.
@@ -470,8 +481,9 @@ reason, not an oversight; the reasons are in `plans/TO_BE_FIXED.md` → BUG-194.
 | Missing control | Who has it | What it would take |
 |---|---|---|
 | PTY / interactive input **on Windows** | Claude Code, Codex, Hermes | Closed on POSIX (2026-08-17). ConPTY objects are built in the caller's context and are not reachable from an AppContainer token. Needs a spike, not a flag |
+| Restart reattachment **on Windows** | Codex, OpenClaw | Closed on POSIX (2026-08-17) over `AF_UNIX`, whose authorisation is the directory's. A named pipe is reachable by name from any session on the machine, so the equivalent needs its own design and its own proof rather than the same code with a different transport |
 | Filtered domain egress | Claude Code | The AppContainer loopback exemption needs elevation; a Linux proxy-only namespace is a separate build |
-| Persistent session boundary | Claude Code, OpenClaw, Hermes | Per-run profiles are deliberate. Persistence is a container-session change |
+| Persistent boundary for the **native sandbox** | Claude Code, OpenClaw, Hermes | Closed for the container backend (2026-08-17). Per-run AppContainer profiles stay deliberate: the container SID is a pure function of the name, so a predictable name is a hole |
 | Restricted token beneath the AppContainer | Codex | Layering `CreateRestrictedToken` under the security-capabilities attribute is the fragile part of this FFI, and a LowBox token already carries most of it |
 | SSH / managed cloud sandbox | Hermes, Codex | Remote supervisor adapters |
 | VM-strength containment | Claude Cowork | A different class of boundary again |
@@ -514,6 +526,60 @@ reference systems answer a misbehaving component with configuration — turn the
 server off, remove the tool — which is all-or-nothing and takes effect only on
 the next start. Raiker contains the exact subject at the moment it misbehaves,
 says why in the owner's words, and gives the state back in one press.
+
+---
+
+## Observation capture control set — what the agent saw, and what it refused to keep
+
+Reviewed 2026-08-17 while closing **MEM-04**, against the "what does the agent
+remember about its own work" surfaces of **Claude Cowork**, **Claude Code**,
+**ChatGPT**, **Codex**, **OpenClaw**, **DeepSeek Harness** and **Hermes Agent**.
+Scope is only that: the record a system keeps of material a tool returned, as
+distinct from the durable memories an owner approved. Nothing here is a claim
+about the rest of those products, and nothing is implemented unless the Raiker
+column says so.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Reference behaviour | Raiker | Status |
+|---|---|---|---|
+| A record that a tool returned material | Every reference product keeps the tool result in the transcript for the length of the session | One `eidetic_observations` row per governed tool result, recorded by the broker at the moment the result lands, surviving the session | ✅ |
+| The record is **not a second copy** of the material | ChatGPT, Claude Code and Cowork all retain the tool output verbatim in conversation storage | Summary, checksum, byte count, retention class and — where one already exists — an artifact reference. There is no column that could hold the material, so this is the shape of the schema rather than a policy applied to it | ✅ beyond |
+| Material that looks like a credential is **not** captured | None of the reference products treat a tool result differently on sensitivity | The classifier that already refuses credential-like memory text runs first; a credential- or secret-like result is refused | ✅ beyond |
+| A refusal is **visible**, not silent | — | The refusal is itself a row, carrying its reason, so an empty Observations list is distinguishable from a disabled feature and from a session where everything was refused | ✅ beyond |
+| A refused observation keeps **no digest either** | — | A SHA-256 of a credential is still a fact about the credential, so a skipped row stores neither the checksum nor the byte count | ✅ beyond |
+| Retention is a **class**, not a session lifetime | ChatGPT retains conversation content under an account-level setting; Claude Code retains a local transcript | Six named classes from the spec, chosen by what produced the material: outside web, connector and MCP results and command output get 7 days; workspace material gets 30. The expiry is computed and stored, so the owner reads a date rather than a policy | ✅ beyond |
+| Outside material is never promotable to durable memory | Every reference product frames external content as data, then stores it beside first-party content | `promotable_to_memory` is false for `external_web`, `connector` and `mcp_tool` by construction, so an untrusted page can be observed without ever becoming a memory candidate | ✅ beyond |
+| A conclusion may propose a durable memory | Cowork and ChatGPT propose memories from conversation | A gist is proposed only from a *conclusion* — a generated document, a subagent digest — never from each file read, and lands `pending_review`. It becomes durable memory only through the approval every other memory needs | ✅ |
+| The owner can see and delete what was captured | ChatGPT and Claude offer conversation deletion; none offers a per-observation view | Memory → **Observations**: every row with its kind, retention, expiry, sensitivity and checksum, filterable by kind, refusal or pending gist, with a delete control per row and a discard for a proposed gist | ✅ beyond |
+| Capture never fails the work | — | Recording is best-effort by construction: a bookkeeping failure emits `eidetic_observation_skipped` and leaves the tool result untouched. Trading a reliability property for a bookkeeping one would be the wrong trade | ✅ beyond |
+| The record points back at the turn it came from | Claude Code and Codex link a tool call to its place in the transcript | `source_event_id` names the real `tool_completed` event, and the broker now returns the event id so the link is checkable rather than asserted | 🟡 — the link is durable; opening it from the Observations row is MEM-08 |
+
+**Where Raiker leads, and why it is worth keeping.**
+
+| Control | Why no reference product has it | Where it is |
+|---|---|---|
+| An observation that is **metadata by construction** | Every reference product keeps tool output verbatim because the transcript *is* the memory. That makes the memory as sensitive as the most sensitive thing the agent ever read. Separating "we saw this" from "here is what we saw" lets recall be broad and storage stay narrow | shipped: `raiker/memory/capture.py`, `eidetic_observations` |
+| A **refusal that is a row** | A product that silently skips sensitive material leaves its owner unable to tell "nothing happened" from "everything was refused". Both look like an empty list | shipped: `capture_status` / `skip_reason` |
+| **Trust travelling with provenance** | Reference products label external content as untrusted for the length of the turn. Here the label is durable: an observation of a fetched page can never be promoted, months later, by a path that has forgotten where it came from | shipped: `FIRST_PARTY_SOURCES` |
+| A retention class chosen by **what produced the material** | Reference retention is per account or per conversation. A fetched page and a workspace file have very different half-lives, and one setting cannot express that | shipped: `RETENTION_BY_SOURCE` |
+
+**What a reference product does that Raiker does not.**
+
+| Missing control | Who has it | What it would take |
+|---|---|---|
+| Opening a recalled answer at the turn it came from | ChatGPT and Claude link a cited memory to its conversation | The `source_event_id` is durable and correct; the missing part is the read-back surface — tracked as **MEM-08** |
+| Exact replay of an observation's material | None (they keep the material instead) | Deliberately not built: replay would need the material, and the point of the row is that Raiker does not hold it. The governed artifact reference is the honest substitute where one exists |
+| Automatic entity extraction from an observation | Cowork and ChatGPT populate a profile from conversation | Tracked as **MEM-06**: the graph is reachable and nothing populates it |
+| A retention sweep that runs by itself | ChatGPT expires conversation content on a schedule | Tracked as **MEM-07**. The expiry is computed and stored per row today; what is missing is the sweep, and an owner-confirmed cleanup already exists in its place |
+
+**Ideas that go beyond every reference product, not yet built.** Recorded so the
+list is a decision rather than a gap: an observation that carries the
+**capability** the tool call crossed, so the owner reads a governed shape rather
+than a tool name; a **diff between two observations of the same path**, which the
+checksums already make computable without storing either version; and a
+retention class the owner can *change per row* after the fact, since the expiry
+is a stored date rather than a derived one.
 
 ---
 
@@ -1119,6 +1185,54 @@ rests on** — the reason behind a refusal, the authority behind a command, the
 index behind a completion, the decision behind what is kept. None of them is a
 new capability. They are the same capability, made accountable, which is the only
 axis on which a governed agent can beat a faster one.
+
+---
+
+## 2026-08-17 review — BUG-194's remainder and MEM-04
+
+Same categorical question as the 2026-08-16 round: for each control this round
+added or proposed, **does it take Raiker past Claude Cowork, Claude Code,
+ChatGPT, Codex, OpenClaw, DeepSeek Harness and Hermes Agent — yes or no** — and
+why. Parity is still not a failure; it is the honest answer for table stakes
+Raiker did not have.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| Eidetic observation recorded for every governed tool result | **No — parity in intent, different in kind** | Every reference product already keeps what a tool returned; it keeps the *material*. Raiker keeping a record was the gap (MEM-04), and closing it is table stakes. What the record contains is where the difference starts. |
+| An observation that carries no material, by schema | **Yes** | ChatGPT, Claude Code, Cowork and Codex retain tool output verbatim in conversation storage, which makes their memory exactly as sensitive as the most sensitive thing the agent ever read. A row of summary, checksum, byte count and retention class cannot leak what it never held. |
+| Refusing to capture credential-shaped material | **Yes** | No reference product treats a tool result differently on sensitivity — the transcript takes whatever came back. Raiker runs the classifier that already refuses credential-like memory text before anything is written. |
+| A refusal that is itself a visible row | **Yes** | The alternative every product takes is silence, and silence makes "nothing ran", "everything was refused" and "this feature is off" identical from where the owner sits. |
+| A skipped observation storing no digest either | **Yes** | A SHA-256 of a credential is still a fact about the credential. No reference product faces the question because none skips. |
+| Retention class chosen by what produced the material | **Yes** | Reference retention is per account or per conversation, one setting for everything. A fetched page and a workspace file have different half-lives and one setting cannot say so. |
+| Untrusted provenance that survives into storage | **Yes** | Every reference product labels external content as untrusted *for the length of the turn*, then stores it beside first-party content. Here `promotable_to_memory` is false for web, connector and MCP material permanently, so a fetched page cannot become a memory candidate months later through a path that forgot where it came from. |
+| Memory → Observations, with per-row delete | **Yes** | ChatGPT and Claude offer conversation deletion; none offers a view of *what the agent recorded seeing*, with its retention, its expiry and its refusals. |
+| Restart reattachment for a background run | **No — parity** | Codex and OpenClaw supervise long-running work across runtime churn. Raiker did not; now it does, on POSIX. |
+| Reattachment as an **authentication**, not a pid lookup | **Yes** | A pid can be reused by a stranger, which is why the BUG-194 entry refused to build reattachment on one. Raiker keeps the run's instance key encrypted at rest and reattaches by proving identity over an authenticated frame — a socket that cannot answer it is refused, and the run stays honestly `lost`. |
+| Persistent session boundary for the container backend | **No — parity** | Claude Code, OpenClaw and Hermes retain a session boundary. This closes a gap; it does not pass them. |
+| Persistence and reset shipped as one control | **Yes** | Reference products with a persistent sandbox generally offer a rebuild as a configuration action, if at all. Treating "it accumulates state" and "you can get back to a known state" as one feature, and refusing the reset by name on a boundary that has nothing to reset, is the governed version. |
+| The environment card listing only capabilities that are **true** | **Yes** | Reference products show a fixed feature list per sandbox mode. Raiker's card is built from the backend's own `CommandFeatures`, so a capability that is not built is absent rather than greyed out — and the profile's declaration now reads from the backend instead of restating it, which is what had already let the card claim less than the product did. |
+
+### Proposed and deliberately not built
+
+| Proposal | Beyond the reference set? | Why it was not built now |
+|---|---|---|
+| Restart reattachment **on Windows** | **No — parity** (Codex, OpenClaw) | `AF_UNIX` borrows the directory's authorisation. A named pipe is reachable by name from any session on the machine, so the equivalent needs its own design and its own proof — the same reason Windows PTY is still open. |
+| Exact replay of an observation's material | **No — and deliberately behind** | Every reference product can replay because it kept the material. Raiker cannot, because it did not, and that is the trade the row exists to make. The governed artifact reference is the honest substitute where one exists. |
+| A retention sweep that runs by itself | **No — parity** (ChatGPT expires on a schedule) | Tracked as MEM-07. The expiry date is computed and stored per row today, and an owner-confirmed cleanup exists in its place; what is missing is the unattended sweep. |
+| Opening a recalled answer at the turn it came from | **No — parity** (ChatGPT, Claude) | Tracked as MEM-08. `source_event_id` is durable and correct; the missing part is the read-back surface. |
+| An observation naming the **capability** the call crossed | **Yes** | No reference product's tool record is governed at all, so none can say which authority a result came through. |
+| A **diff between two observations of the same path** | **Yes** | The checksums already make "this changed" computable without either version being stored. No reference product can do this without keeping both copies. |
+| A boundary-drift watcher | **Yes** | Carried forward from the 2026-08-15 round, unchanged: re-measure when a firewall service or a protected path's DACL changes rather than on a timer. |
+
+**The pattern, restated.** Every row marked *Yes* is the same move as last round:
+the reference product keeps the thing, and Raiker keeps **an accountable record
+of the thing** — the provenance, the class, the refusal, the authority. The two
+new ones this round are worth naming separately, because they are the same idea
+applied to storage and to process identity: an observation that cannot leak what
+it never held, and a reattachment that cannot be spoofed by a number the kernel
+hands out again.
 
 ---
 

@@ -59,10 +59,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Medium | Shell / sandbox / recovery | Open — reduced twice; the OS boundary is FIXED-195, background execution and POSIX PTY are FIXED-229 |
+| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced three times; the OS boundary is FIXED-195, background execution and POSIX PTY are FIXED-229, restart reattachment and the persistent environment are FIXED-238 and FIXED-239 |
 | [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | Open — root cause identified 2026-08-16 |
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
-| MEM-04 … MEM-13 | High → Low | Memory reliability | Open: MEM-04, MEM-06 … MEM-10. Closed 2026-08-17: MEM-03/MEM-05 (FIXED-230/231) and MEM-11/12/13 (FIXED-232/233/234). See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
+| MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-06 … MEM-10. Closed 2026-08-17: MEM-03/MEM-05 (FIXED-230/231), MEM-11/12/13 (FIXED-232/233/234), MEM-14 (FIXED-236) and MEM-04 (FIXED-237). See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -70,19 +70,20 @@ The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
 standard. Its MEM-01 and MEM-02 are closed in
 [`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188, and MEM-03 and
-MEM-05 as FIXED-230 and FIXED-231, and MEM-11, MEM-12 and MEM-13 as FIXED-232,
-FIXED-233 and FIXED-234. Two were raised in their place. MEM-10: closing MEM-03
-built the *selection* of an embedding space, and a default install still has
-nothing semantic to select. MEM-06 is now the binding constraint on the graph
-leg, which MEM-12 made reachable and which nothing populates. MEM-04, MEM-06
-through MEM-10 are open there rather than duplicated here.
+MEM-05 as FIXED-230 and FIXED-231, MEM-11, MEM-12 and MEM-13 as FIXED-232,
+FIXED-233 and FIXED-234, MEM-14 as FIXED-236, and MEM-04 as FIXED-237. Two were
+raised in their place. MEM-10: closing MEM-03 built the *selection* of an
+embedding space, and a default install still has nothing semantic to select.
+MEM-06 is now the binding constraint on the graph leg, which MEM-12 made
+reachable and which nothing populates. MEM-06 through MEM-10 are open there
+rather than duplicated here.
 
 ---
 
 ## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution
 
-**Severity: Medium (was High). Area: shell / sandbox / recovery. Status: Open —
-reduced twice.**
+**Severity: Low (was Medium, was High). Area: shell / sandbox / recovery.
+Status: Open — reduced three times.**
 
 **What changed, 2026-08-15.** A governed command now runs inside a real
 operating-system boundary, and what that boundary enforces is **measured rather
@@ -132,14 +133,37 @@ incompatible with the handle-list attribute the boundary requires.
 a terminal is refused as `command_input_requires_pty` rather than written to a
 pipe where the bytes would arrive and the effect would not.
 
+**What changed, 2026-08-17 (second pass).** The two rows this entry had left as
+the largest components are closed as [FIXED-238](FIXED_ITEMS.md) and
+[FIXED-239](FIXED_ITEMS.md), and they were built the way the entry said they had
+to be — together, because each alone is worse than neither.
+
+* **Restart reattachment.** A background run is started inside a detached
+  supervisor that is a module of the Raiker package, so it is packaged by
+  construction. It holds the child in its own session, the deadline that bounds
+  it, the redactor, and an append-only journal, and it is reached over an
+  `AF_UNIX` socket speaking the authenticated frames the protocol codec already
+  had cross-language vectors for. The socket path and the instance key live
+  encrypted in `command_runs.encrypted_backend_handle`, so **reattachment is an
+  authentication rather than a pid lookup** — which is precisely the objection
+  this entry raised against building it on a pid file. Every case the runtime
+  cannot prove — no handle, a locked vault, a socket that is gone, a socket that
+  fails the key — still produces the honest `lost` receipt.
+* **Persistent environment.** The container's name is a function of owner,
+  session and profile rather than of the run, so a session's second command
+  lands in the boundary its first one left behind. Persistence shipped with its
+  reset, because an environment that accumulates state and can never be cleared
+  is worse than one that never persists.
+
 **Still observed.** Select `native_sandbox` and request network, credential, SSH
 or Daytona execution and the backend fails closed with the corresponding named
-reason; the native sandbox additionally still refuses background and PTY, because
-its capability set comes from the host probe and neither has been measured inside
-an AppContainer. Restart Raiker during an active command: the durable run is
-reconciled to `lost`, because no authenticated backend handle can be reattached.
-The container path is still a per-run `docker exec` client rather than a session
-supervisor.
+reason; the native sandbox additionally still refuses background, PTY and
+persistence, because its capability set comes from the host probe and none has
+been measured inside an AppContainer — and per-run AppContainer profiles stay
+deliberate, since the container SID is a pure function of the name. On
+**Windows**, restart reattachment is refused by name
+(`command_supervisor_platform_unsupported`) and a background run is still
+reconciled to `lost` across a restart.
 
 **Root cause, per item.** Each of these is a component rather than a flag, which
 is why none of them was half-built:
@@ -148,32 +172,33 @@ is why none of them was half-built:
 |---|---|
 | ~~**Background start/poll/wait/log/kill**~~ | **Closed 2026-08-17** as [FIXED-229](FIXED_ITEMS.md) on the `local_native` backend, with the lease, the reclaim path and the `background_run` tool shipped together. Not claimed for `native_sandbox`, whose capabilities come from the host probe. |
 | ~~**PTY and raw input**~~ | **Closed on POSIX 2026-08-17** as [FIXED-229](FIXED_ITEMS.md). Windows unchanged: `CreatePseudoConsole` builds its console objects in the caller's context; they are not reachable from an AppContainer token without an explicit capability, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as incompatible with the handle-list attribute the boundary requires. A PTY that only works outside the sandbox is not the control the row describes. |
-| **Restart reattachment** | Requires the process handle to live in a detached supervisor with an authenticated control channel — a second, larger component. Building it on an unproven boundary would have made both unfalsifiable. Restart continues to produce an honest `lost` receipt, and the runner is now bound to a runtime-owned Job Object so a hard kill of Raiker is reaped by the kernel rather than orphaning a sandboxed process. |
-| **Persistent environment** | Per-run AppContainer profiles are created and deleted around each command, deliberately: a predictable container name is a hole, because the container SID is a pure function of the name. Retaining a boundary is a container-session change, not a Windows one. |
+| ~~**Restart reattachment**~~ | **Closed on POSIX 2026-08-17** as [FIXED-238](FIXED_ITEMS.md), with the detached supervisor, the authenticated `AF_UNIX` control channel and the encrypted restart-safe handle shipped together. Windows unchanged and refused by name: a named pipe is reachable by name from any session on the machine, so the equivalent needs its own design and its own proof rather than the same code with a different transport. |
+| ~~**Persistent environment**~~ | **Closed for the container backend 2026-08-17** as [FIXED-239](FIXED_ITEMS.md), together with the owner's reset and reset-and-clear-cache controls. Per-run AppContainer profiles are still created and deleted around each command, deliberately: a predictable container name is a hole, because the container SID is a pure function of the name. |
 | **Filtered domain egress** | The AppContainer loopback exemption needs elevation, and a Linux proxy-only namespace is a separate netns build. Refused with a named reason on every backend rather than partially claimed. |
 | **Credential delivery and delta quarantine; SSH; Daytona** | Unchanged. None is a Codex or Claude Code control; all three remain storage contracts and selectable-but-refused profiles. |
-| **Container session supervisor** | The per-run `docker exec` client named in the original root cause is unchanged. |
+| ~~**Container session supervisor**~~ | **Closed 2026-08-17** as part of [FIXED-239](FIXED_ITEMS.md): the session's container is created once and reused, liveness is asked of the runtime rather than assumed, and the backend is held for the life of the service so there is somewhere to remember it. |
 | **Signature verification of the runner** | The runner's SHA-256 is recorded at build time, checked before use, and carried into the receipt. That detects corruption and casual replacement; it is **not** protection against an attacker with write access to the install directory, who could replace Raiker itself. Authenticode chain verification is not implemented. |
 
-**Required fix.** Unchanged for each remaining row: a packaged backend-resident
-supervisor with an authenticated control channel and an encrypted restart-safe
-handle; Windows PTY once the ConPTY/AppContainer question is settled by a spike; an
-authenticated domain proxy with DNS/address checking and active revocation;
-purpose-bound credential delivery plus two-pass delta quarantine; persistent
-container/SSH/Daytona supervisor adapters; and owner-authorised reset/recreate.
-Prove every backend independently and preserve the no-fallback and honest-`lost`
-rules.
+**Required fix.** For each remaining row: Windows PTY and Windows restart
+reattachment once the ConPTY/AppContainer and named-pipe-authorisation questions
+are settled by a spike; an authenticated domain proxy with DNS/address checking
+and active revocation; purpose-bound credential delivery plus two-pass delta
+quarantine; and SSH/Daytona supervisor adapters. Prove every backend
+independently and preserve the no-fallback and honest-`lost` rules.
 
-**Required user-interface outcome.** Unchanged, and further met: Runtime shows
-the exact probed boundary and its six measured observations, and Build shows the
-boundary a command ran in plus failure navigation. Background and PTY are now
-agent-facing controls rather than interface ones — an agent starts and observes a
-background run through `run_command`/`background_run`, and the run appears in the
-same owner-visible command list, with the same receipt, as a foreground one.
-Filtered network, persistence and reset controls remain **absent** rather than disabled —
-an absent control is the honest projection of an unbuilt capability, where a
-disabled one implies it is a setting away. No row may turn green from
-configuration or specification alone.
+**Required user-interface outcome.** Further met. Runtime shows the exact probed
+boundary and its six measured observations, and Build shows the boundary a
+command ran in plus failure navigation. Background and PTY are agent-facing
+controls rather than interface ones — an agent starts and observes a background
+run through `run_command`/`background_run`, and the run appears in the same
+owner-visible command list, with the same receipt, as a foreground one. Each
+environment card now lists the capabilities that boundary really has, built from
+the backend's own `CommandFeatures` rather than from configuration, and carries
+the **Reset environment** and **Reset and clear cache** controls where — and
+only where — the boundary persists. **Filtered network remains absent** rather
+than disabled: an absent control is the honest projection of an unbuilt
+capability, where a disabled one implies it is a setting away. No row may turn
+green from configuration or specification alone.
 
 ## Verified working (no action needed)
 

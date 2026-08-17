@@ -4,7 +4,7 @@ import json
 import shutil
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -49,11 +49,23 @@ class ExecutionProfile:
             # literal here would be a claim made before anything ran.
             return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
         if self.kind == "local":
-            return CommandFeatures(shell=False, concurrent_runs=False)
+            # BUG-194 — read from the backend rather than restated here. These
+            # two answers used to be written down twice and had already drifted:
+            # the backend offered background execution and a POSIX terminal
+            # while this said neither, so the card the owner reads described a
+            # different product from the one that ran their command. The import
+            # is local because `backends.container` imports this module.
+            from raiker.execution.commands.backends.local import LocalStrictBackend
+
+            return replace(LocalStrictBackend.features, concurrent_runs=False)
         if self.kind == "container":
-            return CommandFeatures(
+            from raiker.execution.commands.backends.container import (
+                PersistentContainerBackend,
+            )
+
+            return replace(
+                PersistentContainerBackend.features,
                 shell="shell" in self.tools,
-                process_tree_stop=True,
             )
         return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
 

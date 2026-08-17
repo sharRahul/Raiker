@@ -25,6 +25,7 @@ from raiker.execution.profiles import (
 )
 from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.memory.capture import capture_tool_observation
 from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.identity.contracts import (
@@ -767,18 +768,25 @@ class ToolBroker:
         actor: str,
         payload: dict[str, object],
         client: ClientMetadata | None,
-    ) -> None:
-        if self.writer is not None:
-            self.writer.append(
-                make_event(
-                    session_id=session_id,
-                    turn_id=turn_id,
-                    event_type=event_type,
-                    actor=actor,
-                    payload=payload,
-                    client=client,
-                )
-            )
+    ) -> str:
+        """Append one event and return its id, or ``""`` when there is no log.
+
+        The id is what MEM-04's observations point back at: an observation whose
+        `source_event_id` names a real event can be opened at the moment it came
+        from, and one that names nothing is a claim nobody can check.
+        """
+        if self.writer is None:
+            return ""
+        event = make_event(
+            session_id=session_id,
+            turn_id=turn_id,
+            event_type=event_type,
+            actor=actor,
+            payload=payload,
+            client=client,
+        )
+        self.writer.append(event)
+        return event.event_id
 
     def _stream_tool(
         self,
@@ -820,6 +828,50 @@ class ToolBroker:
         if isinstance(reasons, list) and reasons and isinstance(reasons[0], str):
             return reasons[0]
         return ""
+
+    def _capture_observation(
+        self,
+        action: ToolAction,
+        result: ToolResult,
+        *,
+        source_event_id: str,
+        session_id: str,
+        turn_id: str | None,
+        owner_principal_id: str,
+    ) -> None:
+        """MEM-04 — one eidetic observation per governed tool result.
+
+        Best-effort by construction. An observation is a record *about* the
+        work; a tool call that succeeded must not be reported as failed because
+        the bookkeeping for it did not land. What a failure costs is one row,
+        and the tool result the model receives is untouched either way.
+        """
+        if self.store is None or not source_event_id or not owner_principal_id:
+            return
+        try:
+            capture_tool_observation(
+                self.store,
+                tool_name=action.tool_name,
+                arguments=action.arguments,
+                output=result.output,
+                source_event_id=source_event_id,
+                session_id=session_id,
+                turn_id=turn_id or "",
+                owner_principal_id=owner_principal_id,
+            )
+        except Exception:  # noqa: BLE001 — see the docstring; never fails the call
+            self._event(
+                session_id=session_id,
+                turn_id=turn_id,
+                event_type="eidetic_observation_skipped",
+                actor="tool_broker",
+                payload={
+                    "action_id": action.action_id,
+                    "tool_name": action.tool_name,
+                    "reason": "eidetic_capture_failed",
+                },
+                client=None,
+            )
 
     def _stream_tool_result(self, action: ToolAction, result: ToolResult) -> None:
         """The settled half of a row, from the result the broker just produced."""
@@ -1848,7 +1900,7 @@ class ToolBroker:
         )
         if self.store is not None:
             self.store.insert_tool_action(sanitized_action, session_id, turn_id, result.status)
-        self._event(
+        result_event_id = self._event(
             session_id=session_id,
             turn_id=turn_id,
             event_type="tool_completed" if result.status == "success" else "tool_failed",
@@ -1856,6 +1908,15 @@ class ToolBroker:
             payload=self._event_safe_result_payload(result),
             client=client,
         )
+        if result.status == "success":
+            self._capture_observation(
+                action,
+                result,
+                source_event_id=result_event_id,
+                session_id=session_id,
+                turn_id=turn_id,
+                owner_principal_id=verified.claims.owner_principal_id,
+            )
         self._stream_tool_result(action, result)
         self._notify_hook(
             "PostToolUse" if result.status == "success" else "PostToolUseFailure",

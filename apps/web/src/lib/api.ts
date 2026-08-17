@@ -54,6 +54,7 @@ import type {
   GuideIndex,
   GuideSection,
   MemorySettingsView,
+  ObservationsView,
   ModelPricingView,
   ModelReadinessView,
   ModelSetupState,
@@ -1093,6 +1094,18 @@ export const api = {
       `/api/execution-environments/${encodeURIComponent(profile_id)}/probe`,
       {},
     ),
+  // BUG-194 — a boundary that persists needs a way back to a known state, or
+  // it is worse than one that never persisted. Refused by name on a profile
+  // that rebuilds itself around every command.
+  resetExecutionEnvironment: (
+    profile_id: string,
+    session_id: string,
+    recreate: boolean,
+  ) =>
+    postJson<{ ok: boolean; profile_id: string; session_id: string; recreated: boolean }>(
+      `/api/execution-environments/${encodeURIComponent(profile_id)}/reset`,
+      { session_id, recreate },
+    ),
   selectExecutionEnvironment: (profile_id: string) =>
     request<{ ok: boolean; selected_profile_id: string }>(
       "/api/execution-environments/selection",
@@ -1395,6 +1408,21 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embedding_backend: backend }),
     }),
+  // MEM-04 — what the runtime captured while it worked. The counts come back
+  // with the list because a page that can only count what it received cannot
+  // tell an owner whether an empty list means nothing ran or everything was
+  // refused on sensitivity.
+  observations: () => request<ObservationsView>("/api/memory/observations"),
+  deleteObservations: (ids: string[]) =>
+    postJson<{ ok: boolean; deleted_observation_ids: string[] }>(
+      "/api/memory/observations/delete",
+      { observation_ids: ids },
+    ),
+  discardGist: (id: string) =>
+    postJson<{ ok: boolean; gist_id: string; discarded: boolean }>(
+      `/api/memory/gists/${encodeURIComponent(id)}/discard`,
+      {},
+    ),
 
   // ── Build workspace repositories ────────────────────────────────────────
   // References only. A local folder must resolve inside the workspace (fail

@@ -64,8 +64,14 @@
           <p>Simple local model service for Windows, macOS, and Linux.</p>
         </div>
       </div>
+      <!-- One emphasis level per card. `Open official installer` and
+           `Pull model` both *do* something, and the rest of the product spends
+           the ghost variant on inspect-type actions (Test, Details, View
+           source) and the solid one on actions that change something. A card
+           whose main action read quieter than its subordinate one was the only
+           place that rule was inverted. -->
       <button
-        class="btn btn-ghost btn-sm"
+        class="btn btn-sm"
         type="button"
         onclick={() => void openInstaller("ollama")}
         disabled={busy !== null}
@@ -95,7 +101,7 @@
         </div>
       </div>
       <button
-        class="btn btn-ghost btn-sm"
+        class="btn btn-sm"
         type="button"
         onclick={() => void openInstaller("lm-studio-desktop")}
         disabled={busy !== null}

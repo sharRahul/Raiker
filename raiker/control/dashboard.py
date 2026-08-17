@@ -459,6 +459,62 @@ class MemoryControlView:
 
 
 @dataclass(frozen=True)
+class ObservationView:
+    """MEM-04 — one eidetic observation, as the owner reads it.
+
+    Everything here is metadata *about* material the runtime saw. There is no
+    field carrying the material itself, and that is deliberate rather than
+    incidental: the point of an observation is that it makes recall possible
+    without making a second ungoverned copy of everything the agent has read.
+    """
+
+    observation_id: str
+    session_id: str
+    turn_id: str
+    tool_name: str
+    source_type: str
+    summary: str
+    sensitivity: str
+    retention: str
+    capture_status: str
+    skip_reason: str
+    promotable_to_memory: bool
+    content_sha256: str
+    content_bytes: int
+    artifact_ref: str | None
+    source_event_id: str
+    created_at: str
+    expires_at: str
+    gist_status: str = ""
+    gist_summary: str = ""
+    gist_id: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "observation_id": self.observation_id,
+            "session_id": self.session_id,
+            "turn_id": self.turn_id,
+            "tool_name": self.tool_name,
+            "source_type": self.source_type,
+            "summary": self.summary,
+            "sensitivity": self.sensitivity,
+            "retention": self.retention,
+            "capture_status": self.capture_status,
+            "skip_reason": self.skip_reason,
+            "promotable_to_memory": self.promotable_to_memory,
+            "content_sha256": self.content_sha256,
+            "content_bytes": self.content_bytes,
+            "artifact_ref": self.artifact_ref,
+            "source_event_id": self.source_event_id,
+            "created_at": self.created_at,
+            "expires_at": self.expires_at,
+            "gist_status": self.gist_status,
+            "gist_summary": self.gist_summary,
+            "gist_id": self.gist_id,
+        }
+
+
+@dataclass(frozen=True)
 class MemorySettingsView:
     incognito: bool
     #: MEM-03 — which embedding space recall searches, and what is selectable.
@@ -1709,6 +1765,40 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="execution_environment_unavailable")
         self.store.select_execution_environment(owner_principal_id, profile_id)
         return ControlResult(ok=True, data={"selected_profile_id": profile_id})
+
+    def reset_execution_environment(
+        self, profile_id: str, session_id: str, *, recreate: bool, owner_principal_id: str
+    ) -> ControlResult:
+        """Take a session's persistent boundary away, on the owner's word (BUG-194).
+
+        Only a boundary that *is* persistent can be reset, and the refusal says
+        which it is: offering the control on a profile that rebuilds itself
+        around every command would be offering an action with no effect.
+        """
+        view = self.execution_environments(owner_principal_id)
+        environment = next(
+            (item for item in view["environments"] if item["profile_id"] == profile_id), None
+        )
+        if environment is None:
+            return ControlResult(ok=False, reason_code="unknown_execution_environment")
+        if not environment.get("features", {}).get("persistent_environment"):
+            return ControlResult(
+                ok=False, reason_code="execution_environment_not_persistent"
+            )
+        if not session_id.strip():
+            return ControlResult(ok=False, reason_code="execution_environment_session_required")
+        from raiker.execution.commands.service import CommandService
+
+        service = CommandService.for_workspace(self.workspace_root)
+        reset = service.reset_environment(
+            owner_principal_id, session_id, profile_id, recreate=recreate
+        )
+        if not reset:
+            return ControlResult(ok=False, reason_code="execution_environment_reset_unavailable")
+        return ControlResult(
+            ok=True,
+            data={"profile_id": profile_id, "session_id": session_id, "recreated": recreate},
+        )
 
     # ── Code workspace repositories ─────────────────────────────────────
     # The Build workspace points a coding chat at a repository. Connecting one is
@@ -3371,6 +3461,110 @@ class DashboardService:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         return ControlResult(ok=True, data=self.store.reconcile_memory_projections(owner_principal_id=acting_principal_id))
+
+    def list_observations(self, acting_principal_id: str | None) -> ControlResult:
+        """MEM-04 — what the runtime captured, and what it refused to.
+
+        The counters are part of the answer, not a convenience: an owner looking
+        at an empty list needs to know whether nothing was produced or
+        everything was refused, and a page that can only count what it received
+        cannot tell them.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.eidetic import list_observations
+
+        owner = self.store.account_scope(acting_principal_id) or (acting_principal_id or "")
+        observations = list_observations(store=self.store, owner_principal_id=owner)
+        with self.store.connect() as connection:
+            gists = {
+                str(row["observation_id"]): (
+                    str(row["gist_id"]), str(row["status"]), str(row["summary"])
+                )
+                for row in connection.execute(
+                    "SELECT gist_id, observation_id, status, summary FROM gist_memories"
+                ).fetchall()
+            }
+        views = []
+        for item in observations:
+            gist = gists.get(item.observation_id)
+            views.append(
+                ObservationView(
+                    observation_id=item.observation_id,
+                    session_id=item.session_id,
+                    turn_id=item.turn_id,
+                    tool_name=item.tool_name,
+                    source_type=item.source_type,
+                    summary=item.summary,
+                    sensitivity=item.sensitivity,
+                    retention=item.retention,
+                    capture_status=item.capture_status,
+                    skip_reason=item.skip_reason,
+                    promotable_to_memory=item.promotable_to_memory,
+                    content_sha256=item.content_sha256,
+                    content_bytes=item.content_bytes,
+                    artifact_ref=item.artifact_ref,
+                    source_event_id=item.source_event_id,
+                    created_at=item.created_at,
+                    expires_at=item.expires_at,
+                    gist_id=gist[0] if gist else "",
+                    gist_status=gist[1] if gist else "",
+                    gist_summary=gist[2] if gist else "",
+                )
+            )
+        return ControlResult(
+            ok=True,
+            data={
+                "observations": [view.to_dict() for view in views],
+                "captured": sum(1 for view in views if view.capture_status == "captured"),
+                "skipped": sum(1 for view in views if view.capture_status == "skipped"),
+                "gists_pending": sum(1 for view in views if view.gist_status == "pending_review"),
+            },
+        )
+
+    def delete_observations(
+        self, observation_ids: set[str], acting_principal_id: str | None
+    ) -> ControlResult:
+        """The same delete control the rest of memory has, for observations."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.eidetic import delete_observations
+
+        owner = self.store.account_scope(acting_principal_id) or (acting_principal_id or "")
+        try:
+            deleted = delete_observations(
+                store=self.store, owner_principal_id=owner, observation_ids=observation_ids
+            )
+        except ValueError as error:
+            return ControlResult(ok=False, reason_code=str(error))
+        if not deleted:
+            return ControlResult(ok=False, reason_code="unknown_observation")
+        return ControlResult(ok=True, data={"deleted_observation_ids": deleted})
+
+    def discard_gist(self, gist_id: str, acting_principal_id: str | None) -> ControlResult:
+        """Reject a proposed gist without touching the observation it came from.
+
+        A gist is a candidate; discarding one is a review decision, and the
+        observation it summarised remains its own record with its own retention.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        owner = self.store.account_scope(acting_principal_id) or (acting_principal_id or "")
+        with self.store.connect() as connection:
+            row = connection.execute(
+                "SELECT observation_id FROM gist_memories WHERE gist_id = ?", (gist_id,)
+            ).fetchone()
+            if row is None:
+                return ControlResult(ok=False, reason_code="unknown_gist")
+            owned = connection.execute(
+                "SELECT 1 FROM eidetic_observations"
+                " WHERE observation_id = ? AND owner_principal_id = ?",
+                (str(row["observation_id"]), owner),
+            ).fetchone()
+            if owned is None:
+                return ControlResult(ok=False, reason_code="unknown_gist")
+            connection.execute("DELETE FROM gist_memories WHERE gist_id = ?", (gist_id,))
+        return ControlResult(ok=True, data={"gist_id": gist_id, "discarded": True})
 
     def cleanup_expired_observations(
         self, observation_ids: set[str], now: str, acting_principal_id: str | None

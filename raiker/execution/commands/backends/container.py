@@ -17,8 +17,23 @@ from raiker.runtime.command_policy import sandbox_environment
 EXPECTED_SUPERVISOR_DIGEST = "sha256:" + ("b" * 64)
 
 
-def command_container_name(owner: str, session: str, profile: str, run_id: str) -> str:
-    digest = hashlib.sha256(f"{owner}\0{session}\0{profile}\0{run_id}".encode()).hexdigest()[:24]
+def command_container_name(owner: str, session: str, profile: str, run_id: str = "") -> str:
+    """The container's name, derived from what it belongs to.
+
+    BUG-194 — `run_id` is now optional, and leaving it out is what makes the
+    boundary *persistent*: a name that is a function of owner, session and
+    profile addresses one container for the whole session, so a second command
+    in the same session lands in the environment the first one left behind
+    rather than in a fresh one. Passing a `run_id` still produces a per-run
+    name, which is what a run that must not share state asks for.
+
+    The name is a digest rather than a readable label deliberately. It is not a
+    secret — `docker ps` shows it — but it is not guessable either: producing it
+    requires already knowing the owner and session ids, so a name cannot be used
+    to *find* another owner's environment.
+    """
+    material = f"{owner}\0{session}\0{profile}" + (f"\0{run_id}" if run_id else "")
+    digest = hashlib.sha256(material.encode()).hexdigest()[:24]
     return f"raiker-cmd-{digest}"
 
 
@@ -70,21 +85,38 @@ class ContainerBackendHandle:
 
 
 class ContainerCommandHandle:
+    """One command inside a container, without owning the container's life.
+
+    BUG-194 — a handle used to remove the container the moment its command
+    ended, which is what made the boundary per-run: nothing an installer, a
+    build, or a `cd` did could survive into the next command, because there was
+    nothing left for it to survive into. `persistent=True` keeps the container
+    standing, so a session has one environment rather than a sequence of
+    identical fresh ones. The container is still removed — by
+    :meth:`PersistentContainerBackend.reset`, by the session ending, and by the
+    owner asking — but never as a side effect of one command finishing.
+    """
+
     def __init__(
         self,
         backend_handle: ContainerBackendHandle,
         process: Any,
         runtime: ContainerRuntime,
         runtime_name: str,
+        *,
+        persistent: bool = False,
     ) -> None:
         self.backend_handle = backend_handle
         self._process = process
         self._runtime = runtime
         self._runtime_name = runtime_name
+        self._persistent = persistent
         self._cleaned = False
         self._lock = Lock()
 
     def _cleanup(self) -> None:
+        if self._persistent:
+            return
         with self._lock:
             if self._cleaned:
                 return
@@ -114,9 +146,15 @@ class ContainerCommandHandle:
 
 
 class PersistentContainerBackend:
+    # BUG-194 — `persistent_environment` is now a measured property of this
+    # backend rather than an unbuilt row. A session gets one container, and the
+    # state a command leaves in it is there for the next one. It is claimed only
+    # here: the native sandbox still creates and deletes a profile around each
+    # command, and says so.
     features = CommandFeatures(
         shell=True,
         process_tree_stop=True,
+        persistent_environment=True,
     )
 
     def __init__(
@@ -132,6 +170,10 @@ class PersistentContainerBackend:
         self.profile = profile
         self._runner = runner or StreamingCommandRunner().start
         self._handles: dict[str, ContainerBackendHandle] = {}
+        #: The session's standing boundary, keyed by what it belongs to. This is
+        #: the whole of the persistence change: everything else follows from a
+        #: second run finding an entry here instead of creating a container.
+        self._sessions: dict[tuple[str, str, str], ContainerBackendHandle] = {}
         self._credential_lease: tuple[str, str] | None = None
         self._blocked_deltas: set[tuple[str, str, str]] = set()
         self._preflight_workspace()
@@ -173,38 +215,55 @@ class PersistentContainerBackend:
         image = self.profile.image
         if runtime is None or image is None or "@sha256:" not in image:
             raise CommandBackendError("container_supervisor_image_unpinned")
+        # BUG-194 — the session's boundary, reused. The name no longer carries
+        # the run id, so the second command of a session addresses the container
+        # the first one ran in; what that command installed, wrote to /tmp, or
+        # left in the private cache is still there. That *is* the persistent
+        # environment the entry asked for, and it is a container-session change
+        # exactly as the entry said it would have to be.
         name = command_container_name(
-            request.owner_principal_id,
-            request.session_id,
-            self.profile.profile_id,
-            request.run_id,
+            request.owner_principal_id, request.session_id, self.profile.profile_id
         )
         private_cache = f"{name}-cache"
         cache_digest = hashlib.sha256(
             f"{request.owner_principal_id}\0{request.session_id}\0{self.profile.profile_id}".encode()
         ).hexdigest()
-        command = self._create_command(request, name, private_cache, runtime, image)
-        result = self.runtime.run(command)
-        if int(str(result.get("returncode", 1))) != 0:
-            self._release_credential_lease(request.run_id)
-            raise CommandBackendError("container_create_failed")
-        container_id = str(result.get("stdout") or "").strip()
-        if not container_id:
-            self._release_credential_lease(request.run_id)
-            raise CommandBackendError("container_identity_missing")
-        self.runtime.run([runtime, "start", container_id])
-        handle = ContainerBackendHandle(
-            request.run_id,
-            container_id,
-            name,
-            request.template_digest,
-            EXPECTED_SUPERVISOR_DIGEST,
-            cache_digest,
-            private_cache,
-            request.owner_principal_id,
-            request.session_id,
-            self.profile.profile_id,
+        session_key = (
+            request.owner_principal_id, request.session_id, self.profile.profile_id
         )
+        existing = self._sessions.get(session_key)
+        if existing is not None and not self._is_running(runtime, existing.container_id):
+            # A container the owner or the host removed underneath us is not a
+            # boundary any more. Forgetting it here is what stops the next run
+            # from `exec`-ing into an id that no longer resolves and reporting
+            # the resulting failure as the command's.
+            self._sessions.pop(session_key, None)
+            existing = None
+        if existing is None:
+            command = self._create_command(request, name, private_cache, runtime, image)
+            result = self.runtime.run(command)
+            if int(str(result.get("returncode", 1))) != 0:
+                self._release_credential_lease(request.run_id)
+                raise CommandBackendError("container_create_failed")
+            container_id = str(result.get("stdout") or "").strip()
+            if not container_id:
+                self._release_credential_lease(request.run_id)
+                raise CommandBackendError("container_identity_missing")
+            self.runtime.run([runtime, "start", container_id])
+            existing = ContainerBackendHandle(
+                request.run_id,
+                container_id,
+                name,
+                request.template_digest,
+                EXPECTED_SUPERVISOR_DIGEST,
+                cache_digest,
+                private_cache,
+                request.owner_principal_id,
+                request.session_id,
+                self.profile.profile_id,
+            )
+            self._sessions[session_key] = existing
+        handle = existing.with_request_digest(request.template_digest)
         self._handles[request.run_id] = handle
         process = self._runner(
             request,
@@ -212,7 +271,7 @@ class PersistentContainerBackend:
                 runtime,
                 "exec",
                 "-i",
-                container_id,
+                existing.container_id,
                 *request.argv_template,
             ],
             self.workspace_root,
@@ -220,7 +279,37 @@ class PersistentContainerBackend:
             sink or MemoryCommandSink(),
             pty=False,
         )
-        return ContainerCommandHandle(handle, process, self.runtime, runtime)
+        return ContainerCommandHandle(
+            handle, process, self.runtime, runtime, persistent=True
+        )
+
+    def _is_running(self, runtime: str, container_id: str) -> bool:
+        """Ask the runtime, rather than assume the map is the truth.
+
+        The map records what Raiker created; whether it is still standing is a
+        fact about the host, and the two diverge the moment anyone runs
+        `docker rm`.
+        """
+        result = self.runtime.run(
+            [runtime, "inspect", "--format", "{{.State.Running}}", container_id]
+        )
+        if int(str(result.get("returncode", 1))) != 0:
+            return False
+        return str(result.get("stdout") or "").strip().lower() == "true"
+
+    def session_environment(
+        self, owner: str, session: str
+    ) -> dict[str, Any] | None:
+        """What the owner is told about the boundary this session is reusing."""
+        handle = self._sessions.get((owner, session, self.profile.profile_id))
+        if handle is None:
+            return None
+        return {
+            "profile_id": self.profile.profile_id,
+            "container_name": handle.container_name,
+            "cache_volume": handle.private_cache_volume,
+            "running": self._is_running(self.profile.runtime or "docker", handle.container_id),
+        }
 
     def _create_command(
         self,
@@ -307,16 +396,29 @@ class PersistentContainerBackend:
         self._release_credential_lease(run_id)
 
     def reset(self, owner: str, session: str, profile: str, *, recreate: bool) -> None:
+        """Take a session's standing boundary away, on the owner's word.
+
+        BUG-194 — persistence and reset are one control, not two features: an
+        environment that accumulates state and can never be cleared is worse
+        than one that never persists, because the owner has no way back to a
+        known state. `recreate` additionally discards the private cache volume,
+        which is the difference between "start this session's environment again"
+        and "start it again from nothing".
+        """
+        runtime = self.profile.runtime or "docker"
+        key = (owner, session, profile)
+        standing = self._sessions.pop(key, None)
         selected = [
             handle
             for handle in self._handles.values()
-            if (handle.owner_principal_id, handle.session_id, handle.profile_id)
-            == (owner, session, profile)
+            if (handle.owner_principal_id, handle.session_id, handle.profile_id) == key
         ]
-        runtime = self.profile.runtime or "docker"
-        for handle in selected:
-            self.runtime.run([runtime, "rm", "--force", handle.container_id])
-            if recreate:
-                self.runtime.run([runtime, "volume", "rm", handle.private_cache_volume])
+        removed: set[str] = set()
+        for handle in [*( [standing] if standing is not None else [] ), *selected]:
+            if handle.container_id not in removed:
+                self.runtime.run([runtime, "rm", "--force", handle.container_id])
+                if recreate:
+                    self.runtime.run([runtime, "volume", "rm", handle.private_cache_volume])
+                removed.add(handle.container_id)
             self._handles.pop(handle.run_id, None)
             self._release_credential_lease(handle.run_id)

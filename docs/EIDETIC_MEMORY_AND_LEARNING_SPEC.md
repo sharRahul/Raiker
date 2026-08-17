@@ -200,6 +200,39 @@ Required events:
 
 ---
 
+## What the runtime actually calls (MEM-04, 2026-08-17)
+
+The flow above was implemented as a library and, until this date, called only by
+tests. `raiker/memory/capture.py` is the runtime's entry into it: the tool
+broker records **one observation per governed tool result that produced
+material**, at the moment the result lands.
+
+| Stage | Where it happens | Notes |
+|---|---|---|
+| Decide whether a raw observation is allowed | `capture.SOURCE_TYPES` | A tool absent from the map produced bookkeeping rather than material. `update_plan` returns a checklist; `create_task` returns an id; neither is observed |
+| Classify sensitivity | `memory.policy.classify_memory_sensitivity` | The same classifier that already refuses credential-like memory text |
+| Write `eidetic_observations` | `eidetic.record_observation` | Summary, checksum, byte count, retention class, and an artifact reference where one already exists. **Never the material** |
+| Record a refusal | `capture_status = 'skipped'` | Credential- and secret-like material is refused with its reason. A skipped row keeps no checksum and no byte count: a SHA-256 of a credential is still a fact about the credential |
+| Create a gist candidate | `eidetic.propose_gist` | Only from a *conclusion* — a generated document, a subagent digest — never from each file read. Lands `pending_review` |
+| Expose usage | Memory → **Observations** | Kind, retention, expiry, sensitivity and checksum per row, with a delete control and a discard for a proposed gist |
+
+**Retention is chosen by what produced the material** rather than by one global
+setting: `short_term_7_days` for outside web, connector, MCP and command output;
+`short_term_30_days` for workspace material. The expiry date is computed and
+stored, so the owner reads a date rather than a policy.
+
+**Outside material is never promotable.** `promotable_to_memory` is false for
+`external_web`, `connector` and `mcp_tool` by construction, which is governance
+rule 1 above ("raw observations are not trusted instructions") made durable
+rather than turn-scoped.
+
+**Capture never fails the work.** A recording failure emits
+`eidetic_observation_skipped` and leaves the tool result untouched. An
+observation is a record *about* work; failing the work because the record failed
+would trade a reliability property for a bookkeeping one.
+
+---
+
 ## Tests
 
 Tests must prove:

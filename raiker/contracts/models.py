@@ -152,6 +152,12 @@ EVENT_TYPES = {
     "memory_candidate_reviewed",
     "memory_record_created",
     "memory_record_forgotten",
+    # MEM-04 — eidetic capture. `eidetic_observation_skipped` is emitted when
+    # the *bookkeeping* failed, which is a different fact from an observation
+    # the runtime deliberately refused on sensitivity: that one is a row in
+    # `eidetic_observations` carrying its own reason, because the owner has to
+    # be able to see it in Memory rather than only in the audit log.
+    "eidetic_observation_skipped",
     "response_created",
     "checkpoint_created",
     # Checkpoint pre-image capture (Workstream B / B1). `checkpoint_captured`

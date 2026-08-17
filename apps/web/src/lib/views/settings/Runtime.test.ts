@@ -109,3 +109,67 @@ describe("Runtime container profiles", () => {
     );
   });
 });
+
+// BUG-194 — the environment card states what each boundary really does between
+// commands, and offers the reset only where there is something to reset. Both
+// halves matter: an absent control is the honest projection of an unbuilt
+// capability, where a disabled one implies it is a setting away.
+describe("Runtime execution capabilities and reset (BUG-194)", () => {
+  function stubCapabilities() {
+    vi.spyOn(api, "runtimeMode").mockResolvedValue({
+      mode_name: "raiker_runtime",
+      status: "active",
+      activated_at: "2026-08-17T00:00:00Z",
+      activated_by: "principal_owner",
+      reason: "Runtime enabled",
+      allowed_modes: [],
+    });
+    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
+      ...view,
+      environments: [
+        {
+          ...view.environments[0],
+          features: { background: true, pty: true, restart_recovery: true, persistent_environment: false },
+        },
+        {
+          ...view.environments[1],
+          available: true,
+          status: "ready",
+          availability_reason: null,
+          features: { persistent_environment: true, process_tree_stop: true },
+        },
+      ],
+    });
+  }
+
+  it("lists only the capabilities a boundary really has", async () => {
+    stubCapabilities();
+    render(Runtime);
+
+    expect(await screen.findByText("Survives a Raiker restart")).toBeInTheDocument();
+    expect(screen.getByText("Runs work in the background")).toBeInTheDocument();
+    expect(screen.getByText("Keeps its state between commands")).toBeInTheDocument();
+    // The local boundary does not persist, so it gets no reset control at all.
+    expect(screen.getAllByRole("button", { name: "Reset environment" })).toHaveLength(1);
+  });
+
+  it("resets the persistent boundary, and clears the cache only when asked", async () => {
+    stubCapabilities();
+    const reset = vi
+      .spyOn(api, "resetExecutionEnvironment")
+      .mockResolvedValue({ ok: true, profile_id: "container-review", session_id: "settings", recreated: false });
+    vi.stubGlobal("confirm", () => true);
+    render(Runtime);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Reset environment" }));
+    await waitFor(() =>
+      expect(reset).toHaveBeenCalledWith("container-review", "settings", false),
+    );
+
+    await fireEvent.click(screen.getByRole("button", { name: "Reset and clear cache" }));
+    await waitFor(() =>
+      expect(reset).toHaveBeenCalledWith("container-review", "settings", true),
+    );
+    vi.unstubAllGlobals();
+  });
+});

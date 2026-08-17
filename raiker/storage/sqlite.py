@@ -1571,8 +1571,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # projection: every row in it is recomputed from the table that owns
             # the content. Nothing the owner approved lives only here.
             connection.execute(f"DROP TABLE IF EXISTS {table}")
+            # `memory_sqlcipher_fts_sql` rather than `memory_fts_sql`: the two
+            # differ only in that the latter also seeds the index from
+            # `approved_memory`, which `rebuild` does properly a line later —
+            # with the archival, expiry and supersession filters this one omits.
             connection.executescript(
-                memory_fts_sql(TEXT_SEARCH_FTS5).split("INSERT INTO")[0]
+                memory_sqlcipher_fts_sql(TEXT_SEARCH_FTS5)
                 if table == "approved_memory_fts"
                 else conversation_fts_sql(TEXT_SEARCH_FTS5)
             )

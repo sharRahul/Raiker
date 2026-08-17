@@ -128,11 +128,17 @@ class _PtyProcess:
                 # what makes `killpg` reap the whole tree rather than one process.
                 start_new_session=True,
             )
-        finally:
-            # The runtime must not keep the replica open: while any process holds
-            # it, reads on the master never see EOF and `iter_events` would hang
-            # for the full deadline after the child had already exited.
+        except BaseException:
+            # A launch that raised leaves no reader and no writer, so both ends
+            # have to go — closing only the replica would leak one file
+            # descriptor per refused command.
+            os.close(self._master)
             os.close(replica)
+            raise
+        # The runtime must not keep the replica open: while any process holds
+        # it, reads on the master never see EOF and `iter_events` would hang
+        # for the full deadline after the child had already exited.
+        os.close(replica)
         self.pty = True
 
     def iter_events(self) -> Iterator[tuple[str, bytes]]:

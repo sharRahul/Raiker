@@ -175,10 +175,23 @@ jobs:
       - name: Assert the encrypted-database wheel is this platform's
         shell: bash
         run: |
-          ls wheels/ | grep -i sqlcipher3 || {
+          resolved=$(ls wheels/ | grep -i sqlcipher3) || {
             echo "refused: no sqlcipher3 wheel resolved for ${{ matrix.target }}" >&2
             exit 1
           }
+          echo "$resolved"
+          # RAIKER-2025 — and that it is new enough to carry FTS5. The floor in
+          # pyproject.toml is `>=0.5.6` because that is where this wheel gained
+          # the module, so pip should never resolve an older one; this asserts it
+          # per target because a release is the one artifact nobody re-checks,
+          # and an FTS5-less bundle degrades search silently rather than failing.
+          # The packaging smoke test proves the built artifact can really use it.
+          case "$resolved" in
+            *sqlcipher3_wheels-0.5.[0-5]*|*sqlcipher3_wheels-0.[0-4].*)
+              echo "refused: $resolved predates FTS5 (needs >= 0.5.6)" >&2
+              exit 1
+              ;;
+          esac
 
       # Each installer format needs that platform's own packaging tool. macOS
       # has `pkgbuild` and Debian has `dpkg-deb` already; these two do not ship

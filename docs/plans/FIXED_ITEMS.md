@@ -9186,10 +9186,21 @@ exact pathology a comment three lines above it had documented and the previous
 `IN (SELECT …)` form existed to avoid.
 
 Measured at 800 memories: **5.2 s**, against **23 ms** for the same query
-written as a single-evaluation join. It was caught not by a test but by CI's
-Python job running past 35 minutes when this repository's history is 15–23, and
-the plan confirmed it: `CORRELATED SCALAR SUBQUERY` → `SCAN
-approved_memory_fts`.
+written as a single-evaluation join, with the plan naming the cause —
+`CORRELATED SCALAR SUBQUERY` → `SCAN approved_memory_fts`.
+
+**How it was found is worth recording, because nothing caught it.** Not a test:
+every answer was correctly ranked. Not CI either — the suspicion that started
+the investigation was that a slow CI job meant a slow query, and that suspicion
+was **wrong**. The job completed in 23.8 minutes, inside this repository's
+15–23 minute range; it had simply not finished at the moment it was polled. The
+inefficiency is real and was confirmed by direct measurement, but it reached
+`main`-bound code and would have stayed there, because the test corpora are a
+handful of rows each and the local suite runs at the same speed either way.
+
+That is the argument for the plan-shape assertion below rather than a timing
+budget: the only reliable signal was the shape of the query, and the shape is
+what regressed.
 
 Selecting the rank alongside `memory_id` in one subquery and joining on it keeps
 a single `SCAN approved_memory_fts` and a primary-key probe per hit. A derived

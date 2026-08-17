@@ -776,13 +776,47 @@ it wrong without them.
 | Reading references opens nothing new | — | `references` and `passages` re-run no tool, re-read no file, and reach only material that already entered one of this owner's turns. Both are owner-scoped in SQL, and a test asserts another account's passages are unreadable | ✅ |
 | The map shows unresolved references too | Obsidian renders unresolved links distinctly; no agent product draws them | A cited file that no longer exists is drawn hollow with a dashed outline and reads **Missing** in the inspector, searchable as `status:missing` | ✅ beyond |
 
-**Where Raiker's graph is weaker than a vault's, stated rather than papered
-over.** Obsidian's edges are authored: a person wrote `[[deploy]]` and meant it.
-Raiker's are inferred from co-citation, which is the much weaker claim that some
-work needed both things. That is why co-citation edges are labelled
-`shared_sessions` rather than presented as links, and why the reference graph is
-not fed into retrieval scoring — an inferred edge is good enough to *offer a
-model somewhere to look* and not good enough to *change what a search returns*.
+**Read the table above as scoped to link mechanics, not as a verdict on the
+graph.** Every row is a specific control, and each judgement holds for that
+control. What the table does *not* say — and what a reader would wrongly infer
+from eight rows of "beyond" — is that Raiker's knowledge graph is at parity with
+Obsidian's overall. **It is not.** The rows above cover the half that was
+ported; this is the half that was not.
+
+| Obsidian | Raiker | Status |
+|---|---|---|
+| **Authored links** — a person writes `[[deploy]]` and *states* the relationship | Nothing. There is no way to create an edge by hand anywhere in the product; every edge is inferred from co-citation or extracted from approved memory | ❌ absent |
+| Headings, sections and list items — sub-document structure | Not modelled | ❌ absent |
+| Block references (`^id`) — a stable, addressable anchor into a document | `source_id` is per-turn, not a document anchor, and `passage` is text with no stored coordinates. `locate_passage` re-finds it at open time instead | 🟡 partial |
+| Tags as graph entities | Memories carry tags; tags are neither nodes nor a map filter | ❌ absent |
+| Embeds and transclusion | Not modelled | ❌ absent |
+| Frontmatter and `frontmatterLinks` | Not modelled | ❌ absent |
+| Aliases, and `getFirstLinkpathDest` shortest-path link resolution | No alias table; entity matching is exact whole-term on `normalized_name` | ❌ absent |
+| Unlinked mentions | Not modelled | ❌ absent |
+
+**The difference underneath all of it.** Obsidian graphs a corpus a person
+*authored*, and its unit is a document with internal structure. Raiker graphs
+work it *observed*, and its unit is a citation with no sub-document model at all.
+So even the parity rows above are parity on mechanics over different material: an
+Obsidian edge means *someone said these are related*, and a Raiker edge means
+*some work needed both of these*. That is the much weaker claim, which is why
+co-citation edges are labelled `shared_sessions` rather than presented as links,
+and why the reference graph is not fed into retrieval scoring — an inferred edge
+is good enough to *offer a model somewhere to look* and not good enough to
+*change what a search returns*.
+
+**And one gap the tables understate.** Raiker's knowledge graph has two halves.
+The reference half works on a fresh install because `turn_sources` fills itself.
+The *claims* half — entities and typed relationships — is empty, because MEM-06
+means nothing populates it. The part that most resembles a vault graph is the
+part with no data in it.
+
+**Closing the gap, in effort order.** Tags as graph nodes (low — memories
+already carry them); stored passage offsets, which also settles the
+block-reference row (medium); the MEM-06 extractor (medium, and the binding
+constraint); authored links (medium, but a product question before an
+engineering one — it would make Raiker partly a vault, which may not be what it
+should be).
 
 ---
 

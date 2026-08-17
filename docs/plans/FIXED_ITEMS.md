@@ -230,6 +230,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-226](#fixed-226--check-again-reported-check-complete-when-it-had-checked-nothing) | Medium | Model readiness | Fixed |
 | [FIXED-227](#fixed-227--branch-from-here-the-last-open-part-of-c14) | — | Chat / checkpoints (GAP-CHAT C14) | Fixed |
 | [FIXED-228](#fixed-228--the-composer-hid-the-thinking-budget-behind-a-second-dropdown-and-lost-its-focus-ring) | Low | Composer | Fixed |
+| [FIXED-229](#fixed-229--a-governed-command-could-not-outlive-its-turn-and-nothing-could-be-typed-into-one) | High | Shell / background execution (BUG-194) | Fixed |
+| [FIXED-230](#fixed-230--the-vector-leg-searched-one-embedding-space-and-the-query-was-embedded-in-another) | High | Memory retrieval (MEM-03) | Fixed |
+| [FIXED-231](#fixed-231--full-text-search-ranked-by-time-because-a-plan-document-said-fts5-was-unavailable) | High | Text search / retrieval (MEM-05) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -8946,3 +8949,211 @@ now draws the shared ring.
 **User-interface outcome.** The prompt gets the whole card; every per-turn control
 is where a reader of any comparable product would reach for it; and the thinking
 budget belongs to the model it applies to.
+
+
+---
+
+## FIXED-229 — A governed command could not outlive its turn, and nothing could be typed into one
+
+**Severity: High. Area: shell / background execution. Closes two rows of
+[BUG-194](TO_BE_FIXED.md).**
+
+**Observed.** `run_command` waited for the command to finish. A build, a test
+suite, a long `find` — anything slower than the turn's own deadline — either
+timed out or held the conversation open while it ran. Both `LocalStrictBackend`
+and `NativeSandboxBackend` refused `background=True` with
+`selected_environment_background_unsupported`, and `interactive=True` with
+`selected_environment_pty_unsupported`, so a program that asks a question could
+not be answered.
+
+**Root cause, and why it stayed open through two rounds.** Not an oversight —
+a recorded decision, restated on 2026-08-16: background execution "needs a
+supervisor that outlives the turn together with the agent-facing tool that makes
+a background run observable; shipping either half alone is worse than refusing,
+because it leaves an orphan process holding a sandbox grant nothing reclaims, or
+an agent that starts work it cannot poll."
+
+That reasoning was correct, and it is what this fix followed. The pieces the
+entry named were built together rather than a flag being flipped.
+
+**Fix.**
+
+*The lease, which is what makes an unsupervised run reclaimable rather than
+orphaned.* Every background run gets `lease_expires_at`, renewed by a thread at
+a third of the lease term. The thread is the **evidence**, not the mechanism: it
+can only renew while the process it watches is alive and this runtime is up, so
+a lease that keeps moving forward is a live run and a lease that stops is not —
+including on a hard kill, where no `atexit` or signal handler of ours runs.
+`CommandService.reconcile_leases` terminates and finalises every lapsed run with
+a receipt naming `command_background_lease_expired`, never a silent success.
+`list_expired_leases` deliberately excludes `lease_expires_at IS NULL`, because a
+foreground run holds no lease and sweeping those would kill every command that
+had merely not finished yet. A background run also carries a hard two-hour
+ceiling: a run with no deadline renews its lease forever and the reclaim path
+would never fire.
+
+*The observing half.* `background_run` — `list`, `poll`, `log`, `wait`, `kill`,
+`input`. `poll` reads the durable row rather than the in-memory handle, so a run
+this process no longer supervises reports what it really is instead of "not
+found". `log` pages from a resumable sequence, so polling a long run returns only
+what is new. `wait` treats a timeout as a state, not an error — the caller learns
+the run is still going through `state` rather than through an exception it would
+have to tell apart from a real failure. Every action is owner-scoped: one session
+cannot poll, read or kill another owner's run while holding its id, and every
+entry point reconciles first, so a lapsed lease is never reported as "running".
+
+*A terminal, where the platform has one.* `_PtyProcess` uses `openpty` and makes
+the child a session leader, so the replica becomes its *controlling* terminal and
+`killpg` still reaps the whole tree. The runtime closes the replica immediately —
+while any process holds it, reads on the master never see EOF and the pump would
+hang for the full deadline after the child had already exited. A PTY is one duplex
+channel by construction, so the merged stream is reported as `stdout`; that is
+not a simplification, there is no second stream. The redactor still sees every
+byte before anything is stored.
+
+**The tool is not called `process`, and the reason is load-bearing.** BUG-194
+named it `process`. That name already routes to the `process_execution`
+capability — arbitrary host process control, which `runtime/authority/critical.py`
+classifies as critical and the policy holds for approval. Registering a
+read-shaped observation tool under it would have attached a read verdict to host
+process control. The collision surfaced as a hard
+`policy actions cannot have conflicting verdicts: process` at import, not as a
+silent widening, which is the invariant working exactly as designed.
+
+**What is *not* claimed.** `native_sandbox` still refuses both: its
+`CommandFeatures` come from the host probe, and neither background nor PTY has
+been measured inside an AppContainer. Windows PTY stays refused for the reason
+already recorded — `CreatePseudoConsole` builds its console objects in the
+caller's context, unreachable from an AppContainer token. Restart reattachment is
+untouched; a restarted Raiker still reconciles an in-flight run to `lost` with an
+honest receipt.
+
+**Evidence.** `tests/test_background_execution.py` — nine cases. The PTY case is
+the one worth reading: it drives `sort`, writes `beta\nalpha\n^D`, and asserts
+the **last** `alpha` precedes the **last** `beta`. A terminal echoes what is
+typed, so finding the input in the output would prove only that the bytes reached
+the terminal; only the program actually reading them can reverse their order.
+
+**User-interface outcome.** A background run appears in the same owner-visible
+command list, with the same immutable receipt and the same redacted output
+history, as a foreground one. Nothing about it is a second, quieter path.
+
+---
+
+## FIXED-230 — The vector leg searched one embedding space, and the query was embedded in another
+
+**Severity: High. Area: memory retrieval. Closes
+[MEM-03](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** `retrieve_hybrid_memory` combined a lexical, a vector and a graph
+list and presented the result as hybrid retrieval. The vector leg called
+`embed_text` — the hashing trick over lowercased alphanumeric tokens — regardless
+of what had produced the stored vectors. On a default install that made two of
+the three legs the same signal at different weights, so a memory recorded as
+"the owner prefers the encrypted NAS target" was not retrieved by "where should
+backups go". On a workspace holding provider vectors it was worse: the query was
+hashed and compared against coordinates from an unrelated space.
+
+**Root cause.** A model-backed embedding needs either a downloaded local model or
+an egress-gated provider call. Neither had been wired, so the placeholder stayed
+— and `semantic_memory_status()` hard-coded `embedding_backend: "disabled"`,
+which was truthful about **writes** and silent about **reads** while the hashing
+embedding scored every search.
+
+**Fix.** Not a better hash. The embedding became an owner-selected space that
+names itself.
+
+`raiker/vector/backends.py` resolves one `EmbeddingBackend` per search — the
+owner's selection, else any semantic space this workspace actually holds vectors
+in, else the labelled lexical fallback. Resolution is **evidence-led**:
+`list_embedding_spaces` reads the spaces from the vectors themselves, so a space
+is selectable exactly when searching it would return something.
+
+Retrieval then embeds the query with that backend and reads only that backend's
+vectors. When the stored vectors are semantic and no governed embedder is
+available, the vector leg is **dropped** rather than answered from the hashing
+embedding. That is the deliberate part of the design: a cosine between two
+different coordinate systems is not a weaker signal but a meaningless one, and a
+missing leg is a smaller lie than a meaningless one.
+
+The egress stays where the gate is. This module never calls a provider; a
+`query_embedder` is injected by the caller that already holds the capability
+check, so the retrieval path cannot acquire egress by being called.
+
+**User-interface outcome.** Memory → **Recall backend** names the model in force
+and says, in one sentence, whether a paraphrase can recall anything at all.
+`HybridMemoryResult` carries `vector_backend` and `vector_backend_semantic`;
+`semantic_memory_status()` reports the read backend separately from the write
+gate. Selecting a space this workspace holds no vectors in is refused with
+`embedding_backend_unknown`, and a selection that later goes empty resolves to
+the fallback **carrying its reason** rather than answering from a corpus the
+owner did not choose.
+
+**Still true, and stated rather than hidden.** Semantic recall is off on a
+default install, because the honest options are a model download or accepted
+provider egress and both are the owner's decision. `raiker-local-hash-v1` remains
+the labelled fallback — and is no longer describable as semantics.
+
+**Evidence.** `tests/test_memory_embedding_backend.py` — seven cases, two of
+which state the defect directly: a semantic corpus with no embedder answers
+lexically-only instead of from the wrong space, and the same corpus with a
+matching embedder recalls a query that shares no token with the memory.
+
+---
+
+## FIXED-231 — Full-text search ranked by time, because a plan document said FTS5 was unavailable
+
+**Severity: High. Area: text search / retrieval. Closes
+[MEM-05](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** Both `search_approved_memory` and `search_conversation_turns`
+ordered by `created_at DESC` and truncated at the limit. On a workspace holding
+years of history, the exact answer from 2023 sat behind hundreds of newer partial
+matches and was discarded before it was ranked.
+
+**Root cause — and the root cause was false.** MEM-05 recorded it as: *"The
+SQLCipher distribution Raiker ships provides FTS4, not FTS5, so there is no
+BM25."* That sentence was written down, carried forward through several rounds,
+and never checked. It is wrong. `sqlcipher3-wheels` compiles with `ENABLE_FTS5`,
+and so does CPython's bundled SQLite on every platform Raiker targets. An entire
+workaround — a hand-rolled relevance score above the index — had been designed
+around a constraint that did not exist.
+
+**Fix (RAIKER-2025).** The one the false constraint had ruled out.
+
+Both indexes moved to FTS5. That is safe for exactly one reason, and it is the
+reason worth stating: `approved_memory_fts` and `conversation_fts` are
+**rebuildable projections** of governed tables, never a second source of truth.
+The migration drops and recomputes; nothing the owner approved lives only there.
+It is also idempotent per index, so a workspace interrupted halfway is completed
+on the next open, and a workspace opened once on a build without FTS5 is upgraded
+the next time it is opened on one that has it.
+
+Ranking is now `bm25()` before recency. `search_approved_memory` weights the
+approved sentence above its tags (`0.0, 1.0, 0.4` — one weight per declared
+column, `memory_id` being UNINDEXED); `search_conversation_turns` weights only
+its one indexed column. Recency breaks ties.
+
+**The engine is still probed, not declared.** A build can advertise
+`ENABLE_FTS5` in `PRAGMA compile_options` and still refuse the module, and the
+only question that matters is whether the table can be created — so one is
+created in `temp` and dropped. A build genuinely without FTS5 keeps FTS4 and
+keeps working, ranked by recency, and says so. This matters more than it looks:
+`snippet()` takes the same six arguments in a **different order** on each engine,
+and the wrong order does not raise on FTS4 — it silently returns NULL for every
+row. The order is derived from the probe. `memory_evaluation_runs.backend_version`
+is written from it too, so an FTS4 measurement and an FTS5 one are never compared
+as though they were the same thing.
+
+**Found on the way.** `bm25()` resolves its first argument as the FTS table's own
+name, not as a query alias, so the correlated ranking subquery deliberately does
+not alias the table — an aliased first attempt failed with `no such column: f`.
+
+**User-interface outcome.** Memory search and chat search return the best match
+first rather than the most recent, and a conversation snippet is marked at the
+matched term on both engines instead of coming back empty on one of them.
+
+**Evidence.** `tests/test_text_search_fts5.py` — including the case MEM-05
+describes: the best answer is the oldest row, five newer rows mention the term
+once each, and it ranks first at `limit=2`. The FTS4→FTS5 conversion is driven
+from a real FTS4 index and asserted to answer the same query afterwards.

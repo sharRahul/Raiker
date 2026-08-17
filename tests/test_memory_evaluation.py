@@ -10,6 +10,7 @@ from raiker.memory.evaluation import (
     evaluate_hybrid_retrieval,
     evaluate_lexical_retrieval,
     evaluate_vector_retrieval,
+    lexical_backend_version,
 )
 from raiker.memory.store import (
     MemoryGovernance,
@@ -52,7 +53,7 @@ def test_evaluation_reports_quality_latency_and_policy_leaks(tmp_path: Path) -> 
             "FROM memory_evaluation_runs WHERE evaluation_id = ?", (evaluation_id,)
         ).fetchone()
     assert row["policy_leak_count"] == 0
-    assert row["backend_version"] == "sqlite-fts4"
+    assert row["backend_version"] == lexical_backend_version(store)
     assert row["scope"] == "project:alpha"
     assert row["workload"] == "retrieval_case_set"
     assert '"p95_ms"' in row["latency_distribution_json"]
@@ -68,9 +69,10 @@ def test_all_retrieval_strategies_report_aggregate_context(tmp_path: Path) -> No
         evaluate_graph_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
         evaluate_hybrid_retrieval(store, corpus_version="memory-eval-v1", cases=cases),
     )
+    lexical = lexical_backend_version(store)
     assert {report.backend_version for report in reports} == {
-        "sqlite-fts4", LOCAL_EMBEDDING_MODEL, "memory-entity-graph-v1",
-        f"sqlite-fts4+{LOCAL_EMBEDDING_MODEL}+memory-entity-graph-v1",
+        lexical, LOCAL_EMBEDDING_MODEL, "memory-entity-graph-v1",
+        f"{lexical}+{LOCAL_EMBEDDING_MODEL}+memory-entity-graph-v1",
     }
     for report in reports:
         assert report.scope == "project:alpha"

@@ -128,7 +128,7 @@ def inspect_workspace(client_type: str, *, workspace_root: str | Path = ".") -> 
             for c in connectors
         ],
         "capability_gates": list_capability_states(),
-        "semantic_memory": semantic_memory_status(len(memory_candidates))
+        "semantic_memory": semantic_memory_status(len(memory_candidates), store=store)
         | memory_governance_summary(workspace_root),
         "semantic_memory_readiness": semantic_memory_readiness_summary(workspace_root=workspace_root),
         "graph_codemap": graph_governance_status(),

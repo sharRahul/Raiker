@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import json
 from collections.abc import Callable, Mapping
@@ -114,10 +115,21 @@ def _drops_argument_values(tool_name: str) -> bool:
 # calendar_id / event_id / channel) are governance-relevant non-secret
 # identifiers and are kept verbatim (redacted) for the audit trail; only the
 # fetched *content* is dropped from events.
+#: The ceiling a background run may occupy (BUG-194). Deliberately a hard cap
+#: rather than "until it finishes": a run with no deadline is a run whose lease
+#: renews forever, and the reclaim path would never fire. Two hours is long
+#: enough for a real build or test suite and short enough that a wedged one is
+#: reaped the same working day.
+_BACKGROUND_TIMEOUT_SECONDS = 7200.0
+
 _CONTENT_RESULT_TOOLS = frozenset(
     {
         "consult_advisor", "github_read", "gmail_read", "gcal_read", "slack_read",
         "connector_read", "run_command",
+        # BUG-194 — a background run's log is the same program output
+        # `run_command` returns, arriving one page at a time. It gets the same
+        # treatment: metadata into the audit trail, content only to the model.
+        "background_run",
         # B12/C7 — a fetched page and a search result set are outside content the
         # agent read on the owner's behalf. They flow to the calling model as
         # untrusted data; the audit trail keeps the URL, the query and the sizes.
@@ -341,6 +353,7 @@ class ToolBroker:
             "assign_session_project": self._assign_session_project,
             "create_document": self._create_document,
             "run_command": self._run_command,
+            "background_run": self._background_run,
             "update_plan": self._update_plan,
             "spawn_subagent": self._spawn_subagent,
         }
@@ -451,7 +464,7 @@ class ToolBroker:
                     separators=(",", ":"),
                 ).encode()
             ).hexdigest()
-            result = self.command_service.run_foreground(
+            invocation: dict[str, Any] = dict(
                 owner_principal_id=context.owner_principal_id,
                 acting_principal_id=context.acting_principal_id,
                 session_id=context.session_id,
@@ -461,13 +474,94 @@ class ToolBroker:
                 authority_id=grant_identity,
                 command=str(args.get("command", "")),
                 argv=command,
-                timeout_seconds=float(grant["timeout_seconds"]),
                 max_output_bytes=100_000,
+            )
+            if bool(args.get("background")):
+                # BUG-194 — the same grant, the same allowlist, the same argv
+                # policy. What differs is only that the turn does not wait: the
+                # deadline becomes the background ceiling rather than the grant's
+                # foreground one, and the run is observed through `process`.
+                run = self.command_service.start(
+                    **invocation,
+                    timeout_seconds=_BACKGROUND_TIMEOUT_SECONDS,
+                    background=True,
+                )
+                return {
+                    "status": "success",
+                    "run_id": run.run_id,
+                    "state": run.state.value,
+                    "background": True,
+                    "next": "Use background_run with this run_id to poll, log, wait or kill.",
+                }
+            result = self.command_service.run_foreground(
+                **invocation, timeout_seconds=float(grant["timeout_seconds"])
             )
         except (SandboxError, CommandServiceError) as exc:
             reason = exc.reason_code if isinstance(exc, CommandServiceError) else str(exc)
             return {"status": "failed", "error": {"type": reason}}
         return {"status": "success", **result}
+
+    def _background_run(
+        self, args: dict[str, Any], context: ToolExecutionContext
+    ) -> dict[str, Any]:
+        """Observe and control what `run_command` started in the background.
+
+        Owner-scoped throughout: every call reads the durable run row through the
+        owner's principal, so one session cannot poll, read or kill another
+        owner's run even holding its id. The tool grants nothing — a run it can
+        see is one the grant that started it already authorised.
+        """
+        action = str(args.get("action", "")).strip()
+        if action not in {"list", "poll", "log", "wait", "kill", "input"}:
+            return {"status": "denied", "error": {"type": "background_run_action_invalid"}}
+        service = self.command_service
+        owner = context.owner_principal_id
+        # Every entry point reconciles first. A lapsed lease means the run's
+        # supervisor is gone, and reporting it as "running" would be the exact
+        # orphan this design exists to prevent.
+        with contextlib.suppress(Exception):
+            service.reconcile_leases(owner)
+        if action == "list":
+            runs = service.store.list_runs(owner, session_id=context.session_id, limit=25)
+            return {
+                "status": "success",
+                "runs": [
+                    {
+                        "run_id": run.run_id,
+                        "state": run.state.value,
+                        "command": run.safe_display,
+                        "exit_code": run.exit_code,
+                        "started_at": run.started_at,
+                    }
+                    for run in runs
+                ],
+            }
+        run_id = str(args.get("run_id", "")).strip()
+        if not run_id:
+            return {"status": "denied", "error": {"type": "background_run_id_required"}}
+        try:
+            if action == "poll":
+                return {"status": "success", **service.poll(owner, run_id)}
+            if action == "log":
+                after = max(0, int(args.get("after") or 0))
+                return {"status": "success", **service.read_log(owner, run_id, after=after)}
+            if action == "wait":
+                requested = float(args.get("timeout_seconds") or 30.0)
+                timeout = min(300.0, max(1.0, requested))
+                return {"status": "success", **service.wait(
+                    owner, run_id, timeout_seconds=timeout
+                )}
+            if action == "input":
+                data = args.get("input")
+                if not isinstance(data, str) or not data:
+                    return {"status": "denied", "error": {"type": "background_run_input_required"}}
+                return {"status": "success", **service.send_input(owner, run_id, data)}
+            run = service.stop(owner, run_id)
+            return {"status": "success", "run_id": run.run_id, "state": run.state.value}
+        except CommandServiceError as exc:
+            return {"status": "failed", "error": {"type": exc.reason_code}}
+        except (TypeError, ValueError):
+            return {"status": "denied", "error": {"type": "background_run_argument_invalid"}}
 
     def _create_document(
         self, args: dict[str, Any], context: ToolExecutionContext

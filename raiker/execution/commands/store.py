@@ -441,6 +441,42 @@ class CommandStore:
             rows = connection.execute(query, params).fetchall()
         return [self._run(row) for row in rows]
 
+    def renew_lease(self, owner_principal_id: str, run_id: str, expires_at: str) -> None:
+        """Extend the lease a live run holds (BUG-194).
+
+        The lease is what makes a background run reclaimable. A run that outlives
+        the turn cannot be bounded by the turn, so it is bounded by a deadline it
+        must keep renewing: while the supervising thread is alive the lease moves
+        forward, and the moment it is not — a crashed worker, a wedged backend,
+        a restart — the lease stops moving and `list_expired_leases` finds it.
+        A missing lease is therefore never mistaken for a healthy run.
+        """
+        with self.sqlite.connect() as connection:
+            connection.execute(
+                """UPDATE command_runs SET lease_expires_at = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (expires_at, utc_now(), owner_principal_id, run_id),
+            )
+
+    def list_expired_leases(self, owner_principal_id: str) -> list[StoredCommandRun]:
+        """Non-terminal runs whose lease has lapsed. Never runs that never had one.
+
+        `lease_expires_at IS NULL` is deliberately excluded: a foreground run
+        holds no lease, and sweeping those would kill every command that merely
+        had not finished yet.
+        """
+        placeholders = ",".join("?" for _ in TERMINAL_COMMAND_STATES)
+        terminal = [state.value for state in TERMINAL_COMMAND_STATES]
+        with self.sqlite.connect() as connection:
+            rows = connection.execute(
+                f"SELECT * FROM command_runs WHERE owner_principal_id = ? "
+                f"AND state NOT IN ({placeholders}) "
+                f"AND lease_expires_at IS NOT NULL AND lease_expires_at < ? "
+                f"ORDER BY created_at ASC, run_id ASC",
+                [owner_principal_id, *terminal, utc_now()],
+            ).fetchall()
+        return [self._run(row) for row in rows]
+
     def list_recoverable(self, owner_principal_id: str) -> list[StoredCommandRun]:
         placeholders = ",".join("?" for _ in TERMINAL_COMMAND_STATES)
         terminal = [state.value for state in TERMINAL_COMMAND_STATES]

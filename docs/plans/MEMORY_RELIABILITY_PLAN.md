@@ -41,16 +41,18 @@ between them and a turn. **Durable memory answers "what was I told to
 remember". Nothing answered "what did we actually say, and when"**, which is the
 question a conversation from years ago is actually asked.
 
-`MEM-01` and `MEM-02` are closed by this change and kept here with their
-evidence; `MEM-03` onwards are open.
+`MEM-01` and `MEM-02` are closed by the 2026-08-11 change and kept here with
+their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
+(FIXED-230 and FIXED-231) and likewise kept with theirs; `MEM-04` and `MEM-06`
+onwards are open.
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [MEM-01](#mem-01--the-model-had-no-way-to-read-a-past-conversation) | **Critical** | Recall / tools | Fixed 2026-08-11 |
 | [MEM-02](#mem-02--ambient-recall-offered-the-eight-most-recent-chats-whatever-the-turn-was-about) | High | Context assembly | Fixed 2026-08-11 |
-| [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Open |
+| [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Open |
-| [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Open |
+| [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | Open |
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
@@ -148,7 +150,7 @@ Incognito remains an absolute read opt-out ahead of all of it.
 
 ## MEM-03 — The vector leg of hybrid retrieval is lexical, so a paraphrase recalls nothing
 
-**Severity: High. Area: retrieval quality.**
+**Severity: High. Area: retrieval quality. Status: fixed 2026-08-17.**
 
 **Observed.** `retrieve_hybrid_memory` combines a lexical, a vector and a graph
 candidate list and presents the result as hybrid retrieval
@@ -176,6 +178,55 @@ the offline case, or a configured provider for owners who already accepted that
 egress. Record model, version and dimension on every stored vector (the
 projection mapping already has the columns), and refuse to mix vectors from two
 backends in one search. Keep `raiker-local-hash-v1` as the labelled fallback.
+
+**Fixed 2026-08-17.** The fix is not a better hash — it is making the embedding
+an owner-selected space that **names itself**, which is what turns a silent
+wrong answer into a visible one.
+
+*The resolver.* `raiker/vector/backends.py` resolves one `EmbeddingBackend` per
+search: the owner's explicit selection, else any semantic space this workspace
+actually holds vectors in, else the labelled lexical fallback. Resolution is
+**evidence-led, not configuration-led** — `list_embedding_spaces` reads the
+spaces from the vectors themselves, so a space is selectable exactly when
+searching it would return something, and a stored selection that has gone empty
+resolves to the fallback carrying
+`embedding_backend_selected_has_no_vectors:<model>` rather than answering from a
+corpus the owner did not choose.
+
+*One space, or none.* `retrieve_hybrid_memory` embeds the query with the resolved
+backend and reads only that backend's vectors. When the stored vectors are
+semantic and no governed embedder is available to match them, the vector leg is
+**dropped**. That is the deliberate part: the alternative is to hash the query
+and compare two unrelated spaces, and a cosine between different coordinate
+systems is not a weaker signal but a meaningless one. A missing leg is a smaller
+lie than a meaningless one.
+
+*The egress stays where the gate is.* This module never calls a provider. A
+`query_embedder` is injected by the caller that already holds the capability
+check, so the retrieval path cannot acquire egress by being called.
+
+*What every surface now says.* `HybridMemoryResult` carries `vector_backend` and
+`vector_backend_semantic`. `semantic_memory_status()` reports
+`retrieval_embedding_backend`, `retrieval_embedding_kind` and
+`retrieval_is_semantic` **separately from the write gate** — the old single
+`embedding_backend: "disabled"` was true of writes and silent about reads while
+the vector leg ran on every search. Memory → **Recall backend** names the model
+in force and says in one sentence whether a paraphrase can recall anything at
+all. Selecting a space that holds no vectors is refused with
+`embedding_backend_unknown` rather than quietly downgraded.
+
+*What is still true.* Semantic recall is available but **off on a default
+install**, because the honest options are a model download or accepted provider
+egress and both are the owner's decision. The remaining work — a bundled local
+sentence-embedding model served through the existing llama.cpp runtime — is a
+model-acquisition task, not a retrieval one. `raiker-local-hash-v1` remains the
+labelled fallback and is no longer describable as semantics.
+
+*Evidence.* `tests/test_memory_embedding_backend.py` — seven cases, including
+the two that state the defect directly: a semantic corpus with no embedder
+answers lexically-only rather than from the wrong space, and the same corpus
+with a matching embedder recalls a query that **shares no token** with the
+memory.
 
 **Required user-interface outcome.** Models → the memory section names the
 embedding backend in force, and Memory states which of the two postures the
@@ -221,7 +272,7 @@ sensitivity says so, so an empty list is distinguishable from a disabled one.
 
 ## MEM-05 — Lexical ranking is recency order, so the oldest exact answer is the first one dropped
 
-**Severity: High. Area: retrieval quality.**
+**Severity: High. Area: retrieval quality. Status: fixed 2026-08-17.**
 
 **Observed.** The SQLCipher distribution Raiker ships provides FTS4, not FTS5, so
 there is no BM25 (`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`, Stage H). Both
@@ -244,6 +295,36 @@ in a prompt versus an answer — then order by score before recency and expose t
 weights as data the way `HybridRetrievalWeights` already does. This needs no
 FTS5 and no new dependency. Measure it on the `memory-eval-v1` corpus rather than
 asserting the improvement.
+
+**Fixed 2026-08-17 — and the stated root cause was false.** "The SQLCipher
+distribution Raiker ships provides FTS4, not FTS5" was written down, carried
+forward through several rounds, and never checked. It is wrong:
+`sqlcipher3-wheels` compiles with `ENABLE_FTS5`, and so does CPython's bundled
+SQLite on every platform Raiker targets. A whole workaround was designed around
+a constraint that did not exist.
+
+So the fix is the one the constraint had ruled out. RAIKER-2025 migrates both
+full-text indexes to FTS5 — safe precisely because each is a **rebuildable
+projection** of a governed table, never a second source of truth — and both
+searches now order by `bm25()` before recency. `search_approved_memory` weights
+the approved sentence above its tags (`0.0, 1.0, 0.4`); `search_conversation_turns`
+weights only its one indexed column. Ordering is relevance first, recency only
+to break ties.
+
+The engine is still **probed rather than declared**: a temporary `fts5` virtual
+table is created and dropped, because a build can advertise `ENABLE_FTS5` and
+still refuse the module, and a build genuinely without it keeps FTS4 and keeps
+working. `snippet()` takes its six arguments in a different order on each engine
+— and on FTS4 the wrong order returns NULL rather than raising — so the order is
+derived from that probe. `memory_evaluation_runs.backend_version` is written from
+it too, so an FTS4 measurement and an FTS5 one are never compared as though they
+were the same thing.
+
+*Evidence.* `tests/test_text_search_fts5.py` — including the case this entry
+describes: the best answer is the **oldest** row, five newer rows mention the
+term once each, and it ranks first at `limit=2` instead of being dropped. The
+FTS4→FTS5 conversion is driven from a real FTS4 index and asserted to answer the
+same query afterwards.
 
 **Required user-interface outcome.** Search Chat and Memory results are ordered
 by relevance with the date shown, and a result set that was truncated says so

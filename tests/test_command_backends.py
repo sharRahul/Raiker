@@ -216,7 +216,7 @@ def test_a_run_in_flight_already_names_the_backend_its_receipt_will_name(
     service.shutdown()
 
 
-def test_local_strict_rejects_shell_background_network_and_credentials(tmp_path: Path) -> None:
+def test_local_strict_rejects_shell_network_and_credentials(tmp_path: Path) -> None:
     backend = LocalStrictBackend(runner=Mock())
     with pytest.raises(CommandBackendError, match="local_strict_shell_source_denied"):
         backend.start(
@@ -228,8 +228,6 @@ def test_local_strict_rejects_shell_background_network_and_credentials(tmp_path:
                 safe_display="echo hi",
             )
         )
-    with pytest.raises(CommandBackendError, match="selected_environment_background_unsupported"):
-        backend.start(request(tmp_path, background=True))
     with pytest.raises(CommandBackendError, match="selected_environment_network_unsupported"):
         backend.start(request(tmp_path, network_policy_id="filtered"))
 
@@ -242,7 +240,11 @@ def test_local_strict_runs_validated_argv_with_secret_free_environment(tmp_path:
     assert called.args[1] == ["git", "status"]
     assert "OPENAI_API_KEY" not in called.args[3]
     assert backend.features.shell is False
-    assert backend.features.concurrent_runs is False
+    # BUG-194 — background, PTY and raw input are now real on this backend, and
+    # `concurrent_runs` follows: a background run only means anything if a second
+    # command can start while it is still going.
+    assert backend.features.background is True
+    assert backend.features.concurrent_runs is True
     assert backend.features.credential_delivery is False
 
 

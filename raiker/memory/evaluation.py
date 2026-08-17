@@ -22,6 +22,16 @@ class RetrievalCase:
     entity_id: str | None = None
 
 
+def lexical_backend_version(store: SQLiteStore) -> str:
+    """The lexical engine a measurement was actually taken on.
+
+    Two runs of the same corpus on FTS4 and FTS5 are not comparable — one has a
+    relevance score and the other orders by time — so the engine belongs in the
+    stored evaluation row rather than in a constant that outlives its truth.
+    """
+    return f"sqlite-{store.resolved_text_search_engine()}"
+
+
 @dataclass(frozen=True)
 class RetrievalEvaluation:
     corpus_version: str
@@ -36,7 +46,7 @@ class RetrievalEvaluation:
     token_count: int
     compute_cost_usd: float
     storage_bytes: int
-    backend_version: str = "sqlite-fts4"
+    backend_version: str = "sqlite-fts5"
     scope: str = "mixed"
     workload: str = "retrieval_case_set"
     latency_distribution: dict[str, float | int] | None = None
@@ -62,7 +72,9 @@ def evaluate_lexical_retrieval(
         cases=cases,
         retrieve=lambda case: store.search_approved_memory(case.query, scope=case.scope, limit=top_k),
         top_k=top_k,
-        backend_version="sqlite-fts4",
+        # Named from the probe, not from a literal: a measurement recorded
+        # against the wrong engine cannot be compared with the next one.
+        backend_version=lexical_backend_version(store),
         strategy="lexical_fts",
     )
 
@@ -94,7 +106,9 @@ def evaluate_hybrid_retrieval(
     return _evaluate_hybrid_strategy(
         store, corpus_version=corpus_version, cases=cases, top_k=top_k,
         weights=weights or HybridRetrievalWeights(), strategy="hybrid",
-        backend_version=f"sqlite-fts4+{LOCAL_EMBEDDING_MODEL}+memory-entity-graph-v1",
+        backend_version=(
+            f"{lexical_backend_version(store)}+{LOCAL_EMBEDDING_MODEL}+memory-entity-graph-v1"
+        ),
     )
 
 

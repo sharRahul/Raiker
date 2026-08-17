@@ -948,7 +948,9 @@ class ContextGatherer:
         governed = governed_memory_status(
             candidates, store=store, principal_id=owner_principal_id
         )
-        semantic = semantic_memory_status(len(candidates))
+        semantic = semantic_memory_status(
+            len(candidates), store=store, owner_principal_id=owner_principal_id
+        )
         lines = [
             f"mode: {governed['mode']}",
             f"durable_writes_enabled: {governed['durable_writes_enabled']}",

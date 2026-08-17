@@ -100,7 +100,6 @@ from raiker.storage.migrations import (
     CONVERSATION_COMPACTIONS_MIGRATION_ID,
     CONVERSATION_COMPACTIONS_SQL,
     CONVERSATION_FTS_MIGRATION_ID,
-    CONVERSATION_FTS_SQL,
     CREDENTIAL_SECURITY_MIGRATION_ID,
     CREDENTIAL_SECURITY_SQL,
     CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
@@ -144,12 +143,13 @@ from raiker.storage.migrations import (
     MEMORY_CONTENT_CHECKSUM_SQL,
     MEMORY_CONTROLS_MIGRATION_ID,
     MEMORY_CONTROLS_SQL,
+    MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
+    MEMORY_EMBEDDING_BACKEND_SQL,
     MEMORY_ENTITY_GRAPH_MIGRATION_ID,
     MEMORY_ENTITY_GRAPH_SQL,
     MEMORY_EVALUATION_CONTEXT_MIGRATION_ID,
     MEMORY_EVALUATION_CONTEXT_SQL,
     MEMORY_FTS_MIGRATION_ID,
-    MEMORY_FTS_SQL,
     MEMORY_JOBS_MIGRATION_ID,
     MEMORY_JOBS_SQL,
     MEMORY_LIFECYCLE_AUDIT_IMMUTABILITY_MIGRATION_ID,
@@ -163,7 +163,6 @@ from raiker.storage.migrations import (
     MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
     MEMORY_RETRIEVAL_AUTHORITY_SQL,
     MEMORY_SQLCIPHER_FTS_MIGRATION_ID,
-    MEMORY_SQLCIPHER_FTS_SQL,
     MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
     MEMORY_TEMPORAL_EVALUATION_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
@@ -323,6 +322,9 @@ from raiker.storage.migrations import (
     TASK_ATTACHMENTS_SQL,
     TASK_MODEL_CHOICES_MIGRATION_ID,
     TASK_MODEL_CHOICES_SQL,
+    TEXT_SEARCH_FTS4,
+    TEXT_SEARCH_FTS5,
+    TEXT_SEARCH_FTS5_MIGRATION_ID,
     THREAT_MODEL_ACKS_MIGRATION_ID,
     THREAT_MODEL_ACKS_SQL,
     TURN_CONTROLS_MIGRATION_ID,
@@ -333,6 +335,9 @@ from raiker.storage.migrations import (
     TURN_SOURCES_SQL,
     WEB_BLOCKLIST_MIGRATION_ID,
     WEB_BLOCKLIST_SQL,
+    conversation_fts_sql,
+    memory_fts_sql,
+    memory_sqlcipher_fts_sql,
 )
 from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memory_security
 
@@ -1149,9 +1154,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
             self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
-            self._apply_migration(MEMORY_FTS_MIGRATION_ID, MEMORY_FTS_SQL, connection)
+            engine = self.text_search_engine(connection)
+            self._apply_migration(MEMORY_FTS_MIGRATION_ID, memory_fts_sql(engine), connection)
             self._apply_migration(
-                MEMORY_SQLCIPHER_FTS_MIGRATION_ID, MEMORY_SQLCIPHER_FTS_SQL, connection
+                MEMORY_SQLCIPHER_FTS_MIGRATION_ID, memory_sqlcipher_fts_sql(engine), connection
             )
             self._apply_migration(
                 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
@@ -1338,7 +1344,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 CONVERSATION_FTS_MIGRATION_ID,
-                CONVERSATION_FTS_SQL,
+                conversation_fts_sql(self.text_search_engine(connection)),
                 connection,
             )
             self._apply_migration(WEB_BLOCKLIST_MIGRATION_ID, WEB_BLOCKLIST_SQL, connection)
@@ -1359,6 +1365,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection
             )
+            self._apply_migration(
+                MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
+                MEMORY_EMBEDDING_BACKEND_SQL,
+                connection,
+            )
+            # Before the backfills: converting an index and then deciding it is
+            # empty enough to need populating is one read, not two rebuilds.
+            self._migrate_text_search_engine(connection)
             self._backfill_memory_fts(connection)
             self._backfill_conversation_fts(connection)
             for _alter_sql in (
@@ -1400,10 +1414,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     # restore enforcement for every normal Raiker connection.
                     encrypted.execute("PRAGMA foreign_keys = OFF")
                     # FTS virtual-table shadow rows are engine-specific. Rebuild this
-                    # disposable projection from approved memory after importing.
+                    # disposable projection from approved memory after importing,
+                    # on whichever engine the destination build has — the source
+                    # file's engine is not necessarily available here.
+                    engine = self.text_search_engine(encrypted)
                     dump = "\n".join(
                         line for line in source.iterdump() if "approved_memory_fts" not in line
-                    ).replace("USING fts5(", "USING fts4(")
+                    )
+                    for candidate in ("fts5", "fts4"):
+                        dump = dump.replace(f"USING {candidate}(", f"USING {engine}(")
                     encrypted.executescript(dump)
                     encrypted.execute("PRAGMA foreign_keys = ON")
             finally:
@@ -1462,6 +1481,110 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
             (migration_id, utc_now()),
         )
+
+    # ── Text-search engine (RAIKER-2025) ─────────────────────────────────────
+
+    #: Probed once per process. The answer is a property of the SQLite library
+    #: this interpreter loaded, not of any one workspace, and creating a throwaway
+    #: virtual table on every store construction would be a measurable cost on a
+    #: process that opens many.
+    _text_search_engine: str | None = None
+
+    @classmethod
+    def text_search_engine(cls, connection: sqlite3.Connection) -> str:
+        """Which full-text engine this build actually has. Measured, not declared.
+
+        ``PRAGMA compile_options`` is not consulted: a build can report
+        ``ENABLE_FTS5`` and still refuse the module if it was linked without it,
+        and the only question that matters here is whether the table can be
+        created. So one is created, in ``temp``, and dropped again.
+        """
+        if cls._text_search_engine is not None:
+            return cls._text_search_engine
+        engine = TEXT_SEARCH_FTS4
+        try:
+            connection.execute(
+                "CREATE VIRTUAL TABLE temp.raiker_fts5_probe USING fts5(probe)"
+            )
+        except sqlite3.Error:
+            pass
+        else:
+            engine = TEXT_SEARCH_FTS5
+            with contextlib.suppress(sqlite3.Error):
+                connection.execute("DROP TABLE temp.raiker_fts5_probe")
+        cls._text_search_engine = engine
+        return engine
+
+    def resolved_text_search_engine(self) -> str:
+        """The engine, probing once if a search runs before any migration did."""
+        if SQLiteStore._text_search_engine is None:
+            with self.connect() as connection:
+                return self.text_search_engine(connection)
+        return SQLiteStore._text_search_engine
+
+    def _snippet_expression(self, table: str, column: int) -> str:
+        """`snippet()` for whichever engine holds *table*.
+
+        The two engines take the same six arguments in a different order, and
+        FTS4 numbers the column *after* the markers while FTS5 numbers it first.
+        Getting that wrong does not raise — FTS4 would read `18` as the column
+        index and return NULL for every row — so the order is derived from the
+        probe rather than written once and assumed.
+        """
+        if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
+            return f"snippet({table}, {column}, '', '', '…', 18)"
+        return f"snippet({table}, '', '', '…', {column}, 18)"
+
+    @staticmethod
+    def _index_engine(connection: sqlite3.Connection, table: str) -> str | None:
+        """The engine an existing index was built on, read from its own DDL."""
+        row = connection.execute(
+            "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = ?", (table,)
+        ).fetchone()
+        if row is None or not row[0]:
+            return None
+        ddl = str(row[0]).lower()
+        for engine in (TEXT_SEARCH_FTS5, TEXT_SEARCH_FTS4):
+            if f"using {engine}" in ddl:
+                return engine
+        return None
+
+    def _migrate_text_search_engine(self, connection: sqlite3.Connection) -> None:
+        """Move both rebuildable text indexes onto FTS5 where the build has it.
+
+        Written as a method rather than a SQL script because the decision is
+        conditional on a probe and the rebuild reads the governed tables. Each
+        index is converted independently and idempotently: a workspace that is
+        interrupted halfway is completed on the next open, and one that is
+        already FTS5 costs two `sqlite_master` reads.
+        """
+        if self.text_search_engine(connection) != TEXT_SEARCH_FTS5:
+            return
+        converted = False
+        for table, rebuild in (
+            ("approved_memory_fts", self._rebuild_memory_fts),
+            ("conversation_fts", self._rebuild_conversation_fts),
+        ):
+            if self._index_engine(connection, table) != TEXT_SEARCH_FTS4:
+                continue
+            # Dropping before creating is safe precisely because the index is a
+            # projection: every row in it is recomputed from the table that owns
+            # the content. Nothing the owner approved lives only here.
+            connection.execute(f"DROP TABLE IF EXISTS {table}")
+            connection.executescript(
+                memory_fts_sql(TEXT_SEARCH_FTS5).split("INSERT INTO")[0]
+                if table == "approved_memory_fts"
+                else conversation_fts_sql(TEXT_SEARCH_FTS5)
+            )
+            rebuild(connection)
+            converted = True
+        if converted or connection.execute(
+            "SELECT 1 FROM migrations WHERE migration_id = ?", (TEXT_SEARCH_FTS5_MIGRATION_ID,)
+        ).fetchone() is None:
+            connection.execute(
+                "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
+                (TEXT_SEARCH_FTS5_MIGRATION_ID, utc_now()),
+            )
 
     def _backfill_legacy_account_bootstrap_roles(
         self, connection: sqlite3.Connection
@@ -3970,6 +4093,88 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}" if owner_principal_id else self.MEMORY_SETTINGS_SCOPE, 1 if incognito else 0, utc_now()),
             )
 
+    # ── Embedding backend selection (MEM-03) ──────────────────────────────
+
+    def get_memory_embedding_backend(self, owner_principal_id: str | None = None) -> str:
+        """The embedding space this owner chose, or ``auto``.
+
+        Read exactly like ``is_memory_incognito``, including its fall back to
+        the original account's row, so a workspace bootstrapped from the CLI
+        does not silently answer with a different setting than the one the web
+        surface writes.
+        """
+        scope_id = (
+            f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+            if owner_principal_id
+            else self.MEMORY_SETTINGS_SCOPE
+        )
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT embedding_backend FROM memory_settings WHERE scope_id = ?", (scope_id,)
+            ).fetchone()
+            if row is None and owner_principal_id is None:
+                original = self._original_owner_from_connection(connection)
+                if original is not None:
+                    row = connection.execute(
+                        "SELECT embedding_backend FROM memory_settings WHERE scope_id = ?",
+                        (f"{self.MEMORY_SETTINGS_SCOPE}:{original}",),
+                    ).fetchone()
+        return str(row["embedding_backend"]) if row is not None and row["embedding_backend"] else "auto"
+
+    def set_memory_embedding_backend(
+        self, backend: str, owner_principal_id: str | None = None
+    ) -> None:
+        if owner_principal_id is None:
+            owner_principal_id = self.original_account_principal_id()
+        scope_id = (
+            f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+            if owner_principal_id
+            else self.MEMORY_SETTINGS_SCOPE
+        )
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO memory_settings (scope_id, incognito, embedding_backend, updated_at)
+                VALUES (?, 0, ?, ?)
+                ON CONFLICT(scope_id) DO UPDATE SET
+                  embedding_backend = excluded.embedding_backend,
+                  updated_at = excluded.updated_at
+                """,
+                (scope_id, backend, utc_now()),
+            )
+
+    def list_memory_embedding_spaces(
+        self, *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Every ``(model, dimensions)`` this workspace holds memory vectors in.
+
+        Only spaces reachable from an *active* approved memory are listed: a
+        space whose every projection has been archived is not one a search could
+        answer from, and offering it would be offering an empty corpus.
+        """
+        now = utc_now()
+        sql = """
+        SELECT v.embedding_model AS embedding_model, v.dimensions AS dimensions,
+               COUNT(*) AS vector_count
+        FROM vector_records v
+        JOIN memory_projections p ON p.projection_id = v.vector_id
+          AND p.projection_type = 'vector' AND p.active = 1
+        JOIN approved_memory m ON m.memory_id = p.memory_id
+        WHERE v.embedding IS NOT NULL AND m.deleted_at IS NULL AND m.archived_at IS NULL
+          AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+          AND m.search_enabled = 1 AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND (m.valid_from IS NULL OR m.valid_from <= ?)
+          AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
+        """
+        params: list[Any] = [now, now, now]
+        if owner_principal_id:
+            sql += " AND m.owner_principal_id = ?"
+            params.append(owner_principal_id)
+        sql += " GROUP BY v.embedding_model, v.dimensions ORDER BY v.embedding_model"
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
@@ -4246,16 +4451,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     @staticmethod
     def _match_terms(query: str) -> list[str]:
-        """FTS4-safe terms. Operators and punctuation are stripped, not escaped.
+        """Terms both engines read as literals. Punctuation is stripped, not escaped.
 
         Stripping punctuation removes the parenthesis and quote operators, but it
-        leaves the *keyword* operators, which FTS4 recognises only in upper case.
-        A prompt is ordinary prose, so `AND`, `OR`, `NOT`, and `NEAR` arrive as
-        words the owner typed, not as syntax: `NOT deployment` is a malformed
-        expression that raises, and `find NOT deployment` parses as an exclusion
-        and answers with the opposite of what was asked. Lower-casing every term
-        makes each one a literal, which is what the tokenizer already matches
-        case-insensitively — so the search means what the prompt says.
+        leaves the *keyword* operators, which FTS4 and FTS5 alike recognise only
+        in upper case. A prompt is ordinary prose, so `AND`, `OR`, `NOT`, and
+        `NEAR` arrive as words the owner typed, not as syntax: `NOT deployment`
+        is a malformed expression that raises, and `find NOT deployment` parses
+        as an exclusion and answers with the opposite of what was asked.
+        Lower-casing every term makes each one a literal, which is what the
+        tokenizer already matches case-insensitively — so the search means what
+        the prompt says. What is left is alphanumeric ASCII, which is a bareword
+        under both grammars and therefore needs no quoting in either.
         """
         cleaned = "".join(character if character.isalnum() else " " for character in query)
         return [term.lower() for term in cleaned.split() if len(term) >= 3][:12]
@@ -4270,18 +4477,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         after: str | None = None,
         before: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Exchanges matching *query*, newest first, scoped to one owner.
+        """Exchanges matching *query*, best match first, scoped to one owner.
 
         The index answers "which exchanges mention this"; the join answers "and
         may this caller see them". ``after``/``before`` are ISO timestamps, which
         is what makes an old conversation reachable at all: without them a bounded
         result set is always the recent one.
+
+        MEM-05 — ordering is relevance, then recency. Under FTS4 there was no
+        relevance score to order by, so the oldest exact answer was the first
+        row the limit discarded; under FTS5 `bm25()` supplies one and recency
+        only breaks ties. A query with no indexable term still falls back to a
+        substring scan, and that branch has no score, so it stays newest-first.
         """
         if limit < 1:
             return []
         terms = self._match_terms(query)
         conditions = ["turns.turn_id IS NOT NULL"]
         params: list[Any] = []
+        ordering = "turns.created_at DESC"
         if terms:
             source = (
                 "conversation_fts JOIN turns ON turns.turn_id = conversation_fts.turn_id "
@@ -4289,10 +4503,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             selected = (
                 "conversation_fts.role AS role, "
-                "snippet(conversation_fts, '', '', '…', -1, 18) AS snippet"
+                f"{self._snippet_expression('conversation_fts', 3)} AS snippet"
             )
             conditions.append("conversation_fts MATCH ?")
             params.append(" ".join(terms))
+            if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
+                # Only the `text` column is indexed; the other three are
+                # UNINDEXED and can never contribute, but `bm25` still requires
+                # one weight per declared column.
+                ordering = "bm25(conversation_fts, 0.0, 0.0, 0.0, 1.0) ASC, turns.created_at DESC"
         else:
             # Terms shorter than the index tokenizer's floor (an identifier such
             # as `q3`) still have to be findable, so a substring scan stands in.
@@ -4328,7 +4547,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             f"turns.summary AS summary, sessions.title AS session_title, "
             f"sessions.origin AS origin, {selected} FROM {source} "
             f"WHERE {' AND '.join(conditions)} "
-            f"ORDER BY turns.created_at DESC LIMIT ?"
+            f"ORDER BY {ordering} LIMIT ?"
         )
         with self.connect() as connection:
             try:
@@ -6159,11 +6378,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         except sqlite3.OperationalError as exc:
             if "locked" in str(exc).lower():
                 raise
-            # Repair a legacy FTS5 dump that was imported by an older SQLCipher
-            # migration. The FTS table is a rebuildable projection, never source.
+            # Repair an index whose shadow tables did not survive an import —
+            # historically an FTS5 dump read by an FTS4-only migration, and now
+            # the reverse as well. The FTS table is a rebuildable projection,
+            # never source, so re-creating it on the engine this build actually
+            # has is always the right answer.
             connection.execute("DROP TABLE IF EXISTS approved_memory_fts")
             connection.execute(
-                "CREATE VIRTUAL TABLE approved_memory_fts USING fts4("
+                "CREATE VIRTUAL TABLE approved_memory_fts USING "
+                f"{SQLiteStore.text_search_engine(connection)}("
                 "memory_id UNINDEXED, text, tags)"
             )
         connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
@@ -6180,12 +6403,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         terms = self._match_terms(query)
         if not terms:
             return []
+        # MEM-05 — relevance first, recency only to break ties.
+        #
+        # This used to order by `created_at DESC` and truncate, on the recorded
+        # grounds that the shipped SQLCipher build had no FTS5 and therefore no
+        # BM25. Measured, that was untrue (see `text_search_engine`), and the
+        # consequence was real: on a four-year workspace the exact answer from
+        # 2023 sat behind hundreds of newer partial matches and was dropped
+        # before it was ranked. `bm25()` returns a *negative* score that is more
+        # negative the better the match, so ascending order is best-first.
+        #
         # Driving from the FTS index, not joining onto it. Written as a join, the
         # planner picks `approved_memory` as the outer loop and re-runs the
         # full-text match once per candidate row: at 800 memories the same match
         # costs 16 ms on its own and 13 s through the join. `IN (SELECT …)`
         # evaluates the index once and probes the table by primary key.
-        sql = """SELECT m.* FROM approved_memory m
+        ranked = self.resolved_text_search_engine() == TEXT_SEARCH_FTS5
+        rank = (
+            # `bm25()` resolves its first argument as the FTS table's own name,
+            # not as a query alias, so this subquery deliberately does not alias
+            # the table. Weights are one per declared column: `memory_id` is
+            # UNINDEXED and can never match, `text` carries the answer, `tags`
+            # are a weaker signal than the sentence the owner approved.
+            """(SELECT bm25(approved_memory_fts, 0.0, 1.0, 0.4) FROM approved_memory_fts
+                 WHERE approved_memory_fts.memory_id = m.memory_id
+                   AND approved_memory_fts MATCH ?)"""
+            if ranked
+            else "0.0"
+        )
+        sql = f"""SELECT m.*, {rank} AS relevance FROM approved_memory m
         WHERE m.memory_id IN (SELECT memory_id FROM approved_memory_fts
                               WHERE approved_memory_fts MATCH ?)
           AND m.deleted_at IS NULL AND m.archived_at IS NULL
@@ -6194,14 +6440,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
           AND m.superseded_at IS NULL"""
         now = utc_now()
-        params: list[Any] = [" ".join(terms), now, now, now]
+        expression = " ".join(terms)
+        params: list[Any] = [*([expression] if ranked else []), expression, now, now, now]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)
         if owner_principal_id:
             sql += " AND m.owner_principal_id = ?"
             params.append(owner_principal_id)
-        sql += " ORDER BY m.created_at DESC LIMIT ?"
+        # `relevance` is NULL only if the correlated match found nothing, which
+        # the outer `IN` has already excluded; COALESCE keeps such a row from
+        # sorting ahead of every real hit if it ever happens.
+        sql += " ORDER BY COALESCE(relevance, 0.0) ASC, m.created_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()

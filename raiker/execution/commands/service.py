@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import shlex
 import threading
 import weakref
@@ -7,7 +8,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-from raiker.contracts.ids import new_id, utc_now
+from raiker.contracts.ids import new_id, utc_now, utc_plus_seconds
 from raiker.execution.commands.backends.base import CommandBackendError, UnavailableBackend
 from raiker.execution.commands.backends.container import (
     PersistentContainerBackend,
@@ -141,6 +142,9 @@ class CommandService:
         self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
         self._lock = threading.Lock()
+        #: Set on shutdown so lease holders stop renewing immediately rather
+        #: than sleeping out their interval while the runtime is going away.
+        self._lease_stop = threading.Event()
 
     def start(
         self,
@@ -157,6 +161,8 @@ class CommandService:
         cwd: str = ".",
         timeout_seconds: float = 30.0,
         max_output_bytes: int = 100_000,
+        background: bool = False,
+        interactive: bool = False,
     ) -> StoredCommandRun:
         resolution = (
             resolve_command_environment(
@@ -192,8 +198,8 @@ class CommandService:
             safe_display=display,
             credential_bindings=(),
             shell=False,
-            interactive=False,
-            background=False,
+            interactive=interactive,
+            background=background,
             timeout_seconds=timeout_seconds,
             max_output_bytes=max_output_bytes,
             environment_profile_id=profile.profile_id,
@@ -245,7 +251,161 @@ class CommandService:
             self._active[request.run_id] = handle
             if handle.poll() is not None:
                 self._active.pop(request.run_id, None)
+        if background:
+            self._hold_lease(request)
         return self.store.load(owner_principal_id, request.run_id)  # type: ignore[return-value]
+
+    # ── Background lifecycle (BUG-194) ───────────────────────────────────────
+
+    #: How long a background run's lease is good for, and how often the holder
+    #: renews it. Renewing at a third of the term means two consecutive missed
+    #: renewals still leave the run inside its lease, so a momentarily busy
+    #: writer does not get a live command reaped out from under it.
+    LEASE_SECONDS = 30.0
+
+    def _hold_lease(self, request: CommandRequest) -> None:
+        """Renew this run's lease for as long as it is really running.
+
+        The thread is the *evidence*, not the mechanism: it can only renew while
+        the process it is watching is alive and this runtime is up, so a lease
+        that keeps moving forward is a live run and a lease that stops is not —
+        including on a hard kill, where no handler of ours gets to run at all.
+        """
+        deadline = utc_plus_seconds(self.LEASE_SECONDS)
+        self.store.renew_lease(request.owner_principal_id, request.run_id, deadline)
+
+        def renew() -> None:
+            while True:
+                with self._lock:
+                    handle = self._active.get(request.run_id)
+                if handle is None or handle.poll() is not None:
+                    return
+                self.store.renew_lease(
+                    request.owner_principal_id,
+                    request.run_id,
+                    utc_plus_seconds(self.LEASE_SECONDS),
+                )
+                if self._lease_stop.wait(self.LEASE_SECONDS / 3.0):
+                    return
+
+        thread = threading.Thread(target=renew, name=f"lease-{request.run_id}", daemon=True)
+        thread.start()
+
+    def poll(self, owner_principal_id: str, run_id: str) -> dict[str, Any]:
+        """The current state of one run, without waiting for it.
+
+        Reads the durable row rather than the in-memory handle, so a run that
+        this process no longer supervises reports what it really is instead of
+        "not found".
+        """
+        run = self.store.load(owner_principal_id, run_id)
+        if run is None:
+            raise CommandServiceError("command_run_not_found")
+        receipt = self.store.get_receipt(owner_principal_id, run_id)
+        with self._lock:
+            supervised = run_id in self._active
+        return {
+            "run_id": run.run_id,
+            "state": run.state.value,
+            "running": run.state not in TERMINAL_COMMAND_STATES,
+            "supervised": supervised,
+            "backend": run.backend,
+            "safe_display": run.safe_display,
+            "exit_code": run.exit_code,
+            "termination_reason": run.termination_reason,
+            "stdout_bytes": run.stdout_bytes,
+            "stderr_bytes": run.stderr_bytes,
+            "truncated": run.truncated,
+            "started_at": run.started_at,
+            "completed_at": run.completed_at,
+            "lease_expires_at": run.lease_expires_at,
+            "receipt_digest": receipt.digest if receipt else None,
+        }
+
+    def read_log(
+        self, owner_principal_id: str, run_id: str, *, after: int = 0, limit: int = 500
+    ) -> dict[str, Any]:
+        """A page of already-redacted output, resumable by sequence.
+
+        `after` is the last sequence the caller has seen, which is what makes
+        polling a long run cheap: each call returns only what is new, and
+        `next_after` is what to pass next time.
+        """
+        if self.store.load(owner_principal_id, run_id) is None:
+            raise CommandServiceError("command_run_not_found")
+        chunks = self.store.read_output(owner_principal_id, run_id, after=after, limit=limit)
+        return {
+            "run_id": run_id,
+            "after": after,
+            "next_after": chunks[-1].sequence if chunks else after,
+            "complete": len(chunks) < limit,
+            "chunks": [
+                {"sequence": chunk.sequence, "stream": chunk.stream, "text": chunk.text}
+                for chunk in chunks
+            ],
+        }
+
+    def wait(
+        self, owner_principal_id: str, run_id: str, *, timeout_seconds: float = 30.0
+    ) -> dict[str, Any]:
+        """Block until this run is terminal, or say plainly that it is not yet.
+
+        A timeout is not an error: the run is still going, and the caller is told
+        so through `state` rather than through an exception it would have to
+        distinguish from a real failure.
+        """
+        if timeout_seconds <= 0:
+            raise CommandServiceError("command_wait_timeout_invalid")
+        with self._lock:
+            handle = self._active.get(run_id)
+        if handle is not None:
+            with contextlib.suppress(TimeoutError):
+                handle.wait(timeout_seconds)
+        return self.poll(owner_principal_id, run_id)
+
+    def send_input(self, owner_principal_id: str, run_id: str, data: str) -> dict[str, Any]:
+        """Type into a run that has a terminal (BUG-194).
+
+        Refused for a run without a PTY rather than written to a pipe: a program
+        that is not on a terminal is not reading line-by-line, so "input
+        delivered" would be true of the bytes and false of the effect.
+        """
+        run = self.store.load(owner_principal_id, run_id)
+        if run is None:
+            raise CommandServiceError("command_run_not_found")
+        if run.state in TERMINAL_COMMAND_STATES:
+            raise CommandServiceError("command_run_already_complete")
+        with self._lock:
+            handle = self._active.get(run_id)
+        if handle is None:
+            raise CommandServiceError("command_backend_handle_unavailable")
+        try:
+            handle.write(data)
+        except RuntimeError as exc:
+            raise CommandServiceError(str(exc)) from None
+        return {"run_id": run_id, "byte_count": len(data.encode("utf-8"))}
+
+    def reconcile_leases(self, owner_principal_id: str) -> list[str]:
+        """Reclaim every background run whose lease lapsed. Returns their ids.
+
+        This is the half of background execution that makes it safe to offer at
+        all: without it, a run whose supervisor died holds a sandbox grant that
+        nothing ever takes back. A lapsed lease is treated as a lost run and gets
+        the same honest receipt a restart produces — never a silent success.
+        """
+        reclaimed: list[str] = []
+        for run in self.store.list_expired_leases(owner_principal_id):
+            with self._lock:
+                handle = self._active.pop(run.run_id, None)
+            if handle is not None:
+                with contextlib.suppress(Exception):
+                    handle.terminate()
+            current = self.store.load(owner_principal_id, run.run_id)
+            if current is None or current.state in TERMINAL_COMMAND_STATES:
+                continue
+            self._recover_run(current, reason="command_background_lease_expired")
+            reclaimed.append(run.run_id)
+        return reclaimed
 
     def _default_backend(self, profile: ExecutionProfile) -> Any:
         if profile.kind == "local":
@@ -379,7 +539,12 @@ class CommandService:
             if not active:
                 self._recover_run(run)
 
-    def _recover_run(self, run: StoredCommandRun) -> None:
+    def _recover_run(
+        self,
+        run: StoredCommandRun,
+        *,
+        reason: str = "command_backend_handle_unavailable_after_restart",
+    ) -> None:
         current = run.state
         if current is CommandState.QUEUED:
             self.store.transition(run.owner_principal_id, run.run_id, current, CommandState.STARTING)
@@ -390,7 +555,7 @@ class CommandService:
             run_id=run.run_id,
             state=CommandState.LOST,
             exit_code=None,
-            termination_reason="command_backend_handle_unavailable_after_restart",
+            termination_reason=reason,
             completed_at=utc_now(),
             evidence={
                 "backend": run.backend or "unknown",
@@ -406,6 +571,7 @@ class CommandService:
         self.store.finalize_with_receipt(run.owner_principal_id, run.run_id, CommandState.LOST, receipt)
 
     def shutdown(self) -> None:
+        self._lease_stop.set()
         with self._lock:
             handles = list(self._active.values())
         for handle in handles:

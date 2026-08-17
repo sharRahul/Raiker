@@ -6,16 +6,43 @@ running `raiker-web` in Chromium.
 
 | Folder | Contents |
 |---|---|
-| [`working/`](working) | Verified behaviour — every surface that did what it claims |
+| [`working/`](working) | Verified behaviour — every surface that did what it claims. Round-stamped: a file here is evidence of what was true on the day its prefix names, and is **not** re-captured later, because a defect that no longer reproduces cannot be photographed again |
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
+| [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full on each round by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 
 ## Rounds
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `r0817-` | **2026-08-17**, FTS4 → FTS5 (RAIKER-2025), the owner-selected recall backend (MEM-03), and background execution with a POSIX terminal (BUG-194) | hosted Anthropic `claude-haiku-4-5-20251001`, connected through the product's own dialog |
+| `r0815-` | **2026-08-15**, the native OS sandbox | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
 | `r0810-` | **2026-08-10**, closing the 2026-08-08 round's four open defects plus BUG-82 | hosted Anthropic `claude-haiku-4-5-20251001` |
 | `r0808-` | **2026-08-08**, the last full round | hosted Anthropic, all ten catalogue models |
 | `01`–`207`, `b*`, `c*`, `bug*`, `add-*`, `skills-*` | 2026-07-26 → 2026-08-04 | hosted Anthropic `claude-haiku-4-5-20251001`, local Ollama `gemma4:31b-cloud` |
+
+---
+
+## The 2026-08-17 round
+
+Three screenshots, prefix `r0817-`, captured by
+[`apps/web/e2e/fts5-mem03-bug194-live.spec.ts`](../../../apps/web/e2e/fts5-mem03-bug194-live.spec.ts)
+against a fresh workspace, with the Anthropic credential entered through
+Raiker's own connect dialog rather than an environment variable.
+
+| File | Shows |
+|---|---|
+| `r0817-01-memory-recall-backend.png` | FIXED-230 — Memory's **Recall backend** card naming the embedding space recall searches, and saying in one sentence that this one matches words rather than meaning |
+| `r0817-02-anthropic-connected-via-ui.png` | The provider connected and its pinned model reporting reachable, from the credential typed into the product |
+| `r0817-03-chat-search-bm25-ranked.png` | FIXED-231 — chat search answered by the FTS5 index, each hit carrying a snippet quoting the matched term |
+
+The whole `pages/` sweep was re-captured in the same round, with zero console
+errors across all 23 pages.
+
+**Removed in this round.** `03-route-*.png` — an early fifteen-file route sweep
+whose successor is `pages/`, which is now re-captured every round. Nothing else
+was deleted: the rest of `working/` is round-stamped per-defect evidence that
+[`FIXED_ITEMS.md`](../FIXED_ITEMS.md) reads against, and a defect that has been
+fixed cannot be re-photographed.
 
 ---
 

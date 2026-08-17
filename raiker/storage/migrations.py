@@ -1,5 +1,36 @@
 from __future__ import annotations
 
+# ── Text-search engine (RAIKER-2025) ─────────────────────────────────────────
+#
+# Raiker's two full-text indexes — `approved_memory_fts` and `conversation_fts`
+# — are **rebuildable projections**, never a second source of truth. That is the
+# property that makes changing the engine underneath them a migration rather
+# than a data conversion: the index is dropped and recomputed from the governed
+# table, so nothing the owner owns depends on which engine held it.
+#
+# Both were built on FTS4 because the plan documents recorded that the shipped
+# SQLCipher distribution had no FTS5. Measured rather than assumed, that is
+# false: `sqlcipher3-wheels` compiles with `ENABLE_FTS5`, and so does CPython's
+# bundled SQLite on every platform Raiker targets. FTS5 is what the indexes want
+# — it carries a real relevance score (`bm25`), a better tokenizer, and a
+# `DELETE`/`INSERT` path that does not scan the whole content table.
+#
+# The engine is still **probed, not declared**. A build without FTS5 keeps FTS4
+# and says so, because an index that cannot be created is worse than an index
+# that ranks by recency, and claiming BM25 on a build that has none would be the
+# same class of untrue statement the probe exists to prevent.
+TEXT_SEARCH_FTS5 = "fts5"
+TEXT_SEARCH_FTS4 = "fts4"
+TEXT_SEARCH_ENGINES = (TEXT_SEARCH_FTS5, TEXT_SEARCH_FTS4)
+
+
+def require_text_search_engine(engine: str) -> str:
+    """Refuse anything but a known engine — this value is interpolated into DDL."""
+    if engine not in TEXT_SEARCH_ENGINES:
+        raise ValueError("text_search_engine_unsupported")
+    return engine
+
+
 PHASE_1_MIGRATION_ID = "RAIKER-0201-phase1-bootstrap"
 LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID = "RAIKER-2021-legacy-account-bootstrap-roles"
 OWNED_CONTEXT_DATA_MIGRATION_ID = "RAIKER-2022-owned-context-data"
@@ -1647,8 +1678,8 @@ CREATE INDEX IF NOT EXISTS idx_memory_projections_active ON memory_projections(p
 """
 
 MEMORY_FTS_MIGRATION_ID = "RAIKER-2008-memory-fts"
-MEMORY_FTS_SQL = """
-CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
+MEMORY_FTS_SQL_TEMPLATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING {engine}(
   memory_id UNINDEXED, text, tags
 );
 INSERT INTO approved_memory_fts(memory_id, text, tags)
@@ -1657,11 +1688,20 @@ WHERE deleted_at IS NULL AND archived_at IS NULL;
 """
 
 MEMORY_SQLCIPHER_FTS_MIGRATION_ID = "RAIKER-2015-sqlcipher-fts4-repair"
-MEMORY_SQLCIPHER_FTS_SQL = """
-CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING fts4(
+MEMORY_SQLCIPHER_FTS_SQL_TEMPLATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS approved_memory_fts USING {engine}(
   memory_id UNINDEXED, text, tags
 );
 """
+
+
+def memory_fts_sql(engine: str) -> str:
+    """The memory index, built on whichever engine this build actually has."""
+    return MEMORY_FTS_SQL_TEMPLATE.format(engine=require_text_search_engine(engine))
+
+
+def memory_sqlcipher_fts_sql(engine: str) -> str:
+    return MEMORY_SQLCIPHER_FTS_SQL_TEMPLATE.format(engine=require_text_search_engine(engine))
 
 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID = "RAIKER-2009-memory-retrieval-authority"
 MEMORY_RETRIEVAL_AUTHORITY_SQL = """
@@ -2860,11 +2900,25 @@ ALTER TABLE model_operations ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}';
 # authorises nothing.
 CONVERSATION_FTS_MIGRATION_ID = "RAIKER-2020-conversation-fts"
 
-CONVERSATION_FTS_SQL = """
-CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING fts4(
+CONVERSATION_FTS_SQL_TEMPLATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS conversation_fts USING {engine}(
   turn_id UNINDEXED, session_id UNINDEXED, role UNINDEXED, text
 );
 """
+
+
+def conversation_fts_sql(engine: str) -> str:
+    return CONVERSATION_FTS_SQL_TEMPLATE.format(engine=require_text_search_engine(engine))
+
+
+# ── FTS4 → FTS5 (RAIKER-2025) ────────────────────────────────────────────────
+#
+# Applied by `SQLiteStore._migrate_text_search_engine`, not `_apply_migration`,
+# because the decision is conditional on what the build supports and the rebuild
+# has to read the governed tables. The migration row is written only when both
+# indexes really are FTS5, so a workspace that was opened once on a build
+# without FTS5 is upgraded the next time it is opened on one that has it.
+TEXT_SEARCH_FTS5_MIGRATION_ID = "RAIKER-2025-text-search-fts5"
 
 
 # ── Owner-managed web egress blocklist (RAIKER-2021) ─────────────────────────
@@ -3105,4 +3159,23 @@ TURN_REASONING_MIGRATION_ID = "RAIKER-2033-turn-reasoning"
 TURN_REASONING_SQL = """
 ALTER TABLE turns ADD COLUMN reasoning_text TEXT;
 ALTER TABLE turns ADD COLUMN reasoning_chars INTEGER NOT NULL DEFAULT 0;
+"""
+
+
+# ── Owner-selected embedding backend (RAIKER-2034) ───────────────────────────
+#
+# MEM-03 — the vector leg of hybrid retrieval embedded the query with the
+# hashing trick regardless of what produced the stored vectors, so a search
+# either compared two different vector spaces or compared a lexical signal with
+# itself. Which space to search is an owner decision with a real trade-off
+# behind it (a semantic backend means either a downloaded model or accepted
+# egress), so it is stored, not inferred.
+#
+# One column, holding the `embedding_model` label to search — the same value
+# `vector_records.embedding_model` carries — or `auto`, meaning "the best space
+# this workspace actually holds vectors in".
+MEMORY_EMBEDDING_BACKEND_MIGRATION_ID = "RAIKER-2034-memory-embedding-backend"
+
+MEMORY_EMBEDDING_BACKEND_SQL = """
+ALTER TABLE memory_settings ADD COLUMN embedding_backend TEXT NOT NULL DEFAULT 'auto';
 """

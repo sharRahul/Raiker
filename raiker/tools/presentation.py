@@ -80,6 +80,9 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     # Running something.
     "shell": FAMILY_SHELL,
     "run_command": FAMILY_SHELL,
+    # BUG-194 — observing a background run belongs with running one: the owner
+    # reading the transcript is following one activity, not two.
+    "background_run": FAMILY_SHELL,
     "remote_execute": FAMILY_SHELL,
     "cloud_execute": FAMILY_SHELL,
     # Leaving the machine for the open web.
@@ -133,6 +136,7 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "create_document": "Create document",
     "shell": "Run command",
     "run_command": "Run command",
+    "background_run": "Check a background command",
     "remote_execute": "Run command on the remote host",
     "cloud_execute": "Run command in the cloud",
     "web_fetch": "Fetch page",

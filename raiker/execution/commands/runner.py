@@ -79,6 +79,94 @@ class MemoryCommandSink:
         self.returncode = returncode
 
 
+def pty_supported() -> bool:
+    """Whether this platform can give a governed command a real terminal.
+
+    POSIX can: `openpty` produces a controlling terminal the child owns, and the
+    runtime keeps the master side. Windows cannot, and the reason is specific
+    rather than a shrug — `CreatePseudoConsole` builds its console objects in the
+    *caller's* context, which an AppContainer token cannot reach without an
+    explicit capability, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented
+    as incompatible with the handle-list attribute the boundary requires. A PTY
+    that only works with the sandbox turned off is not the control being asked
+    for, so Windows says no here rather than offering a weaker thing under the
+    same name.
+    """
+    return os.name != "nt"
+
+
+class _PtyProcess:
+    """A child with a controlling terminal, and one merged output stream.
+
+    A PTY is a single duplex channel by construction: the kernel gives the child
+    one terminal, and stdout and stderr are the same file description on the
+    other side of it. Reporting the merged stream as ``stdout`` is therefore not
+    a simplification — there is no second stream to separate — and the redactor
+    still sees every byte before anything is stored.
+    """
+
+    def __init__(
+        self,
+        argv: Sequence[str],
+        cwd: Path,
+        env: dict[str, str],
+    ) -> None:
+        import pty as pty_module
+
+        self._master, replica = pty_module.openpty()
+        try:
+            self._process = subprocess.Popen(  # noqa: S603 - argv is a validated command contract
+                list(argv),
+                cwd=cwd,
+                env=env,
+                stdin=replica,
+                stdout=replica,
+                stderr=replica,
+                bufsize=0,
+                # `start_new_session` makes the child a session leader, which is
+                # what lets the replica become its *controlling* terminal — and
+                # what makes `killpg` reap the whole tree rather than one process.
+                start_new_session=True,
+            )
+        finally:
+            # The runtime must not keep the replica open: while any process holds
+            # it, reads on the master never see EOF and `iter_events` would hang
+            # for the full deadline after the child had already exited.
+            os.close(replica)
+        self.pty = True
+
+    def iter_events(self) -> Iterator[tuple[str, bytes]]:
+        try:
+            while True:
+                try:
+                    data = os.read(self._master, 4096)
+                except OSError:
+                    # A PTY master reports the child's exit as EIO on Linux and
+                    # as EOF on macOS. Both mean the same thing here.
+                    break
+                if not data:
+                    break
+                yield "stdout", data
+        finally:
+            with contextlib.suppress(OSError):
+                os.close(self._master)
+
+    def wait(self) -> int:
+        return self._process.wait()
+
+    def poll(self) -> int | None:
+        return self._process.poll()
+
+    def terminate_tree(self) -> None:
+        if self._process.poll() is not None:
+            return
+        with contextlib.suppress(ProcessLookupError, OSError):
+            os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+
+    def write(self, data: bytes) -> None:
+        os.write(self._master, data)
+
+
 class _PopenProcess:
     def __init__(
         self,
@@ -88,7 +176,7 @@ class _PopenProcess:
         *,
         pty: bool,
     ) -> None:
-        if pty:
+        if pty:  # pragma: no cover - `default_process_factory` routes PTY away
             raise RuntimeError("command_pty_backend_unavailable")
         creationflags = (
             int(getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)) if os.name == "nt" else 0
@@ -258,6 +346,17 @@ class RunningProcess:
         self.process.terminate_tree()
 
 
+def default_process_factory(
+    argv: Sequence[str], cwd: Path, env: dict[str, str], *, pty: bool
+) -> StreamProcess:
+    """Pipes, or a terminal — chosen by what was asked for, not by what is easy."""
+    if pty:
+        if not pty_supported():
+            raise RuntimeError("command_pty_platform_unsupported")
+        return _PtyProcess(argv, cwd, env)
+    return _PopenProcess(argv, cwd, env, pty=False)
+
+
 class StreamingCommandRunner:
     def __init__(
         self,
@@ -265,7 +364,7 @@ class StreamingCommandRunner:
         process_factory: Callable[..., StreamProcess] | None = None,
         registered_secrets: Sequence[str] = (),
     ) -> None:
-        self._process_factory = process_factory or _PopenProcess
+        self._process_factory = process_factory or default_process_factory
         self._registered_secrets = tuple(registered_secrets)
 
     def start(
@@ -279,6 +378,8 @@ class StreamingCommandRunner:
         pty: bool,
     ) -> RunningProcess:
         process = self._process_factory(argv, cwd, env, pty=pty)
+        # A factory that quietly ignored `pty=True` would produce a run whose
+        # receipt says "interactive" over a pipe the owner cannot type into.
         if pty and not bool(getattr(process, "pty", False)):
             raise RuntimeError("command_pty_backend_unavailable")
         return RunningProcess(

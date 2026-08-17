@@ -1402,7 +1402,7 @@ def handle_execution_profiles() -> str:
 
 def handle_semantic_memory(*, workspace_root: str | Path = ".") -> str:
     store = SQLiteStore(workspace_root)
-    status = semantic_memory_status(len(store.list_memory_candidates()))
+    status = semantic_memory_status(len(store.list_memory_candidates()), store=store)
     return "\n".join([f"{key}: {value}" for key, value in status.items()])
 
 

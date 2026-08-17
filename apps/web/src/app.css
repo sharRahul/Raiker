@@ -728,6 +728,46 @@ code,
   padding: calc(var(--control-y) * 0.68) calc(var(--control-x) * 0.72);
 }
 
+/* The same argument the dropdowns above settled, applied to the other control
+   the owner clicks most.
+
+   `.btn` covered every button that remembered to ask for it. The ones that did
+   not — Brain's folder browser, Memory's inline row actions, the session menu's
+   own items before it grew a scoped rule — fell back to the user agent's
+   button: a different font, a different height, and a grey bevel next to
+   Raiker's own controls on the same row. Naming thirty call sites would fix
+   today's markup and none of tomorrow's, so the floor goes on the element.
+
+   `:where()` keeps this at zero specificity, so it is genuinely a floor: every
+   `.btn-*` variant, every `.chip`, and every component-scoped `.menu button`
+   still wins without anything being unpicked. A button that must be bare says
+   so with a class, which is the same contract the inputs already use. */
+:where(button) {
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--text-1);
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--r-sm);
+  padding: var(--control-y) var(--control-x);
+  cursor: pointer;
+  transition:
+    background var(--motion-fast) var(--ease),
+    border-color var(--motion-fast) var(--ease);
+}
+:where(button):hover:not(:disabled) {
+  background: var(--sunken);
+}
+:where(button):disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+:where(button):focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
 /* Touch targets: on narrow (touch-first) screens shared shell controls meet
    the WCAG-aligned 44px minimum without changing desktop density. */
 @media (max-width: 1023px) {

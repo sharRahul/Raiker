@@ -41,20 +41,23 @@ between them and a turn. **Durable memory answers "what was I told to
 remember". Nothing answered "what did we actually say, and when"**, which is the
 question a conversation from years ago is actually asked.
 
-`MEM-01` and `MEM-02` are closed by this change and kept here with their
-evidence; `MEM-03` onwards are open.
+`MEM-01` and `MEM-02` are closed by the 2026-08-11 change and kept here with
+their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
+(FIXED-230 and FIXED-231) and likewise kept with theirs; `MEM-04` and `MEM-06`
+onwards are open.
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [MEM-01](#mem-01--the-model-had-no-way-to-read-a-past-conversation) | **Critical** | Recall / tools | Fixed 2026-08-11 |
 | [MEM-02](#mem-02--ambient-recall-offered-the-eight-most-recent-chats-whatever-the-turn-was-about) | High | Context assembly | Fixed 2026-08-11 |
-| [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Open |
+| [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Open |
-| [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Open |
+| [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | Open |
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
+| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium | Retrieval quality | Open — raised 2026-08-17 |
 
 ---
 
@@ -148,7 +151,7 @@ Incognito remains an absolute read opt-out ahead of all of it.
 
 ## MEM-03 — The vector leg of hybrid retrieval is lexical, so a paraphrase recalls nothing
 
-**Severity: High. Area: retrieval quality.**
+**Severity: High. Area: retrieval quality. Status: fixed 2026-08-17.**
 
 **Observed.** `retrieve_hybrid_memory` combines a lexical, a vector and a graph
 candidate list and presents the result as hybrid retrieval
@@ -176,6 +179,55 @@ the offline case, or a configured provider for owners who already accepted that
 egress. Record model, version and dimension on every stored vector (the
 projection mapping already has the columns), and refuse to mix vectors from two
 backends in one search. Keep `raiker-local-hash-v1` as the labelled fallback.
+
+**Fixed 2026-08-17.** The fix is not a better hash — it is making the embedding
+an owner-selected space that **names itself**, which is what turns a silent
+wrong answer into a visible one.
+
+*The resolver.* `raiker/vector/backends.py` resolves one `EmbeddingBackend` per
+search: the owner's explicit selection, else any semantic space this workspace
+actually holds vectors in, else the labelled lexical fallback. Resolution is
+**evidence-led, not configuration-led** — `list_embedding_spaces` reads the
+spaces from the vectors themselves, so a space is selectable exactly when
+searching it would return something, and a stored selection that has gone empty
+resolves to the fallback carrying
+`embedding_backend_selected_has_no_vectors:<model>` rather than answering from a
+corpus the owner did not choose.
+
+*One space, or none.* `retrieve_hybrid_memory` embeds the query with the resolved
+backend and reads only that backend's vectors. When the stored vectors are
+semantic and no governed embedder is available to match them, the vector leg is
+**dropped**. That is the deliberate part: the alternative is to hash the query
+and compare two unrelated spaces, and a cosine between different coordinate
+systems is not a weaker signal but a meaningless one. A missing leg is a smaller
+lie than a meaningless one.
+
+*The egress stays where the gate is.* This module never calls a provider. A
+`query_embedder` is injected by the caller that already holds the capability
+check, so the retrieval path cannot acquire egress by being called.
+
+*What every surface now says.* `HybridMemoryResult` carries `vector_backend` and
+`vector_backend_semantic`. `semantic_memory_status()` reports
+`retrieval_embedding_backend`, `retrieval_embedding_kind` and
+`retrieval_is_semantic` **separately from the write gate** — the old single
+`embedding_backend: "disabled"` was true of writes and silent about reads while
+the vector leg ran on every search. Memory → **Recall backend** names the model
+in force and says in one sentence whether a paraphrase can recall anything at
+all. Selecting a space that holds no vectors is refused with
+`embedding_backend_unknown` rather than quietly downgraded.
+
+*What is still true.* Semantic recall is available but **off on a default
+install**, because the honest options are a model download or accepted provider
+egress and both are the owner's decision. The remaining work — a bundled local
+sentence-embedding model served through the existing llama.cpp runtime — is a
+model-acquisition task, not a retrieval one. `raiker-local-hash-v1` remains the
+labelled fallback and is no longer describable as semantics.
+
+*Evidence.* `tests/test_memory_embedding_backend.py` — seven cases, including
+the two that state the defect directly: a semantic corpus with no embedder
+answers lexically-only rather than from the wrong space, and the same corpus
+with a matching embedder recalls a query that **shares no token** with the
+memory.
 
 **Required user-interface outcome.** Models → the memory section names the
 embedding backend in force, and Memory states which of the two postures the
@@ -221,7 +273,7 @@ sensitivity says so, so an empty list is distinguishable from a disabled one.
 
 ## MEM-05 — Lexical ranking is recency order, so the oldest exact answer is the first one dropped
 
-**Severity: High. Area: retrieval quality.**
+**Severity: High. Area: retrieval quality. Status: fixed 2026-08-17.**
 
 **Observed.** The SQLCipher distribution Raiker ships provides FTS4, not FTS5, so
 there is no BM25 (`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`, Stage H). Both
@@ -244,6 +296,36 @@ in a prompt versus an answer — then order by score before recency and expose t
 weights as data the way `HybridRetrievalWeights` already does. This needs no
 FTS5 and no new dependency. Measure it on the `memory-eval-v1` corpus rather than
 asserting the improvement.
+
+**Fixed 2026-08-17 — and the stated root cause was false.** "The SQLCipher
+distribution Raiker ships provides FTS4, not FTS5" was written down, carried
+forward through several rounds, and never checked. It is wrong:
+`sqlcipher3-wheels` compiles with `ENABLE_FTS5`, and so does CPython's bundled
+SQLite on every platform Raiker targets. A whole workaround was designed around
+a constraint that did not exist.
+
+So the fix is the one the constraint had ruled out. RAIKER-2025 migrates both
+full-text indexes to FTS5 — safe precisely because each is a **rebuildable
+projection** of a governed table, never a second source of truth — and both
+searches now order by `bm25()` before recency. `search_approved_memory` weights
+the approved sentence above its tags (`0.0, 1.0, 0.4`); `search_conversation_turns`
+weights only its one indexed column. Ordering is relevance first, recency only
+to break ties.
+
+The engine is still **probed rather than declared**: a temporary `fts5` virtual
+table is created and dropped, because a build can advertise `ENABLE_FTS5` and
+still refuse the module, and a build genuinely without it keeps FTS4 and keeps
+working. `snippet()` takes its six arguments in a different order on each engine
+— and on FTS4 the wrong order returns NULL rather than raising — so the order is
+derived from that probe. `memory_evaluation_runs.backend_version` is written from
+it too, so an FTS4 measurement and an FTS5 one are never compared as though they
+were the same thing.
+
+*Evidence.* `tests/test_text_search_fts5.py` — including the case this entry
+describes: the best answer is the **oldest** row, five newer rows mention the
+term once each, and it ranks first at `limit=2` instead of being dropped. The
+FTS4→FTS5 conversion is driven from a real FTS4 index and asserted to answer the
+same query afterwards.
 
 **Required user-interface outcome.** Search Chat and Memory results are ordered
 by relevance with the date shown, and a result set that was truncated says so
@@ -354,6 +436,52 @@ log, which is the same class of defect one layer down.
 ---
 
 ## Verified working (no action needed)
+
+---
+
+## MEM-10 — Semantic recall is selectable, but a default install has nothing to select
+
+**Severity: Medium. Area: retrieval quality. Raised 2026-08-17 while closing
+MEM-03.**
+
+**Observed.** Memory → **Recall backend** offers **Automatic** and nothing else
+on a workspace that has never been configured, and states plainly that
+`raiker-local-hash-v1` "matches words, not meaning". That sentence is true and
+it is the honest thing to say — but it is also the whole story for every owner
+who has not accepted provider egress. The paraphrase case MEM-03 opened with,
+"where should backups go" recalling "the owner prefers the encrypted NAS
+target", still does not work out of the box.
+
+**Reproduce.** Install fresh, approve a memory, search it with a synonym-only
+query. The lexical leg misses; the vector leg is the labelled fallback and
+misses identically. The interface says why, which is the MEM-03 fix — but the
+recall does not happen.
+
+**Root cause.** MEM-03 built the *selection* mechanism, not a thing to select.
+`resolve_embedding_backend` is evidence-led: a space is offered exactly when
+the workspace holds vectors in it, and a default install holds none. Producing
+them needs an embedding model, and the two honest ways to get one — a download,
+or a provider call — are both owner decisions rather than defaults. Making
+either the default would be the thing this codebase does not do.
+
+**Proposed fix.** Serve a small sentence-embedding model through the local
+runtime Raiker already manages. `raiker/models/providers/llama_cpp_server.py`
+speaks the OpenAI-compatible `/v1/embeddings` shape and
+`raiker/models/gguf.py` already handles revision-pinned, dry-run-capable
+downloads, so the missing pieces are a curated GGUF embedding model in the
+library, a Memory-page action that offers the download with its size stated
+before anything is fetched, and a governed backfill that projects existing
+approved memories into the new space. Record model, revision and dimension on
+every vector — the columns exist and `list_embedding_spaces` already reads them
+— and keep `raiker-local-hash-v1` as the labelled fallback for an owner who
+declines.
+
+**Required user-interface outcome.** The Recall backend card offers the
+download as an owner choice with its cost stated, never fetches on its own, and
+after a backfill says which space is in force and how many memories are
+reachable in it. An owner who declines sees exactly what they see today,
+including the sentence about what the fallback cannot do.
+
 
 Recorded so the entries above are read against the right baseline. Confirmed by
 reading the code and its tests on **2026-08-11**:

@@ -1633,8 +1633,22 @@ export interface MemoryHistoryEvent {
   details: Record<string, unknown>;
 }
 
+export interface EmbeddingSpaceView {
+  backend_id: string;
+  kind: "lexical_fallback" | "local_model" | "provider";
+  model: string;
+  dimensions: number;
+  semantic: boolean;
+  reason_code: string;
+}
+
 export interface MemorySettingsView {
   incognito: boolean;
+  // MEM-03 — the owner's selection ("auto" or an exact model label), what that
+  // resolved to, and the spaces this workspace really holds vectors in.
+  embedding_backend: string;
+  retrieval: EmbeddingSpaceView;
+  spaces: EmbeddingSpaceView[];
 }
 
 // raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored

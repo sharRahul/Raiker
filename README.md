@@ -469,13 +469,24 @@ on the shipped build, not estimated.
   answers the question in different words scores zero and is not recalled. Ask
   *"what theme does the user like"* and a stored *"the owner prefers dark
   mode"* is reachable only through the one word the two sentences happen to
-  share. Products that advertise memory use a real embedding model here. Tracked
-  as MEM-03; the durable semantic/vector write path is disabled outright
-  (`raiker/memory/semantic.py`).
-- **Lexical results are ordered by recency, not relevance.** The bundled
-  SQLCipher build has no FTS5, so there is no BM25: matches are ordered newest
-  first and truncated. On a workspace with hundreds of partial matches, the exact
-  answer from two years ago is dropped before it is ranked. Tracked as MEM-05.
+  share. Products that advertise memory use a real embedding model here.
+  **Partly addressed 2026-08-17 (FIXED-230):** retrieval now resolves one
+  owner-selected embedding space, embeds the query in that same space, and
+  refuses to mix two — and the Memory page names the space in force and says
+  whether a paraphrase can recall anything at all, rather than letting the word
+  "vector" imply semantics that are not there. What remains is a model to
+  select: a default install still holds only the labelled hashing fallback, and
+  the two honest routes to better (a download, or provider egress) are both the
+  owner's decision. Tracked as MEM-10; the durable semantic/vector write path is
+  disabled outright (`raiker/memory/semantic.py`).
+- ~~**Lexical results are ordered by recency, not relevance.**~~ **Fixed
+  2026-08-17.** This said the bundled SQLCipher build had no FTS5 and therefore
+  no BM25, which was true of `sqlcipher3-wheels` 0.5.2 and 0.5.4 and stopped
+  being true at 0.5.6 without anyone re-measuring. Both text indexes are now
+  FTS5 and both searches rank by `bm25()` before recency, so the exact answer
+  from two years ago ranks first instead of being dropped. The engine is probed
+  at runtime and reported on `/api/health`; a build genuinely without FTS5 still
+  falls back to FTS4 and recency, and says so. Closed as FIXED-231.
 - **Every recall reads every embedding.** Retrieval loads all active vectors for
   the scope, rebuilds the index in memory, and scores them in Python on each
   call. There is no approximate-nearest-neighbour index and no cache. After the

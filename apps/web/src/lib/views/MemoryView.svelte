@@ -34,6 +34,21 @@
   let gates = $state<CapabilityGate[] | null>(null);
   const posture = $derived(memoryWritePosture(gates));
 
+  // MEM-03 — what recall is actually searching. Defaulted rather than assumed
+  // present: a backend that predates the field would otherwise take the page
+  // down, and the honest answer when nothing says otherwise is the fallback,
+  // which is exactly what the server resolves to in that case anyway.
+  const retrieval = $derived(
+    settings?.retrieval ?? {
+      backend_id: "local_hash",
+      kind: "lexical_fallback" as const,
+      model: "raiker-local-hash-v1",
+      dimensions: 384,
+      semantic: false,
+      reason_code: "embedding_backend_semantic_not_configured",
+    },
+  );
+
   async function load() {
     loadError = null;
     try {
@@ -46,8 +61,19 @@
   async function toggleIncognito() {
     if (!settings || busy) return;
     busy = true; actionError = null;
-    try { const incognito = !settings.incognito; await api.setMemoryIncognito(incognito); settings = { incognito }; }
+    try { await api.setMemoryIncognito(!settings.incognito); await load(); }
     catch (e) { actionError = e instanceof ApiError ? `Could not update memory use (${e.status}).` : "Could not update memory use."; }
+    finally { busy = false; }
+  }
+  // MEM-03 — recall searches exactly one embedding space. Reloading rather than
+  // patching the local object is deliberate: the server decides what "auto"
+  // resolved to, and showing a guess would put the page back in the business of
+  // claiming a backend it did not confirm.
+  async function chooseEmbeddingBackend(backend: string) {
+    if (!settings || busy) return;
+    busy = true; actionError = null;
+    try { await api.setMemoryEmbeddingBackend(backend); await load(); }
+    catch (e) { actionError = e instanceof ApiError ? `Could not change the recall backend (${e.status}).` : "Could not change the recall backend."; }
     finally { busy = false; }
   }
   async function togglePin(m: MemoryControlView) {
@@ -197,6 +223,41 @@
     <div><h3>Incognito session</h3><p>Do not use approved memories in new conversations and tasks. Stored memories are not deleted.</p></div>
     <button class="switch" class:on={settings.incognito} role="switch" aria-checked={settings.incognito} aria-label="Incognito session" disabled={busy} onclick={() => void toggleIncognito()}><span></span><b>{settings.incognito ? "On" : "Off"}</b></button>
   </section>
+
+  <section class="control-card">
+    <div>
+      <h3>Recall backend</h3>
+      <p>
+        Which embedding Raiker compares your question against. Only one is searched at a
+        time — comparing two different embeddings produces a similarity that means nothing.
+      </p>
+      <p class="posture-line" data-semantic={retrieval.semantic}>
+        <Icon name={retrieval.semantic ? "check" : "info"} size={14} />
+        {#if retrieval.semantic}
+          Searching <b>{retrieval.model}</b> — a learned embedding, so a
+          paraphrase can recall a memory that shares no words with it.
+        {:else}
+          Searching <b>{retrieval.model}</b> — matches words, not meaning, so a
+          paraphrase will not recall a memory that shares no words with it.
+        {/if}
+      </p>
+    </div>
+    <label class="backend-field">
+      <span class="sr-only">Recall backend</span>
+      <select
+        class="select"
+        aria-label="Recall backend"
+        value={settings.embedding_backend ?? "auto"}
+        disabled={busy}
+        onchange={(event) => void chooseEmbeddingBackend(event.currentTarget.value)}
+      >
+        <option value="auto">Automatic</option>
+        {#each settings.spaces ?? [] as space (space.model)}
+          <option value={space.model}>{space.model} · {space.dimensions}d</option>
+        {/each}
+      </select>
+    </label>
+  </section>
 {/if}
 
 {#if actionError}<p class="notice notice-danger" role="alert">{actionError}</p>{/if}
@@ -260,6 +321,14 @@
 <style>
   .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .page-intro h2,.control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
+  .control-card + .control-card { margin-top:var(--space-3); }
+  /* MEM-03 — the sentence that says which embedding is in force. It is a
+     statement of fact rather than an alert, so it uses the same tone treatment
+     as the posture strip above rather than a second, louder one. */
+  .posture-line { display:flex; align-items:baseline; gap:.4rem; margin-top:var(--space-2) !important; font-size:.82rem; }
+  .posture-line :global(svg) { flex:none; align-self:center; color:var(--warn,var(--text-3)); }
+  .posture-line[data-semantic="true"] :global(svg) { color:var(--ok,var(--text-3)); }
+  .backend-field { flex:none; min-width:14rem; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able

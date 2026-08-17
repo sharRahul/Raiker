@@ -5,7 +5,12 @@ from typing import Any
 
 from raiker.execution.commands.backends.base import CommandBackendError
 from raiker.execution.commands.models import CommandFeatures, CommandRequest
-from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
+from raiker.execution.commands.runner import (
+    CommandSink,
+    MemoryCommandSink,
+    StreamingCommandRunner,
+    pty_supported,
+)
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
     CommandRejected,
@@ -16,7 +21,19 @@ from raiker.runtime.command_policy import (
 
 
 class LocalStrictBackend:
-    features = CommandFeatures(shell=False, concurrent_runs=False)
+    # BUG-194 — background and PTY are now measured properties of the platform
+    # rather than blanket refusals. `background` is a lifecycle the service owns
+    # (a lease, a supervisor that dies with Raiker, and a durable run row), and
+    # costs this backend nothing extra: the runner has always been asynchronous,
+    # what was missing was somewhere to observe it from. `pty` is only claimed
+    # where `openpty` exists, which is why it is read from the platform probe.
+    features = CommandFeatures(
+        shell=False,
+        concurrent_runs=True,
+        background=True,
+        pty=pty_supported(),
+        input=pty_supported(),
+    )
 
     def __init__(self, *, runner: Callable[..., Any] | None = None) -> None:
         self._runner = runner or StreamingCommandRunner().start
@@ -24,10 +41,8 @@ class LocalStrictBackend:
     def start(self, request: CommandRequest, sink: CommandSink | None = None) -> Any:
         if request.shell:
             raise CommandBackendError("local_strict_shell_source_denied")
-        if request.background:
-            raise CommandBackendError("selected_environment_background_unsupported")
-        if request.interactive:
-            raise CommandBackendError("selected_environment_pty_unsupported")
+        if request.interactive and not pty_supported():
+            raise CommandBackendError("command_pty_platform_unsupported")
         if request.network_policy_id:
             raise CommandBackendError("selected_environment_network_unsupported")
         if request.credential_bindings:
@@ -48,5 +63,5 @@ class LocalStrictBackend:
             cwd,
             environment,
             sink or MemoryCommandSink(),
-            pty=False,
+            pty=request.interactive,
         )

@@ -36,8 +36,8 @@ Raiker memory must support:
 | `checkpoint_summary` | State summaries for resume/fork | Phase 1 | checkpoint manifest + SQLite |
 | `memory_candidate` | Proposed durable memory | Phase 1 | SQLite memory_candidates |
 | `scratchpad_memory` | Temporary agent notes | Phase 1 | scoped SQLite/JSON artifact |
-| `profile_memory` | Stable user preferences/facts | Phase 2 | SQLite memory_records + full-text index (FTS4 as shipped) |
-| `project_memory` | Project decisions, architecture, constraints | Phase 2 | SQLite memory_records + full-text index (FTS4 as shipped) |
+| `profile_memory` | Stable user preferences/facts | Phase 2 | SQLite memory_records + full-text index (FTS5, BM25-ranked) |
+| `project_memory` | Project decisions, architecture, constraints | Phase 2 | SQLite memory_records + full-text index (FTS5, BM25-ranked) |
 | `episodic_memory` | Timestamped session/task summaries | Phase 2 | SQLite memory_records + event links |
 | `procedural_memory` | Reusable workflows/skills | Phase 2 | SQLite + skill manifests |
 | `eidetic_observation` | Raw, high-fidelity observation snapshot with strict retention | Phase 2 | artifact file + SQLite metadata |

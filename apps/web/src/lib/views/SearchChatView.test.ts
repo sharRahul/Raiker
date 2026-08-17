@@ -25,6 +25,23 @@ const MATCH = {
 };
 
 describe("SearchChatView", () => {
+  // A single-turn conversation read "1 turns" in the FTS5 evidence sweep of
+  // 2026-08-17. Small, but it is on the row a reader scans to decide whether a
+  // hit is worth opening.
+  it.each([
+    [1, "1 turn ·"],
+    [4, "4 turns ·"],
+  ])("counts %i turn(s) in the singular or plural it needs", async (count, expected) => {
+    stubFetch({ "GET /api/chat-search": [{ ...MATCH, turn_count: count }] });
+    render(SearchChatView);
+    await fireEvent.input(screen.getByLabelText("Search chat history"), {
+      target: { value: "release" },
+    });
+    await waitFor(() =>
+      expect(screen.getByText(new RegExp(expected.replace("·", "\\u00b7")))).toBeInTheDocument(),
+    );
+  });
+
   it("invites a search while the query is empty", async () => {
     stubFetch({});
     render(SearchChatView);

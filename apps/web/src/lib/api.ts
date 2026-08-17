@@ -1386,6 +1386,15 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ incognito }),
     }),
+  // MEM-03 — "auto" resolves to the best space that actually holds vectors;
+  // any other value must name one, or the server refuses rather than silently
+  // searching a different corpus.
+  setMemoryEmbeddingBackend: (backend: string) =>
+    request<{ ok: boolean; embedding_backend: string }>("/api/memory/embedding-backend", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ embedding_backend: backend }),
+    }),
 
   // ── Build workspace repositories ────────────────────────────────────────
   // References only. A local folder must resolve inside the workspace (fail

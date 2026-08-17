@@ -16,7 +16,15 @@ def test_memory_database_uses_sqlcipher_not_plain_sqlite(tmp_path: Path) -> None
     )
     assert not store.db_path.read_bytes().startswith(b"SQLite format 3")
     with store.connect() as encrypted:
-        assert encrypted.execute("SELECT sql FROM sqlite_master WHERE name = 'approved_memory_fts'").fetchone()[0].lower().find("fts4") >= 0
+        # The engine is whichever one this build actually has (RAIKER-2025).
+        # Asserting the literal `fts4` here is what let the plan documents keep
+        # claiming the shipped SQLCipher had no FTS5 long after it did.
+        engine = SQLiteStore.text_search_engine(encrypted)
+        assert engine == "fts5", "the shipped SQLCipher build is expected to provide FTS5"
+        index_sql = encrypted.execute(
+            "SELECT sql FROM sqlite_master WHERE name = 'approved_memory_fts'"
+        ).fetchone()[0]
+        assert f"using {engine}" in index_sql.lower()
     with sqlite3.connect(store.db_path) as plaintext, pytest.raises(sqlite3.DatabaseError):
         plaintext.execute("SELECT * FROM approved_memory").fetchall()
 
@@ -43,5 +51,11 @@ def test_plaintext_database_is_converted_without_leaving_plaintext_backup(tmp_pa
         fts_sql = encrypted.execute(
             "SELECT sql FROM sqlite_master WHERE name = 'approved_memory_fts'"
         ).fetchone()[0]
-        assert "fts4" in fts_sql.lower()
+        # The imported dump's engine is rewritten to the destination build's, and
+        # the projection itself is rebuilt from `approved_memory` rather than
+        # carried over: the legacy row must not survive.
+        assert f"using {SQLiteStore.text_search_engine(encrypted)}" in fts_sql.lower()
+        assert encrypted.execute(
+            "SELECT COUNT(*) FROM approved_memory_fts WHERE memory_id = 'legacy'"
+        ).fetchone()[0] == 0
     assert not db_path.with_suffix(".plaintext-backup").exists()

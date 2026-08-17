@@ -417,17 +417,24 @@ npm run build     # exit 0
   evidence; hybrid retrieval deduplicates active lexical/vector/graph results;
   and an owner-started integrity report finds stale indexes/projections/edges.
   Stage H's backup catalog records retention, legal hold, restore verification,
-  and erasure disposition. SQLCipher now encrypts the SQLite database, FTS4,
-  vectors, and graph rows using a workspace-derived key; local workspace
+  and erasure disposition. SQLCipher now encrypts the SQLite database, the FTS5
+  indexes, vectors, and graph rows using a workspace-derived key; local workspace
   isolation, telemetry, and operational proof remain required.
 - The first maintenance-job primitive is now present: idempotent `reconcile`
   and `integrity_scan` jobs have SQLite leases, retries, and dead-letter state,
   per-workspace rate limits, and lifecycle audit rows, but no daemon, telemetry,
   or load/chaos proof exists yet.
-- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`).
-  The bundled build lacks FTS5, so Raiker uses encrypted FTS4 and deterministic
-  recency ordering. Legacy plaintext databases are converted once and the
-  transient plaintext source is removed after success.
+- SQLCipher is provided by `sqlcipher3-wheels` (imported as `sqlcipher3`),
+  floored at **0.5.6** — the version where the wheel gained FTS5. Earlier
+  versions genuinely have none (0.5.2 → SQLite 3.44.2, 0.5.4 → 3.46.1), which is
+  why an earlier note here said Raiker used FTS4: it was true at the time and
+  went stale when the wheel moved. Both text indexes are now encrypted FTS5 with
+  BM25 relevance ordering (RAIKER-2025). The engine is still probed at runtime
+  rather than assumed — a build without FTS5 falls back to FTS4 and recency
+  order and says so on `/api/health` — and CI asserts FTS5 so a wheel that lost
+  it fails the build rather than quietly degrading search. Legacy plaintext
+  databases are converted once and the transient plaintext source is removed
+  after success.
 - SQLCipher derives its key when a connection is opened, so `raiker/storage/sqlite.py`
   keeps one keyed connection per workspace and worker thread rather than paying
   that per short-lived `SQLiteStore`. The cache is bounded and least-recently-used

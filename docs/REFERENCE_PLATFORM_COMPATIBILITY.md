@@ -417,8 +417,8 @@ shown to the owner on the environment card.
 | Persistent environment | Claude Code and OpenClaw can retain a sandbox/session boundary between commands | Current command container is per run; cache identity and reset internals exist but persistence is not exposed or proven | ❌ |
 | Foreground output and exit status | All coding-agent references provide it | Split-safe redacted stdout/stderr, total byte counts, truncation, timeout, terminal state, and exit code | ✅ |
 | Provider-independent model-to-command path | Market leaders route tool calls consistently across supported model providers | Anthropic (Haiku 4.5), OpenRouter (Gemini 3.7 Flash), OpenAI (GPT-4o Mini) and Ollama (gemma4:31b-cloud) each completed the same live Build → approval → exact-argv command **inside the AppContainer** → output → receipt on 2026-08-15 (`r0815-build-governed-terminal-appcontainer.png`) | ✅ beyond |
-| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | Durable poll/log and stop exist for a running foreground command; background start/wait/lease controls are absent and refused by name. A background run needs an enforcer that outlives the turn — see the BUG-194 remainder | 🟡 |
-| PTY and raw input | Claude Code/Codex terminal workflows support interactive programs | Contracts refuse PTY/input by name and the UI shows no input control. `CreatePseudoConsole` builds its console objects in the caller's context and they are not reachable from an AppContainer token; a PTY that only worked outside the sandbox would not be this control | ❌ |
+| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, and Hermes expose long-running process controls | `run_command background:true` returns a `run_id` without waiting; `background_run` polls, pages the log from a resumable sequence, waits with a bounded timeout, and kills. The enforcer that makes this offerable ships with it: every background run holds a **lease** the supervising thread renews only while the process is alive, and `reconcile_leases` terminates and finalises any run whose lease lapsed with a receipt naming `command_background_lease_expired` — so a crashed supervisor produces a reclaimed run, never an orphan holding a sandbox grant. A foreground run holds no lease and is never swept | ✅ |
+| PTY and raw input | Claude Code/Codex terminal workflows support interactive programs | ✅ **on POSIX**: `openpty` gives the child a controlling terminal, `background_run action=input` types into it, and the test proves the *program* read the bytes rather than the terminal echoing them (`sort` returns its input reordered after ^D). ❌ **on Windows**, with the reason unchanged and named: `CreatePseudoConsole` builds its console objects in the caller's context, unreachable from an AppContainer token, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as incompatible with the handle-list attribute the boundary requires. `pty_supported()` reports the platform's real answer; input to a run without a terminal is refused as `command_input_requires_pty` rather than written to a pipe where the bytes would arrive and the effect would not | 🟡 |
 | Process-tree stop and timeout | Coding agents must stop descendants, not only the launcher | Local runner creates a process group and kills its tree; container stop removes the worker; UI stop is owner-scoped and idempotent | ✅ |
 | Network denied by default | Codex and Claude Code sandbox network by default; OpenClaw supports sandbox network policy | ✅ **for `native_sandbox`**, where the container holds no network capability and the measured egress observation is `enforced`; container uses `--network none`. `local_native` is still the default selection and has no OS egress boundary, so the row is scoped rather than claimed for the product default | 🟡 |
 | Filtered domain escalation and revocation | Claude Code supports domain/proxy policy; mature sandboxes can grant bounded egress | Tables and design exist; authenticated proxy, DNS/address enforcement, grant retry, and active revocation are not implemented | ❌ |
@@ -437,12 +437,14 @@ redacted catch-up, immutable receipts, exact environment choice, honest `lost`
 outcomes — and now a boundary that is **measured rather than declared**, which no
 reference product exposes to its owner.
 
-Raiker still does **not** match the market leader's complete shell capability.
-PTY/background supervision, filtered domain egress, restart reattachment,
-persistent sessions, credential quarantine, a container session supervisor and
-remote backends remain absent, each with its reason recorded in
-[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. They are tracked as
-open work rather than hidden behind a parity claim.
+**Updated 2026-08-17.** Background supervision, the agent-facing observation
+tool, and PTY/raw input on POSIX are now shipped and proven — see the rows above
+and `tests/test_background_execution.py`. Raiker still does **not** match the
+market leader's complete shell capability: Windows PTY, filtered domain egress,
+restart reattachment, persistent sessions, credential quarantine, a container
+session supervisor and remote backends remain absent, each with its reason
+recorded in [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. They are
+tracked as open work rather than hidden behind a parity claim.
 
 Design contract and open work:
 [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194.
@@ -467,9 +469,7 @@ reason, not an oversight; the reasons are in `plans/TO_BE_FIXED.md` → BUG-194.
 
 | Missing control | Who has it | What it would take |
 |---|---|---|
-| PTY / interactive input | Claude Code, Codex, Hermes | ConPTY objects are built in the caller's context and are not reachable from an AppContainer token. Needs a spike, not a flag |
-| Background start/poll/wait/log/kill | Claude Code, Codex, OpenClaw, Hermes | A lease the runner owns, a durable runner identity that survives pid reuse, and reconciliation that works while the vault is locked |
-| An agent-facing `process` tool | Hermes | Backgrounding without it makes an agent re-run commands it cannot observe |
+| PTY / interactive input **on Windows** | Claude Code, Codex, Hermes | Closed on POSIX (2026-08-17). ConPTY objects are built in the caller's context and are not reachable from an AppContainer token. Needs a spike, not a flag |
 | Filtered domain egress | Claude Code | The AppContainer loopback exemption needs elevation; a Linux proxy-only namespace is a separate build |
 | Persistent session boundary | Claude Code, OpenClaw, Hermes | Per-run profiles are deliberate. Persistence is a container-session change |
 | Restricted token beneath the AppContainer | Codex | Layering `CreateRestrictedToken` under the security-capabilities attribute is the fragile part of this FFI, and a LowBox token already carries most of it |
@@ -654,7 +654,7 @@ linking) and provenance.
 | mem0 concept | Raiker specification |
 |---|---|
 | `add` memory from interactions (candidate-first) | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS4 + vector metadata; no BM25) |
+| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + BM25 + vector metadata) |
 | `retrieve` filtered by scope/metadata | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | User / session / agent memory scopes | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Provenance + confidence scoring | `docs/MEMORY_GOVERNANCE_RULES.md` |
@@ -678,12 +678,53 @@ history with a vector index.
 |---|---|
 | Embedding-backed memory index | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (vector metadata tables) |
 | Semantic retrieval over session history | `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md` |
-| Hybrid lexical + vector ranking | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS4 + vector; recency-ordered, not relevance-ranked) |
+| Hybrid lexical + vector ranking | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + BM25 relevance + vector; see the retrieval control set below) |
 | Sensitivity/provenance filters on retrieval | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/OWASP_GENAI_SECURITY_MAPPING.md` |
 | Vector store backend abstraction | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` |
 
 Raiker difference: vector writes, embedding creation, and background indexing are
 phase-scheduled and **disabled** until governance, approval-preview, and retention controls land.
+The **read** path is no longer silent about that — see the control set below.
+
+---
+
+## Text search and memory retrieval control set
+
+Reviewed **2026-08-17** while migrating full-text search from FTS4 to FTS5
+(RAIKER-2025) and making the vector leg name its own embedding space (MEM-03),
+against the retrieval controls of **Claude Cowork**, **Claude Code**,
+**ChatGPT**, **Codex**, **OpenClaw**, **DeepSeek Harness** and **Hermes Agent**.
+Scope is only how each system finds an earlier fact and how honestly it reports
+what it searched. Nothing here is a claim about the rest of those products.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| Relevance-ranked lexical recall | Every reference product ranks recall by relevance, not by time | Both indexes are FTS5 and both searches order by `bm25()` before recency, at one index evaluation per query — the rank is selected alongside `memory_id` and joined, not computed per row (23 ms against 800 memories; the correlated form measured 5.2 s, produced correct answers, and is now guarded by a plan-shape test because no timing or correctness test caught it). Memory weights the approved sentence above its tags (`0.0, 1.0, 0.4`); conversation search weights only the indexed `text` column. Proven by the case MEM-05 described: the best answer is the *oldest* row and survives a limit of two | ✅ |
+| Search engine chosen by measurement | Not a control any reference product exposes | The engine is **probed**, not declared: a temporary `fts5` virtual table is created and dropped, because a build can advertise `ENABLE_FTS5` and still refuse the module. A build without FTS5 keeps FTS4, keeps working, and says so on `/api/health` — `snippet()` takes its six arguments in a different order on each engine, so the order is derived from the probe rather than written once and assumed | ✅ beyond |
+| A capability claim that expires with its dependency | Not a control any reference product exposes | The FTS4 claim these indexes were built on was **true when written** and went stale when `sqlcipher3-wheels` gained FTS5 at 0.5.6 — while the declared floor `>=0.5.0` named a version that was never published. Three things now stop that recurring: the floor is `>=0.5.6` with the per-version measurements recorded beside it, CI asserts FTS5 with `bm25()` before the suite runs, and `packaging_smoke_test.py` asserts the same of the frozen release bundle. A degraded build fails a build rather than a search | ✅ beyond |
+| Zero-downtime index migration | Reference products own their storage and migrate it out of band | Both indexes are **rebuildable projections**, never a second source of truth, so the migration drops and recomputes from the governed table. A workspace opened once on a build without FTS5 is converted the next time it is opened on one that has it, and a workspace interrupted halfway is completed on the next open | ✅ |
+| Prose is searched as prose | Mixed. Several products leak the index's query grammar to the user | `NOT`, `NEAR`, `AND` and `OR` are keywords in both engines. Every term is lower-cased to a bareword, so `NOT deployment` finds the memory containing both words instead of raising or answering with the opposite of what was asked | ✅ beyond |
+| Semantic (paraphrase) recall | Cowork, ChatGPT and Hermes recall a paraphrase through a learned embedding | The vector leg resolves an **owner-selected embedding space** and embeds the query in that same space. A workspace holding provider or local-model vectors searches them; a default install runs the labelled hashing fallback, which matches words rather than meaning. Semantic recall itself is therefore available but not on by default, because it needs either a downloaded model or accepted egress | 🟡 |
+| One embedding space per search | Assumed rather than stated by reference products | Storage fetches exactly one `embedding_model` and retrieval embeds the query with that backend. When the stored vectors are semantic and no governed embedder is available, the vector leg is **dropped** rather than answered from the hashing embedding — a cosine between two different spaces is not a weaker signal, it is a meaningless one | ✅ beyond |
+| The interface names the space it searched | No reference product tells the user which embedding answered | Memory → **Recall backend** states the model in force and, in one sentence, whether a paraphrase can recall anything at all. `HybridMemoryResult` carries `vector_backend` and `vector_backend_semantic`; `semantic_memory_status()` reports the read backend separately from the write gate — the two used to be one field that was true of writes and silent about reads | ✅ beyond |
+| A selection that cannot be honoured is refused | Mixed; several products silently fall back | Selecting a space this workspace holds no vectors in is refused with `embedding_backend_unknown`, and a stored selection that later becomes empty resolves to the fallback **with the reason attached** (`embedding_backend_selected_has_no_vectors:<model>`) rather than answering from a corpus the owner did not choose | ✅ beyond |
+| Measurements attributable to an engine | Not exposed by reference products | `memory_evaluation_runs.backend_version` is written from the probe, so an FTS4 run and an FTS5 run of the same corpus are never compared as if they were the same measurement | ✅ beyond |
+
+**Raiker difference.** Every reference product answers "here is what I found".
+Raiker answers "here is what I found, *and here is the index and the embedding
+that found it, and what that index cannot do*". The fallback is not hidden
+behind the word "vector", and a search that could only be answered dishonestly
+returns one leg fewer instead.
+
+**Still open, with reasons.** Semantic recall is off on a default install
+because the honest options are a model download or provider egress, and both are
+the owner's decision rather than a default. A bundled local sentence-embedding
+model reachable through the existing llama.cpp runtime is the next step and is
+tracked as **MEM-10**, raised in this round in
+[`plans/MEMORY_RELIABILITY_PLAN.md`](plans/MEMORY_RELIABILITY_PLAN.md).
+`MEM-04`, `MEM-06`, `MEM-07`, `MEM-08` and `MEM-09` are unchanged by this round.
 
 ---
 

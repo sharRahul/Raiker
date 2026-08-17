@@ -94,8 +94,30 @@ finally:
 right = sqlite3.connect(path)
 right.execute(f'PRAGMA key = "x\'{key}\'"')
 assert right.execute("SELECT value FROM probe").fetchone()[0] == "workspace secret"
+
+# RAIKER-2025 — the packaged build is where an FTS5 regression would actually
+# reach someone: a bundle freezes whichever wheel was installed when it was
+# built, and Raiker's text indexes are FTS5. The runtime probe would fall back
+# to FTS4 without breaking anything, which is exactly why this has to be
+# checked here rather than left to be noticed.
+try:
+    right.execute("CREATE VIRTUAL TABLE fts_probe USING fts5(text)")
+    right.execute("INSERT INTO fts_probe VALUES ('relevance ranked')")
+    ranked = right.execute(
+        "SELECT bm25(fts_probe) FROM fts_probe WHERE fts_probe MATCH 'relevance'"
+    ).fetchone()
+except sqlite3.DatabaseError as exc:
+    raise SystemExit(
+        f"the packaged sqlcipher has no FTS5, so search would fall back to "
+        f"recency ordering: {exc}"
+    ) from None
+if ranked is None or ranked[0] is None:
+    raise SystemExit("the packaged sqlcipher has FTS5 but no bm25() ranking")
 right.close()
-print("ok: sqlcipher encrypts, refuses a wrong key, and reads back with the right one")
+print(
+    "ok: sqlcipher encrypts, refuses a wrong key, reads back with the right one, "
+    "and provides FTS5 with bm25 ranking"
+)
 """
 
 

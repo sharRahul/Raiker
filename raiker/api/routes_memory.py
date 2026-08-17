@@ -184,6 +184,30 @@ async def set_memory_incognito(
     return {"ok": True, **result.data}
 
 
+@router.put("/api/memory/embedding-backend")
+async def set_memory_embedding_backend(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Choose which embedding space recall searches (MEM-03, human-only).
+
+    ``auto`` means "the best space this workspace actually holds vectors in".
+    Any other value must name a space that exists, or the choice is refused
+    rather than quietly downgraded.
+    """
+    backend = str(body.get("embedding_backend", "auto")).strip() or "auto"
+    result = _service(request).set_memory_embedding_backend(backend, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN
+            if result.reason_code != "embedding_backend_unknown"
+            else status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.delete("/api/memory/{memory_id}")
 async def forget_memory(
     memory_id: str,

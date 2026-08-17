@@ -460,9 +460,21 @@ class MemoryControlView:
 @dataclass(frozen=True)
 class MemorySettingsView:
     incognito: bool
+    #: MEM-03 — which embedding space recall searches, and what is selectable.
+    #: `retrieval` is what is in force *now*, including the reason a weaker
+    #: backend is in force; `spaces` is what this workspace actually holds
+    #: vectors in, which is the only thing worth offering as a choice.
+    embedding_backend: str = "auto"
+    retrieval: dict[str, Any] = field(default_factory=dict)
+    spaces: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
-        return {"incognito": self.incognito}
+        return {
+            "incognito": self.incognito,
+            "embedding_backend": self.embedding_backend,
+            "retrieval": dict(self.retrieval),
+            "spaces": [dict(space) for space in self.spaces],
+        }
 
 
 @dataclass(frozen=True)
@@ -3210,7 +3222,49 @@ class DashboardService:
         )
 
     def get_memory_settings(self, acting_principal_id: str | None = None) -> MemorySettingsView:
-        return MemorySettingsView(incognito=self.store.is_memory_incognito(acting_principal_id))
+        from raiker.vector.backends import list_embedding_spaces, resolve_embedding_backend
+
+        owner = self.store.account_scope(acting_principal_id) if acting_principal_id else None
+        active = resolve_embedding_backend(self.store, owner_principal_id=owner)
+        return MemorySettingsView(
+            incognito=self.store.is_memory_incognito(acting_principal_id),
+            embedding_backend=self.store.get_memory_embedding_backend(owner),
+            retrieval=active.describe(),
+            # `auto` is always offered and always resolvable; the rest are the
+            # spaces that really hold vectors, so a selection can never name a
+            # corpus that would answer with nothing.
+            spaces=tuple(
+                space.describe()
+                for space in list_embedding_spaces(self.store, owner_principal_id=owner)
+            ),
+        )
+
+    def set_memory_embedding_backend(
+        self, backend: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Choose the embedding space recall searches (MEM-03, human-only).
+
+        Refused rather than coerced when the named space holds no vectors: a
+        selection silently downgraded to the fallback is exactly the kind of
+        quiet substitution this change exists to remove.
+        """
+        from raiker.vector.backends import DEFAULT_SELECTION, list_embedding_spaces
+
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        owner = self.store.account_scope(principal.principal_id)
+        if backend != DEFAULT_SELECTION:
+            known = {
+                space.model_label
+                for space in list_embedding_spaces(self.store, owner_principal_id=owner)
+            }
+            if backend not in known:
+                return ControlResult(ok=False, reason_code="embedding_backend_unknown")
+        self.store.set_memory_embedding_backend(backend, owner)
+        return ControlResult(ok=True, data={"embedding_backend": backend})
 
     def set_memory_incognito(
         self, incognito: bool, acting_principal_id: str | None

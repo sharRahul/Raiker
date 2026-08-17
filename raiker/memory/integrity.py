@@ -22,10 +22,18 @@ class MemoryIntegrityReport:
     orphaned_markdown_count: int
     failed_purge_location_count: int
     project_path_inconsistency_count: int
+    #: RAIKER-2025 — the engine each text index is actually built on, and the
+    #: engine this build supports. They differ exactly when a workspace has been
+    #: carried to a host whose SQLite is older, which is a real condition an
+    #: owner can act on (upgrade, or accept recency ordering) and which nothing
+    #: else would surface: an FTS4 index on an FTS5 host answers every query.
+    text_search_engine: str = "fts5"
+    index_engine_mismatch_count: int = 0
 
     @property
     def clean(self) -> bool:
         return not any((
+            self.index_engine_mismatch_count,
             self.stale_fts_count,
             self.missing_markdown_count,
             self.stale_projection_count,
@@ -47,6 +55,11 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
             AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now, now)
         ).fetchone()[0])
         fts_count = int(connection.execute("SELECT COUNT(*) FROM approved_memory_fts").fetchone()[0])
+        engine = SQLiteStore.text_search_engine(connection)
+        index_engine_mismatch_count = sum(
+            SQLiteStore._index_engine(connection, table) not in (None, engine)  # noqa: SLF001
+            for table in ("approved_memory_fts", "conversation_fts")
+        )
         stale_projection_count = int(connection.execute(
             """SELECT COUNT(*) FROM memory_projections p WHERE p.active = 1 AND NOT EXISTS (
             SELECT 1 FROM approved_memory m WHERE m.memory_id = p.memory_id AND m.deleted_at IS NULL
@@ -112,4 +125,6 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         orphaned_markdown_count,
         failed_purge_location_count,
         project_path_inconsistency_count,
+        text_search_engine=engine,
+        index_engine_mismatch_count=index_engine_mismatch_count,
     )

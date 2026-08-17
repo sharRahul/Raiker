@@ -23,7 +23,29 @@ dependencies = [
     # in the stdlib) and TOTP multi-factor auth. Both are local-only, no egress.
     "argon2-cffi>=23.1",
     "pyotp>=2.9",
-    "sqlcipher3-wheels>=0.5.0",
+    # RAIKER-2025 — the floor is 0.5.6 because that is where this wheel gained
+    # FTS5, and Raiker's two text indexes are FTS5.
+    #
+    # Measured, not assumed, across every published version:
+    #
+    #     0.5.2  SQLite 3.44.2  no such module: fts5
+    #     0.5.4  SQLite 3.46.1  no such module: fts5
+    #     0.5.6  SQLite 3.50.4  ENABLE_FTS5
+    #     0.5.7  SQLite 3.51.1  ENABLE_FTS5
+    #
+    # This is also the answer to a question the plan documents got wrong for
+    # months. They recorded that "the SQLCipher distribution Raiker ships
+    # provides FTS4, not FTS5" — which was **true when it was written**, on
+    # 0.5.2/0.5.4. The wheel gained FTS5 underneath the claim and nobody
+    # re-measured, so a workaround stayed designed around a constraint that had
+    # already lifted.
+    #
+    # The old floor, `>=0.5.0`, was worse than nominal: 0.5.0 was never
+    # published at all (PyPI starts at 0.5.2), so the specifier resolved
+    # happily to a wheel with no FTS5 and a fresh install could silently land
+    # on recency-ordered search. The runtime probe still handles that case
+    # honestly, but a dependency floor should not permit it.
+    "sqlcipher3-wheels>=0.5.6",
     "pystray>=0.19.5",
     "Pillow>=10.4",
     # Official client for revision-pinned, filtered, dry-run-capable model downloads.

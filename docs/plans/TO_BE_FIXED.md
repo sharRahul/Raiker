@@ -59,60 +59,93 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | High | Shell / sandbox / recovery | Open — reduced; the OS boundary is closed as FIXED-195 |
+| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Medium | Shell / sandbox / recovery | Open — reduced twice; the OS boundary is FIXED-195, background execution and POSIX PTY are FIXED-229 |
 | [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | Open — root cause identified 2026-08-16 |
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
-| MEM-03 … MEM-09 | High → Low | Memory reliability | Open — see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
+| MEM-04 … MEM-10 | High → Low | Memory reliability | Open — MEM-03 and MEM-05 closed 2026-08-17 as FIXED-230 and FIXED-231; MEM-10 raised in their place; see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
 standard. Its MEM-01 and MEM-02 are closed in
-[`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188; MEM-03 through
-MEM-09 are open there rather than duplicated here.
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188, and MEM-03 and
+MEM-05 as FIXED-230 and FIXED-231. MEM-10 was raised in their place: closing
+MEM-03 built the *selection* of an embedding space, and a default install still
+has nothing semantic to select. MEM-04, MEM-06 through MEM-09 and MEM-10 are
+open there rather than duplicated here.
 
 ---
 
 ## BUG-194 — The governed shell has an OS boundary, but no interactive, background or remote execution
 
-**Severity: High. Area: shell / sandbox / recovery. Status: Open — reduced.**
+**Severity: Medium (was High). Area: shell / sandbox / recovery. Status: Open —
+reduced twice.**
 
-**What changed.** The 2026-08-15 work closes the largest item on this entry: a
-governed command now runs inside a real operating-system boundary, and what that
-boundary enforces is **measured rather than declared**. Closed as
-[FIXED-195](FIXED_ITEMS.md). The rest of this entry is what remains, with the
-reason each item was not attempted rather than a schedule.
+**What changed, 2026-08-15.** A governed command now runs inside a real
+operating-system boundary, and what that boundary enforces is **measured rather
+than declared**. Closed as [FIXED-195](FIXED_ITEMS.md).
 
-**Reviewed again on 2026-08-16 and deliberately not advanced.** The round that
-closed BUG-196, BUG-197, BUG-215 and the composer parity work touched the command
-store — a run now names its backend from the moment it starts
-([FIXED-217](FIXED_ITEMS.md)) — but attempted none of the rows below, and the
-reason is the reason each row states: every one of them is a **component**, not a
-flag. The smallest of them, background execution, needs a supervisor that outlives
-the turn together with the agent-facing `process` tool that makes a background run
-observable; shipping either half alone is worse than refusing, because it leaves
-an orphan process holding a sandbox grant nothing reclaims, or an agent that
-starts work it cannot poll. Doing that properly is its own round with its own live
-proof, and pretending otherwise here would be the exact failure mode the rest of
-this document records. The rows stay red, and the controls stay **absent** from
-the interface rather than disabled.
+**What changed, 2026-08-17.** The two rows this entry called the smallest are
+closed as [FIXED-229](FIXED_ITEMS.md), and they were built the way the entry said
+they had to be — as components, together, with the enforcer.
 
-**Still observed.** Select `native_sandbox` and request interactive, background,
-network, credential, SSH or Daytona execution and the backend fails closed with
-the corresponding named reason. Restart Raiker during an active command: the
-durable run is reconciled to `lost`, because no authenticated backend handle can
-be reattached. The container path is still a per-run `docker exec` client rather
-than a session supervisor, and Docker's daemon was reachable on the 2026-08-15
-host but the container row was not re-proven in that round.
+The 2026-08-16 review declined to advance them on the grounds that background
+execution needs "a supervisor that outlives the turn together with the
+agent-facing tool that makes a background run observable; shipping either half
+alone is worse than refusing." That reasoning was right and is what this round
+followed. Both halves shipped in one change:
+
+* **The enforcer.** Every background run holds a lease. A thread renews it only
+  while the process it is watching is alive and this runtime is up, so a lease
+  that keeps moving forward *is* the evidence of a live run and a lease that
+  stops is evidence of the opposite — including on a hard kill, where no handler
+  of ours runs at all. `reconcile_leases` terminates and finalises any run whose
+  lease lapsed, with a receipt naming `command_background_lease_expired`. A
+  foreground run holds no lease and is never swept, so a missing lease is never
+  read as an expired one. A background run is also bounded by a hard two-hour
+  ceiling, because a run with no deadline is a run whose lease renews forever and
+  the reclaim path would never fire.
+* **The observing half.** `background_run` — `list`, `poll`, `log`, `wait`,
+  `kill`, `input` — owner-scoped on every action, reading the durable run row and
+  the already-redacted output chunks. It starts nothing and grants nothing: a run
+  it can see is one the session's command grant already authorised.
+
+**The tool is not called `process`, and that matters.** The original entry named
+it `process`. That name already routes to the `process_execution` capability —
+arbitrary host process control, which the runtime classifies as critical and the
+policy holds for approval. Registering an observation tool under it would have
+attached a read verdict to host process control. The collision surfaced as a
+hard `policy actions cannot have conflicting verdicts: process` failure rather
+than a silent widening, which is the invariant working.
+
+**PTY and raw input are closed on POSIX and stay open on Windows.** `openpty`
+gives the child a controlling terminal and `background_run action=input` types
+into it; the proof is that the *program* read the bytes, not that the terminal
+echoed them. Windows is unchanged and the reason is unchanged: `CreatePseudoConsole`
+builds its console objects in the caller's context, unreachable from an
+AppContainer token, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as
+incompatible with the handle-list attribute the boundary requires.
+`pty_supported()` reports the platform's real answer, and input to a run without
+a terminal is refused as `command_input_requires_pty` rather than written to a
+pipe where the bytes would arrive and the effect would not.
+
+**Still observed.** Select `native_sandbox` and request network, credential, SSH
+or Daytona execution and the backend fails closed with the corresponding named
+reason; the native sandbox additionally still refuses background and PTY, because
+its capability set comes from the host probe and neither has been measured inside
+an AppContainer. Restart Raiker during an active command: the durable run is
+reconciled to `lost`, because no authenticated backend handle can be reattached.
+The container path is still a per-run `docker exec` client rather than a session
+supervisor.
 
 **Root cause, per item.** Each of these is a component rather than a flag, which
 is why none of them was half-built:
 
 | Remaining item | Why it is not built |
 |---|---|
-| **Background start/poll/wait/log/kill** | A background run outlives the turn, so it needs an enforcer that outlives the turn: a lease the runner owns, a runner that dies with Raiker, a durable runner identity that distinguishes "still running" from "pid reused", and a reconciliation path that works while the vault is locked. Shipping the flag without them creates an orphan process holding a Job Object and a sandbox grant that nothing ever reclaims — strictly worse than refusing. The agent-facing half is a second missing piece: a `process` tool that can poll, log and kill what the agent started, without which `background` makes an agent re-run commands it cannot observe. |
-| **PTY and raw input** | `CreatePseudoConsole` builds its console objects in the caller's context; they are not reachable from an AppContainer token without an explicit capability, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as incompatible with the handle-list attribute the boundary requires. A PTY that only works outside the sandbox is not the control the row describes. |
+| ~~**Background start/poll/wait/log/kill**~~ | **Closed 2026-08-17** as [FIXED-229](FIXED_ITEMS.md) on the `local_native` backend, with the lease, the reclaim path and the `background_run` tool shipped together. Not claimed for `native_sandbox`, whose capabilities come from the host probe. |
+| ~~**PTY and raw input**~~ | **Closed on POSIX 2026-08-17** as [FIXED-229](FIXED_ITEMS.md). Windows unchanged: `CreatePseudoConsole` builds its console objects in the caller's context; they are not reachable from an AppContainer token without an explicit capability, and `PROC_THREAD_ATTRIBUTE_PSEUDOCONSOLE` is documented as incompatible with the handle-list attribute the boundary requires. A PTY that only works outside the sandbox is not the control the row describes. |
 | **Restart reattachment** | Requires the process handle to live in a detached supervisor with an authenticated control channel — a second, larger component. Building it on an unproven boundary would have made both unfalsifiable. Restart continues to produce an honest `lost` receipt, and the runner is now bound to a runtime-owned Job Object so a hard kill of Raiker is reaped by the kernel rather than orphaning a sandboxed process. |
 | **Persistent environment** | Per-run AppContainer profiles are created and deleted around each command, deliberately: a predictable container name is a hole, because the container SID is a pure function of the name. Retaining a boundary is a container-session change, not a Windows one. |
 | **Filtered domain egress** | The AppContainer loopback exemption needs elevation, and a Linux proxy-only namespace is a separate netns build. Refused with a named reason on every backend rather than partially claimed. |
@@ -122,18 +155,20 @@ is why none of them was half-built:
 
 **Required fix.** Unchanged for each remaining row: a packaged backend-resident
 supervisor with an authenticated control channel and an encrypted restart-safe
-handle; background start/poll/wait/log/input/kill with a lease the runner owns;
-PTY once the ConPTY/AppContainer question is settled by a spike; an
+handle; Windows PTY once the ConPTY/AppContainer question is settled by a spike; an
 authenticated domain proxy with DNS/address checking and active revocation;
 purpose-bound credential delivery plus two-pass delta quarantine; persistent
 container/SSH/Daytona supervisor adapters; and owner-authorised reset/recreate.
 Prove every backend independently and preserve the no-fallback and honest-`lost`
 rules.
 
-**Required user-interface outcome.** Unchanged, and partly met: Runtime shows
+**Required user-interface outcome.** Unchanged, and further met: Runtime shows
 the exact probed boundary and its six measured observations, and Build shows the
-boundary a command ran in plus failure navigation. Background, PTY, filtered
-network, persistence and reset controls remain **absent** rather than disabled —
+boundary a command ran in plus failure navigation. Background and PTY are now
+agent-facing controls rather than interface ones — an agent starts and observes a
+background run through `run_command`/`background_run`, and the run appears in the
+same owner-visible command list, with the same receipt, as a foreground one.
+Filtered network, persistence and reset controls remain **absent** rather than disabled —
 an absent control is the honest projection of an unbuilt capability, where a
 disabled one implies it is a setting away. No row may turn green from
 configuration or specification alone.

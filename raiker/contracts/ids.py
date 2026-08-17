@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 _PREFIXES = {
@@ -117,6 +117,22 @@ _PREFIXES = {
 
 def utc_now() -> str:
     return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def utc_plus_seconds(seconds: float) -> str:
+    """An instant *seconds* from now, in the same shape as :func:`utc_now`.
+
+    Same second-truncated, ``Z``-suffixed encoding, because these values are
+    compared as strings in SQL: a deadline written in a different format than
+    the ``utc_now()`` it is compared against would sort wrongly rather than
+    fail, which is the kind of defect that only shows up under load.
+    """
+    return (
+        (datetime.now(UTC) + timedelta(seconds=seconds))
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def new_id(prefix: str) -> str:

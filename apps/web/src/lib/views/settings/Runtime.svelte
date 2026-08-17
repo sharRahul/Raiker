@@ -109,6 +109,42 @@
     if (reason === "container_image_not_allowlisted") return "Choose an operator-approved container image.";
     return "This container profile is not ready.";
   }
+  // BUG-194 — what a boundary actually does between commands, stated on the
+  // card. Only capabilities that are true are listed: an environment that does
+  // not persist says nothing here rather than showing a greyed-out promise,
+  // which is the same rule the absent filtered-network control follows.
+  const CAPABILITY_LABELS: Array<[string, string]> = [
+    ["background", "Runs work in the background"],
+    ["pty", "Gives a command a real terminal"],
+    ["persistent_environment", "Keeps its state between commands"],
+    ["restart_recovery", "Survives a Raiker restart"],
+    ["process_tree_stop", "Stops the whole process tree"],
+    ["concurrent_runs", "Runs commands side by side"],
+  ];
+  function capabilityRows(features: Record<string, boolean> | undefined): string[] {
+    if (!features) return [];
+    return CAPABILITY_LABELS.filter(([key]) => features[key]).map(([, label]) => label);
+  }
+  let resetting = $state<string | null>(null);
+  async function resetEnvironment(profileId: string, recreate: boolean) {
+    const question = recreate
+      ? "Discard this session's environment and its cached files? The next command starts from the approved image."
+      : "Discard this session's environment? The next command starts from the approved image; cached files are kept.";
+    if (!window.confirm(question)) return;
+    resetting = profileId; notice = null;
+    try {
+      await api.resetExecutionEnvironment(profileId, "settings", recreate);
+      notice = { kind: "ok", text: recreate ? "Environment and cache discarded." : "Environment discarded; cache kept." };
+    } catch (e) {
+      const reason = e instanceof ApiError ? (e.reasonCode ?? "") : "";
+      notice = {
+        kind: "error",
+        text: reason === "execution_environment_reset_unavailable"
+          ? "This session has no environment standing, so there is nothing to reset."
+          : "The environment could not be reset.",
+      };
+    } finally { resetting = null; }
+  }
   function toggleContainerTool(tool: string, checked: boolean) {
     selectedContainerTools = checked
       ? [...selectedContainerTools, tool]
@@ -271,6 +307,22 @@
               <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
               {#if environment.cost}<small>USD {environment.cost.committed_cost.toFixed(2)} committed · {environment.cost.remaining_cost?.toFixed(2) ?? "0.00"} remaining · {environment.cost.reconciliation_status.replaceAll("_", " ")}</small>{/if}
             {/if}
+            <!-- BUG-194 — what this boundary does between commands. Only true
+                 capabilities appear: an absent line is the honest projection of
+                 something this environment does not do, where a disabled one
+                 would imply it is a setting away. -->
+            {#if capabilityRows(environment.features).length}
+              <ul class="capabilities">
+                {#each capabilityRows(environment.features) as capability (capability)}<li><Icon name="check" size={13} /> {capability}</li>{/each}
+              </ul>
+            {/if}
+            {#if environment.features?.persistent_environment}
+              <div class="reset-actions">
+                <button class="btn btn-ghost btn-sm" type="button" disabled={resetting === environment.profile_id} onclick={() => void resetEnvironment(environment.profile_id, false)}>Reset environment</button>
+                <button class="btn btn-ghost btn-sm danger" type="button" disabled={resetting === environment.profile_id} onclick={() => void resetEnvironment(environment.profile_id, true)}>Reset and clear cache</button>
+              </div>
+              <small class="plain">Resetting discards what commands left behind. The next command starts from the approved image.</small>
+            {/if}
           </div>
           <button class="btn btn-ghost btn-sm" disabled={!environment.available || environment.selected} onclick={() => void selectEnvironment(environment.profile_id)}>{environment.selected ? "Selected" : "Select"}</button>
         </article>
@@ -347,6 +399,14 @@
   .observations li.unenforced strong { color:var(--danger); }
   .observations li.indeterminate strong { color:var(--warn); }
   .reprobe { justify-self:start; margin-top:.35rem; }
+  /* BUG-194 — the capabilities a boundary really has. Same weight as the
+     measured observations above them, because they are the same kind of claim:
+     a statement of what was built, not of what was configured. */
+  .capabilities { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
+  .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.72rem; text-transform:none; }
+  .capabilities li :global(svg) { flex:none; color:var(--ok); }
+  .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
+  .reset-actions .danger { color:var(--danger); }
   details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:.78rem; } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:.75rem; } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }
   .status { color: var(--ok); font-size: .85rem; } .status.stopped { color: var(--warn); }
   .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .08em; font-size: .72rem; font-weight: 700; }

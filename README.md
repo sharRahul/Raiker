@@ -302,15 +302,26 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-15:
   counts. If the control arm fails, the result is **not proven**, and nothing
   turns green on it. All six, and the probe's own outbound destination, are on
   the environment card with a **Re-measure boundary** button.
-- **That sandbox is foreground-only, and the card says so.** PTY and raw input,
-  background execution, filtered domain egress, persistent sessions, credential
-  quarantine, restart reattachment, SSH and Daytona are **not built**, and are
-  absent from the interface rather than shown disabled — a disabled control
-  implies it is one setting away. Each has its reason recorded in
-  `docs/plans/TO_BE_FIXED.md` → BUG-194. `local_native` remains explicit host
-  access with reduced isolation and is still the default selection. Browser
-  reload restores durable output; a Raiker process restart marks an unprovable
-  active run `lost` rather than inventing success.
+- **That sandbox is foreground-only, and the card says so.** Inside the native
+  sandbox, PTY and raw input, background execution, persistent sessions,
+  filtered domain egress, credential quarantine, SSH and Daytona are **not
+  built** — its capability set comes from the host probe, and none of them has
+  been measured inside an AppContainer. They are absent from the interface
+  rather than shown disabled, because a disabled control implies it is one
+  setting away. Each has its reason recorded in `docs/plans/TO_BE_FIXED.md` →
+  BUG-194. `local_native` remains explicit host access with reduced isolation
+  and is still the default selection; **there**, background execution, a POSIX
+  terminal and restart reattachment are built, and each environment card lists
+  the capabilities that boundary really has. Browser reload restores durable
+  output. A Raiker restart now reattaches to a background run whose supervisor
+  still answers — by authenticating to it, never by pid — and a run it cannot
+  prove is still its own is marked `lost` rather than inventing success.
+- **A container boundary persists for a session, and can be reset.** The
+  container a session's commands run in is created once and reused, so what one
+  command installs the next one can use, and **Reset environment** / **Reset and
+  clear cache** put it back to a known state. The native sandbox still creates
+  and deletes a profile around every command, deliberately: its container SID is
+  a pure function of its name, so a predictable name is a hole.
 - **What a turn did and what it thought are shown live, and are not kept in the
   transcript.** The tool lines and the reasoning block are built from the running
   turn. Re-open the conversation and you see the prompt, the answer and the
@@ -510,15 +521,18 @@ on the shipped build, not estimated.
   *"how does the Kubernetes rollout work"* matches nothing — the longer and more
   natural the question, the likelier every term must appear in one memory. The
   vector half still answers, and it is lexical too.
-- **Nothing writes to the entity graph, and nothing expires.** The graph half of
-  hybrid retrieval has no extractor populating it (MEM-06), and no retention
-  sweep is ever started, so `expires_at` is enforced only at read time and
-  expired rows are never collected (MEM-07). Eidetic capture is specified and
-  implemented but never invoked by the runtime (MEM-04).
-- **The governed shell is foreground-only.** No background execution, no PTY, no
-  persistent session, no restart reattachment — the detail is above and in
-  BUG-194. A coding agent that cannot start a long-running process and poll it is
-  doing a materially smaller job than one that can.
+- **Nothing writes to the entity graph, and nothing expires by itself.** The
+  graph half of hybrid retrieval has no extractor populating it (MEM-06), and no
+  retention sweep is ever started, so `expires_at` is enforced only at read time
+  and expired rows are collected only when the owner confirms a cleanup
+  (MEM-07). Eidetic capture is invoked by the runtime as of 2026-08-17 (MEM-04),
+  and what it recorded is in **Memory → Observations**; what it cannot do is
+  replay the material, because it deliberately never held it.
+- **The governed shell still has three gaps, and they are named.** Filtered
+  domain egress, credential quarantine, and remote (SSH / Daytona) execution are
+  not built; PTY and restart reattachment are POSIX-only and Windows says so by
+  name. Background execution, a real terminal, restart reattachment and a
+  persistent container session are built — the detail is above and in BUG-194.
 - **Hooks, plugins and channels are specified, not built.** The hooks reference
   Raiker maps itself against documents 31 events and five handler types;
   `docs/HOOKS_SPEC.md` has no code behind it, plugin support stops at manifest

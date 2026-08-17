@@ -14,11 +14,40 @@ running `raiker-web` in Chromium.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `r0817b-` | **2026-08-17 (second pass)**, eidetic capture wired into the runtime (MEM-04) and BUG-194's restart reattachment plus persistent environment | hosted Anthropic `claude-haiku-4-5-20251001`, connected through the product's own dialog |
 | `r0817-` | **2026-08-17**, FTS4 → FTS5 (RAIKER-2025), the owner-selected recall backend (MEM-03), and background execution with a POSIX terminal (BUG-194) | hosted Anthropic `claude-haiku-4-5-20251001`, connected through the product's own dialog |
 | `r0815-` | **2026-08-15**, the native OS sandbox | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
 | `r0810-` | **2026-08-10**, closing the 2026-08-08 round's four open defects plus BUG-82 | hosted Anthropic `claude-haiku-4-5-20251001` |
 | `r0808-` | **2026-08-08**, the last full round | hosted Anthropic, all ten catalogue models |
 | `01`–`207`, `b*`, `c*`, `bug*`, `add-*`, `skills-*` | 2026-07-26 → 2026-08-04 | hosted Anthropic `claude-haiku-4-5-20251001`, local Ollama `gemma4:31b-cloud` |
+
+---
+
+## The 2026-08-17 round, second pass
+
+Two screenshots, prefix `r0817b-`, from
+[`apps/web/e2e/mem04-bug194-observations-live.spec.ts`](../../../apps/web/e2e/mem04-bug194-observations-live.spec.ts),
+against a fresh workspace with the Anthropic credential entered through
+Raiker's own connect dialog.
+
+| File | Shows |
+|---|---|
+| `r0817b-01-memory-observations-captured.png` | FIXED-237 — Memory's **Observations** section after a real governed turn read a real file. This is the exact query MEM-04 reproduced with: before this change the count was zero on every workspace, and here the page reads **1 captured · 0 not captured** with the row's retention, expiry and checksum beside it |
+| `r0817b-02-runtime-environment-capabilities.png` | FIXED-238 / FIXED-239 — Settings → Runtime stating what each boundary really does between commands, built from the backend's own capabilities. **Local strict** carries *Runs work in the background* and *Survives a Raiker restart*; the native sandbox carries neither and gets no reset control at all |
+
+The whole `pages/` sweep was re-captured in the same round, with zero console
+errors across all 23 pages.
+
+**On re-capturing the other two folders.** `pages/` is the folder that is meant
+to be replaced wholesale, and it was. `working/` and `not-working/` are not
+refreshable in the same way and deliberately so: a `working/` file is evidence
+of what was true on the day its prefix names, and 110 links in
+[`FIXED_ITEMS.md`](../FIXED_ITEMS.md) and [`TO_BE_FIXED.md`](../TO_BE_FIXED.md)
+cite specific files there; a `not-working/` file photographs a defect, and a
+defect that has since been fixed cannot be photographed again. Replacing either
+folder would delete the evidence those documents read against and leave the
+claims uncheckable. New rounds therefore *add* their prefix rather than
+replacing what came before.
 
 ---
 

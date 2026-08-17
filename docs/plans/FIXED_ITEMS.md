@@ -238,6 +238,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-234](#fixed-234--the-knowledge-graph-could-be-looked-at-but-not-asked) | Medium | Agent reach (MEM-13) | Fixed |
 | [FIXED-235](#fixed-235--the-knowledge-map-was-a-map-of-the-runtimes-bookkeeping-not-the-owners-work) | High | Knowledge Map (BUG-218) | Fixed |
 | [FIXED-236](#fixed-236--the-citation-ledger-recorded-every-reference-and-could-only-be-read-forwards) | Medium | Reference graph (MEM-14) | Fixed |
+| [FIXED-237](#fixed-237--eidetic-capture-was-implemented-and-never-called) | High | Eidetic / Stage C (MEM-04) | Fixed |
+| [FIXED-238](#fixed-238--a-background-run-could-not-survive-the-restart-of-the-runtime-that-started-it) | Medium | Shell / recovery (BUG-194) | Fixed |
+| [FIXED-239](#fixed-239--the-command-container-was-rebuilt-around-every-command-so-nothing-could-persist) | Medium | Shell / sandbox (BUG-194) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -9547,3 +9550,207 @@ still on disk.
 cross-account passage read that would be a disclosure rather than a wrong
 answer) and the unresolved-citation case in
 `tests/test_knowledge_map_graph.py`.
+
+---
+
+## FIXED-237 — Eidetic capture was implemented and never called
+
+**Severity: High. Area: Eidetic / Stage C (MEM-04).**
+
+**Observed.** `EIDETIC_MEMORY_AND_LEARNING_SPEC.md` specifies the flow *agent
+event → classify sensitivity → eidetic observation → gist candidate → review →
+durable memory*. `raiker/memory/eidetic.py` implemented `record_observation`,
+`propose_gist`, `expiry_preview` and `cleanup_expired_observations` correctly,
+and the `eidetic_observations` and `gist_memories` tables existed. **No runtime
+path called any of them.** Every caller in the repository was a test.
+
+**Reproduce (before).** Run a turn that reads a file and produces an answer,
+then query `SELECT COUNT(*) FROM eidetic_observations`. Zero, on every
+workspace.
+
+**Root cause.** Phase C shipped as a library with its lifecycle proven in
+isolation; the orchestrator was never given the call. The result was worse than
+not having the capability: the documentation described a flow the database could
+never show.
+
+**The fix, and the three rules it is built on.** `raiker/memory/capture.py` is a
+policy module rather than three lines in the broker, because each of these is a
+decision that has to be made in one place and be readable afterwards.
+
+* **Never the payload.** An observation stores a summary, a checksum, a byte
+  count, a retention class and — where one already exists — a reference to the
+  governed artifact. The material stays where it already was. A row that carried
+  the text would make eidetic memory a second, ungoverned copy of everything the
+  agent has ever read, and would make that copy exactly as sensitive as the most
+  sensitive thing it read.
+* **A refusal is a row.** Material that classifies credential- or secret-like is
+  not captured, and *that* is recorded with its reason. Without it, an owner
+  reading an empty Observations list cannot tell "nothing ran" from "everything
+  was refused" from "this is off". A skipped row keeps no checksum and no byte
+  count either: a SHA-256 of a credential is still a fact about the credential.
+* **Outside material is never promotable.** A fetched page, a connector response
+  and an MCP tool result are untrusted content the agent read on the owner's
+  behalf. They are observable — that is the point — and `promotable_to_memory`
+  is false for them by construction, so no later path can promote one having
+  forgotten where it came from.
+
+Retention is chosen by what produced the material rather than by one global
+setting: outside web, connector, MCP and command output get
+`short_term_7_days`; workspace material gets `short_term_30_days`. The expiry
+date is computed and stored, so the owner reads a date rather than a policy.
+
+A gist is proposed only from a **conclusion** — a generated document, a subagent
+digest — never from each file read, and lands `pending_review`. Proposing one
+per read would fill the review queue with rows nobody would act on, which is how
+a review queue stops being read at all.
+
+Capture is best-effort by construction. A failure emits
+`eidetic_observation_skipped` and leaves the tool result untouched: an
+observation is a record *about* work, and failing the work because the record
+failed would trade a reliability property for a bookkeeping one.
+
+**Found while fixing.** `ToolBroker._event` returned `None`, so an observation
+had nothing real to point at. It returns the event id now, and the observation's
+`source_event_id` names the actual `tool_completed` row — a link that can be
+checked rather than asserted.
+
+**User-interface outcome.** Memory gains an **Observations** section listing
+what was captured with its kind, retention, expiry, sensitivity and checksum;
+filterable by kind, by refusal, or by pending gist; with a delete control per
+row and a discard for a proposed gist. A refused capture reads **Not captured**
+with its reason, so an empty list is distinguishable from a disabled one. A
+failed read says *observation capture is not reporting* rather than rendering as
+"captured nothing".
+
+**Evidence.** `tests/test_eidetic_capture_runtime.py` — including the count
+query MEM-04 reproduced with, run through the broker rather than the library.
+
+---
+
+## FIXED-238 — A background run could not survive the restart of the runtime that started it
+
+**Severity: Medium. Area: Shell / sandbox / recovery (BUG-194, "Restart
+reattachment").**
+
+**Observed.** Restart Raiker during an active background command and the durable
+run reconciled to `lost`, because no authenticated backend handle could be
+reattached. The receipt was honest and the work was gone.
+
+**Root cause, as the entry stated it.** Reattachment needs the process handle to
+live in a detached supervisor with an authenticated control channel — a second,
+larger component. The entry also named the trap: **a bare pid cannot distinguish
+"still running" from "pid reused"**, so a runtime that reattached by pid would
+eventually reattach to a stranger. Building it on a pid file would have been
+worse than not building it.
+
+**The fix.** `raiker/execution/commands/supervisor.py` is a module of the Raiker
+package, which is what makes it packaged by construction — anywhere Raiker runs,
+`python -m raiker.execution.commands.supervisor` runs, with no second binary and
+no cross-compilation. It holds one child in its own session, the deadline that
+bounds it, the redactor every byte passes through before anything is written
+down, and an append-only journal that is the run's output. It is reached over an
+`AF_UNIX` socket speaking the authenticated frames
+`supervisor_protocol.py` already defines and already has cross-language vectors
+for.
+
+Raiker keeps the socket path and the instance key in
+`command_runs.encrypted_backend_handle`, encrypted at rest. Reattachment is
+therefore an **authentication**: a socket that answers a frame the stored key
+verifies is this run's supervisor; one that does not is refused. `recover_owner`
+reattaches before it recovers, and `reconcile_leases` asks the same question
+before reclaiming — a lapsed lease is evidence that *this runtime* stopped
+watching, not that the run stopped, so killing a live run because the runtime
+restarted would destroy exactly the work this change exists to preserve.
+
+**Why it may outlive Raiker when nothing else may.** The rule that a governed
+command must not outlive the runtime that governs it exists so a command cannot
+escape its governance. Here the governance travels with the command: the
+supervisor holds the deadline itself and enforces it unaided, kills the whole
+process group when it expires, and exits on its own after a bounded linger if
+nobody comes back. The run is bounded by the same two-hour ceiling it had
+before; what changed is who holds the clock.
+
+**Found while fixing.** A `AF_UNIX` address is a fixed-size field in a kernel
+structure — 108 bytes on Linux — and it is the *path string* that has to fit.
+The socket beside the journal under `.raiker/command-supervisors/` exceeded that
+for any workspace nested more than shallowly, which is the same class of failure
+[BUG-216](TO_BE_FIXED.md) records for Windows `MAX_PATH`. The control endpoint
+now lives in a short per-workspace directory under the platform's runtime area,
+0700, with the socket 0600; the journal stays inside `.raiker`, where the
+sandbox denies it to every governed command. The security argument does not rest
+on where the socket file is — the channel is authenticated, and a caller without
+the run's instance key cannot produce a frame it accepts.
+
+Also found: `ExecutionProfile.features` restated the local backend's
+capabilities instead of reading them, and had already drifted — the backend
+offered background execution and a POSIX terminal while the environment card
+said neither. Both container and local profiles now read their features from the
+backend.
+
+**Windows is refused by name.** A named pipe is reachable by name from any
+session on the machine, so its authorisation story differs enough to need its
+own design and its own proof. `command_supervisor_platform_unsupported` says so,
+and a Windows background run is still honestly `lost` across a restart.
+
+**User-interface outcome.** Settings → Runtime → Execution targets lists the
+capabilities each boundary really has, built from the backend's own
+`CommandFeatures` — **Survives a Raiker restart** appears only where it is true.
+`poll` reports `reattached`, so a run picked back up says so rather than looking
+like one that never stopped.
+
+**Evidence.** `tests/test_command_supervisor_reattach.py`, which restarts the
+service for real — dropping every piece of in-memory state, which is all a
+restarted Raiker has — and asserts that the half of the output the first service
+never saw arrives exactly once, that the receipt says `succeeded`, and that a
+missing socket and a forged key both still end in an honest `lost`.
+
+---
+
+## FIXED-239 — The command container was rebuilt around every command, so nothing could persist
+
+**Severity: Medium. Area: Shell / sandbox (BUG-194, "Persistent environment").**
+
+**Observed.** Every command created its own container and every path out of a
+run removed it — including the ordinary one, because the handle cleaned up when
+its process ended. Nothing a command did could be built on: `pip install`
+followed by a command that imports it could never work, because the second
+command ran somewhere the first had never been.
+
+**Root cause.** `command_container_name` took the `run_id`, so the name — and
+therefore the container and its private cache volume — was a function of the
+run. The service also built a fresh backend per run, so even a session-scoped
+name would have had nowhere to remember the container.
+
+**The fix.** The name is a function of owner, session and profile. A session's
+second command lands in the boundary its first one left behind. The container
+backend is held for the life of the service (and only the container backend: a
+local backend has no cross-run state, and a native one must *not* be held,
+because its capability set comes from a probe whose answer can change between
+commands). Liveness is asked of the runtime rather than assumed from Raiker's
+map, so a container removed underneath the runtime is rebuilt rather than
+`exec`-ed into.
+
+The name is still a digest rather than a readable label. It is not a secret —
+`docker ps` shows it — but producing it requires already knowing the owner and
+session ids, so a name cannot be used to *find* another owner's environment. The
+native sandbox is unchanged and still creates and deletes a profile around each
+command, for the reason BUG-194 gave: the AppContainer SID is a pure function of
+the name, so a predictable name there is a hole.
+
+**Persistence and reset shipped as one control**, because an environment that
+accumulates state and can never be cleared is worse than one that never
+persists — the owner has no way back to a known state.
+`POST /api/execution-environments/{profile_id}/reset` offers **Reset
+environment** (discard the boundary, keep the private cache) and **Reset and
+clear cache** (discard both), and refuses `execution_environment_not_persistent`
+on a profile that rebuilds itself around every command rather than offering an
+action with no effect.
+
+**User-interface outcome.** The environment card reads **Keeps its state between
+commands** where that is true, and carries the two reset buttons there and only
+there. On a boundary that does not persist the control is **absent**, not
+disabled — the same rule the filtered-network control still follows.
+
+**Evidence.** `tests/test_persistent_command_container.py`, whose two
+previously-passing assertions were inverted: they asserted the defect, and the
+test now states why the old behaviour was the defect rather than the design.

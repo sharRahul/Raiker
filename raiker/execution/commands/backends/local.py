@@ -11,6 +11,11 @@ from raiker.execution.commands.runner import (
     StreamingCommandRunner,
     pty_supported,
 )
+from raiker.execution.commands.supervisor_client import (
+    SupervisorUnavailable,
+    spawn_supervised,
+    supervisor_supported,
+)
 from raiker.runtime.command_policy import (
     ALLOWED_SHELL_COMMANDS,
     CommandRejected,
@@ -33,6 +38,12 @@ class LocalStrictBackend:
         background=True,
         pty=pty_supported(),
         input=pty_supported(),
+        # BUG-194 — a background run started here lives in a detached
+        # supervisor where the platform has one, so a restart of Raiker
+        # reattaches to it rather than reconciling it to `lost`. Read from the
+        # platform for the same reason `pty` is: on Windows this is false, and
+        # the run is still honestly lost across a restart.
+        restart_recovery=supervisor_supported(),
     )
 
     def __init__(self, *, runner: Callable[..., Any] | None = None) -> None:
@@ -57,11 +68,36 @@ class LocalStrictBackend:
             raise CommandBackendError(exc.reason_code) from None
         cwd = (request.workspace_root / request.cwd).resolve()
         environment = sandbox_environment(workspace_root=request.workspace_root)
+        argv = list(portable_command(request.argv_template))
+        resolved_sink = sink or MemoryCommandSink()
+        # BUG-194 — a background run goes into a detached supervisor where the
+        # platform has one, so a restart of Raiker can reattach to it instead of
+        # reconciling it to `lost`. A foreground run does not: it cannot outlive
+        # the turn that is waiting on it, so a process that outlives Raiker would
+        # be a liability with no corresponding benefit. Where the supervisor is
+        # unavailable the old in-process path still runs the command — the same
+        # command, with the same bounds — and the run is still honestly `lost`
+        # across a restart. Nothing is claimed that was not built.
+        if request.background and supervisor_supported():
+            try:
+                return spawn_supervised(
+                    workspace_root=request.workspace_root,
+                    run_id=request.run_id,
+                    argv=argv,
+                    cwd=cwd,
+                    environment=environment,
+                    sink=resolved_sink,
+                    deadline_seconds=request.timeout_seconds,
+                    max_output_bytes=request.max_output_bytes,
+                    pty=request.interactive,
+                )
+            except SupervisorUnavailable as exc:
+                raise CommandBackendError(exc.reason_code) from None
         return self._runner(
             request,
-            list(portable_command(request.argv_template)),
+            argv,
             cwd,
             environment,
-            sink or MemoryCommandSink(),
+            resolved_sink,
             pty=request.interactive,
         )

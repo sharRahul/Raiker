@@ -3,7 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, SourceExcerptView } from "../apiTypes";
+  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
 
@@ -27,6 +27,14 @@
   let proposalEditingId = $state<string | null>(null);
   let proposalDraft = $state("");
   let historyById = $state<Record<string, MemoryHistoryEvent[]>>({});
+
+  // MEM-04 — what the runtime captured while it worked. Loaded beside the
+  // memories rather than behind a tab click, because the summary counters at
+  // the top of this page are only honest if this half is known: "0 observations
+  // captured" and "everything was refused on sensitivity" are different facts
+  // and used to be indistinguishable.
+  let observations = $state<ObservationsView | null>(null);
+  let observationFilter = $state("all");
 
   // BUG-71 — the two facts that decide whether this page may promise proposals
   // at all. Read alongside the memories so the promise and the gate can never
@@ -55,6 +63,9 @@
       [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]);
       try { proposals = await api.memoryProposals(); } catch { proposals = []; }
       try { gates = await api.capabilityGates(); } catch { gates = null; }
+      // A failed read is null, never an empty list: "capture is not reporting"
+      // must not render as "capture found nothing".
+      try { observations = await api.observations(); } catch { observations = null; }
     }
     catch (e) { memories = null; settings = null; loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable"; }
   }
@@ -191,6 +202,33 @@
     sourceLoading = false;
   }
 
+  async function deleteObservation(observationId: string) {
+    if (!window.confirm("Delete this observation? Raiker keeps no copy of the material it describes, so this removes the record that it was seen.")) return;
+    try { await api.deleteObservations([observationId]); await load(); }
+    catch { actionError = "Could not delete this observation."; }
+  }
+  async function discardGist(gistId: string) {
+    try { await api.discardGist(gistId); await load(); }
+    catch { actionError = "Could not discard this proposed gist."; }
+  }
+  const observationRows = $derived(
+    (observations?.observations ?? []).filter((o) =>
+      observationFilter === "all"
+      || (observationFilter === "skipped" && o.capture_status === "skipped")
+      || (observationFilter === "gist" && o.gist_status === "pending_review")
+      || o.source_type === observationFilter,
+    ),
+  );
+  const observationSources = $derived([...new Set((observations?.observations ?? []).map((o) => o.source_type))]);
+  function retentionLabel(retention: string): string {
+    if (retention === "turn_only") return "Kept for this turn";
+    if (retention === "short_term_7_days") return "Kept 7 days";
+    if (retention === "short_term_30_days") return "Kept 30 days";
+    if (retention === "project_lifetime") return "Kept for the project";
+    if (retention === "legal_hold") return "Legal hold";
+    return "Kept until forgotten";
+  }
+
   function provenanceLabel(m: MemoryControlView): string {
     const title = m.provenance["source_title"] ?? m.provenance["session_title"] ?? m.provenance["path"];
     return title ? `${m.source} — ${String(title)}` : m.source || "Source not available";
@@ -314,6 +352,68 @@
     </article>{/each}</div>{/if}
   </section>
 
+  <!-- MEM-04 — the capture half of eidetic memory, made visible. Every row
+       here is metadata about material the runtime saw; none of it is the
+       material. A row that reads "Not captured" is a refusal that happened,
+       which is the only thing that makes an empty list readable. -->
+  <section class="memory-section" aria-label="Observations">
+    <div class="section-head">
+      <div>
+        <h3>Observations</h3>
+        <p class="section-note">What Raiker recorded seeing while it worked — provenance, a checksum and a retention class, never the material itself.</p>
+      </div>
+      <span>{observations ? `${observations.captured} captured · ${observations.skipped} not captured` : "—"}</span>
+    </div>
+    {#if observations === null}
+      <div class="empty"><Icon name="info" size={24} /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
+    {:else}
+      {#if observations.observations.length}
+        <div class="filters">
+          <select bind:value={observationFilter} aria-label="Observation kind">
+            <option value="all">All observations</option>
+            <option value="skipped">Not captured (sensitivity)</option>
+            <option value="gist">Gist pending review</option>
+            {#each observationSources as source (source)}<option value={source}>{source.replaceAll("_", " ")}</option>{/each}
+          </select>
+        </div>
+      {/if}
+      {#if observations.observations.length === 0}
+        <div class="empty"><Icon name="spark" size={24} /><h4>No observations yet</h4><p>Raiker records one observation each time a governed tool returns material. Run a turn that reads a file or searches the workspace and it will appear here.</p></div>
+      {:else if observationRows.length === 0}
+        <div class="empty"><h4>No observations match this filter</h4><p>Choose a different kind to see what was captured.</p></div>
+      {:else}
+        <div class="memory-grid">
+          {#each observationRows as o (o.observation_id)}
+            <article class="memory-card observation" class:refused={o.capture_status === "skipped"}>
+              <div class="memory-title"><h4>{o.summary}</h4>{#if o.capture_status === "skipped"}<span class="refused-label"><Icon name="info" size={12} /> Not captured</span>{/if}</div>
+              <div class="meta">
+                <span>{o.source_type.replaceAll("_", " ")}</span>
+                <span>{retentionLabel(o.retention)}</span>
+                <span>{o.sensitivity} sensitivity</span>
+                {#if o.promotable_to_memory}<span>May be proposed as memory</span>{/if}
+              </div>
+              {#if o.capture_status === "skipped"}
+                <p class="refused-note">Refused on sensitivity ({o.skip_reason.replace("observation_sensitivity_", "").replaceAll("_", " ")}). No checksum of the material was kept either.</p>
+              {/if}
+              <dl>
+                <div><dt>Seen</dt><dd>{relativeTime(o.created_at)}</dd></div>
+                <div><dt>Expires</dt><dd>{o.expires_at ? relativeTime(o.expires_at) : "No automatic expiry"}</dd></div>
+                <div><dt>Checksum</dt><dd>{o.content_sha256 ? `${o.content_sha256.slice(0, 12)}… · ${o.content_bytes} bytes` : "None kept"}</dd></div>
+              </dl>
+              {#if o.gist_status === "pending_review"}
+                <p class="gist-note"><Icon name="spark" size={14} /> Gist proposed and pending review: “{o.gist_summary}”. It becomes durable memory only through the same approval every other memory needs.</p>
+              {/if}
+              <div class="card-actions">
+                {#if o.gist_id}<button class="btn btn-ghost btn-sm" onclick={() => void discardGist(o.gist_id)}>Discard gist</button>{/if}
+                <button class="btn btn-ghost btn-sm danger" aria-label={`Delete observation ${o.observation_id}`} onclick={() => void deleteObservation(o.observation_id)}>Delete</button>
+              </div>
+            </article>
+          {/each}
+        </div>
+      {/if}
+    {/if}
+  </section>
+
   <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size={16} /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}<div class="import-review" role="status"><strong>{importFileName}</strong><span>{importPreview.length} valid record{importPreview.length === 1 ? "" : "s"} ready for governed import.</span><button class="btn btn-primary btn-sm" onclick={() => void applyImport()}>Import reviewed records</button></div>{/if}</div></details>
 {/if}
 
@@ -357,6 +457,15 @@
   .memory-section { margin-top:var(--space-5); } .section-head { align-items:center; margin-bottom:var(--space-3); } .section-head span { color:var(--text-3); } .memory-grid { display:grid; gap:var(--space-3); }
   .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warning-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
   .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
+  /* MEM-04 — an observation reads as a memory card with one difference: a
+     refused one is drawn in the warning tone the pending proposals already use,
+     because both are "here is something Raiker did not act on by itself". */
+  .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:.8rem; max-width:52rem; }
+  .memory-card.observation.refused { background:var(--warning-soft); border-color:var(--warn-border,var(--border-strong)); }
+  .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:.72rem; }
+  .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:.8rem; }
+  .gist-note { display:flex; align-items:baseline; gap:.4rem; }
+  .gist-note :global(svg) { flex:none; align-self:center; color:var(--accent); }
   .empty { padding:var(--space-7); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
   .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); }
   @media (max-width:45rem) { .summary { grid-template-columns:repeat(2,1fr); } dl { grid-template-columns:1fr; } .page-intro,.control-card { flex-direction:column; } }

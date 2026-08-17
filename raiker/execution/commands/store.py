@@ -374,6 +374,57 @@ class CommandStore:
         if cursor.rowcount != 1:
             raise CommandStoreError("command_run_not_found")
 
+    def record_backend_handle(
+        self, owner_principal_id: str, run_id: str, handle: dict[str, Any]
+    ) -> None:
+        """Store the restart-safe handle for a supervised run (BUG-194).
+
+        Encrypted, unlike `record_backend` and `record_isolation` beside it, and
+        the difference is not stylistic: this row carries the instance key that
+        authenticates to the run's control channel. A locked vault genuinely
+        cannot reattach — which is the correct behaviour, because reattaching
+        means proving identity to a live process, and a runtime that cannot
+        reach its own key has nothing to prove it with.
+        """
+        encrypted = self.material_cipher.encrypt(handle)
+        with self.sqlite.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE command_runs SET encrypted_backend_handle = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (encrypted, utc_now(), owner_principal_id, run_id),
+            )
+        if cursor.rowcount != 1:
+            raise CommandStoreError("command_run_not_found")
+
+    def load_backend_handle(
+        self, owner_principal_id: str, run_id: str
+    ) -> dict[str, Any] | None:
+        with self.sqlite.connect() as connection:
+            row = connection.execute(
+                """SELECT encrypted_backend_handle FROM command_runs
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (owner_principal_id, run_id),
+            ).fetchone()
+        if row is None or row["encrypted_backend_handle"] is None:
+            return None
+        try:
+            return self.material_cipher.decrypt(bytes(row["encrypted_backend_handle"]))
+        except MaterialUnavailable:
+            return None
+
+    def clear_backend_handle(self, owner_principal_id: str, run_id: str) -> None:
+        """Forget the handle once the run is terminal.
+
+        The key it carries authenticates to a channel that no longer exists, so
+        keeping it is storage of a secret with no remaining purpose.
+        """
+        with self.sqlite.connect() as connection:
+            connection.execute(
+                """UPDATE command_runs SET encrypted_backend_handle = NULL, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (utc_now(), owner_principal_id, run_id),
+            )
+
     def record_isolation(
         self, owner_principal_id: str, run_id: str, evidence: dict[str, Any]
     ) -> None:

@@ -104,6 +104,8 @@ from raiker.storage.migrations import (
     CREDENTIAL_SECURITY_SQL,
     CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
     CRITICAL_APPROVAL_LIFECYCLE_SQL,
+    EIDETIC_CAPTURE_MIGRATION_ID,
+    EIDETIC_CAPTURE_SQL,
     EIDETIC_OBSERVATIONS_MIGRATION_ID,
     EIDETIC_OBSERVATIONS_SQL,
     EMAIL_DRAFTS_MIGRATION_ID,
@@ -1183,6 +1185,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._backfill_self_inclusive_project_paths(connection)
             self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
             self._apply_migration(EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection)
+            self._apply_migration(EIDETIC_CAPTURE_MIGRATION_ID, EIDETIC_CAPTURE_SQL, connection)
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
             self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)

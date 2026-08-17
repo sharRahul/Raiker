@@ -43,15 +43,15 @@ question a conversation from years ago is actually asked.
 
 `MEM-01` and `MEM-02` are closed by the 2026-08-11 change and kept here with
 their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
-(FIXED-230 and FIXED-231) and likewise kept with theirs; `MEM-04` and `MEM-06`
-onwards are open.
+(FIXED-230 and FIXED-231) and likewise kept with theirs, as is `MEM-04`
+(FIXED-237) by the second pass of the same day; `MEM-06` onwards are open.
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [MEM-01](#mem-01--the-model-had-no-way-to-read-a-past-conversation) | **Critical** | Recall / tools | Fixed 2026-08-11 |
 | [MEM-02](#mem-02--ambient-recall-offered-the-eight-most-recent-chats-whatever-the-turn-was-about) | High | Context assembly | Fixed 2026-08-11 |
 | [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Fixed 2026-08-17 |
-| [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Open |
+| [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Fixed 2026-08-17 |
 | [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | Open |
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
@@ -243,7 +243,8 @@ distinguishable rather than both being called hybrid.
 
 ## MEM-04 — Eidetic capture is never invoked by the runtime
 
-**Severity: High. Area: eidetic / Stage C.**
+**Severity: High. Area: eidetic / Stage C. Status: fixed 2026-08-17 as
+[FIXED-237](FIXED_ITEMS.md).**
 
 **Observed.** `EIDETIC_MEMORY_AND_LEARNING_SPEC.md` specifies the flow *agent
 event → classify sensitivity → eidetic observation → gist candidate → review →
@@ -272,6 +273,28 @@ Then propose a gist only where the spec allows one, leaving it `pending_review`.
 showing what was captured, its retention class and its expiry, with the same
 delete control the rest of memory has. A capture that was skipped for
 sensitivity says so, so an empty list is distinguishable from a disabled one.
+
+**What was built.** `raiker/memory/capture.py` is the call the orchestrator
+never had, and it is a policy module rather than three lines in the broker
+because three decisions have to be made in one place and be readable afterwards:
+**never the payload** (summary, checksum, byte count, retention class and an
+artifact reference where one exists — the row has no column that could hold the
+material), **a refusal is a row** (credential- and secret-like material is not
+captured and *that* is recorded, with no digest and no byte count either, since
+a SHA-256 of a credential is still a fact about it), and **outside material is
+never promotable** (web, connector and MCP results are observable and can never
+become a memory candidate). Retention is chosen by what produced the material —
+seven days for outside material and command output, thirty for workspace
+material — and the expiry date is stored, so the owner reads a date. A gist is
+proposed only from a conclusion, never from each file read, and lands
+`pending_review`.
+
+The interface outcome is met in full: Memory → **Observations** lists every row
+with its kind, retention, expiry, sensitivity and checksum; filters by kind, by
+refusal and by pending gist; deletes per row; discards a proposed gist; reads
+**Not captured** with its reason for a refusal; and says *observation capture is
+not reporting* when the read itself fails, rather than rendering that as
+"captured nothing".
 
 ---
 

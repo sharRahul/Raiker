@@ -141,6 +141,52 @@ async def reconcile_memory_indexes(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/memory/observations")
+async def list_observations(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """MEM-04 — what the runtime captured while it worked, and what it refused."""
+    result = _service(request).list_observations(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/observations/delete")
+async def delete_observations(
+    request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    raw_ids = body.get("observation_ids", [])
+    observation_ids = {str(item) for item in raw_ids} if isinstance(raw_ids, list) else set()
+    result = _service(request).delete_observations(observation_ids, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND
+            if result.reason_code == "unknown_observation"
+            else status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/gists/{gist_id}/discard")
+async def discard_gist(
+    request: Request, gist_id: str, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    result = _service(request).discard_gist(gist_id, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND
+            if result.reason_code == "unknown_gist"
+            else status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.post("/api/memory/eidetic/cleanup")
 async def cleanup_expired_observations(
     request: Request, body: dict[str, Any], auth_data: tuple[ApiSession, Principal] = Depends(_auth)

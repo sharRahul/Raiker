@@ -1113,6 +1113,33 @@ async def select_execution_environment(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/execution-environments/{profile_id}/reset")
+async def reset_execution_environment(
+    profile_id: str,
+    body: dict[str, Any],
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Discard a session's persistent execution boundary (BUG-194).
+
+    Offered only for a boundary that really persists; anything else is refused
+    by name, because a reset control on an environment that rebuilds itself
+    around every command would be a control with nothing to do.
+    """
+    result = _service(request).reset_execution_environment(
+        profile_id,
+        str(body.get("session_id", "")),
+        recreate=bool(body.get("recreate", False)),
+        owner_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.get("/api/code/repos")
 async def list_code_repos(
     request: Request,

@@ -2596,6 +2596,31 @@ CREATE INDEX IF NOT EXISTS idx_conversation_compactions_session
 """
 
 
+EIDETIC_CAPTURE_MIGRATION_ID = "RAIKER-2044-eidetic-capture"
+EIDETIC_CAPTURE_SQL = """
+-- MEM-04 — the columns a *runtime-recorded* observation needs and a
+-- test-recorded one never did. The original table proved the lifecycle in
+-- isolation: an id, a checksum, a retention class. Capture from a live turn
+-- adds the four facts the owner has to be able to read off the row — who owns
+-- it, what produced it, how sensitive the material was, and when it expires —
+-- plus the one that distinguishes an empty list from a disabled one:
+-- `capture_status`, so an observation that was *refused* on sensitivity is a
+-- row that says so rather than an absence.
+ALTER TABLE eidetic_observations ADD COLUMN owner_principal_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE eidetic_observations ADD COLUMN turn_id TEXT NOT NULL DEFAULT '';
+ALTER TABLE eidetic_observations ADD COLUMN tool_name TEXT NOT NULL DEFAULT '';
+ALTER TABLE eidetic_observations ADD COLUMN source_type TEXT NOT NULL DEFAULT 'tool_result';
+ALTER TABLE eidetic_observations ADD COLUMN sensitivity TEXT NOT NULL DEFAULT 'unknown';
+ALTER TABLE eidetic_observations ADD COLUMN capture_status TEXT NOT NULL DEFAULT 'captured';
+ALTER TABLE eidetic_observations ADD COLUMN skip_reason TEXT NOT NULL DEFAULT '';
+ALTER TABLE eidetic_observations ADD COLUMN promotable_to_memory INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE eidetic_observations ADD COLUMN content_bytes INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE eidetic_observations ADD COLUMN expires_at TEXT NOT NULL DEFAULT '';
+CREATE INDEX IF NOT EXISTS idx_eidetic_observations_owner
+  ON eidetic_observations(owner_principal_id, created_at);
+"""
+
+
 SETUP_STATE_MIGRATION_ID = "RAIKER-1049-full-setup-state"
 SETUP_STATE_SQL = """
 CREATE TABLE IF NOT EXISTS setup_state (

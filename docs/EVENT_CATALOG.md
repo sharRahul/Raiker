@@ -36,6 +36,7 @@ human authorizer, runtime authority, or other literal actor.
 | `tool_started` | A governed executor started work |
 | `tool_completed` | A governed executor completed work |
 | `tool_failed` | A governed executor failed safely |
+| `eidetic_observation_skipped` | An eidetic observation could not be recorded for a completed tool result — the action id, the tool, and the reason. The tool result itself is unaffected: an observation is a record *about* work, and a bookkeeping failure never fails the work. An observation the runtime deliberately refused on sensitivity is **not** this event; it is a row in `eidetic_observations` carrying its own reason, so the owner sees it in Memory rather than only in the audit log |
 | `code_repo_connected` | A repository reference was added to the Build workspace (workspace-relative subpath, or a GitHub `owner/repo` coordinate) |
 | `code_repo_disconnected` | A repository reference was removed; the folder and the remote are untouched |
 | `code_map_indexed` | A repository's code map was built — file, symbol and edge totals, what the scan skipped and why, and which bound it hit if it stopped short. Counts and reasons only; never a path's content and never a symbol's text |

@@ -1651,6 +1651,41 @@ export interface MemorySettingsView {
   spaces: EmbeddingSpaceView[];
 }
 
+// raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
+// about material the runtime saw while it worked. There is no field carrying
+// the material itself, and there is not meant to be one: an observation exists
+// so recall is possible without a second ungoverned copy of everything read.
+export interface ObservationView {
+  observation_id: string;
+  session_id: string;
+  turn_id: string;
+  tool_name: string;
+  source_type: string;
+  summary: string;
+  sensitivity: string;
+  retention: string;
+  capture_status: "captured" | "skipped";
+  skip_reason: string;
+  promotable_to_memory: boolean;
+  content_sha256: string;
+  content_bytes: number;
+  artifact_ref: string | null;
+  source_event_id: string;
+  created_at: string;
+  expires_at: string;
+  gist_status: string;
+  gist_summary: string;
+  gist_id: string;
+}
+
+export interface ObservationsView {
+  ok: boolean;
+  observations: ObservationView[];
+  captured: number;
+  skipped: number;
+  gists_pending: number;
+}
+
 // raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored
 // runtime relationships; the UI may add clearly labelled illustrative motion.
 export interface BrainNode {
@@ -1763,6 +1798,14 @@ export interface ExecutionEnvironment {
   repository_access?: "none" | "read_only";
   writable_output?: boolean;
   assigned_tool_count?: number;
+  /**
+   * What this boundary was measured or built to do — `raiker.execution.commands
+   * .models.CommandFeatures`, as a flat map. BUG-194: `persistent_environment`
+   * and `restart_recovery` are what decide whether the reset control and the
+   * "survives a restart" line appear, and both come from the backend rather
+   * than from configuration.
+   */
+  features?: Record<string, boolean>;
   availability_reason?: string | null;
   /** The boundary this host was measured to build, not the one it was configured with. */
   boundary?: string;

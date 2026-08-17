@@ -29,6 +29,11 @@ from raiker.execution.commands.store import (
     OutputQuotaExceeded,
     SecretMaterialRejected,
 )
+from raiker.execution.commands.supervisor_client import (
+    SupervisorHandle,
+    SupervisorUnavailable,
+)
+from raiker.execution.commands.supervisor_client import attach as attach_supervised
 from raiker.execution.profiles import ExecutionProfile, resolve_command_environment
 from raiker.storage.sqlite import SQLiteStore
 
@@ -141,6 +146,10 @@ class CommandService:
         self._profile_probe = profile_probe
         self._backend_factory = backend_factory
         self._active: dict[str, Any] = {}
+        #: Backends that hold state between runs, kept for the life of the
+        #: service. See `_backend_for` for why this is exactly the container
+        #: backends and nothing else.
+        self._backends: dict[str, Any] = {}
         self._lock = threading.Lock()
         #: Set on shutdown so lease holders stop renewing immediately rather
         #: than sleeping out their interval while the runtime is going away.
@@ -225,11 +234,7 @@ class CommandService:
         sink = _StoreSink(self.store, request, complete)
         isolation: dict[str, Any] = {}
         try:
-            backend = (
-                self._backend_factory(profile)
-                if self._backend_factory is not None
-                else self._default_backend(profile)
-            )
+            backend = self._backend_for(profile)
             # Optional per backend, and validated rather than trusted: a
             # backend that answers with something other than a mapping has not
             # produced evidence, and recording a placeholder would be worse than
@@ -247,6 +252,14 @@ class CommandService:
             self._contain_start_failure(request, "command_launch_failed", backend_name)
             raise CommandServiceError("command_launch_failed") from None
         self.store.transition(owner_principal_id, request.run_id, CommandState.STARTING, CommandState.RUNNING)
+        # BUG-194 — the restart-safe handle, written before the run is
+        # observable. A supervised run whose handle landed after a crash would
+        # be a live process this runtime could never prove was its own.
+        supervisor_handle = getattr(handle, "handle", None)
+        if isinstance(supervisor_handle, SupervisorHandle):
+            self.store.record_backend_handle(
+                owner_principal_id, request.run_id, supervisor_handle.to_dict()
+            )
         with self._lock:
             self._active[request.run_id] = handle
             if handle.poll() is not None:
@@ -304,11 +317,20 @@ class CommandService:
         receipt = self.store.get_receipt(owner_principal_id, run_id)
         with self._lock:
             supervised = run_id in self._active
+        # A live run this process is not watching may still be reattachable —
+        # that is what a restart looks like from here. Ask, once, before
+        # reporting it unsupervised: "not supervised" and "not recoverable" were
+        # the same answer before this change and are two different facts.
+        if not supervised and run.state not in TERMINAL_COMMAND_STATES:
+            supervised = self.reattach(run) is not None
+        with self._lock:
+            reattached = bool(getattr(self._active.get(run_id), "reattached", False))
         return {
             "run_id": run.run_id,
             "state": run.state.value,
             "running": run.state not in TERMINAL_COMMAND_STATES,
             "supervised": supervised,
+            "reattached": reattached,
             "backend": run.backend,
             "safe_display": run.safe_display,
             "exit_code": run.exit_code,
@@ -378,6 +400,10 @@ class CommandService:
         with self._lock:
             handle = self._active.get(run_id)
         if handle is None:
+            # Typing into a run this runtime restarted away from is exactly the
+            # case reattachment exists for.
+            handle = self.reattach(run)
+        if handle is None:
             raise CommandServiceError("command_backend_handle_unavailable")
         try:
             handle.write(data)
@@ -396,6 +422,15 @@ class CommandService:
         reclaimed: list[str] = []
         for run in self.store.list_expired_leases(owner_principal_id):
             with self._lock:
+                supervised = run.run_id in self._active
+            # A lapsed lease is evidence that *this runtime* stopped watching,
+            # not that the run stopped. If the run's supervisor still answers,
+            # the right move is to take it back over — reclaiming a live run
+            # because the runtime that was watching it restarted would kill work
+            # this change exists to preserve.
+            if not supervised and self.reattach(run) is not None:
+                continue
+            with self._lock:
                 handle = self._active.pop(run.run_id, None)
             if handle is not None:
                 with contextlib.suppress(Exception):
@@ -406,6 +441,34 @@ class CommandService:
             self._recover_run(current, reason="command_background_lease_expired")
             reclaimed.append(run.run_id)
         return reclaimed
+
+    def _backend_for(self, profile: ExecutionProfile) -> Any:
+        """The backend for a profile, kept where keeping it is what makes the
+        capability real.
+
+        BUG-194 — a container backend holds the session's standing boundary in
+        its own map, so building a fresh one per run would mean every run
+        created a new container no matter what the naming said. Only container
+        backends are held: a local backend has no cross-run state to keep, and a
+        native one must *not* be kept, because its capability set comes from a
+        probe whose answer can change between commands (see `_default_backend`).
+        """
+        if profile.kind != "container":
+            return (
+                self._backend_factory(profile)
+                if self._backend_factory is not None
+                else self._default_backend(profile)
+            )
+        with self._lock:
+            backend = self._backends.get(profile.profile_id)
+            if backend is None:
+                backend = (
+                    self._backend_factory(profile)
+                    if self._backend_factory is not None
+                    else self._default_backend(profile)
+                )
+                self._backends[profile.profile_id] = backend
+            return backend
 
     def _default_backend(self, profile: ExecutionProfile) -> Any:
         if profile.kind == "local":
@@ -423,6 +486,53 @@ class CommandService:
                 profile=profile,
             )
         return UnavailableBackend(f"{profile.kind}_command_supervisor_unavailable")
+
+    def reset_environment(
+        self, owner_principal_id: str, session_id: str, profile_id: str, *, recreate: bool
+    ) -> bool:
+        """Discard a session's persistent boundary (BUG-194).
+
+        Returns whether a backend actually took the instruction. `False` means
+        the selected profile has no boundary to reset — which the caller reports
+        as a named refusal rather than as a reset that quietly did nothing.
+        """
+        resolution = (
+            resolve_command_environment(
+                self.sqlite, owner_principal_id, "shell", probe=self._profile_probe
+            )
+            if self._profile_probe is not None
+            else resolve_command_environment(self.sqlite, owner_principal_id, "shell")
+        )
+        profile = resolution.profile
+        if profile is None or profile.profile_id != profile_id:
+            return False
+        backend = self._backend_for(profile)
+        reset = getattr(backend, "reset", None)
+        if not callable(reset):
+            return False
+        reset(owner_principal_id, session_id, profile_id, recreate=recreate)
+        return True
+
+    def session_environment(
+        self, owner_principal_id: str, session_id: str
+    ) -> dict[str, Any] | None:
+        """What persistent boundary this session is reusing, if any."""
+        resolution = (
+            resolve_command_environment(
+                self.sqlite, owner_principal_id, "shell", probe=self._profile_probe
+            )
+            if self._profile_probe is not None
+            else resolve_command_environment(self.sqlite, owner_principal_id, "shell")
+        )
+        profile = resolution.profile
+        if profile is None:
+            return None
+        backend = self._backend_for(profile)
+        describe = getattr(backend, "session_environment", None)
+        if not callable(describe):
+            return None
+        described = describe(owner_principal_id, session_id)
+        return dict(described) if isinstance(described, dict) else None
 
     def run_foreground(self, **kwargs: Any) -> dict[str, Any]:
         run = self.start(**kwargs)
@@ -515,6 +625,9 @@ class CommandService:
             },
         )
         self.store.finalize_with_receipt(request.owner_principal_id, request.run_id, state, receipt)
+        # The handle authenticates to a channel that is about to stop existing.
+        # Keeping it would be storage of a secret with no remaining purpose.
+        self.store.clear_backend_handle(request.owner_principal_id, request.run_id)
         with self._lock:
             self._active.pop(request.run_id, None)
 
@@ -527,17 +640,122 @@ class CommandService:
         with self._lock:
             handle = self._active.get(run_id)
         if handle is None:
+            handle = self.reattach(run)
+        if handle is None:
             self._recover_run(run)
         else:
             handle.terminate()
         return self.store.load(owner_principal_id, run_id) or run
 
     def recover_owner(self, owner_principal_id: str) -> None:
+        """Pick up where a restart left off (BUG-194).
+
+        Reattachment is attempted *before* recovery, and the order is the whole
+        change: a run whose supervisor still answers is not lost, and declaring
+        it lost first and asking afterwards would make the honest receipt into a
+        wrong one.
+        """
         for run in self.store.list_recoverable(owner_principal_id):
             with self._lock:
                 active = run.run_id in self._active
-            if not active:
-                self._recover_run(run)
+            if active:
+                continue
+            if self.reattach(run) is not None:
+                continue
+            self._recover_run(run)
+
+    # ── Restart reattachment (BUG-194) ───────────────────────────────────────
+
+    def reattach(self, run: StoredCommandRun) -> Any | None:
+        """Take a live supervised run back over, or return ``None``.
+
+        ``None`` is the answer for every case where this runtime cannot *prove*
+        the run is still its own: no stored handle, a locked vault it cannot
+        read the instance key out of, a socket that is gone, or a socket that
+        answered with a frame the key did not authenticate. Each of those ends
+        in the same honest `lost` receipt a restart has always produced. What
+        changed is that it is now the answer to a question that was asked,
+        rather than the only answer available.
+        """
+        stored = self.store.load_backend_handle(run.owner_principal_id, run.run_id)
+        if not stored:
+            return None
+        try:
+            handle = SupervisorHandle.from_dict(stored)
+        except SupervisorUnavailable:
+            return None
+        request = self._rebuild_request(run)
+        if request is None:
+            return None
+        chunks = self.store.read_output(run.owner_principal_id, run.run_id, limit=5_000)
+        sink = _StoreSink(
+            self.store,
+            request,
+            lambda state, returncode, produced: self._finalize(
+                request, state, returncode, produced, run.backend or "local_strict"
+            ),
+        )
+        # Resume rather than replay. The sink's counters start where the store
+        # already is, so a reattached run's totals are the run's totals and not
+        # the second half's.
+        sink.sequence = chunks[-1].sequence if chunks else 0
+        sink.captured_bytes = chunks[-1].end_byte_offset if chunks else 0
+        sink.stdout_bytes = run.stdout_bytes
+        sink.stderr_bytes = run.stderr_bytes
+        sink.truncated = run.truncated
+        sink.redaction_count = run.redaction_count
+        try:
+            supervised = attach_supervised(
+                handle,
+                sink,
+                max_output_bytes=request.max_output_bytes,
+                after=sink.sequence,
+            )
+        except SupervisorUnavailable:
+            return None
+        with self._lock:
+            self._active[run.run_id] = supervised
+        self._hold_lease(request)
+        return supervised
+
+    def _rebuild_request(self, run: StoredCommandRun) -> CommandRequest | None:
+        """Reconstruct the request a stored run was started from.
+
+        Everything needed is already durable: the row carries the identity and
+        the encrypted material carries the command. A row this cannot rebuild is
+        one this runtime should not pretend to supervise.
+        """
+        try:
+            material = self.store.execution_material(run.owner_principal_id, run.run_id)
+        except Exception:  # noqa: BLE001 — a locked or unreadable vault is "no"
+            return None
+        try:
+            return CommandRequest(
+                run_id=run.run_id,
+                owner_principal_id=run.owner_principal_id,
+                acting_principal_id=run.acting_principal_id,
+                session_id=run.session_id,
+                turn_id=run.turn_id,
+                action_id=run.action_id,
+                repository_id=None,
+                workspace_root=Path(str(material.get("workspace_root", self.workspace_root))),
+                cwd=str(material.get("cwd", ".")),
+                executable_template=str(material.get("executable_template", "")),
+                argv_template=tuple(str(item) for item in material.get("argv_template", [])),
+                safe_display=run.safe_display,
+                credential_bindings=(),
+                shell=bool(material.get("shell", False)),
+                interactive=bool(material.get("interactive", False)),
+                background=bool(material.get("background", False)),
+                timeout_seconds=float(material.get("timeout_seconds", 30.0)),
+                max_output_bytes=int(material.get("max_output_bytes", 100_000)),
+                environment_profile_id=run.profile_id,
+                network_policy_id=material.get("network_policy_id") or None,
+                authority_kind=run.authority_kind,
+                authority_id=run.authority_id,
+            )
+        except ValueError:
+            return None
 
     def _recover_run(
         self,
@@ -576,3 +794,11 @@ class CommandService:
             handles = list(self._active.values())
         for handle in handles:
             handle.terminate()
+            # A supervised run's process is not ours to leave standing. Killing
+            # its child stops the work; releasing tells the supervisor nobody is
+            # coming back, so it exits now rather than holding its linger window
+            # open for a restart that is not happening.
+            release = getattr(handle, "release", None)
+            if callable(release):
+                with contextlib.suppress(Exception):
+                    release()

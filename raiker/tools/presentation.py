@@ -99,6 +99,7 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     "github_write": FAMILY_REPOSITORY,
     "code_map_search": FAMILY_REPOSITORY,
     "code_map_references": FAMILY_REPOSITORY,
+    "knowledge_graph": FAMILY_MEMORY,
     # The owner's own accounts, reached through a governed connector.
     "gmail_read": FAMILY_CONNECTOR,
     "gcal_read": FAMILY_CONNECTOR,
@@ -156,6 +157,7 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "slack_read": "Read Slack",
     "connector_read": "Read connector",
     "connector_write": "Write through connector",
+    "knowledge_graph": "Explore related memories",
     "memory_search": "Search memory",
     "memory_list": "List memory",
     "memory_get": "Open memory",

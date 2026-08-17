@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from collections.abc import Callable
 from dataclasses import dataclass
+from typing import Any
 
 from raiker.storage.sqlite import SQLiteStore
 from raiker.vector import VectorIndex
@@ -29,6 +30,14 @@ class HybridMemoryResult:
     #: space than in a hashing one, and the reader has to be able to tell.
     vector_backend: str = ""
     vector_backend_semantic: bool = False
+    #: MEM-11 — read from the row this result was already built from, so the
+    #: model-facing tool can answer "when, and filed under what" without a
+    #: second query per hit. The lexical-only tool this replaced returned them
+    #: and they are worth keeping: a memory's age is how a reader decides
+    #: whether it has been superseded in spirit if not in the record.
+    created_at: str = ""
+    tags: tuple[str, ...] = ()
+    source: str = ""
 
 
 @dataclass(frozen=True)
@@ -41,6 +50,11 @@ class HybridRetrievalWeights:
         if min(self.lexical, self.vector, self.graph) < 0:
             raise ValueError("invalid_hybrid_retrieval_weights")
 
+
+#: How many entities one query may anchor a graph traversal on. Bounded because
+#: each anchor is a separate neighborhood query, and because a query that names
+#: five entities is asking a broad question the lexical leg answers better.
+_MAX_GRAPH_ANCHORS = 3
 
 #: Embeds a query in a named space. Injected rather than imported so the
 #: egress-gated path stays where the capability check is — this module never
@@ -64,6 +78,15 @@ def _embed_query(
     if backend.semantic:
         return None
     return backend.embed(query)
+
+
+def _tags_of(row: Any) -> tuple[str, ...]:
+    """Tags as a tuple, or empty. A malformed `tags_json` is not a failed search."""
+    try:
+        parsed = json.loads(str(row["tags_json"] or "[]"))
+    except (TypeError, ValueError):
+        return ()
+    return tuple(str(tag) for tag in parsed) if isinstance(parsed, list) else ()
 
 
 def retrieve_hybrid_memory(
@@ -114,15 +137,42 @@ def retrieve_hybrid_memory(
             sources | {"vector"},
             {**breakdown, "vector": contribution},
         )
-    if entity_id:
+    # MEM-12 — the graph leg now has an anchor on an ordinary turn.
+    #
+    # It was gated on an `entity_id` the caller had to already know, and the
+    # context gatherer — the only production caller — never passed one. So the
+    # third leg of "hybrid" retrieval never ran outside the evaluation harness,
+    # and the shortfall was invisible: two legs still answer, just without the
+    # one that relates a memory to a memory.
+    #
+    # An explicit `entity_id` still wins, because a caller that names one is
+    # asking about that entity rather than about the words in the query.
+    # Otherwise the anchors are resolved from the query itself, which is what
+    # makes the leg reachable from Chat, Build and ambient recall alike.
+    anchors = (
+        [entity_id]
+        if entity_id
+        else [
+            str(row["entity_id"])
+            for row in store.match_memory_entities(query, limit=_MAX_GRAPH_ANCHORS)
+        ]
+    )
+    for anchor in anchors:
         for row in store.list_memory_entity_neighborhood(
-            entity_id, scope=scope, owner_principal_id=owner_principal_id
+            anchor, scope=scope, owner_principal_id=owner_principal_id
         ):
             memory_id = str(row["evidence_memory_id"])
             score, sources, breakdown = candidates.get(memory_id, (0.0, set(), {}))
             contribution = float(row["confidence"]) * weights.graph
+            # `max`, not `+`: two anchors that both reach the same memory are
+            # two paths to one fact, not two facts. Summing would let a densely
+            # connected entity outrank an exact lexical hit on nothing more than
+            # how many edges happen to point at it.
+            existing = breakdown.get("graph", 0.0)
+            if contribution <= existing:
+                continue
             candidates[memory_id] = (
-                score + contribution,
+                score - existing + contribution,
                 sources | {"graph"},
                 {**breakdown, "graph": contribution},
             )
@@ -144,6 +194,9 @@ def retrieve_hybrid_memory(
                     score_breakdown=tuple(sorted(breakdown.items())),
                     vector_backend=backend.model_label,
                     vector_backend_semantic=backend.semantic,
+                    created_at=str(memory_row["created_at"] or ""),
+                    tags=_tags_of(memory_row),
+                    source=str(memory_row["source"] or ""),
                 )
             )
     return sorted(results, key=lambda item: (-item.score, item.memory_id))[:limit]

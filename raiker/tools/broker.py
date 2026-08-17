@@ -63,6 +63,7 @@ from raiker.tools.git import (
     run_git,
     selected_repository_subpath,
 )
+from raiker.tools.graph_tools import knowledge_graph
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
 from raiker.tools.memory_tools import (
     memory_get,
@@ -227,10 +228,22 @@ class ToolBroker:
             "apply_patch": lambda args: proposed_patch_snapshot(
                 self.workspace_root, str(args["path"]) if args.get("path") else None, str(args.get("patch", ""))
             ),
+            "knowledge_graph": lambda args: knowledge_graph(
+                self.workspace_root,
+                str(args.get("action", "")),
+                query=str(args.get("query", "")),
+                entity_id=str(args.get("entity_id", "")),
+                locator=str(args.get("locator", "")),
+                session_id=str(args.get("session_id", "")),
+                scope=args.get("scope"),
+                max_results=int(args.get("max_results", 50)),
+                owner_principal_id=self.owner_scope,
+            ),
             "memory_search": lambda args: memory_search(
                 self.workspace_root,
                 str(args.get("query", "")),
                 scope=args.get("scope"),
+                entity_id=str(args["entity_id"]) if args.get("entity_id") else None,
                 max_results=int(args.get("max_results", 20)),
                 owner_principal_id=self.owner_scope,
             ),

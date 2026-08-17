@@ -62,7 +62,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Medium | Shell / sandbox / recovery | Open — reduced twice; the OS boundary is FIXED-195, background execution and POSIX PTY are FIXED-229 |
 | [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | Open — root cause identified 2026-08-16 |
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
-| MEM-04 … MEM-10 | High → Low | Memory reliability | Open — MEM-03 and MEM-05 closed 2026-08-17 as FIXED-230 and FIXED-231; MEM-10 raised in their place; see [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
+| MEM-04 … MEM-13 | High → Low | Memory reliability | Open: MEM-04, MEM-06 … MEM-10. Closed 2026-08-17: MEM-03/MEM-05 (FIXED-230/231) and MEM-11/12/13 (FIXED-232/233/234). See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -70,10 +70,12 @@ The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
 standard. Its MEM-01 and MEM-02 are closed in
 [`FIXED_ITEMS.md`](FIXED_ITEMS.md) as FIXED-187 and FIXED-188, and MEM-03 and
-MEM-05 as FIXED-230 and FIXED-231. MEM-10 was raised in their place: closing
-MEM-03 built the *selection* of an embedding space, and a default install still
-has nothing semantic to select. MEM-04, MEM-06 through MEM-09 and MEM-10 are
-open there rather than duplicated here.
+MEM-05 as FIXED-230 and FIXED-231, and MEM-11, MEM-12 and MEM-13 as FIXED-232,
+FIXED-233 and FIXED-234. Two were raised in their place. MEM-10: closing MEM-03
+built the *selection* of an embedding space, and a default install still has
+nothing semantic to select. MEM-06 is now the binding constraint on the graph
+leg, which MEM-12 made reachable and which nothing populates. MEM-04, MEM-06
+through MEM-10 are open there rather than duplicated here.
 
 ---
 

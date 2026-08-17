@@ -3179,3 +3179,24 @@ MEMORY_EMBEDDING_BACKEND_MIGRATION_ID = "RAIKER-2034-memory-embedding-backend"
 MEMORY_EMBEDDING_BACKEND_SQL = """
 ALTER TABLE memory_settings ADD COLUMN embedding_backend TEXT NOT NULL DEFAULT 'auto';
 """
+
+
+# ── Reference graph over the citation ledger (RAIKER-2035) ───────────────────
+#
+# MEM-14 — `turn_sources` is Raiker's link table: one row per source a turn
+# actually used, carrying the target's `locator` and the bounded `passage` that
+# reached the model. Read the other way round it answers the two questions a
+# reference graph exists to answer — *which work cited this?* and *what was
+# cited alongside it?* — but every index on it was keyed by the turn that wrote
+# the row, so both readings meant a full scan, and the self-join that finds
+# co-cited sources meant two.
+#
+# One index, keyed by the target and then the owner, because every read of this
+# table from the reference graph is scoped to one principal and no read of it
+# crosses accounts.
+TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID = "RAIKER-2035-turn-source-locator-index"
+
+TURN_SOURCE_LOCATOR_INDEX_SQL = """
+CREATE INDEX IF NOT EXISTS idx_turn_sources_locator
+  ON turn_sources(locator, principal_id);
+"""

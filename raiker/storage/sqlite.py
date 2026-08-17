@@ -331,6 +331,8 @@ from raiker.storage.migrations import (
     TURN_CONTROLS_SQL,
     TURN_REASONING_MIGRATION_ID,
     TURN_REASONING_SQL,
+    TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
+    TURN_SOURCE_LOCATOR_INDEX_SQL,
     TURN_SOURCES_MIGRATION_ID,
     TURN_SOURCES_SQL,
     WEB_BLOCKLIST_MIGRATION_ID,
@@ -1398,6 +1400,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
                 MEMORY_EMBEDDING_BACKEND_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
+                TURN_SOURCE_LOCATOR_INDEX_SQL,
                 connection,
             )
             # Before the backfills: converting an index and then deciding it is
@@ -4959,6 +4966,149 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row is not None else None
 
+    # ── the citation ledger read as a reference graph (MEM-14) ───────────────
+    #
+    # `turn_sources` is a link table that was only ever read forwards: "what did
+    # this turn use". Read backwards and sideways it is the graph Obsidian's
+    # metadata cache exposes over a vault — `getBacklinksForFile` (who cites
+    # this), `resolvedLinks` (what this cites, with a count per target), and the
+    # block reference (the exact passage, not the whole document). Raiker
+    # already stored all three facts per row; nothing here derives anything new,
+    # it reads what the ledger recorded from the other end.
+    #
+    # Every method is owner-scoped in the query. `principal_id` is optional only
+    # so the Knowledge Map can render an unfiltered workspace view; the
+    # model-facing tool always passes it.
+
+    def list_source_backlinks(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 25
+    ) -> list[dict[str, Any]]:
+        """Which conversations cited this source, and how often.
+
+        The reference count is per target-and-conversation, matching what
+        Obsidian reports for a backlink: one entry per citing document, carrying
+        how many references it holds.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT s.session_id,
+                        COALESCE(NULLIF(TRIM(sess.title), ''), 'Untitled') AS session_title,
+                        COALESCE(sess.origin, '') AS session_origin,
+                        MIN(s.kind) AS kind,
+                        MIN(s.title) AS title,
+                        MIN(s.tool_name) AS tool_name,
+                        COUNT(*) AS refs,
+                        COUNT(DISTINCT s.turn_id) AS turns,
+                        SUM(CASE WHEN TRIM(s.passage) != '' THEN 1 ELSE 0 END) AS passages,
+                        MAX(s.created_at) AS last_referenced_at
+                 FROM turn_sources s
+                 LEFT JOIN sessions sess ON sess.session_id = s.session_id
+                 WHERE s.locator = ?"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND s.principal_id = ?"
+            params.append(principal_id)
+        sql += (
+            " GROUP BY s.session_id ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_source_outlinks(
+        self, session_id: str, *, principal_id: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
+        """What this conversation cited, one entry per target with a count."""
+        if not session_id.strip():
+            return []
+        sql = """SELECT locator, kind, tool_name, attachment_id,
+                        MIN(title) AS title,
+                        COUNT(*) AS refs,
+                        COUNT(DISTINCT turn_id) AS turns,
+                        SUM(CASE WHEN TRIM(passage) != '' THEN 1 ELSE 0 END) AS passages,
+                        MAX(created_at) AS last_referenced_at
+                 FROM turn_sources
+                 WHERE session_id = ?"""
+        params: list[Any] = [session_id.strip()]
+        if principal_id:
+            sql += " AND principal_id = ?"
+            params.append(principal_id)
+        sql += (
+            " GROUP BY locator, kind, tool_name, attachment_id"
+            " ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_co_cited_sources(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 25
+    ) -> list[dict[str, Any]]:
+        """What else was cited by the conversations that cited this.
+
+        The edge a graph view actually draws. Two sources used to answer the
+        same question are related in the only sense Raiker can evidence — some
+        work needed both — and that is a weaker claim than a hyperlink, so it is
+        reported with the number of conversations behind it rather than as a
+        bare edge.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT other.locator,
+                        MIN(other.kind) AS kind,
+                        MIN(other.title) AS title,
+                        COUNT(DISTINCT other.session_id) AS shared_sessions,
+                        COUNT(*) AS refs,
+                        MAX(other.created_at) AS last_referenced_at
+                 FROM turn_sources mine
+                 JOIN turn_sources other
+                   ON other.session_id = mine.session_id
+                  AND other.locator != mine.locator
+                 WHERE mine.locator = ? AND TRIM(other.locator) != ''"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND mine.principal_id = ? AND other.principal_id = ?"
+            params.extend([principal_id, principal_id])
+        sql += (
+            " GROUP BY other.locator"
+            " ORDER BY shared_sessions DESC, refs DESC, last_referenced_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_source_passages(
+        self, locator: str, *, principal_id: str | None = None, limit: int = 5
+    ) -> list[dict[str, Any]]:
+        """The bounded text this source actually contributed, most recent first.
+
+        This is the half a reference graph is useless without. A backlink says
+        *something over there mentioned this*; the passage is the sentence, and
+        it is the copy that really reached the model rather than whatever the
+        file says today.
+        """
+        cleaned = locator.strip()
+        if not cleaned:
+            return []
+        sql = """SELECT session_id, turn_id, source_id, kind, title, tool_name,
+                        attachment_id, passage, created_at
+                 FROM turn_sources
+                 WHERE locator = ? AND TRIM(passage) != ''"""
+        params: list[Any] = [cleaned]
+        if principal_id:
+            sql += " AND principal_id = ?"
+            params.append(principal_id)
+        sql += " ORDER BY created_at DESC, ordinal ASC LIMIT ?"
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     # ── turn controls (B17/C13 — stop or steer a turn that is running) ───────
 
     def request_turn_stop(
@@ -6175,6 +6325,166 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ON CONFLICT(normalized_name, entity_type) DO UPDATE SET display_name = excluded.display_name, updated_at = excluded.updated_at""",
                 (entity_id, normalized_name, name.strip(), entity_type.strip(), now, now),
             )
+
+    # ── Knowledge Map reads (BUG-218) ─────────────────────────────────────
+    #
+    # The map used to be built from `list_event_index`, one node per event row
+    # typed `tool`. Measured on a workspace after a single live round: 20 of 22
+    # nodes were that type, and none of them was a tool — they were "turn
+    # started", "model request completed" and their kin. These three reads are
+    # what the map is actually about: the tools a session really used, what a
+    # turn's answer actually came from, and the files the owner actually
+    # attached.
+
+    def summarize_session_tool_use(
+        self, session_ids: Sequence[str], *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """One row per (session, tool), with how often it ran and how it ended.
+
+        Aggregated in SQL rather than in the caller because the un-aggregated
+        form is the defect: a busy session has hundreds of tool actions and the
+        map only ever wanted "which tools, how much".
+        """
+        if not session_ids:
+            return []
+        placeholders = ",".join("?" for _ in session_ids)
+        sql = f"""SELECT session_id, tool_name, COUNT(*) AS uses,
+                         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failures,
+                         MAX(COALESCE(completed_at, proposed_at)) AS last_used_at
+                  FROM tool_actions
+                  WHERE session_id IN ({placeholders}) AND TRIM(tool_name) != ''"""
+        params: list[Any] = list(session_ids)
+        if owner_principal_id:
+            sql += " AND (owner_principal_id = ? OR owner_principal_id IS NULL OR owner_principal_id = '')"
+            params.append(owner_principal_id)
+        sql += " GROUP BY session_id, tool_name ORDER BY uses DESC, tool_name"
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_session_context_sources(
+        self, session_ids: Sequence[str], *, principal_id: str | None = None, limit: int = 200
+    ) -> list[dict[str, Any]]:
+        """What the answers in these sessions actually came from.
+
+        `turn_sources` is the citation record — the file, page or tool result an
+        answer was grounded in. It is the closest thing Raiker has to "the
+        context this work used", and the Knowledge Map never read it, which is
+        why a map of the owner's work showed no files and no context.
+        """
+        if not session_ids:
+            return []
+        placeholders = ",".join("?" for _ in session_ids)
+        sql = f"""SELECT session_id, kind, title, locator, tool_name, attachment_id,
+                         COUNT(*) AS uses, MAX(created_at) AS last_used_at
+                  FROM turn_sources
+                  WHERE session_id IN ({placeholders})"""
+        params: list[Any] = list(session_ids)
+        if principal_id:
+            sql += " AND principal_id = ?"
+            params.append(principal_id)
+        sql += (
+            " GROUP BY session_id, kind, title, locator, tool_name, attachment_id"
+            " ORDER BY last_used_at DESC LIMIT ?"
+        )
+        params.append(limit)
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_session_attached_files(
+        self, session_ids: Sequence[str], *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Files the owner attached to a conversation, by name and type.
+
+        Metadata only — the `attachments.data` blob is never selected here. A
+        map is a map; reading the bytes to draw a node would be a needless
+        exposure of file content to a view that only shows its name.
+        """
+        if not session_ids:
+            return []
+        placeholders = ",".join("?" for _ in session_ids)
+        sql = f"""SELECT r.session_id, r.source, a.attachment_id, a.filename,
+                         a.media_type, a.byte_size, a.kind
+                  FROM session_attachment_refs r
+                  JOIN attachments a ON a.attachment_id = r.attachment_id
+                  WHERE r.session_id IN ({placeholders})"""
+        params: list[Any] = list(session_ids)
+        if owner_principal_id:
+            sql += " AND r.owner_principal_id = ?"
+            params.append(owner_principal_id)
+        sql += " ORDER BY r.created_at DESC"
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
+    def sessions_for_events(self, event_ids: Sequence[str]) -> dict[str, str]:
+        """`event_id -> session_id`, for events outside any paged window.
+
+        The Knowledge Map keeps only a bounded page of recent events, so a
+        memory produced months ago has a `source_event_id` the page does not
+        contain. Resolving it directly is what stops that memory being drawn as
+        a fact floating free of the work that produced it.
+        """
+        if not event_ids:
+            return {}
+        placeholders = ",".join("?" for _ in event_ids)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"SELECT event_id, session_id FROM events_index WHERE event_id IN ({placeholders})",
+                list(event_ids),
+            ).fetchall()
+        return {str(row["event_id"]): str(row["session_id"]) for row in rows if row["session_id"]}
+
+    def match_memory_entities(self, query: str, *, limit: int = 3) -> list[dict[str, Any]]:
+        """Entities this query actually names (MEM-12).
+
+        The graph leg of hybrid retrieval needs somewhere to start, and until now
+        the only way to give it one was for the caller to already know an
+        ``entity_id`` — which the context gatherer never does, so the leg never
+        ran on a real turn. This resolves the anchor from the words the owner
+        typed.
+
+        Matching is on ``normalized_name`` against whole query terms, using the
+        same case-folding and whitespace collapse ``upsert_memory_entity``
+        applies, so "the NAS" and "nas" resolve alike. Deliberately **not** a
+        substring or prefix match: `LIKE '%term%'` over an unindexed column
+        would make "id" match every entity containing those two letters, and a
+        graph traversal seeded from a coincidence is worse than no traversal —
+        it adds unrelated memories to a turn's context wearing the label
+        "recalled".
+
+        A multi-word entity ("encrypted nas") is matched by its whole normalized
+        name appearing in the query, which is why the full query is compared as
+        well as each term.
+        """
+        if limit < 1:
+            return []
+        collapsed = " ".join(query.casefold().split())
+        if not collapsed:
+            return []
+        terms = {term for term in collapsed.split() if len(term) >= 3}
+        if not terms:
+            return []
+        placeholders = ",".join("?" for _ in terms)
+        with self.connect() as connection:
+            rows = connection.execute(
+                # The padding is what makes the containment check a *word*
+                # match. Bare `INSTR(query, name)` matches "nas" inside "nasty
+                # business", which is precisely the coincidence this method
+                # exists not to anchor a graph traversal on. Wrapping both sides
+                # in spaces means only a whole term, or a whole multi-word name,
+                # can match.
+                f"""SELECT entity_id, display_name, entity_type, normalized_name
+                    FROM memory_entities
+                    WHERE normalized_name IN ({placeholders})
+                       OR (INSTR(' ' || ? || ' ', ' ' || normalized_name || ' ') > 0
+                           AND LENGTH(normalized_name) >= 3)
+                    ORDER BY LENGTH(normalized_name) DESC, normalized_name
+                    LIMIT ?""",
+                [*sorted(terms), collapsed, limit],
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def link_memory_entities(
         self, relationship_id: str, subject_entity_id: str, predicate: str, object_entity_id: str,

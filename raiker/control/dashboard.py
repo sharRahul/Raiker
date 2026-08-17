@@ -80,6 +80,7 @@ from raiker.tools.git import (
     resolve_repository_root,
     selected_repository_subpath,
 )
+from raiker.tools.graph_tools import reference_resolution
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -580,6 +581,69 @@ class TaskView:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
+
+#: BUG-218 — how a tool is named on the Knowledge Map. The registry's own
+#: labels are written for a transcript line ("Run command"); a graph node has
+#: room for a noun. Anything unlisted falls back to its underscored name made
+#: readable, so a new tool appears sensibly without being registered twice.
+TOOL_LABELS: dict[str, str] = {
+    "read_file": "Read file",
+    "write_file": "Write file",
+    "edit_file": "Edit file",
+    "apply_patch": "Apply patch",
+    "list_directory": "List folder",
+    "grep": "Search text",
+    "glob": "Find files",
+    "shell": "Run command",
+    "run_command": "Run command",
+    "background_run": "Background run",
+    "web_fetch": "Fetch page",
+    "web_search": "Web search",
+    "memory_search": "Search memory",
+    "memory_write": "Remember",
+    "knowledge_graph": "Explore graph",
+    "conversation_search": "Search chats",
+    "code_map_search": "Search code map",
+    "code_map_references": "Find references",
+    "create_document": "Create document",
+    "spawn_subagent": "Delegate",
+    "update_plan": "Update plan",
+}
+
+#: What a cited source is drawn *as*. A file the answer quoted should look like
+#: a file on the map, not like a generic citation — the whole complaint BUG-218
+#: answers is that the map showed runtime bookkeeping where the owner expected
+#: their own material.
+CONTEXT_NODE_TYPES: dict[str, str] = {
+    "file": "file",
+    "repository": "file",
+    "attachment": "file",
+    "document": "file",
+    "folder": "folder",
+    "memory": "memory",
+    "conversation": "conversation",
+    "web": "source",
+    "url": "source",
+    "connector": "source",
+}
+
+
+#: BUG-218 — a Chat and a Build session are different work. `sessions.origin`
+#: already distinguished them and the map drew both as one green dot.
+SESSION_NODE_TYPES: dict[str, str] = {
+    "chat": "conversation",
+    "build": "build",
+    "task": "task_run",
+    "workbench": "conversation",
+}
+
+SESSION_LABELS: dict[str, str] = {
+    "chat": "chat",
+    "build": "build session",
+    "task": "task run",
+    "workbench": "chat",
+}
 
 
 def _task_detail(task: TaskView) -> str | None:
@@ -2004,10 +2068,53 @@ class DashboardService:
         ]
         nodes = [BrainNodeView(f"principal:{principal_id}", "user", "You", "active")]
         edges: list[BrainEdgeView] = []
+        # BUG-218 — projects, which the map never drew even though the colour
+        # for them was already defined. A session belongs to one, and "which
+        # work belongs together" is the first question a map of your work is
+        # asked.
+        projects_by_id = {
+            str(row["project_id"]): row
+            for row in self.store.list_projects(user_id=user_id)
+            if not row.get("is_archived")
+        }
+        used_projects: set[str] = set()
+
         for session in sessions:
             node_id = f"session:{session.session_id}"
-            nodes.append(BrainNodeView(node_id, "session", session.title or "Untitled session", session.status))
-            edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
+            # BUG-218 — a Chat and a Build session were the same green dot. They
+            # are different work and the store already knows which is which;
+            # `origin` was simply never read here.
+            origin = (getattr(session, "origin", "") or "chat").lower()
+            node_type = SESSION_NODE_TYPES.get(origin, "session")
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    node_type,
+                    session.title or f"Untitled {SESSION_LABELS.get(origin, 'session')}",
+                    session.status,
+                    SESSION_LABELS.get(origin, origin),
+                )
+            )
+            project_id = str(getattr(session, "project_id", "") or "")
+            if project_id and project_id in projects_by_id:
+                used_projects.add(project_id)
+                edges.append(BrainEdgeView(f"project:{project_id}", node_id, "contains"))
+            else:
+                edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "owns"))
+        for project_id in sorted(used_projects):
+            row = projects_by_id[project_id]
+            nodes.append(
+                BrainNodeView(
+                    f"project:{project_id}",
+                    "project",
+                    str(row.get("name") or "Untitled project"),
+                    "active",
+                    str(row.get("path") or ""),
+                )
+            )
+            edges.append(
+                BrainEdgeView(f"principal:{principal_id}", f"project:{project_id}", "owns")
+            )
         for task in tasks:
             node_id = f"task:{task.task_id}"
             nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, _task_detail(task), task.progress_percent))
@@ -2032,16 +2139,129 @@ class DashboardService:
                 )
             )
             edges.append(BrainEdgeView(f"task:{agent['parent_task_id']}", node_id, "delegates", str(agent["status"]) == "running"))
+        # BUG-218 — one node per *tool*, not one per event.
+        #
+        # This used to emit a node per row of `list_event_index(limit=250)`,
+        # typed `tool`. Measured on a workspace after one live round: 20 of 22
+        # nodes were that type, and not one was a tool — they were "turn
+        # started", "model request completed" and their kin. The map read as a
+        # map of the runtime's own bookkeeping, which is why chats, context and
+        # files were invisible underneath it.
+        #
+        # `tool_actions` is where tools actually are, aggregated per session, so
+        # a session that ran `read_file` forty times is one node saying forty
+        # rather than forty nodes saying nothing.
+        for use in self.store.summarize_session_tool_use(
+            sorted(session_ids), owner_principal_id=principal_id
+        ):
+            session_key = str(use["session_id"])
+            tool_name = str(use["tool_name"])
+            node_id = f"tool:{session_key}:{tool_name}"
+            uses = int(use["uses"] or 0)
+            failures = int(use["failures"] or 0)
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "tool",
+                    TOOL_LABELS.get(tool_name, tool_name.replace("_", " ")),
+                    "failed" if failures and failures == uses else "used",
+                    f"{uses} use{'' if uses == 1 else 's'}"
+                    + (f", {failures} failed" if failures else ""),
+                )
+            )
+            edges.append(BrainEdgeView(f"session:{session_key}", node_id, "used"))
+
+        # BUG-218 — what the answers actually came from. `turn_sources` is the
+        # citation record and the map never read it, so a map of the owner's
+        # work showed no context at all. A source is drawn as the thing it is:
+        # a cited file is a file node, a fetched page is a source node.
+        context_nodes: set[str] = set()
+        for cited in self.store.list_session_context_sources(
+            sorted(session_ids), principal_id=principal_id
+        ):
+            locator = str(cited["locator"] or "")
+            title = str(cited["title"] or "") or locator or str(cited["kind"])
+            kind = str(cited["kind"] or "")
+            # Identity is the thing cited, not the citation: the same file read
+            # in three sessions is one node with three edges, which is the
+            # relationship the map exists to show.
+            node_id = f"context:{kind}:{locator or title}"
+            # Emitted once even when several sessions cite it — the shared node
+            # with an edge per session *is* the relationship this map exists to
+            # show, and two nodes carrying one id would leave the force layout
+            # drawing the same file twice.
+            if node_id not in context_nodes:
+                context_nodes.add(node_id)
+                # MEM-14 — a citation whose file has since been deleted is drawn
+                # as `missing` rather than omitted. Obsidian keeps its
+                # unresolved links for the same reason: "this answer rested on
+                # something that is gone" is more useful than a tidier map, and
+                # dropping the node would leave the work looking ungrounded
+                # instead of grounded in something that has moved.
+                status = reference_resolution(
+                    self.workspace_root,
+                    kind=kind,
+                    locator=locator,
+                    attachment_id=str(cited["attachment_id"] or ""),
+                    tool_name=str(cited["tool_name"] or ""),
+                )
+                nodes.append(
+                    BrainNodeView(
+                        node_id,
+                        CONTEXT_NODE_TYPES.get(kind, "source"),
+                        title[:80],
+                        "missing" if status == "unresolved" else "cited",
+                        f"{kind}" + (f" · via {cited['tool_name']}" if cited["tool_name"] else ""),
+                    )
+                )
+            edges.append(
+                BrainEdgeView(f"session:{cited['session_id']}", node_id, "grounded_in")
+            )
+
+        # BUG-218 — files the owner attached to a conversation. Metadata only;
+        # the stored bytes are never read to draw a node.
+        for attached in self.store.list_session_attached_files(
+            sorted(session_ids), owner_principal_id=principal_id
+        ):
+            node_id = f"attachment:{attached['attachment_id']}"
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "file",
+                    str(attached["filename"]),
+                    "attached",
+                    str(attached["media_type"]),
+                )
+            )
+            edges.append(
+                BrainEdgeView(f"session:{attached['session_id']}", node_id, "attached")
+            )
+
         event_ids = {event.event_id for event in events}
-        for event in events:
-            node_id = f"event:{event.event_id}"
-            nodes.append(BrainNodeView(node_id, "tool", event.event_type.replace("_", " "), "recorded", event.summary))
-            edges.append(BrainEdgeView(f"session:{event.session_id}", node_id, "recorded"))
+        # One lookup for every memory whose source event is outside the window,
+        # rather than one per memory.
+        distant = self.store.sessions_for_events(
+            [m.source_event_id for m in memories if m.source_event_id not in event_ids]
+        )
         for memory in memories:
             node_id = f"memory:{memory.memory_id}"
             nodes.append(BrainNodeView(node_id, "memory", f"Memory · {memory.scope}", "available", memory.sensitivity))
+            # BUG-218 — a memory whose source event fell outside the event
+            # window used to be drawn with no edge at all: a fact floating free
+            # of the work that produced it. The session is the durable anchor,
+            # so it is the fallback rather than leaving the node orphaned.
             if memory.source_event_id in event_ids:
                 edges.append(BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered"))
+            elif distant.get(memory.source_event_id, "") in session_ids:
+                edges.append(
+                    BrainEdgeView(
+                        f"session:{distant[memory.source_event_id]}", node_id, "remembered"
+                    )
+                )
+            else:
+                # Neither reachable: the owner still owns it, and an anchored
+                # node is more honest than a floating one.
+                edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "remembers"))
         for approval in approvals:
             node_id = f"approval:{approval.approval_id}"
             nodes.append(BrainNodeView(node_id, "approval", approval.tool_name, approval.status, approval.capability))

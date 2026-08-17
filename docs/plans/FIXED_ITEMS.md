@@ -233,6 +233,11 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-229](#fixed-229--a-governed-command-could-not-outlive-its-turn-and-nothing-could-be-typed-into-one) | High | Shell / background execution (BUG-194) | Fixed |
 | [FIXED-230](#fixed-230--the-vector-leg-searched-one-embedding-space-and-the-query-was-embedded-in-another) | High | Memory retrieval (MEM-03) | Fixed |
 | [FIXED-231](#fixed-231--full-text-search-ranked-by-time-because-a-plan-document-said-fts5-was-unavailable) | High | Text search / retrieval (MEM-05) | Fixed |
+| [FIXED-232](#fixed-232--the-agents-memory-search-and-the-runtimes-recall-were-two-different-searches) | High | Retrieval consistency (MEM-11) | Fixed |
+| [FIXED-233](#fixed-233--the-graph-leg-of-hybrid-retrieval-never-ran-on-a-real-turn) | High | Retrieval quality (MEM-12) | Fixed |
+| [FIXED-234](#fixed-234--the-knowledge-graph-could-be-looked-at-but-not-asked) | Medium | Agent reach (MEM-13) | Fixed |
+| [FIXED-235](#fixed-235--the-knowledge-map-was-a-map-of-the-runtimes-bookkeeping-not-the-owners-work) | High | Knowledge Map (BUG-218) | Fixed |
+| [FIXED-236](#fixed-236--the-citation-ledger-recorded-every-reference-and-could-only-be-read-forwards) | Medium | Reference graph (MEM-14) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -9229,3 +9234,316 @@ first, the conversation snippet still marked, and the integrity report clean.
 The FTS4 fallback is exercised rather than assumed, because no runner Raiker
 targets has an FTS5-less build and it would otherwise be dead code that fails
 only on someone else's machine.
+
+
+---
+
+## FIXED-232 — The agent's memory search and the runtime's recall were two different searches
+
+**Severity: High. Area: retrieval consistency. Closes
+[MEM-11](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** One turn, two answers to the same question. The context gatherer
+injected "Recalled owner context" built by `retrieve_hybrid_memory` — lexical,
+vector and graph. The `memory_search` tool the model could actually call ran
+`search_memory`: the lexical index and nothing else. The weaker of the two was
+the half the model could steer.
+
+**Root cause.** Two call sites for one concept, added at different times.
+`memory_tools.memory_search` predates hybrid retrieval and was never revisited
+when the gatherer adopted it. Nothing compared them, and a test of each in
+isolation passes — which is why this survived every round that touched either.
+
+**The part that made an interface untrue.** FIXED-230 gave the owner a **Recall
+backend** choice. It changed the injected context and left `memory_search`
+exactly as it was, so the Memory page described a choice that did not apply to
+the search the assistant ran. A setting that governs half of what reaches the
+model, while presenting as governing recall, is worse than no setting.
+
+**Fix.** `memory_search` calls `retrieve_hybrid_memory`. The reply names the
+strategy, the legs, the embedding space and whether that space is semantic;
+every hit names the legs that found *it*, so a lexical-only match cannot read as
+corroborated by three independent signals. `created_at`, `tags` and `source` are
+now carried on `HybridMemoryResult` from the row it was already built from, so
+the richer path costs the caller nothing the lexical shape gave it.
+
+**User-interface outcome.** The Recall backend card states that the setting
+governs both the memories Raiker recalls on its own and the ones the assistant
+looks up while it works — which it could not honestly say before.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` asserts the tool and the
+gatherer's own call return the same memories in the same order. That is the
+property that was false, and no test asserted it because no test called both.
+
+---
+
+## FIXED-233 — The graph leg of hybrid retrieval never ran on a real turn
+
+**Severity: High. Area: retrieval quality. Closes
+[MEM-12](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** `retrieve_hybrid_memory` presents three legs. The graph leg sits
+inside `if entity_id:`, and the only production caller — the context gatherer —
+never passed one. The leg ran exactly nowhere outside the evaluation harness,
+which is the one caller that *did* pass an `entity_id`, and therefore the reason
+the strategy measured as working.
+
+**Root cause.** The signature required knowledge the caller does not have. A
+turn has the owner's words; it does not have an `entity_id`, and nothing
+resolved one from the other. The parameter was unfillable in practice, so the
+feature was unreachable in practice — while looking, in code and in every
+document, exactly like a feature.
+
+**Fix.** Anchors are resolved from the query. `match_memory_entities` matches
+whole normalized terms — and whole multi-word names appearing in the query —
+against `memory_entities.normalized_name`, reusing the case-folding and
+whitespace collapse `upsert_memory_entity` applies, so "the NAS" and "nas"
+resolve alike. An explicit `entity_id` still wins: a caller that names one is
+asking about that entity rather than about the words.
+
+Three bounds, each with a reason:
+
+* **At most three anchors.** Each is a separate neighborhood query, and a query
+  naming five entities is a broad question the lexical leg answers better.
+* **Whole terms, never substrings.** The first implementation used bare
+  `INSTR(query, name)` and matched "nas" inside "nasty business" — the exact
+  coincidence this must not anchor on, since a traversal seeded from one puts
+  unrelated memories into a turn labelled "recalled". A test caught it; the
+  containment check now pads both sides with spaces.
+* **`max`, not sum, for two anchors reaching one memory.** Two paths to one fact
+  are one fact. Summing would let a densely connected entity outrank an exact
+  lexical hit on nothing but how many edges point at it.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — the decisive case is
+an evidence memory sharing **no token** with the query, unreachable by the
+lexical or hashing-vector legs, returned with `sources == ("graph",)`.
+
+**What it exposes.** The leg works and, on a default install, has nothing to
+walk. That is MEM-06 — the entity graph has no extractor — now the binding
+constraint rather than a second one hidden behind this.
+
+---
+
+## FIXED-234 — The knowledge graph could be looked at, but not asked
+
+**Severity: Medium. Area: agent reach. Closes
+[MEM-13](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** Raiker stores a governed knowledge graph — entities, typed
+relationships, and the approved memory evidencing each edge. It was drawn on the
+Knowledge Map page for a person and consumed internally by the graph leg of
+retrieval. No model-exposed tool could traverse it, so a turn could search
+memory and never ask *what is related to this, and how*.
+
+**Root cause.** `brain_view` is a dashboard method serving the web UI, and the
+graph tables had no tool wrapper. `graph_indexing_runtime` governed *building*
+the graph; nothing read it on the model's behalf.
+
+**Fix.** `knowledge_graph`, gated on that same capability so one owner switch
+covers reading and writing rather than leaving reads ungoverned. Two actions,
+answering two different questions: `entities` discovers by name and returns ids;
+`neighbors` walks one entity's relationships and will resolve a name itself, so
+the model needs no protocol to use it. Bounded at 25 entities and 50 edges — a
+graph read is a context contribution, not a report.
+
+**The governance property, which is the point.** Every edge names the approved
+memory that evidences it, with its confidence and direction. A claim reached
+through the graph is traceable to a sentence the owner approved rather than
+asserted from a topology, and archiving that memory removes the edge. Without
+that the graph would be a back door around memory governance — a forgotten fact
+still readable through its shape. A test asserts exactly this.
+
+**Deliberately not built.** The Knowledge Map *page* stays a human surface. It
+visualises sessions, tasks, approvals, memories and backups, every one of which
+the model already reaches through other tools; a second path to the same facts
+is precisely what FIXED-232 was about.
+
+**User-interface outcome.** None required — an agent-facing capability, whose
+results appear in the transcript under the memory tool family like any other
+recalled material, labelled untrusted.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — discover-then-walk,
+name resolution, and the archived-evidence case.
+
+
+---
+
+## FIXED-235 — The Knowledge Map was a map of the runtime's bookkeeping, not the owner's work
+
+**Severity: High. Area: Knowledge Map.**
+
+**Observed.** The Knowledge Map showed tools. Not chats, not Build sessions, not
+context, not files or folders — tools, and mostly not even real ones.
+
+Measured rather than described. A workspace after a single live round produced
+**22 nodes: 20 typed `tool`, one session, one user.** None of the twenty was a
+tool. They were rows of the event index — "turn started", "model request
+completed", "prompt received" — because `brain_view` emitted one node per event
+and typed every one of them `tool`.
+
+**Reproduce (before).** Hold one conversation, open Knowledge Map. The graph is
+a fan of orange dots labelled with event names hanging off a single green dot.
+Nothing on it is a thing the owner made.
+
+**Root cause.** Four separate omissions that read as one symptom.
+
+*The flood.* `list_event_index(limit=250)` was the map's main input, and every
+row became `BrainNodeView(..., "tool", event.event_type.replace("_", " "), ...)`.
+Events outnumber everything else in a workspace by an order of magnitude, so
+whatever else the map drew was buried under them.
+
+*Chat and Build were the same dot.* `sessions.origin` already distinguishes
+them and `brain_view` never read it. The frontend even defined a `conversation`
+colour that nothing ever emitted.
+
+*Context was never read at all.* `turn_sources` — the citation record, the file
+or page an answer was actually grounded in — is not referenced anywhere in
+`brain_view`. Neither are `session_attachment_refs`, so a file the owner
+uploaded to a chat did not appear either.
+
+*Projects were never drawn.* `project` had a colour, sessions carry a
+`project_id`, and no project node was ever emitted.
+
+A fifth, smaller: a memory whose `source_event_id` fell outside the 250-event
+page was drawn **with no edge at all** — a fact floating free of the work that
+produced it.
+
+**Fix.** The map is built from what the owner did.
+
+* **Tools, aggregated.** `summarize_session_tool_use` groups `tool_actions` by
+  `(session, tool)` in SQL. Forty runs of `read_file` is one node reading "40
+  uses", not forty nodes; a tool whose every run failed says so.
+* **Chat and Build are different nodes.** `origin` selects the node type —
+  `conversation`, `build`, `task_run` — and an origin the map has not been
+  taught about still draws as a generic `session` rather than vanishing.
+* **Context is drawn as what it is.** `turn_sources` becomes nodes typed by
+  kind, so a cited file looks like a file and a fetched page looks like a
+  source. A file cited in three sessions is **one** node with three edges,
+  which is the shared dependency a map exists to reveal.
+* **Attachments appear.** Metadata only — the stored blob is never read to draw
+  a node.
+* **Projects hold their sessions**, and the principal owns the project.
+* **Nothing floats.** A memory whose source event has aged out is anchored by
+  resolving that event to its session in one batch query, and failing that, to
+  the owner. A test asserts no node in the graph is edgeless.
+
+**Found while fixing.** Adding `knowledge_graph` to the delegable set tripped
+`test_subagent_activation`, whose comment says the list is written out longhand
+precisely so a widening must be a deliberate edit rather than something the
+production constant grows quietly. That is the guard working; the edit was made
+with the reason recorded, since the tool is local, read-only, egress-free and
+inherits memory's own scoping.
+
+Also: the first version of the context loop emitted a duplicate node when two
+sessions cited one file — same `node_id`, drawn twice. Caught by the test that
+asserts a shared citation is a single node.
+
+**User-interface outcome.** The filter row lists what the map now contains —
+Chats, Build, Projects, Folders, Files, Context, Tasks, Memories, Tools,
+Approvals — rather than the six types it listed when the map was mostly event
+rows. The counters read "Chats & builds", "Files & folders" and "Context used".
+Build sessions have their own colour.
+
+**Evidence.** `tests/test_knowledge_map_graph.py`. Re-measured on the same
+workspace that produced the 20/22 figure above: the twenty tool nodes are gone
+and the session is typed `conversation`. That workspace genuinely ran no tools,
+so zero tool nodes is the correct answer rather than a smaller wrong one.
+
+---
+
+## FIXED-236 — The citation ledger recorded every reference and could only be read forwards
+
+**Severity: Medium. Area: Reference graph.**
+
+**Observed.** `knowledge_graph` gave a model two actions — find an entity, walk
+its relationships — over the governed memory graph. Both answer questions about
+**claims**: approved sentences, and the typed edges between the things they
+name. Neither answers the question a model actually hits while working in an
+unfamiliar workspace: *what material has this workspace already read, what work
+used it, and what did it say?*
+
+Raiker had the answer and never read it back. `turn_sources` holds one row per
+source a turn used, with the target's `locator`, the tool that fetched it, and
+`passage` — the bounded text that really reached the model. It was read in
+exactly one direction: `load_turn_sources(session_id, …)`, for the citation
+chips under a single answer.
+
+**Reproduce (before).** Ask a model, in a workspace with a dozen conversations
+behind it, "what other work has touched `docs/runbook.md`, and what did it say
+about it?". Every path available to it re-reads the file from disk. The three
+earlier conversations that argued about it are not reachable, and neither is
+the passage the file had *at the time* those conversations read it.
+
+**Root cause.** No missing data and no bug — a table read from one end. Every
+fact needed was already stored and indexed only by the turn that wrote it
+(`idx_turn_sources_turn` on `(session_id, turn_id, ordinal)`), so reading it by
+target meant a full scan and nobody had written the read.
+
+**The reference model, and what was borrowed.**
+[`obsidianmd/obsidian-developer-docs`](https://github.com/obsidianmd/obsidian-developer-docs)
+was reviewed at the owner's suggestion. Obsidian's `MetadataCache` describes
+precisely the reading Raiker was not doing — `resolvedLinks` as
+*source → target → count*, `unresolvedLinks` as its equally first-class other
+half, `getBacklinksForFile()` for the inverse, and block references that resolve
+to a paragraph rather than a document. Three of its properties were taken
+deliberately, each because the obvious build gets it wrong:
+
+* **A link carries a count.** One passing mention and nine references are
+  different facts, and an uncounted edge set ranks them the same.
+* **An unresolved link is reported.** A citation whose file has been deleted is
+  marked, not dropped: "the answer rested on something that is gone" is more
+  useful than a shorter list, and omitting the row makes the work look
+  *ungrounded* rather than grounded in something missing.
+* **A reference resolves to text.** A backlink without a passage is a rumour.
+
+**Fix.** Four owner-scoped reads over the ledger, and two actions over them.
+
+* `list_source_backlinks` — which conversations cited a source, each with its
+  surface (Chat or Build), its reference count, its turn count and whether any
+  stored passage exists.
+* `list_source_outlinks` — what one conversation rested on, one entry per
+  target with a count.
+* `list_co_cited_sources` — what was cited alongside it, weighted by how many
+  conversations needed both.
+* `list_source_passages` — the bounded text the source handed earlier turns.
+* `knowledge_graph action=references` (anchored on a `locator` or a
+  `session_id`) and `action=passages` expose them. Each target is marked
+  `resolved`, `unresolved`, `external` or `attachment`.
+* `RAIKER-2035-turn-source-locator-index` adds `(locator, principal_id)`, since
+  every one of these reads is by target and scoped to one principal.
+
+**Two things deliberately refused.**
+
+*Inferred edges do not touch retrieval.* Co-citation says some work needed both
+of two things, which is much weaker than an authored link. Wiring it into
+scoring would let "these were open together once" reorder a search — topology
+outranking evidence, the exact failure MEM-12's `max`-not-sum rule exists to
+prevent. The reference graph offers a model somewhere to look; it does not
+change what a search returns.
+
+*Passages are dated, not presented as current.* Every one says it is what
+reached a turn at that moment. Left unsaid, a model would quote a months-old
+passage as the present contents of a file it never opened.
+
+**Found while fixing.** Resolution was first gated on the source *kind*, which
+would have reported a deleted document on every repository read: `git_status`
+records kind `repository` with the tool's own name as its locator, so
+`workspace_root / "git_status"` never exists. It is gated on the tool as well
+now — the same pair `resolve_source_excerpt` re-reads from disk — and a test
+holds the case.
+
+Also, in the first live screenshot of the fix: the Knowledge Map's summary pill
+read **"1 nodes • 0 relationships"**. Same defect as the "1 turns" found in the
+previous round's chat-search evidence, in a different view. Both counts are
+pluralized now, in the pill and in the graph's `aria-label`.
+
+**User-interface outcome.** The Knowledge Map draws the unresolved half too. A
+cited file that no longer exists renders hollow with a dashed outline, the way
+an unresolved link renders in a vault, reads **Missing** in the inspector, and
+is searchable as `status:missing`. Previously it was drawn identically to a file
+still on disk.
+
+**Evidence.** `tests/test_reference_graph.py` (16 cases, including the
+cross-account passage read that would be a disclosure rather than a wrong
+answer) and the unresolved-citation case in
+`tests/test_knowledge_map_graph.py`.

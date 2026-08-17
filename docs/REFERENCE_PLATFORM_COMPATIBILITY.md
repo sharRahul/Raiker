@@ -688,6 +688,174 @@ The **read** path is no longer silent about that — see the control set below.
 
 ---
 
+## Agent-reachable memory and knowledge-graph control set
+
+Reviewed **2026-08-17**, second pass, against **Claude Cowork**, **Claude
+Code**, **ChatGPT**, **Codex**, **OpenClaw**, **DeepSeek Harness** and **Hermes
+Agent**. Scope is only one question, asked because it had never been asked
+directly: *of everything Raiker knows, how much can the model itself reach, and
+does what it reaches agree with what the runtime hands it?* Nothing here is a
+claim about the rest of those products.
+
+The audit found three defects, all of the same shape — a capability that
+existed, worked, and was **unreachable or inconsistent from a turn**. None
+would have shown up as a failure; each produced correct output from a weaker
+input than the product had available.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| The agent can search durable memory | Cowork and ChatGPT expose saved-memory recall to the model | `memory_search`, `memory_list`, `memory_get`, in Chat and Build alike — no per-surface filtering | ✅ |
+| The agent can search past conversations | Cowork and ChatGPT recall prior threads | `conversation_search` over the FTS5 index, both sides of an exchange attributed | ✅ |
+| **The agent's search and the runtime's own recall agree** | Not a control any reference product exposes — most have exactly one path | **MEM-11.** They disagreed: `memory_search` ran the lexical index while the ambient recall injected into the *same turn* ran all of hybrid retrieval. Two answers to one question, and the weaker one was the half the model could steer. Both now call `retrieve_hybrid_memory`, and a test asserts the two return the same memories in the same order | ✅ beyond |
+| The agent can traverse a knowledge graph | Cowork surfaces connected work; ChatGPT relates saved memories; Hermes exposes graph tools | **MEM-13.** Raiker stored a governed entity graph, drew it for a person, and consumed it internally — and no tool could walk it. `knowledge_graph` now does: `entities` to discover, `neighbors` to traverse, gated on `graph_indexing_runtime` | ✅ |
+| Every graph edge names its evidence | No reference product does this — a graph edge is a fact about the topology | Each edge carries the **approved memory that evidences it**, its confidence, and its direction, so a claim reached through the graph is traceable to a sentence the owner approved rather than asserted from a shape. Archiving the evidence removes the edge, proven by test | ✅ beyond |
+| A retrieval result says how it was found | Reference products return ranked results without provenance per hit | Every hit names the **legs** that found it (`lexical` / `vector` / `graph`) and the reply names the embedding space searched and whether it can match meaning. A lexical-only hit cannot read as corroborated by three independent signals | ✅ beyond |
+| The owner's retrieval setting governs every path | Not applicable to products with one path | **MEM-11, second half.** Choosing a recall backend changed the injected context and left the model's own search untouched, so the Memory page described a choice that did not apply to half of what reached the model. One setting now governs both, and the card says so | ✅ beyond |
+| Hybrid retrieval actually runs all its legs | Reference products do not describe their retrieval as legged | **MEM-12.** The graph leg was gated on an `entity_id` the only production caller never passed, so the third leg never ran on a real turn. Anchors are now resolved from the query by whole-term match, bounded to three, and reported. Two paths to one memory take `max`, not a sum, so a densely connected entity cannot outrank an exact match on topology | ✅ |
+| Graph anchoring cannot fire on a coincidence | — | Matching is on whole normalized terms with space padding, never `LIKE '%term%'`: "nas" must not anchor on "nasty business". A traversal seeded from a coincidence is worse than no traversal, because it adds unrelated memories to a turn wearing the label "recalled". Asserted by test | ✅ beyond |
+
+### The Knowledge Map — what a map of your work should show
+
+Added **2026-08-17** after the map was found to be showing the runtime's own
+bookkeeping. Measured: 20 of 22 nodes on a real workspace were typed `tool`, and
+none of them was a tool. Compared against how **Claude Cowork**, **ChatGPT**,
+**OpenClaw** and **Hermes Agent** surface the relationship between a
+conversation, the material it used, and the files it touched.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| Conversations are distinguishable by kind | Cowork and ChatGPT separate chats from delegated work in their lists | Chat, Build and task runs are three node types with three colours. `sessions.origin` always knew; the map did not read it. An unknown origin still draws rather than vanishing | ✅ |
+| Work is grouped by project | Cowork groups by project; ChatGPT by folder | Sessions hang from their project node, and the project from the owner | ✅ |
+| The map shows what an answer was grounded in | ChatGPT shows per-message citations; none of the reference products draws them as a **shared graph** | `turn_sources` becomes typed nodes — a cited file looks like a file, a fetched page like a source. A file cited in three sessions is one node with three edges | ✅ beyond |
+| Files the owner attached are visible | Cowork and ChatGPT list attachments per thread | Attachment nodes edged from their session, metadata only — the stored blob is never read to draw a node | ✅ |
+| Tool use is summarised, not enumerated | Reference products show a per-turn activity list, not a graph | One node per `(session, tool)` carrying its use count and whether every run failed. Forty runs of `read_file` is one node reading "40 uses" | ✅ beyond |
+| Nothing on the map floats | Not a control any reference product states | Every node has an anchor. A memory whose source event has aged out of the page is resolved to its session in one batch query, and failing that to the owner. Asserted by a test that walks the whole graph | ✅ beyond |
+
+**Raiker difference.** The reference products present this material as *lists*:
+a thread list, a citation list under a message, an attachment tray. Raiker
+presents it as one graph in which the same file cited by three different
+conversations is visibly one file — which is the question a list cannot answer
+and the reason a map is worth having at all.
+
+**Deliberately still a human surface.** The Knowledge Map page is not exposed to
+the model. Everything on it is reachable through `conversation_search`,
+`memory_search`, `knowledge_graph` and the task and approval tools, so a second
+path would add no capability — and a second path to the same facts is exactly
+the defect MEM-11 was.
+
+### The reference graph — material a model can read, not just a picture
+
+Added **2026-08-17**, third pass, after reviewing
+[`obsidianmd/obsidian-developer-docs`](https://github.com/obsidianmd/obsidian-developer-docs)
+at the owner's suggestion. The question it settled: the knowledge graph Raiker
+had exposed to models was a graph of **claims** — entities and approved
+sentences about them — and a model building an understanding of a workspace also
+needs the graph of **material**: which work used which source, what was used
+beside it, and what that source actually said.
+
+Obsidian's `MetadataCache` turned out to describe exactly the reading Raiker was
+not doing. `turn_sources` already records one row per source a turn used,
+carrying the target's locator and the bounded passage that reached the model —
+`resolvedLinks`, `getBacklinksForFile` and a block reference in one table, read
+only ever forwards, for the chips under a single answer. Nothing was derived;
+the ledger was read from the other end.
+
+Three properties were borrowed deliberately, each because Raiker would have got
+it wrong without them.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| A model can ask what else used a source | Cowork and ChatGPT show citations *under a message*; none exposes the inverse | `knowledge_graph action=references locator=…` returns the conversations that cited it, each with the surface it ran on (Chat or Build) and its own reference count | ✅ beyond |
+| A reference carries a count, not just existence | Obsidian counts references per link; no agent product does | Every edge reports `refs` and `turns`. A conversation that leaned on a file across nine turns and one that glanced at it once are different facts, and collapsing them discards the only signal that says which matters | ✅ beyond |
+| A broken reference is reported, not dropped | `unresolvedLinks` is a first-class half of Obsidian's cache; agent products silently omit dead citations | Resolution is `resolved`, `unresolved`, `external` or `attachment`. A citation whose file has been deleted comes back marked, because "the answer rested on something that is gone" is more useful than a shorter list — and omitting it would make the work look ungrounded rather than grounded in something missing | ✅ beyond |
+| A reference resolves to text, not a document | A citation elsewhere is a link the model must re-open | `action=passages` returns the bounded text the source handed an earlier turn, with its session, turn and capture time. A backlink without a passage is a rumour | ✅ beyond |
+| The text is dated as a snapshot | — | Every passage says it is what reached a turn *then*. Unsaid, a model would quote a year-old passage as the present contents of a file it never opened | ✅ beyond |
+| Related material is weighted by its evidence | A vault's links are authored; Raiker's are inferred | Co-cited sources report `shared_sessions` — the number of conversations that needed both. Nobody wrote these edges, so the strength of the claim travels with it rather than hiding behind a line on a picture | ✅ beyond |
+| Reading references opens nothing new | — | `references` and `passages` re-run no tool, re-read no file, and reach only material that already entered one of this owner's turns. Both are owner-scoped in SQL, and a test asserts another account's passages are unreadable | ✅ |
+| The map shows unresolved references too | Obsidian renders unresolved links distinctly; no agent product draws them | A cited file that no longer exists is drawn hollow with a dashed outline and reads **Missing** in the inspector, searchable as `status:missing` | ✅ beyond |
+
+**Read the table above as scoped to link mechanics, not as a verdict on the
+graph.** Every row is a specific control, and each judgement holds for that
+control. What the table does *not* say — and what a reader would wrongly infer
+from eight rows of "beyond" — is that Raiker's knowledge graph is at parity with
+Obsidian's overall. **It is not.** The rows above cover the half that was
+ported; this is the half that was not.
+
+| Obsidian | Raiker | Status |
+|---|---|---|
+| **Authored links** — a person writes `[[deploy]]` and *states* the relationship | Nothing. There is no way to create an edge by hand anywhere in the product; every edge is inferred from co-citation or extracted from approved memory | ❌ absent |
+| Headings, sections and list items — sub-document structure | Not modelled | ❌ absent |
+| Block references (`^id`) — a stable, addressable anchor into a document | `source_id` is per-turn, not a document anchor, and `passage` is text with no stored coordinates. `locate_passage` re-finds it at open time instead | 🟡 partial |
+| Tags as graph entities | Memories carry tags; tags are neither nodes nor a map filter | ❌ absent |
+| Embeds and transclusion | Not modelled | ❌ absent |
+| Frontmatter and `frontmatterLinks` | Not modelled | ❌ absent |
+| Aliases, and `getFirstLinkpathDest` shortest-path link resolution | No alias table; entity matching is exact whole-term on `normalized_name` | ❌ absent |
+| Unlinked mentions | Not modelled | ❌ absent |
+
+**The difference underneath all of it.** Obsidian graphs a corpus a person
+*authored*, and its unit is a document with internal structure. Raiker graphs
+work it *observed*, and its unit is a citation with no sub-document model at all.
+So even the parity rows above are parity on mechanics over different material: an
+Obsidian edge means *someone said these are related*, and a Raiker edge means
+*some work needed both of these*. That is the much weaker claim, which is why
+co-citation edges are labelled `shared_sessions` rather than presented as links,
+and why the reference graph is not fed into retrieval scoring — an inferred edge
+is good enough to *offer a model somewhere to look* and not good enough to
+*change what a search returns*.
+
+**And one gap the tables understate.** Raiker's knowledge graph has two halves.
+The reference half works on a fresh install because `turn_sources` fills itself.
+The *claims* half — entities and typed relationships — is empty, because MEM-06
+means nothing populates it. The part that most resembles a vault graph is the
+part with no data in it.
+
+**Closing the gap, in effort order.** Tags as graph nodes (low — memories
+already carry them); stored passage offsets, which also settles the
+block-reference row (medium); the MEM-06 extractor (medium, and the binding
+constraint); authored links (medium, but a product question before an
+engineering one — it would make Raiker partly a vault, which may not be what it
+should be).
+
+---
+
+### Categorical confirmation — does this go beyond the reference platforms?
+
+Asked and answered per addition, rather than assumed.
+
+| Addition | Beyond the reference platforms? | Why, categorically |
+|---|---|---|
+| One retrieval path for the agent and the runtime (MEM-11) | **Parity-restoring, not beyond.** | Every reference product has exactly one retrieval path, so none can have this bug. Raiker had two and they disagreed. Fixing it removes a defect Raiker invented for itself; it does not create an advantage. Stated plainly because the alternative is to bank a repair as a differentiator. |
+| Per-hit leg provenance (`sources`) | **Yes, beyond.** | Cowork, ChatGPT, Codex and Claude Code return ranked results; none tells the model *which retrieval mechanism* found each one. It matters because a model weighing whether to trust a recalled fact is currently reasoning from rank alone, and rank conflates "three signals agree" with "one signal is confident". |
+| Evidence-bearing graph edges | **Yes, beyond.** | A knowledge graph elsewhere is a derived structure asserted by the system. Raiker's edges each name an approved memory, so a graph claim is auditable back to owner consent and revocable by archiving that memory. No reference product ties graph topology to a governed approval record. |
+| Naming the embedding space on every reply | **Yes, beyond.** | Reference products do not disclose which embedding answered, because they have one and it does not change. Raiker's is owner-selected and may be a labelled lexical fallback, so not saying would be a claim of semantics it may not have. |
+| Bounded, reported graph anchoring | **Yes, beyond.** | Products with graph retrieval do not disclose *what the traversal started from*. Naming the anchors turns "the graph leg ran" into "it ran from *helios*", which is the difference between a fact a reader can check and one they must accept. |
+| A model-facing graph traversal tool | **Parity.** | Hermes exposes graph tools and Cowork surfaces connected work. Raiker had the data and not the tool; this closes a gap rather than opening a lead. The *governance* of that tool — capability gate, evidence per edge, sensitivity filtering inherited from memory — is where the lead is, and it is listed separately above. |
+| Backlinks over the citation ledger (MEM-14) | **Yes, beyond.** | Cowork, ChatGPT, Codex and Claude Code all show a model what *this* turn used, and none lets it ask what *other* work used the same thing. The inverse is where the value is: it is how a model discovers that a file it just read is the one three earlier conversations argued about, which is a fact no forward citation list can produce. Obsidian has it for a vault of authored notes; no agent product has it for a work history. |
+| Reference counts and co-citation weights | **Yes, beyond.** | Borrowed from Obsidian rather than invented, and beyond the agent field because no reference product models the citation record as a graph at all. Counting matters for the same reason it does in a vault: presence is nearly free and frequency is not, so an uncounted edge set ranks a passing mention with a dependency. |
+| Unresolved references reported rather than dropped | **Yes, beyond.** | The reference platforms drop dead citations silently, which is the failure mode that looks like success — the work reads as ungrounded rather than as grounded in something deleted. Raiker reports four resolution states and refuses to guess about targets it never held, calling a web page `external` rather than `unresolved`. |
+| Stored passages, dated as snapshots | **Yes, beyond.** | Two claims at once. That a reference resolves to *text* rather than to a document is Obsidian's block reference applied to a citation record. That the text is labelled as what reached a turn at a moment is Raiker's own: it is the difference between a quotation and an unchecked assertion about a file's present contents, and a model given the first without the second will make the second. |
+| Refusing to feed inferred edges into retrieval | **A restraint, not a capability.** | Recorded because the opposite is the tempting build. Co-citation edges are inferred, and wiring them into scoring would let "these two files were open together once" reorder a search — topology outranking evidence, which is the failure MEM-12's `max`-not-sum rule already exists to prevent. The reference graph offers a model somewhere to look; it does not change what a search returns. |
+
+**Deliberately not built, with the reason.** The **Knowledge Map** page stays a
+human surface. It is a visualisation of sessions, tasks, approvals, memories and
+backups — every one of which the model already reaches through
+`conversation_search`, `memory_search`, `knowledge_graph`, and the task and
+approval tools. Exposing it again as a tool would be a second path to the same
+facts with no new capability, and a second path is exactly what MEM-11 was.
+The *knowledge graph* is the part that was genuinely unreachable, and that is
+what `knowledge_graph` covers.
+
+**Still open.** Semantic recall remains off on a default install (MEM-10), so
+the vector leg is the labelled lexical fallback until an owner selects a model —
+which means the paraphrase case is still answered by the graph leg or not at
+all. `MEM-04`, `MEM-06` through `MEM-09` are unchanged by this round; MEM-06 in
+particular is load-bearing here, because the graph leg now works and **nothing
+populates the graph** on a default install, so it is reachable and empty.
+
+---
+
 ## Text search and memory retrieval control set
 
 Reviewed **2026-08-17** while migrating full-text search from FTS4 to FTS5

@@ -471,6 +471,18 @@ npm run build     # exit 0
   and tool names only. Opening a citation re-resolves it *now* — a changed file
   reports `source_changed` and is shown without a highlight rather than with one
   near where the passage used to be.
+- The same ledger is readable as a reference graph (MEM-14 / FIXED-236).
+  `turn_sources` was only ever read forwards, for the chips under one answer;
+  read by target it answers which conversations cited a source, what was cited
+  alongside it, and what text it handed those turns.
+  `knowledge_graph action=references|passages` exposes that to a model, scoped to
+  the owner in SQL and reaching only material that already entered one of their
+  turns — it re-runs no tool and re-reads no file. Targets are marked `resolved`,
+  `unresolved`, `external` or `attachment`, following Obsidian's rule that an
+  unresolved link is reported rather than dropped; the Knowledge Map draws that
+  state as a hollow, dashed node. Co-citation edges carry the number of
+  conversations behind them and deliberately do **not** feed retrieval scoring —
+  an inferred edge may offer somewhere to look, never reorder a search.
 - The phased contract for the remaining archive-first eidetic-memory work is
   [HYBRID_MEMORY_IMPLEMENTATION_PLAN.md](HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
   It keeps SQLite authoritative, separates project hierarchy from entity graph,

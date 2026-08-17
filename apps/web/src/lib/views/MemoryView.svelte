@@ -231,6 +231,15 @@
         Which embedding Raiker compares your question against. Only one is searched at a
         time — comparing two different embeddings produces a similarity that means nothing.
       </p>
+      <!-- MEM-11 — this sentence became true in the same change that made it
+           worth saying. The setting used to govern only the memories Raiker
+           attaches to a turn on its own; the search the assistant ran itself
+           ignored it, so this card described a choice that did not apply to
+           half of what reached the model. -->
+      <p class="control-note">
+        Applies both to the memories Raiker recalls on its own and to the ones the
+        assistant looks up while it works.
+      </p>
       <p class="posture-line" data-semantic={retrieval.semantic}>
         <Icon name={retrieval.semantic ? "check" : "info"} size={14} />
         {#if retrieval.semantic}
@@ -329,6 +338,8 @@
   .posture-line :global(svg) { flex:none; align-self:center; color:var(--warn,var(--text-3)); }
   .posture-line[data-semantic="true"] :global(svg) { color:var(--ok,var(--text-3)); }
   .backend-field { flex:none; min-width:14rem; }
+  /* A secondary clause under the lead, not a second lead. */
+  .control-note { margin-top:var(--space-2) !important; font-size:.82rem; color:var(--text-3) !important; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able

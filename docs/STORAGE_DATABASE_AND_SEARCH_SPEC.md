@@ -464,7 +464,39 @@ Raiker search combines:
 | memory keyword search | SQLite full-text index over memory_records (**FTS5**, BM25-ranked — see note below) |
 | semantic search | vector backend + metadata filters |
 | graph search | SQLite graph tables + recursive CTEs |
+| reference search | SQLite `turn_sources`, read by target (MEM-14 — see below) |
 | code symbols | LSP/symbol extraction + graph_nodes |
+
+---
+
+## The citation ledger, read as a reference graph
+
+`turn_sources` holds one row per source a turn actually used: the target's
+`locator`, the tool that fetched it, and `passage`, the bounded text that
+reached the model. It was written for the citation chips under one answer and
+read only in that direction — `load_turn_sources(session_id, …)`.
+
+Read by *target* it is a link table, and MEM-14 adds the four owner-scoped reads
+that do so. Nothing is derived; each is an aggregation of rows already stored.
+
+| Read | Answers | Grouping |
+|---|---|---|
+| `list_source_backlinks(locator)` | which conversations cited this, and how often | per citing session, with `refs`, `turns` and whether any passage exists |
+| `list_source_outlinks(session_id)` | what this conversation rested on | per target locator |
+| `list_co_cited_sources(locator)` | what was cited alongside it | per co-cited locator, weighted by `shared_sessions` |
+| `list_source_passages(locator)` | what the source actually said | most recent first, bounded |
+
+`RAIKER-2035-turn-source-locator-index` adds `(locator, principal_id)`. Every
+one of these reads is by target and scoped to one principal; the pre-existing
+`idx_turn_sources_turn` is keyed by the writing turn and cannot serve them, and
+the co-citation self-join needs the index twice.
+
+`knowledge_graph action=references|passages` is the model-facing surface. Each
+target is reported as `resolved`, `unresolved`, `external` or `attachment` —
+four states rather than two, because a locator only names a workspace path when
+the recording tool was one that reads files. `git_status` records kind
+`repository` with the tool's own name as its locator, so testing the kind alone
+would report a deleted document on every repository read.
 
 ---
 

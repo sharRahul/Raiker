@@ -58,6 +58,10 @@ onwards are open.
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
 | [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium | Retrieval quality | Open — raised 2026-08-17 |
+| [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
+| [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
+| [MEM-13](#mem-13--the-knowledge-graph-was-drawn-for-a-person-and-unreachable-from-a-turn) | Medium | Agent reach | Fixed 2026-08-17 |
+| [MEM-14](#mem-14--the-citation-ledger-could-only-be-read-forwards) | Medium | Agent reach | Fixed 2026-08-17 |
 
 ---
 
@@ -481,6 +485,204 @@ download as an owner choice with its cost stated, never fetches on its own, and
 after a backfill says which space is in force and how many memories are
 reachable in it. An owner who declines sees exactly what they see today,
 including the sentence about what the fallback cannot do.
+
+
+---
+
+## MEM-11 — The agent's own memory search and the runtime's recall disagreed
+
+**Severity: High. Area: retrieval consistency. Status: fixed 2026-08-17.**
+
+**Observed.** In one turn, two different answers to the same question reached
+the model. The context gatherer injected "Recalled owner context" built by
+`retrieve_hybrid_memory` — lexical, vector and graph. The `memory_search` tool
+the model could actually call ran `search_memory`, which is the lexical index
+and nothing else. The weaker of the two was the half the model could steer.
+
+The second half of the defect was worse, because it made an interface untrue:
+choosing a **Recall backend** on the Memory page (MEM-03/FIXED-230) changed the
+injected context and left `memory_search` exactly as it was. The page described
+a choice that did not apply to the search the assistant ran.
+
+**Reproduce (before).** Approve a memory, project a vector for it, then compare
+`memory_search("…")` against `retrieve_hybrid_memory(query="…")` for the same
+query. The tool returns a subset, ordered differently, with no vector hits.
+
+**Root cause.** Two call sites for one concept, added at different times.
+`memory_tools.memory_search` predates hybrid retrieval and was never revisited
+when the gatherer adopted it, and nothing compared the two — a test of each in
+isolation passes.
+
+**Fix.** `memory_search` calls `retrieve_hybrid_memory`. The reply names the
+strategy, the legs, the embedding space and whether that space is semantic;
+every hit names the legs that found *it*, so a lexical-only match cannot read as
+corroborated by three independent signals. `created_at`, `tags` and `source` —
+which the lexical shape returned — are carried on `HybridMemoryResult` from the
+row it was already built from, so routing through hybrid retrieval costs the
+caller nothing it had.
+
+**User-interface outcome.** The Recall backend card states that the setting
+governs both the memories Raiker recalls on its own and the ones the assistant
+looks up while it works. It could not honestly say that before.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — the first test asserts
+the tool and the gatherer's own call return the same memories in the same order,
+which is the property that was false.
+
+---
+
+## MEM-12 — The graph leg was gated on an anchor no caller ever supplied
+
+**Severity: High. Area: retrieval quality. Status: fixed 2026-08-17.**
+
+**Observed.** `retrieve_hybrid_memory` presents three legs. The graph leg is
+inside `if entity_id:`, and the only production caller — the context gatherer —
+calls it as `retrieve_hybrid_memory(store=…, query=…, limit=6,
+owner_principal_id=…)`, with no `entity_id`. The leg never ran on a real turn.
+The only caller that ever passed one was the evaluation harness, which is why
+the strategy measured as working.
+
+**Reproduce (before).** Approve a memory whose text shares no token with a
+query, link it to an entity the query names, and search. Nothing returns: the
+lexical leg cannot match, the hashing vector leg cannot match, and the graph leg
+is skipped.
+
+**Root cause.** The signature required knowledge the caller does not have. A
+turn has the owner's words; it does not have an `entity_id`. Nothing resolved
+one from the other, so the parameter was unfillable in practice.
+
+**Fix.** Anchors are resolved from the query. `match_memory_entities` matches
+whole normalized terms — and whole multi-word names inside the query — against
+`memory_entities.normalized_name`, using the same case-folding and whitespace
+collapse `upsert_memory_entity` applies. An explicit `entity_id` still wins,
+because a caller that names one is asking about that entity rather than about
+the words.
+
+Three deliberate bounds:
+
+* **At most three anchors.** Each is a separate neighborhood query, and a query
+  naming five entities is a broad question the lexical leg answers better.
+* **Whole-term matching, never substring.** `LIKE '%nas%'` would anchor on
+  "nasty business", and a traversal seeded from a coincidence is worse than no
+  traversal: it puts unrelated memories into a turn's context labelled
+  "recalled". The containment check pads both sides with spaces so only a whole
+  term can match. The first implementation got this wrong and a test caught it.
+* **`max`, not sum, when two anchors reach one memory.** Two paths to one fact
+  are one fact. Summing would let a densely connected entity outrank an exact
+  lexical hit on nothing more than how many edges point at it.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — including the case
+this entry describes: an evidence memory sharing **no token** with the query,
+reachable only by traversal, returned with `sources == ("graph",)`.
+
+**What this exposes.** The leg now works and, on a default install, has nothing
+to walk — nothing populates the entity graph. That is
+[MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it),
+unchanged, and it is now the binding constraint rather than a second one behind
+this.
+
+---
+
+## MEM-13 — The knowledge graph was drawn for a person and unreachable from a turn
+
+**Severity: Medium. Area: agent reach. Status: fixed 2026-08-17.**
+
+**Observed.** Raiker stores a governed knowledge graph: entities, typed
+relationships, and the approved memory that evidences each edge. It was rendered
+on the Knowledge Map page for a person to look at, and consumed internally by
+the graph leg of retrieval. No model-exposed tool could traverse it. A turn
+could search memory and never ask *what is related to this, and how*.
+
+**Reproduce (before).** Ask a Chat or Build turn what a stored entity is related
+to. The model can only find memories whose text mentions it; the relationships
+are invisible.
+
+**Root cause.** `brain_view` is a dashboard method serving the web UI, and the
+graph tables had no tool wrapper. The capability `graph_indexing_runtime`
+governed *building* the graph and nothing read it on the model's behalf.
+
+**Fix.** `knowledge_graph`, gated on the same `graph_indexing_runtime` so one
+owner switch covers reading and writing. Two actions, because they answer two
+questions: `entities` discovers by name and returns ids; `neighbors` walks one
+entity's relationships and accepts a name to resolve, so the model needs no
+protocol. Bounded at 25 entities and 50 edges — a graph read is a context
+contribution, not a report.
+
+Every edge carries the **approved memory that evidences it**, its confidence and
+its direction. That is the governance property worth stating: a claim reached
+through the graph is traceable to a sentence the owner approved rather than
+asserted from a topology, and archiving that memory removes the edge. Without
+it the graph would be a back door around memory governance — a forgotten fact
+still readable through its shape.
+
+**Deliberately not built.** The Knowledge Map *page* stays a human surface. It
+visualises sessions, tasks, approvals, memories and backups, all of which the
+model already reaches through other tools; a second path to the same facts is
+exactly what MEM-11 was.
+
+**User-interface outcome.** None required — this is an agent-facing capability,
+and its results appear in the transcript under the memory tool family like any
+other recalled material, labelled untrusted.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — the discover-then-walk
+sequence, name resolution, and the test that archiving the evidence removes the
+edge.
+
+---
+
+## MEM-14 — The citation ledger could only be read forwards
+
+**Severity: Medium. Area: agent reach. Status: fixed 2026-08-17.**
+
+**Observed.** MEM-13 gave a model a graph of **claims**. A model working in an
+unfamiliar workspace also needs the graph of **material**: which work used which
+source, what was used beside it, and what that source said at the time. Raiker
+recorded all three and read none of them back.
+
+`turn_sources` holds one row per source a turn used — the target's `locator`,
+the tool that fetched it, and `passage`, the bounded text that really reached
+the model. It was read in exactly one direction, `load_turn_sources(session_id,
+…)`, for the citation chips under a single answer.
+
+**Reproduce (before).** In a workspace with a dozen conversations behind it, ask
+a turn what other work has touched `docs/runbook.md` and what it said. Every
+available path re-reads the file from disk. The earlier conversations are
+unreachable, and so is the version of the passage those conversations saw.
+
+**Root cause.** No missing data and no bug — a table read from one end. Every
+fact was stored, indexed only by the turn that wrote it, so reading by target
+meant a full scan and nobody had written the read.
+
+**Reference model.** `obsidianmd/obsidian-developer-docs`, reviewed at the
+owner's suggestion. Obsidian's `MetadataCache` names the reading Raiker was not
+doing: `resolvedLinks` as *source → target → count*, `unresolvedLinks` as its
+equally first-class other half, `getBacklinksForFile()` for the inverse, and
+block references that resolve to a paragraph rather than a document. Three
+properties were taken deliberately — a link carries a count, an unresolved link
+is reported rather than dropped, and a reference resolves to text.
+
+**Fix.** Four owner-scoped reads (`list_source_backlinks`,
+`list_source_outlinks`, `list_co_cited_sources`, `list_source_passages`), a
+`(locator, principal_id)` index, and two `knowledge_graph` actions over them:
+`references`, anchored on a locator or a session, and `passages`. Each target is
+marked `resolved`, `unresolved`, `external` or `attachment` — four states, not
+two, because calling a web page unresolved for not being on this disk would be a
+claim about the internet.
+
+**Deliberately not built.** Co-citation edges are **not** fed into retrieval
+scoring. They say some work needed both of two things, which is far weaker than
+an authored link, and letting that reorder a search would put topology above
+evidence — the failure MEM-12's `max`-not-sum rule already exists to prevent.
+
+**User-interface outcome.** The Knowledge Map draws the unresolved half. A cited
+file that no longer exists renders hollow with a dashed outline, reads
+**Missing** in the inspector, and is searchable as `status:missing`; it used to
+be indistinguishable from a file still on disk.
+
+**Evidence.** `tests/test_reference_graph.py`, including the cross-account
+passage read — the one case here that would be a disclosure rather than a wrong
+answer — and the unresolved-citation case in
+`tests/test_knowledge_map_graph.py`.
 
 
 Recorded so the entries above are read against the right baseline. Confirmed by

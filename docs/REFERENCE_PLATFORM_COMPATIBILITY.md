@@ -688,6 +688,65 @@ The **read** path is no longer silent about that — see the control set below.
 
 ---
 
+## Agent-reachable memory and knowledge-graph control set
+
+Reviewed **2026-08-17**, second pass, against **Claude Cowork**, **Claude
+Code**, **ChatGPT**, **Codex**, **OpenClaw**, **DeepSeek Harness** and **Hermes
+Agent**. Scope is only one question, asked because it had never been asked
+directly: *of everything Raiker knows, how much can the model itself reach, and
+does what it reaches agree with what the runtime hands it?* Nothing here is a
+claim about the rest of those products.
+
+The audit found three defects, all of the same shape — a capability that
+existed, worked, and was **unreachable or inconsistent from a turn**. None
+would have shown up as a failure; each produced correct output from a weaker
+input than the product had available.
+
+Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
+
+| Control | Market bar | Raiker implementation | Status |
+|---|---|---|---|
+| The agent can search durable memory | Cowork and ChatGPT expose saved-memory recall to the model | `memory_search`, `memory_list`, `memory_get`, in Chat and Build alike — no per-surface filtering | ✅ |
+| The agent can search past conversations | Cowork and ChatGPT recall prior threads | `conversation_search` over the FTS5 index, both sides of an exchange attributed | ✅ |
+| **The agent's search and the runtime's own recall agree** | Not a control any reference product exposes — most have exactly one path | **MEM-11.** They disagreed: `memory_search` ran the lexical index while the ambient recall injected into the *same turn* ran all of hybrid retrieval. Two answers to one question, and the weaker one was the half the model could steer. Both now call `retrieve_hybrid_memory`, and a test asserts the two return the same memories in the same order | ✅ beyond |
+| The agent can traverse a knowledge graph | Cowork surfaces connected work; ChatGPT relates saved memories; Hermes exposes graph tools | **MEM-13.** Raiker stored a governed entity graph, drew it for a person, and consumed it internally — and no tool could walk it. `knowledge_graph` now does: `entities` to discover, `neighbors` to traverse, gated on `graph_indexing_runtime` | ✅ |
+| Every graph edge names its evidence | No reference product does this — a graph edge is a fact about the topology | Each edge carries the **approved memory that evidences it**, its confidence, and its direction, so a claim reached through the graph is traceable to a sentence the owner approved rather than asserted from a shape. Archiving the evidence removes the edge, proven by test | ✅ beyond |
+| A retrieval result says how it was found | Reference products return ranked results without provenance per hit | Every hit names the **legs** that found it (`lexical` / `vector` / `graph`) and the reply names the embedding space searched and whether it can match meaning. A lexical-only hit cannot read as corroborated by three independent signals | ✅ beyond |
+| The owner's retrieval setting governs every path | Not applicable to products with one path | **MEM-11, second half.** Choosing a recall backend changed the injected context and left the model's own search untouched, so the Memory page described a choice that did not apply to half of what reached the model. One setting now governs both, and the card says so | ✅ beyond |
+| Hybrid retrieval actually runs all its legs | Reference products do not describe their retrieval as legged | **MEM-12.** The graph leg was gated on an `entity_id` the only production caller never passed, so the third leg never ran on a real turn. Anchors are now resolved from the query by whole-term match, bounded to three, and reported. Two paths to one memory take `max`, not a sum, so a densely connected entity cannot outrank an exact match on topology | ✅ |
+| Graph anchoring cannot fire on a coincidence | — | Matching is on whole normalized terms with space padding, never `LIKE '%term%'`: "nas" must not anchor on "nasty business". A traversal seeded from a coincidence is worse than no traversal, because it adds unrelated memories to a turn wearing the label "recalled". Asserted by test | ✅ beyond |
+
+### Categorical confirmation — does this go beyond the reference platforms?
+
+Asked and answered per addition, rather than assumed.
+
+| Addition | Beyond the reference platforms? | Why, categorically |
+|---|---|---|
+| One retrieval path for the agent and the runtime (MEM-11) | **Parity-restoring, not beyond.** | Every reference product has exactly one retrieval path, so none can have this bug. Raiker had two and they disagreed. Fixing it removes a defect Raiker invented for itself; it does not create an advantage. Stated plainly because the alternative is to bank a repair as a differentiator. |
+| Per-hit leg provenance (`sources`) | **Yes, beyond.** | Cowork, ChatGPT, Codex and Claude Code return ranked results; none tells the model *which retrieval mechanism* found each one. It matters because a model weighing whether to trust a recalled fact is currently reasoning from rank alone, and rank conflates "three signals agree" with "one signal is confident". |
+| Evidence-bearing graph edges | **Yes, beyond.** | A knowledge graph elsewhere is a derived structure asserted by the system. Raiker's edges each name an approved memory, so a graph claim is auditable back to owner consent and revocable by archiving that memory. No reference product ties graph topology to a governed approval record. |
+| Naming the embedding space on every reply | **Yes, beyond.** | Reference products do not disclose which embedding answered, because they have one and it does not change. Raiker's is owner-selected and may be a labelled lexical fallback, so not saying would be a claim of semantics it may not have. |
+| Bounded, reported graph anchoring | **Yes, beyond.** | Products with graph retrieval do not disclose *what the traversal started from*. Naming the anchors turns "the graph leg ran" into "it ran from *helios*", which is the difference between a fact a reader can check and one they must accept. |
+| A model-facing graph traversal tool | **Parity.** | Hermes exposes graph tools and Cowork surfaces connected work. Raiker had the data and not the tool; this closes a gap rather than opening a lead. The *governance* of that tool — capability gate, evidence per edge, sensitivity filtering inherited from memory — is where the lead is, and it is listed separately above. |
+
+**Deliberately not built, with the reason.** The **Knowledge Map** page stays a
+human surface. It is a visualisation of sessions, tasks, approvals, memories and
+backups — every one of which the model already reaches through
+`conversation_search`, `memory_search`, `knowledge_graph`, and the task and
+approval tools. Exposing it again as a tool would be a second path to the same
+facts with no new capability, and a second path is exactly what MEM-11 was.
+The *knowledge graph* is the part that was genuinely unreachable, and that is
+what `knowledge_graph` covers.
+
+**Still open.** Semantic recall remains off on a default install (MEM-10), so
+the vector leg is the labelled lexical fallback until an owner selects a model —
+which means the paraphrase case is still answered by the graph leg or not at
+all. `MEM-04`, `MEM-06` through `MEM-09` are unchanged by this round; MEM-06 in
+particular is load-bearing here, because the graph leg now works and **nothing
+populates the graph** on a default install, so it is reachable and empty.
+
+---
+
 ## Text search and memory retrieval control set
 
 Reviewed **2026-08-17** while migrating full-text search from FTS4 to FTS5

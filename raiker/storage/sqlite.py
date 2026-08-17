@@ -6176,6 +6176,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (entity_id, normalized_name, name.strip(), entity_type.strip(), now, now),
             )
 
+    def match_memory_entities(self, query: str, *, limit: int = 3) -> list[dict[str, Any]]:
+        """Entities this query actually names (MEM-12).
+
+        The graph leg of hybrid retrieval needs somewhere to start, and until now
+        the only way to give it one was for the caller to already know an
+        ``entity_id`` — which the context gatherer never does, so the leg never
+        ran on a real turn. This resolves the anchor from the words the owner
+        typed.
+
+        Matching is on ``normalized_name`` against whole query terms, using the
+        same case-folding and whitespace collapse ``upsert_memory_entity``
+        applies, so "the NAS" and "nas" resolve alike. Deliberately **not** a
+        substring or prefix match: `LIKE '%term%'` over an unindexed column
+        would make "id" match every entity containing those two letters, and a
+        graph traversal seeded from a coincidence is worse than no traversal —
+        it adds unrelated memories to a turn's context wearing the label
+        "recalled".
+
+        A multi-word entity ("encrypted nas") is matched by its whole normalized
+        name appearing in the query, which is why the full query is compared as
+        well as each term.
+        """
+        if limit < 1:
+            return []
+        collapsed = " ".join(query.casefold().split())
+        if not collapsed:
+            return []
+        terms = {term for term in collapsed.split() if len(term) >= 3}
+        if not terms:
+            return []
+        placeholders = ",".join("?" for _ in terms)
+        with self.connect() as connection:
+            rows = connection.execute(
+                # The padding is what makes the containment check a *word*
+                # match. Bare `INSTR(query, name)` matches "nas" inside "nasty
+                # business", which is precisely the coincidence this method
+                # exists not to anchor a graph traversal on. Wrapping both sides
+                # in spaces means only a whole term, or a whole multi-word name,
+                # can match.
+                f"""SELECT entity_id, display_name, entity_type, normalized_name
+                    FROM memory_entities
+                    WHERE normalized_name IN ({placeholders})
+                       OR (INSTR(' ' || ? || ' ', ' ' || normalized_name || ' ') > 0
+                           AND LENGTH(normalized_name) >= 3)
+                    ORDER BY LENGTH(normalized_name) DESC, normalized_name
+                    LIMIT ?""",
+                [*sorted(terms), collapsed, limit],
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def link_memory_entities(
         self, relationship_id: str, subject_entity_id: str, predicate: str, object_entity_id: str,
         evidence_memory_id: str, confidence: float,

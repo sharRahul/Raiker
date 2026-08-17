@@ -233,6 +233,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-229](#fixed-229--a-governed-command-could-not-outlive-its-turn-and-nothing-could-be-typed-into-one) | High | Shell / background execution (BUG-194) | Fixed |
 | [FIXED-230](#fixed-230--the-vector-leg-searched-one-embedding-space-and-the-query-was-embedded-in-another) | High | Memory retrieval (MEM-03) | Fixed |
 | [FIXED-231](#fixed-231--full-text-search-ranked-by-time-because-a-plan-document-said-fts5-was-unavailable) | High | Text search / retrieval (MEM-05) | Fixed |
+| [FIXED-232](#fixed-232--the-agents-memory-search-and-the-runtimes-recall-were-two-different-searches) | High | Retrieval consistency (MEM-11) | Fixed |
+| [FIXED-233](#fixed-233--the-graph-leg-of-hybrid-retrieval-never-ran-on-a-real-turn) | High | Retrieval quality (MEM-12) | Fixed |
+| [FIXED-234](#fixed-234--the-knowledge-graph-could-be-looked-at-but-not-asked) | Medium | Agent reach (MEM-13) | Fixed |
 | FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
 | FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
 | FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
@@ -9229,3 +9232,133 @@ first, the conversation snippet still marked, and the integrity report clean.
 The FTS4 fallback is exercised rather than assumed, because no runner Raiker
 targets has an FTS5-less build and it would otherwise be dead code that fails
 only on someone else's machine.
+
+
+---
+
+## FIXED-232 — The agent's memory search and the runtime's recall were two different searches
+
+**Severity: High. Area: retrieval consistency. Closes
+[MEM-11](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** One turn, two answers to the same question. The context gatherer
+injected "Recalled owner context" built by `retrieve_hybrid_memory` — lexical,
+vector and graph. The `memory_search` tool the model could actually call ran
+`search_memory`: the lexical index and nothing else. The weaker of the two was
+the half the model could steer.
+
+**Root cause.** Two call sites for one concept, added at different times.
+`memory_tools.memory_search` predates hybrid retrieval and was never revisited
+when the gatherer adopted it. Nothing compared them, and a test of each in
+isolation passes — which is why this survived every round that touched either.
+
+**The part that made an interface untrue.** FIXED-230 gave the owner a **Recall
+backend** choice. It changed the injected context and left `memory_search`
+exactly as it was, so the Memory page described a choice that did not apply to
+the search the assistant ran. A setting that governs half of what reaches the
+model, while presenting as governing recall, is worse than no setting.
+
+**Fix.** `memory_search` calls `retrieve_hybrid_memory`. The reply names the
+strategy, the legs, the embedding space and whether that space is semantic;
+every hit names the legs that found *it*, so a lexical-only match cannot read as
+corroborated by three independent signals. `created_at`, `tags` and `source` are
+now carried on `HybridMemoryResult` from the row it was already built from, so
+the richer path costs the caller nothing the lexical shape gave it.
+
+**User-interface outcome.** The Recall backend card states that the setting
+governs both the memories Raiker recalls on its own and the ones the assistant
+looks up while it works — which it could not honestly say before.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` asserts the tool and the
+gatherer's own call return the same memories in the same order. That is the
+property that was false, and no test asserted it because no test called both.
+
+---
+
+## FIXED-233 — The graph leg of hybrid retrieval never ran on a real turn
+
+**Severity: High. Area: retrieval quality. Closes
+[MEM-12](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** `retrieve_hybrid_memory` presents three legs. The graph leg sits
+inside `if entity_id:`, and the only production caller — the context gatherer —
+never passed one. The leg ran exactly nowhere outside the evaluation harness,
+which is the one caller that *did* pass an `entity_id`, and therefore the reason
+the strategy measured as working.
+
+**Root cause.** The signature required knowledge the caller does not have. A
+turn has the owner's words; it does not have an `entity_id`, and nothing
+resolved one from the other. The parameter was unfillable in practice, so the
+feature was unreachable in practice — while looking, in code and in every
+document, exactly like a feature.
+
+**Fix.** Anchors are resolved from the query. `match_memory_entities` matches
+whole normalized terms — and whole multi-word names appearing in the query —
+against `memory_entities.normalized_name`, reusing the case-folding and
+whitespace collapse `upsert_memory_entity` applies, so "the NAS" and "nas"
+resolve alike. An explicit `entity_id` still wins: a caller that names one is
+asking about that entity rather than about the words.
+
+Three bounds, each with a reason:
+
+* **At most three anchors.** Each is a separate neighborhood query, and a query
+  naming five entities is a broad question the lexical leg answers better.
+* **Whole terms, never substrings.** The first implementation used bare
+  `INSTR(query, name)` and matched "nas" inside "nasty business" — the exact
+  coincidence this must not anchor on, since a traversal seeded from one puts
+  unrelated memories into a turn labelled "recalled". A test caught it; the
+  containment check now pads both sides with spaces.
+* **`max`, not sum, for two anchors reaching one memory.** Two paths to one fact
+  are one fact. Summing would let a densely connected entity outrank an exact
+  lexical hit on nothing but how many edges point at it.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — the decisive case is
+an evidence memory sharing **no token** with the query, unreachable by the
+lexical or hashing-vector legs, returned with `sources == ("graph",)`.
+
+**What it exposes.** The leg works and, on a default install, has nothing to
+walk. That is MEM-06 — the entity graph has no extractor — now the binding
+constraint rather than a second one hidden behind this.
+
+---
+
+## FIXED-234 — The knowledge graph could be looked at, but not asked
+
+**Severity: Medium. Area: agent reach. Closes
+[MEM-13](MEMORY_RELIABILITY_PLAN.md).**
+
+**Observed.** Raiker stores a governed knowledge graph — entities, typed
+relationships, and the approved memory evidencing each edge. It was drawn on the
+Knowledge Map page for a person and consumed internally by the graph leg of
+retrieval. No model-exposed tool could traverse it, so a turn could search
+memory and never ask *what is related to this, and how*.
+
+**Root cause.** `brain_view` is a dashboard method serving the web UI, and the
+graph tables had no tool wrapper. `graph_indexing_runtime` governed *building*
+the graph; nothing read it on the model's behalf.
+
+**Fix.** `knowledge_graph`, gated on that same capability so one owner switch
+covers reading and writing rather than leaving reads ungoverned. Two actions,
+answering two different questions: `entities` discovers by name and returns ids;
+`neighbors` walks one entity's relationships and will resolve a name itself, so
+the model needs no protocol to use it. Bounded at 25 entities and 50 edges — a
+graph read is a context contribution, not a report.
+
+**The governance property, which is the point.** Every edge names the approved
+memory that evidences it, with its confidence and direction. A claim reached
+through the graph is traceable to a sentence the owner approved rather than
+asserted from a topology, and archiving that memory removes the edge. Without
+that the graph would be a back door around memory governance — a forgotten fact
+still readable through its shape. A test asserts exactly this.
+
+**Deliberately not built.** The Knowledge Map *page* stays a human surface. It
+visualises sessions, tasks, approvals, memories and backups, every one of which
+the model already reaches through other tools; a second path to the same facts
+is precisely what FIXED-232 was about.
+
+**User-interface outcome.** None required — an agent-facing capability, whose
+results appear in the transcript under the memory tool family like any other
+recalled material, labelled untrusted.
+
+**Evidence.** `tests/test_model_facing_memory_graph.py` — discover-then-walk,
+name resolution, and the archived-evidence case.

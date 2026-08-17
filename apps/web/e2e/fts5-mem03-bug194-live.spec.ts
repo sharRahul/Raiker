@@ -79,6 +79,17 @@ test("Memory names the embedding space recall actually searches (MEM-03)", async
   const picker = card.getByLabel("Recall backend");
   await expect(picker).toHaveValue("auto");
 
+  // MEM-11 — the setting used to govern only the memories Raiker attaches on
+  // its own; the search the assistant ran itself ignored it. The card may only
+  // make this claim now that both paths go through one retrieval.
+  // A plain string, not a regex: Playwright normalizes whitespace for string
+  // matchers and does not for regex ones, and this sentence wraps in the
+  // source — so the regex form fails against the raw text node for a reason
+  // that has nothing to do with the product.
+  await expect(card.locator("p.control-note")).toContainText(
+    "recalls on its own and to the ones the assistant looks up",
+  );
+
   await page.screenshot({
     path: `${SHOTS}/r0817-01-memory-recall-backend.png`,
     fullPage: true,

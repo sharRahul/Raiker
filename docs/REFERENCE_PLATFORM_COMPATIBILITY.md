@@ -654,7 +654,7 @@ linking) and provenance.
 | mem0 concept | Raiker specification |
 |---|---|
 | `add` memory from interactions (candidate-first) | `docs/MEMORY_GOVERNANCE_RULES.md`, `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
-| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS4 + vector metadata; no BM25) |
+| `search` (semantic + keyword hybrid) | `docs/STORAGE_DATABASE_AND_SEARCH_SPEC.md` (FTS5 + BM25 + vector metadata) |
 | `retrieve` filtered by scope/metadata | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | User / session / agent memory scopes | `docs/MEMORY_AND_CONTEXT_STRATEGY.md` |
 | Provenance + confidence scoring | `docs/MEMORY_GOVERNANCE_RULES.md` |

@@ -321,8 +321,11 @@ key identifiers, retention/legal-hold state, restore verification, erasure
 requests, and completed erasure. SQLite, FTS, and vector/graph metadata now
 use SQLCipher through `sqlcipher3-wheels` (the `sqlcipher3` DB-API); the
 workspace app key derives the SQLCipher key and legacy plaintext databases are
-converted without retaining a plaintext copy. This distribution provides FTS4,
-not FTS5, so lexical ranking is deterministic recency order rather than BM25.
+converted without retaining a plaintext copy. This distribution **does** provide
+FTS5 — the earlier claim here that it did not was never verified and was wrong —
+so lexical ranking is BM25 relevance with recency only as a tie-break
+(RAIKER-2025). The engine is probed at runtime; a build without FTS5 falls back
+to FTS4 and deterministic recency order, and reports which one it used.
 Memory and backup lifecycle actions are metadata-audited, and lifecycle-audit
 rows are append-only at the SQLite layer. Raiker supports multiple local users
 on one device through separate principals and workspaces, not enterprise

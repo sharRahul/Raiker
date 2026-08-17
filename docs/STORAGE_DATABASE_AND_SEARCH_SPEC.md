@@ -461,7 +461,7 @@ Raiker search combines:
 | file name | SQLite metadata + filesystem glob |
 | text grep | brokered grep tool + optional full-text index |
 | event search | SQLite events_index |
-| memory keyword search | SQLite full-text index over memory_records (**FTS4** as shipped — see note below) |
+| memory keyword search | SQLite full-text index over memory_records (**FTS5**, BM25-ranked — see note below) |
 | semantic search | vector backend + metadata filters |
 | graph search | SQLite graph tables + recursive CTEs |
 | code symbols | LSP/symbol extraction + graph_nodes |
@@ -470,17 +470,35 @@ Raiker search combines:
 
 ## Full-text tables
 
-> **As shipped this is FTS4, not FTS5.** The SQLCipher build Raiker bundles has
-> no FTS5 module, so `raiker/storage/sqlite.py` rewrites `USING fts5(` to
-> `USING fts4(` and the live tables are `approved_memory_fts` and
-> `conversation_fts`, both FTS4. The difference is not cosmetic: FTS4 has no
-> `rank`/`bm25()`, so lexical results are ordered by recency rather than
-> relevance — the open defect
-> [MEM-05](plans/MEMORY_RELIABILITY_PLAN.md#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped).
-> FTS4 also treats upper-case `AND`/`OR`/`NOT`/`NEAR` and parentheses as
-> operators, which is why every query reaching an index is sanitised through
-> `SQLiteStore._match_terms` (FIXED-201). The schema below is the target shape;
-> read it as FTS4 until the bundled build gains FTS5.
+> **As shipped this is FTS5 (RAIKER-2025).** The live tables are
+> `approved_memory_fts` and `conversation_fts`.
+>
+> This note used to say the opposite — that the bundled SQLCipher build had no
+> FTS5 module, so `USING fts5(` was rewritten to `USING fts4(`. That was
+> written down, carried forward through several rounds, and never checked, and
+> it was false: `sqlcipher3-wheels` compiles with `ENABLE_FTS5`, and so does
+> CPython's bundled SQLite on every platform Raiker targets. The consequence
+> was real — lexical results were ordered by recency rather than relevance, so
+> the oldest exact answer was the first row a limit discarded (MEM-05, closed
+> as [FIXED-231](plans/FIXED_ITEMS.md)).
+>
+> **The engine is now probed rather than declared.**
+> `SQLiteStore.text_search_engine` creates a throwaway `fts5` virtual table in
+> `temp` and drops it, because a build can report `ENABLE_FTS5` in
+> `PRAGMA compile_options` and still refuse the module. A build genuinely
+> without FTS5 keeps FTS4 and keeps working — ranked by recency, and saying so.
+> That fallback is not decorative: `snippet()` takes the same six arguments in
+> a **different order** on each engine, and the wrong order does not raise on
+> FTS4, it silently returns NULL, so the order is derived from the probe.
+>
+> Both indexes are **rebuildable projections** of governed tables, never a
+> second source of truth. That is what makes changing the engine underneath
+> them a migration rather than a data conversion: the index is dropped and
+> recomputed from the table that owns the content.
+>
+> Both engines treat upper-case `AND`/`OR`/`NOT`/`NEAR` and parentheses as
+> operators, which is why every query reaching an index is still sanitised
+> through `SQLiteStore._match_terms` (FIXED-201).
 
 ```sql
 CREATE VIRTUAL TABLE memory_fts USING fts5(

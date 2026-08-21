@@ -73,6 +73,14 @@ that proves it, what is missing, and the concrete work.
 | C13 | BUILD | TIER 0 | Done |
 | C14 | CHAT | TIER 3 | **Complete** — copy, edit-and-resend, retry (FIXED-220); branch-from-here (FIXED-227) |
 
+**2026-08-21 compatibility update.** BUG-216 and MEM-06 are closed. Build now
+has foreground SSH/Daytona command adapters, a persistent container boundary,
+background run control and explicit runner-trust posture. Filtered egress and
+credential delta controls are **partial**, not complete: their policy,
+quarantine and UI paths ship, but live container bypass/copy-on-write proof is
+still required before either capability can be selected. This keeps the gap
+table aligned with the measured runtime rather than with configuration.
+
 ---
 
 ## GAP-BUILD — What Build needs to stand against a class-leading coding agent

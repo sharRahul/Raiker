@@ -44,7 +44,7 @@ question a conversation from years ago is actually asked.
 `MEM-01` and `MEM-02` are closed by the 2026-08-11 change and kept here with
 their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 (FIXED-230 and FIXED-231) and likewise kept with theirs, as is `MEM-04`
-(FIXED-237) by the second pass of the same day; `MEM-06` onwards are open.
+(FIXED-237) by the second pass of the same day; MEM-06 is closed by FIXED-241.
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
@@ -53,7 +53,7 @@ their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 | [MEM-03](#mem-03--the-vector-leg-of-hybrid-retrieval-is-lexical-so-a-paraphrase-recalls-nothing) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Fixed 2026-08-17 |
 | [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
-| [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | Open |
+| [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | **Fixed 2026-08-21** |
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
@@ -364,6 +364,15 @@ rather than presenting the first page as the whole answer.
 
 **Severity: Medium. Area: graph projection.**
 
+**Status: fixed 2026-08-21 (FIXED-241).** Approved memories, imports and
+accepted conversation evidence now produce deterministic owner-scoped entity
+and relationship proposals. Every candidate carries evidence metadata and an
+idempotency key; review is atomic, rejection is durable, and accepted edges are
+the only ones projected into graph recall. Memory and Brain expose scan,
+accept/reject and provenance controls without presenting parser inference as
+fact. MEM-11/MEM-12 regressions continue to prove one hybrid retrieval path and
+query-resolved graph anchors.
+
 **Observed.** `GRAPH_MEMORY_AND_CODEMAP_SPEC.md` specifies typed nodes and edges
 for people, projects, decisions and documents. The storage is real and
 lifecycle-aware — `list_memory_entity_neighborhood` is queried by
@@ -598,11 +607,9 @@ Three deliberate bounds:
 this entry describes: an evidence memory sharing **no token** with the query,
 reachable only by traversal, returned with `sources == ("graph",)`.
 
-**What this exposes.** The leg now works and, on a default install, has nothing
-to walk — nothing populates the entity graph. That is
-[MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it),
-unchanged, and it is now the binding constraint rather than a second one behind
-this.
+**2026-08-21 follow-through.** MEM-06 now populates this leg through reviewed,
+evidence-bound proposals. The max-not-sum rule remains unchanged: accepted graph
+topology can make evidence reachable, never multiply the weight of one fact.
 
 ---
 

@@ -4,6 +4,36 @@ This document maps Raiker concepts to the reference systems and concepts used to
 
 Raiker is not a clone of any one system. It combines local-first agent runtime, coding-agent UX, hooks, plugins, channels, memory, graph context, local inference, self-improving skills, eidetic-style recall, and GenAI security into a governed architecture.
 
+## 2026-08-21 implementation and reference review
+
+Status is strict: **at parity** means both sides are evidenced; **beyond**
+requires a useful additional tested Raiker control; **partial** means a safe
+foundation exists but required execution proof is absent; **absent** means no
+working Raiker path exists. “Not established by cited source” replaces guesses
+about a reference platform.
+
+| Platform | Current primary-source control set | Raiker status | Compatibility requirement / differentiator |
+|---|---|---|---|
+| Claude Cowork / Claude chat | Connectors can read local/remote sources and take actions; the cited documentation does not establish Raiker-style receipts, graph review, or checkpoint-health semantics. [Anthropic connectors](https://support.anthropic.com/en/articles/11817150-connect-your-tools-to-unlock-a-smarter-more-capable-ai-companion) | **Partial** | Chat, projects, tasks, approvals, connectors, memory review and provider choice ship. Hosted schedules, the full connector catalogue and desktop reach remain behind. Evidence-bound graph proposals and visible checkpoint non-reversibility are meaningful improvements: **yes**, because inferred memory and failed rollback promises become reviewable. |
+| Claude Code | OS-enforced filesystem/network sandboxing, allowed domains, deny-first permissions and hooks are documented; sandbox unavailability can fail closed. [Sandboxing](https://code.claude.com/docs/en/sandboxing), [permissions](https://code.claude.com/docs/en/permissions), [hooks](https://code.claude.com/docs/en/hooks) | **Partial** | Raiker has measured boundaries, governed commands, approvals, checkpoints, plans and read-only subagents. Hooks/plugins are not at parity. Active per-run egress revocation would be meaningful: **yes**, but only after real bypass/revocation proof. |
+| ChatGPT Chat / Work | Apps support search, deep research, sync and confirmed writes; projects can use project-only memory and memory sources expose recalled inputs. [Apps](https://help.openai.com/en/articles/11487775-connectors-in), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq) | **Partial** | Raiker is at parity for multi-provider chat, projects, governed writes and owner-reviewed durable memory, but behind the app directory, hosted operation and broad multimodal work surface. Evidence-edge acceptance/rejection is meaningful: **yes**; the cited sources do not establish an equivalent. |
+| Codex | Local/cloud agents default to filesystem sandboxing with network disabled; cloud can allow trusted domains and local commands can request elevation. [Codex upgrades](https://openai.com/index/introducing-upgrades-to-codex/), [Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/) | **Partial** | Raiker is at parity for workspace-bounded execution, no-network native sandboxing, foreground/background receipts, persistent container sessions and approvals. It is behind Codex's production domain-network and cloud/worktree lifecycle. Two-pass credential delta quarantine is meaningful: **yes**, conditional on real copy-on-write delivery proof. |
+| OpenClaw | Exec supports foreground/background/process/PTY, host or sandbox routing, allowlists and approval modes; its docs state sandboxing is off by default. [Exec](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec.md), [approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md) | **Partial** | Raiker's deny-by-default authority binding, immutable receipts and measured cards are stronger controls; OpenClaw leads in channels, plugins, PTY breadth and node-host execution. One lifecycle across local/container/SSH/Daytona is meaningful: **yes**; supervised install and broad remote parity remain partial. |
+| DeepSeek Harness | The developer preview composes models, tools, skills, sessions, sandboxes, storage, loops, scheduling and UI as plugins; append-only trajectory drives resume/fork/search/replay. [DeepSeek Harness](https://deepseek.com/harness/en/) | **Partial** | Raiker has append-only audit, resume/branch/search, scoped tools and stronger approval/checkpoint semantics; DeepSeek leads in uniform plugin composability and trajectory replay. A governed projection from one audit/control plane is meaningful: **yes**; deterministic replay and plugin parity remain absent. |
+| Hermes Agent | Hermes documents local, Docker, SSH, Modal, Daytona and Singularity backends plus persistent environments, broad tools and optional cross-session memory. [Configuration](https://github.com/hermes-agent-org/hermes/blob/main/website/docs/user-guide/configuration.md), [tools](https://github.com/hermes-agent-org/hermes/blob/main/website/docs/user-guide/features/tools.md) | **Partial** | Raiker has local, native, container, SSH and Daytona foundations with owner-scoped approvals, host pins and cost reservations, but lacks Modal/Singularity breadth and working credentialed remote persistence. Purpose-bound credentials plus discard-only uncertain deltas are meaningful: **yes**, once live copy-on-write proof enables delivery. |
+
+### Categorical decisions for proposed additions
+
+| Proposed control | Meaningful improvement that could put Raiker beyond the reference set? | Decision |
+|---|---|---|
+| Deep-path-safe I/O plus visible non-reversibility | **Yes — proven** | Shipped for BUG-216; a silent rollback failure becomes durable health and receipt evidence. |
+| Owner-scoped entity extraction with evidence/review | **Yes — proven** | Shipped for MEM-06; parser output is a proposal, never an accepted fact. |
+| Unified governed foreground SSH/Daytona lifecycle | **Yes — partial** | Envelope, host-key/cost refusal and no-fallback adapters ship; supervised install/persistence remain. |
+| Filtered egress with HMAC grants, address pinning and revocation | **Yes — conditional** | Policy, proxy, lifecycle and honest UI ship; no Docker daemon was available for mandatory bypass/revocation proof, so `filtered_network` stays false. |
+| Credential delivery with two-pass delta quarantine | **Yes — conditional** | Safe snapshot/scanner, discard-only API and UI ship; delivery/merge stay off pending real disposable-container proof. |
+| Publisher-verified runner and helper-image pins | **Yes — conditional** | Signed-manifest/Authenticode primitives and exact OCI digest receipts ship; developer packages report package-relative integrity until external trust anchors are verified. |
+| Windows PTY/restart attachment outside a proven sandbox transport | **No** | Convenience would weaken the boundary, so it remains unsupported. |
+
 ---
 
 ## Claude Code Concept Coverage
@@ -570,7 +600,7 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 |---|---|---|
 | Opening a recalled answer at the turn it came from | ChatGPT and Claude link a cited memory to its conversation | The `source_event_id` is durable and correct; the missing part is the read-back surface — tracked as **MEM-08** |
 | Exact replay of an observation's material | None (they keep the material instead) | Deliberately not built: replay would need the material, and the point of the row is that Raiker does not hold it. The governed artifact reference is the honest substitute where one exists |
-| Automatic entity extraction from an observation | Cowork and ChatGPT populate a profile from conversation | Tracked as **MEM-06**: the graph is reachable and nothing populates it |
+| Automatic entity extraction from an observation | Cowork and ChatGPT populate a profile from conversation | **Shipped 2026-08-21 (MEM-06 / FIXED-241):** deterministic owner-scoped proposals carry evidence and require review before projection |
 | A retention sweep that runs by itself | ChatGPT expires conversation content on a schedule | Tracked as **MEM-07**. The expiry is computed and stored per row today; what is missing is the sweep, and an owner-confirmed cleanup already exists in its place |
 
 **Ideas that go beyond every reference product, not yet built.** Recorded so the
@@ -871,16 +901,15 @@ and why the reference graph is not fed into retrieval scoring — an inferred ed
 is good enough to *offer a model somewhere to look* and not good enough to
 *change what a search returns*.
 
-**And one gap the tables understate.** Raiker's knowledge graph has two halves.
-The reference half works on a fresh install because `turn_sources` fills itself.
-The *claims* half — entities and typed relationships — is empty, because MEM-06
-means nothing populates it. The part that most resembles a vault graph is the
-part with no data in it.
+**2026-08-21 update.** Raiker's knowledge graph has two populated halves. The
+reference half fills from `turn_sources`; the claims half fills only from
+accepted, evidence-bound entity and relationship proposals. Inferred parser
+output stays in review and cannot reorder recall until accepted.
 
 **Closing the gap, in effort order.** Tags as graph nodes (low — memories
 already carry them); stored passage offsets, which also settles the
 block-reference row (medium); the MEM-06 extractor (medium, and the binding
-constraint); authored links (medium, but a product question before an
+extractor follow-through (shipped as MEM-06); authored links (medium, but a product question before an
 engineering one — it would make Raiker partly a vault, which may not be what it
 should be).
 

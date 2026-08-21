@@ -9754,3 +9754,40 @@ disabled — the same rule the filtered-network control still follows.
 **Evidence.** `tests/test_persistent_command_container.py`, whose two
 previously-passing assertions were inverted: they asserted the defect, and the
 test now states why the old behaviour was the defect rather than the design.
+
+---
+
+## FIXED-240 — Deep Windows paths silently made approved writes irreversible
+
+**Severity: High. Area: checkpoints / Windows paths (BUG-216). Fixed
+2026-08-21.**
+
+Raiker-owned storage paths now cross one idempotent Windows extended-length
+boundary, including drive and UNC paths, while workspace-visible paths remain
+ordinary. Event locks, checkpoint blobs, operations and internal writers use
+that boundary. The regression creates a real workspace beyond `MAX_PATH` and
+proves bootstrap plus pre-image capture. Capture failure remains best-effort for
+the approved mutation, but is no longer silent: structured checkpoint health,
+Diagnostics and approval receipts name the failed operation and reason.
+
+**Evidence.** `tests/test_windows_internal_paths.py`,
+`tests/test_internal_path_audit.py`, `tests/test_checkpoint_restore.py`, and the
+Approvals/Diagnostics view tests.
+
+---
+
+## FIXED-241 — The memory entity graph had no evidence-producing extractor
+
+**Severity: Medium. Area: memory graph (MEM-06). Fixed 2026-08-21.**
+
+Approved memories, imports and accepted conversation evidence now produce
+deterministic owner-scoped entity and relationship proposals. Candidates carry
+evidence metadata and idempotency keys; duplicate scans converge, review is
+atomic, rejection is durable, and only accepted edges enter graph retrieval.
+Memory and Brain expose scan, provenance, accept and reject controls. The
+extractor never promotes its own inference into fact.
+
+**Evidence.** `tests/test_memory_entity_extraction.py`,
+`tests/test_memory_relationship_review.py`, and the Memory/Brain view tests;
+`tests/test_model_facing_memory_graph.py` continues to prove MEM-11/MEM-12
+retrieval consistency and query-resolved anchors.

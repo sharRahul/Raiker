@@ -59,10 +59,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced three times; the OS boundary is FIXED-195, background execution and POSIX PTY are FIXED-229, restart reattachment and the persistent environment are FIXED-238 and FIXED-239 |
-| [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | Open — root cause identified 2026-08-16 |
+| [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
+| [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
-| MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-06 … MEM-10. Closed 2026-08-17: MEM-03/MEM-05 (FIXED-230/231), MEM-11/12/13 (FIXED-232/233/234), MEM-14 (FIXED-236) and MEM-04 (FIXED-237). See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
+| MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -74,9 +74,9 @@ MEM-05 as FIXED-230 and FIXED-231, MEM-11, MEM-12 and MEM-13 as FIXED-232,
 FIXED-233 and FIXED-234, MEM-14 as FIXED-236, and MEM-04 as FIXED-237. Two were
 raised in their place. MEM-10: closing MEM-03 built the *selection* of an
 embedding space, and a default install still has nothing semantic to select.
-MEM-06 is now the binding constraint on the graph leg, which MEM-12 made
-reachable and which nothing populates. MEM-06 through MEM-10 are open there
-rather than duplicated here.
+MEM-06, the binding constraint on the graph leg MEM-12 made reachable, closed
+2026-08-21 as FIXED-241. MEM-07 through MEM-10 remain open there rather than
+being duplicated here.
 
 ---
 
@@ -84,6 +84,22 @@ rather than duplicated here.
 
 **Severity: Low (was Medium, was High). Area: shell / sandbox / recovery.
 Status: Open — reduced three times.**
+
+**2026-08-21 update.** Foreground SSH and Daytona now enter the same
+`CommandService` lifecycle through a canonical length-prefixed envelope, exact
+SSH host-key pin, Daytona cost reservation and fixed remote supervisor path;
+neither falls back to the host. Container egress has normalized domain/port
+policy, public-address pinning, HMAC-scoped grants, revocation state and a real
+CONNECT proxy. Credential work has a disposable workspace/Git snapshot,
+failure-closed scanner, discard-only quarantine API and review UI. Runner trust
+distinguishes publisher-verified, package-relative and developer-unverified
+postures, and placeholder supervisor digests were removed.
+
+The item remains open for unproved parts: this host had no Docker/Podman daemon
+for live direct-DNS/direct-TCP bypass, active-stream revocation or credential
+copy-on-write delivery/merge tests, and no production signing anchor. Windows
+PTY and restart reattachment remain explicitly unsupported. Configuration
+never turns any of these capabilities on.
 
 **What changed, 2026-08-15.** A governed command now runs inside a real
 operating-system boundary, and what that boundary enforces is **measured rather
@@ -233,8 +249,15 @@ navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 
 ## BUG-216 — Checkpoint capture fails silently on a deep Windows path, and only logs it
 
-**Severity: High. Area: checkpoints / Windows paths. Status: Open — root cause
-identified, not fixed in this round.**
+**Severity: High. Area: checkpoints / Windows paths. Status: Fixed 2026-08-21
+as FIXED-240.**
+
+**Resolution.** All Raiker-owned internal writers now use one idempotent
+extended-length path boundary on Windows, including UNC paths. A regression
+creates a workspace beyond 260 characters and proves bootstrap, event,
+checkpoint and pre-image I/O. Capture failures persist structured health and
+appear in Diagnostics and approval receipts while the approved mutation remains
+best-effort. See FIXED-240.
 
 **Observed.** Running the documented `python -m pytest` on Windows fails:
 

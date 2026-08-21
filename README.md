@@ -288,7 +288,7 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-15:
+Raiker's documentation does not run ahead of its code. As of 2026-08-21:
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each
@@ -322,14 +322,11 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-15:
   clear cache** put it back to a known state. The native sandbox still creates
   and deletes a profile around every command, deliberately: its container SID is
   a pure function of its name, so a predictable name is a hole.
-- **What a turn did and what it thought are shown live, and are not kept in the
-  transcript.** The tool lines and the reasoning block are built from the running
-  turn. Re-open the conversation and you see the prompt, the answer and the
-  sources; the lines and the working are not rebuilt, because nothing persists
-  them. The full record of every call is permanent in **Observability → Audit
-  log**. Tracked as BUG-215; the retention question — whether a model's working
-  should be stored at all, and excluded from export and search if it is — is the
-  reason it was not simply added.
+- **What a turn thought is retained only when the owner chooses.** Reasoning is
+  shown live; Settings → Privacy decides whether it is kept. A reopened turn
+  states when working was not retained, while retained working remains excluded
+  from search and export. Tool-call evidence remains permanent in
+  **Observability → Audit log**.
 - **A batch of tool calls runs in parallel only when nothing in it needs a
   decision.** Every validated read-only call in a batch is executed
   concurrently; the moment one call in the same batch requires approval, the
@@ -521,18 +518,20 @@ on the shipped build, not estimated.
   *"how does the Kubernetes rollout work"* matches nothing — the longer and more
   natural the question, the likelier every term must appear in one memory. The
   vector half still answers, and it is lexical too.
-- **Nothing writes to the entity graph, and nothing expires by itself.** The
-  graph half of hybrid retrieval has no extractor populating it (MEM-06), and no
-  retention sweep is ever started, so `expires_at` is enforced only at read time
+- **Entity relationships are evidence-bound and reviewed; nothing expires by
+  itself.** Approved memory and conversation evidence now creates owner-scoped
+  entity/relationship proposals, and only accepted proposals reach graph recall
+  (MEM-06 / FIXED-241). No retention sweep is started, so `expires_at` is enforced only at read time
   and expired rows are collected only when the owner confirms a cleanup
   (MEM-07). Eidetic capture is invoked by the runtime as of 2026-08-17 (MEM-04),
   and what it recorded is in **Memory → Observations**; what it cannot do is
   replay the material, because it deliberately never held it.
-- **The governed shell still has three gaps, and they are named.** Filtered
-  domain egress, credential quarantine, and remote (SSH / Daytona) execution are
-  not built; PTY and restart reattachment are POSIX-only and Windows says so by
-  name. Background execution, a real terminal, restart reattachment and a
-  persistent container session are built — the detail is above and in BUG-194.
+- **The governed shell keeps unproved controls off.** Foreground SSH and Daytona
+  adapters, filtered-egress policy/proxy/revocation, credential delta snapshots
+  and runner trust verification now exist. This host had no container daemon or
+  production signing anchor, so live egress bypass, credential delivery/merge
+  and publisher verification remain unavailable rather than configuration-
+  enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
 - **Hooks, plugins and channels are specified, not built.** The hooks reference
   Raiker maps itself against documents 31 events and five handler types;
   `docs/HOOKS_SPEC.md` has no code behind it, plugin support stops at manifest

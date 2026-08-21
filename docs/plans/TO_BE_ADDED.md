@@ -78,6 +78,16 @@ that would put Raiker ahead of the field.
 | ADD-15 | Tier 5 | Approvals / WebAuthn step-up | Proposal |
 | ADD-16 | Tier 5 | Runtime / adversarial intent modelling | Proposal |
 | ADD-17 | Tier 5 | Runtime / internal debate core | Proposal |
+
+**2026-08-21 review against the reference platforms.** Evidence-bound graph
+review and visible checkpoint failure are proven meaningful differentiators and
+have shipped (FIXED-241/FIXED-240). Per-run filtered egress revocation,
+purpose-bound credential delivery with two-pass quarantine, and publisher-
+verified runners remain meaningful **conditional** differentiators: foundation
+code and honest UI exist, but they do not graduate to “shipped” until the live
+container and external trust-anchor proofs recorded under BUG-194 pass. Windows
+PTY or reattachment outside a proven sandbox transport is categorically **not**
+an improvement and is not promoted to an ADD item.
 | ADD-18 | Tier 5 | Agents / relationship-based access control | Proposal |
 | ADD-19 | Tier 6 | Build / code provenance watermarking | Proposal |
 | ADD-20 | Tier 6 | Verification / continuous chaos injection | Proposal |

@@ -104,6 +104,8 @@ describe("Runtime container profiles", () => {
           tools: ["grep"],
           repository_access: "read_only",
           writable_output: true,
+          egress_domains: [],
+          egress_ports: [],
         },
       }),
     );
@@ -201,5 +203,33 @@ describe("Runtime execution capabilities and reset (BUG-194)", () => {
       expect(reset).toHaveBeenCalledWith("container-review", "settings", true),
     );
     vi.unstubAllGlobals();
+  });
+});
+
+describe("Runtime filtered egress honesty", () => {
+  it("shows normalized policy but never presents configuration as enforcement", async () => {
+    stubRuntime();
+    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
+      ...view,
+      environments: [
+        view.environments[0],
+        {
+          ...view.environments[1],
+          config: {
+            egress_domains: ["api.example.com", "*.packages.example"],
+            egress_ports: [443],
+            egress_enforcement: "not_proven",
+          },
+          features: { filtered_network: false },
+        },
+      ],
+    });
+    render(Runtime);
+
+    expect(await screen.findByRole("status", { name: "Filtered network status" })).toHaveTextContent(
+      "Filtered network · not proven",
+    );
+    expect(screen.getByText(/api\.example\.com, \*\.packages\.example/)).toBeInTheDocument();
+    expect(screen.queryByText("Filters command network access")).not.toBeInTheDocument();
   });
 });

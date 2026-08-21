@@ -568,6 +568,109 @@ class CommandStore:
             ).fetchone()
         return int(row["count"]) if row else 0
 
+    def create_egress_grant(
+        self,
+        *,
+        grant_id: str,
+        owner_principal_id: str,
+        run_id: str,
+        environment_profile_id: str,
+        domains: tuple[str, ...],
+        ports: tuple[int, ...],
+        grant_digest: str,
+        expires_at: str,
+    ) -> None:
+        now = utc_now()
+        with self.sqlite.connect() as connection:
+            connection.execute(
+                """INSERT INTO command_egress_grants
+                   (grant_id, run_id, owner_principal_id, environment_profile_id,
+                    domains_json, ports_json, grant_digest, state, expires_at,
+                    created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)""",
+                (
+                    grant_id,
+                    run_id,
+                    owner_principal_id,
+                    environment_profile_id,
+                    json.dumps(domains, separators=(",", ":")),
+                    json.dumps(ports, separators=(",", ":")),
+                    grant_digest,
+                    expires_at,
+                    now,
+                    now,
+                ),
+            )
+
+    def transition_egress_grant(
+        self,
+        owner_principal_id: str,
+        run_id: str,
+        *,
+        expected: str,
+        target: str,
+    ) -> bool:
+        allowed = {
+            ("pending", "active"),
+            ("active", "revoking"),
+            ("revoking", "revoked"),
+            ("revoking", "cleanup_failed"),
+        }
+        if (expected, target) not in allowed:
+            raise ValueError("command_egress_transition_invalid")
+        with self.sqlite.connect() as connection:
+            changed = connection.execute(
+                """UPDATE command_egress_grants SET state = ?, updated_at = ?
+                   WHERE owner_principal_id = ? AND run_id = ? AND state = ?""",
+                (target, utc_now(), owner_principal_id, run_id, expected),
+            )
+        return changed.rowcount == 1
+
+    def egress_grant(
+        self, owner_principal_id: str, run_id: str
+    ) -> dict[str, Any] | None:
+        with self.sqlite.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM command_egress_grants
+                   WHERE owner_principal_id = ? AND run_id = ?""",
+                (owner_principal_id, run_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def record_egress_verdict(
+        self,
+        *,
+        grant_id: str,
+        run_id: str,
+        owner_principal_id: str,
+        host: str,
+        port: int,
+        address_set_digest: str,
+        verdict: str,
+        grant_digest: str,
+    ) -> str:
+        verdict_id = new_id("egrv_")
+        with self.sqlite.connect() as connection:
+            connection.execute(
+                """INSERT INTO command_egress_verdicts
+                   (verdict_id, grant_id, run_id, owner_principal_id, host, port,
+                    address_set_digest, verdict, checked_at, grant_digest)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    verdict_id,
+                    grant_id,
+                    run_id,
+                    owner_principal_id,
+                    host,
+                    port,
+                    address_set_digest,
+                    verdict,
+                    utc_now(),
+                    grant_digest,
+                ),
+            )
+        return verdict_id
+
     def create_credential_delta(
         self,
         *,

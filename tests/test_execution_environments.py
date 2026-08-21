@@ -102,6 +102,8 @@ def test_execution_environment_api_configures_container_profile(
                 "tools": ["grep", "read_file"],
                 "repository_access": "read_only",
                 "writable_output": True,
+                "egress_domains": ["BÜCHER.example.", "*.packages.example"],
+                "egress_ports": [443],
             },
         },
     )
@@ -116,6 +118,13 @@ def test_execution_environment_api_configures_container_profile(
     assert profile["assigned_tool_count"] == 2
     assert profile["repository_access"] == "read_only"
     assert profile["writable_output"] is True
+    assert profile["config"]["egress_domains"] == [
+        "*.packages.example",
+        "xn--bcher-kva.example",
+    ]
+    assert profile["config"]["egress_ports"] == [443]
+    assert profile["config"]["egress_enforcement"] == "not_proven"
+    assert profile["features"]["filtered_network"] is False
     assert view["container_options"] == {
         "runtimes": ["docker", "podman"],
         "images": ["raiker-tools:approved"],

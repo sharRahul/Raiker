@@ -3164,6 +3164,45 @@ ALTER TABLE command_runs ADD COLUMN authority_id TEXT NOT NULL DEFAULT '';
 """
 
 
+# BUG-194 — owner-approved filtered egress grants and metadata-only verdicts.
+COMMAND_EGRESS_MIGRATION_ID = "RAIKER-2039-command-egress-grants"
+
+COMMAND_EGRESS_SQL = """
+CREATE TABLE IF NOT EXISTS command_egress_grants (
+  grant_id TEXT PRIMARY KEY,
+  run_id TEXT NOT NULL UNIQUE,
+  owner_principal_id TEXT NOT NULL,
+  environment_profile_id TEXT NOT NULL,
+  domains_json TEXT NOT NULL,
+  ports_json TEXT NOT NULL,
+  grant_digest TEXT NOT NULL,
+  state TEXT NOT NULL,
+  expires_at TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  FOREIGN KEY (run_id) REFERENCES command_runs(run_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_command_egress_owner_profile_state
+  ON command_egress_grants(owner_principal_id, environment_profile_id, state, created_at);
+
+CREATE TABLE IF NOT EXISTS command_egress_verdicts (
+  verdict_id TEXT PRIMARY KEY,
+  grant_id TEXT NOT NULL,
+  run_id TEXT NOT NULL,
+  owner_principal_id TEXT NOT NULL,
+  host TEXT NOT NULL,
+  port INTEGER NOT NULL,
+  address_set_digest TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  checked_at TEXT NOT NULL,
+  grant_digest TEXT NOT NULL,
+  FOREIGN KEY (grant_id) REFERENCES command_egress_grants(grant_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_command_egress_verdicts_owner_run
+  ON command_egress_verdicts(owner_principal_id, run_id, checked_at);
+"""
+
+
 # BUG-215 — a turn's own reasoning, and whether it was kept.
 #
 # Reasoning was a stream fact and only a stream fact: it filled a collapsed

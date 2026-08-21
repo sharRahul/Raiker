@@ -92,6 +92,8 @@ from raiker.storage.migrations import (
     COMMAND_AUTHORITY_EVIDENCE_SQL,
     COMMAND_CREDENTIAL_DELTAS_MIGRATION_ID,
     COMMAND_CREDENTIAL_DELTAS_SQL,
+    COMMAND_EGRESS_MIGRATION_ID,
+    COMMAND_EGRESS_SQL,
     COMMAND_RUNS_MIGRATION_ID,
     COMMAND_RUNS_SQL,
     CONFIGURED_MODELS_MIGRATION_ID,
@@ -1403,6 +1405,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID,
                 COMMAND_AUTHORITY_EVIDENCE_SQL,
                 connection,
+            )
+            self._apply_migration(
+                COMMAND_EGRESS_MIGRATION_ID, COMMAND_EGRESS_SQL, connection
             )
             self._apply_migration(
                 CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,

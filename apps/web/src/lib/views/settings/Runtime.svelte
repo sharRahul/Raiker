@@ -64,6 +64,8 @@
   let containerRuntime = $state<"docker" | "podman">("docker");
   let containerImage = $state("");
   let selectedContainerTools = $state<string[]>([]);
+  let egressDomains = $state("");
+  let egressPorts = $state("443");
   let probing = $state<string | null>(null);
 
   // The runtime is on unless the owner switched it off. An unreadable state is
@@ -92,11 +94,22 @@
         ? { host, user: remoteUser, credential_env: credentialEnv, host_public_key: hostPublicKey, host_key_sha256: hostKeySha256, max_runtime_seconds: 300 }
         : environmentKind === "daytona"
           ? { sandbox_id: sandboxId, api_key_env: credentialEnv, max_cost: maxCost, max_runtime_seconds: 300 }
-          : { runtime: containerRuntime, image: containerImage, tools: selectedContainerTools, repository_access: "read_only", writable_output: true };
+          : {
+              runtime: containerRuntime,
+              image: containerImage,
+              tools: selectedContainerTools,
+              repository_access: "read_only",
+              writable_output: true,
+              egress_domains: egressDomains.split(/[,\s]+/).map((value) => value.trim()).filter(Boolean),
+              egress_ports: egressDomains.trim()
+                ? egressPorts.split(/[,\s]+/).map(Number).filter((value) => Number.isInteger(value))
+                : [],
+            };
       await api.configureExecutionEnvironment({ kind: environmentKind, name: environmentName, config, enabled: true });
       notice = { kind: "ok", text: environmentKind === "container" ? "Container execution profile saved." : `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
       environmentName = ""; host = ""; remoteUser = ""; hostPublicKey = ""; hostKeySha256 = ""; sandboxId = "";
       selectedContainerTools = [];
+      egressDomains = ""; egressPorts = "443";
       await load();
     } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
     finally { busy = false; }
@@ -304,6 +317,13 @@
               <span class="boundary">Read-only repository → writable output</span>
               <small>{environment.assigned_tool_count ?? 0} tools</small>
               {#if containerReason(environment.availability_reason)}<small class="remediation">{containerReason(environment.availability_reason)}</small>{/if}
+              {#if Array.isArray(environment.config?.egress_domains) && environment.config.egress_domains.length}
+                <section class="egress-status" aria-label="Filtered network status" role="status">
+                  <strong>Filtered network · not proven</strong>
+                  <span>{environment.config.egress_domains.join(", ")} · ports {environment.config.egress_ports?.join(", ")}</span>
+                  <small>Configured destinations stay blocked until the container bypass and revocation probe passes.</small>
+                </section>
+              {/if}
             {:else}
               <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
               <span class="boundary">Foreground command execution</span>
@@ -349,6 +369,8 @@
         <label>Container runtime<select bind:value={containerRuntime}>{#each environments?.container_options?.runtimes ?? [] as runtime}<option value={runtime}>{runtimeName(runtime)}</option>{/each}</select></label>
         <label>Approved image<select bind:value={containerImage}>{#each environments?.container_options?.images ?? [] as image}<option value={image}>{image}</option>{/each}</select></label>
         <fieldset><legend>Container tools</legend>{#each environments?.container_options?.supported_tools ?? [] as tool}<label class="tool-choice"><input type="checkbox" checked={selectedContainerTools.includes(tool)} onchange={(event) => toggleContainerTool(tool, event.currentTarget.checked)} /> {tool}</label>{/each}</fieldset>
+        <label>Allowed network domains<input bind:value={egressDomains} placeholder="api.example.com, *.packages.example" /><small>Exact domains or boundary-safe wildcards. Empty keeps networking off.</small></label>
+        <label>Allowed destination ports<input bind:value={egressPorts} inputmode="numeric" placeholder="443" /><small>Usually 443. Configuration alone never enables egress.</small></label>
         <div class="boundary-preview"><span>Repository</span><strong>Read only</strong><i>→</i><span>Output</span><strong>Writable</strong></div>
       {/if}
       {#if environmentKind !== "container"}<label>Credential environment variable<input bind:value={credentialEnv} required pattern={"[A-Z][A-Z0-9_]{2,127}"} /></label>
@@ -412,6 +434,10 @@
   .capabilities { display:grid; gap:.15rem; margin:.35rem 0 0; padding:0; list-style:none; }
   .capabilities li { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.72rem; text-transform:none; }
   .capabilities li :global(svg) { flex:none; color:var(--ok); }
+  .egress-status { display:grid; gap:.2rem; margin-top:.45rem; padding:.65rem .75rem; border-left:3px solid var(--warn); background:var(--sunken); }
+  .egress-status strong { color:var(--warn); font-size:.75rem; }
+  .egress-status span { color:var(--text-1); font-family:var(--font-mono); font-size:.72rem; text-transform:none; overflow-wrap:anywhere; }
+  .egress-status small { color:var(--text-2); text-transform:none; }
   .reset-actions { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:.45rem; }
   .reset-actions .danger { color:var(--danger); }
   details { margin-top:var(--space-4); } summary { cursor:pointer; font-weight:650; } .environment-form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--space-3); margin-top:var(--space-3); } .environment-form label { display:grid; gap:.35rem; color:var(--text-2); font-size:.78rem; } .environment-form input,.environment-form select { background:var(--sunken); } .environment-form small,.environment-form button,.environment-form fieldset,.boundary-preview { grid-column:1/-1; } .environment-form fieldset { display:flex; flex-wrap:wrap; gap:.5rem 1rem; margin:0; padding:var(--space-3); border:1px solid var(--border); border-radius:var(--r-md); } .environment-form fieldset legend { padding:0 .35rem; color:var(--text-2); font-size:.78rem; } .environment-form .tool-choice { display:flex; grid-template-columns:auto 1fr; align-items:center; gap:.35rem; color:var(--text-1); font-family:var(--font-mono); } .environment-form .tool-choice input { min-height:0; } .boundary-preview { display:grid; grid-template-columns:auto auto 1fr auto auto; align-items:center; gap:.55rem; padding:.7rem .8rem; border-left:3px solid var(--accent); background:var(--sunken); color:var(--text-3); font-size:.75rem; } .boundary-preview strong { color:var(--text-1); } .boundary-preview i { text-align:center; color:var(--accent); font-style:normal; }

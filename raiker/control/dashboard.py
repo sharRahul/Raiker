@@ -1592,6 +1592,7 @@ class DashboardService:
                         RepositoryAccess, config.get("repository_access", "none")
                     ),
                     writable_output=bool(config.get("writable_output", False)),
+                    config={**config, "owner_principal_id": owner_principal_id},
                 )
                 reason = validate_execution_profile(profile)
                 if reason is None and profile.image not in container_image_allowlist():
@@ -1631,6 +1632,12 @@ class DashboardService:
                             "tools": list(profile.tools),
                             "repository_access": profile.repository_access,
                             "writable_output": profile.writable_output,
+                            "egress_domains": list(config.get("egress_domains", [])),
+                            "egress_ports": list(config.get("egress_ports", [])),
+                            # Configuration is a request, not enforcement. This
+                            # remains false until the real container bypass
+                            # probe records a passing measurement.
+                            "egress_enforcement": "not_proven",
                         },
                     }
                 )
@@ -1749,6 +1756,23 @@ class DashboardService:
                 return ControlResult(ok=False, reason_code=reason)
             if profile.image not in container_image_allowlist():
                 return ControlResult(ok=False, reason_code="container_image_not_allowed")
+            raw_domains = config.get("egress_domains", [])
+            raw_ports = config.get("egress_ports", [])
+            if raw_domains or raw_ports:
+                try:
+                    from raiker.execution.commands.egress_policy import EgressPolicy
+
+                    policy = EgressPolicy(
+                        tuple(str(value) for value in raw_domains),
+                        tuple(int(value) for value in raw_ports),
+                    )
+                except (TypeError, ValueError):
+                    return ControlResult(ok=False, reason_code="container_egress_policy_invalid")
+                config = {
+                    **config,
+                    "egress_domains": list(policy.domains),
+                    "egress_ports": list(policy.ports),
+                }
         env_key = "credential_env" if kind == "ssh" else "api_key_env"
         credential_env = str(config.get(env_key, "")).strip()
         if kind != "container" and credential_env and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env):

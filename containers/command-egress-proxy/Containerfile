@@ -1,0 +1,6 @@
+FROM python:3.13-alpine@sha256:8e3ed7e1160ac94d268e9a8bd34142049ff103ead2ac984eab6a3bbda8cb783b
+RUN addgroup -S raiker && adduser -S -G raiker -h /app raiker
+WORKDIR /app
+COPY raiker /app/raiker
+USER raiker
+ENTRYPOINT ["python", "-m", "raiker.execution.commands.egress_proxy", "--config", "/run/raiker/egress.json"]

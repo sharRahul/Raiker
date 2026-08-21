@@ -15,7 +15,18 @@ from raiker.execution.profiles import ExecutionProfile
 from raiker.runtime.command_policy import sandbox_environment
 from raiker.storage.internal_paths import display_path, internal_io_path
 
-EXPECTED_SUPERVISOR_DIGEST = "sha256:" + ("b" * 64)
+
+def supervisor_digest_from_image(image: str) -> str:
+    """Return the immutable OCI digest; mutable tags and placeholders refuse."""
+    _name, separator, digest = image.rpartition("@")
+    if (
+        separator != "@"
+        or not digest.startswith("sha256:")
+        or len(digest) != 71
+        or any(char not in "0123456789abcdef" for char in digest[7:].casefold())
+    ):
+        raise CommandBackendError("container_supervisor_image_unpinned")
+    return digest.casefold()
 
 
 def command_container_name(owner: str, session: str, profile: str, run_id: str = "") -> str:
@@ -221,6 +232,7 @@ class PersistentContainerBackend:
         image = self.profile.image
         if runtime is None or image is None or "@sha256:" not in image:
             raise CommandBackendError("container_supervisor_image_unpinned")
+        supervisor_digest = supervisor_digest_from_image(image)
         # BUG-194 — the session's boundary, reused. The name no longer carries
         # the run id, so the second command of a session addresses the container
         # the first one ran in; what that command installed, wrote to /tmp, or
@@ -261,7 +273,7 @@ class PersistentContainerBackend:
                 container_id,
                 name,
                 request.template_digest,
-                EXPECTED_SUPERVISOR_DIGEST,
+                supervisor_digest,
                 cache_digest,
                 private_cache,
                 request.owner_principal_id,
@@ -331,7 +343,7 @@ class PersistentContainerBackend:
             "raiker.profile": self.profile.profile_id,
             "raiker.run": request.run_id,
             "raiker.request.digest": request.template_digest,
-            "raiker.supervisor.digest": EXPECTED_SUPERVISOR_DIGEST,
+            "raiker.supervisor.digest": supervisor_digest_from_image(image),
         }
         command = [
             runtime,

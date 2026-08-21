@@ -1844,6 +1844,8 @@ export interface ExecutionEnvironment {
    */
   probe_observations?: Record<string, ProbeVerdict>;
   probe_checked_at?: string;
+  /** Publisher trust for the exact command runner; never inferred from a sibling digest. */
+  runner_trust?: "publisher_verified" | "package_relative_integrity" | "development_unverified";
 }
 
 export type ProbeVerdict = "enforced" | "unenforced" | "indeterminate";

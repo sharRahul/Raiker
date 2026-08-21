@@ -71,6 +71,7 @@ class NativeSandboxProof:
     checked_at: str
     observations: Mapping[str, str] = field(default_factory=dict)
     connect_destination: str | None = None
+    runner_trust: str = "development_unverified"
 
     @property
     def features(self) -> CommandFeatures:
@@ -98,6 +99,7 @@ class NativeSandboxProof:
             "probe_observations": dict(self.observations),
             "probe_checked_at": self.checked_at,
             "connect_destination": self.connect_destination,
+            "runner_trust": self.runner_trust,
         }
 
 
@@ -202,6 +204,10 @@ class NativeSandboxDriver:
             connect_destination=(
                 str(report["connect_destination"]) if report.get("connect_destination") else None
             ),
+            # The current package stores the digest beside the binary. It
+            # detects corruption but is replaceable with the binary and is
+            # therefore never called publisher verification.
+            runner_trust="package_relative_integrity",
         )
 
     # -- driving a command --------------------------------------------------

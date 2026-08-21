@@ -232,4 +232,18 @@ describe("Runtime filtered egress honesty", () => {
     expect(screen.getByText(/api\.example\.com, \*\.packages\.example/)).toBeInTheDocument();
     expect(screen.queryByText("Filters command network access")).not.toBeInTheDocument();
   });
+
+  it("names package-relative runner integrity without calling it publisher verification", async () => {
+    stubRuntime();
+    vi.spyOn(api, "executionEnvironments").mockResolvedValue({
+      ...view,
+      environments: [{
+        ...view.environments[0], kind: "native", name: "Native OS sandbox",
+        runner_trust: "package_relative_integrity", probe_observations: {},
+      }],
+    });
+    render(Runtime);
+    expect(await screen.findByText("Package-relative integrity only")).toBeInTheDocument();
+    expect(screen.queryByText("Publisher verified")).not.toBeInTheDocument();
+  });
 });

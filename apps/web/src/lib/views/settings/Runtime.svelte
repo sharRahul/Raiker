@@ -304,6 +304,13 @@
                 Foreground commands only. PTY, background execution, network grants and
                 persistence are not built for this boundary and are not offered.
               </small>
+              <small class="trust-posture" class:verified={environment.runner_trust === "publisher_verified"}>
+                {environment.runner_trust === "publisher_verified"
+                  ? "Publisher verified"
+                  : environment.runner_trust === "package_relative_integrity"
+                    ? "Package-relative integrity only"
+                    : "Developer build — runner publisher unverified"}
+              </small>
               {#if environment.availability_reason}
                 <small class="remediation">{explainReasonCode(environment.availability_reason)?.plain ?? environment.availability_reason.replaceAll("_", " ")}</small>
               {/if}
@@ -431,6 +438,8 @@
   .observations li.enforced strong { color:var(--ok); }
   .observations li.unenforced strong { color:var(--danger); }
   .observations li.indeterminate strong { color:var(--warn); }
+  .trust-posture { color:var(--warn) !important; text-transform:none !important; }
+  .trust-posture.verified { color:var(--ok) !important; }
   .reprobe { justify-self:start; margin-top:.35rem; }
   /* BUG-194 — the capabilities a boundary really has. Same weight as the
      measured observations above them, because they are the same kind of claim:

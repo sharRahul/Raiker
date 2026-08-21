@@ -8,10 +8,10 @@ import pytest
 from raiker.execution.commands import CommandRequest
 from raiker.execution.commands.backends import CommandBackendError
 from raiker.execution.commands.backends.container import (
-    EXPECTED_SUPERVISOR_DIGEST,
     PersistentContainerBackend,
     SubprocessContainerRuntime,
     command_container_name,
+    supervisor_digest_from_image,
 )
 from raiker.execution.commands.runner import MemoryCommandSink
 from raiker.execution.profiles import ExecutionProfile
@@ -126,7 +126,7 @@ def test_a_session_gets_one_boundary_and_the_second_run_lands_in_it(tmp_path: Pa
     assert "--read-only" in create
     assert create[create.index("--cap-drop") + 1] == "ALL"
     assert create[create.index("--security-opt") + 1] == "no-new-privileges"
-    assert f"raiker.supervisor.digest={EXPECTED_SUPERVISOR_DIGEST}" in create
+    assert f"raiker.supervisor.digest={supervisor_digest_from_image(profile().image or '')}" in create
     mounts = [create[index + 1] for index, value in enumerate(create) if value == "--mount"]
     assert any("dst=/workspace/.git,readonly" in mount for mount in mounts)
     assert any("dst=/workspace/.raiker,readonly" in mount for mount in mounts)

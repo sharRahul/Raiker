@@ -1551,6 +1551,7 @@ class DashboardService:
                 "availability_reason": native_probe.reason_code,
                 "boundary": native_probe.boundary,
                 "probe_observations": dict(native_probe.observations),
+                "runner_trust": native_probe.runner_trust,
             },
             {
                 "profile_id": "container_default", "kind": "container", "name": "Local container",

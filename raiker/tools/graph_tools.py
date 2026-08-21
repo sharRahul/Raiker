@@ -107,7 +107,11 @@ def knowledge_graph(
     if action == "entities":
         if not query.strip():
             return _failed("empty_query", "A search term is required to find entities.")
-        rows = store.match_memory_entities(query, limit=min(limit, MAX_ENTITIES))
+        rows = store.match_memory_entities(
+            query,
+            limit=min(limit, MAX_ENTITIES),
+            owner_principal_id=owner_principal_id,
+        )
         return {
             "status": "success",
             "action": "entities",
@@ -136,7 +140,9 @@ def knowledge_graph(
                 return _failed(
                     "missing_anchor", "Pass entity_id, or query to resolve one by name."
                 )
-            matches = store.match_memory_entities(query, limit=1)
+            matches = store.match_memory_entities(
+                query, limit=1, owner_principal_id=owner_principal_id
+            )
             if not matches:
                 return {
                     "status": "success",

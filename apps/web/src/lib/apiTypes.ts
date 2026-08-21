@@ -1635,6 +1635,21 @@ export interface MemoryProposal {
   created_at: string;
 }
 
+export interface MemoryRelationshipProposal {
+  candidate_id: string;
+  subject_name: string;
+  subject_type: string;
+  predicate: string;
+  object_name: string;
+  object_type: string;
+  evidence_memory_id: string;
+  evidence_text: string;
+  confidence: number;
+  extractor_version: string;
+  decision: "needs_user_review";
+  created_at: string;
+}
+
 export interface MemoryHistoryEvent {
   audit_id: string;
   action: string;

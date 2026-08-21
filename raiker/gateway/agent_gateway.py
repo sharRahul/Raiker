@@ -416,6 +416,45 @@ class AgentGateway:
             response.status,
             self._persisted_summary(response),
         )
+        if response.status == "completed":
+            try:
+                from raiker.memory.entity_extraction import propose_completed_turn_memories
+
+                summary = propose_completed_turn_memories(
+                    self.store,
+                    owner_principal_id=self.owner_principal_id,
+                    session_id=prompt_envelope.session_id,
+                    turn_id=prompt_envelope.turn_id,
+                    source_event_id=self.writer.last_event_id or "evt_missing",
+                    user_text=prompt_envelope.prompt.text,
+                    assistant_text=self._persisted_summary(response),
+                )
+                self.writer.append(
+                    make_event(
+                        session_id=prompt_envelope.session_id,
+                        turn_id=prompt_envelope.turn_id,
+                        event_type="memory_relationship_extraction_completed",
+                        actor="memory_entity_extractor",
+                        payload={
+                            "scanned": summary.scanned,
+                            "proposed": summary.proposed,
+                            "skipped": summary.skipped,
+                            "already_present": summary.already_present,
+                        },
+                        client=prompt_envelope.client,
+                    )
+                )
+            except Exception as exc:  # extraction never invalidates a completed turn
+                self.writer.append(
+                    make_event(
+                        session_id=prompt_envelope.session_id,
+                        turn_id=prompt_envelope.turn_id,
+                        event_type="memory_relationship_extraction_failed",
+                        actor="memory_entity_extractor",
+                        payload={"reason_code": type(exc).__name__},
+                        client=prompt_envelope.client,
+                    )
+                )
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
             request_id=response.request_id,

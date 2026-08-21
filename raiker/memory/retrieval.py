@@ -154,7 +154,11 @@ def retrieve_hybrid_memory(
         if entity_id
         else [
             str(row["entity_id"])
-            for row in store.match_memory_entities(query, limit=_MAX_GRAPH_ANCHORS)
+            for row in store.match_memory_entities(
+                query,
+                limit=_MAX_GRAPH_ANCHORS,
+                owner_principal_id=owner_principal_id,
+            )
         ]
     )
     for anchor in anchors:

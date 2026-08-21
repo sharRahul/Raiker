@@ -106,6 +106,55 @@ class TestMemoryList:
         }
 
 
+class TestMemoryRelationshipReview:
+    def test_owner_can_scan_review_and_reject_relationships(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        memory_id = write_memory(
+            "Rahul works on Raiker.",
+            workspace_root=workspace,
+            store=service.store,
+            owner_principal_id=OWNER,
+            governance=MemoryGovernance(
+                "evt_relation",
+                "sess_relation",
+                "turn_relation",
+                "test",
+                0.9,
+                0.9,
+                "until_forget",
+                "approved",
+                OWNER,
+            ),
+        ).memory_id
+
+        scan = service.scan_memory_relationships(OWNER)
+        assert scan.ok and scan.data["proposed"] == 1
+        proposal = service.list_memory_relationship_proposals(OWNER)[0]
+        assert proposal["evidence_memory_id"] == memory_id
+        assert proposal["evidence_text"] == "Rahul works on Raiker."
+        approved = service.decide_memory_relationship_proposal(
+            str(proposal["candidate_id"]),
+            decision="approved",
+            expected_decision="needs_user_review",
+            acting_principal_id=OWNER,
+        )
+        assert approved.ok and approved.data["relationship_id"]
+        stale = service.decide_memory_relationship_proposal(
+            str(proposal["candidate_id"]),
+            decision="denied",
+            expected_decision="needs_user_review",
+            acting_principal_id=OWNER,
+        )
+        assert not stale.ok and stale.reason_code == "stale_memory_relationship_proposal"
+
+    def test_non_owner_cannot_scan_or_list_relationships(
+        self, service: DashboardService
+    ) -> None:
+        assert not service.scan_memory_relationships("principal_unknown").ok
+        assert service.list_memory_relationship_proposals("principal_unknown") == []
+
+
 class TestMemoryPin:
     def test_pin_round_trips_and_surfaces_in_list(
         self, service: DashboardService, workspace: Path

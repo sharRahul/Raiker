@@ -3241,3 +3241,64 @@ CREATE TABLE IF NOT EXISTS checkpoint_capture_health (
   remediation TEXT NOT NULL
 );
 """
+
+
+# MEM-06 — owner-scoped, idempotent relationship proposals.
+MEMORY_RELATIONSHIP_EXTRACTION_MIGRATION_ID = "RAIKER-2037-memory-relationship-extraction"
+
+MEMORY_RELATIONSHIP_EXTRACTION_SQL = """
+PRAGMA foreign_keys = OFF;
+BEGIN IMMEDIATE;
+ALTER TABLE memory_relationship_candidates RENAME TO memory_relationship_candidates_legacy;
+CREATE TABLE memory_relationship_candidates (
+  candidate_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  subject_name TEXT NOT NULL,
+  subject_type TEXT NOT NULL,
+  normalized_subject TEXT NOT NULL,
+  predicate TEXT NOT NULL,
+  object_name TEXT NOT NULL,
+  object_type TEXT NOT NULL,
+  normalized_object TEXT NOT NULL,
+  evidence_memory_id TEXT NOT NULL REFERENCES approved_memory(memory_id),
+  confidence REAL NOT NULL CHECK(confidence >= 0 AND confidence <= 1),
+  extractor_version TEXT NOT NULL,
+  decision TEXT NOT NULL CHECK(decision IN ('needs_user_review', 'approved', 'denied')),
+  created_at TEXT NOT NULL,
+  resolved_at TEXT,
+  resolved_by TEXT,
+  UNIQUE(owner_principal_id, evidence_memory_id, normalized_subject, predicate,
+         normalized_object, extractor_version)
+);
+INSERT OR IGNORE INTO memory_relationship_candidates (
+  candidate_id, owner_principal_id, subject_name, subject_type, normalized_subject,
+  predicate, object_name, object_type, normalized_object, evidence_memory_id,
+  confidence, extractor_version, decision, created_at, resolved_at, resolved_by
+)
+SELECT c.candidate_id, m.owner_principal_id, c.subject_name, c.subject_type,
+       lower(trim(c.subject_name)), c.predicate, c.object_name, c.object_type,
+       lower(trim(c.object_name)), c.evidence_memory_id, c.confidence,
+       'legacy-v0', c.decision, c.created_at, c.resolved_at, c.resolved_by
+FROM memory_relationship_candidates_legacy c
+JOIN approved_memory m ON m.memory_id = c.evidence_memory_id
+WHERE m.owner_principal_id IS NOT NULL AND trim(m.owner_principal_id) != ''
+ORDER BY c.created_at, c.candidate_id;
+DROP TABLE memory_relationship_candidates_legacy;
+CREATE INDEX idx_memory_relationship_candidates_review
+  ON memory_relationship_candidates(owner_principal_id, decision, created_at);
+COMMIT;
+PRAGMA foreign_keys = ON;
+"""
+
+TURN_MEMORY_PROVENANCE_MIGRATION_ID = "RAIKER-2038-turn-memory-provenance"
+
+TURN_MEMORY_PROVENANCE_SQL = """
+ALTER TABLE memory_candidates ADD COLUMN source_session_id TEXT;
+ALTER TABLE memory_candidates ADD COLUMN source_turn_id TEXT;
+ALTER TABLE memory_candidates ADD COLUMN source_role TEXT;
+ALTER TABLE memory_candidates ADD COLUMN extractor_version TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_candidates_turn_source
+  ON memory_candidates(owner_principal_id, source_turn_id, source_role, extractor_version)
+  WHERE source_turn_id IS NOT NULL AND source_role IS NOT NULL
+    AND extractor_version IS NOT NULL;
+"""

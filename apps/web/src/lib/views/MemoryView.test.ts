@@ -101,6 +101,42 @@ describe("MemoryView", () => {
     ));
   });
 
+  it("reviews extracted relationships with visible evidence", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/relationship-proposals": [{
+        candidate_id: "relcand_1",
+        subject_name: "Rahul",
+        subject_type: "person",
+        predicate: "works_on",
+        object_name: "Raiker",
+        object_type: "project",
+        evidence_memory_id: "mem_evidence",
+        evidence_text: "Rahul works on Raiker.",
+        confidence: 0.97,
+        extractor_version: "memory-entity-rules-v1",
+        decision: "needs_user_review",
+        created_at: "2026-08-21T00:00:00Z",
+      }],
+      "POST /api/memory/relationship-proposals/relcand_1/decision": {
+        ok: true,
+        candidate_id: "relcand_1",
+        decision: "approved",
+        relationship_id: "rel_1",
+      },
+    });
+    render(MemoryView);
+
+    expect(await screen.findByText("Rahul works on Raiker.")).toBeInTheDocument();
+    expect(screen.getByText(/97% confidence/i)).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /approve relationship/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/relationship-proposals/relcand_1/decision",
+      expect.objectContaining({ method: "POST" }),
+    ));
+  });
+
   it("toggles incognito and reflects the new state", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [],

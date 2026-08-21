@@ -81,6 +81,55 @@ async def decide_memory_proposal(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/memory/relationship-proposals")
+async def list_memory_relationship_proposals(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    return _service(request).list_memory_relationship_proposals(
+        auth_data[0].principal_id
+    )
+
+
+@router.post("/api/memory/relationship-proposals/scan")
+async def scan_memory_relationships(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).scan_memory_relationships(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/relationship-proposals/{candidate_id}/decision")
+async def decide_memory_relationship_proposal(
+    candidate_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).decide_memory_relationship_proposal(
+        candidate_id,
+        decision=str(body.get("decision", "")),
+        expected_decision=str(body.get("expected_decision", "needs_user_review")),
+        acting_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if result.reason_code == "stale_memory_relationship_proposal"
+                else status.HTTP_403_FORBIDDEN
+            ),
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.put("/api/memory/{memory_id}/pin")
 async def set_memory_pinned(
     memory_id: str,

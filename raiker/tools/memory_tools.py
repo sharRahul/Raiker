@@ -90,7 +90,9 @@ def memory_search(
     anchors = (
         [{"entity_id": entity_id, "display_name": "", "entity_type": ""}]
         if entity_id
-        else store.match_memory_entities(query)
+        else store.match_memory_entities(
+            query, owner_principal_id=owner_principal_id
+        )
     )
     return {
         "status": "success",

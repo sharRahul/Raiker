@@ -63,6 +63,10 @@ EVENT_TYPES = {
     # summary itself remains in the encrypted workspace store.
     "compacted_context_created",
     "compacted_context_failed",
+    # Deterministic, bounded relationship extraction after a completed turn.
+    # Payloads are counts/reason codes only; candidate text stays encrypted.
+    "memory_relationship_extraction_completed",
+    "memory_relationship_extraction_failed",
     # B2 — a turn parked for an approval, and the same turn picking up again
     # once the owner resolved it. Counts and ids only; the parked conversation
     # stays in the encrypted store and never enters an event payload.

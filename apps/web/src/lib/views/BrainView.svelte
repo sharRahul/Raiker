@@ -18,7 +18,7 @@
     user: "#f3f5fa", workspace: "#77d5ee", project: "#a78bfa", source: "#60a5fa",
     folder: "#818cf8", file: "#60a5fa", session: "#58d68d", conversation: "#58d68d",
     build: "#38bdf8", task_run: "#f5b942",
-    task: "#f5b942", memory: "#2dd4bf", tool: "#fb923c", approval: "#facc15",
+    task: "#f5b942", memory: "#2dd4bf", entity: "#14b8a6", tool: "#fb923c", approval: "#facc15",
     agent: "#c084fc", schedule: "#f5b942", backup: "#60a5fa",
   };
   // The filter row is what an owner reaches for to answer "show me only my
@@ -26,11 +26,11 @@
   // contained when the map was mostly event rows.
   const FILTER_TYPES = [
     "conversation", "build", "project", "folder", "file", "source",
-    "task", "memory", "tool", "approval",
+    "task", "memory", "entity", "tool", "approval",
   ];
   const FILTER_LABELS: Record<string, string> = {
     conversation: "Chats", build: "Build", project: "Projects", folder: "Folders",
-    file: "Files", source: "Context", task: "Tasks", memory: "Memories",
+    file: "Files", source: "Context", task: "Tasks", memory: "Memories", entity: "Entities",
     tool: "Tools", approval: "Approvals",
   };
 

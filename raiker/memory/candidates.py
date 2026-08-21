@@ -28,6 +28,10 @@ class MemoryCandidate:
     confidence: float
     decision: str
     created_at: str
+    source_session_id: str | None = None
+    source_turn_id: str | None = None
+    source_role: str | None = None
+    extractor_version: str | None = None
 
 
 def create_deferred_candidate(

@@ -21,6 +21,8 @@ import pytest
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ToolAction, User
 from raiker.control.dashboard import DashboardService
+from raiker.memory.entity_extraction import propose_memory_relationships
+from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "prin_owner"
@@ -96,6 +98,36 @@ def test_a_failing_tool_says_so(service: DashboardService) -> None:
     node = next(n for n in view.nodes if n.label == "Fetch page")
     assert node.status == "failed"
     assert "failed" in (node.detail or "")
+
+
+def test_reviewed_memory_relationship_draws_entities_and_evidence(
+    service: DashboardService, tmp_path: Path
+) -> None:
+    memory = write_memory(
+        "Rahul works on Raiker.",
+        workspace_root=tmp_path,
+        store=service.store,
+        owner_principal_id=OWNER,
+        governance=MemoryGovernance(
+            "evt_graph_relation", "", None, "test", 0.9, 0.9,
+            "until_forget", "approved", OWNER,
+        ),
+    )
+    propose_memory_relationships(service.store, memory.memory_id, OWNER)
+    candidate = service.store.list_memory_relationship_candidates(OWNER)[0]
+    service.store.resolve_memory_relationship_candidate_atomic(
+        str(candidate["candidate_id"]),
+        owner_principal_id=OWNER,
+        decision="approved",
+        reviewer_id=OWNER,
+    )
+
+    view = service.brain_view(principal_id=OWNER, user_id=USER)
+
+    assert _labels(view, "entity") == {"Rahul", "Raiker"}
+    relationships = {(edge.relationship, edge.source, edge.target) for edge in view.edges}
+    assert any(value[0] == "works_on" for value in relationships)
+    assert any(value[0] == "evidence_for" for value in relationships)
 
 
 def test_chat_and_build_are_different_nodes(service: DashboardService) -> None:

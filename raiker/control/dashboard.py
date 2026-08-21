@@ -2353,6 +2353,43 @@ class DashboardService:
                 # Neither reachable: the owner still owns it, and an anchored
                 # node is more honest than a floating one.
                 edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "remembers"))
+        # MEM-06 — reviewed entity facts are first-class graph records. Every
+        # relation remains connected to the approved memory that evidenced it;
+        # an edge can therefore be inspected instead of trusted as inference.
+        entity_nodes: set[str] = set()
+        memory_node_ids = {f"memory:{memory.memory_id}" for memory in memories}
+        for relationship in self.store.list_memory_relationships(principal_id):
+            subject = f"entity:{relationship['subject_entity_id']}"
+            object_id = f"entity:{relationship['object_entity_id']}"
+            if subject not in entity_nodes:
+                entity_nodes.add(subject)
+                nodes.append(
+                    BrainNodeView(
+                        subject,
+                        "entity",
+                        str(relationship["subject_name"]),
+                        "reviewed",
+                        str(relationship["subject_type"]),
+                    )
+                )
+            if object_id not in entity_nodes:
+                entity_nodes.add(object_id)
+                nodes.append(
+                    BrainNodeView(
+                        object_id,
+                        "entity",
+                        str(relationship["object_name"]),
+                        "reviewed",
+                        str(relationship["object_type"]),
+                    )
+                )
+            edges.append(
+                BrainEdgeView(subject, object_id, str(relationship["predicate"]))
+            )
+            evidence = f"memory:{relationship['evidence_memory_id']}"
+            if evidence in memory_node_ids:
+                edges.append(BrainEdgeView(evidence, subject, "evidence_for"))
+
         for approval in approvals:
             node_id = f"approval:{approval.approval_id}"
             nodes.append(BrainNodeView(node_id, "approval", approval.tool_name, approval.status, approval.capability))
@@ -3145,6 +3182,83 @@ class DashboardService:
             decision="deferred", owner_principal_id=acting_principal_id
         )
 
+    def list_memory_relationship_proposals(
+        self, acting_principal_id: str | None
+    ) -> list[dict[str, Any]]:
+        if not self._is_human(acting_principal_id):
+            return []
+        return self.store.list_memory_relationship_candidates(
+            acting_principal_id or ""
+        )
+
+    def scan_memory_relationships(
+        self, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Owner-started, idempotent backfill over currently approved memory."""
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.entity_extraction import propose_memory_relationships
+
+        scanned = proposed = skipped = already_present = 0
+        for memory in self.store.list_approved_memory(
+            limit=10_000,
+            include_search_disabled=False,
+            owner_principal_id=acting_principal_id,
+        ):
+            summary = propose_memory_relationships(
+                self.store, str(memory["memory_id"]), acting_principal_id or ""
+            )
+            scanned += summary.scanned
+            proposed += summary.proposed
+            skipped += summary.skipped
+            already_present += summary.already_present
+        return ControlResult(
+            ok=True,
+            data={
+                "scanned": scanned,
+                "proposed": proposed,
+                "skipped": skipped,
+                "already_present": already_present,
+            },
+        )
+
+    def decide_memory_relationship_proposal(
+        self,
+        candidate_id: str,
+        *,
+        decision: str,
+        expected_decision: str,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if decision not in {"approved", "denied"}:
+            return ControlResult(
+                ok=False, reason_code="invalid_memory_relationship_decision"
+            )
+        try:
+            relationship_id = self.store.resolve_memory_relationship_candidate_atomic(
+                candidate_id,
+                owner_principal_id=acting_principal_id or "",
+                decision=decision,
+                reviewer_id=acting_principal_id or "",
+                expected_decision=expected_decision,
+            )
+        except ValueError as exc:
+            if str(exc) == "stale_memory_relationship_candidate":
+                return ControlResult(
+                    ok=False, reason_code="stale_memory_relationship_proposal"
+                )
+            raise
+        return ControlResult(
+            ok=True,
+            data={
+                "candidate_id": candidate_id,
+                "decision": decision,
+                "relationship_id": relationship_id or None,
+            },
+        )
+
     def decide_memory_proposal(
         self,
         candidate_id: str,
@@ -3196,6 +3310,7 @@ class DashboardService:
             )
             return ControlResult(ok=True, data={"candidate_id": candidate_id, "decision": decision})
 
+        from raiker.memory.entity_extraction import propose_memory_relationships
         from raiker.memory.store import MemoryGovernance, write_memory
 
         entry = write_memory(
@@ -3228,9 +3343,17 @@ class DashboardService:
                 "reason": reason or "",
             },
         )
+        extraction = propose_memory_relationships(
+            self.store, entry.memory_id, acting_principal_id or ""
+        )
         return ControlResult(
             ok=True,
-            data={"candidate_id": candidate_id, "decision": decision, "memory_id": entry.memory_id},
+            data={
+                "candidate_id": candidate_id,
+                "decision": decision,
+                "memory_id": entry.memory_id,
+                "relationship_proposals": extraction.proposed,
+            },
         )
 
     def memory_history(
@@ -3432,7 +3555,9 @@ class DashboardService:
     def import_memories(self, memories: list[dict[str, Any]], acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.entity_extraction import propose_memory_relationships
         from raiker.memory.store import MemoryGovernance, update_memory, write_memory
+        relationship_proposals = 0
         for item in memories:
             text = str(item.get("text", "")).strip()
             if not text:
@@ -3460,7 +3585,16 @@ class DashboardService:
             self.store.record_memory_lifecycle_event(
                 entry.memory_id, "import", acting_principal_id or "", {"source": "user_import"}
             )
-        return ControlResult(ok=True, data={"count": len(memories)})
+            relationship_proposals += propose_memory_relationships(
+                self.store, entry.memory_id, acting_principal_id or ""
+            ).proposed
+        return ControlResult(
+            ok=True,
+            data={
+                "count": len(memories),
+                "relationship_proposals": relationship_proposals,
+            },
+        )
 
     def reconcile_memory_indexes(self, acting_principal_id: str | None) -> ControlResult:
         """Owner-started repair; never runs as an autonomous background worker."""

@@ -48,25 +48,14 @@ def resolve_entity_relationship_proposal(
     candidate = store.get_memory_relationship_candidate(candidate_id)
     if candidate is None or str(candidate["decision"]) != "needs_user_review":
         return None
-    if decision == "denied":
-        return "" if store.resolve_memory_relationship_candidate(
-            candidate_id, decision=decision, resolved_by=reviewer_id
-        ) else None
-    if decision != "approved":
-        raise ValueError("invalid_memory_relationship_resolution")
-    if store.get_active_approved_memory(str(candidate["evidence_memory_id"])) is None:
-        raise ValueError("memory_relationship_evidence_not_active")
-    subject_id = create_entity(
-        store=store, name=str(candidate["subject_name"]), entity_type=str(candidate["subject_type"])
-    )
-    object_id = create_entity(
-        store=store, name=str(candidate["object_name"]), entity_type=str(candidate["object_type"])
-    )
-    relationship_id = relate_entities(
-        store=store, subject_entity_id=subject_id, predicate=str(candidate["predicate"]),
-        object_entity_id=object_id, evidence_memory_id=str(candidate["evidence_memory_id"]),
-        confidence=float(candidate["confidence"]),
-    )
-    if not store.resolve_memory_relationship_candidate(candidate_id, decision=decision, resolved_by=reviewer_id):
-        raise RuntimeError("memory_relationship_resolution_race")
-    return relationship_id
+    try:
+        return store.resolve_memory_relationship_candidate_atomic(
+            candidate_id,
+            owner_principal_id=str(candidate["owner_principal_id"]),
+            decision=decision,
+            reviewer_id=reviewer_id,
+        )
+    except ValueError as exc:
+        if str(exc) == "stale_memory_relationship_candidate":
+            return None
+        raise

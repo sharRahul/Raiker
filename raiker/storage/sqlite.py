@@ -163,6 +163,8 @@ from raiker.storage.migrations import (
     MEMORY_PROJECTIONS_SQL,
     MEMORY_PURGE_MIGRATION_ID,
     MEMORY_PURGE_SQL,
+    MEMORY_RELATIONSHIP_EXTRACTION_MIGRATION_ID,
+    MEMORY_RELATIONSHIP_EXTRACTION_SQL,
     MEMORY_RELATIONSHIP_REVIEW_MIGRATION_ID,
     MEMORY_RELATIONSHIP_REVIEW_SQL,
     MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID,
@@ -334,6 +336,8 @@ from raiker.storage.migrations import (
     THREAT_MODEL_ACKS_SQL,
     TURN_CONTROLS_MIGRATION_ID,
     TURN_CONTROLS_SQL,
+    TURN_MEMORY_PROVENANCE_MIGRATION_ID,
+    TURN_MEMORY_PROVENANCE_SQL,
     TURN_REASONING_MIGRATION_ID,
     TURN_REASONING_SQL,
     TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
@@ -1403,6 +1407,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
                 CHECKPOINT_CAPTURE_HEALTH_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MEMORY_RELATIONSHIP_EXTRACTION_MIGRATION_ID,
+                MEMORY_RELATIONSHIP_EXTRACTION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TURN_MEMORY_PROVENANCE_MIGRATION_ID,
+                TURN_MEMORY_PROVENANCE_SQL,
                 connection,
             )
             self._apply_migration(
@@ -6178,13 +6192,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def update_task_status(self, task_id: str, status: str) -> None:
         self._update_task(task_id, status=status)
 
-    def insert_memory_candidate(self, candidate: Any, *, owner_principal_id: str | None = None) -> None:
+    def insert_memory_candidate(
+        self, candidate: Any, *, owner_principal_id: str | None = None
+    ) -> bool:
         with self.connect() as connection:
-            connection.execute(
+            cursor = connection.execute(
                 """
-                INSERT INTO memory_candidates
-                (candidate_id, source_event_id, memory_type, scope, text, sensitivity, confidence, decision, created_at, owner_principal_id)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT OR IGNORE INTO memory_candidates
+                (candidate_id, source_event_id, memory_type, scope, text, sensitivity,
+                 confidence, decision, created_at, owner_principal_id,
+                 source_session_id, source_turn_id, source_role, extractor_version)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     candidate.candidate_id,
@@ -6197,8 +6215,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     candidate.decision,
                     candidate.created_at,
                     owner_principal_id,
+                    getattr(candidate, "source_session_id", None),
+                    getattr(candidate, "source_turn_id", None),
+                    getattr(candidate, "source_role", None),
+                    getattr(candidate, "extractor_version", None),
                 ),
             )
+        return cursor.rowcount > 0
 
     def list_memory_candidates(self, decision: str | None = None, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
         query = "SELECT * FROM memory_candidates"
@@ -6486,7 +6509,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return {str(row["event_id"]): str(row["session_id"]) for row in rows if row["session_id"]}
 
-    def match_memory_entities(self, query: str, *, limit: int = 3) -> list[dict[str, Any]]:
+    def match_memory_entities(
+        self,
+        query: str,
+        *,
+        limit: int = 3,
+        owner_principal_id: str | None = None,
+    ) -> list[dict[str, Any]]:
         """Entities this query actually names (MEM-12).
 
         The graph leg of hybrid retrieval needs somewhere to start, and until now
@@ -6517,6 +6546,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if not terms:
             return []
         placeholders = ",".join("?" for _ in terms)
+        owner_filter = ""
+        params: list[Any] = [*sorted(terms), collapsed]
+        if owner_principal_id:
+            owner_filter = """ AND EXISTS (
+                SELECT 1 FROM memory_entity_relationships r
+                JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
+                WHERE r.active = 1
+                  AND (r.subject_entity_id = memory_entities.entity_id
+                       OR r.object_entity_id = memory_entities.entity_id)
+                  AND m.owner_principal_id = ?
+                  AND m.deleted_at IS NULL AND m.archived_at IS NULL
+                  AND m.search_enabled = 1
+                  AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+                  AND (m.expires_at IS NULL OR m.expires_at > ?)
+                  AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                  AND (m.valid_until IS NULL OR m.valid_until > ?)
+                  AND m.superseded_at IS NULL
+            )"""
+            now = utc_now()
+            params.extend([owner_principal_id, now, now, now])
+        params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(
                 # The padding is what makes the containment check a *word*
@@ -6527,12 +6577,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 # can match.
                 f"""SELECT entity_id, display_name, entity_type, normalized_name
                     FROM memory_entities
-                    WHERE normalized_name IN ({placeholders})
+                    WHERE (normalized_name IN ({placeholders})
                        OR (INSTR(' ' || ? || ' ', ' ' || normalized_name || ' ') > 0
-                           AND LENGTH(normalized_name) >= 3)
+                           AND LENGTH(normalized_name) >= 3))
+                    {owner_filter}
                     ORDER BY LENGTH(normalized_name) DESC, normalized_name
                     LIMIT ?""",
-                [*sorted(terms), collapsed, limit],
+                params,
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -6552,25 +6603,101 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def create_memory_relationship_candidate(
         self, candidate_id: str, *, subject_name: str, subject_type: str, predicate: str,
         object_name: str, object_type: str, evidence_memory_id: str, confidence: float,
-    ) -> None:
+        owner_principal_id: str | None = None, extractor_version: str = "manual-v1",
+    ) -> bool:
         if not all(value.strip() for value in (subject_name, subject_type, predicate, object_name, object_type)):
             raise ValueError("invalid_memory_relationship_candidate")
-        if not 0 <= confidence <= 1 or self.get_active_approved_memory(evidence_memory_id) is None:
+        evidence = self.get_active_approved_memory(
+            evidence_memory_id, owner_principal_id=owner_principal_id
+        )
+        if not 0 <= confidence <= 1 or evidence is None:
             raise ValueError("invalid_memory_relationship_candidate")
+        owner = owner_principal_id or str(evidence.get("owner_principal_id") or "")
+        if not owner or not extractor_version.strip():
+            raise ValueError("invalid_memory_relationship_candidate")
+        normalized_subject = " ".join(subject_name.casefold().split())
+        normalized_object = " ".join(object_name.casefold().split())
         with self.connect() as connection:
-            connection.execute(
-                """INSERT INTO memory_relationship_candidates VALUES (?, ?, ?, ?, ?, ?, ?, ?,
-                'needs_user_review', ?, NULL, NULL)""",
-                (candidate_id, subject_name.strip(), subject_type.strip(), predicate.strip(), object_name.strip(),
-                 object_type.strip(), evidence_memory_id, confidence, utc_now()),
+            cursor = connection.execute(
+                """INSERT OR IGNORE INTO memory_relationship_candidates
+                   (candidate_id, owner_principal_id, subject_name, subject_type,
+                    normalized_subject, predicate, object_name, object_type,
+                    normalized_object, evidence_memory_id, confidence, extractor_version,
+                    decision, created_at, resolved_at, resolved_by)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                           'needs_user_review', ?, NULL, NULL)""",
+                (
+                    candidate_id,
+                    owner,
+                    subject_name.strip(),
+                    subject_type.strip(),
+                    normalized_subject,
+                    predicate.strip(),
+                    object_name.strip(),
+                    object_type.strip(),
+                    normalized_object,
+                    evidence_memory_id,
+                    confidence,
+                    extractor_version.strip(),
+                    utc_now(),
+                ),
             )
+        return cursor.rowcount > 0
 
-    def get_memory_relationship_candidate(self, candidate_id: str) -> dict[str, Any] | None:
+    def get_memory_relationship_candidate(
+        self, candidate_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM memory_relationship_candidates WHERE candidate_id = ?", (candidate_id,)
+                "SELECT * FROM memory_relationship_candidates WHERE candidate_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (candidate_id, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
         return dict(row) if row else None
+
+    def list_memory_relationship_candidates(
+        self, owner_principal_id: str, *, decision: str = "needs_user_review"
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT c.*, m.text AS evidence_text,
+                          m.source_event_id AS evidence_source_event_id
+                   FROM memory_relationship_candidates c
+                   JOIN approved_memory m ON m.memory_id = c.evidence_memory_id
+                   WHERE c.owner_principal_id = ? AND c.decision = ?
+                     AND m.owner_principal_id = ?
+                   ORDER BY c.created_at, c.candidate_id""",
+                (owner_principal_id, decision, owner_principal_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def list_memory_relationships(
+        self, owner_principal_id: str
+    ) -> list[dict[str, Any]]:
+        """Active graph edges whose approved evidence belongs to one owner."""
+        now = utc_now()
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT r.*, s.display_name AS subject_name,
+                          s.entity_type AS subject_type,
+                          o.display_name AS object_name,
+                          o.entity_type AS object_type
+                   FROM memory_entity_relationships r
+                   JOIN memory_entities s ON s.entity_id = r.subject_entity_id
+                   JOIN memory_entities o ON o.entity_id = r.object_entity_id
+                   JOIN approved_memory m ON m.memory_id = r.evidence_memory_id
+                   WHERE r.active = 1 AND m.owner_principal_id = ?
+                     AND m.deleted_at IS NULL AND m.archived_at IS NULL
+                     AND m.search_enabled = 1
+                     AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+                     AND (m.expires_at IS NULL OR m.expires_at > ?)
+                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                     AND (m.valid_until IS NULL OR m.valid_until > ?)
+                     AND m.superseded_at IS NULL
+                   ORDER BY r.created_at, r.relationship_id""",
+                (owner_principal_id, now, now, now),
+            ).fetchall()
+        return [dict(row) for row in rows]
 
     def resolve_memory_relationship_candidate(
         self, candidate_id: str, *, decision: str, resolved_by: str,
@@ -6584,6 +6711,140 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (decision, utc_now(), resolved_by, candidate_id),
             )
         return cursor.rowcount > 0
+
+    def resolve_memory_relationship_candidate_atomic(
+        self,
+        candidate_id: str,
+        *,
+        owner_principal_id: str,
+        decision: str,
+        reviewer_id: str,
+        expected_decision: str = "needs_user_review",
+    ) -> str:
+        if decision not in {"approved", "denied"} or not reviewer_id.strip():
+            raise ValueError("invalid_memory_relationship_resolution")
+        relationship_id = new_id("rel_")
+        subject_id = new_id("ent_")
+        object_id = new_id("ent_")
+        now = utc_now()
+        with self.connect() as connection:
+            # Serialize the compare-and-swap before reading the candidate. A
+            # deferred transaction lets two reviewers both observe "pending"
+            # and makes the loser fail later with a database lock instead of
+            # the stable stale-decision contract the API promises.
+            connection.execute("BEGIN IMMEDIATE")
+            candidate = connection.execute(
+                """SELECT c.* FROM memory_relationship_candidates c
+                   JOIN approved_memory m ON m.memory_id = c.evidence_memory_id
+                   WHERE c.candidate_id = ? AND c.owner_principal_id = ?
+                     AND c.decision = ? AND m.owner_principal_id = ?
+                     AND m.deleted_at IS NULL AND m.archived_at IS NULL
+                     AND m.search_enabled = 1
+                     AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+                     AND (m.expires_at IS NULL OR m.expires_at > ?)
+                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
+                     AND (m.valid_until IS NULL OR m.valid_until > ?)
+                     AND m.superseded_at IS NULL""",
+                (
+                    candidate_id,
+                    owner_principal_id,
+                    expected_decision,
+                    owner_principal_id,
+                    now,
+                    now,
+                    now,
+                ),
+            ).fetchone()
+            if candidate is None:
+                raise ValueError("stale_memory_relationship_candidate")
+            if decision == "denied":
+                changed = connection.execute(
+                    """UPDATE memory_relationship_candidates
+                       SET decision='denied', resolved_at=?, resolved_by=?
+                       WHERE candidate_id=? AND owner_principal_id=? AND decision=?""",
+                    (
+                        now,
+                        reviewer_id,
+                        candidate_id,
+                        owner_principal_id,
+                        expected_decision,
+                    ),
+                )
+                if changed.rowcount != 1:
+                    raise ValueError("stale_memory_relationship_candidate")
+                return ""
+
+            for entity_id, normalized, display_name, entity_type in (
+                (
+                    subject_id,
+                    str(candidate["normalized_subject"]),
+                    str(candidate["subject_name"]),
+                    str(candidate["subject_type"]),
+                ),
+                (
+                    object_id,
+                    str(candidate["normalized_object"]),
+                    str(candidate["object_name"]),
+                    str(candidate["object_type"]),
+                ),
+            ):
+                connection.execute(
+                    """INSERT INTO memory_entities
+                       (entity_id, normalized_name, display_name, entity_type, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(normalized_name, entity_type) DO UPDATE SET
+                         display_name=excluded.display_name, updated_at=excluded.updated_at""",
+                    (entity_id, normalized, display_name, entity_type, now, now),
+                )
+            subject = connection.execute(
+                "SELECT entity_id FROM memory_entities WHERE normalized_name=? AND entity_type=?",
+                (candidate["normalized_subject"], candidate["subject_type"]),
+            ).fetchone()
+            object_row = connection.execute(
+                "SELECT entity_id FROM memory_entities WHERE normalized_name=? AND entity_type=?",
+                (candidate["normalized_object"], candidate["object_type"]),
+            ).fetchone()
+            assert subject is not None and object_row is not None
+            connection.execute(
+                """INSERT INTO memory_entity_relationships
+                   (relationship_id, subject_entity_id, predicate, object_entity_id,
+                    evidence_memory_id, confidence, created_at, active)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, 1)""",
+                (
+                    relationship_id,
+                    subject["entity_id"],
+                    candidate["predicate"],
+                    object_row["entity_id"],
+                    candidate["evidence_memory_id"],
+                    candidate["confidence"],
+                    now,
+                ),
+            )
+            changed = connection.execute(
+                """UPDATE memory_relationship_candidates
+                   SET decision='approved', resolved_at=?, resolved_by=?
+                   WHERE candidate_id=? AND owner_principal_id=? AND decision=?""",
+                (
+                    now,
+                    reviewer_id,
+                    candidate_id,
+                    owner_principal_id,
+                    expected_decision,
+                ),
+            )
+            if changed.rowcount != 1:
+                raise ValueError("stale_memory_relationship_candidate")
+            connection.execute(
+                """INSERT OR REPLACE INTO memory_projections
+                   (memory_id, projection_type, projection_id, source_version, active)
+                   VALUES (?, 'graph', ?, ?, 1)""",
+                (
+                    candidate["evidence_memory_id"],
+                    relationship_id,
+                    candidate["extractor_version"],
+                ),
+            )
+        return relationship_id
 
     def list_memory_entity_neighborhood(
         self, entity_id: str, scope: str | None = None, *, owner_principal_id: str | None = None

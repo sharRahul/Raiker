@@ -3,7 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
+  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
 
@@ -11,6 +11,7 @@
   let memories = $state<MemoryControlView[] | null>(null);
   let settings = $state<MemorySettingsView | null>(null);
   let proposals = $state<MemoryProposal[]>([]);
+  let relationshipProposals = $state<MemoryRelationshipProposal[]>([]);
   let loadError = $state<string | null>(null);
   let actionError = $state<string | null>(null);
   let busy = $state(false);
@@ -62,6 +63,7 @@
     try {
       [memories, settings] = await Promise.all([api.memories(), api.memorySettings()]);
       try { proposals = await api.memoryProposals(); } catch { proposals = []; }
+      try { relationshipProposals = await api.memoryRelationshipProposals(); } catch { relationshipProposals = []; }
       try { gates = await api.capabilityGates(); } catch { gates = null; }
       // A failed read is null, never an empty list: "capture is not reporting"
       // must not render as "capture found nothing".
@@ -108,6 +110,19 @@
       proposalEditingId = null;
       await load();
     } catch { actionError = "This proposal could not be decided. Refresh in case it changed elsewhere."; }
+  }
+  async function scanRelationships() {
+    if (busy) return;
+    busy = true; actionError = null;
+    try { await api.scanMemoryRelationships(); await load(); }
+    catch { actionError = "Could not scan approved memories for relationships."; }
+    finally { busy = false; }
+  }
+  async function decideRelationship(proposal: MemoryRelationshipProposal, decision: "approved" | "denied") {
+    try {
+      await api.decideMemoryRelationshipProposal(proposal.candidate_id, decision, proposal.decision);
+      await load();
+    } catch { actionError = "This relationship could not be decided. Refresh in case it changed elsewhere."; }
   }
   async function changeScope(m: MemoryControlView) {
     const scope = window.prompt("New scope (account, project, project:<id>, session, or session:<id>)", m.scope);
@@ -312,7 +327,7 @@
 {:else if memories === null}<PageState state="loading" title="Loading memories…" />
 {:else}
   <section class="summary" aria-label="Memory summary">
-    <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
+    <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length + relationshipProposals.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
   </section>
 
   <section class="filters" aria-label="Filter memories">
@@ -338,6 +353,26 @@
       </article>{/each}
     </section>
   {/if}
+
+  <section class="memory-section relationship-review">
+    <div class="section-head">
+      <div><h3>Relationship review</h3><p>Only approved relationships can enter recall and the Knowledge Map.</p></div>
+      <button class="btn btn-ghost btn-sm" type="button" disabled={busy} onclick={() => void scanRelationships()}>{busy ? "Scanning…" : "Scan approved memories"}</button>
+    </div>
+    {#if relationshipProposals.length}
+      {#each relationshipProposals as proposal (proposal.candidate_id)}
+        <article class="memory-card pending relationship-card">
+          <h4>{proposal.subject_name} <span>{proposal.predicate.replaceAll("_", " ")}</span> {proposal.object_name}</h4>
+          <blockquote>{proposal.evidence_text}</blockquote>
+          <div class="meta"><span>{proposal.subject_type} → {proposal.object_type}</span><span>{Math.round(proposal.confidence * 100)}% confidence</span><span>{proposal.extractor_version}</span></div>
+          <p>Evidence: {proposal.evidence_memory_id}. Approving adds the reviewed edge; denying leaves the evidence memory unchanged.</p>
+          <div class="card-actions"><button class="btn btn-primary btn-sm" onclick={() => void decideRelationship(proposal, "approved")}>Approve relationship</button><button class="btn btn-ghost btn-sm danger" onclick={() => void decideRelationship(proposal, "denied")}>Reject relationship</button></div>
+        </article>
+      {/each}
+    {:else}
+      <p class="muted">No relationship proposals are waiting for review.</p>
+    {/if}
+  </section>
 
   <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
     {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><p>{posture.headline}</p><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>

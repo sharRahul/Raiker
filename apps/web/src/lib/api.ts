@@ -50,6 +50,7 @@ import type {
   Notification,
   MemoryControlView,
   MemoryProposal,
+  MemoryRelationshipProposal,
   MemoryHistoryEvent,
   GuideIndex,
   GuideSection,
@@ -1287,6 +1288,30 @@ export const api = {
   memories: (scope?: string) =>
     request<MemoryControlView[]>(withQuery("/api/memory", { scope })),
   memoryProposals: () => request<MemoryProposal[]>("/api/memory/proposals"),
+  memoryRelationshipProposals: () =>
+    request<MemoryRelationshipProposal[]>("/api/memory/relationship-proposals"),
+  scanMemoryRelationships: () =>
+    postJson<{
+      ok: boolean;
+      scanned: number;
+      proposed: number;
+      skipped: number;
+      already_present: number;
+    }>("/api/memory/relationship-proposals/scan", {}),
+  decideMemoryRelationshipProposal: (
+    id: string,
+    decision: "approved" | "denied",
+    expectedDecision = "needs_user_review",
+  ) =>
+    postJson<{
+      ok: boolean;
+      candidate_id: string;
+      decision: string;
+      relationship_id: string | null;
+    }>(
+      `/api/memory/relationship-proposals/${encodeURIComponent(id)}/decision`,
+      { decision, expected_decision: expectedDecision },
+    ),
   decideMemoryProposal: (
     id: string,
     body: {

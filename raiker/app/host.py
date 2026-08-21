@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.internal_paths import internal_io_path
 
 # Task states that mean real work would be interrupted by a quit. Sourced here
 # rather than imported from the web UI's copy so the CLI and the API agree
@@ -100,7 +101,7 @@ class HostControl:
 
     @property
     def state_dir(self) -> Path:
-        return self.workspace_root / ".raiker" / "host"
+        return internal_io_path(self.workspace_root / ".raiker" / "host")
 
     @property
     def record_path(self) -> Path:
@@ -189,7 +190,9 @@ class HostControl:
         count is worse than no count at all. A workspace with no database yet
         simply has nothing waiting, which is the truth.
         """
-        if not (self.workspace_root / ".raiker" / "raiker.db").is_file():
+        if not internal_io_path(
+            self.workspace_root / ".raiker" / "raiker.db"
+        ).is_file():
             return []
         from raiker.storage.sqlite import SQLiteStore
 

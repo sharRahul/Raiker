@@ -43,6 +43,7 @@ from raiker.runtime.command_policy import (
     sandbox_environment,
     validate_command,
 )
+from raiker.storage.internal_paths import internal_io_path
 
 #: Workspace-relative paths a command may never read or write. `.raiker` holds
 #: the runtime's own encrypted state; a command that could read it could read
@@ -231,7 +232,9 @@ class NativeSandboxDriver:
         return f"raiker.cmd.{digest}"
 
     def policy_path(self, request: CommandRequest) -> Path:
-        directory = request.workspace_root / ".raiker" / "command-policies"
+        directory = internal_io_path(
+            request.workspace_root / ".raiker" / "command-policies"
+        )
         directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{request.run_id}.json"
 

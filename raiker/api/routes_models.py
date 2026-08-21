@@ -39,6 +39,7 @@ from raiker.models.runtime_installers import RuntimeInstallerRegistry
 from raiker.models.setup import ModelSetupState
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.runtime.connector_ecosystem import ConnectorVault
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -65,7 +66,9 @@ def _library_service(request: Request) -> ModelLibraryService:
 
 def _hugging_face_service(request: Request) -> HuggingFaceService:
     root = Path(request.app.state.workspace_root)  # type: ignore[attr-defined]
-    return HuggingFaceService(cache_dir=root / ".raiker" / "models" / "huggingface")
+    return HuggingFaceService(
+        cache_dir=internal_io_path(root / ".raiker" / "models" / "huggingface")
+    )
 
 
 def _hugging_face_token(request: Request, owner: str) -> str | None:

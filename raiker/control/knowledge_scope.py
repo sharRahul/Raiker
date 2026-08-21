@@ -37,6 +37,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raiker.storage.internal_paths import internal_io_path
+
 # Never walked, wherever they appear: version-control internals, dependency
 # trees, and build output are noise in a knowledge graph and are large enough to
 # make an incremental review meaningless.
@@ -123,7 +125,7 @@ def build_roots(
     created yet is a real project, and hiding it would read as Raiker having
     lost it. Browsing one that does not exist fails by name.
     """
-    runtime_dir = workspace_root / RUNTIME_DIR_NAME
+    runtime_dir = internal_io_path(workspace_root / RUNTIME_DIR_NAME)
     roots: list[ScopeRoot] = []
     for project in projects:
         subpath = str(project.get("root_subpath") or "").strip().strip("/")

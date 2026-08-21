@@ -9,6 +9,7 @@ from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import ExportManifest
 from raiker.events.writer import EventLogWriter
+from raiker.storage.internal_paths import display_path
 from raiker.storage.sqlite import SQLiteStore
 
 SECRET_PATTERNS = (
@@ -265,7 +266,7 @@ def generate_export(
         last_event_id=manifest.last_event_id,
         first_timestamp=manifest.first_timestamp,
         last_timestamp=manifest.last_timestamp,
-        export_path=str(export_path),
+        export_path=display_path(export_path),
         exported_by=manifest.exported_by,
         created_at=manifest.created_at,
     )

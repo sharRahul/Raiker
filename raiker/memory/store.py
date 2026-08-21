@@ -7,6 +7,7 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.memory.policy import classify_memory_sensitivity
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -63,7 +64,7 @@ class MemoryForgetGovernance:
 
 
 def _memory_dir(workspace_root: str | Path) -> Path:
-    d = Path(workspace_root).resolve() / ".raiker" / "memory"
+    d = internal_io_path(Path(workspace_root).resolve() / ".raiker" / "memory")
     d.mkdir(parents=True, exist_ok=True)
     return d
 

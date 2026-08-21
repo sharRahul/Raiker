@@ -14,13 +14,16 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 from raiker.auth.secure_io import atomic_write_private
+from raiker.storage.internal_paths import internal_io_path
 
 _KEY_DIRNAME = ".raiker"
 _KEY_FILENAME = "app.key"
 
 
 def app_key_path(workspace_root: str | Path) -> Path:
-    return Path(workspace_root).resolve() / _KEY_DIRNAME / _KEY_FILENAME
+    return internal_io_path(
+        Path(workspace_root).resolve() / _KEY_DIRNAME / _KEY_FILENAME
+    )
 
 
 def ensure_app_key(workspace_root: str | Path) -> bytes:

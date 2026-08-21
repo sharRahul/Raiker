@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
+from raiker.storage.internal_paths import internal_io_path
+
 
 @dataclass(frozen=True)
 class MemorySecurityProbeResult:
@@ -32,7 +34,9 @@ def probe_memory_security(
     than trying the pragma against a production connection.
     """
 
-    probe_parent = Path(workspace_root).resolve() / ".raiker" / "runtime" / "probes"
+    probe_parent = internal_io_path(
+        Path(workspace_root).resolve() / ".raiker" / "runtime" / "probes"
+    )
     probe_parent.mkdir(parents=True, exist_ok=True)
     checked_at = _checked_at()
     with tempfile.TemporaryDirectory(prefix="sqlcipher-", dir=probe_parent) as raw_dir:

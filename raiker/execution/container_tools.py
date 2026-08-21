@@ -15,6 +15,7 @@ from raiker.runtime.executors.containers import (
     container_image_allowlist,
 )
 from raiker.runtime.executors.sandbox import SandboxError, run_command
+from raiker.storage.internal_paths import internal_io_path
 
 _ACTION_ID = re.compile(r"[A-Za-z0-9_-]{1,160}\Z")
 
@@ -23,7 +24,7 @@ def container_action_workspace(workspace_root: str | Path, action_id: str) -> Pa
     if not _ACTION_ID.fullmatch(action_id):
         raise ValueError("container_action_id_invalid")
     root = Path(workspace_root).resolve()
-    action_root = root / ".raiker" / "container-workspaces"
+    action_root = internal_io_path(root / ".raiker" / "container-workspaces")
     output = (action_root / action_id).resolve()
     if action_root.resolve() not in output.parents:
         raise ValueError("container_output_outside_action_root")

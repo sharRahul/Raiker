@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Literal
 
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, run_command
+from raiker.storage.internal_paths import display_path, internal_io_path
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -38,7 +39,7 @@ class ContainerRunRequest:
 
 
 def _action_workspace_root(repository: Path) -> Path:
-    return repository.resolve() / ".raiker" / "container-workspaces"
+    return internal_io_path(repository.resolve() / ".raiker" / "container-workspaces")
 
 
 def build_container_command(request: ContainerRunRequest) -> list[str]:
@@ -67,9 +68,18 @@ def build_container_command(request: ContainerRunRequest) -> list[str]:
         *_docker_user_args(),
     ]
     repository = request.repository.resolve() if request.repository is not None else None
-    output = request.output_dir.resolve() if request.output_dir is not None else None
+    output = (
+        Path(display_path(request.output_dir)).resolve()
+        if request.output_dir is not None
+        else None
+    )
+    action_root = (
+        Path(display_path(_action_workspace_root(repository)))
+        if repository is not None
+        else None
+    )
     if output is not None and (
-        repository is None or _action_workspace_root(repository) not in output.parents
+        action_root is None or action_root not in output.parents
     ):
         raise ValueError("container_output_outside_action_root")
     if repository is not None:

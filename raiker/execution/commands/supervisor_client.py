@@ -39,6 +39,7 @@ from raiker.execution.commands.supervisor_protocol import (
     instance_key_from_hex,
     instance_key_to_hex,
 )
+from raiker.storage.internal_paths import internal_io_path
 
 __all__ = [
     "SupervisedProcess",
@@ -312,7 +313,7 @@ def spawn_supervised(
         raise SupervisorUnavailable("command_supervisor_platform_unsupported")
     import hashlib
 
-    directory = workspace_root / SUPERVISOR_DIRECTORY
+    directory = internal_io_path(workspace_root / SUPERVISOR_DIRECTORY)
     directory.mkdir(parents=True, exist_ok=True)
     with contextlib.suppress(OSError):
         directory.chmod(0o700)

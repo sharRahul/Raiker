@@ -94,6 +94,7 @@ from raiker.storage.cleanup_readiness_registry import (
     cleanup_readiness_summary,
     render_cleanup_readiness,
 )
+from raiker.storage.internal_paths import display_path
 from raiker.storage.lifecycle_registry import (
     render_lifecycle_evidence_summary,
     render_lifecycle_policy_simulation_summary,
@@ -287,9 +288,9 @@ def handle_status(*, workspace_root: str | Path = ".") -> str:
     latest_session_id = sessions[0].get("session_id") if sessions else "none"
     lines = [
         f"workspace: {store.paths.workspace_root}",
-        f"database: {db_path}",
-        f"events: {events_dir}",
-        f"checkpoints: {checkpoints_dir}",
+        f"database: {display_path(db_path)}",
+        f"events: {display_path(events_dir)}",
+        f"checkpoints: {display_path(checkpoints_dir)}",
         f"sessions: {len(sessions)}",
         f"latest_session: {latest_session_id}",
         f"pending_approvals: {pending}",

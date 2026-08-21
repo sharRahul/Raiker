@@ -40,6 +40,7 @@ from raiker.security.mcp_monitor import (
     McpSessionTelemetry,
     shape_sensitivity,
 )
+from raiker.storage.internal_paths import internal_io_path
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -231,9 +232,15 @@ class McpBuilderExecutor:
             return self._fail(action.action_id, "mcp_invalid_server_name")
 
         output_path = str(args.get("output_path", "")).strip() or f"{_MCP_SERVERS_DIR}/{name}.py"
-        resolved = _safe_workspace_relative(self._ws, output_path)
-        if resolved is None:
+        ordinary_resolved = _safe_workspace_relative(self._ws, output_path)
+        if ordinary_resolved is None:
             return self._fail(action.action_id, "mcp_output_path_not_workspace_relative")
+        rel_path = ordinary_resolved.relative_to(self._ws).as_posix()
+        resolved = (
+            internal_io_path(ordinary_resolved)
+            if rel_path == ".raiker" or rel_path.startswith(".raiker/")
+            else ordinary_resolved
+        )
 
         try:
             resolved.parent.mkdir(parents=True, exist_ok=True)
@@ -241,7 +248,6 @@ class McpBuilderExecutor:
         except OSError as exc:
             return self._fail(action.action_id, f"mcp_write_failed:{type(exc).__name__}")
 
-        rel_path = resolved.relative_to(self._ws).as_posix()
         command = ["python", rel_path]
         existing = self._store.get_mcp_server_by_name(principal_id, name)
         server_id = str(existing["server_id"]) if existing else new_id("mcp_")

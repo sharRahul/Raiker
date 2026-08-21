@@ -63,6 +63,7 @@ from raiker.runtime.executors.containers import container_image_allowlist
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.security.credentials import CredentialLifecycle, CredentialLifecycleView
 from raiker.security.monitoring import SecurityMonitor
+from raiker.storage.internal_paths import display_path, internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 from raiker.tasks.scheduler import RECURRING_INTERVALS
@@ -1310,9 +1311,9 @@ class DashboardService:
             raise ValueError("brain_upload_empty")
         if len(content) > MAX_KNOWLEDGE_UPLOAD_BYTES:
             raise ValueError("brain_upload_too_large")
-        destination_dir = (
+        destination_dir = internal_io_path(
             self.workspace_root / RUNTIME_DIR_NAME / "artifacts" / KNOWLEDGE_UPLOAD_DIR
-        ).resolve()
+        )
         destination_dir.mkdir(parents=True, exist_ok=True)
         destination = destination_dir / name
         if destination.exists():
@@ -3353,7 +3354,10 @@ class DashboardService:
         memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True, owner_principal_id=acting_principal_id)
         if memory is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
-        return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [str(self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md")], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
+        memory_path = internal_io_path(
+            self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
+        )
+        return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [display_path(memory_path)], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
 
     def purge_memory(self, memory_id: str, confirmation: str | None, acting_principal_id: str | None) -> ControlResult:
         preview = self.preview_memory_purge(memory_id, acting_principal_id)
@@ -3362,7 +3366,9 @@ class DashboardService:
         if confirmation != memory_id:
             return ControlResult(ok=False, reason_code="memory_purge_confirmation_required")
         from raiker.contracts.ids import utc_now
-        path = self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
+        path = internal_io_path(
+            self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
+        )
         path.unlink(missing_ok=True)
         projections = self.store.list_memory_projections(memory_id)
         self.store.deactivate_memory_projections(memory_id)

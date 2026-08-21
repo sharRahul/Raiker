@@ -56,6 +56,7 @@ from raiker.models.readiness import (
 )
 from raiker.models.registry import ModelProfileRegistry
 from raiker.runtime.authority.models import Principal
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -1404,7 +1405,7 @@ async def export_project(
     export_path = result.data["export_path"]
     if export_path is not None:
         return FileResponse(
-            export_path,
+            internal_io_path(Path(str(export_path)).resolve()),
             media_type="application/x-ndjson",
             filename="project-export.ndjson",
         )

@@ -13,6 +13,7 @@ from raiker.execution.commands.models import CommandFeatures, CommandRequest
 from raiker.execution.commands.runner import CommandSink, MemoryCommandSink, StreamingCommandRunner
 from raiker.execution.profiles import ExecutionProfile
 from raiker.runtime.command_policy import sandbox_environment
+from raiker.storage.internal_paths import display_path, internal_io_path
 
 EXPECTED_SUPERVISOR_DIGEST = "sha256:" + ("b" * 64)
 
@@ -177,13 +178,18 @@ class PersistentContainerBackend:
         self._credential_lease: tuple[str, str] | None = None
         self._blocked_deltas: set[tuple[str, str, str]] = set()
         self._preflight_workspace()
-        self.mask_dir = self.workspace_root / ".raiker" / "command-empty-mask"
+        self.mask_dir = internal_io_path(
+            self.workspace_root / ".raiker" / "command-empty-mask"
+        )
         self.mask_dir.mkdir(parents=True, exist_ok=True)
         with __import__("contextlib").suppress(OSError):
             self.mask_dir.chmod(0)
 
     def _preflight_workspace(self) -> None:
-        for protected in (self.workspace_root / ".raiker", self.workspace_root / ".git"):
+        for protected in (
+            internal_io_path(self.workspace_root / ".raiker"),
+            self.workspace_root / ".git",
+        ):
             if protected.is_symlink():
                 raise CommandBackendError("container_protected_path_unsafe")
 
@@ -357,7 +363,7 @@ class PersistentContainerBackend:
                 "--mount",
                 f"type=bind,src={self.workspace_root / '.git'},dst=/workspace/.git,readonly",
                 "--mount",
-                f"type=bind,src={self.mask_dir},dst=/workspace/.raiker,readonly",
+                f"type=bind,src={display_path(self.mask_dir)},dst=/workspace/.raiker,readonly",
                 "--mount",
                 f"type=volume,src={cache},dst=/home/raiker/.cache",
                 "--workdir",

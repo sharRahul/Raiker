@@ -10,6 +10,7 @@ from pathlib import Path
 from cryptography.fernet import Fernet
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -20,7 +21,7 @@ class BackupResult:
 
 
 def _backup_key(workspace_root: Path) -> bytes:
-    key_path = workspace_root / ".raiker" / "keys" / "backup.key"
+    key_path = internal_io_path(workspace_root / ".raiker" / "keys" / "backup.key")
     key_path.parent.mkdir(parents=True, exist_ok=True)
     if not key_path.exists():
         temporary = key_path.with_suffix(f".{secrets.token_hex(4)}.tmp")

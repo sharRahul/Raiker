@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from raiker.runtime.executors.base import ExecutionResult
+from raiker.storage.internal_paths import internal_io_path
 from raiker.tools.filesystem import (
     apply_patch_content,
     replace_text_content,
@@ -53,13 +54,14 @@ class FileWriteExecutor:
                 )
             text = str(action.arguments.get("text", ""))
             resolved = resolve_writable_workspace_path(self._workspace_root, path)
-            resolved.parent.mkdir(parents=True, exist_ok=True)
-            resolved.write_text(text, encoding="utf-8")
+            io_resolved = internal_io_path(resolved)
+            io_resolved.parent.mkdir(parents=True, exist_ok=True)
+            io_resolved.write_text(text, encoding="utf-8")
             rel = str(resolved.relative_to(self._workspace_root))
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
-                summary=f"Wrote {resolved.stat().st_size} bytes to {rel}.",
-                artifacts={"path": rel, "size_bytes": resolved.stat().st_size},
+                summary=f"Wrote {io_resolved.stat().st_size} bytes to {rel}.",
+                artifacts={"path": rel, "size_bytes": io_resolved.stat().st_size},
             )
         except Exception as exc:
             return ExecutionResult(

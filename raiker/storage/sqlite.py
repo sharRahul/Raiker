@@ -58,6 +58,7 @@ from raiker.models.local_operations import ModelOperation
 from raiker.models.readiness import ModelReadiness, ModelReadinessKey, ModelReadinessState
 from raiker.models.session_state import ModelSessionState
 from raiker.models.setup import ModelSetupState, SetupState
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.migrations import (
     AGENT_PLANS_MIGRATION_ID,
     AGENT_PLANS_SQL,
@@ -730,7 +731,7 @@ class RuntimePaths:
 
     @property
     def runtime_dir(self) -> Path:
-        return self.workspace_root / ".raiker"
+        return internal_io_path(self.workspace_root / ".raiker")
 
     @property
     def db_path(self) -> Path:
@@ -1885,7 +1886,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def _backfill_legacy_brain_sources(self, connection: sqlite3.Connection) -> None:
         """Migrate the former shared source list to the original account once."""
         owner = self._original_owner_from_connection(connection)
-        legacy_path = self.paths.workspace_root / ".raiker" / "brain-sources.json"
+        legacy_path = self.paths.runtime_dir / "brain-sources.json"
         if owner is None or not legacy_path.exists():
             return
         try:
@@ -9103,7 +9104,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             if connection.execute("SELECT 1 FROM account_credentials LIMIT 1").fetchone() is None:
                 connection.execute("DELETE FROM instance_account_guard WHERE singleton = 1")
         # Durable markdown exports are plaintext on disk and outlive the rows.
-        memory_dir = self.paths.workspace_root / ".raiker" / "memory"
+        memory_dir = self.paths.runtime_dir / "memory"
         for memory_id in memory_ids:
             with contextlib.suppress(OSError):
                 (memory_dir / f"{memory_id}.md").unlink(missing_ok=True)

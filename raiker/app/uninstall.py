@@ -31,6 +31,8 @@ import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from raiker.storage.internal_paths import internal_io_path
+
 DISPOSITIONS = ("keep", "export", "erase")
 # Overwritten in chunks so a large encrypted database does not have to be
 # materialised in memory to be erased.
@@ -217,7 +219,7 @@ def secure_erase(root: Path) -> int:
 def _instances(workspace: Path) -> list[tuple[str, Path]]:
     """The main workspace and every additional instance mounted under it."""
     found: list[tuple[str, Path]] = [("This device's Raiker data", workspace)]
-    instance_root = workspace / ".raiker" / "instances"
+    instance_root = internal_io_path(workspace / ".raiker" / "instances")
     if instance_root.is_dir():
         found.extend(
             (f"Instance “{child.name}”", child)

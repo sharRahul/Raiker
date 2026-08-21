@@ -47,6 +47,7 @@ from raiker.control.knowledge_scope import MAX_KNOWLEDGE_UPLOAD_BYTES
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
+from raiker.storage.internal_paths import display_path, internal_io_path
 from raiker.storage.sqlite import StoreUnavailableError
 from raiker.tasks.wakeup import SchedulerWakeup
 
@@ -168,7 +169,7 @@ def _try_redact_json_body(raw: bytes) -> Any | None:
 
 
 def _instances_registry(root: Path) -> Path:
-    return root / ".raiker" / "instances.json"
+    return internal_io_path(root / ".raiker" / "instances.json")
 
 
 def _stored_instance_names(root: Path) -> list[str]:
@@ -208,10 +209,11 @@ def _mount_instance(app: FastAPI, name: str, workspace: Path) -> None:
 
 def create_and_mount_instance(app: FastAPI, name: str, root: Path) -> Path:
     """Create one isolated workspace and mount its independent ASGI app."""
-    workspace = root / ".raiker" / "instances" / name
-    if workspace.exists():
+    internal_workspace = internal_io_path(root / ".raiker" / "instances" / name)
+    if internal_workspace.exists():
         raise FileExistsError(name)
-    workspace.mkdir(parents=True)
+    internal_workspace.mkdir(parents=True)
+    workspace = Path(display_path(internal_workspace))
     names = _stored_instance_names(root)
     _write_instance_names(root, [*names, name])
     _mount_instance(app, name, workspace)

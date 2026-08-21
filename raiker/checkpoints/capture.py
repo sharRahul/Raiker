@@ -34,6 +34,7 @@ from pathlib import Path
 from uuid import uuid4
 
 from raiker.contracts.ids import new_id, utc_now
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
@@ -116,8 +117,9 @@ class CheckpointCaptureService:
         except FilesystemSafetyError:
             return None
         rel = str(resolved.relative_to(self.workspace_root))
+        io_resolved = internal_io_path(resolved)
 
-        if not (resolved.exists() and resolved.is_file()):
+        if not (io_resolved.exists() and io_resolved.is_file()):
             return PreImage(
                 capability=capability,
                 workspace_path=rel,
@@ -126,7 +128,7 @@ class CheckpointCaptureService:
                 data=None,
                 status=STATUS_ABSENT,
             )
-        size = resolved.stat().st_size
+        size = io_resolved.stat().st_size
         if size > self.max_bytes:
             return PreImage(
                 capability=capability,
@@ -136,7 +138,7 @@ class CheckpointCaptureService:
                 data=None,
                 status=STATUS_OVERSIZE,
             )
-        data = resolved.read_bytes()
+        data = io_resolved.read_bytes()
         return PreImage(
             capability=capability,
             workspace_path=rel,

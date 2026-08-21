@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raiker.contracts.ids import utc_now
+from raiker.storage.internal_paths import internal_io_path
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -79,7 +80,7 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         ).fetchall()
         purge_rows = connection.execute("SELECT disposition_json FROM memory_purge_records").fetchall()
         project_rows = connection.execute("SELECT project_id, parent_id, path FROM projects").fetchall()
-    memory_dir = Path(workspace_root).resolve() / ".raiker" / "memory"
+    memory_dir = internal_io_path(Path(workspace_root).resolve() / ".raiker" / "memory")
     missing_markdown_count = sum(not (memory_dir / f"{row['memory_id']}.md").exists() for row in rows)
     known_memory_ids = {str(row["memory_id"]) for row in rows}
     orphaned_markdown_count = sum(

@@ -5502,6 +5502,11 @@ class DashboardService:
 
     def get_diagnostics(self, acting_principal_id: str | None = None) -> DiagnosticsView:
         readiness = self.control.get_runtime_readiness(acting_principal_id)
+        readiness_summary = dict(readiness.summary)
+        checkpoint_health = self.store.get_checkpoint_capture_health()
+        if checkpoint_health is not None:
+            checkpoint_health["ok"] = bool(checkpoint_health["ok"])
+            readiness_summary["checkpoint_capture"] = checkpoint_health
         disabled = tuple(
             g.capability for g in readiness.gates if g.state in _DISABLED_STATES
         )
@@ -5519,10 +5524,10 @@ class DashboardService:
             production_ready_local_single_user_runtime=bool(
                 readiness.summary.get("production_ready_local_single_user_runtime", False)
             ),
-            summary=readiness.summary,
+            summary=readiness_summary,
             disabled_capabilities=disabled,
             counts=counts,
-            readiness=readiness.summary,
+            readiness=readiness_summary,
             missing_config=missing_config,
             provider_health=provider_health,
         )

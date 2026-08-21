@@ -322,6 +322,7 @@ async def resolve_approval(
                         # capability whose result is neither a file nor a row:
                         # the branch that now exists, the commit that was made.
                         "summary",
+                        "checkpoint_capture",
                     )
                     if key in execution.artifacts
                 },

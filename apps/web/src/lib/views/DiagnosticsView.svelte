@@ -4,7 +4,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { Diagnostics, SecurityHealth } from "../apiTypes";
+  import type { CheckpointCaptureHealth, Diagnostics, SecurityHealth } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, relativeTime } from "../format";
 
@@ -43,6 +43,15 @@
     return Object.entries(diag.readiness)
       .filter(([, v]) => typeof v === "boolean")
       .map(([key, ok]) => ({ key, ok: Boolean(ok) }));
+  });
+
+  const readinessDetails = $derived.by(() => {
+    if (diag === null) return [];
+    return Object.entries(diag.readiness)
+      .filter((entry): entry is [string, CheckpointCaptureHealth] =>
+        typeof entry[1] === "object" && entry[1] !== null && "reason_code" in entry[1],
+      )
+      .map(([key, detail]) => ({ key, detail }));
   });
 
   // Plain-English labels for backend identifiers.
@@ -156,6 +165,18 @@
           </li>
         {/each}
       </ul>
+      {#each readinessDetails as check (check.key)}
+        <article class:readiness-failed={!check.detail.ok} class="readiness-detail">
+          <div class="readiness-title">
+            <Icon name={check.detail.ok ? "check" : "warning"} size={14} />
+            <strong>{readinessLabel(check.key)}</strong>
+          </div>
+          <p>{check.detail.ok ? "Reversible writes are available." : "Change capture failed — writes may not be reversible."}</p>
+          <p class="mono">{humanize(check.detail.reason_code)}</p>
+          {#if check.detail.remediation}<p>{check.detail.remediation}</p>{/if}
+          <p class="sub">Checked {relativeTime(check.detail.checked_at)}</p>
+        </article>
+      {/each}
     </section>
 
     <section class="card" aria-labelledby="diag-providers-h">
@@ -217,6 +238,25 @@
   }
   .big-status {
     margin: 0 0 var(--space-3);
+  }
+  .readiness-detail {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+  }
+  .readiness-failed {
+    border-color: var(--danger-border, var(--border));
+    background: var(--danger-soft, transparent);
+  }
+  .readiness-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .readiness-detail p {
+    margin: var(--space-2) 0 0;
+    overflow-wrap: anywhere;
   }
   .kv {
     display: grid;

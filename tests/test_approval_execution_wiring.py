@@ -21,6 +21,7 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn
 from raiker.api.sessions import ApiSessionStore
+from raiker.checkpoints.capture import CheckpointCaptureService
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.models import ToolAction
 from raiker.runtime.attachment_preview import AttachmentPreviewService
@@ -102,10 +103,9 @@ class TestApprovedWriteExecutes:
         body = resp.json()
         assert body["executes_action"] is True
         assert body["status"] == "executed"
-        assert body["execution"] == {
-            "capability": "file_write_execution",
-            "path": "docs/report.md",
-        }
+        assert body["execution"]["capability"] == "file_write_execution"
+        assert body["execution"]["path"] == "docs/report.md"
+        assert body["execution"]["checkpoint_capture"]["ok"] is True
         assert (workspace / "docs" / "report.md").read_text(encoding="utf-8") == "# Q3\n"
         assert SQLiteStore(workspace).load_approval("appr_1")["status"] == "executed"  # type: ignore[index]
 
@@ -188,6 +188,33 @@ class TestApprovedWriteExecutes:
         store = SQLiteStore(workspace)
         types = {e["event_type"] for e in store.list_event_index(limit=500)}
         assert "checkpoint_captured" in types
+
+    def test_snapshot_failure_is_visible_on_receipt_and_diagnostics(
+        self,
+        workspace: Path,
+        client: TestClient,
+        headers: dict[str, str],
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (workspace / "notes.md").write_text("original\n", encoding="utf-8")
+        _pending(workspace, arguments={"path": "notes.md", "text": "replaced\n"})
+
+        def _boom(*_args: object, **_kwargs: object) -> None:
+            raise OSError("must never reach the response")
+
+        monkeypatch.setattr(CheckpointCaptureService, "snapshot_pre_image", _boom)
+        response = _resolve(client, headers, "appr_1")
+
+        assert response.status_code == 200, response.text
+        capture = response.json()["execution"]["checkpoint_capture"]
+        assert capture["ok"] is False
+        assert capture["stage"] == "snapshot"
+        assert capture["reason_code"] == "checkpoint_snapshot_os_error"
+        assert "must never reach" not in response.text
+        diagnostics = client.get("/api/diagnostics", headers=headers).json()
+        health = diagnostics["readiness"]["checkpoint_capture"]
+        assert health["ok"] is False
+        assert health["reason_code"] == "checkpoint_snapshot_os_error"
 
     def test_the_audit_trail_records_both_the_decision_and_the_execution(
         self, workspace: Path, client: TestClient, headers: dict[str, str]

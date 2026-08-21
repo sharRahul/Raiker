@@ -3225,3 +3225,19 @@ TURN_SOURCE_LOCATOR_INDEX_SQL = """
 CREATE INDEX IF NOT EXISTS idx_turn_sources_locator
   ON turn_sources(locator, principal_id);
 """
+
+
+# BUG-216 — the last checkpoint-capture result is a durable readiness fact.
+CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID = "RAIKER-2036-checkpoint-capture-health"
+
+CHECKPOINT_CAPTURE_HEALTH_SQL = """
+CREATE TABLE IF NOT EXISTS checkpoint_capture_health (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  ok INTEGER NOT NULL,
+  stage TEXT NOT NULL,
+  reason_code TEXT NOT NULL,
+  display_path TEXT,
+  checked_at TEXT NOT NULL,
+  remediation TEXT NOT NULL
+);
+"""

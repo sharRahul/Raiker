@@ -482,10 +482,19 @@ export interface Diagnostics {
   summary: Record<string, unknown>;
   disabled_capabilities: string[];
   counts: Record<string, number>;
-  readiness: Record<string, boolean>;
+  readiness: Record<string, boolean | CheckpointCaptureHealth>;
   missing_config: string[];
   provider_health: ProviderHealth[];
   scope_note: string;
+}
+
+export interface CheckpointCaptureHealth {
+  ok: boolean;
+  stage: "ineligible" | "snapshot_ready" | "snapshot" | "commit";
+  reason_code: string;
+  display_path: string | null;
+  checked_at: string;
+  remediation: string;
 }
 
 export interface ModelProfile {
@@ -1297,6 +1306,7 @@ export interface ResolveApprovalResult {
     // B11 — one sentence naming what the execution did, for a capability whose
     // result is neither a file nor a row (the branch created, the commit made).
     summary?: string;
+    checkpoint_capture?: CheckpointCaptureHealth;
   };
   // B2 — whether a turn was parked on this approval and can now pick up again.
   // ADD-02 adds the batch counters and how many calls the resume still owes.

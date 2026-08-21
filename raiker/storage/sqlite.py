@@ -78,6 +78,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     CAPABILITY_MONITORING_MIGRATION_ID,
     CAPABILITY_MONITORING_SQL,
+    CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
+    CHECKPOINT_CAPTURE_HEALTH_SQL,
     CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
     CHECKPOINT_CAPTURE_MANIFEST_SQL,
     CLOUD_EXECUTION_COST_LEDGER_MIGRATION_ID,
@@ -1396,6 +1398,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 COMMAND_AUTHORITY_EVIDENCE_MIGRATION_ID,
                 COMMAND_AUTHORITY_EVIDENCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
+                CHECKPOINT_CAPTURE_HEALTH_SQL,
                 connection,
             )
             self._apply_migration(
@@ -5606,6 +5613,45 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 tuple(params),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def upsert_checkpoint_capture_health(
+        self,
+        *,
+        ok: bool,
+        stage: str,
+        reason_code: str,
+        display_path: str | None,
+        checked_at: str,
+        remediation: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO checkpoint_capture_health
+                   (singleton, ok, stage, reason_code, display_path, checked_at, remediation)
+                   VALUES (1, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(singleton) DO UPDATE SET
+                     ok=excluded.ok, stage=excluded.stage,
+                     reason_code=excluded.reason_code,
+                     display_path=excluded.display_path,
+                     checked_at=excluded.checked_at,
+                     remediation=excluded.remediation""",
+                (
+                    1 if ok else 0,
+                    stage,
+                    reason_code,
+                    display_path,
+                    checked_at,
+                    remediation,
+                ),
+            )
+
+    def get_checkpoint_capture_health(self) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT ok, stage, reason_code, display_path, checked_at, remediation "
+                "FROM checkpoint_capture_health WHERE singleton = 1"
+            ).fetchone()
+        return dict(row) if row else None
 
     def upsert_model_profiles(self, profiles: list[ModelProfile]) -> None:
         now = utc_now()

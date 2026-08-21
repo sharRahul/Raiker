@@ -104,11 +104,14 @@
         reason: decisionReason.trim() || (approve ? "approved via web UI" : "denied via web UI"),
       });
       const receipt = result.execution?.receipt;
+      const checkpoint = result.execution?.checkpoint_capture;
       notice = {
         kind: "ok",
         text: result.executes_action
           ? result.execution?.path
-            ? `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
+            ? checkpoint && !checkpoint.ok
+              ? `Executed once — wrote ${result.execution.path}. Change completed — not reversible. ${checkpoint.reason_code}. ${checkpoint.remediation}`
+              : `Executed once — wrote ${result.execution.path}. The previous contents were checkpointed.`
             : receipt
               ? `Executed once — “${receipt.title}” now exists.`
               : result.execution?.summary

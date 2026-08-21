@@ -34,6 +34,7 @@ from raiker.runtime.authority.models import (
     normalize_runtime_mode,
 )
 from raiker.runtime.executors.registry import ExecutorRegistry
+from raiker.storage.internal_paths import display_path
 from raiker.storage.sqlite import SQLiteStore
 
 if TYPE_CHECKING:
@@ -254,18 +255,78 @@ class RuntimeAuthority:
             self._capture_service = CheckpointCaptureService(self.store)
         return self._capture_service
 
-    def _snapshot_pre_image(self, capability: str, arguments: dict[str, Any]) -> Any:
-        """Best-effort pre-mutation snapshot; never raises into the mutation path."""
+    @staticmethod
+    def _checkpoint_reason(stage: str, exc: Exception) -> str:
+        kind = "os_error" if isinstance(exc, OSError) else "invalid_path" if isinstance(
+            exc, ValueError
+        ) else "internal_error"
+        return f"checkpoint_{stage}_{kind}"
+
+    @staticmethod
+    def _checkpoint_remediation(reason_code: str) -> str:
+        if reason_code.endswith("_os_error"):
+            return "Check workspace permissions and enable Windows long-path support."
+        if reason_code.endswith("_invalid_path"):
+            return "Choose a valid file path inside the workspace."
+        return "Open Diagnostics and retry after repairing checkpoint storage."
+
+    def _capture_outcome(
+        self,
+        *,
+        ok: bool,
+        stage: str,
+        reason_code: str,
+        path: object | None,
+    ) -> dict[str, Any]:
+        checked_at = utc_now()
+        safe_path = display_path(str(path))[:512] if path else None
+        remediation = "" if ok else self._checkpoint_remediation(reason_code)
+        outcome = {
+            "ok": ok,
+            "stage": stage,
+            "reason_code": reason_code,
+            "display_path": safe_path,
+            "checked_at": checked_at,
+            "remediation": remediation,
+        }
+        self.store.upsert_checkpoint_capture_health(**outcome)
+        return outcome
+
+    def _snapshot_pre_image(
+        self, capability: str, arguments: dict[str, Any]
+    ) -> tuple[Any, dict[str, Any] | None]:
+        """Return a snapshot plus an honest structured eligibility/outcome."""
+        if not self.capture_service.eligible(capability):
+            return None, None
+        path = arguments.get("path")
         try:
-            if not self.capture_service.eligible(capability):
-                return None
-            return self.capture_service.snapshot_pre_image(capability, arguments)
-        except Exception:
-            return None
+            pre_image = self.capture_service.snapshot_pre_image(capability, arguments)
+        except Exception as exc:  # capture cannot block an approved mutation
+            reason = self._checkpoint_reason("snapshot", exc)
+            return None, self._capture_outcome(
+                ok=False, stage="snapshot", reason_code=reason, path=path
+            )
+        if pre_image is None:
+            return None, {
+                "ok": False,
+                "stage": "ineligible",
+                "reason_code": "checkpoint_capture_ineligible",
+                "display_path": display_path(str(path))[:512] if path else None,
+                "checked_at": utc_now(),
+                "remediation": "Choose a valid file path inside the workspace.",
+            }
+        return pre_image, {
+            "ok": True,
+            "stage": "snapshot_ready",
+            "reason_code": "checkpoint_snapshot_ready",
+            "display_path": display_path(str(path))[:512] if path else None,
+            "checked_at": utc_now(),
+            "remediation": "",
+        }
 
     def _commit_pre_image(
         self, pre_image: Any, action: GovernedAction, principal: Principal
-    ) -> None:
+    ) -> dict[str, Any]:
         """Persist the captured pre-image + emit a metadata-only capture event.
 
         Isolated in try/except: a checkpoint-capture failure is recorded as a
@@ -287,7 +348,16 @@ class RuntimeAuthority:
                     session_id=action.session_id,
                     turn_id=action.turn_id,
                 )
+            return self._capture_outcome(
+                ok=True,
+                stage="commit",
+                reason_code="checkpoint_capture_ok",
+                path=pre_image[0].workspace_path
+                if isinstance(pre_image, list) and pre_image
+                else pre_image.workspace_path,
+            )
         except Exception as exc:  # pragma: no cover - defensive; capture is best-effort
+            reason_code = self._checkpoint_reason("commit", exc)
             self._event(
                 event_type="checkpoint_capture_failed",
                 actor="checkpoint_capture",
@@ -301,6 +371,16 @@ class RuntimeAuthority:
                 },
                 session_id=action.session_id,
                 turn_id=action.turn_id,
+            )
+            return self._capture_outcome(
+                ok=False,
+                stage="commit",
+                reason_code=reason_code,
+                path=(
+                    pre_image[0].workspace_path
+                    if isinstance(pre_image, list) and pre_image
+                    else pre_image.workspace_path if pre_image else None
+                ),
             )
 
     def _capture_action_posture(
@@ -1413,10 +1493,15 @@ class RuntimeAuthority:
             # executor overwrites it, so the mutation is reversible. Best-effort
             # and fully isolated — a capture failure must never fail or block the
             # real mutation.
-            pre_image = self._snapshot_pre_image(capability, action.arguments)
+            pre_image, checkpoint_capture = self._snapshot_pre_image(
+                capability, action.arguments
+            )
             result = executor.execute(action, principal)
             if pre_image is not None and result.ok:
-                self._commit_pre_image(pre_image, action, principal)
+                checkpoint_capture = self._commit_pre_image(pre_image, action, principal)
+            execution_artifacts = dict(result.artifacts)
+            if checkpoint_capture is not None and result.ok:
+                execution_artifacts["checkpoint_capture"] = checkpoint_capture
             event_type = "action_executed" if result.ok else "action_failed"
             self._event(
                 event_type=event_type,
@@ -1427,7 +1512,7 @@ class RuntimeAuthority:
                     "ok": result.ok,
                     "reason_code": result.reason_code,
                     "summary": result.summary,
-                    "artifacts": result.artifacts,
+                    "artifacts": execution_artifacts,
                     "posture": posture,
                 },
                 session_id=action.session_id,
@@ -1439,7 +1524,7 @@ class RuntimeAuthority:
                 policy_decision=decision,
                 message="executed" if result.ok else f"execution_failed:{result.reason_code}",
                 error=None if result.ok else result.reason_code,
-                artifacts=result.artifacts,
+                artifacts=execution_artifacts,
             )
 
         return GovernedActionResult(

@@ -231,6 +231,41 @@ describe("ApprovalsView", () => {
     expect(await screen.findByText(/executed once — wrote notes\.txt/i)).toBeInTheDocument();
   });
 
+  it("names a completed write as not reversible when checkpoint capture failed", async () => {
+    stubFetch({
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": { ...DETAIL, executes_on_approval: true },
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "executed",
+        executes_action: true,
+        reason: "approved via web UI",
+        execution: {
+          capability: "file_write_execution",
+          path: "notes.txt",
+          checkpoint_capture: {
+            ok: false,
+            stage: "snapshot",
+            reason_code: "checkpoint_snapshot_os_error",
+            display_path: "notes.txt",
+            checked_at: "2026-08-21T00:00:00Z",
+            remediation: "Check workspace permissions and enable Windows long-path support.",
+          },
+        },
+      },
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: /approve and execute once/i }));
+
+    const notice = await screen.findByText(/change completed — not reversible/i);
+    expect(notice).toHaveTextContent(/checkpoint_snapshot_os_error/i);
+    expect(notice).toHaveTextContent(/enable Windows long-path support/i);
+    expect(notice).not.toHaveTextContent(/previous contents were checkpointed/i);
+  });
+
   it("keeps the record-only label and message when the server says the capability is gated off", async () => {
     stubFetch({
       "GET /api/approvals": [PENDING],

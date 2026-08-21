@@ -248,6 +248,41 @@ def test_capture_failure_does_not_break_mutation(
         session_id="sess_a", event_type="checkpoint_capture_failed"
     )
     assert len(failed) == 1
+    assert result.artifacts["checkpoint_capture"]["ok"] is False
+    assert result.artifacts["checkpoint_capture"]["stage"] == "commit"
+    assert result.artifacts["checkpoint_capture"]["reason_code"] == (
+        "checkpoint_commit_internal_error"
+    )
+    health = store.get_checkpoint_capture_health()
+    assert health is not None and health["ok"] == 0
+    assert "capture storage unavailable" not in str(health)
+
+
+def test_snapshot_failure_is_returned_and_persisted_without_exception_text(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = _ws(tmp_path)
+    store = SQLiteStore(ws)
+    store.create_session("sess_a", "ws")
+    (ws / "note.txt").write_text("OLD", encoding="utf-8")
+    authority = _authority(ws, store)
+
+    def _boom(*_args: object, **_kwargs: object) -> None:
+        raise OSError("private machine detail")
+
+    monkeypatch.setattr(authority.capture_service, "snapshot_pre_image", _boom)
+    result = authority.route_action(
+        _write_action(path="note.txt", text="NEW"), _human(store)
+    )
+
+    assert (ws / "note.txt").read_text(encoding="utf-8") == "NEW"
+    outcome = result.artifacts["checkpoint_capture"]
+    assert outcome["ok"] is False
+    assert outcome["stage"] == "snapshot"
+    assert outcome["reason_code"] == "checkpoint_snapshot_os_error"
+    assert "private machine detail" not in str(outcome)
+    health = store.get_checkpoint_capture_health()
+    assert health is not None and health["reason_code"] == "checkpoint_snapshot_os_error"
 
 
 # ── Service-level: oversize + outside-workspace are handled honestly ─────────

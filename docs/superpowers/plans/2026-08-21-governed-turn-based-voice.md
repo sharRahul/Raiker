@@ -68,7 +68,7 @@ Record the existing `.raiker` workspace path and confirm no delete, reset, migra
 - Modify: `apps/web/src/test-setup.ts`
 
 **Interfaces:**
-- Produces: `VoiceInputMode`, `SpeechLanguage`, `AudioSessionCoordinator`, `VoiceRecognitionAdapter`, `RecognitionHandlers`, `browserRecognitionAdapter`, `voicePlayback`, `resolveSpeechLanguage(preference, deviceLanguage): string`, `speechText(markdown: string): string`, and `inputModeForDraft(state): VoiceInputMode`.
+- Produces: `VoiceInputMode`, `SpeechLanguage`, `AudioSessionCoordinator`, `createAudioSessionCoordinator(): AudioSessionCoordinator`, `VoiceRecognitionAdapter`, `RecognitionHandlers`, `browserRecognitionAdapter`, `voicePlayback`, `resolveSpeechLanguage(preference, deviceLanguage): string`, `speechText(markdown: string): string`, and `inputModeForDraft(state): VoiceInputMode`.
 - Consumes: browser `SpeechRecognition`/`webkitSpeechRecognition`, `speechSynthesis`, `SpeechSynthesisUtterance`, and deterministic injected fakes in tests.
 
 - [ ] **Step 1: Write failing adapter and text-conversion tests**
@@ -76,9 +76,11 @@ Record the existing `.raiker` workspace path and confirm no delete, reset, migra
 ```ts
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  createAudioSessionCoordinator,
   createRecognitionAdapter,
   createVoicePlaybackCoordinator,
   inputModeForDraft,
+  resolveSpeechLanguage,
   speechText,
 } from "./voice";
 
@@ -352,6 +354,7 @@ git commit -m "feat: add governed dictation control"
 **Files:**
 - Create: `apps/web/src/lib/components/ReadAloudButton.svelte`
 - Create: `apps/web/src/lib/components/ReadAloudButton.test.ts`
+- Create: `apps/web/src/lib/components/ReadAloudHarness.test.svelte`
 - Modify: `apps/web/src/lib/icons.ts`
 
 **Interfaces:**
@@ -361,6 +364,12 @@ git commit -m "feat: add governed dictation control"
 - [ ] **Step 1: Write failing read-aloud tests**
 
 ```ts
+import { fireEvent, render, screen } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
+import { createAudioSessionCoordinator } from "../voice";
+import ReadAloudButton from "./ReadAloudButton.svelte";
+import ReadAloudHarness from "./ReadAloudHarness.test.svelte";
+
 it("reads only the visible answer and toggles to Stop speaking", async () => {
   const playback = playbackFake();
   render(ReadAloudButton, { responseId: "turn-1", text: "**Ready** [s1]", language: "en", playback });
@@ -390,6 +399,10 @@ it("clears the previous response's pressed state when another response takes own
 });
 ```
 
+`ReadAloudHarness.test.svelte` is test-only code colocated with the test. It
+mounts two `ReadAloudButton` instances with the same freshly-created
+`AudioSessionCoordinator`; it is never imported by production code.
+
 - [ ] **Step 2: Run the test and verify RED**
 
 Run: `npm --prefix apps/web test -- src/lib/components/ReadAloudButton.test.ts`
@@ -409,7 +422,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit the playback component**
 
 ```powershell
-git add -- apps/web/src/lib/components/ReadAloudButton.svelte apps/web/src/lib/components/ReadAloudButton.test.ts apps/web/src/lib/icons.ts
+git add -- apps/web/src/lib/components/ReadAloudButton.svelte apps/web/src/lib/components/ReadAloudButton.test.ts apps/web/src/lib/components/ReadAloudHarness.test.svelte apps/web/src/lib/icons.ts
 git commit -m "feat: add manual response read aloud"
 ```
 
@@ -601,6 +614,21 @@ it("marks a typed and edited dictated draft as mixed", async () => {
   await fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect(streamPromptMock.mock.calls[0][0].input_mode).toBe("mixed");
 });
+
+it("marks an initially all-dictated draft as mixed after the owner edits it", async () => {
+  const recognition = installRecognitionFake();
+  render(ChatView, { projects });
+  const prompt = await screen.findByLabelText("Prompt");
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  recognition.final("summarize this");
+  await fireEvent.click(screen.getByRole("button", { name: "Done dictating" }));
+  await fireEvent.input(prompt, { target: { value: "summarize this carefully" } });
+  await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+  expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+    text: "summarize this carefully",
+    input_mode: "mixed",
+  });
+});
 ```
 
 Add a completed-response test to each view asserting **Read aloud** appears beside Copy, while streaming/approval-waiting answers have no read-aloud control.
@@ -629,7 +657,7 @@ Expected: FAIL because the controls, request provenance and setting are not moun
 
 - [ ] **Step 4: Integrate the shared components without duplicating voice logic**
 
-Each view loads `general.speech_language` with default `auto`, binds `VoiceDictationControl` as `VoiceDictationHandle`, tracks `dictated`, `typedBefore` and `editedAfter`, resets provenance after a successful submit/new conversation, and passes `input_mode: inputModeForDraft(...)` to `streamPrompt`. `onfinalized` sets `dictated=true`; it does not set `editedAfter`. A later textarea `input` event sets `editedAfter=true` only after a final segment was contributed. The view's Enter handler first checks `voiceControl?.active()`; when true it calls `voiceControl.done()`, restores textarea focus and returns. Only the next Enter can submit. On submit, route change or component teardown, call the shared coordinator's `stopAll` while preserving finalized draft text and discarding interim text.
+Each view loads `general.speech_language` with default `auto`, binds `VoiceDictationControl` as `VoiceDictationHandle`, tracks `dictated`, `typedBefore` and `editedAfter`, resets provenance after a successful submit/new conversation, and passes `input_mode: inputModeForDraft(...)` to `streamPrompt`. The exact ordering is load-bearing: `onactivechange(true)` fires synchronously before `adapter.start()` and before any recognition callback, and the view captures `typedBefore = promptText.trim() !== ""` there. Only after that snapshot may `onfinalized` insert text and set `dictated=true`; programmatic `onchange` from the component does not set `editedAfter`. A later native textarea `input` event sets `editedAfter=true` only when `dictated` is already true. The view's Enter handler first checks `voiceControl?.active()`; when true it calls `voiceControl.done()`, restores textarea focus and returns. Only the next Enter can submit. On submit, route change or component teardown, call the shared coordinator's `stopAll` while preserving finalized draft text and discarding interim text.
 
 Mount `VoiceDictationControl` in `.bar-left` immediately after `ComposerAttach`. Mount `ReadAloudButton` in a shared `.response-actions` row beside Copy for completed visible answers. General settings adds the exact language options and disclosure in the existing Language and region card.
 

@@ -606,6 +606,12 @@ class PromptRequest:
     # Client-reported input provenance only. The server can constrain this
     # label but cannot prove how a REST or web client produced the text.
     input_mode: Literal["typed", "dictated", "mixed"] = "typed"
+    # Which composer sent this prompt. It selects the operating protocol the
+    # turn runs under — Build gets the engineering protocol, Chat does not — and
+    # grants nothing: capabilities, gates and approvals are identical either way.
+    # Defaults to "chat" so an external REST client that has never heard of the
+    # field gets the conservative surface rather than the coding one.
+    surface: Literal["chat", "build"] = "chat"
     session_id: str | None = None
     planning_mode: str | None = None
     approval_mode: str | None = None

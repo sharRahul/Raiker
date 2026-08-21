@@ -14,6 +14,7 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import { api, ApiError } from "../api";
   import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
+  import { takeScheduleRequest } from "../scheduleHandoff";
   import type { ApprovalView, PromptAttachment, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
@@ -31,6 +32,7 @@
   let priority = $state("normal");
   let parentTaskId = $state("");
   let cadence = $state<"now" | "once" | "daily" | "background">("now");
+  let titleEl: HTMLInputElement | undefined = $state();
   let scheduledAt = $state("");
   let modelProfile = $state("");
   let model = $state("");
@@ -229,6 +231,12 @@
   // page. A listener for an event nothing dispatches is a handoff the product
   // claims and never performs, so it is gone with its sender.
   onMount(() => {
+    // Chat's `/schedule` asks this surface to open on **Schedule once**. It
+    // arranges the form and stops: nothing is created and nothing is scheduled.
+    if (takeScheduleRequest()) {
+      cadence = "once";
+      queueMicrotask(() => titleEl?.focus());
+    }
     void refreshModels();
     const timer = window.setInterval(() => void load(), 15_000);
     return () => window.clearInterval(timer);
@@ -241,7 +249,7 @@
 
   <form class="card composer" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
     <div class="composer-heading"><div><h3>Plan work</h3><p>A routine is a recurring task; a child task becomes a subtask or subroutine. A background agent runs asynchronously until its work is complete or you stop it.</p></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Schedule once</button><button type="button" class="chip" aria-pressed={cadence === "daily"} onclick={() => cadence = "daily"}>Daily routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background agent</button></div></div>
-    <label>Title<input class="input" aria-label="Task title" bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "daily" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
+    <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "daily" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
     <ComposerChips store={attachStore} disabled={creating} />

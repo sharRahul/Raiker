@@ -5,8 +5,8 @@ import BuildView from "./BuildView.svelte";
 
 afterEach(() => vi.unstubAllGlobals());
 
-describe("BuildView mode tooltip", () => {
-  it("shows the Plan/Edit/Auto explanation on both hover and keyboard focus", async () => {
+describe("BuildView mode explanation", () => {
+  it("explains Plan, Edit and Auto inside the mode picker and nowhere else", async () => {
     stubFetch({
       "GET /api/models": { profiles: [], chat_profiles: [] },
       "GET /api/code/repos": { repos: [], selected_repo_id: null },
@@ -20,21 +20,24 @@ describe("BuildView mode tooltip", () => {
     });
     render(BuildView);
 
-    const help = await screen.findByRole("button", { name: /about plan, edit, and auto modes/i });
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+    // The composer stays minimal: the three explanations are one click away in
+    // the control that sets them, not three paragraphs standing above the box.
+    const trigger = await screen.findByRole("button", {
+      name: /^How much Raiker may do this turn:/,
+    });
+    expect(screen.queryByRole("menu", { name: "Mode" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Research and propose\. No changes\./i)).not.toBeInTheDocument();
 
-    await fireEvent.mouseEnter(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan researches and proposes without writing anything/i);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/edit turns every change into a decision/i);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/auto adds no restriction of its own/i);
-    // BUG-70 — the tooltip has to say whose posture this is, because the chips
-    // used to change the owner's standing permissions without asking.
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/none of them changes your standing permissions/i);
+    await fireEvent.click(trigger);
 
-    await fireEvent.mouseLeave(help);
-    expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
-
-    await fireEvent.focus(help);
-    expect(screen.getByRole("tooltip")).toHaveTextContent(/plan researches and proposes without writing anything/i);
+    const menu = screen.getByRole("menu", { name: "Mode" });
+    expect(menu).toHaveTextContent(/Research and propose\. No changes\./i);
+    expect(menu).toHaveTextContent(/Propose each change and wait for you\./i);
+    expect(menu).toHaveTextContent(/Follow your standing permissions\./i);
+    // BUG-70 — the menu has to say whose posture this is, because the chips used
+    // to change the owner's standing permissions without asking.
+    expect(menu).toHaveTextContent(/applies to this conversation's turns only/i);
+    expect(menu).toHaveTextContent(/never widen it/i);
+    expect(menu).toHaveTextContent(/raising a standing permission stays on the Permissions page/i);
   });
 });

@@ -42,9 +42,17 @@ describe("build composer modes", () => {
     ]);
   });
 
-  it("defaults to Edit and falls back to it for an unknown id", () => {
-    expect(DEFAULT_BUILD_MODE).toBe("edit");
-    expect(buildMode("nonsense").id).toBe("edit");
+  it("defaults to Auto and falls back to it for an unknown id", () => {
+    expect(DEFAULT_BUILD_MODE).toBe("auto");
+    expect(buildMode("nonsense").id).toBe("auto");
+  });
+
+  it("keeps the default free of any turn-scoped override", () => {
+    // Opening in Auto must not widen anything: Auto sends no capability
+    // override and no planning override, so a new Build conversation runs under
+    // exactly the owner's standing permissions and nothing more.
+    expect(turnCapabilityModes(DEFAULT_BUILD_MODE)).toEqual({});
+    expect(buildMode(DEFAULT_BUILD_MODE).planningMode).toBeNull();
   });
 
   it("cycles Plan → Edit → Auto → Plan", () => {

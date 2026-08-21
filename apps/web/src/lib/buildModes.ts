@@ -51,10 +51,13 @@ export type BuildTurnMode = "ask" | "deny" | null;
 export interface BuildModeSpec {
   id: BuildMode;
   label: string;
-  /** One line under the mode name in the picker. */
+  /**
+   * One line under the mode name in the picker. It is the only prose a mode
+   * carries: the picker's own note states that a mode is turn-scoped and can
+   * only tighten, so repeating that per mode was three paragraphs saying the
+   * same thing above a composer that has to stay small.
+   */
   summary: string;
-  /** What the runtime will actually do — shown as the composer's hint line. */
-  detail: string;
   /**
    * Turn-scoped decision mode applied to every capability in
    * BUILD_WRITE_CAPABILITIES, or null to send no override and run under the
@@ -70,8 +73,6 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
     id: "plan",
     label: "Plan",
     summary: "Research and propose. No changes.",
-    detail:
-      "Raiker plans the work and writes nothing: for this turn only, file writes, patches and commands are refused by the runtime, so a change proposed anyway is blocked rather than trusted. Your standing permissions are not changed.",
     turnMode: "deny",
     planningMode: "always",
   },
@@ -79,8 +80,6 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
     id: "edit",
     label: "Edit",
     summary: "Propose each change and wait for you.",
-    detail:
-      "Every file write, patch and command becomes a decision you accept or reject, for this turn only. Accepting records your decision — Raiker never treats a recorded decision as permission it already had, and your standing permissions are not changed.",
     turnMode: "ask",
     planningMode: null,
   },
@@ -88,17 +87,27 @@ export const BUILD_MODES: readonly BuildModeSpec[] = [
     id: "auto",
     label: "Auto",
     summary: "Follow your standing permissions.",
-    detail:
-      "This turn adds no restriction of its own and runs under the permissions you set in Permissions. Where you allowed a capability to run unprompted it runs; where you left it at Ask it still asks. This chip changes nothing standing — raise a permission on the Permissions page, where the change is recorded with your reason.",
     turnMode: null,
     planningMode: null,
   },
 ];
 
-export const DEFAULT_BUILD_MODE: BuildMode = "edit";
+/**
+ * Build opens in **Auto**, matching the mode a coding agent is expected to start
+ * in. Auto is safe to default to *here* precisely because of BUG-70: it sends no
+ * override and therefore adds no authority. A turn in Auto can only do what the
+ * owner already allowed on the Permissions page, so opening in it widens
+ * nothing — it stops Build from silently tightening below the owner's own
+ * settings on every new conversation, which is what defaulting to Edit did.
+ */
+export const DEFAULT_BUILD_MODE: BuildMode = "auto";
 
 export function buildMode(id: string): BuildModeSpec {
-  return BUILD_MODES.find((mode) => mode.id === id) ?? BUILD_MODES[1];
+  return (
+    BUILD_MODES.find((mode) => mode.id === id) ??
+    BUILD_MODES.find((mode) => mode.id === DEFAULT_BUILD_MODE) ??
+    BUILD_MODES[0]
+  );
 }
 
 /**

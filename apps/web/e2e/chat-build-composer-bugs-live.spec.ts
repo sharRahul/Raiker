@@ -213,9 +213,10 @@ test("composer parity — Chat, Build, and Workbench agree on what they offer", 
   await expect(
     page.getByRole("button", { name: /^How much Raiker may do this turn:/ }),
   ).toBeVisible();
-  // Both composers carry the surface toggle, so a half-typed prompt moves between
-  // them without being sent or retyped.
-  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
+  // The Build composer is the coding agent's own: mode, attach, dictate, model.
+  // No surface switch, no duplicate capacity chip.
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Model context capacity" })).toHaveCount(0);
   await page.screenshot({ path: join(SHOTS, "126-build-composer-parity-live.png"), fullPage: true });
 
   await page.goto(`${BASE}/#/workbench`);

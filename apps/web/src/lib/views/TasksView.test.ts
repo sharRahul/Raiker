@@ -3,12 +3,48 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import TasksView from "./TasksView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { requestSchedule, takeScheduleRequest } from "../scheduleHandoff";
 
-afterEach(() => { vi.unstubAllGlobals(); resetModels(); });
+afterEach(() => { vi.unstubAllGlobals(); resetModels(); takeScheduleRequest(); });
 
 const READY_MODEL = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
 
 describe("TasksView", () => {
+  it("opens on Schedule once when Chat's /schedule asked for it, and creates nothing", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    requestSchedule();
+    render(TasksView);
+
+    // The command arranges the control it names, and stops there.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Schedule once" })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    expect(screen.getByRole("button", { name: "Task" })).toHaveAttribute("aria-pressed", "false");
+    expect(
+      fetchMock.mock.calls.filter(([url, init]) =>
+        String(url).includes("/api/tasks") && (init as RequestInit | undefined)?.method === "POST",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("opens on an immediate task when nothing asked otherwise", async () => {
+    stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Task" })).toHaveAttribute("aria-pressed", "true"),
+    );
+  });
+
   it("offers Run now for an unscheduled queued task and invokes only the explicit run route", async () => {
     const task = {
       task_id: "task_ready", session_id: "sess_inbox", status: "queued",

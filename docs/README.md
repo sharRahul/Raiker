@@ -24,6 +24,9 @@ superseded guides, and screenshots are not maintained here.
 
 - [Build workspace](BUILD_WORKSPACE_SPEC.md): the coding surface, its Plan/Edit/Auto
   modes, repository references, and scheduled agents.
+- [Build process](RAIKER_BUILD_PROCESS.md): the operating protocol every Build
+  turn runs under — how effort is scaled, what is checked before a claim is made,
+  and why a Chat turn does not receive it.
 - [Visual design](VISUAL_DESIGN_SPEC.md): the type scale, density modes, empty
   and loading states, iconography, data-visual rules, and motion a new page is
   built from.

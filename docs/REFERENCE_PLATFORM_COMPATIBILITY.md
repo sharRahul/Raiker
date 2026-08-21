@@ -1128,7 +1128,7 @@ moved one control to where it belongs — see
 | The thinking budget inside the model menu | **Parity with Claude Code**, which nests **Effort ›** and a **Thinking** switch in its model menu | And it fixes a Raiker-specific incoherence: "Thinking: default" and "send no effort" were one fact spelled two ways. They are now one control. |
 | Effort levels are only ever the model's own | **Yes** | Claude Code offers Low…Max for every model in its list. Raiker offers exactly the values the backend advertises for that exact profile, and a model that publishes none has **no** Effort section rather than a disabled one. |
 | Build's posture as one chip and one Mode menu | **Parity with Claude Code's Mode menu** (Auto / Accept edits / Plan, with 1/2/3) | Raiker's three modes are server-enforced per turn and may only ever *tighten*, which Claude Code's cannot claim — but the control's shape is theirs, and three always-visible buttons made a posture look like a filter. |
-| A `Chat | Build` surface toggle that carries the draft | **Parity with Claude's `Chat | Cowork`**, with one difference worth naming | It moves the prompt and its staged files and **sends nothing**; neither surface's governance changes. Deciding which room a half-typed prompt belongs in used to mean abandoning it. |
+| A `Chat | Build` surface toggle that carries the draft | **Removed in the 2026-08-21 composer round — see below** | It was parity with Claude's `Chat | Cowork` picker, but Cowork's lives in the *new-session* affordance, not in the control bar of an open one. Both composers now open in the surface the owner chose from the sidebar. |
 | Governance chips on the same bar | **Yes** | No reference composer carries an approval-mode chip, an execution-environment badge and a measured context-capacity badge at all, because none of them has a governed answer to put in one. |
 
 **Voice has since landed.** GAP-CHAT C16 is closed by FIXED-247: both composers
@@ -1301,6 +1301,86 @@ new ones this round are worth naming separately, because they are the same idea
 applied to storage and to process identity: an observation that cannot leak what
 it never held, and a reattachment that cannot be spoofed by a number the kernel
 hands out again.
+
+---
+
+## 2026-08-21 review (second round) — Build modes, Cowork-shaped Chat, and the C16 re-verification
+
+Same categorical question as every round: for each control this round added,
+removed or verified, **does it take Raiker past Claude Cowork, Claude Code,
+ChatGPT Chat/Work, Codex, OpenClaw, DeepSeek Harness and Hermes Agent — yes or
+no** — and why.
+
+Primary sources read for this round:
+[Cowork overview](https://claude.com/docs/cowork/overview),
+[Cowork Dispatch](https://claude.com/docs/cowork/guide/dispatch),
+[Cowork projects](https://claude.com/docs/cowork/guide/projects),
+[Get started with Cowork](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork),
+[Claude Code permissions](https://code.claude.com/docs/en/permissions) and
+[Claude voice mode](https://support.claude.com/en/articles/11101966-use-voice-mode).
+Where a cited source does not establish a control, this section says so rather
+than inferring one.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| Build opens in **Auto** | **No — parity in shape, and a correctness fix** | Claude Code starts in a mode set by `defaultMode` and cycles with `Shift+Tab`; Raiker's cycle already matched. Opening in **Edit** meant every new Build conversation silently tightened *below* the owner's own Permissions page, which is the opposite of what a default should do. Auto is the only mode that sends no override, so opening in it defers to Permissions instead of overriding it. |
+| The Build operating protocol, selected by surface | **Yes — narrowly** | Claude Code, Codex and Hermes all ship a standing system prompt, and Cowork ships skills; that part is parity. What the cited sources do not establish is a protocol whose *selection is a recorded fact*: Raiker's prompt envelope carries `surface`, the gateway validates it against a closed set and writes it into `prompt_received`, so the audit log states which protocol a turn ran under instead of leaving it to be inferred. See [`RAIKER_BUILD_PROCESS.md`](RAIKER_BUILD_PROCESS.md). |
+| A surface that selects a method and never authority | **Yes** | An unknown surface is refused (`invalid_prompt_surface`) rather than defaulted to Build, and a test asserts the two surfaces are offered an identical tool set. Reference products vary the system prompt per mode freely, because in none of them does the prompt sit inside a governance envelope that could be widened by it. |
+| The Cowork-minimal Chat composer | **No — parity** | Cowork's composer is short. Raiker's carried a Build switch, an execution-environment badge and a context-capacity chip that repeated what the context ring already reported. Removing three controls is not a differentiator; keeping the two governance chips that *do* have a governed answer is the part that stays. |
+| The Code-minimal Build composer | **No — parity** | Claude Code's Mode menu carries its own explanation. Raiker printed the same explanation three more times — a per-mode paragraph above the box, an info button and a tooltip. One menu now carries it; the only line left above the composer is the one the menu cannot know, which is what the owner's standing permissions actually allow under Auto. |
+| `/schedule` and `/tasks` in Chat | **No — parity** | Cowork has `/schedule` and a **Scheduled** sidebar. Raiker already had the cadences (one-off, daily routine, background agent) and the governed `create_task` tool; what was missing was the shortcut from the conversation to them. Neither command creates or starts anything — a command that silently scheduled work is the invisible automation the approval path exists to prevent. |
+| C16 audio released when a surface is navigated away from | **Yes — and it was a real defect** | Found by this round's independent re-verification, not by a report. Chat and Build stay *mounted* across route visits so a long conversation survives a trip to Permissions, which meant the unmount cleanup carrying the `route` reason never ran on an ordinary navigation: dictation kept listening behind a hidden composer whose only **Cancel** control was hidden with it. Both surfaces now release the audio owner the moment they stop being on screen, keeping the finalized words exactly as **Done** would. No cited reference product keeps a conversation surface mounted while hidden, so none faces this — but Raiker made the invisible-capture promise, which is why it had to be kept. |
+
+### Independent verification — GAP-CHAT C16
+
+Re-checked against the code rather than against the closure note. Nine of the ten
+claims held as written; the tenth is the defect fixed above.
+
+| C16 claim | Verified how | Result |
+|---|---|---|
+| One shared **Dictate** control in Chat and Build | `VoiceDictationControl` is imported and rendered by both views | ✅ holds |
+| Dictation writes into the ordinary editable draft | `onchange` writes `promptText`; the textarea is unchanged and still typable | ✅ holds |
+| **Done** finalises without sending | `done()` calls `preserveFinalized()` and releases the owner; it never calls `submit` | ✅ holds |
+| The first `Enter` finalises, a later one sends | `submit()` returns early while `voiceControl.active()` | ✅ holds |
+| **Cancel** restores the byte-for-byte pre-dictation draft | `cancel()` restores the snapshot and caret, and resets provenance through `onrestored` | ✅ holds |
+| Only `typed` / `dictated` / `mixed` cross the boundary | Pydantic `Literal` at the route, `normalize_input_mode` in the envelope **and** again in the gateway | ✅ holds |
+| No audio and no second transcript retained | `prompt_received` carries `client_type`, `prompt_length`, `input_mode` and `surface` only; a test asserts the spoken text is absent from the record | ✅ holds |
+| Read-aloud is manual, completed-only, and skips code and URLs | Rendered under `{#if !turn.streaming}`; `speechText` replaces fenced code with "Code block." and strips raw URLs | ✅ holds |
+| One audio owner across both surfaces | A module-level `audioSessionCoordinator`; starting recognition or playback displaces the previous owner and notifies it | ✅ holds |
+| Listening stops on route change | The `route` cleanup ran only on unmount and on **New chat**, and neither happens on an ordinary navigation | ❌ **fixed this round** |
+
+The boundary itself is also confirmed correct against the reference set. Claude's
+own documentation states that dictation is available in Cowork and Code while
+voice mode is not — so shipping turn-based dictation in both surfaces and leaving
+full-duplex conversation out is the same line Anthropic draws, not a shortfall.
+
+### Gaps this round identified and did **not** close
+
+Recorded here and, where they are work rather than a decision, in
+[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md).
+
+| Gap | Reference | Raiker today | Compatibility requirement to close it |
+|---|---|---|---|
+| **Auto mode has no safety classifier** | Claude Code's `auto` "auto-approves tool calls with background safety checks that verify actions align with your request"; Cowork's Auto "reviews each action for safety" and blocks what it judges unsafe | Raiker's Auto sends no override and defers to standing permissions. There is no second opinion on whether an action matches what was asked | A classifier would have to be a *governed* reviewer: its verdict recorded as evidence on the approval, never a silent grant, and never able to widen a gate. Absent that it is a heuristic that makes Auto feel safer without being safer, which is worse than not having it |
+| **`dontAsk` and `bypassPermissions` postures** | Claude Code offers both; Cowork's Skip is the second | Raiker has Manual / Auto / Skip on the approval chip; there is no deny-unless-preapproved posture | `dontAsk` is the more useful of the two for a governed runtime and maps cleanly onto existing decision modes. It is a mode-list addition, not new enforcement |
+| **Cowork Dispatch** — one conversation that plans, spawns child tasks, and routes each to Chat or Build | [Dispatch](https://claude.com/docs/cowork/guide/dispatch) | `spawn_subagent`, background agents, nested tasks and a live work board all exist; what is missing is the single briefing conversation that owns them and the per-child routing | The routing decision has to be visible and re-decidable, and each child must carry its own approvals rather than inheriting the parent's. Raiker's per-task session model already supports this; the surface does not exist |
+| **Ten-minute auto-deny on an unanswered forwarded approval** | Dispatch forwards a child's permission prompt and denies it automatically after ten minutes | Raiker approvals wait indefinitely | A timeout is only safe if the expiry is itself a recorded decision with its reason, not a silent drop |
+| **Project links** | A Cowork project holds reference URLs alongside folders and instructions | Raiker projects hold instructions, shared attachments, a root subpath and an opt-in approved-memory boundary — links are absent | A link is a fetch the agent may perform, so it belongs to the web-access gate rather than to project metadata. That is the design question, not the storage |
+| **Hosted scheduling** | Cowork's scheduled tasks "run in the cloud, so they don't need your computer to be awake" | Raiker schedules run on the resident local host | Out of scope by design — Raiker is local-first and single-user. Recorded so the difference is stated rather than looking like an oversight |
+| **Hooks, plugins and channels** | Claude Code ships all three; Cowork installs plugins from **Customize** | Specified in `HOOKS_SPEC.md`, `PLUGIN_SYSTEM_SPEC.md` and `CHANNELS_SPEC.md`; manifest validation and a connector registry exist, execution does not | Unchanged from earlier rounds and still the largest single gap to Claude Code |
+
+### Recommended improvements, in the order they are worth doing
+
+1. **`dontAsk` as a fourth approval posture.** Low effort, real coverage gain,
+   and it needs no new enforcement — the decision modes already express it.
+2. **A governed alignment reviewer for Auto.** The differentiator is not the
+   classifier; it is that its verdict is recorded as evidence on the decision and
+   can never widen a gate. Only worth building with that constraint.
+3. **A Dispatch-shaped briefing conversation.** Raiker has every part except the
+   surface that owns the children and routes each to Chat or Build.
+4. **Hooks execution**, which unblocks plugins and channels behind it.
 
 ---
 

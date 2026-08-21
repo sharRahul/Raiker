@@ -52,6 +52,8 @@ export interface SlashCommand {
     | "mode-auto"
     | "terminal"
     | "repos"
+    | "schedule"
+    | "tasks"
     | "shortcuts";
 }
 
@@ -76,6 +78,14 @@ const SHARED: readonly SlashCommand[] = [
 
 const CHAT_ONLY: readonly SlashCommand[] = [
   { name: "export", summary: "Export this conversation as HTML, Markdown or PDF", action: "export" },
+  // Chat is Raiker's knowledge-work surface, so it carries the two controls that
+  // turn a conversation into work that continues without the owner watching: a
+  // schedule or daily routine, and the list of runs already under way. Both open
+  // the governed Tasks surface — neither creates anything on its own, because a
+  // command that silently scheduled work would be exactly the invisible
+  // automation the approval path exists to prevent.
+  { name: "schedule", summary: "Schedule a task or a daily routine", action: "schedule" },
+  { name: "tasks", summary: "Show tasks, schedules and background agents", action: "tasks" },
 ];
 
 const BUILD_ONLY: readonly SlashCommand[] = [

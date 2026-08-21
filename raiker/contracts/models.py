@@ -33,6 +33,11 @@ CLIENT_TYPES = {
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
 APPROVAL_MODES = {"manual", "auto", "skip"}
 VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
+#: Which conversation surface produced a prompt. It selects the operating
+#: protocol the turn is run under and nothing else: a surface can never widen
+#: what a turn may do, and every capability, gate and approval is unchanged by
+#: it. An unknown value is refused rather than silently treated as "chat".
+PROMPT_SURFACES = {"chat", "build"}
 _LEGACY_APPROVAL_MODE_ALIASES = {
     "interactive": "manual",
     "allow_safe_only": "auto",
@@ -554,6 +559,19 @@ def normalize_input_mode(value: object) -> str:
     """Validate client-reported prompt provenance without inferring audio facts."""
     if not isinstance(value, str) or value not in VOICE_INPUT_MODES:
         raise ContractValidationError(f"invalid_input_mode:{value}")
+    return value
+
+
+def normalize_prompt_surface(value: object) -> str:
+    """Validate which composer a prompt came from.
+
+    The surface is advisory about *how to work*, never about *what is allowed*.
+    It is still validated here rather than coerced, because a turn whose surface
+    the runtime guessed would put a Build operating protocol on a Chat turn (or
+    the reverse) without anything in the audit trail saying so.
+    """
+    if not isinstance(value, str) or value not in PROMPT_SURFACES:
+        raise ContractValidationError(f"invalid_prompt_surface:{value}")
     return value
 
 

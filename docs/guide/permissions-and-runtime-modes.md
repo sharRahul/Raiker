@@ -146,8 +146,10 @@ Two things worth knowing about how these rows behave elsewhere:
   to that turn: Plan refuses file writes, patches and commands, Edit turns each one
   into a decision. A turn may only ever tighten itself, so **Auto** adds no
   restriction of its own and does exactly as much as the modes here already
-  allow — which the Build composer states. `Shift+Tab` cycles the three. Widening a
-  permission happens here, under the step-up.
+  allow — which the Build composer states. `Shift+Tab` cycles the three, and
+  Build **opens in Auto**: opening in a mode that sends no override means a new
+  conversation runs under exactly what you set here, rather than silently
+  tightening below it. Widening a permission happens here, under the step-up.
 
 ### The step-up dialog
 

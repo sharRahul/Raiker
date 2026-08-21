@@ -17,6 +17,7 @@ from raiker.contracts.models import (
     PromptPayload,
     UserMetadata,
     normalize_input_mode,
+    normalize_prompt_surface,
 )
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
@@ -268,6 +269,9 @@ class AgentGateway:
         input_mode = normalize_input_mode(
             prompt_envelope.prompt.metadata.get("input_mode", "typed")
         )
+        surface = normalize_prompt_surface(
+            prompt_envelope.prompt.metadata.get("surface", "chat")
+        )
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)
         self.sessions.track_turn(
@@ -285,6 +289,9 @@ class AgentGateway:
                     "client_type": prompt_envelope.client.type,
                     "prompt_length": len(prompt_envelope.prompt.text),
                     "input_mode": input_mode,
+                    # Recorded so the audit trail states which operating protocol
+                    # the turn ran under rather than leaving it to be inferred.
+                    "surface": surface,
                 },
                 client=prompt_envelope.client,
             )

@@ -575,7 +575,13 @@ to prevent.
 **C15. Attachments are one-way.** The composer uploads; the transcript cannot
 hand a file back (C1), preview one (C4), or let the owner drag one out.
 
-**C16. Governed turn-based voice.** ✅ **Complete — see FIXED-247.** Chat and
+**C16. Governed turn-based voice.** ✅ **Complete — see FIXED-247, re-verified
+2026-08-21 and corrected by FIXED-249.** The re-verification checked all ten
+claims against the code rather than against the closure note: nine held as
+written, and the tenth did not. "Listening stops on a route change" was
+implemented in the views' unmount teardown, but Chat and Build stay *mounted*
+across route visits, so the microphone kept running behind a hidden composer.
+Both surfaces now release the audio owner on visibility. Chat and
 Build now share a real **Dictate** control: browser speech recognition writes
 into the ordinary editable composer, **Done** finalises without sending,
 **Cancel** restores the exact pre-dictation draft, and only the existing

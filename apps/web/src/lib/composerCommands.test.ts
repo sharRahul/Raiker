@@ -27,6 +27,12 @@ describe("slash commands", () => {
     expect(build).toContain("terminal");
     expect(build).toContain("plan-mode");
     expect(build).not.toContain("export");
+    // Scheduling and the task list are Chat's: Chat is where work is handed off
+    // to run without the owner watching, and Build is where code is written.
+    expect(chat).toContain("schedule");
+    expect(chat).toContain("tasks");
+    expect(build).not.toContain("schedule");
+    expect(build).not.toContain("tasks");
     // Both carry the shared set.
     for (const shared of ["new", "model", "attach", "approvals", "stop", "shortcuts"]) {
       expect(chat).toContain(shared);

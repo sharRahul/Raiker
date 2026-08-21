@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, StreamEvent } from "../apiTypes";
 import { stubFetch } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { takeScheduleRequest } from "../scheduleHandoff";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -94,6 +95,22 @@ const NON_REASONING_PROFILE = {
 };
 
 describe("ChatView composer parity", () => {
+  it("is the Cowork-minimal composer: no Build switch, no duplicate capacity chip", async () => {
+    stubFetch(routes());
+    render(ChatView, { projects });
+
+    await screen.findByLabelText("Prompt");
+    // Chat is not where code gets built, so the composer no longer offers a way
+    // to move the draft into Build; and the context ring already reports the
+    // window, so the capacity chip beside it was the same fact stated twice.
+    expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Execution environment")).not.toBeInTheDocument();
+    // What a Cowork-shaped composer does keep.
+    expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Context window" })).toBeInTheDocument();
+  });
+
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
     const recognition = installRecognitionFake();
     stubFetch({ ...routes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
@@ -346,6 +363,27 @@ describe("ChatView composer — commands, mentions and message actions", () => {
     });
 
     expect(screen.queryByRole("listbox", { name: "Commands" })).not.toBeInTheDocument();
+  });
+
+  it("opens the governed Tasks surface for /schedule rather than scheduling anything", async () => {
+    stubFetch(routes());
+    streamPromptMock.mockResolvedValue(undefined);
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+
+    await fireEvent.input(prompt, { target: { value: "/schedule" } });
+    const menu = await screen.findByRole("listbox", { name: "Commands" });
+    await fireEvent.mouseDown(within(menu).getByText("/schedule"));
+
+    // The command is a shortcut to a control the owner already has. It creates
+    // no task, sends no turn, and reaches the model with no authority at all.
+    expect(window.location.hash).toBe("#/tasks");
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    // It also arranges the control it names: the next Tasks mount opens on
+    // Schedule once rather than on a plain immediate task.
+    expect(takeScheduleRequest()).toBe(true);
+    // One shot only — a later visit to Tasks must not be silently rearranged.
+    expect(takeScheduleRequest()).toBe(false);
   });
 
   it("running a command clears its token instead of sending it to the model", async () => {

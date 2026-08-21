@@ -10,8 +10,6 @@
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
-  import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
-  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
@@ -43,13 +41,13 @@
   import ToolActivity from "../components/ToolActivity.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
-  import SurfaceToggle from "../components/SurfaceToggle.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
   import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
   import ReadAloudButton from "../components/ReadAloudButton.svelte";
+  import { requestSchedule } from "../scheduleHandoff";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
   import {
     applyMention,
@@ -105,11 +103,31 @@
     sessionId: continuedSessionId = null,
     projects = null,
     onProjectsChanged,
+    // Chat keeps its transcript and its unsent draft when the owner navigates
+    // away — the view is hidden, not unmounted — so it has to be told when it
+    // stops being the surface on screen. Dictation and read-aloud are the
+    // reason: an unmount hook never fires here, so without this the microphone
+    // would keep listening from a hidden page.
+    visible = true,
   }: {
     sessionId?: string | null;
     projects?: ProjectsList | null;
     onProjectsChanged?: () => void;
+    visible?: boolean;
   } = $props();
+
+  // C16 — leaving the surface ends the turn's audio.
+  //
+  // Chat and Build are kept mounted across route visits, so the unmount cleanup
+  // that was supposed to carry the `route` reason never ran on an ordinary
+  // navigation. A microphone that stays live behind a hidden composer, with its
+  // only Stop control hidden along with it, is exactly the invisible capture the
+  // dictation design exists to prevent — so the audio owner is released the
+  // moment this surface stops being the one on screen. Nothing is discarded:
+  // finalized words stay in the draft, exactly as pressing Done would leave them.
+  $effect(() => {
+    if (!visible) audioSessionCoordinator.stopAll("route");
+  });
   let promptText = $state("");
   let speechLanguage = $state<SpeechLanguage>("auto");
   let voiceControl = $state<VoiceDictationHandle | undefined>();
@@ -701,6 +719,7 @@
         {
           text,
           input_mode: inputMode,
+          surface: "chat",
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: model || undefined,
@@ -928,6 +947,16 @@
       case "attach": attachOpen = true; break;
       case "context": contextOpen = true; void refreshContextUsage(); break;
       case "approvals": window.location.hash = "#/approvals"; break;
+      // Cowork's own two: schedule work, and see what is already running. The
+      // Tasks surface owns both, including the cadence chips (once / daily /
+      // background agent) that make a routine a routine. `/schedule` also asks
+      // that surface to open on **Schedule once**, so the command arranges the
+      // control it names — it still creates nothing and starts nothing.
+      case "schedule":
+        requestSchedule();
+        window.location.hash = "#/tasks";
+        break;
+      case "tasks": window.location.hash = "#/tasks"; break;
       case "export": if (sessionId !== null) exportOpen = true; break;
       case "plan": planCollapsed = false; void loadPlan(); break;
       // The same governed `POST /api/interrupts` the composer's Stop button and
@@ -1776,12 +1805,6 @@
             onrestored={restoreVoiceProvenance}
             onactivechange={onVoiceActive}
           />
-          <SurfaceToggle
-            surface="chat"
-            draft={promptText}
-            attachments={() => attachStore.take()}
-            disabled={streaming}
-          />
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
               <span class="sr-only">Project for this chat</span>
@@ -1800,8 +1823,6 @@
             </label>
           {/if}
           <ApprovalModeControl />
-          <ExecutionEnvironmentBadge />
-          <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
         </div>
 
         <div class="bar-right">

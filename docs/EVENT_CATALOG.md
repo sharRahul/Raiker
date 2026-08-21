@@ -14,7 +14,7 @@ human authorizer, runtime authority, or other literal actor.
 | `machine_identity_rotated` | A resumed turn received a fresh token ID while retaining its machine subject |
 | `machine_identity_refused` | Broker verification failed closed with a stable reason code before policy, credentials, hooks, or tools |
 | `machine_identity_deactivated` | A terminal turn's machine principal was made inactive |
-| `prompt_received` | A client submitted a turn |
+| `prompt_received` | A client submitted a turn (client type, prompt length, input provenance and the composer surface — never the prompt text) |
 | `conversation_history_replayed` | Prior turns of the session were sent to the model as context (message count and character total only — never the transcript) |
 | `policy_decision` | Policy classified the requested action |
 | `approval_requested` | A human decision is required |

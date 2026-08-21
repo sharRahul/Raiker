@@ -63,6 +63,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
+| [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
+| [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | Open — raised 2026-08-21 |
+| [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -366,3 +369,103 @@ FIXED-244.
 **Required user-interface outcome.** None — this is a test-isolation defect on one
 platform. The product's memory-security posture is reported from a real probe and
 is unaffected.
+
+---
+
+## BUG-218 — Auto mode has no alignment check of its own
+
+**Severity: Medium. Area: decision modes / Build / Chat. Status: Open — raised
+2026-08-21 while reviewing Claude Code and Cowork permission modes.**
+
+**Observed.** Raiker's **Auto** approval mode, and Build's **Auto** composer
+mode, both mean "do not add a restriction of my own" — the turn runs under the
+owner's standing permissions and nothing looks at whether a particular action is
+what the owner actually asked for.
+
+The reference set does more than that.
+[Claude Code's `auto`](https://code.claude.com/docs/en/permissions)
+"auto-approves tool calls with background safety checks that verify actions align
+with your request", and
+[Cowork's Auto](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork)
+"reviews each action for safety" and blocks what it judges unsafe. An owner
+moving from either product to Raiker will read Raiker's **Auto** as the same
+promise, and it is not.
+
+**Reproduction.** Set every write capability to allow, choose Auto, and ask for a
+change to a file unrelated to the request. It runs. Nothing records that the
+action and the request disagreed.
+
+**Root cause.** There is no reviewer between a permitted action and its
+execution. `raiker/tools/broker.py` decides on the gate and the decision mode
+only; alignment is not a concept the runtime has.
+
+**Proposed fix, and the constraint that makes it worth building.** A classifier
+that quietly approves is worse than none — it makes Auto *feel* safer without
+being safer, and it puts a model in the authority path. Any implementation must:
+
+- record its verdict as **evidence on the decision**, visible in the approval and
+  in the audit record, never as a silent grant;
+- be able to **withhold** an action into the ordinary approval queue, and never to
+  widen a gate or skip one;
+- state, where it withheld, which part of the request the action did not match,
+  so the owner is answering a question rather than a mood;
+- fail closed when the reviewer itself is unavailable — an unreachable reviewer
+  means Auto behaves as Manual, not as Skip.
+
+Until it is built, Raiker's Auto should keep saying exactly what it does, which
+the Build composer already does through `standingPostureNote`.
+
+---
+
+## BUG-219 — There is no deny-unless-preapproved posture
+
+**Severity: Low. Area: approval modes. Status: Open — raised 2026-08-21.**
+
+**Observed.** The approval chip offers Manual, Auto and Skip. Claude Code also
+offers `dontAsk`, which auto-**denies** anything not already allowed by a rule
+instead of prompting for it. That is the posture for unattended work where an
+interruption is worse than a refusal — a scheduled routine, a background agent —
+and Raiker has no way to express it.
+
+**Root cause.** `APPROVAL_MODES` in `raiker/contracts/models.py` and
+`apps/web/src/lib/approvalMode.ts` list three modes. The enforcement it would
+need already exists: `deny` is a decision mode the runtime honours today.
+
+**Proposed fix.** Add a fourth mode that resolves any otherwise-eligible governed
+action to `deny` rather than to a prompt, with the refusal recorded and visible
+in the transcript like any other. It is a mode-list addition rather than new
+enforcement, which is why the severity is Low and the value is real — a routine
+that runs at 06:00 cannot answer a prompt, and today it parks instead of
+proceeding within what it was allowed.
+
+---
+
+## BUG-220 — Nothing owns a set of delegated child tasks
+
+**Severity: Medium. Area: tasks / delegation. Status: Open — raised 2026-08-21
+while reviewing Cowork Dispatch.**
+
+**Observed.** Raiker has every component of
+[Cowork's Dispatch](https://claude.com/docs/cowork/guide/dispatch): read-only
+subagents (`spawn_subagent`), background agents, nested tasks with a parent id,
+per-task sessions, and a live work board in Observability. What is missing is the
+one conversation that briefs the work, decides how to split it, and owns the
+children — and the routing decision that sends each child to Chat or to Build.
+
+Today the owner does the splitting by hand, one task form at a time, and nothing
+connects the resulting runs to the intent that produced them.
+
+**Root cause.** `parent_task_id` records structure but no surface composes it. No
+route lists a task's children as a group, and no turn can create more than one
+task at a time.
+
+**Proposed fix, with the governance requirements that are not optional.**
+
+- The routing decision (Chat or Build, and which project or repository) must be
+  **visible and re-decidable** before the child starts, not inferred silently.
+- Each child must carry **its own approvals**. A child inheriting the parent
+  conversation's approvals would turn one decision into an unbounded number, which
+  is the exact failure the per-turn capability envelope exists to prevent.
+- A forwarded approval must not expire silently. Cowork auto-denies an unanswered
+  prompt after ten minutes; if Raiker adopts that, the expiry has to be a
+  **recorded decision with its reason**, not a dropped request.

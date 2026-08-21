@@ -1448,6 +1448,10 @@ export interface PromptRequestBody {
   text: string;
   // Client-reported provenance; no audio or transcript metadata crosses this boundary.
   input_mode?: "typed" | "dictated" | "mixed";
+  // Which composer sent this prompt. It selects the operating protocol the turn
+  // runs under — Build adds the engineering protocol, Chat does not — and grants
+  // nothing: gates, capabilities and approvals are identical either way.
+  surface?: "chat" | "build";
   session_id?: string;
   planning_mode?: string;
   approval_mode?: string;

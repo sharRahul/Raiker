@@ -30,6 +30,21 @@ not accept or retain microphone audio and does not store a second transcript.
 Voice-created prompts use the same authenticated prompt route, session scope,
 policy, model selection, approval and audit path as keyboard-created prompts.
 
+### Composer surface
+
+The same three routes accept optional `surface: "chat" | "build"`, defaulting to
+`chat` so a REST client that has never heard of the field gets the conservative
+surface rather than the coding one. Like `input_mode` it is revalidated when the
+request becomes a `PromptEnvelope` and again at the Agent Gateway, which records
+it on `prompt_received`; an unrecognised value is refused as
+`invalid_prompt_surface` rather than coerced.
+
+It selects **the operating protocol the turn runs under and nothing else**: a
+Build turn receives the protocol in `docs/RAIKER_BUILD_PROCESS.md` as a second
+system message, a Chat turn does not, and every field that decides authority —
+capability modes, approval mode, planning mode, tool-call budget, and the tool
+set offered to the model — is identical on both.
+
 ### Machine identity attribution
 
 Agentic turn, event, and approval views use a redacted `IdentityView`:

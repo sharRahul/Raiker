@@ -64,6 +64,32 @@ Notes that keep the mapping honest:
   continues under the posture it was sent with rather than under whatever the
   standing modes say by then.
 - `Shift+Tab` cycles Plan → Edit → Auto without leaving the prompt.
+- **Build opens in Auto.** Auto is the only mode that sends no override, so a new
+  conversation runs under exactly the owner's standing permissions. Opening in
+  Edit — as Build used to — meant the surface silently tightened *below* what the
+  owner had set on the Permissions page, on every new conversation, with nothing
+  saying so. Choosing Plan or Edit stays a deliberate act of tightening.
+
+## The operating protocol
+
+A Build turn carries a second system message that a Chat turn does not: the
+compressed operating protocol from
+[`RAIKER_BUILD_PROCESS.md`](RAIKER_BUILD_PROCESS.md). Build is where a turn
+changes a repository, and the failures that matter there are process failures
+rather than knowledge failures — committing to the first plausible story, editing
+a file from memory instead of reading it, reporting a success that was never
+confirmed.
+
+The prompt envelope carries `surface`, validated against a closed set
+(`chat` / `build`) at the HTTP schema, in the envelope builder, and again in the
+gateway, which writes it into `prompt_received`. So the audit trail states which
+protocol a turn ran under rather than leaving it to be inferred, and an unknown
+value is refused (`invalid_prompt_surface`) rather than read as Build.
+
+**The surface selects a working method and never authority.** Every capability
+gate, decision mode, approval and boundary is identical with or without it; the
+tool set offered to the model is asserted identical on both surfaces
+(`tests/test_build_operating_protocol.py`).
 
 Accepting a proposed change from the transcript uses the ordinary approval
 route, and the action is **re-governed before anything runs** — the capability

@@ -15,7 +15,6 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |
-| **Chat / Build** | `Chat or Build` | Moves a half-typed prompt, and its staged files, to the other surface. It sends nothing and changes no governance. |
 | **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 | **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
@@ -23,7 +22,9 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **Dictate** | `Dictate` | Starts browser speech recognition and writes the result into the ordinary editable draft. It never sends. The same control ships in Build. |
 
 Every control lives on one bar under the prompt: `+` and the scope controls on
-the left, the model chip and **Send** on the right.
+the left, the model chip and **Send** on the right. The bar is deliberately
+short: Chat is the knowledge-work surface, so it carries no way to switch into
+Build and no capacity chip repeating what **Context** already reports.
 
 There is no planning chip in Chat. While dictation is listening, **Done** or the
 first `Enter` stops listening and keeps focus in the draft; **Cancel** restores
@@ -49,6 +50,32 @@ The approval setting controls the interaction, not the runtime's protections:
 
 The selected policy is shared with Build and is remembered for the next
 composer session. It is not the same as Build's Plan/Edit/Auto runtime modes.
+
+### Slash commands
+
+Typing `/` at the **start** of the prompt opens the command menu. Every entry is
+a control you already have; none of them sends anything to the model, and none
+grants anything:
+
+| Command | What it does |
+|---|---|
+| `/new` | Start a fresh conversation |
+| `/model` | Open the model menu for this surface |
+| `/attach` | Open the attachment panel |
+| `/context` | Open the read-only context popover |
+| `/approvals` | Open the approvals inbox |
+| `/plan` | Show the agent's current plan |
+| `/schedule` | Open **Tasks**, where a one-off schedule, a daily routine or a background agent is created |
+| `/tasks` | Open **Tasks** to see schedules and runs already under way |
+| `/export` | Export this conversation |
+| `/stop` | Stop the running turn at its next safe boundary |
+| `/shortcuts` | Show the keyboard map |
+
+`/schedule` and `/tasks` open the governed **Tasks** surface; neither creates or
+starts anything on its own. Asking Raiker in prose — *"run this every morning"* —
+goes through the `create_task` approval instead, which names exactly what it
+would create before you decide. See
+[Tasks and projects](tasks-and-projects.md).
 
 ## Reading a reply
 

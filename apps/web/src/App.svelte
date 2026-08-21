@@ -181,6 +181,7 @@
                 sessionId={continuedSessionId}
                 {projects}
                 onProjectsChanged={refreshProjects}
+                visible={current === "new-chat"}
               />
             </div>
           {/if}

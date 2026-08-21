@@ -22,7 +22,6 @@
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
-  import ModelCapacityBadge from "../components/ModelCapacityBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -73,7 +72,6 @@
   import ComposerAttachPanel from "../components/ComposerAttachPanel.svelte";
   import ComposerChips from "../components/ComposerChips.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
-  import SurfaceToggle from "../components/SurfaceToggle.svelte";
   import BuildModePicker from "../components/BuildModePicker.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import CommandOutputPane from "../components/CommandOutputPane.svelte";
@@ -122,6 +120,13 @@
     onProjectsChanged?: () => void;
     visible?: boolean;
   } = $props();
+
+  // C16 — leaving the surface ends the turn's audio. See the matching comment in
+  // ChatView: Build is hidden rather than unmounted, so the release has to be
+  // driven by visibility instead of by an unmount hook that never fires.
+  $effect(() => {
+    if (!visible) audioSessionCoordinator.stopAll("route");
+  });
 
   $effect(() => {
     if (!visible) return;
@@ -285,11 +290,7 @@
   // The owner's standing write permissions, read only so the composer can say
   // what Auto will actually amount to. Never written from this page.
   let standingModes = $state<Record<string, string> | null>(null);
-  let modeTooltipOpen = $state(false);
-  const modeSpec = $derived(buildMode(mode));
   const standingNote = $derived(standingPostureNote(mode, standingModes));
-  const modeTooltip =
-    "Plan researches and proposes without writing anything. Edit turns every change into a decision you accept or reject. Auto adds no restriction of its own and follows the permissions you set in Permissions. All three apply to this conversation's turns only — none of them changes your standing permissions.";
 
   // ── Repository ───────────────────────────────────────────────────────
   let repos = $state<CodeReposView | null>(null);
@@ -734,6 +735,7 @@
         {
           text: sent,
           input_mode: inputMode,
+          surface: "build",
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: model || undefined,
@@ -1439,12 +1441,10 @@
           ></textarea>
         </div>
 
-        <!-- BUG-70 — what this mode does, stated where it is chosen. The chip no
-             longer edits standing permissions, so the sentence has to say whose
-             posture it is; for Auto it also reports what the owner's standing
-             permissions actually allow, rather than promising unprompted
-             execution they never granted. -->
-        <p class="line-notice mode-detail">{modeSpec.detail}</p>
+        <!-- BUG-70 — the mode picker's own menu carries what each mode does, so
+             the composer keeps only the line the picker cannot know: for Auto,
+             what the owner's standing permissions actually allow. Auto promises
+             nothing it has not read. -->
         {#if standingNote !== null}
           <p class="line-notice" role="status">
             {standingNote}
@@ -1479,28 +1479,7 @@
               onrestored={restoreVoiceProvenance}
               onactivechange={onVoiceActive}
             />
-            <SurfaceToggle
-              surface="build"
-              draft={promptText}
-              attachments={() => attachStore.take()}
-              disabled={streaming}
-            />
             <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
-            <button
-              type="button"
-              class="mode-help"
-              aria-label="About Plan, Edit, and Auto modes"
-              aria-describedby="build-mode-tooltip"
-              onmouseenter={() => (modeTooltipOpen = true)}
-              onmouseleave={() => (modeTooltipOpen = false)}
-              onfocus={() => (modeTooltipOpen = true)}
-              onblur={() => (modeTooltipOpen = false)}
-            >
-              <Icon name="info" size={14} />
-            </button>
-            {#if modeTooltipOpen}
-              <span id="build-mode-tooltip" class="mode-tooltip" role="tooltip">{modeTooltip}</span>
-            {/if}
             {#if projects && projects.projects.length > 0}
               <label class="project-picker">
                 <Icon name="folder" size={14} />
@@ -1520,7 +1499,6 @@
             {/if}
             <ApprovalModeControl />
             <ExecutionEnvironmentBadge />
-            <ModelCapacityBadge tokens={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_tokens} source={(profiles.find((profile) => profile.profile_id === modelProfile && (!model || profile.model === model)) ?? selectedProfile)?.context_window_source} />
           </div>
 
           <div class="bar-right">
@@ -1995,37 +1973,6 @@
   }
   .composer-card textarea::placeholder {
     color: var(--text-3);
-  }
-  .mode-help {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 1.7rem;
-    height: 1.7rem;
-    padding: 0;
-    border: 1px solid var(--neutral-border);
-    border-radius: 50%;
-    background: var(--surface);
-    color: var(--text-2);
-    cursor: help;
-  }
-  .mode-help:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 1px;
-  }
-  .mode-tooltip {
-    position: absolute;
-    z-index: 2;
-    max-width: min(22rem, calc(100vw - 3rem));
-    margin-top: 3.4rem;
-    padding: .45rem .6rem;
-    border: 1px solid var(--neutral-border);
-    border-radius: var(--r-md);
-    background: var(--surface);
-    box-shadow: var(--shadow-2);
-    color: var(--text-2);
-    font-size: .76rem;
-    line-height: 1.45;
   }
   .line-notice {
     margin: 0;

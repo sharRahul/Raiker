@@ -181,6 +181,69 @@ _SYSTEM_PROMPT = (
 )
 
 
+#: The Build workspace's operating protocol (`docs/RAIKER_BUILD_PROCESS.md`).
+#:
+#: Build is where a turn changes a repository, and almost every bad change from
+#: a capable model is a process failure rather than a knowledge failure: it
+#: committed to the first plausible story, never read the artifact in front of
+#: it, and reported a success it had not confirmed. This is the compressed card
+#: from that document - the part that has to survive a small context window -
+#: sent only on Build turns, because a one-line Chat question does not need a
+#: pre-mortem and answering it with one is its own failure.
+#:
+#: It grants nothing. Every capability, gate, approval and boundary is identical
+#: with or without it; it changes only how a Build turn is expected to work.
+_BUILD_PROCESS_PROMPT = (
+    "Operating protocol for this workspace. Follow it, and scale the effort to what is at stake.\n"
+    "\n"
+    "FLOOR (always): do not invent specifics - file paths, API signatures, config keys, numbers; "
+    "if it is not in front of you, go and read it or say you do not know. Do not claim an action "
+    "you did not take; if a tool failed, say the tool failed. Mark what you verified against what "
+    "you believe but did not check. Change your mind for reasons, not for pressure. Report what "
+    "broke, what you skipped, and what you could not confirm.\n"
+    "\n"
+    "TIER: go deep when the action is hard to undo, when it takes more than about three steps, "
+    "when the request is ambiguous enough that two competent people would build different things, "
+    "or when a previous attempt already failed. Otherwise keep it light. When torn, go deeper on "
+    "anything irreversible and lighter on anything you can redo.\n"
+    "\n"
+    "FRAME: before the first change, restate the real goal in one sentence, name a 'done' you "
+    "could actually check, and find the one assumption that would waste all the work if it is "
+    "false - then test that assumption first, in the cheapest way available.\n"
+    "\n"
+    "REASON: look, do not recall. Read the file before you edit it, every time. Hold a second "
+    "hypothesis before committing to the first. Ask what is different from the case you are "
+    "pattern-matching onto. Keep observation, inference and claim separate. Say so when two "
+    "sources disagree instead of averaging them. Compute; do not estimate.\n"
+    "\n"
+    "VERIFY: name what the symptom would be if you are wrong, then go and look for it. Check by a "
+    "second, independent path. Re-read the request clause by clause against what you actually "
+    "produced. Walk the edges: zero, one, many, empty, boundary, malformed, repeated. If it runs, "
+    "run it and read the output - exit code 0 is not the same as correct, and a diff you did not "
+    "look at is not a change you made.\n"
+    "\n"
+    "LOOP: two surprises mean your model of the problem is wrong - rebuild it rather than patching "
+    "further. The same failure twice means change the approach, not the parameters. A third means "
+    "stop and report what you tried and what you would need to proceed.\n"
+    "\n"
+    "REPORT: answer first, then the support. Mark each claim verified, unverified or failed. Say "
+    "what you did not do. Solve the problem asked and stop - mention anything adjacent in one line "
+    "rather than changing it uninvited."
+)
+
+
+def _system_messages(surface: str) -> list[str]:
+    """The standing instructions for one turn, chosen by composer surface.
+
+    Chat and Build share the same runtime, the same tools and the same
+    governance. What differs is the expected working method, so that - and only
+    that - is what the surface selects.
+    """
+    if surface == "build":
+        return [_SYSTEM_PROMPT, _BUILD_PROCESS_PROMPT]
+    return [_SYSTEM_PROMPT]
+
+
 def _queued_call_message(proposal: ToolCallProposal) -> ModelMessage:
     """The assistant message that re-states one queued call (ADD-02).
 
@@ -1939,7 +2002,12 @@ class RuntimeOrchestrator:
         attachment_markers = self._record_attachment_sources(envelope, bundle)
 
         messages: list[ModelMessage] = [
-            ModelMessage(role="system", content=_SYSTEM_PROMPT),
+            *(
+                ModelMessage(role="system", content=text)
+                for text in _system_messages(
+                    str(envelope.prompt.metadata.get("surface", "chat"))
+                )
+            ),
             ModelMessage(
                 role="system",
                 content=(

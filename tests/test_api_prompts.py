@@ -88,7 +88,41 @@ def test_prompt_input_provenance_defaults_to_typed_and_preserves_dictation(
 
     assert typed.prompt.metadata["input_mode"] == "typed"
     assert dictated.prompt.metadata["input_mode"] == "dictated"
-    assert set(dictated.prompt.metadata) == {"entry_command", "input_mode"}
+    assert set(dictated.prompt.metadata) == {"entry_command", "input_mode", "surface"}
+
+
+def test_prompt_surface_defaults_to_chat_and_is_validated(workspace: Path) -> None:
+    default = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+    build = _build_envelope(
+        PromptRequest(text="hello", surface="build"), "principal_owner", workspace
+    )
+
+    # An external REST client that has never heard of the field gets the
+    # conservative surface, not the coding one.
+    assert default.prompt.metadata["surface"] == "chat"
+    assert build.prompt.metadata["surface"] == "build"
+
+
+def test_prompt_surface_never_changes_what_a_turn_may_do(workspace: Path) -> None:
+    chat = _build_envelope(
+        PromptRequest(text="hello", capability_modes={"shell_execution": "ask"}),
+        "principal_owner",
+        workspace,
+    )
+    build = _build_envelope(
+        PromptRequest(
+            text="hello", surface="build", capability_modes={"shell_execution": "ask"}
+        ),
+        "principal_owner",
+        workspace,
+    )
+
+    # The surface selects an operating protocol and nothing else: every field
+    # that decides authority is identical on both.
+    assert chat.options.capability_modes == build.options.capability_modes
+    assert chat.options.approval_mode == build.options.approval_mode
+    assert chat.options.planning_mode == build.options.planning_mode
+    assert chat.options.max_tool_calls == build.options.max_tool_calls
 
 
 def test_gateway_revalidates_and_audits_only_safe_input_provenance(workspace: Path) -> None:
@@ -110,16 +144,28 @@ def test_gateway_revalidates_and_audits_only_safe_input_provenance(workspace: Pa
     assert received["payload"]["client_type"] == "web_ui"
     assert received["payload"]["prompt_length"] == len(envelope.prompt.text)
     assert received["payload"]["input_mode"] == "mixed"
+    assert received["payload"]["surface"] == "chat"
     assert set(received["payload"]) == {
         "client",
         "client_type",
         "prompt_length",
         "input_mode",
+        "surface",
     }
     assert "spoken secret" not in json.dumps(received)
 
     envelope.prompt.metadata["input_mode"] = "continuous-listening"
     with pytest.raises(ContractValidationError, match="invalid_input_mode"):
+        AgentGateway(workspace)._prepare_turn(envelope)
+
+
+def test_gateway_refuses_an_unknown_prompt_surface(workspace: Path) -> None:
+    envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+    envelope.prompt.metadata["surface"] = "voice"
+
+    # Guessing here would put the Build operating protocol on a Chat turn (or the
+    # reverse) with nothing in the audit trail saying so.
+    with pytest.raises(ContractValidationError, match="invalid_prompt_surface"):
         AgentGateway(workspace)._prepare_turn(envelope)
 
 

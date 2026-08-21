@@ -176,6 +176,38 @@ function modeTrigger() {
 }
 
 describe("Build composer modes", () => {
+  it("opens in Auto and sends no turn-scoped override for it", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Done.");
+    render(BuildView);
+
+    expect(await screen.findByRole("button", {
+      name: "How much Raiker may do this turn: Auto",
+    })).toBeInTheDocument();
+
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    // Opening in Auto must widen nothing: no capability override and no planning
+    // override, so the turn runs under exactly the owner's standing permissions.
+    expect(streamPromptMock.mock.calls[0][0].capability_modes).toEqual({});
+    expect(streamPromptMock.mock.calls[0][0].planning_mode).toBeUndefined();
+  });
+
+  it("is the Code-minimal composer: no Chat switch, no duplicate capacity chip", async () => {
+    stubFetch(baseRoutes());
+    render(BuildView);
+
+    await screen.findByLabelText("Describe the change");
+    expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Model context capacity")).not.toBeInTheDocument();
+    // Build keeps the one badge that is about where the work runs.
+    expect(screen.getByLabelText("Execution environment")).toBeInTheDocument();
+  });
+
 
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
     vi.stubGlobal("SpeechRecognition", FakeRecognition);
@@ -288,10 +320,13 @@ describe("Build composer modes", () => {
     stubFetch(baseRoutes());
     render(BuildView);
 
-    await pickMode("Plan");
+    await fireEvent.click(
+      await screen.findByRole("button", { name: /^How much Raiker may do this turn:/ }),
+    );
 
-    expect(await screen.findByText(/for this turn only/i)).toBeInTheDocument();
-    expect(screen.getByText(/standing permissions are not changed/i)).toBeInTheDocument();
+    const menu = screen.getByRole("menu", { name: "Mode" });
+    expect(menu).toHaveTextContent(/applies to this conversation's turns only/i);
+    expect(menu).toHaveTextContent(/raising a standing permission stays on the Permissions page/i);
   });
 
   it("sends the mode as a turn-scoped posture with the prompt", async () => {

@@ -293,9 +293,9 @@ test("both composers carry the reference control set, and Chat still sends", asy
   const prompt = page.getByLabel("Prompt", { exact: true });
   await expect(prompt).toBeVisible({ timeout: 60_000 });
   await expect(prompt).toHaveAttribute("placeholder", "How can I help you today?");
-  // `+`, the surface toggle, the approval-mode chip, and the model chip: the
-  // Claude composer's shape, with Raiker's governance controls in it.
-  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
+  // `+`, the approval-mode chip, and the model chip: Cowork's minimal composer
+  // shape, with Raiker's governance controls in it and nothing else.
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /^Approval mode:/ })).toBeVisible();
   const modelChip = page.getByRole("button", { name: /^Model for this turn:/ });
   await expect(modelChip).toBeVisible();
@@ -357,7 +357,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   // ── Build ──────────────────────────────────────────────────────────────
   await page.goto(`${BASE}/#/build`);
   await expect(page.getByLabel("Describe the change")).toBeVisible({ timeout: 60_000 });
-  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
   const mode = page.getByRole("button", { name: /^How much Raiker may do this turn:/ });
   await expect(mode).toBeVisible();
   await mode.click();

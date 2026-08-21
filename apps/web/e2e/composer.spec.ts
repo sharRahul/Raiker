@@ -147,9 +147,10 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt", { exact: true });
   await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");
-  // Both composers carry the surface toggle, so a half-typed prompt can move
-  // between them without being sent or retyped.
-  await expect(page.getByRole("group", { name: "Chat or Build" })).toBeVisible();
+  // The Chat composer is deliberately minimal: no surface switch, no duplicate
+  // capacity chip. What is left is what a prompt needs.
+  await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Model context capacity" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Model for this turn/ })).toBeVisible();
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();

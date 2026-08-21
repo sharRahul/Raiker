@@ -222,11 +222,16 @@ Highlights, each verified against a live instance:
   restate anything your prompt contained. Kept working never enters chat search
   and never leaves in an export; when it is not kept, a re-opened turn says so
   rather than reading as a turn that never thought.
-- **A composer built for daily use** — `/` opens the commands each surface really
-  has (Chat has `/export`; Build has `/plan-mode`, `/edit-mode`, `/auto-mode`,
-  `/terminal` and `/repos`), `@` completes a path out of the code map you built,
-  the prompt box grows with what you write, and `/shortcuts` shows the keyboard
-  map. Your own messages carry **Copy**, **Edit** and **Retry** — and an edit
+- **Two composers, each shaped for its own work** — Chat's is the short one: a
+  prompt, what to attach, who to ask, and how much to approve. Build's is the
+  coding agent's: the same, plus the **Plan / Edit / Auto** mode it enforces and
+  the boundary its commands run in. Neither offers a way into the other, because
+  the sidebar already does that, and neither repeats a fact the control beside it
+  already reports. `/` opens the commands each surface really has (Chat has
+  `/export`, `/schedule` and `/tasks`; Build has `/plan-mode`, `/edit-mode`,
+  `/auto-mode`, `/terminal` and `/repos`), `@` completes a path out of the code
+  map you built, the prompt box grows with what you write, and `/shortcuts` shows
+  the keyboard map. Your own messages carry **Copy**, **Edit** and **Retry** — and an edit
   adds a new turn rather than rewriting what you asked, because the transcript is
   a record. No command grants anything: each one opens a control you already have.
 - **Recall** — a turn can read your own past conversations, not only the ones it
@@ -283,11 +288,22 @@ Highlights, each verified against a live instance:
   provider, pinning a model — plus metadata-only checkpoints and exact-model
   readiness evidence with bounded live probes and expiry.
 
+- **Build works to a stated protocol, and the record says which one ran** — a
+  Build turn carries an operating protocol a Chat turn does not: scale the effort
+  to what is at stake, name the assumption that would waste the work and test it
+  first, read the file before editing it, and check a claim before making it
+  (`docs/RAIKER_BUILD_PROCESS.md`). The composer surface travels with the prompt
+  and is written into the audit record, so which protocol a turn ran under is a
+  fact rather than an inference — and it selects a working method only: every
+  gate, decision mode, approval and tool is identical on both surfaces.
+
 - **Governed voice in Chat and Build** — dictate into the normal editable
   composer, finish or cancel without sending, then explicitly send through the
   same prompt path as typed text. Completed replies can be read aloud manually;
   one global audio owner prevents overlapping listening/playback, and Raiker
-  stores prompt provenance rather than microphone audio.
+  stores prompt provenance rather than microphone audio. Leaving the surface ends
+  its audio: navigating away from a listening composer stops the microphone and
+  keeps the words already dictated.
 
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer to 1023 px, and the full sidebar at 1024 px and above.
@@ -408,15 +424,17 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-21:
   is refused before you are asked. The Memory page states which of those you are
   in rather than promising proposals a disabled gate cannot produce.
 - **A composer mode tightens the turn; it never widens your permissions.**
-  Build's **Plan / Edit / Auto** chips are this conversation's posture, sent with
+  Build's **Plan / Edit / Auto** modes are this conversation's posture, sent with
   each prompt and applied to that turn: Plan refuses file writes, patches and
   commands outright, Edit turns each one into a decision, and both leave your
   standing permissions untouched. A turn may only ever tighten itself — `allow`
   and `auto` are refused by the prompt contract — so **Auto** adds no restriction
   of its own and does exactly as much as you already allowed, which the composer
-  states rather than implies. Widening a permission still happens on Permissions,
-  under the step-up: a recorded reason, and a threat-model acknowledgement where
-  the capability demands one.
+  states rather than implies. That is why Build **opens in Auto**: the default
+  posture is the one that defers to Permissions instead of quietly overriding it.
+  Widening a permission still happens on Permissions, under the step-up: a
+  recorded reason, and a threat-model acknowledgement where the capability
+  demands one.
 - **The code map answers where a name is defined and where it is used, but it
   matches text rather than resolving a call graph.** Turning on **Code map** lets
   Raiker index the repository Build points at, so the agent can ask where

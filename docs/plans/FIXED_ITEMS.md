@@ -9966,3 +9966,101 @@ Playwright composer suite, and live browser captures in `output/playwright/`.
 The live Ollama turn submitted `input_mode: dictated`, returned the requested
 marker, exposed manual playback, and Build cancellation restored the exact
 pre-dictation draft.
+
+## FIXED-248 — Build defaulted to a mode that overrode the owner's own permissions
+
+**Severity: Medium. Area: Build composer / decision modes. Fixed 2026-08-21.**
+
+Every new Build conversation opened in **Edit**, which sends
+`capability_modes: {file_write, patch_apply, shell, process → ask}` with the
+prompt. That is a turn-scoped *override*, so the default posture of the surface
+silently tightened below whatever the owner had set on Permissions: a capability
+deliberately raised to run unprompted still asked, and nothing said why.
+
+Build now opens in **Auto**, which is the only mode that sends no override at
+all. A new conversation therefore runs under exactly the owner's standing
+permissions, and choosing Plan or Edit remains a deliberate act of tightening.
+This is also the shape Claude Code has, where the starting mode is a setting
+rather than an unannounced restriction.
+
+**Evidence.** `apps/web/src/lib/buildModes.test.ts` asserts the default and that
+it carries neither a capability override nor a planning override;
+`apps/web/src/lib/views/BuildView.test.ts` asserts a first turn from a fresh
+Build view sends `capability_modes: {}` and no `planning_mode`.
+
+## FIXED-249 — Dictation kept listening from a page the owner had left
+
+**Severity: High. Area: Chat / Build voice (GAP-CHAT C16). Fixed 2026-08-21.**
+
+Found by re-verifying FIXED-247 against the code rather than against its closure
+note. C16 promised that listening stops on a route change, and the cleanup
+carrying the `route` reason existed — in `onMount`'s teardown. Chat and Build are
+deliberately kept **mounted** across route visits so a long conversation survives
+a trip to Permissions, so that teardown never ran on an ordinary navigation. The
+observable result: start dictating in Chat, navigate to Models, and the
+microphone stayed live behind a hidden composer whose **Cancel** control was
+hidden along with it. Read-aloud behaved the same way, with its **Stop** control
+equally out of reach.
+
+Both views now take the `visible` prop App.svelte already passed to Build, and
+release the single audio owner the moment they stop being the surface on screen.
+Nothing is discarded: finalized words stay in the draft exactly as pressing
+**Done** would leave them.
+
+**Reference-platform decision.** No cited reference product keeps a conversation
+surface mounted while hidden, so none faces this. Raiker made the
+no-invisible-capture promise, which is the reason it had to be kept rather than
+weakened.
+
+**Evidence.** `apps/web/src/lib/views/ConversationAudioLifecycle.test.ts` drives
+the real `visible` prop for both surfaces and asserts the recognition adapter was
+aborted, the listening controls are gone, and the dictated words survive.
+
+## FIXED-250 — The composers carried each other's controls, and said the same thing four times
+
+**Severity: Low. Area: Chat / Build composer. Fixed 2026-08-21.**
+
+Chat's control bar carried a **Chat | Build** switch, an execution-environment
+badge and a context-capacity chip that restated what the context ring's own
+popover already reported. Build carried the switch and the same capacity chip,
+plus three copies of its own mode explanation: a paragraph above the box, an info
+button, and a tooltip — on top of the Mode menu, which already explains all three
+modes and states that a mode is turn-scoped and can only tighten.
+
+Chat is now the Cowork-shaped composer and Build the Claude Code-shaped one:
+neither offers a way into the other, the duplicate capacity chip is gone from
+both, and Build's explanation lives only in the control that sets it. The one
+line left above Build's prompt is the only one the menu cannot know — what the
+owner's standing permissions actually amount to under Auto.
+
+**Evidence.** `ChatView.composerParity.test.ts` and `BuildView.test.ts` assert
+the removed controls are absent and the kept ones present;
+`BuildView.tooltip.test.ts` asserts the three explanations and the governance
+note live in the Mode menu and nowhere else; the mocked Playwright composer suite
+asserts the same from the built app.
+
+## FIXED-251 — Build had no operating protocol, and no record of which one ran
+
+**Severity: Medium. Area: Runtime orchestration / Build. Fixed 2026-08-21.**
+
+Chat and Build shared one system prompt. Build is where a turn changes a
+repository, and the failures that matter there are process failures rather than
+knowledge failures — committing to the first plausible story, editing a file from
+memory instead of reading it, reporting a success that was never confirmed.
+
+The prompt envelope now carries `surface`, validated against a closed set
+(`chat` / `build`) at the HTTP schema, in the envelope builder and again in the
+gateway, which writes it into `prompt_received`. A Build turn receives the
+compressed operating protocol from
+[`docs/RAIKER_BUILD_PROCESS.md`](../RAIKER_BUILD_PROCESS.md) as a second system
+message; a Chat turn does not, because answering a one-line question with a
+pre-mortem is its own failure.
+
+The surface selects a working method and never authority. An unknown value is
+refused (`invalid_prompt_surface`) rather than defaulted to Build, and a test
+asserts both surfaces are offered an identical tool set.
+
+**Evidence.** `tests/test_build_operating_protocol.py` (protocol present on
+Build, absent on Chat, identical tools on both); `tests/test_api_prompts.py`
+(default, validation, and that every authority-bearing option is identical
+across surfaces).

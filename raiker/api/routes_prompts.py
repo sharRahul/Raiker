@@ -26,6 +26,7 @@ from raiker.contracts.models import (
     PromptPayload,
     UserMetadata,
     normalize_input_mode,
+    normalize_prompt_surface,
 )
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
@@ -156,6 +157,7 @@ def _build_envelope(
             metadata={
                 "entry_command": client.type,
                 "input_mode": normalize_input_mode(body.input_mode),
+                "surface": normalize_prompt_surface(body.surface),
             },
         ),
         options=options,

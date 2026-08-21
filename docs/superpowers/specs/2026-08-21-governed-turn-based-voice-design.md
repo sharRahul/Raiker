@@ -119,7 +119,7 @@ VoiceRecognitionAdapter
 
 VoicePlaybackCoordinator
   supported(): boolean
-  speak(text, language, handlers): void
+  speak(responseId, text, language, handlers): void
   stop(): void
   activeId(): string | null
 ```

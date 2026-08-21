@@ -10,6 +10,7 @@
   import { humanize } from "../format";
   import { boundaryLabel, posturaLine } from "../sandboxPosture";
   import Icon from "./Icon.svelte";
+  import CredentialDeltaReview from "./CredentialDeltaReview.svelte";
 
   let {
     sessionId = null,
@@ -226,6 +227,9 @@
             <div><dt>Completed</dt><dd>{receipt.completed_at}</dd></div>
           </dl>
         </details>
+      {/if}
+      {#if selected}
+        <CredentialDeltaReview runId={selected.run_id} profileId={selected.profile_id} />
       {/if}
       {#if selected && failed}
         <p class="failure-nav" role="status">

@@ -1915,6 +1915,19 @@ export interface CommandReceiptView {
   digest: string;
 }
 
+export interface CredentialDeltaView {
+  run_id: string;
+  environment_profile_id: string;
+  state: "scanning" | "clean" | "quarantined" | "resolving" | "cleanup_failed";
+  manifest: { files: Array<{ path: string; kind: string; size?: number }> };
+  delta_digest: string;
+  scan_digest: string;
+  scan_rule_version: string;
+  cleanup_status: string;
+  created_at: string;
+  recipient_boundary: "disposable_container_tcb";
+}
+
 export interface ModelCapacityEntry {
   profile_id: string;
   provider: string;

@@ -140,6 +140,10 @@
     if (!features) return [];
     return CAPABILITY_LABELS.filter(([key]) => features[key]).map(([, label]) => label);
   }
+  function egressList(config: Record<string, unknown> | undefined, key: string): string[] {
+    const value = config?.[key];
+    return Array.isArray(value) ? value.map(String) : [];
+  }
   let resetting = $state<string | null>(null);
   async function resetEnvironment(profileId: string, recreate: boolean) {
     const question = recreate
@@ -317,10 +321,10 @@
               <span class="boundary">Read-only repository → writable output</span>
               <small>{environment.assigned_tool_count ?? 0} tools</small>
               {#if containerReason(environment.availability_reason)}<small class="remediation">{containerReason(environment.availability_reason)}</small>{/if}
-              {#if Array.isArray(environment.config?.egress_domains) && environment.config.egress_domains.length}
+              {#if egressList(environment.config, "egress_domains").length}
                 <section class="egress-status" aria-label="Filtered network status" role="status">
                   <strong>Filtered network · not proven</strong>
-                  <span>{environment.config.egress_domains.join(", ")} · ports {environment.config.egress_ports?.join(", ")}</span>
+                  <span>{egressList(environment.config, "egress_domains").join(", ")} · ports {egressList(environment.config, "egress_ports").join(", ")}</span>
                   <small>Configured destinations stay blocked until the container bypass and revocation probe passes.</small>
                 </section>
               {/if}

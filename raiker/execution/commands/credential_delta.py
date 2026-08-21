@@ -4,6 +4,7 @@ import hashlib
 import json
 import re
 import stat
+import unicodedata
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -45,8 +46,10 @@ class CredentialDeltaScanner:
         self.max_bytes = max_bytes
 
     def scan(self, root: Path) -> CredentialDeltaScan:
+        if root.is_symlink():
+            raise ValueError("credential_delta_root_invalid")
         root = root.resolve()
-        if not root.is_dir() or root.is_symlink():
+        if not root.is_dir():
             raise ValueError("credential_delta_root_invalid")
         manifest: list[dict[str, object]] = []
         delta_hash = hashlib.sha256()
@@ -54,12 +57,27 @@ class CredentialDeltaScanner:
         matches = 0
         files = 0
         total = 0
+        root_device = root.stat().st_dev
+        normalized_paths: set[str] = set()
         for path in sorted(root.rglob("*")):
             relative = path.relative_to(root).as_posix()
-            info = path.lstat()
+            collision_key = unicodedata.normalize("NFC", relative).casefold()
+            collision = collision_key in normalized_paths
+            normalized_paths.add(collision_key)
+            try:
+                info = path.lstat()
+            except OSError:
+                manifest.append({"path": relative, "kind": "unsafe"})
+                matches += 1
+                continue
             kind = "directory" if stat.S_ISDIR(info.st_mode) else "file"
-            unsafe = stat.S_ISLNK(info.st_mode) or not (
-                stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode)
+            unsafe = (
+                collision
+                or info.st_dev != root_device
+                or stat.S_ISLNK(info.st_mode)
+                or (stat.S_ISREG(info.st_mode) and info.st_nlink != 1)
+                or bool(info.st_mode & (stat.S_ISUID | stat.S_ISGID | stat.S_ISVTX))
+                or not (stat.S_ISDIR(info.st_mode) or stat.S_ISREG(info.st_mode))
             )
             if unsafe:
                 matches += 1
@@ -72,8 +90,16 @@ class CredentialDeltaScanner:
                 files += 1
                 total += info.st_size
                 if files > self.max_files or total > self.max_bytes:
-                    raise ValueError("credential_delta_scan_limit")
-                data = path.read_bytes()
+                    manifest.append({"path": relative, "kind": "unsafe", "reason": "scan_limit"})
+                    matches += 1
+                    break
+                try:
+                    data = path.read_bytes()
+                except OSError:
+                    entry["kind"] = "unsafe"
+                    matches += 1
+                    manifest.append(entry)
+                    continue
                 content_digest = hashlib.sha256(data).hexdigest()
                 entry.update(size=len(data), sha256=content_digest)
                 delta_hash.update(data)

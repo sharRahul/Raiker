@@ -75,3 +75,35 @@ def test_unresolved_delta_survives_store_restart(tmp_path: Path) -> None:
     )
     second = CommandStore(SQLiteStore(tmp_path))
     assert second.list_unresolved_deltas("owner_a", "container_a")[0]["run_id"] == "cmd_delta"
+
+
+def test_scan_limit_and_hardlink_are_quarantined_not_raised(tmp_path: Path) -> None:
+    delta = tmp_path / "delta"
+    delta.mkdir()
+    first = delta / "first.txt"
+    first.write_text("safe", encoding="utf-8")
+    limited = CredentialDeltaScanner(max_files=0).scan(delta)
+    assert limited.state is DeltaState.QUARANTINED
+    assert "scan_limit" in limited.safe_manifest_json
+
+    hard = delta / "hard.txt"
+    try:
+        __import__("os").link(first, hard)
+    except OSError:
+        pytest.skip("hardlink creation unavailable")
+    assert CredentialDeltaScanner().scan(delta).state is DeltaState.QUARANTINED
+
+
+def test_case_or_unicode_equivalent_paths_are_quarantined(tmp_path: Path) -> None:
+    delta = tmp_path / "delta"
+    delta.mkdir()
+    first = delta / "é.txt"
+    second = delta / "e\u0301.txt"
+    first.write_text("one", encoding="utf-8")
+    try:
+        second.write_text("two", encoding="utf-8")
+    except OSError:
+        pytest.skip("filesystem normalizes Unicode names")
+    if len(list(delta.iterdir())) < 2:
+        pytest.skip("filesystem normalizes Unicode names")
+    assert CredentialDeltaScanner().scan(delta).state is DeltaState.QUARANTINED

@@ -736,6 +736,7 @@ class CommandStore:
         *,
         decision_id: str,
         resolution: str,
+        second_scan_digest: str | None = None,
     ) -> bool:
         if resolution not in {"merged", "discarded"}:
             raise ValueError("credential_delta_resolution_invalid")
@@ -750,7 +751,7 @@ class CommandStore:
             if existing is not None:
                 raise ReceiptImmutable("command_delta_receipt_immutable")
             row = connection.execute(
-                """SELECT delta_digest, state FROM command_credential_deltas
+                """SELECT delta_digest, scan_digest, state FROM command_credential_deltas
                    WHERE owner_principal_id = ? AND run_id = ?""",
                 (owner_principal_id, run_id),
             ).fetchone()
@@ -759,21 +760,26 @@ class CommandStore:
                 return False
             if row["state"] in {"merged", "discarded"}:
                 raise ReceiptImmutable("command_delta_receipt_immutable")
+            if resolution == "merged" and row["state"] != "clean":
+                raise ValueError("credential_delta_quarantined_discard_only")
+            if resolution == "merged" and second_scan_digest != row["scan_digest"]:
+                raise ValueError("credential_delta_second_scan_changed")
             now = utc_now()
             receipt_payload = {
-                "cleanup_status": "crypto_erased",
+                "cleanup_status": "metadata_erased",
                 "decision_id": decision_id,
                 "delta_digest": row["delta_digest"],
                 "owner_principal_id": owner_principal_id,
                 "resolution": resolution,
                 "resolved_at": now,
                 "run_id": run_id,
+                "second_scan_digest": second_scan_digest if resolution == "merged" else None,
             }
             receipt_json = json.dumps(receipt_payload, sort_keys=True, separators=(",", ":"))
             receipt_digest = __import__("hashlib").sha256(receipt_json.encode()).hexdigest()
             cursor = connection.execute(
                 """UPDATE command_credential_deltas
-                   SET state = ?, decision_id = ?, cleanup_status = 'crypto_erased',
+                   SET state = ?, decision_id = ?, cleanup_status = 'metadata_erased',
                        encrypted_snapshot_handle = X'', encrypted_cleanup_scan_bundle = X'',
                        resolved_at = ?
                    WHERE owner_principal_id = ? AND run_id = ?

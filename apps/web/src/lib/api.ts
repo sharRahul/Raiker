@@ -23,6 +23,7 @@ import type {
   CommandChunkView,
   CommandReceiptView,
   CommandRunView,
+  CredentialDeltaView,
   ComposerApprovalModeSettings,
   CodeMapPaths,
   CodeMapStatus,
@@ -1134,6 +1135,15 @@ export const api = {
     postJson<{ ok: boolean; run: CommandRunView }>(
       `/api/command-runs/${encodeURIComponent(runId)}/stop`,
       {},
+    ),
+  credentialDeltas: (profileId: string) =>
+    request<{ deltas: CredentialDeltaView[] }>(
+      withQuery("/api/credential-deltas", { environment_profile_id: profileId }),
+    ),
+  discardCredentialDelta: (runId: string, decisionId: string) =>
+    postJson<{ ok: boolean; receipt: Record<string, unknown> }>(
+      `/api/credential-deltas/${encodeURIComponent(runId)}/discard`,
+      { decision_id: decisionId },
     ),
   checkpoints: (sessionId?: string, projectId?: string) =>
     request<Checkpoint[]>(

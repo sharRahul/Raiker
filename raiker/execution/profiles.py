@@ -35,6 +35,7 @@ class ExecutionProfile:
     writable_output: bool = False
     credential_delivery: bool = False
     credential_delta_quarantine: bool = False
+    config: Mapping[str, Any] = field(default_factory=dict, compare=False)
 
     def __post_init__(self) -> None:
         if self.credential_delivery and not self.credential_delta_quarantine:
@@ -67,6 +68,10 @@ class ExecutionProfile:
                 PersistentContainerBackend.features,
                 shell="shell" in self.tools,
             )
+        if self.kind in {"ssh", "daytona"}:
+            from raiker.execution.commands.backends.remote import REMOTE_FEATURES
+
+            return REMOTE_FEATURES
         return CommandFeatures(shell=False, process_tree_stop=False, concurrent_runs=False)
 
 
@@ -259,6 +264,32 @@ def probe_execution_profile(
         if image.returncode != 0:
             return ProfileProbe(profile, False, "container_image_unavailable", checked_at)
         return ProfileProbe(profile, True, None, checked_at)
+    if profile.kind in {"ssh", "daytona"}:
+        if workspace_root is None:
+            return ProfileProbe(
+                profile,
+                False,
+                f"{profile.kind}_command_supervisor_unavailable",
+                checked_at,
+                boundary="remote_recipient_tcb",
+                features=profile.features,
+            )
+        from raiker.execution.commands.backends.remote import probe_remote_profile
+
+        available, remote_reason, observed = probe_remote_profile(
+            profile, Path(workspace_root).resolve()
+        )
+        return ProfileProbe(
+            profile,
+            available,
+            remote_reason,
+            checked_at,
+            boundary="remote_recipient_tcb",
+            observations={
+                "supervisor_identity": "enforced" if available else "indeterminate",
+            },
+            features=profile.features,
+        )
     return ProfileProbe(profile, False, f"{profile.kind}_command_supervisor_unavailable", checked_at)
 
 
@@ -289,6 +320,7 @@ def _selected_profile(store: Any, owner_principal_id: str, profile_id: str) -> E
         writable_output=bool(config.get("writable_output", False)),
         credential_delivery=bool(config.get("credential_delivery", False)),
         credential_delta_quarantine=bool(config.get("credential_delta_quarantine", False)),
+        config={**config, "owner_principal_id": owner_principal_id},
     )
 
 
@@ -343,9 +375,9 @@ def resolve_command_environment(
 
 def _probe_profile(probe: Any, profile: ExecutionProfile, store: Any) -> Any:
     """Call the probe, handing it the workspace when it can use one."""
-    if profile.kind != "native":
-        return probe(profile)
     workspace_root = getattr(getattr(store, "paths", None), "workspace_root", None)
+    if profile.kind not in {"native", "ssh", "daytona"}:
+        return probe(profile)
     try:
         return probe(profile, workspace_root=workspace_root)
     except TypeError:

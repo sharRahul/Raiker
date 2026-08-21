@@ -16,6 +16,10 @@ from raiker.execution.commands.backends.native import (
     NativeSandboxDriver,
     NativeSandboxProof,
 )
+from raiker.execution.commands.backends.remote import (
+    DaytonaCommandBackend,
+    SshCommandBackend,
+)
 
 __all__ = [
     "BackendRegistry",
@@ -28,6 +32,8 @@ __all__ = [
     "NativeSandboxDriver",
     "NativeSandboxProof",
     "PersistentContainerBackend",
+    "SshCommandBackend",
+    "DaytonaCommandBackend",
     "UnavailableBackend",
     "command_container_name",
 ]

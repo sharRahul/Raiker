@@ -1637,8 +1637,39 @@ class DashboardService:
                 continue
             credential_env = str(config.get("credential_env") or config.get("api_key_env") or "")
             credential_configured = bool(credential_env and os.environ.get(credential_env, "").strip())
-            configured = bool(config.get("host") and config.get("user") and credential_env) if kind == "ssh" else bool(config.get("sandbox_id") and credential_env)
-            available = bool(row["enabled"] and configured and credential_configured)
+            configured = (
+                bool(
+                    config.get("host")
+                    and config.get("user")
+                    and config.get("host_public_key")
+                    and config.get("host_key_sha256")
+                    and credential_env
+                )
+                if kind == "ssh"
+                else bool(config.get("sandbox_id") and credential_env)
+            )
+            remote_profile = ExecutionProfile(
+                str(row["profile_id"]),
+                cast(Any, kind),
+                name=str(row["name"]),
+                enabled=bool(row["enabled"]),
+                tools=("shell",),
+                config={**config, "owner_principal_id": owner_principal_id},
+            )
+            proof = (
+                probe_execution_profile(
+                    remote_profile, workspace_root=self.store.paths.workspace_root
+                )
+                if configured and credential_configured
+                else None
+            )
+            available = bool(
+                row["enabled"]
+                and configured
+                and credential_configured
+                and proof is not None
+                and proof.available
+            )
             budget = config.get("max_cost") if kind == "daytona" else None
             cost = self.store.cloud_execution_cost_summary(
                 owner_principal_id, str(row["profile_id"]), max_cost=float(budget or 0)
@@ -1647,19 +1678,21 @@ class DashboardService:
                 {
                     "profile_id": str(row["profile_id"]), "kind": kind, "name": str(row["name"]),
                     "enabled": bool(row["enabled"]), "configured": configured, "available": available,
-                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "configuration_required"),
+                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "unavailable" if proof is not None else "configuration_required"),
                     "selected": selected == row["profile_id"], "credential_configured": credential_configured,
                     "budget": budget,
                     "cost": cost,
                     "selected_for_commands": selected == row["profile_id"],
                     "assigned_tools": ["shell"],
-                    "features": asdict(ExecutionProfile(str(row["profile_id"]), cast(Any, kind), tools=("shell",)).features),
-                    "probe_checked_at": utc_now(),
-                    "availability_reason": None if available else (
+                    "features": asdict(remote_profile.features),
+                    "probe_checked_at": proof.checked_at if proof is not None else utc_now(),
+                    "boundary": proof.boundary if proof is not None else "remote_recipient_tcb",
+                    "probe_observations": dict(proof.observations) if proof is not None else {},
+                    "availability_reason": None if available else (proof.reason_code if proof is not None else (
                         "execution_environment_credential_required"
                         if configured and not credential_configured
                         else "execution_environment_configuration_required"
-                    ),
+                    )),
                     "config": {key: value for key, value in config.items() if key not in {"password", "token", "api_key", "secret"}},
                 }
             )
@@ -1725,6 +1758,17 @@ class DashboardService:
             user = str(config.get("user", "")).strip()
             if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", user):
                 return ControlResult(ok=False, reason_code="invalid_ssh_profile")
+            try:
+                from raiker.execution.commands.known_hosts import host_key_fingerprint
+
+                if host_key_fingerprint(str(config.get("host_public_key", ""))) != str(
+                    config.get("host_key_sha256", "")
+                ).strip():
+                    return ControlResult(
+                        ok=False, reason_code="ssh_host_key_fingerprint_mismatch"
+                    )
+            except ValueError:
+                return ControlResult(ok=False, reason_code="ssh_host_key_invalid")
         elif kind == "daytona" and not str(config.get("sandbox_id", "")).strip():
             return ControlResult(ok=False, reason_code="daytona_sandbox_required")
         elif kind == "daytona":

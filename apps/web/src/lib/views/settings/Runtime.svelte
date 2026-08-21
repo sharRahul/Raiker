@@ -56,6 +56,8 @@
   let environmentName = $state("");
   let host = $state("");
   let remoteUser = $state("");
+  let hostPublicKey = $state("");
+  let hostKeySha256 = $state("");
   let credentialEnv = $state("RAIKER_SSH_IDENTITY_FILE");
   let sandboxId = $state("");
   let maxCost = $state(10);
@@ -87,13 +89,13 @@
     busy = true; notice = null;
     try {
       const config = environmentKind === "ssh"
-        ? { host, user: remoteUser, credential_env: credentialEnv, max_runtime_seconds: 300 }
+        ? { host, user: remoteUser, credential_env: credentialEnv, host_public_key: hostPublicKey, host_key_sha256: hostKeySha256, max_runtime_seconds: 300 }
         : environmentKind === "daytona"
           ? { sandbox_id: sandboxId, api_key_env: credentialEnv, max_cost: maxCost, max_runtime_seconds: 300 }
           : { runtime: containerRuntime, image: containerImage, tools: selectedContainerTools, repository_access: "read_only", writable_output: true };
       await api.configureExecutionEnvironment({ kind: environmentKind, name: environmentName, config, enabled: true });
       notice = { kind: "ok", text: environmentKind === "container" ? "Container execution profile saved." : `${environmentKind === "ssh" ? "SSH" : "Daytona"} environment saved. Credential values remain in the named environment variable.` };
-      environmentName = ""; host = ""; remoteUser = ""; sandboxId = "";
+      environmentName = ""; host = ""; remoteUser = ""; hostPublicKey = ""; hostKeySha256 = ""; sandboxId = "";
       selectedContainerTools = [];
       await load();
     } catch { notice = { kind: "error", text: "The execution profile could not be saved." }; }
@@ -151,15 +153,14 @@
       : selectedContainerTools.filter((item) => item !== tool);
   }
   async function reprobe(profileId: string) {
-    // Re-measuring makes one outbound connection to the host's default gateway
-    // on a closed port. That is stated on the card rather than left for someone
-    // to discover in a firewall log.
+    // Native re-measures its host boundary; remote targets invoke only the
+    // fixed read-only supervisor probe. Both are explicit owner actions.
     probing = profileId;
     notice = null;
     try {
       await api.probeExecutionEnvironment(profileId);
       await load();
-      notice = { kind: "ok", text: "The boundary was re-measured." };
+      notice = { kind: "ok", text: "The execution boundary was checked." };
     } catch {
       notice = { kind: "error", text: "The boundary could not be measured on this host." };
     } finally {
@@ -305,6 +306,10 @@
               {#if containerReason(environment.availability_reason)}<small class="remediation">{containerReason(environment.availability_reason)}</small>{/if}
             {:else}
               <span>{environment.kind} · {environment.status.replaceAll("_", " ")}</span>
+              <span class="boundary">Foreground command execution</span>
+              <small class="plain">PTY, background execution, persistence, restart recovery, filtered egress, and command credential delivery are unavailable.</small>
+              {#if environment.availability_reason}<small class="remediation">{environment.availability_reason.replaceAll("_", " ")}</small>{/if}
+              <button class="btn btn-ghost btn-sm reprobe" type="button" disabled={probing === environment.profile_id} onclick={() => void reprobe(environment.profile_id)}>{probing === environment.profile_id ? "Checking…" : "Check supervisor"}</button>
               {#if environment.cost}<small>USD {environment.cost.committed_cost.toFixed(2)} committed · {environment.cost.remaining_cost?.toFixed(2) ?? "0.00"} remaining · {environment.cost.reconciliation_status.replaceAll("_", " ")}</small>{/if}
             {/if}
             <!-- BUG-194 — what this boundary does between commands. Only true
@@ -336,6 +341,8 @@
       <label>Display name<input bind:value={environmentName} required placeholder="Build host" /></label>
       {#if environmentKind === "ssh"}
         <label>Host<input bind:value={host} required placeholder="build.example.com" /></label><label>Remote user<input bind:value={remoteUser} required placeholder="raiker" /></label>
+        <label>Pinned host public key<input bind:value={hostPublicKey} required placeholder="ssh-ed25519 AAAA…" /></label>
+        <label>Host fingerprint<input bind:value={hostKeySha256} required pattern={"SHA256:[A-Za-z0-9+/]{43}"} placeholder="SHA256:…" /></label>
       {:else if environmentKind === "daytona"}
         <label>Sandbox ID<input bind:value={sandboxId} required placeholder="sandbox-id" /></label><label>Maximum run cost (USD)<input type="number" min="0.01" step="0.01" bind:value={maxCost} /></label>
       {:else}

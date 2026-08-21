@@ -108,6 +108,36 @@ describe("Runtime container profiles", () => {
       }),
     );
   });
+
+  it("requires an exact SSH host key pin and keeps remote capabilities honest", async () => {
+    stubRuntime();
+    const configure = vi
+      .spyOn(api, "configureExecutionEnvironment")
+      .mockResolvedValue({ ok: true, profile_id: "ssh-new" });
+    render(Runtime);
+
+    await fireEvent.click(await screen.findByText("Add execution profile"));
+    await fireEvent.input(screen.getByLabelText("Display name"), { target: { value: "Build host" } });
+    await fireEvent.input(screen.getByLabelText("Host"), { target: { value: "build.example.com" } });
+    await fireEvent.input(screen.getByLabelText("Remote user"), { target: { value: "raiker" } });
+    await fireEvent.input(screen.getByLabelText("Pinned host public key"), { target: { value: "ssh-ed25519 AAAATEST" } });
+    await fireEvent.input(screen.getByLabelText("Host fingerprint"), { target: { value: `SHA256:${"a".repeat(43)}` } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save environment" }));
+
+    await waitFor(() => expect(configure).toHaveBeenCalledWith({
+      kind: "ssh",
+      name: "Build host",
+      enabled: true,
+      config: {
+        host: "build.example.com",
+        user: "raiker",
+        credential_env: "RAIKER_SSH_IDENTITY_FILE",
+        host_public_key: "ssh-ed25519 AAAATEST",
+        host_key_sha256: `SHA256:${"a".repeat(43)}`,
+        max_runtime_seconds: 300,
+      },
+    }));
+  });
 });
 
 // BUG-194 — the environment card states what each boundary really does between

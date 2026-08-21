@@ -1082,12 +1082,18 @@ async def probe_execution_environment(
     AppContainer's egress enforcement with it. The owner therefore needs a way
     to ask again rather than waiting for a cached answer to expire.
     """
-    if profile_id != "native_sandbox":
+    owner = auth_data[0].principal_id
+    remote = _service(request).store.load_remote_execution_profile(
+        profile_id, owner_principal_id=owner
+    )
+    if profile_id != "native_sandbox" and (
+        remote is None or str(remote.get("profile_type")) not in {"ssh", "cloud"}
+    ):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"ok": False, "reason_code": "execution_environment_not_probeable"},
         )
-    view = _service(request).execution_environments(auth_data[0].principal_id)
+    view = _service(request).execution_environments(owner)
     measured = next(
         (item for item in view["environments"] if item["profile_id"] == profile_id),
         None,

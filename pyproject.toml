@@ -67,6 +67,7 @@ raiker-web = "apps.api.main:main"
 # target's own runner; keeping it a console script rather than `python -m` keeps
 # the import of `raiker.app` from happening twice.
 raiker-release = "raiker.app.release:main"
+raiker-command-supervisor = "raiker.execution.commands.remote_supervisor:main"
 
 [tool.setuptools.packages.find]
 include = ["raiker*", "apps*"]

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ from raiker.api.app import create_app
 from raiker.approvals.execution import executable_capability
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
+from raiker.execution.commands.known_hosts import host_key_fingerprint
+from raiker.execution.profiles import ProfileProbe
 from raiker.models.tool_call_validation import default_tool_specs
 from raiker.runtime.authority.models import Principal, PrincipalType
 from raiker.runtime.authority.router import GovernedAction
@@ -21,6 +24,14 @@ from raiker.runtime.executors.tier5_network import (
 )
 
 OWNER = "principal_owner"
+
+
+def _ssh_pin() -> dict[str, str]:
+    public_key = "ssh-ed25519 " + base64.b64encode(b"test execution host key").decode()
+    return {
+        "host_public_key": public_key,
+        "host_key_sha256": host_key_fingerprint(public_key),
+    }
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -37,6 +48,12 @@ def test_execution_environment_api_configures_and_selects_ssh(
     identity = workspace / "id_ed25519"
     identity.write_text("test key path only", encoding="utf-8")
     monkeypatch.setenv("RAIKER_TEST_SSH_KEY", str(identity))
+    monkeypatch.setattr(
+        "raiker.control.dashboard.probe_execution_profile",
+        lambda profile, **_kwargs: ProfileProbe(
+            profile, True, None, "2026-08-21T00:00:00Z", features=profile.features
+        ),
+    )
     client = TestClient(create_app(workspace))
     token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
     headers = {"Authorization": f"Bearer {token}"}
@@ -46,7 +63,7 @@ def test_execution_environment_api_configures_and_selects_ssh(
         headers=headers,
         json={
             "kind": "ssh", "name": "Build host", "enabled": True,
-            "config": {"host": "build.example.com", "user": "raiker", "credential_env": "RAIKER_TEST_SSH_KEY"},
+            "config": {"host": "build.example.com", "user": "raiker", "credential_env": "RAIKER_TEST_SSH_KEY", **_ssh_pin()},
         },
     )
     assert saved.status_code == 200, saved.text
@@ -146,7 +163,7 @@ def test_remote_and_daytona_executors_are_real_bounded_adapters(
     monkeypatch.setenv("RAIKER_TEST_DAYTONA_KEY", "not-logged")
     ssh_id = service.configure_execution_environment(
         profile_id=None, kind="ssh", name="SSH", enabled=True,
-        config={"host": "example.com", "user": "runner", "credential_env": "RAIKER_TEST_SSH_KEY"},
+        config={"host": "example.com", "user": "runner", "credential_env": "RAIKER_TEST_SSH_KEY", **_ssh_pin()},
         owner_principal_id=OWNER,
     ).data["profile_id"]
     cloud_id = service.configure_execution_environment(

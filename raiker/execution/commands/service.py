@@ -16,6 +16,7 @@ from raiker.execution.commands.backends.container import (
 )
 from raiker.execution.commands.backends.local import LocalStrictBackend
 from raiker.execution.commands.backends.native import NativeSandboxBackend, NativeSandboxDriver
+from raiker.execution.commands.backends.remote import DaytonaCommandBackend, SshCommandBackend
 from raiker.execution.commands.models import (
     TERMINAL_COMMAND_STATES,
     CommandChunk,
@@ -485,6 +486,10 @@ class CommandService:
                 workspace_root=self.workspace_root,
                 profile=profile,
             )
+        if profile.kind == "ssh":
+            return SshCommandBackend(profile, self.workspace_root)
+        if profile.kind == "daytona":
+            return DaytonaCommandBackend(profile, self.workspace_root, self.sqlite)
         return UnavailableBackend(f"{profile.kind}_command_supervisor_unavailable")
 
     def reset_environment(

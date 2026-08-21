@@ -283,12 +283,24 @@ Highlights, each verified against a live instance:
   provider, pinning a model — plus metadata-only checkpoints and exact-model
   readiness evidence with bounded live probes and expiry.
 
+- **Governed voice in Chat and Build** — dictate into the normal editable
+  composer, finish or cancel without sending, then explicitly send through the
+  same prompt path as typed text. Completed replies can be read aloud manually;
+  one global audio owner prevents overlapping listening/playback, and Raiker
+  stores prompt provenance rather than microphone audio.
+
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
 Raiker's documentation does not run ahead of its code. As of 2026-08-21:
+
+- **Voice is governed and turn-based, not full duplex.** Chat and Build support
+  editable dictation and manual response playback. Continuous listening,
+  speaking, interruption and hands-free task control remain future work; spoken
+  consequential controls will not ship without visible confirmation and the
+  same policy/audit route as typed controls.
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each

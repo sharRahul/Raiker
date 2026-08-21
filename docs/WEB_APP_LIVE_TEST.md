@@ -3,8 +3,9 @@
 > A repeatable procedure + results matrix for exercising the Raiker web app
 > against a real model backend. One round was run against **hosted Anthropic
 > (Haiku 4.5)**; the same steps apply to every other backend (see the matrix).
-> **Never commit an API key.** Keys are read from the owner's environment only,
-> for the duration of the test.
+> **Never commit an API key.** A test round either enters it through Raiker's
+> encrypted Models UI or reads it from the owner's environment for that run;
+> credentials never belong in a spec, command, log or screenshot.
 
 ## What this verifies
 
@@ -13,6 +14,34 @@ owner session mint → governed read endpoints → a **streamed prompt turn** �
 the model provider → the audit event log. It also exercises the two features in
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
+
+## Result — 2026-08-21 (governed turn-based voice, preserved owner workspace)
+
+The running built SPA was unlocked with Rahul's existing account and every
+supplied hosted credential was entered through the Models reconnect dialog —
+never a source file, process command or server environment. Browser speech was
+driven through a deterministic Playwright recognition adapter because a
+headless browser has no trustworthy physical-microphone path; the prompt itself
+and the provider turn used the live FastAPI service, owner store, gateway and
+configured Ollama model.
+
+| Check | Result |
+|---|---|
+| Chat dictation is an editable draft | ✅ recognition produced `Reply with only: voice verified`; zero prompt requests before **Done** and zero before explicit **Send** |
+| Prompt provenance crosses the real HTTP boundary | ✅ the sole prompt request carried `input_mode: dictated`; the live Ollama `gemma4:31b-cloud` turn returned exactly `voice verified` |
+| Manual response playback | ✅ only the completed answer exposed **Read aloud**; activation exposed **Stop speaking**, and stopping restored the idle control |
+| Build rollback | ✅ the draft changed from `keep this exact draft` while listening and **Cancel** restored that exact original text |
+| Provider credentials entered through UI | ✅ Anthropic, OpenAI and OpenRouter reconnect dialogs accepted the supplied credentials into the encrypted instance vault |
+| Anthropic readiness | ✅ `claude-sonnet-5` ready |
+| OpenRouter readiness | ✅ `nvidia/nemotron-3.5-lightning:free` ready |
+| OpenAI readiness | ⚠️ the supplied account could not execute pinned `gpt-5.4`; Raiker reported credential/access/billing guidance and did not claim readiness |
+| Ollama readiness and execution | ✅ model row was ready and the real governed turn completed; a repeated readiness click exceeded the 30-second browser-control bound, while execution itself completed normally |
+| Mocked browser regression | ✅ 5/5 Playwright tests, including desktop, 390×844 mobile, Settings persistence and zero Axe violations |
+| Visual review | ✅ `output/playwright/voice-live-chat.png`, `voice-live-complete.png`, `voice-live-build.png`, plus the mocked desktop/mobile/Settings captures inspected at original resolution |
+
+The OpenAI result is an external account/model-access limitation, not a Raiker
+defect: the control failed closed and gave the owner an actionable reason. No
+credential appears in these results or screenshots.
 
 ## Result — 2026-08-16 (first-run provider matrix, the Workbench board, both composers)
 

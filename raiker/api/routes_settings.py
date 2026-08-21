@@ -24,6 +24,8 @@ from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
 
+SPEECH_LANGUAGES = {"auto", "en", "fr", "de", "hi", "it", "ja", "ko", "pt", "ru", "es", "tr", "uk"}
+
 
 def _ws(request: Request) -> str | Path:
     return request.app.state.workspace_root  # type: ignore[attr-defined]
@@ -84,6 +86,14 @@ async def get_settings(request: Request) -> dict[str, Any]:
 async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any]:
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     ws = _ws(request)
+    speech_language = body.settings.get("general.speech_language")
+    if speech_language is not None and (
+        not isinstance(speech_language, str) or speech_language not in SPEECH_LANGUAGES
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail="invalid_speech_language",
+        )
     SQLiteStore(ws).put_user_settings(
         principal.principal_id, json.dumps(body.settings), utc_now()
     )

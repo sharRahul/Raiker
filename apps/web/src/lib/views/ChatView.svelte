@@ -48,6 +48,8 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
+  import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
+  import ReadAloudButton from "../components/ReadAloudButton.svelte";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
   import {
     applyMention,
@@ -69,6 +71,12 @@
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import {
+    audioSessionCoordinator,
+    inputModeForDraft,
+    speechLanguagePreference,
+    type SpeechLanguage,
+  } from "../voice";
 
   interface ChatTurn {
     id: number;
@@ -103,6 +111,14 @@
     onProjectsChanged?: () => void;
   } = $props();
   let promptText = $state("");
+  let speechLanguage = $state<SpeechLanguage>("auto");
+  let voiceControl = $state<VoiceDictationHandle | undefined>();
+  let voiceDictated = $state(false);
+  let voiceTypedBefore = $state(false);
+  let voiceEditedAfter = $state(false);
+  let voiceProvenanceSnapshot = { dictated: false, typedBefore: false, editedAfter: false };
+  let promptSelectionStart = $state(0);
+  let promptSelectionEnd = $state(0);
   let userName = $state("there");
   let turns = $state<ChatTurn[]>([]);
   // What the last copy action did. Shown, not only announced: a copy that
@@ -484,7 +500,10 @@
       modelProfile = remembered.profileId;
       model = remembered.model;
     });
-    void api.settings().then((view) => { userName = view.status.username || "there"; }).catch(() => {});
+    void api.settings().then((view) => {
+      userName = view.status.username || "there";
+      speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
+    }).catch(() => {});
     // The Workbench composer hands its text to this mounted chat rather than
     // sending a prompt of its own. There is one governed send path, and it is
     // `submit()` below — the Workbench never talks to the API directly, so a
@@ -513,7 +532,10 @@
       void submit();
     };
     window.addEventListener("raiker:compose", onCompose);
-    return () => window.removeEventListener("raiker:compose", onCompose);
+    return () => {
+      window.removeEventListener("raiker:compose", onCompose);
+      audioSessionCoordinator.stopAll("route");
+    };
   });
 
   // Hydrate the persisted transcript for a continued session so a search result
@@ -633,8 +655,20 @@
   }
 
   async function submit() {
+    if (voiceControl?.active()) {
+      voiceControl.done();
+      promptEl?.focus();
+      return;
+    }
     const text = promptText.trim();
     if (text === "" || !modelReadiness.ready || streaming || attachStore.uploading) return;
+    const voiceState = {
+      dictated: voiceDictated,
+      typedBefore: voiceTypedBefore,
+      editedAfter: voiceEditedAfter,
+    };
+    const inputMode = inputModeForDraft(voiceState);
+    audioSessionCoordinator.stopAll("submit");
     const sentAttachments = attachStore.take();
     turns = [
       ...turns,
@@ -652,6 +686,7 @@
     // bypass Svelte 5's signals and the transcript would never re-render.
     const turn = turns[turns.length - 1];
     promptText = "";
+    resetVoiceProvenance();
     // B19 — a box that grew to hold a long prompt has to shrink back when the
     // prompt leaves it, or the composer keeps the height of the longest thing
     // ever typed into it.
@@ -665,6 +700,7 @@
       await streamPrompt(
         {
           text,
+          input_mode: inputMode,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: model || undefined,
@@ -717,6 +753,9 @@
       if (e instanceof ApiError && e.reasonCode === "model_not_ready") {
         turns = turns.filter((candidate) => candidate !== turn);
         promptText = text;
+        voiceDictated = voiceState.dictated;
+        voiceTypedBefore = voiceState.typedBefore;
+        voiceEditedAfter = voiceState.editedAfter;
         attachStore.set(sentAttachments);
         await refreshModels();
         openModelSetup(activeProfile);
@@ -773,8 +812,48 @@
     return promptEl?.selectionStart ?? promptText.length;
   }
 
+  function trackPromptSelection() {
+    promptSelectionStart = promptEl?.selectionStart ?? promptText.length;
+    promptSelectionEnd = promptEl?.selectionEnd ?? promptSelectionStart;
+  }
+
+  function onVoiceDraft(next: string, cursor: number) {
+    promptText = next;
+    promptSelectionStart = cursor;
+    promptSelectionEnd = cursor;
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(cursor, cursor);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  function onVoiceActive(active: boolean) {
+    if (!active) return;
+    voiceProvenanceSnapshot = {
+      dictated: voiceDictated,
+      typedBefore: voiceTypedBefore,
+      editedAfter: voiceEditedAfter,
+    };
+    if (!voiceDictated) voiceTypedBefore = promptText.trim() !== "";
+  }
+
+  function restoreVoiceProvenance() {
+    voiceDictated = voiceProvenanceSnapshot.dictated;
+    voiceTypedBefore = voiceProvenanceSnapshot.typedBefore;
+    voiceEditedAfter = voiceProvenanceSnapshot.editedAfter;
+  }
+
+  function resetVoiceProvenance() {
+    voiceDictated = false;
+    voiceTypedBefore = false;
+    voiceEditedAfter = false;
+  }
+
   /** Re-read what the caret is sitting in after every edit. */
   function onPromptInput() {
+    if (voiceDictated) voiceEditedAfter = true;
+    trackPromptSelection();
     autoGrow(promptEl ?? null);
     menuActive = 0;
     const position = caret();
@@ -951,6 +1030,12 @@
   }
 
   function onKeydown(e: KeyboardEvent) {
+    if (e.key === "Enter" && !e.shiftKey && voiceControl?.active()) {
+      e.preventDefault();
+      voiceControl.done();
+      promptEl?.focus();
+      return;
+    }
     // An open menu owns the arrows, Enter, Tab and Escape — otherwise Enter
     // would send the half-typed `/mo` the owner is picking from.
     if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
@@ -986,6 +1071,8 @@
 
   function newConversation() {
     if (streaming) return;
+    audioSessionCoordinator.stopAll("route");
+    resetVoiceProvenance();
     // Release the transcript's thumbnails with the transcript. They are held
     // for as long as the images are on screen and no longer — a blob URL kept
     // past its last render pins the whole file in memory.
@@ -1454,6 +1541,12 @@
             {#if !turn.streaming}
               <!-- A glyph, like the code-block copy action, so the transcript
                    reads as the answer rather than as chrome around it. -->
+              <div class="response-actions">
+              <ReadAloudButton
+                responseId={turn.response?.turn_id ?? String(turn.id)}
+                text={answer}
+                language={speechLanguage}
+              />
               <button
                 type="button"
                 class="copy-message"
@@ -1462,6 +1555,7 @@
                 aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
               ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+              </div>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
             <!-- BUG-73 — a turn with no answer has a state, not an answer. It
@@ -1640,6 +1734,9 @@
           bind:this={promptEl}
           bind:value={promptText}
           oninput={onPromptInput}
+          onselect={trackPromptSelection}
+          onclick={trackPromptSelection}
+          onkeyup={trackPromptSelection}
           onkeydown={onKeydown}
           onblur={() => (menuKind = "none")}
           rows="2"
@@ -1667,6 +1764,18 @@
       <div class="composer-bar">
         <div class="bar-left">
           <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
+          <VoiceDictationControl
+            bind:this={voiceControl}
+            draft={promptText}
+            selectionStart={promptSelectionStart}
+            selectionEnd={promptSelectionEnd}
+            language={speechLanguage}
+            disabled={streaming}
+            onchange={onVoiceDraft}
+            onfinalized={() => (voiceDictated = true)}
+            onrestored={restoreVoiceProvenance}
+            onactivechange={onVoiceActive}
+          />
           <SurfaceToggle
             surface="chat"
             draft={promptText}
@@ -1922,6 +2031,7 @@
     line-height: 1.45;
   }
   .branch-origin > :global(svg) { flex: none; margin-top: 0.15rem; color: var(--accent); }
+  .response-actions { display: inline-flex; align-items: center; gap: 0.15rem; }
   .copy-message {
     display: inline-flex;
     align-items: center;

@@ -33,6 +33,8 @@ about a reference platform.
 | Credential delivery with two-pass delta quarantine | **Yes — conditional** | Safe snapshot/scanner, discard-only API and UI ship; delivery/merge stay off pending real disposable-container proof. |
 | Publisher-verified runner and helper-image pins | **Yes — conditional** | Signed-manifest/Authenticode primitives and exact OCI digest receipts ship; developer packages report package-relative integrity until external trust anchors are verified. |
 | Windows PTY/restart attachment outside a proven sandbox transport | **No** | Convenience would weaken the boundary, so it remains unsupported. |
+| Governed turn-based dictation and manual read-aloud | **Yes — proven** | Dictation itself is parity with Claude and ChatGPT; explicit-send invariance, exact draft rollback, constrained provenance and a single cross-surface audio owner are the meaningful improvement. |
+| Full-duplex live conversation with interruption and hands-free task control | **Yes — conditional** | Continuous voice is parity with Claude and ChatGPT. It becomes a differentiator only when spoken task controls retain visible state, action-bound confirmation, gateway policy and durable accepted/refused receipts. |
 
 ---
 
@@ -258,7 +260,8 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Queue a message while a turn runs | Claude Code, Codex | Steer queues the owner's words into the running turn, arriving as a user message before the model is asked anything else | ✅ |
 | `!` bash prefix and `#` memory prefix | Claude Code | ❌ absent. Both would be a second route into governed execution and governed memory writes, beside the approval path that exists — the "one governed route" rule the shell control set is built on | ❌ by decision |
 | Branch a conversation from a message | ChatGPT, Claude | ❌ absent. Checkpoints already record the point to branch from; the missing part is a conversation-fork surface, tracked as C14 | ❌ |
-| Voice input | ChatGPT, Claude mobile | ❌ absent, and labelled as absent rather than "coming soon" (C16) | ❌ |
+| Governed voice input | ChatGPT and Claude offer voice conversation | **Dictate** writes into the editable Chat or Build draft; **Done** never sends, **Cancel** restores the exact prior draft, and only the normal Send path creates a turn. Provenance is constrained metadata and no audio is stored | ✅ beyond |
+| Manual response read-aloud | ChatGPT and Claude voice surfaces speak responses | Completed answers expose **Read aloud** and **Stop speaking**; playback is never automatic and code bodies, citation syntax and raw URLs are excluded | ✅ |
 
 **Where Raiker leads, and why it is worth keeping.**
 
@@ -1128,9 +1131,45 @@ moved one control to where it belongs — see
 | A `Chat | Build` surface toggle that carries the draft | **Parity with Claude's `Chat | Cowork`**, with one difference worth naming | It moves the prompt and its staged files and **sends nothing**; neither surface's governance changes. Deciding which room a half-typed prompt belongs in used to mean abandoning it. |
 | Governance chips on the same bar | **Yes** | No reference composer carries an approval-mode chip, an execution-environment badge and a measured context-capacity badge at all, because none of them has a governed answer to put in one. |
 
-**Still absent, and named rather than mocked up.** There is no microphone and no
-dictation: ChatGPT and Claude both have one. GAP-CHAT C16 records it, and the
-control is absent rather than present-and-disabled.
+**Voice has since landed.** GAP-CHAT C16 is closed by FIXED-247: both composers
+carry one shared microphone control, owner-triggered response playback, one
+global audio owner and the same explicit Send boundary. Full-duplex live voice
+is recorded as future work rather than implied by the turn-based control.
+
+---
+
+## Governed voice control set — GAP-CHAT C16
+
+Reviewed 2026-08-21 against official descriptions of
+[ChatGPT voice](https://help.openai.com/en/articles/8400625-voice-mode-faq) and
+[Claude voice mode](https://support.anthropic.com/en/articles/11101966-using-voice-mode-on-claude-mobile-apps),
+and against the documented control surfaces of Claude Code, Codex, OpenClaw,
+DeepSeek Harness and Hermes Agent cited elsewhere in this document. Where those
+primary sources do not establish a voice control, this table says so rather
+than inferring one.
+
+| Control | Reference requirement | Raiker result | Beyond the reference set? |
+|---|---|---|---|
+| Dictation in Chat | ChatGPT and Claude accept spoken input | Browser recognition writes into the ordinary editable Chat composer | **No — parity** |
+| Dictation in Build | No equivalent is established for Claude Code, Codex, DeepSeek Harness or Hermes Agent by the cited primary sources | The identical control and state machine ship in Build | **Yes** — coding work gains voice without a second execution route |
+| Explicit send | Voice conversation products may submit a spoken turn as conversation input | Recognition can never call submit; **Done** finalises only, and a later Enter or **Send** is required | **Yes** — the owner can review the exact instruction before it enters an agent loop |
+| Reversible draft | Editing is possible in text composers | **Cancel** and permission/error recovery restore the byte-for-byte pre-dictation draft | **Yes** — speech is an undoable draft operation |
+| Input provenance | The reviewed voice products disclose voice use, but do not establish Raiker's gateway metadata contract | Only `typed`, `dictated` or `mixed` pass HTTP, envelope and gateway validation; audit retains the value, not audio or another transcript | **Yes** — useful, privacy-preserving control evidence |
+| Manual read-aloud | ChatGPT and Claude speak responses in voice mode | Only a completed answer can be read; playback is manual and interruptible | **No — parity**, with a safer turn-based default |
+| One audio owner | Voice products coordinate listening and speaking within their own live session | Starting Chat dictation, Build dictation or response playback stops the previous owner | **Yes** — cross-surface displacement prevents hidden listening or overlapping output |
+| Language and processing disclosure | ChatGPT and Claude expose voice/language behavior | Owner-scoped language choice; UI states that recognition and playback depend on browser/OS services and may use online processing | **No — required parity and disclosure** |
+| Full-duplex conversation | ChatGPT and Claude support continuous voice, spoken replies and interruption | Not built. Continuous listening, barge-in, hands-free control and wake/stop state remain future work | **No — currently behind** |
+| Governed full-duplex task control | No cited reference establishes action-bound spoken confirmations plus accepted/refused receipts | Proposed: visible live transcript, explicit confirmation for consequential controls, barge-in cancellation, gateway/policy parity and durable receipts | **Yes — conditional**; this is the bar for the future feature to be more than parity |
+
+Compatibility requirements for the future full-duplex path are strict: it must
+reuse the prompt and task-control gateway contracts; distinguish conversation,
+dictation, speaking and consequential-control confirmation states; expose a
+persistent stop affordance; stop listening on route, lock and owner changes;
+make interruption cancel the exact playback/turn it names; and store neither raw
+audio nor a shadow transcript by default. OpenClaw, DeepSeek Harness and Hermes
+Agent remain relevant harness comparisons for gateway, tool and control parity,
+but their cited primary sources do not establish an equivalent end-user voice
+surface.
 
 ---
 

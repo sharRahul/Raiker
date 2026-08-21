@@ -80,6 +80,8 @@
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
+  import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
+  import ReadAloudButton from "../components/ReadAloudButton.svelte";
   import ShortcutSheet from "../components/ShortcutSheet.svelte";
   import {
     applyMention,
@@ -99,6 +101,12 @@
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import {
+    audioSessionCoordinator,
+    inputModeForDraft,
+    speechLanguagePreference,
+    type SpeechLanguage,
+  } from "../voice";
 
   let {
     projects = null,
@@ -122,6 +130,9 @@
     // visit to Permissions is exactly when they change — so they are re-read on
     // return rather than held as they stood when Build first mounted.
     void readStandingModes();
+    void api.settings().then((view) => {
+      speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
+    }).catch(() => {});
   });
 
   interface BuildTurn {
@@ -149,6 +160,14 @@
   let attachOpen = $state(false);
 
   let promptText = $state("");
+  let speechLanguage = $state<SpeechLanguage>("auto");
+  let voiceControl = $state<VoiceDictationHandle | undefined>();
+  let voiceDictated = $state(false);
+  let voiceTypedBefore = $state(false);
+  let voiceEditedAfter = $state(false);
+  let voiceProvenanceSnapshot = { dictated: false, typedBefore: false, editedAfter: false };
+  let promptSelectionStart = $state(0);
+  let promptSelectionEnd = $state(0);
   let turns = $state<BuildTurn[]>([]);
   let streaming = $state(false);
   // B17/C13 — whether the owner has already asked this turn to stop.
@@ -375,7 +394,10 @@
       if (detail.attachments?.length) attachStore.set([...detail.attachments]);
     };
     window.addEventListener("raiker:build-compose", onCompose);
-    return () => window.removeEventListener("raiker:build-compose", onCompose);
+    return () => {
+      window.removeEventListener("raiker:build-compose", onCompose);
+      audioSessionCoordinator.stopAll("route");
+    };
   });
 
   async function loadRepos() {
@@ -447,7 +469,47 @@
     return promptEl?.selectionStart ?? promptText.length;
   }
 
+  function trackPromptSelection() {
+    promptSelectionStart = promptEl?.selectionStart ?? promptText.length;
+    promptSelectionEnd = promptEl?.selectionEnd ?? promptSelectionStart;
+  }
+
+  function onVoiceDraft(next: string, cursor: number) {
+    promptText = next;
+    promptSelectionStart = cursor;
+    promptSelectionEnd = cursor;
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(cursor, cursor);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  function onVoiceActive(active: boolean) {
+    if (!active) return;
+    voiceProvenanceSnapshot = {
+      dictated: voiceDictated,
+      typedBefore: voiceTypedBefore,
+      editedAfter: voiceEditedAfter,
+    };
+    if (!voiceDictated) voiceTypedBefore = promptText.trim() !== "";
+  }
+
+  function restoreVoiceProvenance() {
+    voiceDictated = voiceProvenanceSnapshot.dictated;
+    voiceTypedBefore = voiceProvenanceSnapshot.typedBefore;
+    voiceEditedAfter = voiceProvenanceSnapshot.editedAfter;
+  }
+
+  function resetVoiceProvenance() {
+    voiceDictated = false;
+    voiceTypedBefore = false;
+    voiceEditedAfter = false;
+  }
+
   function onPromptInput() {
+    if (voiceDictated) voiceEditedAfter = true;
+    trackPromptSelection();
     autoGrow(promptEl ?? null);
     menuActive = 0;
     const position = caret();
@@ -569,6 +631,12 @@
   }
 
   function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Enter" && !event.shiftKey && voiceControl?.active()) {
+      event.preventDefault();
+      voiceControl.done();
+      promptEl?.focus();
+      return;
+    }
     // An open menu owns the arrows, Enter, Tab and Escape.
     if (menuKind !== "none" && (menuItems.length > 0 || mentionNotice !== null)) {
       if (event.key === "Escape") {
@@ -624,8 +692,20 @@
   }
 
   async function submit() {
+    if (voiceControl?.active()) {
+      voiceControl.done();
+      promptEl?.focus();
+      return;
+    }
     const text = promptText.trim();
     if (text === "" || !modelReadiness.ready || streaming || attachStore.uploading) return;
+    const voiceState = {
+      dictated: voiceDictated,
+      typedBefore: voiceTypedBefore,
+      editedAfter: voiceEditedAfter,
+    };
+    const inputMode = inputModeForDraft(voiceState);
+    audioSessionCoordinator.stopAll("submit");
     const preamble = repoPreamble(activeRepo);
     // The preamble is prepended here, not server-side, so the transcript shows
     // the exact text the turn received.
@@ -641,6 +721,7 @@
     ];
     const turn = turns[turns.length - 1];
     promptText = "";
+    resetVoiceProvenance();
     // B19 — shrink the box back with the prompt that grew it.
     menuKind = "none";
     queueMicrotask(() => autoGrow(promptEl ?? null));
@@ -652,6 +733,7 @@
       await streamPrompt(
         {
           text: sent,
+          input_mode: inputMode,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: model || undefined,
@@ -696,6 +778,9 @@
       if (error instanceof ApiError && error.reasonCode === "model_not_ready") {
         turns = turns.filter((candidate) => candidate !== turn);
         promptText = text;
+        voiceDictated = voiceState.dictated;
+        voiceTypedBefore = voiceState.typedBefore;
+        voiceEditedAfter = voiceState.editedAfter;
         attachStore.set(sentAttachments);
         await refreshModels();
         openModelSetup(activeProfile);
@@ -850,6 +935,8 @@
 
   function newConversation() {
     if (streaming) return;
+    audioSessionCoordinator.stopAll("route");
+    resetVoiceProvenance();
     turns = [];
     sessionId = null;
     approvals = [];
@@ -1196,6 +1283,12 @@
               {#if !turn.streaming}
                 <!-- Parity with Chat: the same glyph, the same behaviour, so a
                      response reads the same way in either conversation. -->
+                <div class="response-actions">
+                <ReadAloudButton
+                  responseId={turn.response?.turn_id ?? String(turn.id)}
+                  text={answer}
+                  language={speechLanguage}
+                />
                 <button
                   type="button"
                   class="copy-message"
@@ -1204,6 +1297,7 @@
                   aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                   title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+                </div>
               {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
               <!-- BUG-73 / BUG-206 — see ChatView: a turn with no answer reports
@@ -1329,6 +1423,9 @@
             bind:this={promptEl}
             bind:value={promptText}
             oninput={onPromptInput}
+            onselect={trackPromptSelection}
+            onclick={trackPromptSelection}
+            onkeyup={trackPromptSelection}
             onkeydown={onKeydown}
             onblur={() => (menuKind = "none")}
             rows="2"
@@ -1370,6 +1467,18 @@
         <div class="composer-bar">
           <div class="bar-left">
             <ComposerAttach bind:this={attachControl} bind:open={attachOpen} disabled={streaming} />
+            <VoiceDictationControl
+              bind:this={voiceControl}
+              draft={promptText}
+              selectionStart={promptSelectionStart}
+              selectionEnd={promptSelectionEnd}
+              language={speechLanguage}
+              disabled={streaming}
+              onchange={onVoiceDraft}
+              onfinalized={() => (voiceDictated = true)}
+              onrestored={restoreVoiceProvenance}
+              onactivechange={onVoiceActive}
+            />
             <SurfaceToggle
               surface="build"
               draft={promptText}
@@ -1817,6 +1926,7 @@
   }
 
   .turn-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }
+  .response-actions { display: inline-flex; align-items: center; gap: 0.15rem; }
   .copy-message {
     display: inline-flex;
     align-items: center;

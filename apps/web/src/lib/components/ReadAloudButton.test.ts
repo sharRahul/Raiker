@@ -1,0 +1,60 @@
+import { fireEvent, render, screen } from "@testing-library/svelte";
+import { expect, it, vi } from "vitest";
+import { createAudioSessionCoordinator, type VoicePlayback } from "../voice";
+import ReadAloudButton from "./ReadAloudButton.svelte";
+import ReadAloudHarness from "./ReadAloudHarness.test.svelte";
+
+function playbackFake() {
+  let handlers: { end(): void; error(): void } | undefined;
+  const playback: VoicePlayback & { end(): void; error(): void } = {
+    supported: () => true,
+    speak: vi.fn((_id, _text, _language, next) => { handlers = next; }),
+    stop: vi.fn(),
+    end: () => handlers?.end(),
+    error: () => handlers?.error(),
+  };
+  return playback;
+}
+
+it("reads only cleaned visible answer text and toggles to Stop speaking", async () => {
+  const playback = playbackFake();
+  render(ReadAloudButton, {
+    responseId: "turn-1",
+    text: "**Ready** [s1]",
+    language: "en",
+    playback,
+    coordinator: createAudioSessionCoordinator(),
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Read aloud" }));
+  expect(playback.speak).toHaveBeenCalledWith("turn-1", "Ready", "en", expect.any(Object));
+  expect(screen.getByRole("button", { name: "Stop speaking" })).toHaveAttribute("aria-pressed", "true");
+  await fireEvent.click(screen.getByRole("button", { name: "Stop speaking" }));
+  expect(playback.stop).toHaveBeenCalledOnce();
+});
+
+it("states playback failure and leaves text controls usable", async () => {
+  const playback = playbackFake();
+  render(ReadAloudButton, {
+    responseId: "turn-1",
+    text: "Answer",
+    language: "auto",
+    playback,
+    coordinator: createAudioSessionCoordinator(),
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Read aloud" }));
+  playback.error();
+  expect(await screen.findByRole("status")).toHaveTextContent("This device could not play the response.");
+  expect(screen.getByRole("button", { name: "Read aloud" })).toBeEnabled();
+});
+
+it("clears the previous response's pressed state when another response takes ownership", async () => {
+  const playback = playbackFake();
+  render(ReadAloudHarness, { coordinator: createAudioSessionCoordinator(), playback });
+  const readButtons = screen.getAllByRole("button", { name: "Read aloud" });
+  await fireEvent.click(readButtons[0]);
+  expect(screen.getByRole("button", { name: "Stop speaking" })).toBeInTheDocument();
+  await fireEvent.click(readButtons[1]);
+  expect(await screen.findByRole("button", { name: "Stop speaking" })).toBeInTheDocument();
+  expect(screen.getAllByRole("button", { name: "Read aloud" })).toHaveLength(1);
+  expect(playback.stop).toHaveBeenCalledOnce();
+});

@@ -55,6 +55,7 @@ export type IconName =
   | "info"
   | "spark"
   | "mic"
+  | "volume"
   | "file"
   | "code"
   | "branch"
@@ -148,6 +149,11 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M6 11.5a6 6 0 0 0 12 0",
     "M12 17.5V21",
     "M9 21h6",
+  ],
+  volume: [
+    "M4 10v4h4l5 4V6l-5 4H4Z",
+    "M16 9a4 4 0 0 1 0 6",
+    "M18.5 6.5a8 8 0 0 1 0 11",
   ],
   file: ["M7 3h7l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 0-1Z", "M14 3v4h4"],
   // Stacked boards: a project groups conversations, files and instructions. It

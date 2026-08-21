@@ -32,6 +32,7 @@ CLIENT_TYPES = {
 }
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
 APPROVAL_MODES = {"manual", "auto", "skip"}
+VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
 _LEGACY_APPROVAL_MODE_ALIASES = {
     "interactive": "manual",
     "allow_safe_only": "auto",
@@ -547,6 +548,13 @@ def normalize_approval_mode(value: str) -> str:
     normalized = _LEGACY_APPROVAL_MODE_ALIASES.get(value, value)
     _one_of(normalized, APPROVAL_MODES, "approval_mode")
     return normalized
+
+
+def normalize_input_mode(value: object) -> str:
+    """Validate client-reported prompt provenance without inferring audio facts."""
+    if not isinstance(value, str) or value not in VOICE_INPUT_MODES:
+        raise ContractValidationError(f"invalid_input_mode:{value}")
+    return value
 
 
 def _schema(value: str) -> None:

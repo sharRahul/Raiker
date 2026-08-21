@@ -51,6 +51,34 @@ def test_settings_requires_auth(client: TestClient) -> None:
     assert client.get("/api/settings").status_code == 401
 
 
+def test_speech_language_is_owner_scoped_and_constrained(client: TestClient) -> None:
+    token = _token(client, "alice")
+    saved = client.put(
+        "/api/settings",
+        json={"settings": {"general.speech_language": "fr"}},
+        headers=_h(token),
+    )
+    assert saved.status_code == 200
+
+    rejected = client.put(
+        "/api/settings",
+        json={"settings": {"general.speech_language": "unbounded"}},
+        headers=_h(token),
+    )
+
+    assert rejected.status_code == 422
+    assert client.get("/api/settings", headers=_h(token)).json()["settings"] == {
+        "general.speech_language": "fr"
+    }
+
+    wrong_type = client.put(
+        "/api/settings",
+        json={"settings": {"general.speech_language": ["en"]}},
+        headers=_h(token),
+    )
+    assert wrong_type.status_code == 422
+
+
 def test_composer_approval_mode_defaults_to_manual(client: TestClient) -> None:
     token = _token(client, "alice")
 

@@ -18,6 +18,23 @@ vi.mock("../api", async (importOriginal) => {
 
 import BuildView from "./BuildView.svelte";
 
+class FakeRecognition {
+  static instance: FakeRecognition;
+  continuous = false;
+  interimResults = false;
+  lang = "";
+  onresult: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  constructor() { FakeRecognition.instance = this; }
+  start() {}
+  stop() { this.onend?.(); }
+  abort() { this.onend?.(); }
+  final(text: string) {
+    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
+  }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
@@ -159,6 +176,50 @@ function modeTrigger() {
 }
 
 describe("Build composer modes", () => {
+
+  it("keeps dictated text editable and sends it only after explicit Send", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeRecognition);
+    stubFetch({ ...baseRoutes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
+    streamPromptMock.mockResolvedValue(undefined);
+    render(BuildView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    FakeRecognition.instance.final("check the repository");
+    await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Describe the change")).toHaveValue("check the repository");
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({ input_mode: "dictated" });
+  });
+
+  it("does not retain dictated provenance after the owner cancels it", async () => {
+    vi.stubGlobal("SpeechRecognition", FakeRecognition);
+    stubFetch(baseRoutes());
+    streamPromptMock.mockResolvedValue(undefined);
+    render(BuildView);
+    const prompt = await screen.findByLabelText("Describe the change");
+    await fireEvent.input(prompt, { target: { value: "keep this" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    FakeRecognition.instance.final("discard this");
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      text: expect.stringContaining("keep this"),
+      input_mode: "typed",
+    });
+  });
+
+  it("offers manual read aloud beside Copy only after a Build answer completes", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Build answer");
+    render(BuildView);
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), { target: { value: "Plan it" } });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    expect(await screen.findByRole("button", { name: "Read aloud" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy response" })).toBeInTheDocument();
+  });
 
   it("preserves the change and disables Send when the exact model is unready", async () => {
     const stopped = { ...REASONING_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "The local runtime is stopped.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start it, then check again." };

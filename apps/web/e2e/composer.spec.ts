@@ -11,6 +11,7 @@
 // against the surfaces as they are now, and the suite is in CI so the next
 // redesign cannot silently outrun it.
 import { expect, test } from "@playwright/test";
+import AxeBuilder from "@axe-core/playwright";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 
@@ -21,12 +22,35 @@ const model = {
   default_state: "enabled_runtime", local_only: false, requires_network: true,
   endpoint_kind: "remote_hosted", requires_egress_policy: true, requires_budget_policy: true,
   runtime_gate: "hosted_model_runtime", off_machine: true, selected: true,
-  connection_configured: true, configured: true, billable: true, supports_reasoning: true,
+  connection_configured: true, configured: true, ready: true, readiness_state: "ready",
+  billable: true, supports_reasoning: true,
   supports_reasoning_effort: true, reasoning_effort_values: ["low", "medium", "high"],
   context_window_tokens: 200000,
 };
 
 test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => {
+    class FakeRecognition {
+      continuous = false;
+      interimResults = false;
+      lang = "";
+      onresult: ((event: unknown) => void) | null = null;
+      onerror: ((event: unknown) => void) | null = null;
+      onend: (() => void) | null = null;
+      constructor() { (window as unknown as { __voiceRecognition: FakeRecognition }).__voiceRecognition = this; }
+      start() { document.documentElement.dataset.voiceListening = "true"; }
+      stop() { delete document.documentElement.dataset.voiceListening; this.onend?.(); }
+      abort() { delete document.documentElement.dataset.voiceListening; this.onend?.(); }
+      emitFinal(text: string) {
+        this.onresult?.({
+          resultIndex: 0,
+          results: [Object.assign([{ transcript: text }], { isFinal: true })],
+        });
+      }
+    }
+    Object.assign(window, { SpeechRecognition: FakeRecognition });
+  });
+  let settings: Record<string, unknown> = {};
   await page.route("http://raiker.test/**", async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname.startsWith("/api/")) {
@@ -38,7 +62,13 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/runtime-mode") body = { mode_name: "local_single_user_runtime", status: "active", allowed_modes: ["local_single_user_runtime"] };
       else if (path === "/api/diagnostics") body = { summary: {}, counts: {}, readiness: {}, missing_config: [], provider_health: [] };
       else if (path === "/api/projects") body = { projects: [], active_project_id: null };
-      else if (path === "/api/settings") body = { settings: {}, status: { vault: "configured", mfa_enrolled: false, username: "owner" } };
+      else if (path === "/api/settings") {
+        if (route.request().method() === "PUT") {
+          const submitted = route.request().postDataJSON() as { settings?: Record<string, unknown> };
+          settings = submitted.settings ?? settings;
+        }
+        body = { settings, status: { vault: "configured", mfa_enrolled: false, username: "owner" } };
+      }
       else if (path === "/api/models") body = { profiles: [model], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
@@ -62,6 +92,56 @@ test.beforeEach(async ({ page }) => {
   await page.getByLabel("Password", { exact: true }).fill("test-password");
   await page.getByRole("button", { name: /unlock/i }).click();
   await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible();
+});
+
+test("governed voice stays editable and visually consistent in Chat, Build, mobile, and Settings", async ({ page }) => {
+  const promptPosts: string[] = [];
+  page.on("request", (request) => {
+    if (request.method() === "POST" && new URL(request.url()).pathname.startsWith("/api/prompts")) {
+      promptPosts.push(request.postData() ?? "");
+    }
+  });
+
+  const chat = page.getByLabel("Prompt", { exact: true });
+  await page.getByRole("button", { name: "Dictate" }).click();
+  await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("check the repository"));
+  await expect(chat).toHaveValue("check the repository");
+  expect(promptPosts).toHaveLength(0);
+  await expect(page.getByText("Listening…", { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.getByRole("button", { name: "Done dictating" }).click();
+  expect(promptPosts).toHaveLength(0);
+  await page.screenshot({ path: join(shots, "voice-chat-desktop.png"), fullPage: true });
+  await page.getByRole("button", { name: "Send" }).click();
+  await expect.poll(() => promptPosts.length).toBe(1);
+  expect(JSON.parse(promptPosts[0])).toMatchObject({ text: "check the repository", input_mode: "dictated" });
+
+  await page.getByRole("navigation", { name: "All navigation" }).getByRole("link", { name: "Build" }).click();
+  const build = page.getByLabel("Describe the change");
+  await build.fill("keep this");
+  await page.getByRole("button", { name: "Dictate" }).click();
+  await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("discard this"));
+  await page.getByRole("button", { name: "Cancel dictation" }).click();
+  await expect(build).toHaveValue("keep this");
+  await page.screenshot({ path: join(shots, "voice-build-desktop.png"), fullPage: true });
+
+  await page.goto("http://raiker.test/#/settings?tab=general");
+  await page.getByLabel("Speech language").selectOption("ja");
+  await page.screenshot({ path: join(shots, "voice-settings.png"), fullPage: true });
+  await Promise.all([
+    page.waitForRequest((request) => request.method() === "PUT" && new URL(request.url()).pathname === "/api/settings"),
+    page.getByRole("button", { name: /save changes/i }).click(),
+  ]);
+  await page.goto("http://raiker.test/#/settings?tab=general");
+  await expect(page.getByLabel("Speech language")).toHaveValue("ja");
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("http://raiker.test/#/new-chat");
+  await expect(page.getByRole("button", { name: "Dictate" })).toBeVisible();
+  const mobileDrawer = page.locator("#all-navigation");
+  await expect(mobileDrawer).toHaveAttribute("aria-hidden", "true");
+  await expect.poll(async () => (await mobileDrawer.boundingBox())?.x ?? 0).toBeLessThan(-200);
+  await page.screenshot({ path: join(shots, "voice-chat-mobile.png"), fullPage: true });
 });
 
 test("Chat and Build composers stay polished and usable", async ({ page }) => {

@@ -325,7 +325,7 @@ Phase 3 is `implemented_verified` only for safe foundation/readiness slices A-P:
 | Dashboard | Launchable local web dashboard via apps/web, with governed views, prompt/turn flows, task creation, Connector Store, settings, and approvals. | Yes | No direct authority; every mutation follows the governed API path. | Keep API and frontend tests in parity; native and mobile dashboards remain deferred. |
 | IDE extension | Specified/deferred; no extension runtime. | No | None. | Define extension transport and auth. |
 | Mobile apps | Specified/deferred; no Apple/Android apps. | No | None. | Build mobile clients after explicit activation scope. |
-| Voice UI | Specified/deferred. | No | None. | Define voice contracts after explicit activation scope. |
+| Voice UI | Governed turn-based dictation in web Chat/Build plus manual response read-aloud; full-duplex conversation deferred. | Yes — web composer only | Prompt submission uses the existing authenticated gateway; `input_mode` is constrained metadata, raw audio is not retained, and speech never submits or executes by itself. | Add continuous listening, interruption and hands-free task control only with visible state, action-bound confirmation and receipt parity. |
 | Browser extension | Specified/deferred. | No | None. | Define extension boundary after explicit activation scope. |
 | External chat/channel clients | Metadata/readiness only; transports disabled. | Readiness-only | None. | Implement connectors after explicit activation scope. |
 | REST/API | Authenticated single-user raiker-web API, loopback by default with explicit public opt-in. | Yes | No direct authority; requests route through the same gateway, RuntimeAuthority, and broker path. | Hosted multi-user API remains deferred. |

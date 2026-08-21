@@ -1446,6 +1446,8 @@ export type PromptAttachment =
 
 export interface PromptRequestBody {
   text: string;
+  // Client-reported provenance; no audio or transcript metadata crosses this boundary.
+  input_mode?: "typed" | "dictated" | "mixed";
   session_id?: string;
   planning_mode?: string;
   approval_mode?: string;

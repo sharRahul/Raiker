@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -12,9 +13,10 @@ from raiker.api.schemas import PromptRequest
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
-from raiker.contracts.models import AgentResponse, PromptEnvelope
+from raiker.contracts.models import AgentResponse, ContractValidationError, PromptEnvelope
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.writer import EventLogWriter
+from raiker.gateway.agent_gateway import AgentGateway
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
 
@@ -74,6 +76,51 @@ def test_prompt_without_reasoning_effort_remains_backward_compatible(workspace: 
     envelope = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
 
     assert envelope.options.reasoning_effort is None
+
+
+def test_prompt_input_provenance_defaults_to_typed_and_preserves_dictation(
+    workspace: Path,
+) -> None:
+    typed = _build_envelope(PromptRequest(text="hello"), "principal_owner", workspace)
+    dictated = _build_envelope(
+        PromptRequest(text="hello", input_mode="dictated"), "principal_owner", workspace
+    )
+
+    assert typed.prompt.metadata["input_mode"] == "typed"
+    assert dictated.prompt.metadata["input_mode"] == "dictated"
+    assert set(dictated.prompt.metadata) == {"entry_command", "input_mode"}
+
+
+def test_gateway_revalidates_and_audits_only_safe_input_provenance(workspace: Path) -> None:
+    envelope = _build_envelope(
+        PromptRequest(text="spoken secret stays only in the prompt", input_mode="mixed"),
+        "principal_owner",
+        workspace,
+    )
+    AgentGateway(workspace)._prepare_turn(envelope)
+    events = [
+        json.loads(line)
+        for line in EventLogWriter(SQLiteStore(workspace))
+        .path_for_session(envelope.session_id)
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    received = next(event for event in events if event["event_type"] == "prompt_received")
+
+    assert received["payload"]["client_type"] == "web_ui"
+    assert received["payload"]["prompt_length"] == len(envelope.prompt.text)
+    assert received["payload"]["input_mode"] == "mixed"
+    assert set(received["payload"]) == {
+        "client",
+        "client_type",
+        "prompt_length",
+        "input_mode",
+    }
+    assert "spoken secret" not in json.dumps(received)
+
+    envelope.prompt.metadata["input_mode"] = "continuous-listening"
+    with pytest.raises(ContractValidationError, match="invalid_input_mode"):
+        AgentGateway(workspace)._prepare_turn(envelope)
 
 
 class TestPrompts:
@@ -143,6 +190,18 @@ class TestPrompts:
         resp = client.post("/api/prompts", json={"text": ""}, headers=_headers(token))
         assert resp.status_code == 200
         assert resp.json()["status"] == "failed"
+
+    def test_invalid_input_provenance_is_rejected_at_the_http_boundary(
+        self, client: TestClient
+    ) -> None:
+        token = _token(client)
+        response = client.post(
+            "/api/prompts",
+            json={"text": "hello", "input_mode": "continuous-listening"},
+            headers=_headers(token),
+        )
+
+        assert response.status_code == 422
 
     def test_stream_emits_sse_with_final(self, client: TestClient) -> None:
         token = _token(client)

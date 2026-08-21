@@ -189,11 +189,13 @@
 
   --text-1: #1b1c1e;
   --text-2: #575859;
-  --text-3: #7c7d7e;
+  /* Small secondary labels must remain AA-readable on both white and the
+     composer's slightly sunken surface. */
+  --text-3: #68696a;
   --text-inverse: #ffffff;
 
   /* Steel blue — the one accent; primary action and active state */
-  --accent: #2779a7;
+  --accent: #236f9a;
   --accent-strong: #1d5d81;
   --accent-soft: #e7f1f7;
   --accent-border: #a9cde1;

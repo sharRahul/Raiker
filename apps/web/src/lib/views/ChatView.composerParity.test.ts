@@ -12,6 +12,28 @@ vi.mock("../api", async (importOriginal) => {
 
 import ChatView from "./ChatView.svelte";
 
+class FakeRecognition {
+  static instance: FakeRecognition;
+  continuous = false;
+  interimResults = false;
+  lang = "";
+  onresult: ((event: unknown) => void) | null = null;
+  onerror: ((event: unknown) => void) | null = null;
+  onend: (() => void) | null = null;
+  constructor() { FakeRecognition.instance = this; }
+  start() {}
+  stop() { this.onend?.(); }
+  abort() { this.onend?.(); }
+  final(text: string) {
+    this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: text }], { isFinal: true })] });
+  }
+}
+
+function installRecognitionFake() {
+  vi.stubGlobal("SpeechRecognition", FakeRecognition);
+  return () => FakeRecognition.instance;
+}
+
 afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
@@ -72,6 +94,96 @@ const NON_REASONING_PROFILE = {
 };
 
 describe("ChatView composer parity", () => {
+  it("keeps dictated text editable and sends it only after explicit Send", async () => {
+    const recognition = installRecognitionFake();
+    stubFetch({ ...routes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
+    streamPromptMock.mockResolvedValue(undefined);
+    render(ChatView, { projects });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    recognition().final("check the repository");
+    await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Prompt")).toHaveValue("check the repository");
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      text: "check the repository",
+      input_mode: "dictated",
+    });
+  });
+
+  it("uses the first Enter to finish dictation and the second to send", async () => {
+    const recognition = installRecognitionFake();
+    stubFetch(routes());
+    streamPromptMock.mockResolvedValue(undefined);
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+    await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+    recognition().final("check this");
+
+    await fireEvent.keyDown(prompt, { key: "Enter" });
+    expect(streamPromptMock).not.toHaveBeenCalled();
+    expect(await screen.findByRole("button", { name: "Dictate" })).toBeInTheDocument();
+    expect(prompt).toHaveFocus();
+    await fireEvent.keyDown(prompt, { key: "Enter" });
+    expect(streamPromptMock).toHaveBeenCalledOnce();
+  });
+
+  it("reports mixed provenance when dictated text is combined with owner edits", async () => {
+    const recognition = installRecognitionFake();
+    stubFetch(routes());
+    streamPromptMock.mockResolvedValue(undefined);
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+    await fireEvent.input(prompt, { target: { value: "Please " } });
+    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    recognition().final("summarize this");
+    await fireEvent.click(await screen.findByRole("button", { name: "Done dictating" }));
+    await fireEvent.input(prompt, { target: { value: "Please summarize this carefully" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(streamPromptMock.mock.calls[0][0].input_mode).toBe("mixed");
+  });
+
+  it("restores typed provenance when dictation is cancelled", async () => {
+    const recognition = installRecognitionFake();
+    stubFetch(routes());
+    streamPromptMock.mockResolvedValue(undefined);
+    render(ChatView, { projects });
+    const prompt = await screen.findByLabelText("Prompt");
+    await fireEvent.input(prompt, { target: { value: "keep this" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    recognition().final("discard this");
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel dictation" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(streamPromptMock.mock.calls[0][0]).toMatchObject({
+      text: "keep this",
+      input_mode: "typed",
+    });
+  });
+
+  it("offers manual read aloud only after an answer is complete", async () => {
+    stubFetch(routes());
+    streamPromptMock.mockImplementation(async (_body: unknown, onEvent: (event: StreamEvent) => void) => {
+      expect(screen.queryByRole("button", { name: "Read aloud" })).not.toBeInTheDocument();
+      onEvent({
+        kind: "final", text: "", event_type: "", payload: {},
+        response: {
+          request_id: "req-voice", session_id: "sess-voice", turn_id: "turn-voice",
+          status: "completed", message: "Ready", events_path: null,
+          checkpoint_path: null, approval: null, last_event_id: null,
+        } satisfies AgentResponse,
+      });
+    });
+    render(ChatView, { projects });
+    await fireEvent.input(await screen.findByLabelText("Prompt"), { target: { value: "Answer" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Send" }));
+
+    expect(await screen.findByRole("button", { name: "Read aloud" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy response" })).toBeInTheDocument();
+  });
+
   it("renders its background-work rail beside the chat column, not below the composer", async () => {
     stubFetch(routes());
     render(ChatView, { projects });

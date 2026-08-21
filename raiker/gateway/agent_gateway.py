@@ -16,6 +16,7 @@ from raiker.contracts.models import (
     PromptOptions,
     PromptPayload,
     UserMetadata,
+    normalize_input_mode,
 )
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
@@ -264,6 +265,9 @@ class AgentGateway:
         return prompt_envelope, None
 
     def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
+        input_mode = normalize_input_mode(
+            prompt_envelope.prompt.metadata.get("input_mode", "typed")
+        )
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)
         self.sessions.track_turn(
@@ -280,6 +284,7 @@ class AgentGateway:
                 payload={
                     "client_type": prompt_envelope.client.type,
                     "prompt_length": len(prompt_envelope.prompt.text),
+                    "input_mode": input_mode,
                 },
                 client=prompt_envelope.client,
             )

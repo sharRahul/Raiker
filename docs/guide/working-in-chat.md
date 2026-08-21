@@ -20,14 +20,22 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 | **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
 | **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
+| **Dictate** | `Dictate` | Starts browser speech recognition and writes the result into the ordinary editable draft. It never sends. The same control ships in Build. |
 
 Every control lives on one bar under the prompt: `+` and the scope controls on
 the left, the model chip and **Send** on the right.
 
-There is **no** planning chip and **no** voice-input control in the shipped
-composer; earlier drafts of this guide listed both.
+There is no planning chip in Chat. While dictation is listening, **Done** or the
+first `Enter` stops listening and keeps focus in the draft; **Cancel** restores
+the exact draft from before dictation began. A later `Enter` or **Send** is the
+only way to submit. Outside dictation, `Enter` sends and `Shift+Enter` adds a
+line.
 
-`Enter` sends, `Shift+Enter` adds a line.
+Speech recognition and read-aloud use browser and operating-system services;
+the selected service may process speech online. Settings → General stores the
+owner's speech language. Raiker stores the normal prompt and its
+`typed`/`dictated`/`mixed` provenance, never microphone audio or a second copy of
+the transcript.
 
 The approval setting controls the interaction, not the runtime's protections:
 
@@ -49,6 +57,12 @@ fenced code. **Your own messages are shown exactly as you typed them, and this
 is deliberate** — a prompt is an instruction whose exact characters matter, so
 Chat never re-formats one. If you write `**bold**` in a prompt, the model
 receives those asterisks and you see those asterisks.
+
+A completed reply also has **Read aloud**. It is manual: Raiker never starts
+speaking because a response arrived. **Stop speaking** interrupts playback, and
+starting dictation anywhere stops it. The spoken form keeps readable prose but
+omits fenced-code bodies, Markdown/citation syntax and raw URL text. Streaming
+or incomplete replies cannot be read aloud.
 
 Every code block in a reply carries:
 
@@ -313,8 +327,14 @@ from.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-15, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-21, these
 are the edges a Chat user can still hit:
+
+- **Voice is turn-based, not a hands-free live conversation.** Dictation stays
+  in an editable draft and response playback is manual. Continuous listening,
+  spoken replies, interruption and hands-free task control are future work; a
+  consequential spoken control will require visible, action-bound confirmation
+  and the same gateway receipt as its typed equivalent before it can ship.
 
 - **What a turn did is shown while it runs, and is not kept in the transcript.**
   The tool lines and the Thinking block are built from the live turn. Re-open the

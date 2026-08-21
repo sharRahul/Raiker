@@ -19,6 +19,17 @@ backend as the terminal; it adds no direct tool authority.
 | Audit views | Reads sessions, events, checkpoints, approvals, and diagnostics |
 | Code repositories | Lists, connects, selects, and forgets the repository *references* the Build workspace points a coding chat at |
 
+### Prompt input provenance
+
+`POST /api/prompts`, `/api/prompts/stream`, and `/api/prompts/background` accept
+optional `input_mode: "typed" | "dictated" | "mixed"`, defaulting to `typed`
+for existing clients. The value is revalidated when the HTTP request becomes a
+`PromptEnvelope` and again at the Agent Gateway, so an internal or external
+client cannot invent another provenance class. It is metadata only: Raiker does
+not accept or retain microphone audio and does not store a second transcript.
+Voice-created prompts use the same authenticated prompt route, session scope,
+policy, model selection, approval and audit path as keyboard-created prompts.
+
 ### Machine identity attribution
 
 Agentic turn, event, and approval views use a redacted `IdentityView`:

@@ -603,6 +603,9 @@ class SetModelFallbackRequest(BaseModel):
 @dataclass
 class PromptRequest:
     text: str
+    # Client-reported input provenance only. The server can constrain this
+    # label but cannot prove how a REST or web client produced the text.
+    input_mode: Literal["typed", "dictated", "mixed"] = "typed"
     session_id: str | None = None
     planning_mode: str | None = None
     approval_mode: str | None = None

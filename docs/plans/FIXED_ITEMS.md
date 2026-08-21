@@ -9928,3 +9928,41 @@ credential-delta review without overstating runner trust.
 
 **Evidence.** `tests/test_credential_overlay.py`,
 `tests/test_native_artifact_packaging.py`, and GitHub CI run `32511985390`.
+
+---
+
+## FIXED-247 — Voice controls were labels rather than governed input
+
+**Severity: High. Area: Chat / Build / prompt provenance (GAP-CHAT C16). Fixed
+2026-08-21.**
+
+Chat and Build now use one governed turn-based voice implementation. **Dictate**
+writes recognition results into the normal editable composer; **Done** keeps the
+draft, **Cancel** restores the exact original text, and no recognition callback
+can send a prompt. The first Enter while listening ends dictation and returns
+focus; only a later Enter or the existing **Send** control submits. Permission
+and recognition failures preserve the draft and state the recovery action.
+
+The request contract records `typed`, `dictated` or `mixed` as metadata through
+the HTTP schema, prompt envelope and gateway audit path. Invalid or externally
+constructed values fail closed, while audit events retain neither microphone
+audio nor a duplicate transcript. Completed responses have an owner-triggered
+**Read aloud** / **Stop speaking** control that strips Markdown syntax, citation
+markers, raw URLs and code bodies. Dictation and playback share one global audio
+owner, so starting either in Chat or Build stops the other. Speech language is
+an owner-scoped setting and processing is disclosed as a browser capability.
+
+**Reference-platform decision.** Turn-based dictation and manual playback are
+**No — parity** with Claude and ChatGPT. The useful Raiker improvement is
+**Yes — beyond**: explicit-send invariance, reversible drafts, constrained
+provenance and one cross-surface audio coordinator make voice input unable to
+acquire more authority than typed input. Full-duplex conversation remains a
+future parity item until its spoken task controls carry visible, action-bound
+confirmation and receipt evidence.
+
+**Evidence.** `apps/web/src/lib/voice.test.ts`, the Chat/Build component tests,
+`tests/test_api_prompts.py`, `tests/test_routes_settings.py`, the mocked
+Playwright composer suite, and live browser captures in `output/playwright/`.
+The live Ollama turn submitted `input_mode: dictated`, returned the requested
+marker, exposed manual playback, and Build cancellation restored the exact
+pre-dictation draft.

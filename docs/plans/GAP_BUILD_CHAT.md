@@ -575,9 +575,26 @@ to prevent.
 **C15. Attachments are one-way.** The composer uploads; the transcript cannot
 hand a file back (C1), preview one (C4), or let the owner drag one out.
 
-**C16. Voice is a label.** The control is present and marked "(coming soon)" —
-honest, but a work assistant used from a phone needs dictation and, ideally,
-read-back.
+**C16. Governed turn-based voice.** ✅ **Complete — see FIXED-247.** Chat and
+Build now share a real **Dictate** control: browser speech recognition writes
+into the ordinary editable composer, **Done** finalises without sending,
+**Cancel** restores the exact pre-dictation draft, and only the existing
+**Send** action can create a turn. The backend accepts only `typed`, `dictated`
+or `mixed` provenance and records that metadata without retaining audio or a
+second transcript. A completed assistant response has a manual **Read aloud** /
+**Stop speaking** control; it never auto-plays, never reads code bodies or raw
+URLs, and shares one audio owner with dictation across both surfaces. The owner
+chooses one of the browser-supported speech languages in Settings.
+
+**Future improvement — full-duplex live conversation.** Continuous listening,
+speaking, interruption and hands-free task control remain deliberately absent.
+They are not a safe extension of C16: each spoken task-control command needs an
+explicit state model, visible transcript, wake/stop affordance, action-bound
+confirmation for consequential work, barge-in cancellation, one global audio
+owner, and the same gateway/policy/audit route as a typed control. This is
+**meaningful parity**, because ChatGPT and Claude already offer live voice; it
+would go beyond them only if every accepted or refused spoken control carried
+visible authority, confirmation and receipt evidence.
 
 **C17. Recall is invisible.** Once C3 lands, the owner must be able to see what
 was remembered, why it was injected, and correct or forget it inline. The
@@ -594,12 +611,13 @@ threads a routine is advancing.
 
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
 leaving document output; C3 makes it feel like it knows the owner;
-C10/C11 make it present when the owner is not watching. C4–C6 and C13–C15 are
+C10/C11 make it present when the owner is not watching. C4–C6 and C13–C16 are
 the daily-use polish that determines whether any of it gets used; **C4, C6, C7,
-C13 and C14 have landed** — an answer says what it was drawn from and opens it at
+C13, C14 and C16 have landed** — an answer says what it was drawn from and opens it at
 the passage used, Chat can look something up instead of guessing, a turn can be
 stopped or steered while it runs, and a prompt can be corrected and re-run
-without retyping it. C2, C3(3), C10 and C12 are owner policy
+without retyping it; both composers can take an editable dictated draft and
+completed answers can be read aloud only when the owner asks. C2, C3(3), C10 and C12 are owner policy
 decisions before they are implementation tasks.
 
 ---

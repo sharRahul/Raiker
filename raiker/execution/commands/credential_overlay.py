@@ -158,6 +158,11 @@ def _make_writable_and_retry(
     path: str,
     _exc: tuple[type[BaseException], BaseException, TracebackType],
 ) -> None:
-    """Remove Windows read-only attributes before retrying overlay disposal."""
-    Path(path).chmod(stat.S_IRWXU)
+    """Restore owner write access on a read-only snapshot before retrying."""
+    target = Path(path)
+    # POSIX needs write permission on the parent to unlink an entry; Windows
+    # needs the entry's read-only bit cleared. Restore both, owner-only, inside
+    # the already isolated staging root before repeating shutil's operation.
+    target.parent.chmod(stat.S_IRWXU)
+    target.chmod(stat.S_IRWXU)
     function(path)

@@ -88,6 +88,7 @@ def test_missing_manifest_or_publisher_fails_closed(tmp_path: Path) -> None:
 
 def test_signed_manifest_distinguishes_external_publisher_trust_from_package_integrity(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     package, artifact = _package(tmp_path)
     manifest = artifact.parent / "manifest.json"
@@ -122,6 +123,11 @@ def test_signed_manifest_distinguishes_external_publisher_trust_from_package_int
     launcher.write_text("launcher", encoding="utf-8")
     trust.chmod(0o444)
     launcher.chmod(0o555)
+    checked_anchors: list[Path] = []
+    monkeypatch.setattr(
+        "raiker.execution.native_artifacts._verify_posix_anchor",
+        lambda path, _root, _reason: checked_anchors.append(path),
+    )
     verified = verify_signed_native_artifact(
         package,
         platform_tag="win32-x86_64",
@@ -133,6 +139,7 @@ def test_signed_manifest_distinguishes_external_publisher_trust_from_package_int
         launcher_path=launcher,
     )
     assert verified.posture is NativeTrustPosture.PUBLISHER_VERIFIED
+    assert checked_anchors == [trust, launcher]
 
     artifact.write_bytes(b"replacement")
     with pytest.raises(NativeArtifactError, match="native_artifact_digest_mismatch"):
@@ -162,4 +169,25 @@ def test_wrong_release_key_and_writable_external_anchor_fail_closed(tmp_path: Pa
             expected_protocol=1,
             expected_publisher="CN=Raiker Test",
             public_key=wrong,
+        )
+
+    public = signer.public_key().public_bytes(
+        serialization.Encoding.Raw, serialization.PublicFormat.Raw
+    )
+    trust = tmp_path / "writable-trust.pub"
+    launcher = tmp_path / "launcher"
+    trust.write_bytes(public)
+    launcher.write_text("launcher", encoding="utf-8")
+    trust.chmod(0o666)
+    launcher.chmod(0o777)
+    with pytest.raises(NativeArtifactError, match="native_artifact_trust_key_unsafe"):
+        verify_signed_native_artifact(
+            package,
+            platform_tag="win32-x86_64",
+            artifact_name=artifact.name,
+            expected_protocol=1,
+            expected_publisher="CN=Raiker Test",
+            public_key=public,
+            trust_key_path=trust,
+            launcher_path=launcher,
         )

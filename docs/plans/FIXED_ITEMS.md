@@ -9900,3 +9900,31 @@ control.
 1024px live verification capture in the completion report. The Local card had
 one positive background row, zero contradictory negative rows and zero console
 errors.
+
+---
+
+## FIXED-246 — Read-only quarantine disposal was only proven on Windows
+
+**Severity: High. Area: credential delta quarantine / CI portability
+(BUG-194). Found by the exact-SHA GitHub Python workflow on 2026-08-21.**
+
+**Observed.** Windows live testing proved that a read-only Git snapshot could
+be discarded after clearing the file attribute. On POSIX, unlink permission
+belongs to the parent directory: restoring only `HEAD` left its parent at
+`0555`, so cleanup failed after 3,873 other tests passed.
+
+**Fix.** The retry restores owner-only access on both the entry and its parent,
+inside the already isolated staging root, before repeating `shutil`'s exact
+operation. The same CI run also exposed a test that tried to manufacture a
+root-owned publisher trust anchor as the unprivileged runner. Trust-tier
+classification now stubs only the OS ownership verifier and asserts both anchor
+checks occurred; a separate regression still refuses a writable key and
+launcher. Production continues to require external root-owned POSIX anchors.
+
+**Reference-platform decision.** **No — safeguard and portability.** Reliable
+quarantine cleanup and faithful trust tests are prerequisites, not new user
+capabilities. They protect the meaningful differentiator already recorded for
+credential-delta review without overstating runner trust.
+
+**Evidence.** `tests/test_credential_overlay.py`,
+`tests/test_native_artifact_packaging.py`, and GitHub CI run `32511985390`.

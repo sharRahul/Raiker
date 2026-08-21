@@ -48,6 +48,38 @@ describe("BrainView", () => {
     expect(screen.getByRole("button", { name: "Add workspace source" })).toBeInTheDocument();
   });
 
+  it("shows evidence and lets the owner reject a reviewed entity link", async () => {
+    vi.spyOn(window, "prompt").mockReturnValue("Incorrect relationship");
+    const fetchMock = stubFetch({
+      "GET /api/brain": {
+        generated_at: "2026-08-21T00:00:00Z",
+        illustrative_motion_notice: "Stored records only.",
+        nodes: [
+          { node_id: "principal:p", node_type: "user", label: "You", status: "active", detail: null, progress_percent: null, is_real: true },
+          { node_id: "entity:rahul", node_type: "entity", label: "Rahul", status: "reviewed", detail: "person", progress_percent: null, is_real: true },
+          { node_id: "entity:raiker", node_type: "entity", label: "Raiker", status: "reviewed", detail: "project", progress_percent: null, is_real: true },
+        ],
+        edges: [{
+          source: "entity:rahul", target: "entity:raiker", relationship: "works_on",
+          is_active: false, relationship_id: "rel_1", evidence_memory_id: "mem_1",
+          owner_can_reject: true,
+        }],
+      },
+      "POST /api/memory/entity-relationships/rel_1/reject": {
+        ok: true, relationship_id: "rel_1", active: false,
+      },
+    });
+    render(BrainView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /Rahul, entity record/i }));
+    expect(await screen.findByText("Evidence: mem_1")).toBeInTheDocument();
+    await fireEvent.click(screen.getByRole("button", { name: /reject link/i }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/memory/entity-relationships/rel_1/reject",
+      expect.objectContaining({ method: "POST" }),
+    ));
+  });
+
   it("shows the governed starter graph and opens force settings", async () => {
     stubFetch({
       "GET /api/brain": {

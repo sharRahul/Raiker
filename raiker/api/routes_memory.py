@@ -82,6 +82,7 @@ async def decide_memory_proposal(
 
 
 @router.get("/api/memory/relationship-proposals")
+@router.get("/api/memory/entity-proposals")
 async def list_memory_relationship_proposals(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
@@ -92,6 +93,7 @@ async def list_memory_relationship_proposals(
 
 
 @router.post("/api/memory/relationship-proposals/scan")
+@router.post("/api/memory/entity-proposals/scan")
 async def scan_memory_relationships(
     request: Request,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
@@ -106,6 +108,7 @@ async def scan_memory_relationships(
 
 
 @router.post("/api/memory/relationship-proposals/{candidate_id}/decision")
+@router.post("/api/memory/entity-proposals/{candidate_id}/decision")
 async def decide_memory_relationship_proposal(
     candidate_id: str,
     request: Request,
@@ -123,6 +126,31 @@ async def decide_memory_relationship_proposal(
             status_code=(
                 status.HTTP_409_CONFLICT
                 if result.reason_code == "stale_memory_relationship_proposal"
+                else status.HTTP_403_FORBIDDEN
+            ),
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/entity-relationships/{relationship_id}/reject")
+async def reject_memory_relationship(
+    relationship_id: str,
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    result = _service(request).reject_memory_relationship(
+        relationship_id,
+        reason=str(body.get("reason", "")),
+        expected_active=bool(body.get("expected_active", True)),
+        acting_principal_id=auth_data[0].principal_id,
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_409_CONFLICT
+                if result.reason_code == "stale_memory_relationship"
                 else status.HTTP_403_FORBIDDEN
             ),
             detail={"ok": False, "reason_code": result.reason_code},

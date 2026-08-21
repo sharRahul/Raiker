@@ -147,6 +147,21 @@ class TestMemoryRelationshipReview:
             acting_principal_id=OWNER,
         )
         assert not stale.ok and stale.reason_code == "stale_memory_relationship_proposal"
+        rejected = service.reject_memory_relationship(
+            str(approved.data["relationship_id"]),
+            reason="Incorrect relationship",
+            expected_active=True,
+            acting_principal_id=OWNER,
+        )
+        assert rejected.ok
+        assert service.store.list_memory_relationships(OWNER) == []
+        second_rejection = service.reject_memory_relationship(
+            str(approved.data["relationship_id"]),
+            reason="Already removed",
+            expected_active=True,
+            acting_principal_id=OWNER,
+        )
+        assert not second_rejection.ok
 
     def test_non_owner_cannot_scan_or_list_relationships(
         self, service: DashboardService
@@ -510,3 +525,42 @@ class TestMemoryApi:
         history = client.get(f"/api/memory/{mid}/history", headers=headers)
         assert history.status_code == 200
         assert {event["action"] for event in history.json()["events"]} >= {"approve", "scope_change"}
+
+    def test_entity_proposal_and_rejection_routes(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        write_memory(
+            "Rahul works on Raiker.",
+            workspace_root=workspace,
+            store=store,
+            owner_principal_id=OWNER,
+            governance=MemoryGovernance(
+                "evt_entity_api", "", None, "test", 0.9, 0.9,
+                "until_forget", "approved", OWNER,
+            ),
+        )
+        scan = client.post("/api/memory/entity-proposals/scan", headers=headers)
+        assert scan.status_code == 200, scan.text
+        proposal = client.get("/api/memory/entity-proposals", headers=headers).json()[0]
+        approved = client.post(
+            f"/api/memory/entity-proposals/{proposal['candidate_id']}/decision",
+            json={"decision": "approved", "expected_decision": "needs_user_review"},
+            headers=headers,
+        )
+        assert approved.status_code == 200, approved.text
+        relationship_id = approved.json()["relationship_id"]
+        stale = client.post(
+            f"/api/memory/entity-proposals/{proposal['candidate_id']}/decision",
+            json={"decision": "denied", "expected_decision": "needs_user_review"},
+            headers=headers,
+        )
+        assert stale.status_code == 409
+        rejected = client.post(
+            f"/api/memory/entity-relationships/{relationship_id}/reject",
+            json={"reason": "Incorrect relationship", "expected_active": True},
+            headers=headers,
+        )
+        assert rejected.status_code == 200, rejected.text
+        assert store.list_memory_relationships(OWNER) == []

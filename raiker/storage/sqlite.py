@@ -6699,6 +6699,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def reject_memory_relationship(
+        self,
+        relationship_id: str,
+        *,
+        owner_principal_id: str,
+        expected_active: bool = True,
+    ) -> bool:
+        """Deactivate one owner-evidenced edge and its projection atomically."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            changed = connection.execute(
+                """UPDATE memory_entity_relationships AS r SET active = 0
+                   WHERE r.relationship_id = ? AND r.active = ?
+                     AND EXISTS (
+                       SELECT 1 FROM approved_memory m
+                       WHERE m.memory_id = r.evidence_memory_id
+                         AND m.owner_principal_id = ?
+                     )""",
+                (relationship_id, int(expected_active), owner_principal_id),
+            )
+            if changed.rowcount != 1:
+                return False
+            connection.execute(
+                """UPDATE memory_projections SET active = 0
+                   WHERE projection_type = 'graph' AND projection_id = ?""",
+                (relationship_id,),
+            )
+        return True
+
     def resolve_memory_relationship_candidate(
         self, candidate_id: str, *, decision: str, resolved_by: str,
     ) -> bool:

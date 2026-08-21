@@ -1312,6 +1312,11 @@ export const api = {
       `/api/memory/relationship-proposals/${encodeURIComponent(id)}/decision`,
       { decision, expected_decision: expectedDecision },
     ),
+  rejectMemoryRelationship: (id: string, reason: string) =>
+    postJson<{ ok: boolean; relationship_id: string; active: false }>(
+      `/api/memory/entity-relationships/${encodeURIComponent(id)}/reject`,
+      { reason, expected_active: true },
+    ),
   decideMemoryProposal: (
     id: string,
     body: {

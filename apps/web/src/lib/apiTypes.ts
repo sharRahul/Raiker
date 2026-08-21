@@ -1728,6 +1728,9 @@ export interface BrainEdge {
   target: string;
   relationship: string;
   is_active: boolean;
+  relationship_id?: string | null;
+  evidence_memory_id?: string | null;
+  owner_can_reject?: boolean;
 }
 
 export interface BrainView {

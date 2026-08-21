@@ -370,6 +370,9 @@ class BrainEdgeView:
     target: str
     relationship: str
     is_active: bool = False
+    relationship_id: str | None = None
+    evidence_memory_id: str | None = None
+    owner_can_reject: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2384,7 +2387,15 @@ class DashboardService:
                     )
                 )
             edges.append(
-                BrainEdgeView(subject, object_id, str(relationship["predicate"]))
+                BrainEdgeView(
+                    subject,
+                    object_id,
+                    str(relationship["predicate"]),
+                    False,
+                    str(relationship["relationship_id"]),
+                    str(relationship["evidence_memory_id"]),
+                    True,
+                )
             )
             evidence = f"memory:{relationship['evidence_memory_id']}"
             if evidence in memory_node_ids:
@@ -3257,6 +3268,37 @@ class DashboardService:
                 "decision": decision,
                 "relationship_id": relationship_id or None,
             },
+        )
+
+    def reject_memory_relationship(
+        self,
+        relationship_id: str,
+        *,
+        reason: str,
+        expected_active: bool,
+        acting_principal_id: str | None,
+    ) -> ControlResult:
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if not reason.strip():
+            return ControlResult(
+                ok=False, reason_code="memory_relationship_rejection_reason_required"
+            )
+        if not self.store.reject_memory_relationship(
+            relationship_id,
+            owner_principal_id=acting_principal_id or "",
+            expected_active=expected_active,
+        ):
+            return ControlResult(ok=False, reason_code="stale_memory_relationship")
+        self.store.record_memory_lifecycle_event(
+            relationship_id,
+            "reject",
+            acting_principal_id or "",
+            {"kind": "entity_relationship", "reason": reason.strip()},
+        )
+        return ControlResult(
+            ok=True,
+            data={"relationship_id": relationship_id, "active": False},
         )
 
     def decide_memory_proposal(

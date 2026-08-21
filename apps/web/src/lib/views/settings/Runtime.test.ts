@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../api";
 import type { ExecutionEnvironmentsView } from "../../apiTypes";
@@ -181,6 +181,9 @@ describe("Runtime execution capabilities and reset (BUG-194)", () => {
     expect(await screen.findByText("Survives a Raiker restart")).toBeInTheDocument();
     expect(screen.getByText("Runs work in the background")).toBeInTheDocument();
     expect(screen.getByText("Keeps its state between commands")).toBeInTheDocument();
+    const localCard = within(screen.getByText("Local workspace").closest("article")!);
+    expect(localCard.getByText("Foreground and background command execution")).toBeInTheDocument();
+    expect(localCard.queryByText(/background execution.*unavailable/i)).not.toBeInTheDocument();
     // The local boundary does not persist, so it gets no reset control at all.
     expect(screen.getAllByRole("button", { name: "Reset environment" })).toHaveLength(1);
   });

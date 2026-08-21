@@ -213,7 +213,7 @@ def test_a_process_that_never_enabled_the_pragma_really_reads_it_back_off(
 
 
 def test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A latched process must not report ``off`` while every connection is ``on``.
 
@@ -227,7 +227,11 @@ def test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved(
     monkeypatch.setattr(sqlite_module, "probe_memory_security", lambda root: _supported_probe())
     monkeypatch.setenv("RAIKER_SQLCIPHER_MEMORY_SECURITY", "on")
     resolve_memory_security(refresh=True)
-    SQLiteStore(tmp_path)
+    # The latch is the unit under test. Do not execute an ON pragma against a
+    # platform whose real child-process probe returned ``host_crash``: forcing
+    # the native SQLCipher library past that refusal terminates pytest itself on
+    # Windows instead of testing the posture dictionary.
+    monkeypatch.setattr(sqlite_module, "_MEMORY_SECURITY_EVER_ENABLED", True)
     assert sqlite_module.memory_security_ever_enabled() is True
 
     close_cached_connections()

@@ -4,6 +4,7 @@ import base64
 import hashlib
 import json
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -14,8 +15,10 @@ from raiker.execution.windows_authenticode import (
 )
 
 
-def _runner(value: dict[str, str], returncode: int = 0):
-    def run(*_args, **_kwargs):
+def _runner(
+    value: dict[str, str], returncode: int = 0
+) -> Callable[..., subprocess.CompletedProcess[str]]:
+    def run(*_args: object, **_kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess([], returncode, json.dumps(value), "")
 
     return run

@@ -106,6 +106,16 @@ def test_signed_manifest_distinguishes_external_publisher_trust_from_package_int
     )
     assert relative.posture is NativeTrustPosture.PACKAGE_RELATIVE
 
+    signed_but_unanchored = verify_signed_native_artifact(
+        package,
+        platform_tag="win32-x86_64",
+        artifact_name=artifact.name,
+        expected_protocol=1,
+        expected_publisher="CN=Raiker Test",
+        public_key=public,
+    )
+    assert signed_but_unanchored.posture is NativeTrustPosture.PACKAGE_RELATIVE
+
     trust = tmp_path / "trust.pub"
     launcher = tmp_path / "launcher"
     trust.write_bytes(public)

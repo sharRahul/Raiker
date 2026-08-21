@@ -18,7 +18,7 @@ import socketserver
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
-from typing import BinaryIO, Protocol
+from typing import Protocol
 
 from raiker.execution.commands.egress_policy import EgressPolicy
 from raiker.execution.commands.egress_tokens import EgressTokenAuthority
@@ -26,6 +26,10 @@ from raiker.execution.commands.egress_tokens import EgressTokenAuthority
 
 class ClosableSocket(Protocol):
     def close(self) -> None: ...
+
+
+class HeaderReader(Protocol):
+    def readline(self, size: int = -1) -> bytes: ...
 
 
 @dataclass(frozen=True)
@@ -171,7 +175,7 @@ class _ProxyHandler(socketserver.StreamRequestHandler):
             upstream.close()
 
 
-def _read_headers(reader: BinaryIO) -> dict[str, str]:
+def _read_headers(reader: HeaderReader) -> dict[str, str]:
     headers: dict[str, str] = {}
     for _ in range(64):
         line = reader.readline(8193)
@@ -223,8 +227,8 @@ def _proxy_credential(value: str, asserted_run_id: str) -> tuple[str, str]:
 
 
 def _resolve_public(host: str, port: int) -> tuple[str, ...]:
-    values = {
-        item[4][0]
+    values: set[str] = {
+        str(item[4][0])
         for item in socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
     }
     return tuple(sorted(values))
@@ -256,10 +260,15 @@ def _tunnel(client: socket.socket, upstream: socket.socket) -> None:
             if not events:
                 return
             for key, _ in events:
-                data = key.fileobj.recv(65536)
+                source, destination = key.fileobj, key.data
+                if not isinstance(source, socket.socket) or not isinstance(
+                    destination, socket.socket
+                ):
+                    raise TypeError("egress_proxy_selector_state_invalid")
+                data = source.recv(65536)
                 if not data:
                     return
-                key.data.sendall(data)
+                destination.sendall(data)
     finally:
         selector.close()
 

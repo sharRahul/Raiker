@@ -113,7 +113,7 @@ class _PtyProcess:
     ) -> None:
         import pty as pty_module
 
-        self._master, replica = pty_module.openpty()
+        self._master, replica = pty_module.openpty()  # type: ignore[attr-defined]
         try:
             self._process = subprocess.Popen(  # noqa: S603 - argv is a validated command contract
                 list(argv),
@@ -167,7 +167,9 @@ class _PtyProcess:
         if self._process.poll() is not None:
             return
         with contextlib.suppress(ProcessLookupError, OSError):
-            os.killpg(os.getpgid(self._process.pid), signal.SIGKILL)
+            os.killpg(  # type: ignore[attr-defined]
+                os.getpgid(self._process.pid), signal.SIGKILL  # type: ignore[attr-defined]
+            )
 
     def write(self, data: bytes) -> None:
         os.write(self._master, data)
@@ -238,11 +240,21 @@ class _PopenProcess:
         if self._process.poll() is not None:
             return
         if os.name == "nt":
-            subprocess.run(  # noqa: S603,S607 - fixed OS process-tree utility
+            stopped = subprocess.run(  # noqa: S603,S607 - fixed OS process-tree utility
                 ["taskkill", "/PID", str(self._process.pid), "/T", "/F"],
                 capture_output=True,
                 check=False,
             )
+            # A surrounding Windows sandbox can deny taskkill even for this
+            # process's own child. The run must still become terminal rather
+            # than claiming it was cancelled forever. Closing stdin releases
+            # stdin-bound tools; kill is the final direct-child fallback.
+            if stopped.returncode != 0 and self._process.poll() is None:
+                if self._process.stdin is not None:
+                    with contextlib.suppress(OSError):
+                        self._process.stdin.close()
+                with contextlib.suppress(OSError):
+                    self._process.kill()
         else:
             with contextlib.suppress(ProcessLookupError):
                 os.killpg(  # type: ignore[attr-defined]  # Unix-only branch

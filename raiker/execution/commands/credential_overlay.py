@@ -8,8 +8,10 @@ import os
 import shutil
 import stat
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from types import TracebackType
 
 
 @dataclass(frozen=True)
@@ -78,7 +80,11 @@ class CredentialOverlay:
         return OverlayDelta(created, changed, deleted, unsafe, baseline.digest, current.digest)
 
     def discard(self) -> None:
-        shutil.rmtree(self.staging_root, ignore_errors=False)
+        shutil.rmtree(
+            self.staging_root,
+            ignore_errors=False,
+            onerror=_make_writable_and_retry,
+        )
 
     @staticmethod
     def _copy_tree(source: Path, destination: Path, *, excluded: set[str]) -> None:
@@ -145,3 +151,13 @@ def manifest(root: Path) -> OverlayManifest:
 
 def _no_follow_opener(path: str, flags: int) -> int:
     return os.open(path, flags | getattr(os, "O_NOFOLLOW", 0))
+
+
+def _make_writable_and_retry(
+    function: Callable[[str], object],
+    path: str,
+    _exc: tuple[type[BaseException], BaseException, TracebackType],
+) -> None:
+    """Remove Windows read-only attributes before retrying overlay disposal."""
+    Path(path).chmod(stat.S_IRWXU)
+    function(path)

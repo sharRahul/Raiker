@@ -289,7 +289,14 @@ class RuntimeAuthority:
             "checked_at": checked_at,
             "remediation": remediation,
         }
-        self.store.upsert_checkpoint_capture_health(**outcome)
+        self.store.upsert_checkpoint_capture_health(
+            ok=ok,
+            stage=stage,
+            reason_code=reason_code,
+            display_path=safe_path,
+            checked_at=checked_at,
+            remediation=remediation,
+        )
         return outcome
 
     def _snapshot_pre_image(

@@ -146,7 +146,10 @@ class _Channel:
     def call(self, kind: str, payload: dict[str, Any], *, timeout: float = 10.0) -> dict[str, Any]:
         codec = SupervisorCodec(self._key)
         try:
-            with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+            with socket.socket(  # type: ignore[attr-defined]
+                socket.AF_UNIX,  # type: ignore[attr-defined]
+                socket.SOCK_STREAM,
+            ) as connection:
                 connection.settimeout(timeout)
                 connection.connect(self._socket_path)
                 connection.sendall(codec.encode(kind, payload))

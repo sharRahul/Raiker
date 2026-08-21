@@ -61,7 +61,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
 | [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
-| [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | Open |
+| [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
@@ -324,7 +324,8 @@ presenting as an ordinary reversible write.
 
 ## BUG-217 — `test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved` overflows the stack on Windows
 
-**Severity: Low. Area: test isolation / SQLCipher posture. Status: Open.**
+**Severity: Low. Area: test isolation / SQLCipher posture. Status: Fixed
+2026-08-21 — FIXED-244.**
 
 **Observed.** A full `python -m pytest` run on Windows aborts the whole process at
 ~87%:
@@ -355,11 +356,12 @@ in a *fresh* process where nothing has latched the pragma on. The overflow needs
 combination this test only meets in a full local run: Windows, the bundled build,
 and a process that has already opened many stores.
 
-**Required fix.** Establish whether the overflow is in the bundled SQLCipher build's
-pragma read or in how the posture probe re-enters it, and isolate the posture test
-into its own process (as CI already does for its second step) so a contributor's
-documented `pytest` run cannot be aborted by it. Do not silence it with an env var:
-that is precisely what hid FIXED-218.
+**Resolution.** The real child-process probe already classified this Windows build
+as `host_crash`; the test then replaced that answer with `supported` and performed
+the native operation that the probe had refused. The regression now exercises the
+process-global posture latch directly, without overriding the safety probe. The
+ordinary suite and the pristine-process 17-test SQLCipher gate both pass. See
+FIXED-244.
 
 **Required user-interface outcome.** None — this is a test-isolation defect on one
 platform. The product's memory-security posture is reported from a real probe and

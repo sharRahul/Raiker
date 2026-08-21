@@ -9772,7 +9772,8 @@ Diagnostics and approval receipts name the failed operation and reason.
 
 **Evidence.** `tests/test_windows_internal_paths.py`,
 `tests/test_internal_path_audit.py`, `tests/test_checkpoint_restore.py`, and the
-Approvals/Diagnostics view tests.
+Approvals/Diagnostics view tests. Live desktop verification is captured in
+[`working/2026-08-21-diagnostics-1440.png`](screenshots/working/2026-08-21-diagnostics-1440.png).
 
 ---
 
@@ -9790,4 +9791,112 @@ extractor never promotes its own inference into fact.
 **Evidence.** `tests/test_memory_entity_extraction.py`,
 `tests/test_memory_relationship_review.py`, and the Memory/Brain view tests;
 `tests/test_model_facing_memory_graph.py` continues to prove MEM-11/MEM-12
-retrieval consistency and query-resolved anchors.
+retrieval consistency and query-resolved anchors. Live verification found six
+owner-scoped nodes and five relationships in Rahul's existing workspace; see
+[`working/2026-08-21-brain-1440.png`](screenshots/working/2026-08-21-brain-1440.png),
+[`working/2026-08-21-memory-375.png`](screenshots/working/2026-08-21-memory-375.png),
+and [`working/2026-08-21-memory-768.png`](screenshots/working/2026-08-21-memory-768.png).
+
+---
+
+## FIXED-242 — Runtime settings crashed while rendering measured runner trust
+
+**Severity: High. Area: Runtime UI/API. Found during live Playwright
+verification on 2026-08-21.**
+
+**Observed.** Settings → Runtime requested `/api/execution-environments`, which
+returned HTTP 500. The page retained only the add-profile shell, hiding every
+local, native and container target.
+
+**Root cause.** The dashboard exposed `native_probe.runner_trust`, but
+`ProfileProbe` did not carry that field from `NativeSandboxProof`. Unit tests
+replaced the native probe and therefore did not exercise the real object shape.
+
+**Fix.** `ProfileProbe` now carries the optional measured trust posture and the
+native probe copies it explicitly. The API regression uses the real response
+contract. The signed-artifact classifier was tightened at the same time: a
+valid signature supplied without external trust-anchor paths remains
+**package-relative integrity**, never publisher-verified. Disposable credential
+overlays also remove their deliberately read-only Git snapshot on Windows.
+
+**Evidence.** `tests/test_execution_environments.py`,
+`tests/test_native_artifact_packaging.py`, and `tests/test_credential_overlay.py`;
+the repaired page has zero console errors and is captured in
+[`working/2026-08-21-runtime-1024-full.png`](screenshots/working/2026-08-21-runtime-1024-full.png).
+
+---
+
+## FIXED-243 — A denied Windows tree kill left cancelled runs running forever
+
+**Severity: High. Area: Shell / background execution (BUG-194). Found during
+the complete Windows gate run on 2026-08-21.**
+
+**Observed.** `background_run stop` set the forced terminal state to cancelled,
+but a host sandbox denied `taskkill /T /F`. The stdin-bound child stayed alive,
+the output pump never reached EOF, and both `wait` and `poll` reported the run
+as running beyond their 20-second test bound.
+
+**Fix.** Windows still attempts the operating-system tree termination first.
+If the surrounding host denies it, Raiker closes the stdin it owns and kills
+the direct child. That fallback is enough to complete the redactor, write the
+cancelled receipt and release the run; it is deliberately not described as
+proof that an arbitrary descendant tree was reaped.
+
+**Reference-platform decision.** **No — parity and safeguard.** Claude Code,
+Codex, OpenClaw and Hermes already offer reliable cancellation. The meaningful
+improvement is honesty: a restricted host now yields a terminal cancelled
+receipt rather than an action that says “stop” while remaining live.
+
+**Evidence.** The two formerly failing Windows regressions in
+`tests/test_background_execution.py` now pass in 2.4 seconds under the managed
+host that denies `taskkill`.
+
+---
+
+## FIXED-244 — The SQLCipher posture test bypassed its own crash probe
+
+**Severity: Medium. Area: Windows test reliability. Found during the complete
+gate run on 2026-08-21.**
+
+**Observed.** The real child-process memory-security probe reported
+`host_crash` on this Windows SQLCipher build. One posture unit test replaced
+that result with “supported” and then opened a real keyed store with the unsafe
+pragma, terminating pytest with a native stack overflow at 87%.
+
+**Fix.** The test now exercises the process latch—the unit it was written to
+verify—without forcing a native operation the platform probe already refused.
+Production behaviour is unchanged and remains fail-closed: a required memory
+lock that cannot be proven returns `store_memory_lock_unavailable`.
+
+**Evidence.** The ordinary suite passes to 100% with memory security off, as CI
+runs it, and the separate pristine-process posture gate passes all 17 tests.
+
+---
+
+## FIXED-245 — The Local Runtime card contradicted its measured capabilities
+
+**Severity: Medium. Area: Runtime UI / capability truthfulness (BUG-194). Found
+during focused live Playwright verification on 2026-08-21.**
+
+**Observed.** The Local workspace card listed **Runs work in the background** and
+also stated that background execution was unavailable. The API response was
+correct; the card selected its remote-target fallback because the built-in
+workspace uses `kind: local`, while the measured-host UI recognized only
+`kind: native`.
+
+**Fix.** Local and native targets now share the measured-host presentation. The
+execution-mode label and unavailable-capability sentence are derived from the
+same `features` object that produces the positive capability list. A regression
+asserts that a background-capable boundary cannot render the opposite claim.
+
+**Reference-platform decision.** The rendering correction is **No — parity and
+safeguard**. A trustworthy capability card is table stakes. The backend-driven,
+single-source capability/limitation projection is **Yes — a meaningful
+improvement** over the fixed mode descriptions used by the reference set,
+because Raiker can disclose the measured boundary without claiming an unproven
+control.
+
+**Evidence.** `apps/web/src/lib/views/settings/Runtime.test.ts` plus the focused
+1024px live verification capture in the completion report. The Local card had
+one positive background row, zero contradictory negative rows and zero console
+errors.

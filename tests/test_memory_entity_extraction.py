@@ -183,5 +183,7 @@ def test_relationship_write_failure_rolls_back_entities_and_review(tmp_path: Pat
             reviewer_id=OWNER,
         )
 
-    assert store.get_memory_relationship_candidate(candidate_id)["decision"] == "needs_user_review"
+    candidate = store.get_memory_relationship_candidate(candidate_id)
+    assert candidate is not None
+    assert candidate["decision"] == "needs_user_review"
     assert store.match_memory_entities("Sarah") == []

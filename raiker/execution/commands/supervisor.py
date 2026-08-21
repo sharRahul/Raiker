@@ -322,7 +322,7 @@ class CommandSupervisor:
                 connection.sendall(self.codec.encode(kind, payload))
 
     def run(self) -> int:
-        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)  # type: ignore[attr-defined]
         self.socket_path.parent.mkdir(parents=True, exist_ok=True)
         with contextlib.suppress(OSError):
             self.socket_path.parent.chmod(0o700)

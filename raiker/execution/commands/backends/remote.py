@@ -56,11 +56,13 @@ def probe_remote_profile(
     """Run only the fixed read-only supervisor probe and verify its identity."""
     try:
         if profile.kind == "ssh":
-            backend = SshCommandBackend(profile, workspace_root)
-            argv, environment, _secrets = backend.transport()
+            ssh_backend = SshCommandBackend(profile, workspace_root)
+            argv, environment, _secrets = ssh_backend.transport()
         elif profile.kind == "daytona":
-            backend = DaytonaCommandBackend(profile, workspace_root, SQLiteStore(workspace_root))
-            argv, environment, _api_key = backend.transport(15)
+            daytona_backend = DaytonaCommandBackend(
+                profile, workspace_root, SQLiteStore(workspace_root)
+            )
+            argv, environment, _api_key = daytona_backend.transport(15)
         else:
             return False, "remote_profile_kind_invalid", {}
         argv = [*argv, "--probe"]

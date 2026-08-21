@@ -94,6 +94,8 @@ class ProfileProbe:
     observations: Mapping[str, str] = field(default_factory=dict)
     #: Present only when the probe measured the capabilities itself.
     features: CommandFeatures | None = None
+    #: Trust tier measured for the runner artifact, when the backend exposes it.
+    runner_trust: str | None = None
 
 
 @dataclass(frozen=True)
@@ -240,6 +242,7 @@ def probe_execution_profile(
             boundary=proof.boundary,
             observations=dict(proof.observations),
             features=proof.features,
+            runner_trust=proof.runner_trust,
         )
     if profile.kind == "container":
         assert profile.runtime is not None and profile.image is not None

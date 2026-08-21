@@ -61,7 +61,7 @@ def execute_from_stream() -> int:
     except subprocess.TimeoutExpired:
         if os.name != "nt":
             with contextlib.suppress(ProcessLookupError):
-                os.killpg(process.pid, signal.SIGKILL)
+                os.killpg(process.pid, signal.SIGKILL)  # type: ignore[attr-defined]
         else:
             process.kill()
         process.wait()

@@ -104,7 +104,7 @@ def _fifo(tmp_path: Path, name: str = "pipe") -> Path:
     it ends, using a program the policy already permits.
     """
     path = tmp_path / name
-    os.mkfifo(path)
+    os.mkfifo(path)  # type: ignore[attr-defined]
     return path
 
 

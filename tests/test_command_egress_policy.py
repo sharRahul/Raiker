@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 import pytest
 
@@ -81,7 +82,7 @@ def test_token_is_expiring_single_use_and_bound_to_owner_profile_and_run() -> No
         )
 
 
-def test_durable_grant_lifecycle_is_compare_and_swap(tmp_path) -> None:
+def test_durable_grant_lifecycle_is_compare_and_swap(tmp_path: Path) -> None:
     store = CommandStore(SQLiteStore(tmp_path))
     request = CommandRequest(
         "run_a", "owner_a", "agent_a", "session_a", "turn_a", "action_a", None,
@@ -106,4 +107,6 @@ def test_durable_grant_lifecycle_is_compare_and_swap(tmp_path) -> None:
     assert not store.transition_egress_grant(
         "owner_a", "run_a", expected="pending", target="active"
     )
-    assert store.egress_grant("owner_a", "run_a")["state"] == "active"
+    grant = store.egress_grant("owner_a", "run_a")
+    assert grant is not None
+    assert grant["state"] == "active"

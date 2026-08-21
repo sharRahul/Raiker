@@ -125,12 +125,15 @@ def verify_signed_native_artifact(
         )
     except (InvalidSignature, ValueError, OSError) as exc:
         raise NativeArtifactError("native_artifact_signature_invalid") from exc
-    if trust_key_path is not None or launcher_path is not None:
-        if trust_key_path is None or launcher_path is None:
-            raise NativeArtifactError("native_artifact_trust_anchor_incomplete")
-        root = Path(package_root).resolve()
-        _verify_posix_anchor(trust_key_path, root, "native_artifact_trust_key_unsafe")
-        _verify_posix_anchor(launcher_path, root, "native_artifact_launcher_unsafe")
+    if trust_key_path is None and launcher_path is None:
+        return VerifiedNativeArtifact(
+            artifact, NativeTrustPosture.PACKAGE_RELATIVE, manifest_digest
+        )
+    if trust_key_path is None or launcher_path is None:
+        raise NativeArtifactError("native_artifact_trust_anchor_incomplete")
+    root = Path(package_root).resolve()
+    _verify_posix_anchor(trust_key_path, root, "native_artifact_trust_key_unsafe")
+    _verify_posix_anchor(launcher_path, root, "native_artifact_launcher_unsafe")
     return VerifiedNativeArtifact(
         artifact, NativeTrustPosture.PUBLISHER_VERIFIED, manifest_digest
     )

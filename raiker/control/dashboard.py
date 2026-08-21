@@ -1664,7 +1664,7 @@ class DashboardService:
                 tools=("shell",),
                 config={**config, "owner_principal_id": owner_principal_id},
             )
-            proof = (
+            remote_proof = (
                 probe_execution_profile(
                     remote_profile, workspace_root=self.store.paths.workspace_root
                 )
@@ -1675,8 +1675,8 @@ class DashboardService:
                 row["enabled"]
                 and configured
                 and credential_configured
-                and proof is not None
-                and proof.available
+                and remote_proof is not None
+                and remote_proof.available
             )
             budget = config.get("max_cost") if kind == "daytona" else None
             cost = self.store.cloud_execution_cost_summary(
@@ -1686,17 +1686,17 @@ class DashboardService:
                 {
                     "profile_id": str(row["profile_id"]), "kind": kind, "name": str(row["name"]),
                     "enabled": bool(row["enabled"]), "configured": configured, "available": available,
-                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "unavailable" if proof is not None else "configuration_required"),
+                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "unavailable" if remote_proof is not None else "configuration_required"),
                     "selected": selected == row["profile_id"], "credential_configured": credential_configured,
                     "budget": budget,
                     "cost": cost,
                     "selected_for_commands": selected == row["profile_id"],
                     "assigned_tools": ["shell"],
                     "features": asdict(remote_profile.features),
-                    "probe_checked_at": proof.checked_at if proof is not None else utc_now(),
-                    "boundary": proof.boundary if proof is not None else "remote_recipient_tcb",
-                    "probe_observations": dict(proof.observations) if proof is not None else {},
-                    "availability_reason": None if available else (proof.reason_code if proof is not None else (
+                    "probe_checked_at": remote_proof.checked_at if remote_proof is not None else utc_now(),
+                    "boundary": remote_proof.boundary if remote_proof is not None else "remote_recipient_tcb",
+                    "probe_observations": dict(remote_proof.observations) if remote_proof is not None else {},
+                    "availability_reason": None if available else (remote_proof.reason_code if remote_proof is not None else (
                         "execution_environment_credential_required"
                         if configured and not credential_configured
                         else "execution_environment_configuration_required"

@@ -140,6 +140,22 @@
     if (!features) return [];
     return CAPABILITY_LABELS.filter(([key]) => features[key]).map(([, label]) => label);
   }
+  const LIMITATION_LABELS: Array<[string, string]> = [
+    ["pty", "PTY"],
+    ["background", "background execution"],
+    ["persistent_environment", "persistence"],
+    ["restart_recovery", "restart recovery"],
+    ["filtered_network", "filtered egress"],
+    ["credential_delivery", "command credential delivery"],
+  ];
+  function limitationSummary(features: Record<string, boolean> | undefined): string {
+    const missing = LIMITATION_LABELS.filter(([key]) => !features?.[key]).map(([, label]) => label);
+    if (!missing.length) return "All governed execution capabilities are available.";
+    const names = missing.length === 1
+      ? missing[0]
+      : `${missing.slice(0, -1).join(", ")} and ${missing.at(-1)}`;
+    return `${names} ${missing.length === 1 ? "is" : "are"} unavailable.`;
+  }
   function egressList(config: Record<string, unknown> | undefined, key: string): string[] {
     const value = config?.[key];
     return Array.isArray(value) ? value.map(String) : [];
@@ -285,7 +301,7 @@
         <article class:selected={environment.selected}>
           <div>
             <strong>{environment.name}</strong>
-            {#if environment.kind === "native"}
+            {#if environment.kind === "native" || environment.kind === "local"}
               <span class="container-runtime">{boundaryLabel(environment)}</span>
               <ul class="observations">
                 {#each observationRows(environment.probe_observations) as observation}
@@ -300,10 +316,8 @@
                   </li>
                 {/each}
               </ul>
-              <small class="plain">
-                Foreground commands only. PTY, background execution, network grants and
-                persistence are not built for this boundary and are not offered.
-              </small>
+              <span class="boundary">{environment.features?.background ? "Foreground and background command execution" : "Foreground command execution"}</span>
+              <small class="plain">{limitationSummary(environment.features)}</small>
               <small class="trust-posture" class:verified={environment.runner_trust === "publisher_verified"}>
                 {environment.runner_trust === "publisher_verified"
                   ? "Publisher verified"

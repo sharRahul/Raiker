@@ -79,6 +79,38 @@ def test_execution_environment_api_configures_and_selects_ssh(
     assert client.get("/api/execution-environments", headers=headers).json()["selected_profile_id"] == profile_id
 
 
+def test_execution_environment_api_surfaces_native_runner_trust(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workspace = _workspace(tmp_path)
+    monkeypatch.setattr(
+        "raiker.control.dashboard.probe_execution_profile",
+        lambda profile, **_kwargs: ProfileProbe(
+            profile,
+            True,
+            None,
+            "2026-08-21T00:00:00Z",
+            features=profile.features,
+            runner_trust="package_relative_integrity",
+        ),
+    )
+    client = TestClient(create_app(workspace))
+    token = client.post("/api/auth/session", json={"as_principal": None}).json()["token"]
+
+    response = client.get(
+        "/api/execution-environments",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 200, response.text
+    native = next(
+        item
+        for item in response.json()["environments"]
+        if item["profile_id"] == "native_sandbox"
+    )
+    assert native["runner_trust"] == "package_relative_integrity"
+
+
 def test_execution_environment_api_configures_container_profile(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

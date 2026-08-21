@@ -49,6 +49,18 @@ def test_overlay_delta_names_creates_changes_and_deletes_without_content(tmp_pat
     assert "before" not in repr(delta) and "after" not in repr(delta)
 
 
+def test_overlay_discard_removes_read_only_git_snapshot(tmp_path: Path) -> None:
+    workspace = tmp_path / "source"
+    (workspace / ".git").mkdir(parents=True)
+    (workspace / ".git" / "HEAD").write_text("ref", encoding="utf-8")
+    overlay = CredentialOverlay(workspace, tmp_path / "staging")
+    overlay.create()
+
+    overlay.discard()
+
+    assert not overlay.staging_root.exists()
+
+
 def test_overlay_rejects_symlink_and_hardlink_sources(tmp_path: Path) -> None:
     workspace = tmp_path / "source"
     workspace.mkdir()

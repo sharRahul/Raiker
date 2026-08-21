@@ -134,6 +134,8 @@ test("container profile is enabled, configured, selected, and visibly bounded", 
   await card.getByRole("button", { name: "Select" }).click();
   await expect(card.getByRole("button", { name: "Selected" })).toBeVisible({ timeout: 30_000 });
   await page.screenshot({ path: join(SHOTS, "add01-container-profile-live.png"), fullPage: true });
-  await page.goto(`${BASE}/#/new-chat`);
+  // Build, not Chat: the environment badge is about where a *command* runs, so
+  // it lives on the coding surface. Chat's composer no longer carries it.
+  await page.goto(`${BASE}/#/build`);
   await expect(page.getByLabel("Execution environment")).toContainText(`${profileName} · Docker · Ready`);
 });

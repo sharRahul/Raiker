@@ -195,6 +195,28 @@ test("BUG-68 — the context meter reports real input and output counts", async 
   await page.screenshot({ path: join(SHOTS, "r0810-bug68-context-meter-real-io-counts.png") });
 });
 
+/**
+ * Build's posture is one chip and one menu (it was three side-by-side buttons),
+ * so choosing a mode is: open the chip, click the option.
+ */
+function modeTrigger(target: Page) {
+  return target.getByRole("button", { name: /^How much Raiker may do this turn:/ });
+}
+
+async function pickMode(
+  target: Page,
+  label: "Plan" | "Edit" | "Auto",
+  options: { keepMenuOpen?: boolean } = {},
+) {
+  await modeTrigger(target).click();
+  await expect(target.getByRole("menu", { name: "Mode" })).toBeVisible();
+  if (options.keepMenuOpen) return;
+  await target.getByRole("menuitemradio", { name: new RegExp(`^${label}`) }).click();
+  await expect(modeTrigger(target)).toHaveAccessibleName(
+    `How much Raiker may do this turn: ${label}`,
+  );
+}
+
 test("BUG-70 — a Build mode chip changes nothing standing and says so", async () => {
   const before = await standingWriteModes();
   expect(Object.keys(before)).toHaveLength(4);
@@ -209,17 +231,22 @@ test("BUG-70 — a Build mode chip changes nothing standing and says so", async 
   page.on("request", listener);
 
   // Auto was the sharpest case: four high-risk permissions set to `auto` with
-  // no dialog, no reason, and no acknowledgement.
-  await page.getByRole("button", { name: "Auto", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Auto", exact: true })).toHaveAttribute(
-    "aria-pressed",
-    "true",
+  // no dialog, no reason, and no acknowledgement. Build now *opens* in Auto, so
+  // the assertion is that arriving in it wrote nothing — and the composer says
+  // what the owner's standing permissions actually amount to.
+  await expect(modeTrigger(page)).toHaveAccessibleName(
+    "How much Raiker may do this turn: Auto",
   );
   await expect(page.getByText(/Change in Permissions/)).toBeVisible({ timeout: 10_000 });
   await page.screenshot({ path: join(SHOTS, "r0810-bug70-build-auto-changes-nothing-standing.png") });
 
-  await page.getByRole("button", { name: "Plan", exact: true }).click();
-  await expect(page.getByText(/for this turn only/i)).toBeVisible({ timeout: 10_000 });
+  await pickMode(page, "Plan");
+  // The mode menu is where a posture is explained, and it says whose it is.
+  await pickMode(page, "Plan", { keepMenuOpen: true });
+  await expect(page.getByRole("menu", { name: "Mode" })).toContainText(
+    /applies to this conversation's turns only/i,
+  );
+  await page.keyboard.press("Escape");
   page.off("request", listener);
 
   expect(requests, "a composer chip must not write standing decision modes").toEqual([]);
@@ -230,7 +257,7 @@ test("BUG-70 — a Build mode chip changes nothing standing and says so", async 
 test("BUG-70 — Plan really refuses the write it is presented as refusing", async () => {
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/build`);
-  await page.getByRole("button", { name: "Plan", exact: true }).click();
+  await pickMode(page, "Plan");
 
   const composer = page.getByLabel("Describe the change");
   await expect(composer).toBeVisible({ timeout: 30_000 });

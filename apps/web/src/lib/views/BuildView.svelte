@@ -2095,6 +2095,17 @@
       height: auto;
       min-height: 0;
     }
+    /* Stacked, the column still starts as tall as the room the shell gives it.
+       `height: auto` is what lets the transcript and the rail below it take
+       the space they need; without a floor to go with it, an empty or short
+       conversation collapsed to its content and left the composer floating in
+       the middle of a tall tablet screen with half the page blank under it.
+       A minimum, rather than a fixed height, keeps both: the composer sits at
+       the bottom when there is little to show, and the page still scrolls
+       normally once there is more. */
+    .main {
+      min-height: var(--content-h);
+    }
     .thread {
       overflow-y: visible;
     }

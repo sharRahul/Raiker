@@ -144,6 +144,34 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await page.screenshot({ path: join(shots, "voice-chat-mobile.png"), fullPage: true });
 });
 
+test("both composers stay anchored to the bottom on a tablet, not floating mid-page", async ({ page }) => {
+  // Below the split-view breakpoint the two surfaces switch to `height: auto` so
+  // the transcript, and Build's stacked rail, can take the room they need. The
+  // floor has to survive that: without it an empty conversation collapsed to its
+  // own content and left the composer in the middle of a tall screen.
+  await page.setViewportSize({ width: 820, height: 1180 });
+
+  for (const [route, label] of [
+    ["new-chat", "Prompt"],
+    ["build", "Describe the change"],
+  ] as const) {
+    await page.goto(`http://raiker.test/#/${route}`);
+    await expect(page.getByLabel(label, { exact: true })).toBeVisible();
+
+    const gap = await page.evaluate(() => {
+      const content = document.querySelector(".content")!.getBoundingClientRect();
+      const composer = [...document.querySelectorAll("form.composer")]
+        .find((form) => (form as HTMLElement).offsetParent !== null)!
+        .getBoundingClientRect();
+      return content.bottom - composer.bottom;
+    });
+
+    // Only the shell's own bottom padding may sit under the composer.
+    expect(gap).toBeLessThan(64);
+    expect(gap).toBeGreaterThanOrEqual(0);
+  }
+});
+
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt", { exact: true });
   await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");

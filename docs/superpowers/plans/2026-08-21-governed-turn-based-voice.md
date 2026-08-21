@@ -25,6 +25,41 @@
 
 ---
 
+### Task 0: Service and data-preservation preflight
+
+**Files:**
+- Read only: repository manifests, listener/process metadata and the configured Raiker workspace.
+- Modify: none.
+
+**Interfaces:**
+- Consumes: current TCP listeners and process command lines.
+- Produces: a verified stopped Raiker service state without changing `.raiker`, Rahul's account, provider profiles, conversations, projects or any other existing user/test data.
+
+- [ ] **Step 1: Identify only Raiker-owned listeners and processes**
+
+Run: `Get-NetTCPConnection -State Listen | Sort-Object LocalPort | Select-Object LocalAddress,LocalPort,OwningProcess`
+
+For each candidate PID, assign the inspected integer to `$raikerProcessId` and
+run `Get-CimInstance Win32_Process -Filter "ProcessId = $raikerProcessId" |
+Select-Object ProcessId,Name,CommandLine`. A process is in scope only when its
+command line resolves to this repository's `raiker-web`, `raiker-app`, Vite or
+Playwright web server. Do not stop unrelated Python, Node or browser processes.
+
+- [ ] **Step 2: Stop each verified Raiker-owned service and prove the listener closed**
+
+Use `Stop-Process -Id $raikerProcessId` only while the variable still contains
+the exact PID established in Step 1. Re-run the listener query and confirm its
+port is absent. If no Raiker-owned listener exists, record that fact and take no
+process action.
+
+- [ ] **Step 3: Prove user/test data was preserved**
+
+Run: `git status --short --branch`
+
+Record the existing `.raiker` workspace path and confirm no delete, reset, migration, account bootstrap or provider-profile mutation command ran during preflight. Do not read or print encrypted credential values.
+
+---
+
 ### Task 1: Browser voice adapters and readable speech text
 
 **Files:**
@@ -33,7 +68,7 @@
 - Modify: `apps/web/src/test-setup.ts`
 
 **Interfaces:**
-- Produces: `VoiceInputMode`, `SpeechLanguage`, `VoiceRecognitionAdapter`, `RecognitionHandlers`, `browserRecognitionAdapter`, `voicePlayback`, `speechText(markdown: string): string`, and `inputModeForDraft(state): VoiceInputMode`.
+- Produces: `VoiceInputMode`, `SpeechLanguage`, `AudioSessionCoordinator`, `VoiceRecognitionAdapter`, `RecognitionHandlers`, `browserRecognitionAdapter`, `voicePlayback`, `resolveSpeechLanguage(preference, deviceLanguage): string`, `speechText(markdown: string): string`, and `inputModeForDraft(state): VoiceInputMode`.
 - Consumes: browser `SpeechRecognition`/`webkitSpeechRecognition`, `speechSynthesis`, `SpeechSynthesisUtterance`, and deterministic injected fakes in tests.
 
 - [ ] **Step 1: Write failing adapter and text-conversion tests**
@@ -70,6 +105,40 @@ describe("voice recognition adapter", () => {
     expect(abort).toHaveBeenCalledOnce();
     expect(synth.speak).toHaveBeenCalledOnce();
   });
+
+  it("stops playback and a second recognition owner before recognition starts", () => {
+    const coordinator = createAudioSessionCoordinator();
+    const firstRecognitionStop = vi.fn();
+    const playbackStop = vi.fn();
+    const lost = vi.fn();
+    coordinator.startRecognition("first", vi.fn(), firstRecognitionStop);
+    coordinator.subscribe("first", lost);
+    coordinator.startPlayback("answer", vi.fn(), playbackStop);
+    coordinator.startRecognition("second", vi.fn(), vi.fn());
+    expect(firstRecognitionStop).toHaveBeenCalledOnce();
+    expect(playbackStop).toHaveBeenCalledOnce();
+    expect(lost).toHaveBeenCalled();
+  });
+
+  it("resolves Auto to a valid device language with an English fallback", () => {
+    expect(resolveSpeechLanguage("auto", "en-GB")).toBe("en-GB");
+    expect(resolveSpeechLanguage("auto", "")).toBe("en");
+    expect(resolveSpeechLanguage("ja", "en-GB")).toBe("ja");
+  });
+
+  it.each(["submit", "route", "sign-out", "handoff"] as const)(
+    "releases the active owner on %s cleanup",
+    (reason) => {
+      const coordinator = createAudioSessionCoordinator();
+      const stop = vi.fn();
+      const lost = vi.fn();
+      coordinator.subscribe("composer", lost);
+      coordinator.startRecognition("composer", vi.fn(), stop);
+      coordinator.stopAll(reason);
+      expect(stop).toHaveBeenCalledOnce();
+      expect(lost).toHaveBeenCalledOnce();
+    },
+  );
 });
 
 it("classifies the submitted draft from actual dictation contribution", () => {
@@ -111,6 +180,14 @@ export interface VoiceRecognitionAdapter {
   abort(): void;
 }
 
+export interface AudioSessionCoordinator {
+  startRecognition(ownerId: string, start: () => void, stop: () => void): void;
+  startPlayback(ownerId: string, start: () => void, stop: () => void): void;
+  release(ownerId: string): void;
+  stopAll(reason: "submit" | "route" | "sign-out" | "handoff"): void;
+  subscribe(ownerId: string, onOwnershipLost: () => void): () => void;
+}
+
 export function inputModeForDraft(state: {
   dictated: boolean;
   typedBefore: boolean;
@@ -121,7 +198,7 @@ export function inputModeForDraft(state: {
 }
 ```
 
-The implementation must resolve `window.SpeechRecognition ?? window.webkitSpeechRecognition`, set `continuous = true`, `interimResults = true`, translate result ranges into interim/final strings, and expose `supported() === false` without throwing. The playback coordinator must cancel the current utterance before another starts and expose the active response id. `speechText` must remove citation markers, preserve link labels, collapse Markdown syntax, and replace every fenced code block with `Code block.`.
+The implementation must resolve `window.SpeechRecognition ?? window.webkitSpeechRecognition`, set `continuous = true`, `interimResults = true`, translate result ranges into interim/final strings, and expose `supported() === false` without throwing. One exported singleton coordinator owns all recognition and playback. It must notify displaced owners so their UI state resets. Submit, route teardown and sign-out call `stopAll`; second recognition/playback controls and cross-route controls are covered by tests. `resolveSpeechLanguage("auto", navigator.language)` returns the non-empty device tag or `en`; the string `auto` is never assigned to a Web Speech `.lang`. `speechText` must remove citation markers, preserve link labels, collapse Markdown syntax, and replace every fenced code block with `Code block.`.
 
 - [ ] **Step 4: Run the focused test and verify GREEN**
 
@@ -146,8 +223,8 @@ git commit -m "feat: add shared browser voice adapters"
 - Modify: `apps/web/src/lib/icons.ts`
 
 **Interfaces:**
-- Consumes: `VoiceRecognitionAdapter`, `SpeechLanguage`, draft value, textarea selection, and `onchange`, `onmodechange`, `onactivechange` callbacks.
-- Produces: one accessible Dictate/Listening/Done/Cancel control that both views mount.
+- Consumes: `VoiceRecognitionAdapter`, the global `AudioSessionCoordinator`, `SpeechLanguage`, draft value, textarea selection, and `onchange`, `onfinalized`, `onactivechange` callbacks.
+- Produces: one accessible Dictate/Listening/Done/Cancel control that both views mount and an exported `VoiceDictationHandle` with `done(): boolean`, `cancel(): boolean`, and `active(): boolean`.
 
 - [ ] **Step 1: Write failing component behavior tests**
 
@@ -203,6 +280,46 @@ it.each([
   adapter.error(code);
   expect(screen.getByRole("alert")).toHaveTextContent(message);
 });
+
+it.each(["not-allowed", "audio-capture", "no-speech"])(
+  "%s restores the original draft and selection",
+  async (code) => {
+    const adapter = recognitionAdapterFake();
+    const onchange = vi.fn();
+    render(VoiceDictationControl, {
+      draft: "keep this",
+      selectionStart: 4,
+      selectionEnd: 4,
+      language: "auto",
+      adapter,
+      onchange,
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+    adapter.error(code);
+    expect(onchange).toHaveBeenLastCalledWith("keep this", 4);
+  },
+);
+
+it("keeps finalized text but discards interim text on service failure or ownership loss", async () => {
+  const adapter = recognitionAdapterFake();
+  const coordinator = createAudioSessionCoordinator();
+  const onchange = vi.fn();
+  render(VoiceDictationControl, { draft: "", language: "en", adapter, coordinator, onchange });
+  await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
+  adapter.final("keep finalized");
+  adapter.interim("discard interim");
+  adapter.error("network");
+  expect(onchange).toHaveBeenLastCalledWith("keep finalized", 14);
+  coordinator.stopAll("route");
+  expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
+});
+
+it("always exposes the browser-processing disclosure when dictation is available", () => {
+  render(VoiceDictationControl, { draft: "", language: "auto", adapter: recognitionAdapterFake(), onchange: vi.fn() });
+  const disclosure = screen.getByText(/browser's speech service may process audio externally/);
+  expect(disclosure).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Dictate" })).toHaveAccessibleDescription(disclosure.textContent ?? "");
+});
 ```
 
 - [ ] **Step 2: Run the component test and verify RED**
@@ -213,7 +330,7 @@ Expected: FAIL because the component does not exist.
 
 - [ ] **Step 3: Implement the component and microphone icon state**
 
-The component must snapshot draft/selection at start, maintain interim text separately from finalized draft text, normalize only insertion-boundary spaces, and expose these exact labels: **Dictate**, **Listening…**, **Done dictating**, and **Cancel dictation**. Unsupported recognition renders a disabled Dictate control plus “Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.” Recording state uses text plus the existing accent token; any pulse/wave line disables motion under `prefers-reduced-motion`.
+The component must snapshot draft/selection at start, maintain interim text separately from finalized draft text, normalize only insertion-boundary spaces, and expose these exact labels: **Dictate**, **Listening…**, **Done dictating**, and **Cancel dictation**. Export `VoiceDictationHandle`; `done()` stops and retains finalized text, `cancel()` restores the snapshot, and `active()` reports ownership. `onfinalized()` reports a real final-segment contribution independently of `onchange`, so inserting recognition text does not look like an owner edit. Unsupported recognition renders a disabled Dictate control plus “Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.” Supported and unsupported states both expose the browser-processing disclosure through a persistent accessible description/popover reachable without hover. Recording state uses text plus the existing accent token; any pulse/wave line disables motion under `prefers-reduced-motion`.
 
 - [ ] **Step 4: Run the component test and verify GREEN**
 
@@ -260,6 +377,16 @@ it("states playback failure and leaves text controls usable", async () => {
   await fireEvent.click(screen.getByRole("button", { name: "Read aloud" }));
   playback.error();
   expect(screen.getByRole("status")).toHaveTextContent("This device could not play the response.");
+});
+
+it("clears the previous response's pressed state when another response takes ownership", async () => {
+  const coordinator = createAudioSessionCoordinator();
+  render(ReadAloudHarness, { coordinator, first: "One", second: "Two" });
+  await fireEvent.click(screen.getAllByRole("button", { name: "Read aloud" })[0]);
+  expect(screen.getByRole("button", { name: "Stop speaking" })).toHaveAttribute("aria-pressed", "true");
+  await fireEvent.click(screen.getAllByRole("button", { name: "Read aloud" })[0]);
+  expect(screen.getAllByRole("button", { name: "Read aloud" })).toHaveLength(1);
+  expect(screen.getByRole("button", { name: "Stop speaking" })).toHaveAttribute("aria-pressed", "true");
 });
 ```
 
@@ -331,6 +458,13 @@ def test_prompt_rejects_unknown_input_mode(client) -> None:
     )
     assert response.status_code == 422
 
+def test_gateway_rejects_invalid_client_reported_input_mode(workspace) -> None:
+    envelope = _build_envelope(PromptRequest(text="hello"))
+    envelope.prompt.metadata["input_mode"] = "always-listening"
+    gateway = AgentGateway(workspace, principal_id="principal_owner")
+    with pytest.raises(ContractValidationError, match="invalid_input_mode"):
+        gateway._prepare_turn(envelope)
+
 def test_settings_reject_unknown_speech_language_and_preserve_previous(client) -> None:
     token = _token(client, "alice")
     accepted = client.put(
@@ -369,7 +503,7 @@ class PromptRequest:
     # existing fields stay unchanged
 ```
 
-`_build_envelope` must validate direct Python callers as well as FastAPI parsing, then add `input_mode` beside `entry_command` in prompt metadata. `_prepare_turn` reads the constrained metadata value and writes only that value, client type and prompt length. `put_settings` validates `general.speech_language` before writing and returns HTTP 422 without mutating the previous settings row.
+Define one `normalize_input_mode(value: object) -> str` contract helper and use it in `_build_envelope` and `AgentGateway._prepare_turn`; FastAPI parsing remains the first HTTP boundary. Add `input_mode` beside `entry_command` in prompt metadata. `_prepare_turn` validates again before writing only that value, client type and prompt length. Documentation and names call this **client-reported input provenance** because the backend cannot prove how a REST/web client produced text. `put_settings` validates `general.speech_language` before writing and returns HTTP 422 without mutating the previous settings row.
 
 - [ ] **Step 4: Add the TypeScript request field**
 
@@ -440,6 +574,22 @@ it.each([
   });
 });
 
+it.each([
+  ["Chat", ChatView, "Prompt"],
+  ["Build", BuildView, "Describe the change"],
+])("%s uses first Enter for Done and second Enter for Send", async (_name, View, label) => {
+  const recognition = installRecognitionFake();
+  render(View);
+  await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
+  recognition.final("check this");
+  await fireEvent.keyDown(screen.getByLabelText(label), { key: "Enter" });
+  expect(streamPromptMock).not.toHaveBeenCalled();
+  expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
+  expect(screen.getByLabelText(label)).toHaveFocus();
+  await fireEvent.keyDown(screen.getByLabelText(label), { key: "Enter" });
+  expect(streamPromptMock).toHaveBeenCalledOnce();
+});
+
 it("marks a typed and edited dictated draft as mixed", async () => {
   const recognition = installRecognitionFake();
   render(ChatView, { projects });
@@ -479,7 +629,7 @@ Expected: FAIL because the controls, request provenance and setting are not moun
 
 - [ ] **Step 4: Integrate the shared components without duplicating voice logic**
 
-Each view loads `general.speech_language` with default `auto`, tracks whether finalized dictation contributed to the current draft, resets provenance after a successful submit/new conversation, and passes `input_mode: inputModeForDraft(...)` to `streamPrompt`. The view's Enter handler must call the dictation component's Done behavior and return while recognition is active; only the next Enter can submit. On submit, route change or component teardown, stop recognition/playback through the shared coordinator.
+Each view loads `general.speech_language` with default `auto`, binds `VoiceDictationControl` as `VoiceDictationHandle`, tracks `dictated`, `typedBefore` and `editedAfter`, resets provenance after a successful submit/new conversation, and passes `input_mode: inputModeForDraft(...)` to `streamPrompt`. `onfinalized` sets `dictated=true`; it does not set `editedAfter`. A later textarea `input` event sets `editedAfter=true` only after a final segment was contributed. The view's Enter handler first checks `voiceControl?.active()`; when true it calls `voiceControl.done()`, restores textarea focus and returns. Only the next Enter can submit. On submit, route change or component teardown, call the shared coordinator's `stopAll` while preserving finalized draft text and discarding interim text.
 
 Mount `VoiceDictationControl` in `.bar-left` immediately after `ComposerAttach`. Mount `ReadAloudButton` in a shared `.response-actions` row beside Copy for completed visible answers. General settings adds the exact language options and disclosure in the existing Language and region card.
 

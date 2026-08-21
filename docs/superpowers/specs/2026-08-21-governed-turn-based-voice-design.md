@@ -2,10 +2,11 @@
 
 ## Status
 
-**Approved on 2026-08-21.** This specification completes GAP-CHAT C16 for
-turn-based voice and applies the same control set to Build. Full-duplex live
-conversation is recorded separately as a future improvement; it is not part of
-this delivery's acceptance boundary.
+**Approved on 2026-08-21; implementation pending.** This specification defines
+the delivery that will complete GAP-CHAT C16 for turn-based voice and apply the
+same control set to Build. C16 may be marked complete only after implementation
+and verification ship. Full-duplex live conversation is recorded separately as
+a future improvement; it is not part of this delivery's acceptance boundary.
 
 ## Outcome
 
@@ -70,6 +71,8 @@ Primary references reviewed on 2026-08-21:
   <https://help.openai.com/en/articles/12168547-voice-dictation-faq>
 - ChatGPT Voice, Work and Codex:
   <https://help.openai.com/en/articles/20001274/>
+- ChatGPT Work and Codex voice controls:
+  <https://help.openai.com/en/articles/20001275/>
 - OpenClaw Voice Wake:
   <https://github.com/openclaw/openclaw/blob/main/docs/nodes/voicewake.md>
 - DeepSeek Harness:
@@ -86,7 +89,7 @@ competitive superiority.
 |---|---|---|
 | Shared Dictate control in Chat and Build | **Yes.** It closes C16 and matches the selected Claude/ChatGPT dictation behavior. | Build. |
 | Explicit send after editable transcription | **Yes.** It preserves owner intent and prevents silence detection or a recognition mistake from starting governed work. | Build; mandatory. |
-| `typed` / `dictated` / `mixed` provenance | **Yes.** It adds backend observability without retaining audio or duplicating prompt text in audit payloads. This is a Raiker differentiator over the reviewed dictation documentation. | Build. |
+| Client-reported `typed` / `dictated` / `mixed` provenance | **Yes.** It adds backend observability without retaining audio or duplicating prompt text in audit payloads. The server validates the value but cannot independently prove how a web or REST client produced its text. | Build. |
 | Provider-neutral voice adapter | **Yes.** Dictation works with every text model profile rather than only the provider performing speech recognition. | Build. |
 | Raiker-side zero audio retention | **Yes, with precise wording.** Raiker neither receives nor stores audio in this architecture. The browser speech engine may process audio externally and the UI must disclose that fact. | Build. |
 | Manual read-aloud with one active speaker | **Yes.** It supplies accessible spoken output without introducing automatic playback or overlapping responses. | Build. |
@@ -105,8 +108,9 @@ independence and keeping audio outside Raiker's storage and audit systems.
 
 Create a focused browser voice module that owns feature detection and wraps the
 browser's speech-recognition and speech-synthesis APIs behind typed interfaces.
-Components consume those interfaces rather than referencing vendor-prefixed
-globals directly. Tests inject fakes through the same boundary.
+One process-global `AudioSessionCoordinator` is the sole owner of recognition
+and playback. Components consume those interfaces rather than referencing
+vendor-prefixed globals directly. Tests inject fakes through the same boundary.
 
 The adapter exposes:
 
@@ -122,18 +126,33 @@ VoicePlaybackCoordinator
   speak(responseId, text, language, handlers): void
   stop(): void
   activeId(): string | null
+
+AudioSessionCoordinator
+  startRecognition(ownerId, start, stop): void
+  startPlayback(ownerId, start, stop): void
+  release(ownerId): void
+  stopAll(reason): void
+  subscribe(ownerId, onOwnershipLost): unsubscribe
 ```
 
-Only one recognition session and one playback session may own audio at a time.
-Starting recognition stops playback. Starting playback aborts recognition.
-Starting another playback stops the first response. This rule is shared across
-routes rather than reimplemented inside each view.
+Exactly one recognition or playback session may own audio at a time. Starting
+recognition stops playback and any other recognition. Starting playback aborts
+recognition and stops any other playback. Submit, route teardown and sign-out
+call `stopAll`. Every displaced owner receives `onOwnershipLost` so its button,
+pressed state, interim text and live announcement reset immediately. This rule
+is process-global and shared across routes rather than reimplemented inside
+each view.
 
 ### Dictation component
 
 One `VoiceDictationControl` is mounted in the lower action row of both composer
 cards, beside Attach and the surface toggle. It receives the current draft,
-the textarea selection and callbacks that replace the draft and restore focus.
+the textarea selection and callbacks that replace the draft, report finalized
+dictation contribution, report subsequent owner edits and restore focus. It
+exports an imperative `VoiceDictationHandle` with `done(): boolean`,
+`cancel(): boolean` and `active(): boolean`. Both Enter handlers use this exact
+handle: the first Enter while active calls `done()`, retains text, restores
+focus and returns; only a later Enter may submit.
 
 Its states are exact and owner-visible:
 
@@ -157,6 +176,13 @@ insertion boundaries; Raiker does not rewrite punctuation or wording produced
 by the speech engine. Interim text may be shown as a visually distinct composer
 preview, but it must not become the submitted draft until finalized.
 
+The component emits a finalized-dictation contribution event only when a final
+segment changes the draft. Programmatic insertion of that segment is not an
+owner edit. The view marks `editedAfter=true` only on a later textarea input
+event whose value differs after the component has returned control. This keeps
+an untouched all-dictated prompt `dictated` and classifies typed-before or
+owner-edited-after text as `mixed`.
+
 Dictation never submits the form. Enter while recognition is active stops and
 keeps the text; a second explicit Enter or the Send button submits it. This
 prevents an accidental key press from collapsing stop and send into one action.
@@ -174,10 +200,12 @@ input_mode: typed | dictated | mixed
 - `mixed`: typed content existed before dictation or the finalized transcript
   was edited before submission.
 
-The server rejects every other value. It places the mode in the existing prompt
-metadata and the safe `prompt_received` event payload. It does not add audio,
-transcript text or language to the audit event. The ordinary turn row remains
-the single stored copy of the submitted prompt.
+The value is client-reported provenance, not an independently verified fact
+about a browser microphone. FastAPI parsing, direct `_build_envelope` callers,
+and `AgentGateway` envelope preparation all reject every other value. The
+gateway places the validated mode in the safe `prompt_received` event payload.
+It does not add audio, transcript text or language to the audit event. The
+ordinary turn row remains the single stored copy of the submitted prompt.
 
 Edit, Retry, Branch and restored sessions keep their existing semantics. A
 retried text prompt is `typed` for the new request unless the owner dictates
@@ -215,6 +243,11 @@ persisted through the existing settings API, not only in one browser's local
 storage. Recognition and synthesis use that language where supported. Changing
 it does not mutate application display language or model selection.
 
+`auto` is a Raiker preference value, never a Web Speech language tag. The
+adapter resolves it to `navigator.language` when that value is a non-empty
+BCP-47 tag, otherwise to `en`. Recognition and synthesis tests cover both
+resolution paths. Explicit primary tags are passed unchanged.
+
 The setting contains the same browser-processing disclosure as the composer:
 Raiker does not receive or retain audio; the browser's speech service may
 process it according to the browser or operating-system provider's terms.
@@ -227,6 +260,9 @@ does not introduce a separate voice page, modal orb or visual identity.
 - Chat and Build use the same components, labels, state colors and keyboard
   behavior.
 - The active recording state is conveyed by text and icon, never color alone.
+- The idle Dictate control exposes the browser-processing disclosure through a
+  keyboard/touch-accessible description or popover on both composers; it is not
+  hidden behind hover and is present even when recognition is supported.
 - State changes use a polite live region; permission and capture failures use
   `role="alert"` only when owner action is required.
 - All controls have visible focus, at least 44-by-44 CSS-pixel touch targets on
@@ -259,6 +295,13 @@ Every adapter error maps to stable owner-facing copy:
 Recognition errors never clear an existing prompt, change the selected model or
 surface mode, attach a file, or start a turn. Voice failure cannot make text
 conversation failure.
+
+Permission denial, unavailable capture and no-speech restore the pre-dictation
+draft and selection. A service/network failure preserves every finalized
+segment and discards interim text. Navigation, sign-out, submit or ownership
+handoff likewise preserve finalized text, discard interim text and reset the
+old owner's UI state. Playback handoff clears the previous response button's
+pressed state before the new response starts.
 
 ## Safeguards and authority
 
@@ -336,6 +379,17 @@ The future design must include:
 - bounded silence and idle timers plus a hard session cap;
 - optional wake words only with an owner-visible foreground/listening state;
 - hands-free start, status, steer, stop and approval handoff for governed tasks;
+- start, prioritize, interrupt and redirect tasks by voice, including explicit
+  coordination of multiple agents, conversations and projects;
+- resume available project context and connected-tool context without creating
+  a separate reduced-authority voice session;
+- spoken and on-screen progress, blocked, approval-needed and completed states;
+- visible listening, mute and stop controls throughout the session;
+- concurrent listen-and-speak where the selected realtime provider supports it;
+- configurable output voice, speech language and intelligence/reasoning level
+  where supported, with the exact selection visible;
+- explicit session limits, usage limits and voice/task metering before and
+  during a session;
 - visual confirmation for every high-risk approval—voice alone cannot authorize
   an irreversible or elevated action;
 - one audio owner across devices/routes and recovery after backend reconnect;

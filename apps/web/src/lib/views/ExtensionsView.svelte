@@ -46,6 +46,8 @@
   let hooks = $state<HooksView | null>(null);
   let hooksError = $state<string | null>(null);
 
+  let hooksBusy = $state(false);
+
   async function loadHooks() {
     try {
       hooks = await api.hooks();
@@ -53,6 +55,32 @@
     } catch (error) {
       hooks = null;
       hooksError = error instanceof ApiError ? error.message : "Hook configuration is unavailable.";
+    }
+  }
+
+  /**
+   * BUG-222 — the owner's off switch.
+   *
+   * `config/hooks.json` travels with a repository, so cloning a project can
+   * bring rules that run commands on this machine. Editing someone else's
+   * checked-in file is not a refusal, so this is an owner setting rather than a
+   * fourth config file — and it is the one control on this page that writes
+   * anything, which is why it goes through the ordinary settings route.
+   */
+  async function setHooksDisabled(disabled: boolean) {
+    if (hooksBusy) return;
+    hooksBusy = true;
+    try {
+      const current = await api.settings();
+      const next = { ...current.settings, hooks: { disabled } };
+      await api.putSettings(next);
+      await loadHooks();
+      hooksError = null;
+    } catch (error) {
+      hooksError =
+        error instanceof ApiError ? error.message : "That setting could not be saved.";
+    } finally {
+      hooksBusy = false;
     }
   }
 
@@ -361,8 +389,26 @@
       {#if hooks === null}
         <p class="note">{hooksError ?? "Reading hook configuration…"}</p>
       {:else}
-        <p class="posture" class:posture-warn={hooks.failed_sources.length > 0}>
-          {#if hooks.failed_sources.length > 0}
+        <label class="hooks-switch">
+          <input
+            type="checkbox"
+            checked={hooks.disabled}
+            disabled={hooksBusy}
+            onchange={(event) => void setHooksDisabled(event.currentTarget.checked)}
+          />
+          <span>Turn every hook off</span>
+        </label>
+        <p class="note">
+          Your setting, not a fourth configuration file — a file a project ships cannot re-enable
+          itself. Rules stay listed while this is on, so you can see what would run.
+        </p>
+
+        <p class="posture" class:posture-warn={hooks.disabled || hooks.failed_sources.length > 0}>
+          {#if hooks.disabled}
+            Hooks are turned off. {hooks.rule_count}
+            {hooks.rule_count === 1 ? "configured rule is" : "configured rules are"} loaded and
+            will not run.
+          {:else if hooks.failed_sources.length > 0}
             {hooks.failed_sources.length} configuration
             {hooks.failed_sources.length === 1 ? "file" : "files"} could not be read, so
             {hooks.failed_sources.length === 1 ? "its rules are" : "their rules are"} not loaded.
@@ -626,6 +672,25 @@
   }
   .hook-tag-dead {
     border-style: dashed;
+  }
+  .hooks-switch {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    font-size: 0.86rem;
+    font-weight: 650;
+    color: var(--text-1);
+    cursor: pointer;
+  }
+  .hooks-switch input {
+    width: 1rem;
+    height: 1rem;
+    accent-color: var(--accent);
+    cursor: pointer;
+  }
+  .hooks-switch input:disabled {
+    cursor: wait;
   }
   @media (max-width: 47rem) {
     .event-list > li {

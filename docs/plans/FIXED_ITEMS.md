@@ -10157,3 +10157,39 @@ with `opacity: 0.78`, which dropped its note text and scope chip to a 3.45:1
 contrast ratio — below the 4.5:1 floor — and the mocked suite's axe check caught
 it. Emphasis now drops through a dashed border and a sunken background, and the
 rule stays readable.
+
+## FIXED-254 — Refusing a project's hooks meant editing the project's file
+
+**Severity: Low. Area: hooks. Fixed 2026-08-22 (BUG-222).**
+
+Hooks load from three files and one of them, `config/hooks.json`, travels with a
+repository. Cloning a project could therefore bring rules that run commands on
+the owner's machine — argv-only, bounded, resolved inside the workspace, but
+still theirs to refuse — and the only way to refuse was to edit or delete someone
+else's checked-in file. That is not a refusal, it is a local modification that
+the next pull undoes.
+
+**Turn every hook off** is now on Extensions → Hooks. It is an **owner setting**
+rather than a fourth configuration file, deliberately: a file a project ships
+must not be able to re-enable itself. `HookDispatcher.is_active()` returns
+`False` while it is on, which is the single gate the tool broker and the
+orchestrator already consult, so every hook path goes inert at once. The setting
+is re-read once per turn, so toggling it takes effect without restarting the
+host — and once per turn rather than per call, because a store read on every tool
+call to answer a question that cannot change mid-turn is the wrong trade.
+
+Off is a **state to display, not an erasure**: the rules stay listed and the page
+says they are loaded and will not run, so the owner can see what they turned off.
+
+**Reference-platform decision.** **No — parity.** Claude Code has
+`disableAllHooks` in settings and `--settings '{"disableAllHooks": true}'` for a
+single run. Raiker had nothing. Keeping the rules visible while they are off is
+the one thing the cited reference does not describe, and it is a small
+difference, not a differentiator.
+
+**Evidence.** `tests/test_hooks_surface.py` — the switch stops the dispatcher
+while leaving all three rules loaded, hooks run by default, the switch is never
+read from any of the three hook sources, and the read model reports it. The panel
+test asserts the rules stay listed. Verified live: with the switch on, a Build
+turn that made a tool call produced **zero** new hook events, where the identical
+turn with the switch off produced `hook_matched → hook_decision → hook_failed`.

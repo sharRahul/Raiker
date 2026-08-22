@@ -2948,7 +2948,7 @@ class DashboardService:
         "hook_failed",
     )
 
-    def list_hooks(self, user_id: str | None = None) -> dict[str, Any]:
+    def list_hooks(self, principal_id: str | None = None) -> dict[str, Any]:
         """What hooks are configured, whether they can fire, and what they did.
 
         Hooks were the one extension surface with a real, enforcing backend and no
@@ -2978,6 +2978,7 @@ class DashboardService:
             HookHandler,
         )
         from raiker.hooks.handlers.builtin import BUILTIN_HANDLERS
+        from raiker.hooks.owner_switch import hooks_disabled
         from raiker.hooks.registry import HooksRegistry
 
         registry = HooksRegistry.load(self.workspace_root)
@@ -3067,8 +3068,16 @@ class DashboardService:
                 )
         activity.sort(key=lambda entry: entry["timestamp"], reverse=True)
 
+        # BUG-222 — off is a state to display, not a reason to hide what would
+        # otherwise run: the rules stay listed and the page says they are off.
+        disabled = (
+            hooks_disabled(self.workspace_root, principal_id)
+            if principal_id is not None
+            else False
+        )
         return {
-            "active": not registry.is_empty(),
+            "active": not disabled and not registry.is_empty(),
+            "disabled": disabled,
             "rule_count": len(rules),
             "rules": rules,
             "sources": [entry.to_dict() for entry in registry.sources],

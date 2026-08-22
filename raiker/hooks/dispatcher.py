@@ -31,9 +31,20 @@ class HookDispatcher:
         self.registry = registry
         self.workspace_root = Path(workspace_root)
         self.writer = writer
+        self._disabled = False
+
+    def set_disabled(self, disabled: bool) -> None:
+        """Apply the owner's off switch (BUG-222), refreshed once per turn.
+
+        Read per turn rather than per call: it is a setting the owner changes
+        from a page, so it has to take effect without a restart, and a store read
+        on every tool call to answer a question that cannot change mid-turn is
+        the wrong trade.
+        """
+        self._disabled = disabled
 
     def is_active(self) -> bool:
-        return not self.registry.is_empty()
+        return not self._disabled and not self.registry.is_empty()
 
     def _emit(
         self,

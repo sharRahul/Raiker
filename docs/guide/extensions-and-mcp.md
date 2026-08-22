@@ -213,6 +213,18 @@ optional `"if"` narrows further on the arguments — `"shell(rm -rf *)"` fires o
 for a command matching that glob. A malformed guard fails closed rather than
 widening the rule.
 
+### Turning them off
+
+**Turn every hook off** on the Hooks tab stops all of them at once. It is your
+setting, not a fourth configuration file — `config/hooks.json` travels with a
+repository, so a project you clone can bring rules that run commands on your
+machine, and refusing them should not mean editing someone else's checked-in
+file. A file a project ships cannot re-enable itself.
+
+The rules stay listed while the switch is on, and the page says they are loaded
+and will not run, so you can see what you turned off. The setting takes effect on
+your next turn; nothing needs restarting.
+
 ### What the Hooks tab tells you
 
 Extensions → **Hooks** reports what the runtime actually loaded, which is not

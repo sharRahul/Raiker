@@ -24,6 +24,7 @@ from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.contracts import HookInput
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.hooks.owner_switch import hooks_disabled
 from raiker.hooks.registry import HooksRegistry
 from raiker.models.connections import get_model_connection
 from raiker.models.contracts import ModelMessage, ToolCallProposal
@@ -271,6 +272,11 @@ class AgentGateway:
         )
         surface = normalize_prompt_surface(
             prompt_envelope.prompt.metadata.get("surface", "chat")
+        )
+        # BUG-222 — the owner's hooks off switch, re-read per turn so toggling it
+        # takes effect without restarting the host.
+        self.hook_dispatcher.set_disabled(
+            hooks_disabled(self.workspace_root, self.owner_principal_id)
         )
         existing_session = self.sessions.load_session(prompt_envelope.session_id)
         self.sessions.get_or_create(prompt_envelope.session_id, user_id=self._owner_user_id)

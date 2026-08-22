@@ -341,7 +341,10 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-21:
   still gated, **no plugin code executes** — a plugin is validated, signature-
   checked and recorded, and provides nothing to the runtime — and channel
   activation stays off. Each is absent from the interface rather than shown
-  disabled. Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221.
+  disabled. Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221 and BUG-223. Hooks
+  do have an owner off switch: **Turn every hook off** on the Hooks tab stops all
+  of them at once and is your setting rather than a fourth config file, so a
+  `config/hooks.json` that arrived with a repository cannot re-enable itself.
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each

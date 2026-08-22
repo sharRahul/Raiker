@@ -1420,6 +1420,7 @@ was missing was everything an owner could see or trust:
 | A configured rule that can never fire, marked | **Yes — with an honest caveat** | No reference product needs this, because Claude Code emits every event it documents. Raiker does not, so the marking exists to make a Raiker gap visible rather than to beat anyone. It is a differentiator in *kind* — the surface refuses to let a dead rule look enforcing — and a consequence of being behind on event coverage. |
 | A handler naming a builtin that does not exist, marked | **Yes** | Same shape as the row above and the same reasoning: the rule parses, matches, and fails every time. Counting it as a guard would be the surface asserting a safeguard that is not there. |
 | Rules separated into **Can deny or ask** and **Observes only** | **Yes** | Claude Code documents which events can block in prose. Raiker computes it per rule, from the event *and* whether that rule's handlers hold decision authority, and prints the answer on the rule. |
+| An owner off switch that keeps the rules visible | **No — parity, with one small difference** | Claude Code has `disableAllHooks`; Raiker had nothing, so the switch itself is the bar. The difference is that the rules stay listed and the page says they are loaded and will not run, rather than the surface going empty — off is a state to display, not an erasure. It is an owner setting rather than a fourth config source, so a `config/hooks.json` that travelled with a repository cannot re-enable itself ([FIXED-254](plans/FIXED_ITEMS.md)). |
 | Hooks may only ever tighten | **Yes — already true, now visible** | Claude Code hooks return `permissionDecision: "allow"`, so a hook there can *grant*. Raiker's `combine()` accepts only `deny` and `ask` from an authoritative handler; nothing a hook returns can allow an action policy refused. The panel now says so on the page rather than leaving it to the spec. |
 
 ### Gaps this round identified and did **not** close
@@ -1428,14 +1429,13 @@ was missing was everything an owner could see or trust:
 |---|---|---|---|
 | **22 of ~31 lifecycle events** | Claude Code fires `Stop`, `SubagentStart/Stop`, `TaskCreated/Completed`, `PostToolBatch`, `Notification`, `FileChanged`, `ConfigChange`, `Elicitation`, `WorktreeCreate/Remove` and more | Nine are dispatched; `SessionEnd` is accepted and never emitted | Each needs a real call site, not a schema entry. The rule this round establishes is that an event is published as dispatched only when a test can derive it from the code |
 | **Four of five handler types** | `http`, `mcp_tool`, `prompt`, `agent` | `command` and `builtin` | Each needs a gated surface Raiker keeps closed: network egress, the MCP broker, a model call, a subagent. A hook that reaches the network is an egress decision before it is a hook |
-| **A global off switch** | `disableAllHooks`, including per-run via `--settings` | Removing the rules from the file is the only way to stop them | Low effort, and it belongs to the owner rather than to a config file a project can ship. Raised as **BUG-222** |
 | **Plugin execution** | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP; Cowork installs them from **Customize** | A plugin is validated, supply-chain checked, signature-levelled and recorded — and provides **nothing** to the runtime (`execution_enabled` is `False` by construction) | The blocking question is not packaging, it is what a plugin's code is allowed to be. Raised as **BUG-221** |
 | **Channel delivery** | Claude Code channels relay permissions and messages over MCP | Connector registry, pairing rows and an inbound receiver that quarantines and never executes; activation returns `active: false` | Unchanged from earlier rounds. Inbound quarantine is the safe half and is built; outbound delivery and sender trust are not |
 
 ### Recommended improvements, in the order they are worth doing
 
-1. **`disableAllHooks`** (BUG-222). Smallest control with a real safety story:
-   an owner who cannot read a project's hook file still needs one switch.
+1. ~~**`disableAllHooks`**~~ — shipped this round as
+   [FIXED-254](plans/FIXED_ITEMS.md).
 2. **`Stop` and `SubagentStop`.** Both have obvious call sites in the runtime
    today and are the two most-used blocking events in the reference set.
 3. **Plugin execution** (BUG-221), which is a design task about authority before

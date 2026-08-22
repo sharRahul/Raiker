@@ -35,6 +35,7 @@ const EVENTS: HooksView["events"] = [
 function hooks(partial: Partial<HooksView> = {}): HooksView {
   return {
     active: true,
+    disabled: false,
     rule_count: 0,
     rules: [],
     sources: [
@@ -229,6 +230,20 @@ describe("Extensions → Hooks", () => {
 
     const builtins = screen.getByRole("heading", { name: "Built-in handlers" }).closest("section") as HTMLElement;
     expect(within(builtins).getByText("block_destructive_shell")).toBeInTheDocument();
+  });
+
+  it("keeps the rules listed when the owner turns hooks off", async () => {
+    stubFetch(routes(hooks({ active: false, disabled: true, rule_count: 1, rules: [rule({})] })));
+    render(ExtensionsView, { tab: "hooks" });
+
+    // Off is a state to display, not a reason to hide what would otherwise run.
+    expect(await screen.findByText(/Hooks are turned off/i)).toBeInTheDocument();
+    expect(screen.getByText(/will not run/i)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: /Turn every hook off/i })).toBeChecked();
+    // The rule itself is still on the page — scoped past the builtin catalogue,
+    // which names the same handler.
+    const rules = screen.getByRole("heading", { name: "Configured rules" }).closest("section")!;
+    expect(within(rules as HTMLElement).getByText("block_destructive_shell")).toBeInTheDocument();
   });
 
   it("says nothing is configured rather than looking like it never checked", async () => {

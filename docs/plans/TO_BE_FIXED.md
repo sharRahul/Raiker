@@ -67,7 +67,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | Open — raised 2026-08-21 |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
 | [BUG-221](#bug-221--a-plugin-is-recorded-and-then-provides-nothing) | Medium | Plugins / extensibility | Open — raised 2026-08-22 |
-| [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | Open — raised 2026-08-22 |
+| [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
 | [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | Open — raised 2026-08-22 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
@@ -518,7 +518,7 @@ should arrive through a surface that already governs it.
 
 ## BUG-222 — There is no way to turn every hook off
 
-**Severity: Low. Area: hooks. Status: Open — raised 2026-08-22.**
+**Severity: Low. Area: hooks. Status: Fixed 2026-08-22 — see FIXED-254.**
 
 **Observed.** Hooks are loaded from `config/managed-hooks.json`,
 `config/hooks.json` and `.raiker/hooks.json`. The only way to stop them is to

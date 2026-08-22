@@ -26,6 +26,7 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.ids import utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.hooks.contracts import (
@@ -35,7 +36,9 @@ from raiker.hooks.contracts import (
     HOOK_EVENTS,
     HookConfigError,
 )
+from raiker.hooks.owner_switch import hooks_disabled
 from raiker.hooks.registry import HooksRegistry
+from raiker.storage.sqlite import SQLiteStore
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -130,6 +133,66 @@ def test_from_config_still_refuses_an_invalid_config(workspace: Path) -> None:
         HooksRegistry.from_config(
             {"schema_version": "1.0", "hooks": {"Nope": [{"matcher": "*", "handlers": []}]}}
         )
+
+
+# ── 1b. The owner can turn every hook off (BUG-222) ─────────────────────────
+
+
+def _disable_hooks(workspace: Path, principal_id: str = "principal_owner") -> None:
+    SQLiteStore(workspace).put_user_settings(
+        principal_id, json.dumps({"hooks": {"disabled": True}}), utc_now()
+    )
+
+
+def test_the_owner_switch_stops_every_hook_without_touching_the_files(
+    workspace: Path,
+) -> None:
+    _write(workspace, "config/hooks.json", json.dumps(WORKING_CONFIG))
+    _disable_hooks(workspace)
+
+    gateway = AgentGateway(workspace)
+    gateway.hook_dispatcher.set_disabled(hooks_disabled(workspace, "principal_owner"))
+
+    assert gateway.hook_dispatcher.is_active() is False
+    # The rules are still loaded. Off is a state, not an erasure: the owner has to
+    # be able to see what would run if they turned it back on.
+    assert len(gateway.hook_dispatcher.registry.rules) == 3
+
+
+def test_hooks_run_by_default(workspace: Path) -> None:
+    # Configuring a hook is what asking for it to run means; the switch exists to
+    # be reachable, not to be the posture.
+    _write(workspace, "config/hooks.json", json.dumps(WORKING_CONFIG))
+
+    gateway = AgentGateway(workspace)
+
+    assert hooks_disabled(workspace, "principal_owner") is False
+    assert gateway.hook_dispatcher.is_active() is True
+
+
+def test_the_switch_is_an_owner_setting_not_a_fourth_config_file(workspace: Path) -> None:
+    # A file a project ships must not be able to re-enable itself, so the switch
+    # is never read from any of the three hook sources.
+    _write(
+        workspace,
+        "config/hooks.json",
+        json.dumps({**WORKING_CONFIG, "disabled": False}),
+    )
+    _disable_hooks(workspace)
+
+    assert hooks_disabled(workspace, "principal_owner") is True
+
+
+def test_the_read_model_reports_the_switch_and_keeps_the_rules(workspace: Path) -> None:
+    _write(workspace, "config/hooks.json", json.dumps(WORKING_CONFIG))
+    _disable_hooks(workspace)
+
+    view = DashboardService(workspace).list_hooks("principal_owner")
+
+    assert view["disabled"] is True
+    assert view["active"] is False
+    assert view["rule_count"] == 3
+    assert len(view["rules"]) == 3
 
 
 # ── 2. The published dispatched set matches the real call sites ──────────────

@@ -30,6 +30,11 @@
 >   `HookSourceStatus` per source: a bad file contributes no rules and is reported, the others load
 >   normally, and the runtime is untouched. `HooksRegistry.from_config` still raises, because a
 >   caller handing over a config wants to be told it is wrong.
+> - **Owner off switch:** `hooks.disabled` in the owner's settings makes
+>   `HookDispatcher.is_active()` return `False`, re-read once per turn so it applies without a
+>   restart. It is deliberately an owner setting rather than a fourth config source, because
+>   `config/hooks.json` travels with a repository and a file a project ships must not be able to
+>   re-enable itself. Rules stay loaded and listed while it is on (`raiker/hooks/owner_switch.py`).
 > - **Owner surface:** Extensions → **Hooks** (`GET /api/hooks`) reports what the runtime loaded —
 >   each rule's event, matcher, `if` guard, scope, source file and handlers; the file it could not
 >   read; the events this build actually dispatches; the builtin handler names that exist; and the

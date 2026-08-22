@@ -1527,7 +1527,10 @@ export interface HookActivityView {
 }
 
 export interface HooksView {
+  /** False when nothing is configured **or** the owner turned hooks off. */
   active: boolean;
+  /** The owner's off switch. Rules stay listed while it is on. */
+  disabled: boolean;
   rule_count: number;
   rules: HookRuleView[];
   sources: HookSourceView[];

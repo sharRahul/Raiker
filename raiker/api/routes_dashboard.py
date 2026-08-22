@@ -488,7 +488,7 @@ async def list_hooks(
     Read-only. The config files are the owner's own text on disk; this route
     reports what the runtime loaded from them, including a file it could not read.
     """
-    return _service(request).list_hooks(auth_data[1].delegated_by_user_id)
+    return _service(request).list_hooks(auth_data[0].principal_id)
 
 
 @router.get("/api/plugins")

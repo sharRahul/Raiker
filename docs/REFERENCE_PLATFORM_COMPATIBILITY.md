@@ -1474,21 +1474,28 @@ was missing was everything an owner could see or trust:
 
 | Gap | Reference | Raiker today | Compatibility requirement to close it |
 |---|---|---|---|
-| **22 of ~31 lifecycle events** | Claude Code fires `Stop`, `SubagentStart/Stop`, `TaskCreated/Completed`, `PostToolBatch`, `Notification`, `FileChanged`, `ConfigChange`, `Elicitation`, `WorktreeCreate/Remove` and more | Nine are dispatched; `SessionEnd` is accepted and never emitted | Each needs a real call site, not a schema entry. The rule this round establishes is that an event is published as dispatched only when a test can derive it from the code |
-| **Four of five handler types** | `http`, `mcp_tool`, `prompt`, `agent` | `command` and `builtin` | Each needs a gated surface Raiker keeps closed: network egress, the MCP broker, a model call, a subagent. A hook that reaches the network is an egress decision before it is a hook |
-| **Plugin execution** | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP; Cowork installs them from **Customize** | A plugin is validated, supply-chain checked, signature-levelled and recorded — and provides **nothing** to the runtime (`execution_enabled` is `False` by construction) | The blocking question is not packaging, it is what a plugin's code is allowed to be. Raised as **BUG-221** |
-| **Channel delivery** | Claude Code channels relay permissions and messages over MCP | Connector registry, pairing rows and an inbound receiver that quarantines and never executes; activation returns `active: false` | Unchanged from earlier rounds. Inbound quarantine is the safe half and is built; outbound delivery and sender trust are not |
+| ~~**22 of ~31 lifecycle events**~~ | Claude Code fires `Stop`, `SubagentStart/Stop`, `TaskCreated/Completed`, `PostToolBatch`, `Notification`, `FileChanged`, `ConfigChange`, `Elicitation`, `WorktreeCreate/Remove` and more | **Closed 2026-08-22 as [FIXED-255](plans/FIXED_ITEMS.md).** Sixteen events accepted, all sixteen emitted — `Stop`, `StopFailure`, `SubagentStart/Stop`, `TaskCreated/Completed` and `SessionEnd` gained call sites | The rule this round established held: an event is published as dispatched only when a test can derive it from the code, and the test now derives all sixteen |
+| **Four of five handler types** | `http`, `mcp_tool`, `prompt`, `agent` | `command` and `builtin`. Unchanged; now tracked as **BUG-226** | Each needs a gated surface Raiker keeps closed: network egress, the MCP broker, a model call, a subagent. A hook that reaches the network is an egress decision before it is a hook |
+| **Plugin execution** | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP; Cowork installs them from **Customize** | **Reduced 2026-08-22 as [FIXED-256](plans/FIXED_ITEMS.md).** A plugin contributes hook rules at `plugin` scope; skills, MCP servers and panels do not. `execution_enabled` stays `False` — a contributed rule runs as a *hook* | The blocking question was what a plugin's code is allowed to be, and the answer taken is that it gets no execution surface of its own. **BUG-221** stays open for the remaining three |
+| **Channel delivery** | Claude Code channels relay permissions and messages over MCP | Connector registry, pairing rows and an inbound receiver that quarantines and never executes; activation returns `active: false`. Now tracked as **BUG-225**, and the largest remaining piece of the three-way gap | Unchanged. Inbound quarantine is the safe half and is built; outbound delivery and sender trust are not, and the gate is a decision about what a channel message *is* in a turn rather than the code |
 
 ### Recommended improvements, in the order they are worth doing
 
 1. ~~**`disableAllHooks`**~~ — shipped this round as
    [FIXED-254](plans/FIXED_ITEMS.md).
-2. **`Stop` and `SubagentStop`.** Both have obvious call sites in the runtime
-   today and are the two most-used blocking events in the reference set.
-3. **Plugin execution** (BUG-221), which is a design task about authority before
-   it is an implementation task.
-4. **Channel activation**, last: it is the only one of the three whose safe half
-   already ships.
+2. ~~**`Stop` and `SubagentStop`**~~ — shipped 2026-08-22 as
+   [FIXED-255](plans/FIXED_ITEMS.md), along with `StopFailure`, `SubagentStart`,
+   `TaskCreated`, `TaskCompleted` and `SessionEnd`. The prediction held: every one
+   had an obvious call site already in the runtime.
+3. ~~**Plugin execution**~~ (BUG-221) — first kind shipped 2026-08-22 as
+   [FIXED-256](plans/FIXED_ITEMS.md). It was a design task about authority, and
+   the answer was that a plugin gets no execution surface of its own. Skills,
+   MCP servers and panels remain, in that order.
+4. **Channel activation** (BUG-225), last: it is the only one of the three whose
+   safe half already ships, and the only one whose gate is a threat model rather
+   than an implementation.
+5. **The three refused handler types** (BUG-226). `prompt` first — it makes no
+   outbound request and its output is context, not a decision.
 
 ---
 

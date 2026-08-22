@@ -195,7 +195,11 @@ def _check_no_secrets(
     # emits rather than a stricter rule the middleware never applied.
     if isinstance(value, dict):
         for k, v in value.items():
-            if is_token_count_field(k, v):
+            # Same two exemptions as `_redact_value`, and for the reason stated
+            # above this function: the guard must prove what the middleware
+            # emits, not a stricter rule the middleware never applied. A boolean
+            # the middleware now lets through must not fail here.
+            if is_token_count_field(k, v) or isinstance(v, bool):
                 continue
             if _is_secret_key(k):
                 raise AssertionError(f"Secret-like key at {path}.{k}: {k}")

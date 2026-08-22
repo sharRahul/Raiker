@@ -10941,3 +10941,16 @@ governed product should surface rather than assume.
 over the exact bytes, no secret means unsigned rather than refused, and the
 surface reports which. `apps/web/e2e/bug-225-channels-live.spec.ts` asserts the
 Signing row is present at every width.
+
+**Follow-up, same day — an existing test asserted the opposite, and was
+reversed.** `tests/test_token_count_redaction.py` carried
+`test_a_count_key_holding_a_bool_is_still_redacted`, asserting that
+`{"max_tokens": True}` came back as `"***REDACTED***"`. CI caught the conflict.
+
+The rule that test defends is real and is unchanged: the *count* exemption is
+integer-only, so a **string** under a count-shaped key can never ride out as "not
+a secret". Extending the same guard to booleans, though, protected nothing and
+cost the bug above — so it is reversed, with the reasoning written into the test
+rather than left in a commit message. `_check_no_secrets` gained the identical
+exemption, because that function's own docstring requires it to prove what the
+middleware emits rather than a stricter rule the middleware never applied.

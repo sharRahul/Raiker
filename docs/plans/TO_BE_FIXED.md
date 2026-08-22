@@ -74,6 +74,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
+| [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -786,3 +787,40 @@ rather than by review, and matches the pattern the other three kinds established
 
 **Not blocking anything.** No other work depends on this, and the surface already
 states it is unavailable rather than offering a control that does nothing.
+
+---
+
+## BUG-229 — Most live specs sign in only on an empty workspace
+
+**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-22 while
+running the round's own specs.**
+
+**Observed.** The Workbench greets a fresh instance with *"Welcome to your Work
+Dashboard"* and a returning owner with *"Welcome back"*, and a workspace turns
+from the first into the second the moment it holds any work. Almost every live
+spec's `signIn` waits for the first string. So a suite passes on an empty
+instance and fails on a used one — **at sign-in**, before it reaches anything it
+was written to test, and reporting a missing heading rather than the thing under
+test.
+
+**Reproduction.** Run any live spec against a workspace that has one
+conversation in it. It fails at `signIn` with
+`waiting for getByRole('heading', { name: 'Welcome to your Work Dashboard' })`.
+
+It surfaced mid-round exactly this way: the plugin specs passed, the provider
+spec then created a chat session, and the next spec could not sign in.
+
+**Root cause.** `signIn` is copy-pasted into each spec rather than shared, and
+each copy encodes an assumption about the *state* of the instance that has
+nothing to do with what the spec asserts. `hosted-provider.ts` exists precisely
+to hold the steps every live spec must take — and sign-in is not in it.
+
+**Proposed fix.** Move `signIn` into `e2e/hosted-provider.ts` beside
+`dismissFirstRunModelSetup` and `openHostedProviders`, accepting either greeting,
+and have every live spec call it. The four specs added on 2026-08-22 already
+accept both, which is the shape to lift.
+
+Not urgent, and deliberately not done in bulk this round: each older spec is the
+evidence behind a closed FIXED entry, and re-running one is how that evidence is
+refreshed — a sweeping edit across thirty of them is a change to thirty pieces of
+evidence, which deserves its own pass rather than being smuggled into another.

@@ -675,7 +675,17 @@ handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. `HANDLER_TYP
 in `raiker/hooks/contracts.py` accepts two — `command` and `builtin`, the second
 being Raiker's own in-process code rather than one of the five. A rule naming
 `http` is refused at parse time with `unsupported_handler_type:http`, which is
-the right failure but leaves three of the reference set unavailable.
+the right failure.
+
+**The title undercounts: it is four, not three** — `http`, `mcp_tool`, `prompt`
+and `agent`. The title is left as raised so the anchor other documents link to
+keeps working; the count here is the accurate one.
+
+**Worth stating before the effort is spent:** `command` is the *only* handler
+type Claude Code's own hooks have. This is therefore a gap against Raiker's own
+reference document, not against Claude Code — which is why it stayed Low while
+BUG-221 and BUG-225 were taken first, and why adding a model call inside the hook
+path to satisfy it deserves more scepticism than the count alone suggests.
 
 This is the remainder of the hooks gap after BUG-223. The *events* are at parity;
 the *handlers* are not.

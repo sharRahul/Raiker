@@ -75,7 +75,8 @@ third with its reason.
   design and `ConnectorRegistry` already validates transport, auth, pairing and
   allowlist requirements per profile. *Superseded by the second pass below:* the
   missing decision — what a channel message *is* in a turn — was made and accepted
-  as FIXED-261. Delivery itself is still absent. Tracked as BUG-225.
+  as FIXED-261. *Superseded again by the second pass below:* delivery was not
+  absent, it was unreachable — see FIXED-265. Tracked as BUG-225.
 * **A marketplace or plugin directory.** Not planned; installing from a path or
   URL with a reviewed permission diff is the local-first equivalent.
 * **Hook handler types.** Two accepted (`command`, `builtin` — the second being
@@ -142,7 +143,10 @@ named as next, and settled the decision channels were blocked on.
   an approval over a channel. Tracked as BUG-225.
 * **A marketplace or plugin directory.** Still not planned; installing from a
   path or URL with a reviewed permission diff is the local-first equivalent.
-* **Hook handler types.** Unchanged from the first pass. Tracked as BUG-226.
+* **Hook handler types.** Unchanged from the first pass, and worth restating:
+  `command` is the only handler type **Claude Code's own hooks have**, so the four
+  Raiker refuses are a gap against Raiker's own reference document rather than
+  against Claude Code. Tracked as BUG-226.
 
 ---
 
@@ -1555,7 +1559,7 @@ was missing was everything an owner could see or trust:
 4. **Channel activation** (BUG-225), last: it is the only one of the three whose
    safe half already ships, and the only one whose gate is a threat model rather
    than an implementation.
-5. **The three refused handler types** (BUG-226). `prompt` first — it makes no
+5. **The four refused handler types** (BUG-226). `prompt` first — it makes no
    outbound request and its output is context, not a decision.
 
 ---

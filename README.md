@@ -356,18 +356,20 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
 
-- **Hooks are complete; plugins are nearly so; channels cannot deliver.** Of the
-  three extension surfaces Claude Code ships:
+- **Hooks are complete; plugins are one kind short; channels stop below routing.**
+  Of the three extension surfaces Claude Code ships:
 
   **Hooks** are done. All sixteen events the format accepts are emitted,
   `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
   `command` handlers execute under a bounded timeout with the program resolved
   inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
   at once and is your setting rather than a fourth config file, so a
-  `config/hooks.json` that arrived with a repository cannot re-enable itself. Two
-  of the five handler types in the reference format are unbuilt — `http`,
-  `mcp_tool`, `prompt` and `agent` need network, model and subagent surfaces that
-  are still gated.
+  `config/hooks.json` that arrived with a repository cannot re-enable itself. Of
+  the five handler types in the reference format, `command` is built and four are
+  not: `http`, `mcp_tool`, `prompt` and `agent` need network, model and subagent
+  surfaces that are still gated. (`command` is also the only handler type Claude
+  Code's own hooks have, so this is a gap against Raiker's reference document
+  rather than against Claude Code.)
 
   **Plugins** contribute three of the four kinds the Plugins tab names: hook
   rules, skills, and MCP-server *offers*. A plugin is validated, supply-chain
@@ -388,15 +390,15 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   *enabled*, *trusted* and *reachable* are now four facts shown as four things.
   Each condition is its own row with its own remedy — the capability, the egress
   allowlist, whether deliveries are signed, the inbound secret, and the inbound
-  budget — 60 messages per sender per minute, since
-  allowlisting says *who* may speak and not how often. The spec's routing modes
+  budget of 60 messages per sender per minute, since allowlisting says *who* may
+  speak and not how often. The spec's routing modes
   and resolving an approval over a channel are not built: an inbound message
   never becomes work on its own.
 
-  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-225 (channel rate limits, routing
-  modes and relay resolution), BUG-226 (the hook handler types this build
-  refuses: `http`, `mcp_tool`, `prompt` and `agent`), BUG-227 (no LSP surface)
-  and BUG-228 (plugin panels).
+  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-225 (channel routing modes and
+  relay resolution), BUG-226 (the four hook handler types this build refuses),
+  BUG-227 (no LSP surface), BUG-228 (plugin panels) and BUG-229 (a live-spec
+  sign-in that only works on an empty workspace).
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each

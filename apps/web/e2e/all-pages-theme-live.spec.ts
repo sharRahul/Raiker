@@ -3,6 +3,10 @@ import { expect, test } from "@playwright/test";
 const routes = [
   "home", "new-chat", "build", "search-chat", "tasks", "projects", "memory", "brain",
   "approvals", "capabilities", "models", "extensions?tab=connectors", "extensions?tab=mcp",
+  // Skills and Hooks were missing, so two of the six extension surfaces were
+  // never checked in either theme — the Hooks tab in particular carries several
+  // colours of its own (the dead-rule note, the decides/observes tags).
+  "extensions?tab=skills", "extensions?tab=hooks",
   "extensions?tab=plugins", "extensions?tab=channels", "observe?tab=overview",
   "observe?tab=sessions", "observe?tab=activity", "observe?tab=checkpoints",
   "observe?tab=diagnostics", "observe?tab=work", "observe?tab=notifications", "settings",

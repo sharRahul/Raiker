@@ -15,7 +15,7 @@ about a reference platform.
 | Platform | Current primary-source control set | Raiker status | Compatibility requirement / differentiator |
 |---|---|---|---|
 | Claude Cowork / Claude chat | Connectors can read local/remote sources and take actions; the cited documentation does not establish Raiker-style receipts, graph review, or checkpoint-health semantics. [Anthropic connectors](https://support.anthropic.com/en/articles/11817150-connect-your-tools-to-unlock-a-smarter-more-capable-ai-companion) | **Partial** | Chat, projects, tasks, approvals, connectors, memory review and provider choice ship. Hosted schedules, the full connector catalogue and desktop reach remain behind. Evidence-bound graph proposals and visible checkpoint non-reversibility are meaningful improvements: **yes**, because inferred memory and failed rollback promises become reviewable. |
-| Claude Code | OS-enforced filesystem/network sandboxing, allowed domains, deny-first permissions and hooks are documented; sandbox unavailability can fail closed. [Sandboxing](https://code.claude.com/docs/en/sandboxing), [permissions](https://code.claude.com/docs/en/permissions), [hooks](https://code.claude.com/docs/en/hooks) | **Partial** | Raiker has measured boundaries, governed commands, approvals, checkpoints, plans and read-only subagents. Hooks/plugins are not at parity. Active per-run egress revocation would be meaningful: **yes**, but only after real bypass/revocation proof. |
+| Claude Code | OS-enforced filesystem/network sandboxing, allowed domains, deny-first permissions and hooks are documented; sandbox unavailability can fail closed. [Sandboxing](https://code.claude.com/docs/en/sandboxing), [permissions](https://code.claude.com/docs/en/permissions), [hooks](https://code.claude.com/docs/en/hooks) | **Partial** | Raiker has measured boundaries, governed commands, approvals, checkpoints, plans and read-only subagents. Hooks reached parity on 2026-08-22 — every event the schema accepts is emitted, and an owner off switch exists (FIXED-255, FIXED-254). Plugins are partial: hook rules are contributable, skills / MCP servers / panels are not (FIXED-256). Active per-run egress revocation would be meaningful: **yes**, but only after real bypass/revocation proof. |
 | ChatGPT Chat / Work | Apps support search, deep research, sync and confirmed writes; projects can use project-only memory and memory sources expose recalled inputs. [Apps](https://help.openai.com/en/articles/11487775-connectors-in), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq) | **Partial** | Raiker is at parity for multi-provider chat, projects, governed writes and owner-reviewed durable memory, but behind the app directory, hosted operation and broad multimodal work surface. Evidence-edge acceptance/rejection is meaningful: **yes**; the cited sources do not establish an equivalent. |
 | Codex | Local/cloud agents default to filesystem sandboxing with network disabled; cloud can allow trusted domains and local commands can request elevation. [Codex upgrades](https://openai.com/index/introducing-upgrades-to-codex/), [Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/) | **Partial** | Raiker is at parity for workspace-bounded execution, no-network native sandboxing, foreground/background receipts, persistent container sessions and approvals. It is behind Codex's production domain-network and cloud/worktree lifecycle. Two-pass credential delta quarantine is meaningful: **yes**, conditional on real copy-on-write delivery proof. |
 | OpenClaw | Exec supports foreground/background/process/PTY, host or sandbox routing, allowlists and approval modes; its docs state sandboxing is off by default. [Exec](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec.md), [approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md) | **Partial** | Raiker's deny-by-default authority binding, immutable receipts and measured cards are stronger controls; OpenClaw leads in channels, plugins, PTY breadth and node-host execution. One lifecycle across local/container/SSH/Daytona is meaningful: **yes**; supervised install and broad remote parity remain partial. |
@@ -35,6 +35,48 @@ about a reference platform.
 | Windows PTY/restart attachment outside a proven sandbox transport | **No** | Convenience would weaken the boundary, so it remains unsupported. |
 | Governed turn-based dictation and manual read-aloud | **Yes — proven** | Dictation itself is parity with Claude and ChatGPT; explicit-send invariance, exact draft rollback, constrained provenance and a single cross-surface audio owner are the meaningful improvement. |
 | Full-duplex live conversation with interruption and hands-free task control | **Yes — conditional** | Continuous voice is parity with Claude and ChatGPT. It becomes a differentiator only when spoken task controls retain visible state, action-bound confirmation, gateway policy and durable accepted/refused receipts. |
+
+---
+
+## 2026-08-22 review — hooks, plugins and channels
+
+The standing "largest single gap to Claude Code" was hooks → plugins → channels.
+This round closed the first, took the first slice of the second, and left the
+third with its reason.
+
+| Area | Reference control set | Raiker after this round | Status |
+|---|---|---|---|
+| Hook lifecycle events | Claude Code documents `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `Stop`, `SubagentStop`, `PreToolUse`, `PostToolUse`, `PreCompact` and others. [Hooks](https://code.claude.com/docs/en/hooks) | Sixteen events accepted and **all sixteen emitted**; the accepted set and the emitted set are equal, derived from the call sites by a test so they cannot drift | **At parity** |
+| Turn-end signalling | One `Stop`, with a separate `SubagentStop` | `Stop` and `StopFailure` are separate events: a turn parked on an approval or stopped by the owner never reports as a clean completion | **Beyond**, narrowly — see below |
+| Turning hooks off | `disableAllHooks` in settings; `--settings` for one run | Owner setting; rules stay listed and marked off rather than hidden | **At parity** (FIXED-254) |
+| Which rules actually enforce | Not established by cited source | Every rule states whether it can decide or only observes, whether its event is emitted, and which file it came from | **Beyond** (FIXED-253) |
+| Plugin contributions | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers; Cowork installs them from **Customize**. [Plugins](https://code.claude.com/docs/en/plugins) | Hook rules only, at `plugin` scope below every owner scope, behind a declared `event:hook` permission, deleted on revocation | **Partial** |
+| Plugin authorship verification | Claude Code and Codex verify MCP server transport, not manifest authorship | HMAC / Ed25519 manifest verification with a first-class `verified` / `present only` / `unsigned` level either way | **Beyond** (FIXED-166) |
+| Channels / inbound delivery | OpenClaw leads here; Claude Code has no equivalent | Specified in `CHANNELS_SPEC.md`; a connector registry exists, no delivery path does | **Absent** |
+
+### Categorical confirmation — does this go beyond the reference set?
+
+| Proposed control | Meaningful improvement that could put Raiker beyond the reference set? | Decision |
+|---|---|---|
+| Emitting the seven missing lifecycle events | **No — parity.** Claude Code documents them; Raiker specified them and emitted nine | Shipped (FIXED-255). Necessary to be honest about the surface, not a differentiator |
+| Splitting `Stop` from `StopFailure` | **Yes — small, proven.** The cited reference has one `Stop`. A rule written to react to *completion* firing on a run that was stopped or parked is a correctness bug the single event invites | Shipped. Narrow, but real: it is the difference between "the turn ended" and "the turn succeeded" |
+| Deriving the emitted-event set from the source | **Yes — proven.** No cited reference publishes which of its documented events a given build really emits | Shipped (FIXED-253, extended by FIXED-255). A configured rule that can never run is the worst kind of safeguard |
+| Plugin contributions arriving only through an already-governed surface | **Yes — structural.** Claude Code plugins bundle code that runs; Raiker's contribute through hooks, which already have an execution model, a timeout, an audit trail and a scope below every owner scope | Shipped (FIXED-256). It is also *less* capable than the reference set today, which the Plugins tab states rather than hides |
+| Revocation deleting a contribution rather than flagging it | **Yes — proven.** Prevents the state where the page says revoked and the runtime still runs the rule | Shipped (FIXED-256) |
+| A general "plugin code runs" step | **No — refused.** It would need an authority story none of the remaining contribution kinds requires | Not taken, deliberately |
+| Channel delivery controls | **Not yet assessable.** Inbound delivery is the highest-risk surface in the reference set — OpenClaw's own docs treat channels as the place external input enters — and offering controls before an accepted threat model would be the opposite of governed | Deferred. The tab says so rather than hiding the gap |
+
+### What is still behind, stated plainly
+
+* **Plugin skills, MCP servers and panels.** Tracked on BUG-221. Skills are next
+  because they run nothing and need only provenance.
+* **Channels.** No inbound or outbound delivery. `CHANNELS_SPEC.md` has the
+  design; the threat model is the gate, not the code.
+* **A marketplace or plugin directory.** Not planned; installing from a path or
+  URL with a reviewed permission diff is the local-first equivalent.
+* **Hook handler types.** Two of five (`command`, `builtin`). `http`, `mcp_tool`,
+  `prompt` and `agent` handlers are specified and unbuilt — the first two need an
+  egress story, the second two need a model-call budget.
 
 ---
 
@@ -72,8 +114,8 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | `commands` / slash commands (built-in + custom) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | ✅ 50+ inspection commands |
 | `cli-reference` (flags: `--prompt`, `--workspace`, resume/fork) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `README.md` | 🟡 `--prompt`/`--workspace` only |
 | `checkpointing` (snapshot before edit, rewind, restore code/convo) | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 write real; restore plan-only |
-| `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 🟡 dispatcher, matchers and `if` real; 9 events, 2 handler types, owner surface at Extensions → Hooks |
-| `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🔒 manifest validation only |
+| `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 🟡 dispatcher, matchers and `if` real; **16 events, all of them emitted** (FIXED-255), 2 handler types, owner off switch and owner surface at Extensions → Hooks |
+| `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🟡 manifest validation, supply chain and signature level, plus **contributed hook rules at `plugin` scope** (FIXED-256); skills, MCP servers and panels not contributable; no marketplace |
 | `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | 🔒 registry only |
 
 > Alignment notes: the Claude Code hooks reference documents **31 events** (incl.
@@ -1018,7 +1060,7 @@ Status: ✅ at parity or beyond · 🟡 partial · ❌ absent.
 | Plugin manifest | Claude Code `plugin.json` | `raiker-plugin.json` with a required per-permission `reason` and `expected_effect` | ✅ beyond |
 | Permission change on update | Version bump | Version bump **plus** a permission diff whenever authority widens | ✅ beyond |
 | Enabling a plugin | Enabled on install | Install and enable are separate decisions; execution stays behind the gate for the component class | ✅ beyond |
-| Hooks | Claude Code hook events; OpenClaw gateway events | `docs/HOOKS_SPEC.md` event catalogue; a hook can block or annotate, never grant | 📘 specified |
+| Hooks | Claude Code hook events; OpenClaw gateway events | Sixteen events, all emitted; a hook can block or annotate, never grant; owner off switch; the page states which rules can decide and which only observe | ✅ |
 | MCP servers | stdio + streamable HTTP; HTTP+SSE deprecated | Same transports, owner-added, per-connection monitoring and re-consent on a surface change | ✅ |
 | Protocol revision covered | 2026-07-28 (stateless core, MRTR, cacheable lists) | `mcp-builder` ships the revision reference and the migration checklist | ✅ |
 | Self-created skills | Hermes proposes skills after successful tasks | Skill candidates recorded for owner review; never auto-installed | ✅ |
@@ -1369,7 +1411,7 @@ Recorded here and, where they are work rather than a decision, in
 | **Ten-minute auto-deny on an unanswered forwarded approval** | Dispatch forwards a child's permission prompt and denies it automatically after ten minutes | Raiker approvals wait indefinitely | A timeout is only safe if the expiry is itself a recorded decision with its reason, not a silent drop |
 | **Project links** | A Cowork project holds reference URLs alongside folders and instructions | Raiker projects hold instructions, shared attachments, a root subpath and an opt-in approved-memory boundary — links are absent | A link is a fetch the agent may perform, so it belongs to the web-access gate rather than to project metadata. That is the design question, not the storage |
 | **Hosted scheduling** | Cowork's scheduled tasks "run in the cloud, so they don't need your computer to be awake" | Raiker schedules run on the resident local host | Out of scope by design — Raiker is local-first and single-user. Recorded so the difference is stated rather than looking like an oversight |
-| **Hooks, plugins and channels** | Claude Code ships all three; Cowork installs plugins from **Customize** | Specified in `HOOKS_SPEC.md`, `PLUGIN_SYSTEM_SPEC.md` and `CHANNELS_SPEC.md`; manifest validation and a connector registry exist, execution does not | Unchanged from earlier rounds and still the largest single gap to Claude Code |
+| **Hooks, plugins and channels** | Claude Code ships all three; Cowork installs plugins from **Customize** | **Hooks: at parity** (2026-08-22 — 16 events all emitted, owner off switch, owner surface). **Plugins: partial** — a plugin contributes hook rules at `plugin` scope; skills, MCP servers and panels do not. **Channels: absent** — specified in `CHANNELS_SPEC.md`, no delivery path | Reduced 2026-08-22. Channels are now the largest remaining piece, and the one that still needs an accepted threat model before controls are offered |
 
 ### Recommended improvements, in the order they are worth doing
 

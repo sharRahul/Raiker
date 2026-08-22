@@ -3,7 +3,7 @@
 // connected, enabled, and usable are four separate facts, and anything not
 // usable says which condition is unmet.
 import { render, screen, waitFor } from "@testing-library/svelte";
-import { fireEvent } from "@testing-library/dom";
+import { fireEvent, within } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ExtensionsView from "./ExtensionsView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -168,10 +168,64 @@ describe("ExtensionsView", () => {
     expect(screen.queryByText(/waiting on your decision/i)).not.toBeInTheDocument();
   });
 
-  it("states plainly that plugin panels are not available yet", async () => {
-    stubFetch({});
+  it("separates what a plugin may contribute from what it does not yet", async () => {
+    // BUG-221 — hooks are contributable now, panels are not. One list saying
+    // which is which beats a card that implies a plugin contributes nothing.
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [],
+        signing: { configured: false, summary: "No signing key configured." },
+        contribution_kinds: [
+          { kind: "hooks", available: true, summary: "Hook rules at plugin scope." },
+          { kind: "panels", available: false, summary: "Needs a route contract." },
+        ],
+      },
+    });
     render(ExtensionsView, { props: { tab: "plugins" } });
-    expect(await screen.findByText(/plugin panels are not available yet/i)).toBeInTheDocument();
+
+    const heading = await screen.findByText(/what a plugin may contribute/i);
+    // Scoped to the card: "Hooks" is also a tab label, and asserting against the
+    // wrong one would pass without proving anything about this list.
+    const card = within(heading.closest("section") as HTMLElement);
+    expect(card.getByText("Hooks").closest("li")).toHaveTextContent("Available");
+    expect(card.getByText("Panels").closest("li")).toHaveTextContent("Not yet");
+  });
+
+  it("says what an installed plugin actually provides", async () => {
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [
+          {
+            record_id: "plr_1",
+            plugin_id: "acme-guard",
+            version: "1.2.0",
+            trust_level: "local_dev",
+            status: "installed",
+            source_url: null,
+            installed_at: "2026-08-22T00:00:00Z",
+            installed_by: "cli",
+            checksum_present: true,
+            signature: {
+              level: "present_only",
+              label: "Signature present",
+              reason: "no_key",
+              method: "hmac",
+              verified: false,
+              explanation: "A signature is present but no key was configured to check it.",
+              remediation: "",
+            },
+            contributions: { hooks: 2, events: ["PostToolUse", "PreToolUse"], error: null },
+          },
+        ],
+        signing: { configured: false, summary: "No signing key configured." },
+        contribution_kinds: [],
+      },
+    });
+    render(ExtensionsView, { props: { tab: "plugins" } });
+
+    expect(
+      await screen.findByText(/provides 2 hook rules on PostToolUse, PreToolUse/i),
+    ).toBeInTheDocument();
   });
 
   it("states the signing posture rather than leaving it to be inferred", async () => {

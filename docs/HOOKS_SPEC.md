@@ -213,6 +213,86 @@ If a matcher is unsupported for an event, configuration validation must warn or 
 
 ---
 
+## What This Build Accepts And Emits
+
+The catalogue above is the target surface. This section is the build, and the two
+are kept apart deliberately: a rule that parses and never runs is a safeguard the
+owner believes is in place when it is not.
+
+`raiker/hooks/contracts.py` publishes two sets:
+
+- **`HOOK_EVENTS`** — what a configuration file may name. Anything else is
+  refused at parse time, so a typo is never silently ignored.
+- **`DISPATCHED_HOOK_EVENTS`** — what the runtime really emits.
+
+They are **equal on this build** (BUG-223). `tests/test_hooks_surface.py` derives
+the second set from the call sites in the source and asserts it matches, so the
+published surface cannot drift from the code; when a later build accepts an event
+before wiring it, every surface that lists hooks marks such a rule as configured
+but never firing.
+
+| Event | Where it is emitted | Decides? |
+|---|---|---|
+| `SessionStart` | first turn of a new conversation | observes |
+| `SessionEnd` | a conversation is archived or deleted | observes |
+| `UserPromptSubmit` | before the turn runs | observes |
+| `Stop` | a turn finished and produced an answer | observes |
+| `StopFailure` | a turn failed, was stopped, or parked on an approval | observes |
+| `PreCompact` | before older exchanges leave the context window | **decides** |
+| `PostCompact` | after compaction, with what it produced | observes |
+| `PreToolUse` | before policy finalises a tool call | **decides** |
+| `PostToolUse` | a tool call succeeded | observes |
+| `PostToolUseFailure` | a tool call failed | observes |
+| `PermissionRequest` | an approval is about to be raised | observes |
+| `PermissionDenied` | a tool call was denied | observes |
+| `SubagentStart` | a delegation is about to run | observes |
+| `SubagentStop` | a delegation finished | observes |
+| `TaskCreated` | a task was created | observes |
+| `TaskCompleted` | a task completed, failed or was cancelled | observes |
+
+Only `PreToolUse` and `PreCompact` decisions are honoured, and only from a
+handler holding decision authority. Everything else observes: a handler returning
+`deny` on `PostToolUse` changes nothing, which the Hooks surface says rather than
+implies.
+
+`Stop` and `StopFailure` are split because "the turn ended" and "the turn
+succeeded" are different questions. A turn parked on an approval has not
+finished — it is waiting — and a turn the owner stopped did what it was told;
+reporting either as `Stop` would let a rule written to react to completion fire on
+a run that never completed.
+
+---
+
+## Where Rules Are Loaded From
+
+In order of authority, highest first:
+
+| Source | Scope | Written by |
+|---|---|---|
+| `config/managed-hooks.json` | `managed` | the organisation |
+| `config/hooks.json` | `project` | the repository |
+| `.raiker/hooks.json` | `local` | this checkout |
+| `.raiker/plugins/<plugin_id>/hooks.json` | `plugin` | an installed plugin |
+
+A lower scope can never override a higher-scope deny, so a plugin rule can make
+an action stricter and can never loosen one the owner set.
+
+A source that cannot be parsed contributes **no rules** and is reported as a
+failed source; it never takes the rest of the runtime with it. `HooksRegistry.load`
+runs inside the `AgentGateway` constructor, so raising there once made every
+prompt in the product fail.
+
+### The Owner's Off Switch
+
+`hooks.disabled` in owner settings makes `HookDispatcher.is_active()` return
+`False` for every event, including the ones no turn owns — tasks, subagents,
+session ends. It is deliberately **not** a fourth configuration file: a file a
+project ships must not be able to re-enable itself. Rules stay listed while it is
+on, because off is a state to display rather than a reason to hide what would
+otherwise run.
+
+---
+
 ## Hook Input Schema
 
 ```json

@@ -10193,3 +10193,216 @@ read from any of the three hook sources, and the read model reports it. The pane
 test asserts the rules stay listed. Verified live: with the switch on, a Build
 turn that made a tool call produced **zero** new hook events, where the identical
 turn with the switch off produced `hook_matched → hook_decision → hook_failed`.
+
+---
+
+## FIXED-255 — Seven lifecycle events were specified and never emitted
+
+**Severity: Medium. Area: hooks / lifecycle. Fixed 2026-08-22 (BUG-223).**
+
+`docs/HOOKS_SPEC.md` described roughly the event surface Claude Code documents.
+Nine were dispatched. `SessionEnd` was accepted by the config schema and had no
+call site at all, so a rule written for it parsed cleanly and never ran; the rest
+were not in `HOOK_EVENTS`, so a rule naming one was refused at parse time.
+FIXED-253 made the first kind *visible* — a rule on a dead event is marked as
+configured but never firing — which named the gap without closing it.
+
+Seven events now have call sites, each placed where the boundary already existed:
+
+| Event | Call site | Why there |
+|---|---|---|
+| `Stop` / `StopFailure` | `AgentGateway._finalize_turn` | Both turn paths — submit and stream — already funnel through it, after the checkpoint and the turn row are written. |
+| `SubagentStart` / `SubagentStop` | `ToolBroker._spawn_subagent` | The parent's `PreToolUse` already fired for the call, but a rule that wants to know a *subagent* ran needs the objective going in and the outcome coming back. |
+| `TaskCreated` / `TaskCompleted` | `TaskManager` | The only place that sees every task regardless of who asked for it; a scheduled run has no turn at all. |
+| `SessionEnd` | `DashboardService`, on archive and delete | What ends a web session had no obvious answer — a closed tab is not a decision. Archiving or deleting one is. |
+
+Four decisions worth stating, because each rules out a plausible alternative:
+
+* **`Stop` and `StopFailure` are two events, not one with a status field.** A turn
+  parked on an approval has not finished — it is waiting — and a turn the owner
+  stopped did what it was told. A single `Stop` would let a rule written to react
+  to *completion* fire on a run that never completed, which is the same class of
+  dishonesty as an event that never fires at all.
+* **`TaskCompleted` fires on failed and cancelled tasks too.** Terminal is
+  terminal: a rule that cleans up after a task must run when the task failed, or
+  it only ever tidies the happy path.
+* **Every one of the seven observes; none can decide.** `PreToolUse` and
+  `PreCompact` remain the only events whose decision is honoured. A second place
+  that could stop the same action would not appear on the authority matrix the
+  owner reads.
+* **`SessionEnd` is dispatched before a delete and after an archive**, for the
+  same reason in both cases: a handler should be able to read the transcript it
+  is being told about.
+
+The owner's off switch reaches all of them. `raiker/hooks/factory.py` exists so
+that the call sites with no gateway to borrow from — a scheduler creating a task,
+a dashboard route archiving a conversation — cannot forget it: the dispatcher it
+returns already has the switch applied, so there is nothing for a caller to
+remember.
+
+`HOOK_EVENTS` and `DISPATCHED_HOOK_EVENTS` are now **equal**, and the machinery
+that lets them differ is kept: what makes a future gap visible is worth more than
+the fact that there is not one today.
+
+**Reference-platform decision.** **No — parity.** Claude Code documents `Stop`,
+`SubagentStop`, `SessionEnd` and the rest; Raiker specified them and emitted
+nine. The `Stop`/`StopFailure` split is the one thing the reference set does not
+describe, and it is a correctness choice rather than a differentiator.
+
+**Evidence.** `tests/test_hooks_lifecycle.py` — each event exercised through the
+object that owns its boundary, with the durable `hook_matched` / `hook_executed`
+record as the proof, plus the negative cases: a task fires nothing when no rule
+names it, un-archiving does not fire `SessionEnd`, and the owner switch silences
+the task events too. `tests/test_hooks_surface.py` derives the dispatched set from
+the call sites in the source, so the published surface cannot drift, and still
+tests the "configured but never fires" path by forcing it. Verified live against
+a running host on hosted Anthropic `claude-haiku-4-5-20251001`: a `Stop` rule
+written to `config/hooks.json`, a real prompt answered, and `hook_matched` and
+`hook_executed` in Recent hook activity afterwards
+(`screenshots/working/bug-223-stop-fired-on-a-real-turn.png`).
+
+---
+
+## FIXED-256 — A plugin was recorded and then provided nothing
+
+**Severity: Medium. Area: plugins / extensibility. Fixed 2026-08-22 (BUG-221,
+first contribution kind).**
+
+Installing a plugin validated its manifest, checked its supply chain, resolved
+its signature to `verified` / `present_only` / `unsigned`, wrote a
+`PluginInstallRecord`, and showed all of that on Extensions → Plugins. Then
+nothing happened. `PluginRegistrationPlan.execution_enabled` is `False` by
+construction, so a plugin contributed no skill, no agent, no hook, no MCP server
+and no panel — an install flow for something that could not be installed.
+
+The blocking question was never packaging. It was **what a plugin's code is
+allowed to be**, and the answer taken is that a plugin **does not get an
+execution surface of its own**: it contributes through a surface that already
+governs the thing contributed. Hooks are the first, because a hook already has an
+execution model (argv resolved inside the workspace under a bounded timeout), an
+audit trail, and a scope — and `plugin` sits below `managed`, `user`, `project`
+and `local` in `HOOK_SCOPES`, so a plugin rule can make an action stricter and can
+never override a deny the owner or their organisation set. That property is
+structural rather than a check.
+
+A manifest declares rules under `contributes.hooks`. Three refusals, all
+fail-closed and all named:
+
+1. **No declared permission, no contribution.** The manifest must ask for
+   `event:hook`, which is not in `SAFE_READ_ONLY` — so a plugin asking for it can
+   never be auto-planned, and the owner reads it in the permission diff *before*
+   installing. That is the point of requiring it rather than inferring it from
+   the manifest's contents.
+2. **A malformed contribution is refused at plan time**, with the parse error
+   named, rather than written and discovered later as a file that silently loads
+   nothing.
+3. **An unsafe plugin id is refused, not sanitised.** Sanitising invites two ids
+   collapsing onto one folder, where one plugin silently overwrites another's
+   rules.
+
+Revocation **deletes** the contributed file rather than annotating the record.
+`HooksRegistry.load` reads files and has no store to consult, so leaving it
+behind would produce the one state revocation exists to prevent: the page says
+revoked and the runtime still runs the rule. `PluginRevocationExecutor` reports
+`contributions_removed`, so a removal that did not happen is visible rather than
+assumed. Re-installing replaces rather than accumulates, so an upgrade that
+dropped a rule drops it here too.
+
+**A rule now names its own source file.** Scope stopped identifying a file the
+moment plugins could contribute — every installed plugin loads at scope
+`plugin` — so `HookRule` carries `source`, and the Hooks page credits each rule
+to the plugin that wrote it instead of labelling them all "plugin".
+
+**Extensions → Plugins** states what each installed plugin *provides*, read from
+the files the runtime loads rather than from the manifest that described them, so
+it cannot claim a contribution the runtime does not have. The tab also lists what
+a plugin **may** contribute — hooks available, skills / MCP servers / panels not
+yet, each with the reason — which replaces the old "plugin panels are not
+available yet" card. "Provides nothing" and "may not provide anything" are
+different facts and now read differently.
+
+`execution_enabled` stays `False`. It is a different claim: a plugin still runs no
+code of its own, and a hook rule it contributed runs as a **hook**, under the
+hook's rules.
+
+**Reference-platform decision.** **No — parity, taken narrowly.** Claude Code
+plugins bundle skills, agents, hooks, MCP servers and LSP servers, and Cowork
+installs them from Customize. This closes the first of those and states the rest
+as not available with the reason, which is behind the reference set. The
+scope-ordering guarantee — a plugin rule can never loosen one the owner set — is
+a property the cited references do not document, but it is a consequence of the
+hook model rather than a differentiator.
+
+**Remaining.** Skills, MCP servers and plugin panels. Tracked on BUG-221, which
+stays open for them.
+
+**Evidence.** `tests/test_plugin_contributions.py` — asking is required and the
+refusal is named on the plan; a plugin loads at `plugin` scope below every owner
+scope and cannot override a managed deny whatever it returns; the owner switch
+reaches it; revoking through the real executor removes the rules; re-installing
+replaces them; an upgrade contributing nothing removes the old ones; a broken
+plugin file does not discard the owner's rules; each rule names its own plugin.
+`apps/web/src/lib/views/ExtensionsHooks.test.ts` and `ExtensionsView.test.ts` for
+the surfaces. Verified live: two contributed rules loaded, credited to
+`acme-guard`, with the `PreToolUse` one reported as enforcing
+(`screenshots/working/bug-221-plugin-contributed-rules.png`,
+`bug-221-plugin-contribution-kinds.png`).
+
+---
+
+## FIXED-257 — The selected tab could be off the screen it was selected on
+
+**Severity: Low. Area: navigation / responsive. Fixed 2026-08-22.**
+
+The hub tab strips are `overflow-x: auto`, and on a phone six tabs are wider than
+the screen. Landing on `#/extensions?tab=plugins` at 390px rendered the strip at
+`scrollLeft: 0` with the selected tab at 365px in a 364px-wide viewport: the page
+showed the Plugins panel under a strip that appeared to have Hooks selected, and
+nothing on screen said otherwise.
+
+`TabStrip` now scrolls the selected tab into view when the strip actually
+overflows. `inline: "nearest"` rather than `center`, so a tab that is already
+visible is left alone — arrow-key navigation is not fighting a scroll animation,
+and the first and last tabs keep their strip edge instead of being pulled inward.
+`block: "nearest"` because a horizontal strip must never scroll the page.
+
+Found while photographing Extensions at three window sizes for BUG-221; it
+affects every hub with more tabs than fit — Extensions, Observability, Models,
+Settings.
+
+**Reference-platform decision.** **No — a defect fix**, not a feature.
+
+**Evidence.** `apps/web/src/lib/components/TabStrip.test.ts` — the selected tab
+is scrolled into view when the strip overflows and left alone when it fits.
+`bug-221-223-hooks-plugins-live.spec.ts` asserts the selected tab is in the
+viewport at mobile, tablet and desktop, which is what caught it.
+
+---
+
+## FIXED-258 — Twenty web tests failed on a current Node and passed on CI's
+
+**Severity: Low. Area: web tests / environment. Fixed 2026-08-22 (BUG-224).**
+
+`npx vitest run` under Node 25.6.1 failed `src/lib/theme.test.ts` and
+`src/lib/views/LoginView.test.ts` — twenty tests — with
+`TypeError: window.localStorage.clear is not a function`. CI, pinned to Node 22
+in `.github/workflows/web.yml`, was green throughout. That split is the actual
+harm: a developer on a current Node saw twenty failures with nothing to do with
+their change, and had no way to tell them from a real regression.
+
+Node 25 ships a built-in `localStorage` global that shadows jsdom's and is inert
+unless the process was started with a valid `--localstorage-file`. The LoginView
+failures were the same cause one step downstream: the `afterEach` that clears
+storage threw, cleanup never ran, and the next test found two of every button.
+
+`src/test-setup.ts` now restores the storage jsdom promises when what is present
+is not a working `Storage`. Raising the pinned Node version was the alternative
+and was rejected: it fixes the symptom for one release and inherits whichever
+globals the next one adds. The shim is a real map rather than a stub returning
+undefined, because the code under test persists a theme choice and reads it back —
+a no-op would pass the type check and fail the behaviour.
+
+**Reference-platform decision.** **No — a defect fix**, and an environment one.
+
+**Evidence.** The full web suite: 107 files, 913 passed, 1 skipped, on Node
+25.6.1. Previously 105 passed / 2 failed with 20 failing tests on the same host.

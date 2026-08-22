@@ -23,7 +23,7 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
-    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, and what is not yet available" },
+    { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, skills, hooks and plugins" },
   ] },
   { label: "Observe", items: [
     { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },

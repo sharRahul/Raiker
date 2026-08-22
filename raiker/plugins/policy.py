@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from raiker.plugins.contributions import contribution_summary
 from raiker.plugins.dependencies import (
     plugin_dependency_allowlist,
     validate_plugin_dependencies,
@@ -45,6 +46,11 @@ class PluginRegistrationPlan:
     execution_enabled: bool = False
     entrypoints: dict[str, Any] = field(default_factory=dict)
     events: list[dict[str, Any]] = field(default_factory=list)
+    # BUG-221 — what this plugin would actually provide once installed, and the
+    # named reason when it would provide nothing. `execution_enabled` stays False
+    # because a plugin still runs no code of its own; a contribution arrives
+    # through a surface that already governs it, which is a different claim.
+    contributions: dict[str, Any] = field(default_factory=dict)
     # BUG-79 — what the manifest's signature actually proved. Carried on the plan
     # so the permission diff the owner reads states it alongside the permissions,
     # rather than leaving `verified` and `present only` looking identical.
@@ -60,6 +66,7 @@ class PluginRegistrationPlan:
             "execution_enabled": self.execution_enabled,
             "entrypoints": self.entrypoints,
             "events": self.events,
+            "contributions": dict(self.contributions),
             "signature": self.signature.to_dict() if self.signature is not None else None,
         }
 
@@ -100,6 +107,7 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
         if status == "denied"
         else "phase3.plugin.registration.planned"
     )
+    contributions = contribution_summary(manifest, permissions)
     return PluginRegistrationPlan(
         plugin_id=validation.plugin_id,
         status=status,
@@ -123,8 +131,11 @@ def plan_plugin_registration(manifest: dict[str, Any]) -> PluginRegistrationPlan
                     "execution_enabled": False,
                     "signature_level": signature.level,
                     "signature_reason": signature.reason,
+                    "contributed_hooks": contributions.get("hooks", 0),
+                    "contributions_refused": contributions.get("refused", []),
                 },
             },
         ],
         signature=signature,
+        contributions=contributions,
     )

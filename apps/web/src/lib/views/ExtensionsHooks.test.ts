@@ -85,7 +85,11 @@ function rule(partial: Partial<HooksView["rules"][number]>): HooksView["rules"][
 function routes(view: HooksView) {
   return {
     "GET /api/extensions": { extensions: [], summary: {} },
-    "GET /api/plugins": { plugins: [], signing: { configured: false, summary: "", remediation: null } },
+    "GET /api/plugins": {
+      plugins: [],
+      signing: { configured: false, summary: "", remediation: null },
+      contribution_kinds: [],
+    },
     "GET /api/approvals": [],
     "GET /api/hooks": view,
   };
@@ -216,6 +220,43 @@ describe("Extensions → Hooks", () => {
     // enforcing would be the surface asserting a guard that is not there.
     expect(await screen.findByText(/no builtin by this name in this build/i)).toBeInTheDocument();
     expect(screen.queryByText("Can deny or ask")).not.toBeInTheDocument();
+  });
+
+  it("credits a plugin rule to the plugin that wrote it, not to its scope", async () => {
+    // BUG-221 — every installed plugin loads at scope "plugin", so the scope word
+    // stopped identifying a file. Two plugins showing the same label would leave
+    // the owner unable to tell which one wrote the rule that just denied them.
+    stubFetch(
+      routes(
+        hooks({
+          rule_count: 2,
+          rules: [
+            rule({
+              rule_id: "plugin:PreToolUse:0",
+              scope: "plugin",
+              source: ".raiker/plugins/acme-guard/hooks.json",
+            }),
+            rule({
+              rule_id: "plugin:PreToolUse:1",
+              scope: "plugin",
+              source: ".raiker/plugins/beta-watch/hooks.json",
+            }),
+          ],
+        }),
+      ),
+    );
+    render(ExtensionsView, { tab: "hooks" });
+
+    expect(await screen.findByText("acme-guard")).toBeInTheDocument();
+    expect(screen.getByText("beta-watch")).toBeInTheDocument();
+  });
+
+  it("names the plugin directory among the places hooks come from", async () => {
+    stubFetch(routes(hooks()));
+    render(ExtensionsView, { tab: "hooks" });
+
+    const footer = await screen.findByText(/hooks are configured in a file, not here/i);
+    expect(footer.closest("section")).toHaveTextContent(".raiker/plugins/");
   });
 
   it("publishes what a rule may name, because the file is written by hand", async () => {

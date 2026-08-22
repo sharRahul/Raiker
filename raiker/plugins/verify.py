@@ -170,6 +170,17 @@ def expected_plugin_signature(manifest: dict[str, Any], key: str) -> str:
     return hmac.new(key.encode("utf-8"), content.encode("utf-8"), hashlib.sha256).hexdigest()
 
 
+def plugin_checksum(manifest: dict[str, Any]) -> str:
+    """The checksum an owner would compute for *manifest*.
+
+    The counterpart to :func:`expected_plugin_signature`, and exposed for the
+    same reason: tooling that prepares a manifest should not have to
+    reimplement the canonicalisation, and a second implementation of it is a
+    second thing that can disagree with the verifier.
+    """
+    return hashlib.sha256(_canonical_content(manifest).encode("utf-8")).hexdigest()
+
+
 def verify_plugin_checksum(manifest: dict[str, Any]) -> tuple[bool, str]:
     supply_chain = manifest.get("supply_chain") or {}
     checksum = supply_chain.get("checksum")

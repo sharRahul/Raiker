@@ -367,6 +367,15 @@ export interface PluginSignature {
   remediation: string;
 }
 
+/** What a plugin actually provides, read from the files the runtime loads
+ *  rather than from the manifest that described them (BUG-221). */
+export interface PluginContributions {
+  hooks: number;
+  events: string[];
+  /** "unreadable" when the contributed file exists and could not be parsed. */
+  error: string | null;
+}
+
 export interface InstalledPlugin {
   record_id: string;
   plugin_id: string;
@@ -378,6 +387,15 @@ export interface InstalledPlugin {
   installed_by: string;
   checksum_present: boolean;
   signature: PluginSignature;
+  contributions: PluginContributions;
+}
+
+/** A kind of contribution, and whether this build accepts it yet — so
+ *  "provides nothing" and "may not provide anything" stay distinguishable. */
+export interface PluginContributionKind {
+  kind: string;
+  available: boolean;
+  summary: string;
 }
 
 export interface PluginsView {
@@ -389,6 +407,7 @@ export interface PluginsView {
     summary: string;
     remediation: string;
   };
+  contribution_kinds: PluginContributionKind[];
 }
 
 export interface RuntimeInstallPlan {

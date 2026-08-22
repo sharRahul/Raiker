@@ -299,15 +299,31 @@ Highlights, each verified against a live instance:
 
 - **Hooks you can see, not just write** — a hook runs your own logic at a point
   in a turn and may only ever make an action *stricter*: it can deny a tool call
-  or turn it into a decision, and can never allow one the runtime refused. They
-  are configured in a file, and Extensions → **Hooks** reports what the runtime
-  actually loaded from it — including the three ways a rule you wrote still does
+  or turn it into a decision, and can never allow one the runtime refused. Every
+  event the configuration format accepts is emitted — sixteen of them, covering
+  the session, the prompt, the turn's two possible endings, every tool call,
+  approvals, delegations and tasks. `Stop` and `StopFailure` are separate on
+  purpose: a turn parked on an approval, or stopped by you, never reports as a
+  clean completion.
+
+  They are configured in a file, and Extensions → **Hooks** reports what the
+  runtime actually loaded from it — including the ways a rule you wrote still does
   nothing. A file that did not parse is named with the position the parse stopped
-  at, and contributes no rules rather than being guessed at. A rule on an event
-  this build never emits is marked configured-but-never-fires. A rule that cannot
+  at, and contributes no rules rather than being guessed at. A rule that cannot
   change an outcome reads **Observes only** instead of looking enforcing, and one
   naming a builtin this build does not ship says so rather than being counted as a
   guard. Every match, run, decision, timeout and failure is in the audit log.
+
+- **A plugin contributes something, or says why it cannot** — a plugin runs no
+  code of its own. It contributes through a surface that already governs the
+  thing contributed, and the first is hooks: a manifest that declares
+  `event:hook` may ship hook rules, which load at `plugin` scope *below* every
+  scope you control, so a plugin can make an action stricter and can never loosen
+  one you set. Revoking the plugin deletes its rules rather than flagging them.
+  Extensions → **Plugins** states what each installed plugin provides, read from
+  the files the runtime loads rather than from the manifest that described them —
+  and lists what a plugin *may* contribute, so "provides nothing" and "may not
+  provide anything" read differently.
 
 - **Governed voice in Chat and Build** — dictate into the normal editable
   composer, finish or cancel without sending, then explicitly send through the
@@ -322,7 +338,7 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-21:
+Raiker's documentation does not run ahead of its code. As of 2026-08-22:
 
 - **Voice is governed and turn-based, not full duplex.** Chat and Build support
   editable dictation and manual response playback. Continuous listening,
@@ -330,21 +346,31 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-21:
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
 
-- **Hooks run; plugins and channels do not.** Of the three extension surfaces
-  Claude Code ships, hooks are real here: nine lifecycle events are dispatched,
+- **Hooks are complete; plugins are partial; channels do not exist.** Of the
+  three extension surfaces Claude Code ships:
+
+  **Hooks** are done. All sixteen events the format accepts are emitted,
   `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
   `command` handlers execute under a bounded timeout with the program resolved
-  inside the workspace. What is not built is the rest of the surface: `SessionEnd`
-  is accepted by the schema and never emitted (the Hooks tab marks a rule on it as
-  dead rather than letting it look enforcing), the `http`, `mcp_tool`, `prompt`
-  and `agent` handler types need network, model and subagent surfaces that are
-  still gated, **no plugin code executes** — a plugin is validated, signature-
-  checked and recorded, and provides nothing to the runtime — and channel
-  activation stays off. Each is absent from the interface rather than shown
-  disabled. Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221 and BUG-223. Hooks
-  do have an owner off switch: **Turn every hook off** on the Hooks tab stops all
-  of them at once and is your setting rather than a fourth config file, so a
-  `config/hooks.json` that arrived with a repository cannot re-enable itself.
+  inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
+  at once and is your setting rather than a fourth config file, so a
+  `config/hooks.json` that arrived with a repository cannot re-enable itself. Two
+  of the five handler types in the reference format are unbuilt — `http`,
+  `mcp_tool`, `prompt` and `agent` need network, model and subagent surfaces that
+  are still gated.
+
+  **Plugins** contribute hook rules and nothing else. A plugin is validated,
+  supply-chain checked, signature-levelled and recorded, and a manifest declaring
+  `event:hook` ships real hook rules at `plugin` scope. Skills, MCP servers and
+  plugin panels are not contributable, and the Plugins tab names all four with
+  their state rather than implying a plugin does everything. No plugin code
+  executes.
+
+  **Channels** are absent: no inbound or outbound delivery, and the tab says so
+  rather than showing disabled controls. The gate is an accepted threat model,
+  not the code — inbound delivery is the highest-risk surface in this class.
+
+  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221.
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each
@@ -590,11 +616,12 @@ on the shipped build, not estimated.
   production signing anchor, so live egress bypass, credential delivery/merge
   and publisher verification remain unavailable rather than configuration-
   enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
-- **Hooks, plugins and channels are specified, not built.** The hooks reference
-  Raiker maps itself against documents 31 events and five handler types;
-  `docs/HOOKS_SPEC.md` has no code behind it, plugin support stops at manifest
-  validation, and the channel registry is a registry. These are the extension
-  points other agent platforms are largely defined by.
+- **Plugins and channels are behind the reference set.** Hooks reached parity on
+  2026-08-22 — every event the format accepts is emitted, with an owner off
+  switch and a page that states which rules actually enforce. Plugins contribute
+  hook rules and not skills, MCP servers or panels. Channels remain a registry
+  with no delivery path. These are the extension points other agent platforms are
+  largely defined by, and two of the three are still short.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

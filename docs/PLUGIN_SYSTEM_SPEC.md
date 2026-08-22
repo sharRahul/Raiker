@@ -464,6 +464,93 @@ Tests must verify:
 - plugin update rollback works;
 - plugin channel enforces sender allowlist.
 
+## What A Plugin Actually Contributes Today
+
+The component catalogue above is the target surface. This section is the build.
+
+Until BUG-221, installing a plugin validated its manifest, checked its supply
+chain, resolved its signature and wrote an install record — and then nothing
+happened. `PluginRegistrationPlan.execution_enabled` was `False` by construction,
+so a plugin contributed no skill, no agent, no hook, no MCP server and no panel.
+
+The blocking question was never packaging. It was **what a plugin's code is
+allowed to be**, and every other extension surface already answers it: a skill is
+instructions and runs nothing, a connector is a brokered tool behind a capability
+gate, a hook is argv resolved inside the workspace under a bounded timeout.
+
+The answer taken is that a plugin **does not get an execution surface of its
+own**. It contributes through a surface that already governs the thing
+contributed, and they are taken in the order their authority story is written.
+
+| Contribution | Available | Why it is where it is |
+|---|---|---|
+| Hooks | **yes** | A hook already has an execution model, a timeout, an audit trail and a scope. `plugin` sits below `managed`, `user`, `project` and `local`, so a plugin rule can make an action stricter and can never override a deny the owner set. |
+| Skills | no | Run nothing, and need only a provenance story — the next one to take. |
+| MCP servers | no | Already brokered and gated, but not yet contributable from a manifest. |
+| Panels | no | Need a route, permission and accessibility contract that does not exist. |
+
+`execution_enabled` stays `False`. It is a different claim: a plugin still runs no
+code of its own, and a hook rule it contributed runs as a **hook**, under the
+hook's rules, not as plugin code.
+
+### Contributing Hooks
+
+A manifest declares the rules under `contributes.hooks`, in the same shape as a
+hooks configuration file:
+
+```json
+{
+  "id": "acme-guard",
+  "version": "1.2.0",
+  "permissions": ["event:hook"],
+  "contributes": {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "shell",
+          "if": "shell(rm -rf *)",
+          "handlers": [
+            { "id": "acme-block", "type": "builtin", "builtin": "block_destructive_shell" }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+Three refusals, all fail-closed and all named:
+
+1. **No declared permission, no contribution.** The manifest must ask for
+   `event:hook`. That permission is not in `SAFE_READ_ONLY`, so a plugin asking
+   for it can never be auto-planned — the plan lands on `pending_approval` and the
+   owner reads it in the permission diff *before* installing.
+2. **A malformed contribution is refused at plan time**, with the parse error
+   named, rather than being written and discovered later as a file that silently
+   loads nothing.
+3. **The contribution is a file the owner can read and delete.** Installing
+   writes `.raiker/plugins/<plugin_id>/hooks.json`; the plugin id is held to a
+   directory-safe shape rather than sanitised into one, so two ids can never
+   collapse onto the same folder.
+
+The plan and the CLI both state what would be contributed before the install, and
+Extensions → Plugins states what each installed plugin provides — read from the
+files the runtime loads, not from the manifest that described them.
+
+### Revocation
+
+Revoking a plugin **deletes** its contributed rules rather than annotating the
+record. `HooksRegistry.load` reads files and has no store to consult, so leaving
+the file behind would produce the one state revocation exists to prevent: the page
+says revoked and the runtime still runs the rule. `PluginRevocationExecutor`
+reports `contributions_removed` in its artifacts, so a removal that did not happen
+is visible rather than assumed.
+
+Re-installing replaces the file rather than adding a second one, so an upgrade
+that dropped a rule drops it here too.
+
+---
+
 ## Phase 3 rollout slice A plugin policy boundary
 
 Plugin registration planning now evaluates manifests as inert data. The planner may return `planned`, `pending_approval`, or `denied`; it never imports entrypoints, evaluates strings, launches subprocesses, opens network connections, starts MCP/LSP servers, starts monitors, applies output styles, loads themes, enables channels, or enables execution. Shell, network, filesystem mutation, MCP, LSP, monitor, channel, subagent, and hosted-service permissions require explicit future policy and approval lifecycle work before activation.

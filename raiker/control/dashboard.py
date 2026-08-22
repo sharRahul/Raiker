@@ -2715,6 +2715,41 @@ class DashboardService:
             ok=True, data={"session_id": session_id, "title": normalized}
         )
 
+    def _dispatch_session_end_hook(self, session_id: str, reason: str) -> None:
+        """`SessionEnd` for the one thing that really ends a web conversation.
+
+        The event was in the config schema from the start and had no call site,
+        because "what ends a session" has no obvious answer on the web: a browser
+        tab closing is not a decision, and a conversation left idle is not over.
+        Archiving or deleting it is a decision the owner made, and it is the only
+        point at which the conversation stops being somewhere work continues —
+        so that is the boundary (BUG-223).
+
+        Dispatched *before* a delete and *after* an archive, for the same reason
+        in both cases: a handler should be able to read the transcript it is
+        being told about. Observation only — a handler cannot refuse either.
+        """
+        from raiker.hooks.contracts import HookInput
+        from raiker.hooks.factory import dispatcher_for_workspace
+
+        try:
+            dispatcher = dispatcher_for_workspace(self.store)
+            if not dispatcher.is_active():
+                return
+            dispatcher.dispatch(
+                HookInput(
+                    event_name="SessionEnd",
+                    tool_name=None,
+                    tool_input={},
+                    context={"session_id": session_id, "reason": reason},
+                    session_id=session_id,
+                ),
+                session_id=session_id,
+                turn_id=None,
+            )
+        except Exception:  # noqa: BLE001 — a hook never blocks archiving or deleting
+            return
+
     def set_session_archived(
         self, session_id: str, archived: bool, acting_principal_id: str | None
     ) -> ControlResult:
@@ -2744,6 +2779,8 @@ class DashboardService:
                 payload={"session_id": session_id, "archived": archived},
             )
         )
+        if archived:
+            self._dispatch_session_end_hook(session_id, "archived")
         return ControlResult(
             ok=True, data={"session_id": session_id, "archived": archived}
         )
@@ -2986,14 +3023,7 @@ class DashboardService:
         for index, rule in enumerate(
             sorted(registry.rules, key=lambda r: (HOOK_SCOPES.index(r.scope), r.event, r.matcher))
         ):
-            source = next(
-                (
-                    entry.path
-                    for entry in registry.sources
-                    if entry.scope == rule.scope and entry.loaded
-                ),
-                None,
-            )
+            source = rule.source
             dispatched = rule.event in DISPATCHED_HOOK_EVENTS
             deciding = rule.event in DECIDING_HOOK_EVENTS
             # A builtin naming a handler this build does not have raises at
@@ -3097,12 +3127,19 @@ class DashboardService:
         }
 
     def list_plugins(self) -> dict[str, Any]:
-        """Installed plugin records plus this workspace's signing posture (BUG-79).
+        """Installed plugin records, what each one provides, and the signing posture.
 
         A plugin's signature is reported at the level it actually earned —
         ``verified``, ``present_only`` or ``unsigned`` — rather than as a boolean
-        that reads the same whether an author was checked or not.
+        that reads the same whether an author was checked or not (BUG-79).
+
+        Each record also carries what the plugin *provides*, read from the
+        contribution files on disk rather than from the manifest that described
+        them (BUG-221). The files are what the runtime loads, so this cannot
+        report a contribution the runtime does not have — or miss one it does,
+        which is the failure that would matter.
         """
+        from raiker.plugins.contributions import installed_contributions
         from raiker.plugins.verify import (
             LEVEL_PRESENT_ONLY,
             LEVEL_UNSIGNED,
@@ -3112,6 +3149,7 @@ class DashboardService:
         )
 
         posture = signing_posture()
+        contributions = installed_contributions(self.workspace_root)
         plugins: list[dict[str, Any]] = []
         for row in self.store.list_plugin_install_records():
             signature = str(row.get("signature") or "")
@@ -3144,9 +3182,47 @@ class DashboardService:
                     "installed_by": row.get("installed_by"),
                     "checksum_present": bool(row.get("checksum")),
                     "signature": {**verification.to_dict(), "level": level},
+                    # A revoked plugin's files are deleted with the revocation, so
+                    # an empty contribution here is the same answer the runtime
+                    # would give: it provides nothing.
+                    "contributions": contributions.get(
+                        str(row.get("plugin_id") or ""),
+                        {"hooks": 0, "events": [], "error": None},
+                    ),
                 }
             )
-        return {"plugins": plugins, "signing": posture}
+        return {
+            "plugins": plugins,
+            "signing": posture,
+            # What a plugin is allowed to contribute on this build, so the tab can
+            # say what the surface *is* rather than only what is installed.
+            "contribution_kinds": [
+                {
+                    "kind": "hooks",
+                    "available": True,
+                    "summary": (
+                        "Hook rules at plugin scope — below managed, user, project "
+                        "and local, so they can make an action stricter and never "
+                        "override a deny you set."
+                    ),
+                },
+                {
+                    "kind": "skills",
+                    "available": False,
+                    "summary": "Instructions that run nothing. Needs a provenance story first.",
+                },
+                {
+                    "kind": "mcp_servers",
+                    "available": False,
+                    "summary": "Already brokered and gated; not yet contributable from a plugin.",
+                },
+                {
+                    "kind": "panels",
+                    "available": False,
+                    "summary": "Needs a route, permission and accessibility contract that does not exist.",
+                },
+            ],
+        }
 
     def list_security_findings(self, principal_id: str) -> list[SecurityFindingView]:
         return [
@@ -3202,6 +3278,8 @@ class DashboardService:
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         user_id = principal.delegated_by_user_id
+        # Before the row goes, so a handler can still read what it is told about.
+        self._dispatch_session_end_hook(session_id, "deleted")
         if not self.store.delete_session(session_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id})
@@ -3212,6 +3290,8 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
+        for session_id in session_ids:
+            self._dispatch_session_end_hook(session_id, "deleted")
         if not self.store.delete_sessions(session_ids, user_id=principal.delegated_by_user_id):
             return ControlResult(ok=False, reason_code="unknown_or_unauthorized_session")
         return ControlResult(ok=True, data={"session_ids": session_ids})

@@ -9,6 +9,8 @@ HOOK_EVENTS = {
     "SessionStart",
     "SessionEnd",
     "UserPromptSubmit",
+    "Stop",
+    "StopFailure",
     "PreCompact",
     "PostCompact",
     "PreToolUse",
@@ -16,12 +18,16 @@ HOOK_EVENTS = {
     "PostToolUseFailure",
     "PermissionRequest",
     "PermissionDenied",
+    "SubagentStart",
+    "SubagentStop",
+    "TaskCreated",
+    "TaskCompleted",
 }
 
 #: The events this build actually emits. `HOOK_EVENTS` is what a config file may
-#: name; this is what the runtime really dispatches, and the two are not the same
-#: set — `SessionEnd` is accepted by the schema and has no call site, so a rule
-#: written for it never fires.
+#: name; this is what the runtime really dispatches. They are equal on this build
+#: (BUG-223) and the machinery that lets them differ is kept, because it is what
+#: makes a future gap visible instead of silent.
 #:
 #: A configured rule that can never run is the worst kind of safeguard: the owner
 #: believes a guard is in place and there is nothing to observe that says
@@ -34,7 +40,10 @@ HOOK_EVENTS = {
 #: asserts they equal this set, so it cannot drift from the code.
 DISPATCHED_HOOK_EVENTS = {
     "SessionStart",
+    "SessionEnd",
     "UserPromptSubmit",
+    "Stop",
+    "StopFailure",
     "PreCompact",
     "PostCompact",
     "PreToolUse",
@@ -42,13 +51,19 @@ DISPATCHED_HOOK_EVENTS = {
     "PostToolUseFailure",
     "PermissionRequest",
     "PermissionDenied",
+    "SubagentStart",
+    "SubagentStop",
+    "TaskCreated",
+    "TaskCompleted",
 }
 
 #: One line per event, in the owner's language, for the surfaces that list them.
 HOOK_EVENT_SUMMARIES = {
     "SessionStart": "A conversation is created.",
-    "SessionEnd": "A conversation ends.",
+    "SessionEnd": "A conversation is archived or deleted.",
     "UserPromptSubmit": "A prompt is submitted, before the turn runs.",
+    "Stop": "A turn finished and produced an answer.",
+    "StopFailure": "A turn ended without one — it failed, was stopped, or is parked.",
     "PreCompact": "Before older exchanges are compacted out of the context window.",
     "PostCompact": "After compaction, with what it produced.",
     "PreToolUse": "Before policy finalises a tool call. The only event that can change the outcome.",
@@ -56,6 +71,10 @@ HOOK_EVENT_SUMMARIES = {
     "PostToolUseFailure": "A tool call failed.",
     "PermissionRequest": "An approval is about to be raised.",
     "PermissionDenied": "A tool call was denied.",
+    "SubagentStart": "A subagent is about to run, with the objective it was given.",
+    "SubagentStop": "A subagent finished, with what it found and whether it succeeded.",
+    "TaskCreated": "A task was created.",
+    "TaskCompleted": "A task reached a terminal state — done, failed or cancelled.",
 }
 
 #: The one event whose decision the runtime honours. Every other event is
@@ -107,6 +126,14 @@ class HookRule:
     handlers: list[HookHandler]
     scope: str
     if_guard: str | None = None
+    #: The file this rule was read from, relative to the workspace.
+    #:
+    #: Carried on the rule rather than looked up by scope, because scope stopped
+    #: identifying a file the moment plugins could contribute (BUG-221): every
+    #: installed plugin loads at scope ``plugin``, so "the source for this scope"
+    #: would name whichever plugin happened to load first for all of them, and
+    #: the Hooks page would credit one plugin with another's rules.
+    source: str | None = None
 
     def __post_init__(self) -> None:
         if self.event not in HOOK_EVENTS:

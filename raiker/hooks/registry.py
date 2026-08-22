@@ -14,6 +14,21 @@ _SOURCES: tuple[tuple[str, str], ...] = (
     (".raiker/hooks.json", "local"),
 )
 
+#: Where an installed plugin's contributed hook rules are written (BUG-221).
+#:
+#: A plugin contributes through a surface that is already governed rather than
+#: through a new one. Hooks were the first candidate for exactly that reason: a
+#: hook already has an execution model (argv resolved inside the workspace, under
+#: a bounded timeout), an audit trail, and a scope — and ``plugin`` sits below
+#: ``managed``, ``user``, ``project`` and ``local`` in :data:`HOOK_SCOPES`, so a
+#: plugin rule can never override a deny the owner or their organisation set.
+#:
+#: The contribution is a *file*, deliberately. It is the owner's to read, the
+#: owner's to delete, and revoking the plugin removes it — so "what does this
+#: plugin do" has an answer that does not require trusting the manifest.
+PLUGIN_HOOKS_DIR = ".raiker/plugins"
+PLUGIN_HOOKS_FILE = "hooks.json"
+
 
 def _parse_handler(data: dict[str, Any]) -> HookHandler:
     return HookHandler(
@@ -27,7 +42,7 @@ def _parse_handler(data: dict[str, Any]) -> HookHandler:
     )
 
 
-def _parse_config(data: dict[str, Any], scope: str) -> list[HookRule]:
+def _parse_config(data: dict[str, Any], scope: str, source: str | None = None) -> list[HookRule]:
     if data.get("schema_version") != "1.0" or not isinstance(data.get("hooks"), dict):
         raise HookConfigError("invalid_hooks_config")
     rules: list[HookRule] = []
@@ -43,6 +58,7 @@ def _parse_config(data: dict[str, Any], scope: str) -> list[HookRule]:
                     handlers=handlers,
                     scope=scope,
                     if_guard=str(entry["if"]) if entry.get("if") is not None else None,
+                    source=source,
                 )
             )
     return rules
@@ -81,6 +97,29 @@ class HookSourceStatus:
         }
 
 
+def _plugin_sources(root: Path) -> list[tuple[str, str]]:
+    """Every installed plugin's contributed hooks file, in a stable order.
+
+    Sorted by plugin id so two plugins contributing rules for the same event
+    always load in the same order — the aggregate decision does not depend on
+    it (a deny from either wins), but the audit trail and the Hooks page do, and
+    a list that reshuffles between reads is a list nobody trusts.
+
+    Missing directory, unreadable directory: no plugin rules. A contribution that
+    cannot be read is not guessed at.
+    """
+    plugins_dir = root / PLUGIN_HOOKS_DIR
+    try:
+        entries = sorted(entry.name for entry in plugins_dir.iterdir() if entry.is_dir())
+    except OSError:
+        return []
+    return [
+        (f"{PLUGIN_HOOKS_DIR}/{name}/{PLUGIN_HOOKS_FILE}", "plugin")
+        for name in entries
+        if (plugins_dir / name / PLUGIN_HOOKS_FILE).is_file()
+    ]
+
+
 class HooksRegistry:
     def __init__(
         self, rules: list[HookRule], sources: list[HookSourceStatus] | None = None
@@ -99,7 +138,7 @@ class HooksRegistry:
         root = Path(workspace_root)
         rules: list[HookRule] = []
         sources: list[HookSourceStatus] = []
-        for relative, scope in _SOURCES:
+        for relative, scope in (*_SOURCES, *_plugin_sources(root)):
             path = root / relative
             if not path.exists():
                 sources.append(
@@ -110,7 +149,7 @@ class HooksRegistry:
                 continue
             try:
                 data = json.loads(path.read_text(encoding="utf-8"))
-                parsed = _parse_config(data, scope)
+                parsed = _parse_config(data, scope, relative)
             except json.JSONDecodeError as exc:
                 sources.append(
                     HookSourceStatus(

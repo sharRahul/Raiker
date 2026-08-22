@@ -1,6 +1,6 @@
 # Extensions and MCP
 
-**Extensions** has five tabs: Connectors, MCP servers, Skills, Plugins, Channels.
+**Extensions** has six tabs: Connectors, MCP servers, Skills, Hooks, Plugins, Channels.
 
 ## Connectors
 
@@ -181,7 +181,7 @@ A hook runs your own logic at a point in a turn. It can only make an action
 and it can never allow one the runtime refused, skip an approval, or reach past
 the tool broker.
 
-Hooks are configured in a file, not on this page. Raiker reads three, in this
+Hooks are configured in a file, not on this page. Raiker reads four, in this
 order of authority:
 
 | File | Scope | For |
@@ -189,8 +189,10 @@ order of authority:
 | `config/managed-hooks.json` | managed | Rules nothing below may override |
 | `config/hooks.json` | project | Rules that travel with the repository |
 | `.raiker/hooks.json` | local | Rules for this machine only |
+| `.raiker/plugins/<id>/hooks.json` | plugin | Rules an installed plugin contributed |
 
-A lower scope can never override a higher-scope deny.
+A lower scope can never override a higher-scope deny — so a plugin can make an
+action stricter and can never loosen one you set.
 
 ```json
 {
@@ -234,9 +236,11 @@ alone cannot show you:
 - **A file that did not parse.** It contributes no rules — Raiker will not guess
   at a config it cannot read — and the tab names the file and where the parse
   stopped. Everything else keeps working; fix the file and reload.
-- **A rule that never fires.** The schema accepts every event in
-  `docs/HOOKS_SPEC.md`, but this build emits only some of them. A rule on one it
-  does not emit parses cleanly and never runs, and is shown as such.
+- **A rule that never fires.** Every event this build's schema accepts is now
+  emitted, so there is nothing on the list marked dead today. The state is still
+  reported, because the schema and the emitted set are allowed to diverge again:
+  a rule on an event a later build accepts before wiring parses cleanly and never
+  runs, and would be shown as such rather than left looking enforcing.
 - **A rule that cannot change anything.** Only `PreToolUse` and `PreCompact`
   decisions are honoured, and only from a handler holding decision authority — a
   builtin always has it, a `command` handler only when you set
@@ -246,7 +250,12 @@ alone cannot show you:
 
 The tab also lists every event a rule may name and every builtin handler that
 exists, because you are writing the file by hand and guessing a name produces a
-rule that fails every time it matches.
+rule that fails every time it matches. There are sixteen events: the session
+starting and ending, a prompt being submitted, the turn's two possible endings
+(`Stop` when it produced an answer, `StopFailure` when it failed, was stopped, or
+is parked on an approval), compaction either side, every tool call and its
+approval outcomes, a delegation starting and stopping, and a task being created
+and reaching a terminal state.
 
 Every match, run, decision, timeout and failure is in **Observability → Audit
 log** as `hook_matched`, `hook_executed`, `hook_decision`, `hook_timeout` and
@@ -258,17 +267,78 @@ bounded timeout, and its output is truncated. A timeout or an error is recorded
 and the action falls through to normal policy rather than being blocked by a
 hook that did not answer.
 
-## Plugins and Channels
+## Plugins
 
-Both tabs are intentionally empty and say so:
+A plugin runs **no code of its own**. It contributes through a surface that
+already governs the thing contributed, and the first of those is hooks.
 
-> A plugin cannot render its own page here until Raiker has an accepted route,
-> permission, and accessibility contract for it. Listing them early would
-> suggest an authority the runtime does not enforce, so this tab stays empty on
-> purpose.
+To contribute hook rules, a manifest declares the permission and the rules:
+
+```json
+{
+  "id": "acme-guard",
+  "version": "1.2.0",
+  "permissions": ["event:hook"],
+  "contributes": {
+    "hooks": {
+      "PreToolUse": [
+        {
+          "matcher": "shell",
+          "if": "shell(rm -rf *)",
+          "handlers": [
+            { "id": "acme-block", "type": "builtin", "builtin": "block_destructive_shell" }
+          ]
+        }
+      ]
+    }
+  }
+}
+```
+
+`event:hook` is required. Without it the rules are refused and the plan says so
+by name — and because that permission is never auto-approved, you read it in the
+permission diff *before* installing rather than discovering it afterwards.
+Installing writes the rules to `.raiker/plugins/acme-guard/hooks.json`, where you
+can read them; they load at `plugin` scope, below every scope you control.
+
+Install and inspect from the CLI:
+
+```
+/plugin-plan path/to/raiker-plugin.json
+/plugin-plan path/to/raiker-plugin.json --install
+```
+
+The plan states the permissions, the reasons, and what would be contributed. A
+malformed `contributes.hooks` block is refused there, with the parse error named,
+rather than written and silently loading nothing.
+
+**Revoking a plugin deletes its rules.** Not flags them — deletes them, so there
+is no state where the page says revoked and the runtime still runs the rule.
+Re-installing replaces rather than adds, so an upgrade that dropped a rule drops
+it here too.
+
+Extensions → **Plugins** states what each installed plugin provides, read from the
+files the runtime loads rather than from the manifest that described them. It also
+lists what a plugin *may* contribute:
+
+| Contribution | Available |
+|---|---|
+| Hooks | yes |
+| Skills | not yet — they run nothing, and need a provenance story first |
+| MCP servers | not yet — already brokered and gated, but not contributable |
+| Panels | not yet — needs a route, permission and accessibility contract |
+
+so "provides nothing" and "may not provide anything" read differently.
+
+No plugin code runs in your browser.
+
+## Channels
+
+The tab is intentionally empty and says so:
 
 > Inbound and outbound delivery needs an accepted contract and threat model
 > before Raiker offers controls for it. This tab exists so the gap is visible
 > rather than silently missing.
 
-No plugin code runs in your browser.
+Inbound delivery is the highest-risk surface in this class — it is where external
+input enters — so the gate here is the threat model, not the code.

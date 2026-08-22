@@ -26,6 +26,7 @@
     ExtensionView,
     ExtensionsOverview,
     HooksView,
+    PluginContributions,
     PluginsView,
   } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -107,6 +108,35 @@
       ? []
       : approvals.filter((approval) => approval.capability === selected?.capability),
   );
+
+  // `.raiker/plugins/<id>/hooks.json` → `<id>`. Two plugins load at the same
+  // scope, so "plugin" alone no longer identifies which one wrote a rule.
+  function pluginName(source: string | null): string {
+    const parts = (source ?? "").split("/");
+    return parts.length >= 3 ? parts[2] : "plugin";
+  }
+
+  // Read through a helper rather than field-by-field in the markup: this page
+  // renders a payload the server owns, and a template that dereferences a field
+  // the server has not sent yet takes the whole tab down rather than one line.
+  const contributedEvents = (c: PluginContributions | undefined) => c?.events ?? [];
+
+  function provides(contributions: PluginContributions | undefined): string {
+    if (!contributions || contributions.error) {
+      return "What it provides could not be read, so nothing is loaded from it.";
+    }
+    if (contributions.hooks === 0) return "Provides nothing — no hook rules are loaded from it.";
+    const rules = `${contributions.hooks} hook ${contributions.hooks === 1 ? "rule" : "rules"}`;
+    return `Provides ${rules} on ${contributions.events.join(", ")}.`;
+  }
+
+  const KIND_LABELS: Record<string, string> = {
+    hooks: "Hooks",
+    skills: "Skills",
+    mcp_servers: "MCP servers",
+    panels: "Panels",
+  };
+  const kindLabel = (kind: string) => KIND_LABELS[kind] ?? kind;
 
   const tabs = HUB_TABS.extensions.map((id) => ({
     id,
@@ -446,7 +476,9 @@
                 <strong>{rule.event}</strong>
                 <code class="matcher">{rule.matcher}</code>
                 {#if rule.if_guard}<code class="matcher">if {rule.if_guard}</code>{/if}
-                <span class="hook-scope">{rule.scope}</span>
+                <span class="hook-scope" class:hook-scope-plugin={rule.scope === "plugin"}>
+                  {rule.scope === "plugin" ? pluginName(rule.source) : rule.scope}
+                </span>
                 {#if rule.can_decide}
                   <span class="hook-tag hook-tag-decides">Can deny or ask</span>
                 {:else if rule.dispatched}
@@ -555,10 +587,11 @@
       <h2>Hooks are configured in a file, not here</h2>
       <p class="measure">
         Raiker reads <code>config/managed-hooks.json</code>, <code>config/hooks.json</code> and
-        <code>.raiker/hooks.json</code>, in that order of authority. A lower scope can never
-        override a higher-scope deny. This page reports what the runtime loaded; it does not edit
-        those files, because a surface that rewrote your own configuration would need an authority
-        story it does not have yet.
+        <code>.raiker/hooks.json</code>, in that order of authority, then any rules an installed
+        plugin contributed under <code>.raiker/plugins/</code>. A lower scope can never override a
+        higher-scope deny, so a plugin can make an action stricter and never loosen one you set.
+        This page reports what the runtime loaded; it does not edit those files, because a surface
+        that rewrote your own configuration would need an authority story it does not have yet.
       </p>
     </section>
   </div>
@@ -590,6 +623,12 @@
                   <span class="note">
                     {plugin.version} · {plugin.trust_level} · {plugin.status}
                   </span>
+                  <span class="note">{provides(plugin.contributions)}</span>
+                  {#if contributedEvents(plugin.contributions).length > 0}
+                    <span class="note">
+                      <a href="#/extensions?tab=hooks">See the rules on the Hooks tab →</a>
+                    </span>
+                  {/if}
                   <span class="note">{plugin.signature.explanation}</span>
                   {#if plugin.signature.remediation}
                     <span class="note">{plugin.signature.remediation}</span>
@@ -608,14 +647,27 @@
         {/if}
       {/if}
     </section>
-    <section class="card deferred">
-      <h2>Plugin panels are not available yet</h2>
-      <p>
-        A plugin cannot render its own page here until Raiker has an accepted route, permission, and
-        accessibility contract for it. Listing them early would suggest an authority the runtime does
-        not enforce, so this tab stays empty on purpose.
-      </p>
-    </section>
+    {#if plugins !== null}
+      <section class="card">
+        <h2>What a plugin may contribute</h2>
+        <p class="note">
+          A plugin runs no code of its own. It contributes through a surface that already governs
+          the thing contributed — which is why hooks came first, and why the rest are still marked
+          as not available rather than quietly listed.
+        </p>
+        <ul class="event-list">
+          {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}
+            <li class:event-dead={!kind.available}>
+              <strong>{kindLabel(kind.kind)}</strong>
+              <span class="hook-tag" class:hook-tag-dead={!kind.available}>
+                {kind.available ? "Available" : "Not yet"}
+              </span>
+              <span class="note">{kind.summary}</span>
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   </div>
 {:else}
   <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
@@ -722,6 +774,17 @@
     letter-spacing: 0.06em;
     text-transform: uppercase;
     color: var(--text-3);
+  }
+  /* A plugin rule carries the plugin's name where the other rules carry a scope
+     word. It is provenance, not a rank, so it is set apart rather than styled
+     like the four owner scopes it sits below — and it keeps its own casing,
+     because uppercasing someone's plugin id renames it on screen. Written with
+     both classes so it outranks `.hook-scope` regardless of source order. */
+  .hook-scope.hook-scope-plugin {
+    font-size: 0.74rem;
+    font-style: italic;
+    letter-spacing: 0;
+    text-transform: none;
   }
   .hook-tag {
     padding: 0.1rem 0.45rem;

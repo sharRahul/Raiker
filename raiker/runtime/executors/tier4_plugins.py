@@ -502,11 +502,21 @@ class PluginRevocationExecutor:
         if not isinstance(record_id, str) or not self._store.revoke_plugin_install_record(record_id):
             return self._failed(action.action_id, "plugin_revocation_failed")
 
+        # BUG-221 — a revoked plugin's contributed hook rules are *deleted*, not
+        # annotated. `HooksRegistry.load` reads files and has no store to consult,
+        # so leaving the file behind would produce the one state this executor
+        # exists to prevent: the page says revoked and the runtime still runs the
+        # rule. Reported in the artifacts either way, so a removal that did not
+        # happen is visible rather than assumed.
+        from raiker.plugins.contributions import remove_contributions
+
+        contributions_removed = remove_contributions(self._workspace_root, plugin_id)
+
         return ExecutionResult(
             ok=True,
             capability=self.capability,
             action_id=action.action_id,
-            summary="Installed plugin revoked; brokered read-only execution is now denied for it.",
+            summary="Installed plugin revoked; its contributed hooks are removed and brokered read-only execution is now denied for it.",
             artifacts={
                 "record_id": record_id,
                 "plugin_id": plugin_id,
@@ -514,6 +524,7 @@ class PluginRevocationExecutor:
                 "new_status": "revoked",
                 "reason_provided": isinstance(reason, str) and bool(reason.strip()),
                 "execution_enabled": False,
+                "contributions_removed": contributions_removed,
             },
         )
 

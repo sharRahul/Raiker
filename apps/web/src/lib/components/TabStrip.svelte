@@ -23,6 +23,26 @@
 
   let strip = $state<HTMLDivElement>();
 
+  /**
+   * Keep the selected tab visible when the strip is scrollable.
+   *
+   * The strip is `overflow-x: auto`, and on a phone six tabs are wider than the
+   * screen. Landing on `#/extensions?tab=plugins` at 390px rendered the strip at
+   * `scrollLeft: 0` with the selected tab at 365px in a 364px viewport — so the
+   * page showed the Plugins panel under a strip that appeared to have Hooks
+   * selected, and there was nothing on screen saying otherwise.
+   *
+   * `nearest` rather than `center`: when the tab is already visible this does
+   * nothing, so arrow-key navigation is not fighting a scroll animation, and the
+   * first and last tabs keep their strip edge rather than being pulled inward.
+   * `block: "nearest"` because a horizontal strip must never scroll the page.
+   */
+  $effect(() => {
+    const active = strip?.querySelector<HTMLButtonElement>(`[data-tab="${selected}"]`);
+    if (!active || !strip || strip.scrollWidth <= strip.clientWidth) return;
+    active.scrollIntoView({ inline: "nearest", block: "nearest" });
+  });
+
   function onKeydown(event: KeyboardEvent) {
     const index = tabs.findIndex((tab) => tab.id === selected);
     if (index < 0) return;

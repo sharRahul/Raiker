@@ -15,16 +15,21 @@ const pages = [
   ["11-models", "models"],
   ["12-extensions-connectors", "extensions?tab=connectors"],
   ["13-extensions-mcp", "extensions?tab=mcp"],
-  ["14-extensions-plugins", "extensions?tab=plugins"],
-  ["15-extensions-channels", "extensions?tab=channels"],
-  ["16-observability-overview", "observe?tab=overview"],
-  ["17-observability-sessions", "observe?tab=sessions"],
-  ["18-observability-activity", "observe?tab=activity"],
-  ["19-observability-checkpoints", "observe?tab=checkpoints"],
-  ["20-observability-diagnostics", "observe?tab=diagnostics"],
-  ["21-observability-work", "observe?tab=work"],
-  ["22-observability-notifications", "observe?tab=notifications"],
-  ["23-settings", "settings"],
+  // The sweep is only a sweep if it covers every tab the nav offers. Skills and
+  // Hooks were missing, so two of the six extension surfaces were never
+  // photographed and a regression on either would have gone unseen.
+  ["14-extensions-skills", "extensions?tab=skills"],
+  ["15-extensions-hooks", "extensions?tab=hooks"],
+  ["16-extensions-plugins", "extensions?tab=plugins"],
+  ["17-extensions-channels", "extensions?tab=channels"],
+  ["18-observability-overview", "observe?tab=overview"],
+  ["19-observability-sessions", "observe?tab=sessions"],
+  ["20-observability-activity", "observe?tab=activity"],
+  ["21-observability-checkpoints", "observe?tab=checkpoints"],
+  ["22-observability-diagnostics", "observe?tab=diagnostics"],
+  ["23-observability-work", "observe?tab=work"],
+  ["24-observability-notifications", "observe?tab=notifications"],
+  ["25-settings", "settings"],
 ] as const;
 
 test("capture every application page from a live fresh instance", async ({ page }) => {

@@ -510,6 +510,7 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
     if not isinstance(manifest, dict):
         return "Plugin plan failed: manifest must be a JSON object"
     plan = plan_plugin_registration(manifest).to_dict()
+    contributions = plan["contributions"]
     lines = [
         "Plugin registration plan:",
         f"plugin_id: {plan['plugin_id']}",
@@ -517,7 +518,17 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
         f"execution_enabled: {plan['execution_enabled']}",
         f"permissions: {','.join(plan['permissions'])}",
         f"reasons: {','.join(plan['reasons']) if plan['reasons'] else 'none'}",
+        # BUG-221 — a plan that lists permissions and never says what the plugin
+        # would provide is why installing one felt like it did nothing.
+        f"contributed_hooks: {contributions.get('hooks', 0)}"
+        + (
+            f" ({','.join(contributions.get('events', []))})"
+            if contributions.get("events")
+            else ""
+        ),
     ]
+    if contributions.get("refused"):
+        lines.append(f"contributions_refused: {','.join(contributions['refused'])}")
     if install_flag and plan["status"] != "denied":
         supply_chain = manifest.get("supply_chain") or {}
         from raiker.plugins.registry import record_plugin_install
@@ -534,6 +545,18 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
             commit_sha=supply_chain.get("commit_sha"),
         )
         lines.append(f"Installed: {record.record_id}")
+        # Written only after the record exists, so a workspace can never hold a
+        # plugin's rules without the install that authorised them.
+        from raiker.plugins.contributions import install_contributions
+
+        written = install_contributions(
+            workspace_root,
+            manifest,
+            plugin_id=str(plan["plugin_id"]),
+            permissions=list(plan["permissions"]),
+        )
+        if written.get("path"):
+            lines.append(f"Contributed hooks written: {written['path']}")
     return "\n".join(lines)
 
 

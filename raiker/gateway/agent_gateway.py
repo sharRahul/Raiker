@@ -230,13 +230,18 @@ class AgentGateway:
                 chain.append(resolved)
         return chain
 
-    def _dispatch_lifecycle_hook(self, event_name: str, envelope: PromptEnvelope) -> None:
+    def _dispatch_lifecycle_hook(
+        self,
+        event_name: str,
+        envelope: PromptEnvelope,
+        context: dict[str, object] | None = None,
+    ) -> None:
         self.hook_dispatcher.dispatch(
             HookInput(
                 event_name=event_name,
                 tool_name=None,
                 tool_input={},
-                context={"prompt_length": len(envelope.prompt.text)},
+                context={"prompt_length": len(envelope.prompt.text), **(context or {})},
                 session_id=envelope.session_id,
                 turn_id=envelope.turn_id,
                 cwd=str(self.workspace_root),
@@ -244,6 +249,41 @@ class AgentGateway:
             session_id=envelope.session_id,
             turn_id=envelope.turn_id,
             client=envelope.client,
+        )
+
+    def _dispatch_turn_end_hook(
+        self, envelope: PromptEnvelope, response: AgentResponse
+    ) -> None:
+        """`Stop` when the turn produced an answer, `StopFailure` when it did not.
+
+        Claude Code's `Stop` fires when the agent stops responding, and the split
+        exists because the two are not the same question. A turn parked on an
+        approval has not finished — it is waiting — and a turn the owner stopped
+        did what it was told. Reporting either as a clean `Stop` would let a rule
+        written to react to *completion* fire on a run that never completed, which
+        is the same class of dishonesty as an event that never fires at all.
+
+        Observation only: both land after the checkpoint and the turn row are
+        written, so nothing a handler returns can change an outcome that already
+        happened. That is deliberate — a hook may make an action stricter before
+        it runs, never rewrite it afterwards.
+
+        The reply text is **not** passed. A `command` handler is a subprocess, and
+        `config/hooks.json` travels with a repository, so a project a workspace
+        cloned could hand a script whatever this context carries. A rule reacting
+        to a turn ending needs to know *whether* and *why*, which is what `status`
+        is; a handler that genuinely needs what was said can read the audit trail
+        under its own authority rather than being fed it. `UserPromptSubmit`
+        already passes the prompt's length rather than the prompt for the same
+        reason, and this keeps the two ends of a turn consistent.
+        """
+        if not self.hook_dispatcher.is_active():
+            return
+        completed = response.status == "completed"
+        self._dispatch_lifecycle_hook(
+            "Stop" if completed else "StopFailure",
+            envelope,
+            {"status": response.status, "reply_length": len(response.message)},
         )
 
     @staticmethod
@@ -473,6 +513,7 @@ class AgentGateway:
                         client=prompt_envelope.client,
                     )
                 )
+        self._dispatch_turn_end_hook(prompt_envelope, response)
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
             request_id=response.request_id,

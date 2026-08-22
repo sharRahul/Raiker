@@ -9,9 +9,9 @@ to see it. Three properties this file exists to hold:
    a raw ``JSONDecodeError``. Failing closed for that file is right; failing
    closed for the whole runtime, silently, is not.
 2. **A rule that can never fire has to say so.** ``HOOK_EVENTS`` is what a config
-   may name; ``DISPATCHED_HOOK_EVENTS`` is what this build emits. The two differ,
-   and the difference is derived here from the source rather than trusted, so the
-   published set cannot drift from the code.
+   may name; ``DISPATCHED_HOOK_EVENTS`` is what this build emits. They are equal
+   since BUG-223, and the set is still derived here from the source rather than
+   trusted, so it cannot drift from the code the next time they diverge.
 3. **A rule that cannot change an outcome has to say so.** Only ``PreToolUse``
    and ``PreCompact`` decisions are honoured, and only from a handler holding
    decision authority.
@@ -199,19 +199,23 @@ def test_the_read_model_reports_the_switch_and_keeps_the_rules(workspace: Path) 
 
 
 def _dispatched_events_in_source() -> set[str]:
-    """Every hook event name this build really emits, read out of the source."""
+    """Every hook event name this build really emits, read out of the source.
+
+    Two scans, because a call site names its event in one of two ways. The first
+    is unfiltered — a genuinely new event name shows up here as a mismatch, which
+    is the point of deriving the set rather than maintaining it by hand. The
+    second reads the first line of a ``_notify_hook`` or ``_dispatch_*_hook``
+    call, where a ternary (``"Stop" if completed else "StopFailure"``) also
+    carries string literals that are not event names, so that scan is narrowed to
+    names the schema accepts.
+    """
     found: set[str] = set()
     for path in (REPO_ROOT / "raiker").rglob("*.py"):
         if path.parts[-2:] == ("hooks", "contracts.py"):
             continue
         text = path.read_text(encoding="utf-8")
         found.update(re.findall(r'event_name=\s*"([A-Za-z]+)"', text))
-        found.update(re.findall(r'_dispatch_lifecycle_hook\(\s*"([A-Za-z]+)"', text))
-        # `_notify_hook("PostToolUse", …)` and its ternary form. Only this scan is
-        # narrowed to known event names: the ternary also carries the unrelated
-        # `result.status == "success"`. The two scans above stay unfiltered, so a
-        # genuinely new event name still shows up here as a mismatch.
-        for block in re.findall(r"_notify_hook\(\s*(.*?)\n", text, re.S):
+        for block in re.findall(r"_(?:notify|dispatch_\w+)_hook\(\s*(.*?)\n", text, re.S):
             found.update(
                 name for name in re.findall(r'"([A-Za-z]+)"', block) if name in HOOK_EVENTS
             )
@@ -222,12 +226,57 @@ def test_the_published_dispatched_events_match_the_code() -> None:
     assert _dispatched_events_in_source() == DISPATCHED_HOOK_EVENTS
 
 
-def test_every_accepted_event_has_a_summary_and_the_gap_is_named() -> None:
+def test_every_accepted_event_has_a_summary_and_no_accepted_event_is_dead() -> None:
     assert set(HOOK_EVENT_SUMMARIES) == HOOK_EVENTS
     assert DISPATCHED_HOOK_EVENTS <= HOOK_EVENTS
-    # The gap is the point of the surface: a rule here parses and never runs.
-    assert {"SessionEnd"} == HOOK_EVENTS - DISPATCHED_HOOK_EVENTS
+    # BUG-223 closed the last gap: every event the schema accepts now has a call
+    # site. The machinery that would report one as dead is kept and still tested
+    # below, because what makes a future gap visible is worth more than the fact
+    # that there is not one today.
+    assert set() == HOOK_EVENTS - DISPATCHED_HOOK_EVENTS
     assert DECIDING_HOOK_EVENTS <= DISPATCHED_HOOK_EVENTS
+
+
+def test_the_events_bug_223_added_are_all_dispatched() -> None:
+    # Named one by one rather than as a count, so deleting a call site fails here
+    # with the event's name rather than with an arithmetic mismatch.
+    assert {
+        "SessionEnd",
+        "Stop",
+        "StopFailure",
+        "SubagentStart",
+        "SubagentStop",
+        "TaskCreated",
+        "TaskCompleted",
+    } <= DISPATCHED_HOOK_EVENTS
+
+
+def test_a_dead_event_would_still_be_reported_as_dead(workspace: Path) -> None:
+    """The surface's honesty does not depend on there being a gap to report.
+
+    Every accepted event is dispatched today, so nothing in a real config can
+    exercise the "configured but never fires" path. Forcing it here keeps that
+    path tested: if a later build adds an event to the schema before wiring it,
+    the rule has to come back marked dead rather than quietly looking enforcing.
+    """
+    import raiker.control.dashboard as dashboard_module
+    from raiker.hooks import contracts as hook_contracts
+
+    _write(workspace, "config/hooks.json", json.dumps(WORKING_CONFIG))
+    original = set(hook_contracts.DISPATCHED_HOOK_EVENTS)
+    hook_contracts.DISPATCHED_HOOK_EVENTS.discard("SessionEnd")
+    try:
+        view = dashboard_module.DashboardService(workspace).list_hooks()
+    finally:
+        hook_contracts.DISPATCHED_HOOK_EVENTS.clear()
+        hook_contracts.DISPATCHED_HOOK_EVENTS.update(original)
+
+    rules = {rule["event"]: rule for rule in view["rules"]}
+    assert rules["SessionEnd"]["dispatched"] is False
+    assert rules["SessionEnd"]["can_decide"] is False
+    assert {event["event"] for event in view["events"] if not event["dispatched"]} == {
+        "SessionEnd"
+    }
 
 
 # ── 3. The read model says all three things ─────────────────────────────────
@@ -256,8 +305,10 @@ def test_the_read_model_reports_authority_reach_and_provenance(workspace: Path) 
     assert rules["PostToolUse"]["can_decide"] is False
     assert rules["PostToolUse"]["handlers"][0]["decision_authority"] is False
 
-    # SessionEnd parses and never fires.
-    assert rules["SessionEnd"]["dispatched"] is False
+    # SessionEnd is dispatched now (BUG-223) but still cannot change an outcome:
+    # by the time a conversation is being archived or deleted there is nothing
+    # left to refuse.
+    assert rules["SessionEnd"]["dispatched"] is True
     assert rules["SessionEnd"]["can_decide"] is False
 
     # And the file that could not be read is visible rather than silent.
@@ -350,6 +401,4 @@ def test_the_read_model_is_honest_when_nothing_is_configured(workspace: Path) ->
     # The event catalogue is always available, so the owner can see what a rule
     # could name before writing one.
     assert {event["event"] for event in view["events"]} == HOOK_EVENTS
-    assert {event["event"] for event in view["events"] if not event["dispatched"]} == {
-        "SessionEnd"
-    }
+    assert [event["event"] for event in view["events"] if not event["dispatched"]] == []

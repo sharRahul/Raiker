@@ -66,9 +66,10 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
 | [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | Open — raised 2026-08-21 |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
-| [BUG-221](#bug-221--a-plugin-is-recorded-and-then-provides-nothing) | Medium | Plugins / extensibility | Open — raised 2026-08-22 |
+| [BUG-221](#bug-221--a-plugin-is-recorded-and-then-provides-nothing) | Medium → Low | Plugins / extensibility | Open — reduced 2026-08-22 (FIXED-256): hooks are contributable; skills, MCP servers and panels remain |
 | [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
-| [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | Open — raised 2026-08-22 |
+| [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
+| [BUG-224](#bug-224--the-node-25-web-test-run-cannot-see-jsdoms-localstorage) | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -477,8 +478,34 @@ task at a time.
 
 ## BUG-221 — A plugin is recorded and then provides nothing
 
-**Severity: Medium. Area: plugins / extensibility. Status: Open — raised
-2026-08-22 while closing the hooks half of the same gap.**
+**Severity: Medium → Low. Area: plugins / extensibility. Status: Open — reduced
+2026-08-22.**
+
+**2026-08-22 update — the first contribution kind ships (FIXED-256).** A plugin
+that declares `event:hook` and a `contributes.hooks` block now contributes real
+hook rules: they are written to `.raiker/plugins/<plugin_id>/hooks.json`, loaded
+at `plugin` scope below every scope the owner controls, listed on Extensions →
+Hooks credited to the plugin that wrote them, and deleted when the plugin is
+revoked. The plan and the CLI state what would be contributed before the install,
+and the Plugins tab states what each installed plugin provides — read from the
+files the runtime loads, not from the manifest that described them.
+
+`execution_enabled` stays `False`, deliberately: a plugin still runs no code of
+its own, and a contributed rule runs as a **hook**, under the hook's rules.
+
+**What is left**, in the order the original analysis set out — steps 2, 3 and 4:
+
+* **Skills.** They run nothing and need only provenance, which makes this the
+  next one to take. The blocking piece is where a plugin-contributed `SKILL.md`
+  lives and how the Skills tab distinguishes it from an uploaded one.
+* **MCP servers.** Already brokered and gated; what is missing is a manifest →
+  server-profile path that goes through the existing trust gate rather than
+  around it.
+* **Plugin panels.** Still last, and still for the same reason: a route,
+  permission and accessibility contract that does not exist.
+
+The Plugins tab now names all four with their state, so this gap is visible on
+the surface rather than only in this document.
 
 **Observed.** Installing a plugin validates its manifest, checks its supply
 chain, resolves its signature to `verified` / `present_only` / `unsigned`, writes
@@ -498,21 +525,11 @@ other extension surface answers it: a skill is instructions and runs nothing, a
 connector is a brokered tool with a capability gate, a hook is argv resolved
 inside the workspace under a bounded timeout. A plugin has no such answer yet.
 
-**Proposed fix, and the constraint that decides its shape.** Take the pieces in
-the order their authority story is already written:
-
-1. **Plugin-bundled hooks first.** A hook already has a scope (`plugin` is in
-   `HOOK_SCOPES` and unused), an execution model, a timeout and an audit trail.
-   A plugin that may only contribute hook rules gains real capability without
-   inventing a new execution surface — and `HOOK_SCOPES` ordering already means a
-   plugin rule can never override a managed deny.
-2. **Then skills**, which run nothing and need only provenance.
-3. **Then MCP servers**, which are already brokered and gated.
-4. **Plugin panels last**, because they need a route, permission and
-   accessibility contract that does not exist.
-
-What must not happen is a general "plugin code runs" step. Each contribution
-should arrive through a surface that already governs it.
+**The constraint that decides the shape of the rest.** Step 1 is done and proved
+the approach: each contribution arrives through a surface that **already governs
+it**, so no new execution surface is invented. Steps 2 to 4 are held to the same
+bar. What must not happen is a general "plugin code runs" step — that would need
+its own authority story, and none of the remaining three requires one.
 
 ---
 
@@ -543,31 +560,49 @@ project ships must not be able to re-enable itself.
 
 ## BUG-223 — Twenty-two lifecycle events are specified and never emitted
 
-**Severity: Medium. Area: hooks / lifecycle. Status: Open — raised 2026-08-22.**
+**Severity: Medium. Area: hooks / lifecycle. Status: Fixed 2026-08-22 — see
+FIXED-255.**
 
-**Observed.** `docs/HOOKS_SPEC.md` lists roughly the same event surface Claude
-Code documents. Nine are dispatched: `SessionStart`, `UserPromptSubmit`,
-`PreCompact`, `PostCompact`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`,
-`PermissionRequest`, `PermissionDenied`. `SessionEnd` is accepted by the config
-schema and has no call site at all; the rest are not in `HOOK_EVENTS`, so a rule
-naming one is refused at parse time.
+**Observed.** `docs/HOOKS_SPEC.md` listed roughly the same event surface Claude
+Code documents. Nine were dispatched. `SessionEnd` was accepted by the config
+schema and had no call site at all, so a rule written for it parsed cleanly and
+never ran; the rest were not in `HOOK_EVENTS`, so a rule naming one was refused
+at parse time.
 
-The immediate harm — a rule that parses and silently never runs — is now
-surfaced: `DISPATCHED_HOOK_EVENTS` is published, a test derives it from the call
-sites so it cannot drift, and the Hooks tab marks such a rule as configured but
-never firing. That makes the gap visible; it does not close it.
+**Fixed.** Seven events gained call sites — `Stop`, `StopFailure`,
+`SubagentStart`, `SubagentStop`, `TaskCreated`, `TaskCompleted` and
+`SessionEnd` — each at a boundary the runtime already knew about. `HOOK_EVENTS`
+and `DISPATCHED_HOOK_EVENTS` are now equal, and the machinery that reports a dead
+event is kept and still tested, because what makes a *future* gap visible is
+worth more than the fact that there is not one today.
 
-**Proposed fix, in the order the call sites already exist.**
+`docs/HOOKS_SPEC.md` now separates the target catalogue from what this build
+accepts and emits, so the two can never be read as the same list again.
 
-- **`Stop` / `StopFailure`** — the orchestrator already knows when a turn ends
-  and why. Both are blocking events in the reference set, which makes them the
-  most useful of the missing ones.
-- **`SubagentStart` / `SubagentStop`** — `spawn_subagent` has both boundaries.
-- **`TaskCreated` / `TaskCompleted`** — `TaskManager` already emits
-  `task_created`; the hook point is beside it.
-- **`SessionEnd`** — needs a decision about what ends a web session before it can
-  have a call site, which is why it is last despite already being in the schema.
+**BUG-224** — the Node 25 web-test environment — was raised while verifying this.
 
-Each one is published as dispatched only when the derivation test in
-`tests/test_hooks_surface.py` can find its call site, so the surface cannot claim
-an event the runtime does not emit.
+---
+
+## BUG-224 — The Node 25 web test run cannot see jsdom's `localStorage`
+
+**Severity: Low. Area: web tests / environment. Status: Fixed 2026-08-22 — see
+FIXED-258.**
+
+**Observed.** `npx vitest run` under Node 25.6.1 failed `src/lib/theme.test.ts`
+(5 tests) and `src/lib/views/LoginView.test.ts` (15) with
+`TypeError: window.localStorage.clear is not a function`, alongside a Node
+warning: `` `--localstorage-file` was provided without a valid path ``. The
+LoginView failures were the same cause one step downstream — cleanup never ran,
+so the next test found two of every button and failed on
+`Found multiple elements`.
+
+**Root cause.** Node 25 ships a built-in `localStorage` global. It shadows the
+one jsdom installs, and the built-in is inert unless the process was started with
+a valid `--localstorage-file`. Nothing in the repository was wrong; the
+environment changed underneath it.
+
+**Fixed.** `src/test-setup.ts` restores the storage jsdom promises when what is
+present is not a working `Storage`. Rather than pinning harder — which only
+defers the same break to the next Node release — the shim is a real map, because
+the code under test persists a theme choice and reads it back; a no-op stub would
+pass the type check and fail the behaviour.

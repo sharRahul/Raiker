@@ -416,13 +416,59 @@ class ToolBroker:
 
         if self.store is None:
             return {"status": "failed", "error": {"type": "subagent_store_unavailable"}}
-        return spawn_subagent(
+        # BUG-223 — a delegation is a lifecycle boundary of its own. The parent's
+        # `PreToolUse` already fired for the `spawn_subagent` call, but a rule that
+        # wants to know a *subagent* ran cannot tell that from a tool name alone:
+        # it needs the objective going in and the outcome coming back, and the
+        # subagent's own steps are brokered under a different principal.
+        self._dispatch_subagent_hook("SubagentStart", args, context, {})
+        result = spawn_subagent(
             self.workspace_root,
             args,
             store=self.store,
             principal_id=context.acting_principal_id,
             owner_principal_id=context.owner_principal_id,
             parent_identity=context.verified_identity,
+            session_id=context.session_id,
+            turn_id=context.turn_id,
+        )
+        self._dispatch_subagent_hook(
+            "SubagentStop",
+            args,
+            context,
+            {
+                "status": str(result.get("status", "")),
+                "subagent_id": str(result.get("subagent_id", "")),
+                "steps_executed": result.get("steps_executed", 0),
+            },
+        )
+        return result
+
+    def _dispatch_subagent_hook(
+        self,
+        event_name: str,
+        args: dict[str, Any],
+        context: ToolExecutionContext,
+        extra: dict[str, Any],
+    ) -> None:
+        """Observation only — neither boundary can refuse the delegation.
+
+        `PreToolUse` is where a refusal belongs, and it has already run for this
+        call. Giving a second event the power to deny would mean two places could
+        stop the same action, and only one of them appears on the authority
+        matrix the owner reads.
+        """
+        if self.hook_dispatcher is None or not self.hook_dispatcher.is_active():
+            return
+        self.hook_dispatcher.dispatch(
+            HookInput(
+                event_name=event_name,
+                tool_name="spawn_subagent",
+                tool_input={"objective": str(args.get("objective", ""))[:500]},
+                context={"name": str(args.get("name", "")), **extra},
+                session_id=context.session_id,
+                turn_id=context.turn_id,
+            ),
             session_id=context.session_id,
             turn_id=context.turn_id,
         )

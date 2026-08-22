@@ -62,4 +62,49 @@ describe("TabStrip", () => {
     expect(screen.getByRole("tab", { name: /work in action 3/i })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveTextContent(/^Overview$/);
   });
+
+  // The strip scrolls sideways when the tabs are wider than the screen. Landing
+  // on `#/extensions?tab=plugins` at 390px rendered it at scrollLeft 0 with the
+  // selected tab at 365px in a 364px viewport: the Plugins panel under a strip
+  // that looked like Hooks was selected, and nothing on screen said otherwise.
+  function scrollable(strip: HTMLElement, tabWidth = 200, visible = 364) {
+    Object.defineProperty(strip, "clientWidth", { value: visible, configurable: true });
+    Object.defineProperty(strip, "scrollWidth", {
+      value: tabWidth * TABS.length,
+      configurable: true,
+    });
+    for (const [index, tab] of Array.from(strip.querySelectorAll("button")).entries()) {
+      Object.defineProperty(tab, "offsetLeft", { value: index * tabWidth, configurable: true });
+      Object.defineProperty(tab, "offsetWidth", { value: tabWidth, configurable: true });
+    }
+  }
+
+  it("scrolls the selected tab into view when the strip overflows", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { rerender } = render(TabStrip, {
+      props: { tabs: TABS, selected: "overview", onselect: vi.fn(), label: "Sections" },
+    });
+    scrollable(screen.getByRole("tablist"));
+    scrollIntoView.mockClear();
+
+    await rerender({ tabs: TABS, selected: "work", onselect: vi.fn(), label: "Sections" });
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ inline: "nearest", block: "nearest" });
+  });
+
+  it("does not scroll a strip that already fits", async () => {
+    const scrollIntoView = vi.fn();
+    Element.prototype.scrollIntoView = scrollIntoView;
+    const { rerender } = render(TabStrip, {
+      props: { tabs: TABS, selected: "overview", onselect: vi.fn(), label: "Sections" },
+    });
+    // jsdom reports 0 for both, so `scrollWidth <= clientWidth` holds: a strip
+    // with nothing to scroll must not fight the page for scroll position.
+    scrollIntoView.mockClear();
+
+    await rerender({ tabs: TABS, selected: "work", onselect: vi.fn(), label: "Sections" });
+
+    expect(scrollIntoView).not.toHaveBeenCalled();
+  });
 });

@@ -59,6 +59,7 @@ Specs:
 | **Decline, don't ask** persists across a visit | ✅ chosen, navigated away and back, still selected |
 | The Channels tab states the contract | ✅ *"untrusted content with a named sender who is not you"* |
 | Three fail-closed gates reported separately | ✅ **Capability off**, **None allowlisted**, **Refusing everything** — each with its own remedy named |
+| The inbound budget is stated | ✅ **60/min** per sender; allowlisting says who, the budget says how often |
 | Pairing links without switching on | ✅ *"It is switched off until you turn it on"*; row reads **Linked, off · 2 senders** |
 | A profile that needs senders cannot be paired without them | ✅ the pairing form asks, and the control service refuses `sender_allowlist_required` |
 | A test delivery runs the governed path | ✅ refused with a readable reason — the owner's own capability gate, not a shortcut that would have "worked" |

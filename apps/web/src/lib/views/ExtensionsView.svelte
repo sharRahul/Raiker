@@ -857,6 +857,18 @@
               quarantined and its instructions are inert, whatever the sender wrote.
             </span>
           </li>
+          <li>
+            <strong>Rate limit</strong>
+            <span class="hook-tag">
+              {channels.inbound.rate_limit_per_minute ?? 60}/min
+            </span>
+            <span class="note">
+              Per sender, per channel. Allowlisting says <em>who</em> may speak; this says how
+              often. A sender over budget is refused and the refusal is recorded, so a channel
+              that goes quiet is answerable rather than a mystery. Override with
+              <code>RAIKER_CHANNEL_INBOUND_RATE</code>.
+            </span>
+          </li>
         </ul>
       {/if}
     </section>
@@ -1009,7 +1021,8 @@
         <li><strong>The contract</strong> — what a channel message is in a turn. <span class="hook-tag">Done</span></li>
         <li><strong>Outbound delivery</strong> — sending a result to a paired channel, through the capability gate and the egress allowlist. <span class="hook-tag">Done</span></li>
         <li><strong>Inbound</strong> — paired and sender-allowlisted; every message quarantined and its instructions inert. <span class="hook-tag">Done</span></li>
-        <li><strong>Rate limits</strong> — a per-channel inbound budget. <span class="hook-tag hook-tag-dead">Next</span></li>
+        <li><strong>Rate limits</strong> — a per-sender inbound budget, refusals recorded. <span class="hook-tag">Done</span></li>
+        <li><strong>Routing modes</strong> — turning an inbound message into work. <span class="hook-tag hook-tag-dead">Next</span></li>
         <li><strong>Approval relay</strong> — last; a channel that can raise an approval can be used to ask for one. The queue exists and can only ever hold a <em>pending</em> relay: nothing on a channel resolves an approval. <span class="hook-tag hook-tag-dead">Not planned yet</span></li>
       </ol>
       <p class="note">

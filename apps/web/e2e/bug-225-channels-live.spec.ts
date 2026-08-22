@@ -71,7 +71,7 @@ test("the tab states what a channel message is (BUG-225)", async ({ page }) => {
   // The three gates, each its own row: one is a capability the owner sets, one
   // is an environment allowlist, one is an inbound secret. Different remedies.
   const posture = page.getByTestId("channel-posture");
-  for (const fact of ["Outbound", "Egress", "Inbound"]) {
+  for (const fact of ["Outbound", "Egress", "Inbound", "Rate limit"]) {
     await expect(posture.getByText(fact, { exact: true })).toBeVisible();
   }
 
@@ -97,6 +97,12 @@ test("the tab states what a channel message is (BUG-225)", async ({ page }) => {
     await expect(inboundRow).not.toContainText("REDACTED");
     await expect(inboundRow).toContainText(/Secret set|Refusing everything/);
   }
+
+  // Allowlisting says *who* may speak; the budget says how often. An allowlisted
+  // sender was unbounded until this row existed.
+  await expect(
+    posture.getByText("Rate limit", { exact: true }).locator("xpath=ancestor::li[1]"),
+  ).toContainText(/\d+\/min/);
 
   await page.screenshot({ path: `${SHOTS}/bug-225-channel-surface.png`, fullPage: true });
 });

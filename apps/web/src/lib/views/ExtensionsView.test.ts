@@ -381,7 +381,12 @@ describe("ExtensionsView", () => {
       egress_configured: false,
       egress_host_count: 0,
     },
-    inbound: { secret_configured: false, quarantined: true, instructions_inert: true },
+    inbound: {
+      secret_configured: false,
+      rate_limit_per_minute: 60,
+      quarantined: true,
+      instructions_inert: true,
+    },
     ...overrides,
   });
 
@@ -408,6 +413,9 @@ describe("ExtensionsView", () => {
     expect(within(posture).getByText("Inbound").closest("li")).toHaveTextContent(
       "Refusing everything",
     );
+    // Allowlisting says *who* may speak; the budget says how often. An
+    // allowlisted sender was unbounded until this row existed.
+    expect(within(posture).getByText("Rate limit").closest("li")).toHaveTextContent("60/min");
   });
 
   it("offers pairing, and says pairing is not switching on", async () => {
@@ -483,7 +491,8 @@ describe("ExtensionsView", () => {
     render(ExtensionsView, { props: { tab: "channels" } });
     await screen.findByText(/What is still not built/i);
     expect(screen.getByText(/Outbound delivery/).closest("li")).toHaveTextContent("Done");
-    expect(screen.getByText(/Rate limits/).closest("li")).toHaveTextContent("Next");
+    expect(screen.getByText(/Rate limits/).closest("li")).toHaveTextContent("Done");
+    expect(screen.getByText(/Routing modes/).closest("li")).toHaveTextContent("Next");
     expect(screen.getByText(/Approval relay/).closest("li")).toHaveTextContent("Not planned yet");
   });
 

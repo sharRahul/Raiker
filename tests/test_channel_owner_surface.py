@@ -303,3 +303,133 @@ def test_a_boolean_under_a_secret_looking_key_survives_the_api(
     assert served["inbound"]["secret_configured"] is False
     # And a real credential under the same kind of key is still discarded whole.
     assert redact_response_body({"api_secret": "sk-live-abcdef"})["api_secret"] != "sk-live-abcdef"
+
+
+# ── Inbound rate limits: allowlisting says who, not how often ────────────────
+
+
+def test_an_allowlisted_sender_is_still_bounded(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The allowlist is the gate; the budget is what sits behind it.
+
+    A compromised or merely broken allowlisted client could post as fast as it
+    could open sockets, and every message is written to durable storage before
+    anything else looks at it.
+    """
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.api.routes_channels import _inbound_hits
+
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_RATE", "3")
+    _inbound_hits.clear()
+
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+    service.set_channel_enabled(owner, pairing_id, True)
+
+    client = TestClient(create_app(workspace_root=workspace))
+    headers = {"X-Raiker-Channel-Secret": "s3cret"}
+    body = {"sender_id": "ops", "text": "status?"}
+    codes = [
+        client.post(f"/api/channels/{WEBHOOKS}/inbound", json=body, headers=headers).status_code
+        for _ in range(4)
+    ]
+
+    assert codes[:3] == [200, 200, 200]
+    assert codes[3] == 429
+
+
+def test_a_rate_limited_message_is_recorded_rather_than_dropped(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.api.routes_channels import _inbound_hits
+
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_RATE", "1")
+    _inbound_hits.clear()
+
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops"]).data["pairing_id"]
+    service.set_channel_enabled(owner, pairing_id, True)
+
+    client = TestClient(create_app(workspace_root=workspace))
+    headers = {"X-Raiker-Channel-Secret": "s3cret"}
+    for _ in range(2):
+        client.post(
+            f"/api/channels/{WEBHOOKS}/inbound",
+            json={"sender_id": "ops", "text": "hi"},
+            headers=headers,
+        )
+
+    # A channel that goes quiet has to be answerable from Observability rather
+    # than by guesswork, so the refusal is an event with a named reason.
+    rejected = [
+        row
+        for row in service.store.list_event_index(session_id="channels", limit=200)
+        if row.get("event_type") == "channel_message_rejected"
+    ]
+    assert rejected, "the refusal was not recorded at all"
+
+
+def test_one_senders_budget_is_not_anothers(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from fastapi.testclient import TestClient
+
+    from raiker.api.app import create_app
+    from raiker.api.routes_channels import _inbound_hits
+
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_RATE", "1")
+    _inbound_hits.clear()
+
+    service = DashboardService(workspace)
+    pairing_id = service.pair_channel(owner, WEBHOOKS, "Webhooks", ["ops", "oncall"]).data[
+        "pairing_id"
+    ]
+    service.set_channel_enabled(owner, pairing_id, True)
+
+    client = TestClient(create_app(workspace_root=workspace))
+    headers = {"X-Raiker-Channel-Secret": "s3cret"}
+    first = client.post(
+        f"/api/channels/{WEBHOOKS}/inbound",
+        json={"sender_id": "ops", "text": "hi"},
+        headers=headers,
+    )
+    other = client.post(
+        f"/api/channels/{WEBHOOKS}/inbound",
+        json={"sender_id": "oncall", "text": "hi"},
+        headers=headers,
+    )
+
+    # A shared bucket would let one noisy sender silence everyone else, which is
+    # the same denial the limit exists to prevent, aimed inward.
+    assert first.status_code == 200
+    assert other.status_code == 200
+
+
+def test_a_nonsense_rate_override_falls_back_rather_than_disabling_the_limit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from raiker.api.routes_channels import CHANNEL_INBOUND_DEFAULT_MAX, channel_inbound_limit
+
+    for value in ("0", "-5", "lots", ""):
+        monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_RATE", value)
+        # "0" is far more likely to be a mistake than a request to accept an
+        # unbounded stream, and this is the one setting where guessing generously
+        # is the wrong way to be wrong.
+        assert channel_inbound_limit() == CHANNEL_INBOUND_DEFAULT_MAX
+
+
+def test_the_surface_states_the_budget(workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_RATE", "12")
+
+    view = DashboardService(workspace).list_channels(owner)
+
+    assert view["inbound"]["rate_limit_per_minute"] == 12

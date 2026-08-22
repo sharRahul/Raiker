@@ -70,7 +70,7 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
 | [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
 | [BUG-224](#bug-224--the-node-25-web-test-run-cannot-see-jsdoms-localstorage) | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
-| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced twice 2026-08-22 (FIXED-261, FIXED-265). **The premise was wrong**: the transport existed and had no owner surface. It has one now; rate limits and approval-relay resolution remain |
+| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
@@ -591,8 +591,8 @@ FIXED-265.
 **What is actually left**, restated against the code rather than the original
 guess:
 
-* **Rate limits.** `CHANNELS_SPEC.md` lists a per-channel inbound budget. There
-  is none: an allowlisted sender can post as fast as they like.
+* ~~**Rate limits.**~~ Closed the same day as FIXED-267: a fixed window per
+  `(connector, sender)`, 60/min by default, with the refusal recorded.
 * **Approval-relay resolution.** The queue exists and is deliberately
   pending-only. Resolving an approval over a channel still has no anti-phishing
   story, and should stay refused until it does.
@@ -657,8 +657,7 @@ than not shipping it.
    channel that can raise an approval is a channel that can be used to *ask for
    one*, and the anti-phishing story for that does not exist. The relay queue is
    deliberately pending-only until it does.
-5. **Rate limits** — raised by this work rather than closed by it. There is no
-   per-channel inbound budget, so an allowlisted sender is unbounded.
+5. ~~**Rate limits**~~ — raised by this work and closed by it (FIXED-267).
 
 The tab now states the contract, offers the controls, and reports each
 fail-closed gate separately — so "nothing has been delivered" and "nothing can be

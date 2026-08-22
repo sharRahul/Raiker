@@ -229,7 +229,7 @@ each step is refused until the one before it is done:
 | 2 | **Outbound delivery** — connector profile, capability gate, egress allowlist, audit event | **Done.** `ExternalChannelExecutor` under `external_channel_runtime`. |
 | 3 | **Inbound, paired and allowlisted** | **Done.** The receiver enforces `requires_pairing` and `requires_sender_allowlist`, and marks every accepted message untrusted, quarantined and instructions-inert. |
 | 4 | **An owner surface for all of it** | **Done (FIXED-265).** Steps 2 and 3 were built and had no way in: with no pairing the executors refuse and the receiver 404s, so the transport was unreachable and the tab reported that channels did not exist. |
-| 5 | **Rate limits** — a per-channel inbound budget | **Open.** An allowlisted sender is currently unbounded. |
+| 5 | **Rate limits** — a per-sender inbound budget | **Done.** Fixed window per `(connector, sender)`, default 60/min, `RAIKER_CHANNEL_INBOUND_RATE` overrides; a refusal is a recorded `channel_message_rejected` event with `reason: rate_limited`. Allowlisting says *who*, this says *how often*. |
 | 6 | **Routing modes** — `new_turn`, `side_question`, `interrupt`, … | **Open.** An inbound message is recorded and quarantined; none of the modes below is implemented, so a channel message never becomes work on its own. |
 | 7 | **Permission relay** | **Open, and last.** A channel that can raise an approval is a channel that can be used to *ask for one*. The relay queue exists and is deliberately pending-only; nothing on a channel resolves an approval. |
 

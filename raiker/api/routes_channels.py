@@ -3,6 +3,8 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +43,66 @@ def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict[str, Any] | 
         if pairing.get("connector_id") == connector_id:
             return pairing
     return None
+
+
+# ── Inbound rate limit (BUG-225) ─────────────────────────────────────────────
+#
+# An allowlisted sender was unbounded. Allowlisting says *who* may speak; it says
+# nothing about *how often*, and the two are different questions — a compromised
+# or merely broken allowlisted client could fill the event log as fast as it
+# could post, and every message is written to durable storage before anything
+# else looks at it.
+#
+# Fixed window, in memory, per (connector, sender) — the same shape and the same
+# trade-off as `RateLimitMiddleware`: process-local, reset by a restart, and a
+# denial-of-service guardrail rather than an auth boundary. The allowlist is
+# still the gate; this is the budget behind it.
+#
+# A refusal is *recorded*, not silent: a sender that hits the limit produces a
+# `channel_message_rejected` event with `reason: rate_limited`, so a channel that
+# stops working is answerable from Observability rather than by guesswork.
+
+CHANNEL_INBOUND_WINDOW_SECONDS = 60.0
+CHANNEL_INBOUND_DEFAULT_MAX = 60
+
+_inbound_hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+
+def channel_inbound_limit() -> int:
+    """Messages per sender per minute. ``RAIKER_CHANNEL_INBOUND_RATE`` overrides.
+
+    A non-numeric or non-positive override falls back to the default rather than
+    disabling the limit: "0" is far more likely to be a mistake than a request to
+    accept an unbounded stream, and this is the one setting where guessing
+    generously is the wrong way to be wrong.
+    """
+    raw = os.environ.get("RAIKER_CHANNEL_INBOUND_RATE", "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return CHANNEL_INBOUND_DEFAULT_MAX
+    return value if value > 0 else CHANNEL_INBOUND_DEFAULT_MAX
+
+
+def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
+    """Record this message against the sender's budget; False when it is spent."""
+    limit = channel_inbound_limit()
+    now = time.monotonic()
+    cutoff = now - CHANNEL_INBOUND_WINDOW_SECONDS
+    # Aged out and swept *before* this sender's bucket is fetched. Doing it after
+    # is subtly wrong and silently disables the limit: a `defaultdict` creates the
+    # bucket empty on access, so a sweep that drops empty buckets drops the one
+    # about to be appended to, and every message then looks like the first.
+    for key, seen in list(_inbound_hits.items()):
+        while seen and seen[0] < cutoff:
+            seen.popleft()
+        if not seen:
+            del _inbound_hits[key]
+    hits = _inbound_hits[(connector_id, sender_id)]
+    if len(hits) >= limit:
+        return False
+    hits.append(now)
+    return True
 
 
 # ── Owner surface (BUG-225) ──────────────────────────────────────────────────
@@ -234,7 +296,33 @@ async def receive_inbound(
             },
         )
 
-    # Allowlisted sender: still untrusted + quarantined; instructions are inert.
+    if not _within_inbound_budget(connector_id, body.sender_id):
+        writer.append(make_event(
+            session_id="channels",
+            turn_id=None,
+            event_type="channel_message_rejected",
+            actor="channel_receiver",
+            payload={
+                "connector_id": connector_id,
+                "channel_type": channel_type,
+                "sender_id": body.sender_id,
+                "trust_level": "untrusted",
+                "reason": "rate_limited",
+                "limit_per_minute": channel_inbound_limit(),
+            },
+        ))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "ok": False,
+                "reason_code": "rate_limited",
+                "trust_level": "untrusted",
+                "quarantined": True,
+            },
+        )
+
+    # Allowlisted sender, within budget: still untrusted + quarantined;
+    # instructions are inert.
     writer.append(make_event(
         session_id="channels",
         turn_id=None,

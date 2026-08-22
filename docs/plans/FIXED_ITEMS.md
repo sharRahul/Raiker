@@ -10832,3 +10832,60 @@ dangerous than one that drops it.
 response filter and a real credential under the same kind of key does not. The
 live spec now compares the rendered chip against the served payload, so a
 recurrence fails rather than being photographed.
+
+---
+
+## FIXED-267 — An allowlisted channel sender is no longer unbounded
+
+**Severity: Medium. Area: channels / abuse resistance. Fixed 2026-08-22
+(BUG-225).**
+
+The inbound receiver refused any sender not on the pairing's allowlist and then
+accepted everything from one that was. Allowlisting answers *who may speak*; it
+says nothing about *how often*, and the two are different questions. Every
+accepted message is written to durable storage before anything else looks at it,
+so a compromised — or merely broken — allowlisted client could fill the event log
+as fast as it could open sockets.
+
+**What ships.** A fixed window per `(connector, sender)`: 60 messages a minute by
+default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Same shape and the same
+stated trade-off as `RateLimitMiddleware` — process-local, reset by a restart, a
+denial-of-service guardrail rather than an auth boundary. The allowlist stays the
+gate; this is the budget behind it.
+
+Three decisions worth naming:
+
+* **The refusal is recorded.** A sender over budget produces a
+  `channel_message_rejected` event with `reason: rate_limited` and the limit in
+  force, so a channel that goes quiet is answerable from Observability rather
+  than by guesswork. A silent 429 would have been the cheaper implementation and
+  the worse product.
+* **Per sender, not per channel.** One shared bucket would let a single noisy
+  sender silence everyone else on the same connector — the same denial the limit
+  exists to prevent, aimed inward.
+* **A nonsense override falls back rather than disabling the limit.** `0`, `-5`
+  and `lots` all yield the default. `0` is far more likely to be a mistake than a
+  request to accept an unbounded stream, and this is the one setting where
+  guessing generously is the wrong way to be wrong.
+
+**A bug the tests caught, worth recording because it would have been invisible.**
+The first implementation swept empty buckets *after* fetching the sender's own.
+`_inbound_hits` is a `defaultdict`, so fetching creates the bucket empty — and
+the sweep then deleted the bucket about to be appended to. Every message looked
+like the first, and the limit never fired once. The sweep runs before the fetch
+now, and the test that failed is the one that asserts the fourth message of four
+is refused.
+
+**User-interface outcome.** Extensions → Channels states the budget beside the
+other three gates, and says what it is for in one line: allowlisting says who,
+this says how often.
+
+**Reference-platform decision — is this a meaningful improvement?** **No —
+closing a gap Raiker's own spec had already named**, and the reference set has
+had inbound rate limits for years. The *recorded refusal* is the part that goes
+slightly beyond: a 429 with no audit trail leaves the owner unable to distinguish
+"nobody is sending" from "everything is being dropped".
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the fourth of four is
+refused, the refusal is recorded, one sender's budget is not another's, a
+nonsense override falls back, and the surface states the limit.

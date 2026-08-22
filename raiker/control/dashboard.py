@@ -3297,6 +3297,7 @@ class DashboardService:
         import json as _json
         import os
 
+        from raiker.api.routes_channels import channel_inbound_limit
         from raiker.channels.registry import ConnectorRegistry
         from raiker.runtime.executors.sandbox import channel_egress_allowlist
 
@@ -3358,6 +3359,10 @@ class DashboardService:
                 "secret_configured": bool(
                     os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
                 ),
+                # Allowlisting says *who* may speak; the budget says how often.
+                # They are different questions, and an allowlisted sender was
+                # unbounded until one had an answer.
+                "rate_limit_per_minute": channel_inbound_limit(),
                 # Stated rather than implied: an inbound message is untrusted
                 # content from a sender who is not the owner, it is quarantined,
                 # and its instructions are inert. That is the accepted contract,

@@ -392,11 +392,17 @@ reports them one by one rather than as a single "ready":
 | Egress | `RAIKER_CHANNEL_EGRESS_ALLOWLIST` — empty means deny | Your environment |
 | Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
 
+A fourth row states the **inbound budget**: 60 messages per sender per minute by
+default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Allowlisting says *who* may
+speak; the budget says how often, and they are different questions — a sender
+that goes over is refused and the refusal is recorded, so a channel that goes
+quiet is answerable from Observability rather than a mystery.
+
 **An inbound message never becomes a turn on its own.** It is recorded as a
 governed event, quarantined, and its instructions are inert whatever the sender
 wrote. Accepted and rejected messages both appear in Observability → Activity.
 
-Still unbuilt: per-channel rate limits, the routing modes in the spec, and
-resolving an approval over a channel — the relay queue is deliberately
+Still unbuilt: the routing modes in the spec, and resolving an approval over a
+channel — the relay queue is deliberately
 pending-only, because a channel that can raise an approval can be used to *ask
 for* one. Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).

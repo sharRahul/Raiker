@@ -404,6 +404,8 @@ export interface ChannelsView {
   inbound: {
     /** RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses. */
     secret_configured?: boolean;
+    /** Messages per sender per minute. Allowlisting says who; this says how often. */
+    rate_limit_per_minute?: number;
     quarantined?: boolean;
     instructions_inert?: boolean;
   };

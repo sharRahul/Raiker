@@ -64,14 +64,17 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
-| [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | Open — raised 2026-08-21 |
+| [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | **Fixed 2026-08-22 — FIXED-262** |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
-| [BUG-221](#bug-221--a-plugin-is-recorded-and-then-provides-nothing) | Medium → Low | Plugins / extensibility | Open — reduced 2026-08-22 (FIXED-256): hooks are contributable; skills, MCP servers and panels remain |
+| BUG-221 | Medium → Low | Plugins / extensibility | **Closed 2026-08-22 — FIXED-256, FIXED-259, FIXED-260.** Hooks, skills and MCP-server offers all contribute; panels continue as [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) |
 | [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
 | [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
 | [BUG-224](#bug-224--the-node-25-web-test-run-cannot-see-jsdoms-localstorage) | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
-| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium | Channels / extensibility | Open — raised 2026-08-22 |
+| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
+| [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
+| [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
+| [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -425,7 +428,8 @@ the Build composer already does through `standingPostureNote`.
 
 ## BUG-219 — There is no deny-unless-preapproved posture
 
-**Severity: Low. Area: approval modes. Status: Open — raised 2026-08-21.**
+**Severity: Low. Area: approval modes. Status: Fixed 2026-08-22 — see
+FIXED-262.**
 
 **Observed.** The approval chip offers Manual, Auto and Skip. Claude Code also
 offers `dontAsk`, which auto-**denies** anything not already allowed by a rule
@@ -437,12 +441,19 @@ and Raiker has no way to express it.
 `apps/web/src/lib/approvalMode.ts` list three modes. The enforcement it would
 need already exists: `deny` is a decision mode the runtime honours today.
 
-**Proposed fix.** Add a fourth mode that resolves any otherwise-eligible governed
-action to `deny` rather than to a prompt, with the refusal recorded and visible
-in the transcript like any other. It is a mode-list addition rather than new
-enforcement, which is why the severity is Low and the value is real — a routine
-that runs at 06:00 cannot answer a prompt, and today it parks instead of
-proceeding within what it was allowed.
+**Fixed.** `dont_ask` is the fourth mode. It resolves any otherwise-eligible
+governed action to `deny` rather than to a prompt, before the decision is
+recorded — so the audit log never describes a queue entry that did not exist. The
+refusal carries its own reason, `denied_no_one_to_ask`, distinct from every other
+denial: *"the owner refused this"* and *"nobody was there to ask"* call for
+different follow-ups, and only the second means re-running attended would have
+worked. It can only ever refuse more; an action policy already allowed is
+untouched, and one policy already denied keeps policy's own reason.
+
+A per-turn `ask` posture normally forces `manual` so the unattended modes cannot
+swallow it. `dont_ask` is the deliberate exception: there is nobody to show it
+to, so forcing `manual` would park the turn on a queue entry that is never read —
+the exact outcome the mode exists to avoid.
 
 ---
 
@@ -475,66 +486,6 @@ task at a time.
 - A forwarded approval must not expire silently. Cowork auto-denies an unanswered
   prompt after ten minutes; if Raiker adopts that, the expiry has to be a
   **recorded decision with its reason**, not a dropped request.
-
----
-
-## BUG-221 — A plugin is recorded and then provides nothing
-
-**Severity: Medium → Low. Area: plugins / extensibility. Status: Open — reduced
-2026-08-22.**
-
-**2026-08-22 update — the first contribution kind ships (FIXED-256).** A plugin
-that declares `event:hook` and a `contributes.hooks` block now contributes real
-hook rules: they are written to `.raiker/plugins/<plugin_id>/hooks.json`, loaded
-at `plugin` scope below every scope the owner controls, listed on Extensions →
-Hooks credited to the plugin that wrote them, and deleted when the plugin is
-revoked. The plan and the CLI state what would be contributed before the install,
-and the Plugins tab states what each installed plugin provides — read from the
-files the runtime loads, not from the manifest that described them.
-
-`execution_enabled` stays `False`, deliberately: a plugin still runs no code of
-its own, and a contributed rule runs as a **hook**, under the hook's rules.
-
-**What is left**, in the order the original analysis set out — steps 2, 3 and 4:
-
-* **Skills.** They run nothing and need only provenance, which makes this the
-  next one to take. The blocking piece is where a plugin-contributed `SKILL.md`
-  lives and how the Skills tab distinguishes it from an uploaded one.
-* **MCP servers.** Already brokered and gated; what is missing is a manifest →
-  server-profile path that goes through the existing trust gate rather than
-  around it.
-* **Plugin panels.** Still last, and still for the same reason: a route,
-  permission and accessibility contract that does not exist.
-
-The Plugins tab now names all four with their state, so this gap is visible on
-the surface rather than only in this document.
-
-**Observed, as raised.** Installing a plugin validated its manifest, checked its
-supply chain, resolved its signature to `verified` / `present_only` / `unsigned`,
-wrote a `PluginInstallRecord`, and showed all of that on Extensions → Plugins.
-Then nothing happened: a plugin contributed no skill, no agent, no hook, no MCP
-server and no panel. The tab said so, which was right — but the surface as a
-whole read as an install flow for something that could not be installed.
-
-Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers;
-Cowork installs them from **Customize**. This was the largest remaining piece of
-the hooks → plugins → channels gap; since hooks reached parity and this took its
-first contribution kind, channels (BUG-225) is.
-
-**Root cause.** Not packaging — `raiker/plugins/` already did the hard parts of
-that. The blocking question was what a plugin's *code* is allowed to be. Every
-other extension surface answers it: a skill is instructions and runs nothing, a
-connector is a brokered tool with a capability gate, a hook is argv resolved
-inside the workspace under a bounded timeout. The answer taken for a plugin is
-that it gets **no execution surface of its own** — it contributes through one
-that already governs the thing contributed, which is why hooks came first and why
-the three remaining kinds are held to the same bar.
-
-**The constraint that decides the shape of the rest.** Step 1 is done and proved
-the approach: each contribution arrives through a surface that **already governs
-it**, so no new execution surface is invented. Steps 2 to 4 are held to the same
-bar. What must not happen is a general "plugin code runs" step — that would need
-its own authority story, and none of the remaining three requires one.
 
 ---
 
@@ -616,8 +567,53 @@ pass the type check and fail the behaviour.
 
 ## BUG-225 — A channel can be described and never reached
 
-**Severity: Medium. Area: channels / extensibility. Status: Open — raised
-2026-08-22 while closing the hooks and plugin halves of the same gap.**
+**Severity: Medium. Area: channels / extensibility. Status: Open — reduced
+2026-08-22 (FIXED-261). Raised 2026-08-22 while closing the hooks and plugin
+halves of the same gap.**
+
+**2026-08-22 update — the premise was wrong, and the surface now exists
+(FIXED-265).** This entry said *"nothing consumes them for delivery"*. Building
+delivery started by reading `raiker/channels/` and found that it was already
+built: `ExternalChannelExecutor` does bounded outbound webhook delivery against
+the channel egress allowlist, `POST /api/channels/{id}/inbound` receives messages
+behind an owner secret with sender allowlisting and marks every one untrusted and
+quarantined, and `ChannelApprovalRelayExecutor` can only ever queue a *pending*
+relay. The capability is registered, gated, phase-gated and audited.
+
+What was missing was **any way for the owner to pair a connector**. With no
+pairing the executors refuse and the receiver 404s, so the tab's "channels do not
+exist" was true in effect and wrong about the cause — and it is the failure this
+document's own standard forbids: backend work that leaves an invisible surface.
+
+Pairing, enable/disable, sender allowlist, unpair and a governed test delivery
+now exist, and the tab reports the three fail-closed gates separately. See
+FIXED-265.
+
+**What is actually left**, restated against the code rather than the original
+guess:
+
+* ~~**Rate limits.**~~ Closed the same day as FIXED-267: a fixed window per
+  `(connector, sender)`, 60/min by default, with the refusal recorded.
+* **Approval-relay resolution.** The queue exists and is deliberately
+  pending-only. Resolving an approval over a channel still has no anti-phishing
+  story, and should stay refused until it does.
+* **Routing modes.** An inbound message is recorded and quarantined; none of the
+  routing modes in the spec (`new_turn`, `side_question`, `interrupt`, …) is
+  implemented, so a channel message never becomes work on its own. That is the
+  safe default and it is *not* what the spec's Channel Type Matrix implies.
+
+**2026-08-22 update — step 1 is done (FIXED-261).** The decision this entry named
+as the blocker is written down and accepted: a channel message is **untrusted
+content with a named sender who is not the owner**, in `docs/CHANNELS_SPEC.md` →
+*What a channel message is in a turn*, with the matching rows in
+`docs/THREAT_MODEL.md`. Five enforceable rules follow — never a prompt, trust from
+the pairing record rather than from the message, no raising of the turn's
+authority, outbound-is-a-capability vs inbound-is-a-boundary, and nothing
+implicit. Extensions → Channels states the contract and the four steps with the
+state of each, so an accepted spec cannot be mistaken for a shipped feature.
+
+**Steps 2, 3 and 4 remain open**, and the code below now has a contract to
+satisfy. Outbound delivery is next.
 
 **Observed.** `config/channel-connectors.json` describes channel connectors in
 detail — transport, auth method, whether pairing is required, whether a sender
@@ -648,21 +644,25 @@ than not shipping it.
 
 **Proposed fix, in the order the authority story has to be written.**
 
-1. **Decide what a channel message *is* in a turn.** It is untrusted content with
-   a named sender, and the sender is not the owner. Until that is written down —
-   in `docs/CHANNELS_SPEC.md` and the threat model — none of the code below has a
-   contract to satisfy.
-2. **Outbound first.** Delivering a result the owner asked for is the half with
-   no inbound risk, and it exercises the connector profile, the capability gate
-   and the audit path end to end.
-3. **Then inbound, paired and allowlisted.** `requires_pairing` and
-   `requires_sender_allowlist` are already fields on every profile; they become
-   enforcement.
-4. **Permission relay last**, because a channel that can raise an approval is a
-   channel that can be used to *ask for one*, and the anti-phishing story for
-   that does not exist.
+1. ~~**Decide what a channel message *is* in a turn.**~~ **Done — FIXED-261.** It
+   is untrusted content with a named sender, and the sender is not the owner.
+   Written down in `docs/CHANNELS_SPEC.md` and the threat model, so the code
+   below now has a contract to satisfy.
+2. ~~**Outbound first.**~~ **Already existed; reachable since FIXED-265.** The
+   executor, the capability gate, the egress allowlist and the audit path were
+   built. What it lacked was a pairing the owner could create.
+3. ~~**Then inbound, paired and allowlisted.**~~ **Already existed; reachable
+   since FIXED-265.** `requires_pairing` and `requires_sender_allowlist` were
+   enforced by the receiver and unreachable for the same reason.
+4. **Permission relay last** — still open, and still for the original reason: a
+   channel that can raise an approval is a channel that can be used to *ask for
+   one*, and the anti-phishing story for that does not exist. The relay queue is
+   deliberately pending-only until it does.
+5. ~~**Rate limits**~~ — raised by this work and closed by it (FIXED-267).
 
-Until step 1 exists, the tab should keep saying so rather than offering controls.
+The tab now states the contract, offers the controls, and reports each
+fail-closed gate separately — so "nothing has been delivered" and "nothing can be
+delivered" stop looking the same.
 
 ---
 
@@ -675,7 +675,17 @@ handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. `HANDLER_TYP
 in `raiker/hooks/contracts.py` accepts two — `command` and `builtin`, the second
 being Raiker's own in-process code rather than one of the five. A rule naming
 `http` is refused at parse time with `unsupported_handler_type:http`, which is
-the right failure but leaves three of the reference set unavailable.
+the right failure.
+
+**The title undercounts: it is four, not three** — `http`, `mcp_tool`, `prompt`
+and `agent`. The title is left as raised so the anchor other documents link to
+keeps working; the count here is the accurate one.
+
+**Worth stating before the effort is spent:** `command` is the *only* handler
+type Claude Code's own hooks have. This is therefore a gap against Raiker's own
+reference document, not against Claude Code — which is why it stayed Low while
+BUG-221 and BUG-225 were taken first, and why adding a model call inside the hook
+path to satisfy it deserves more scepticism than the count alone suggests.
 
 This is the remainder of the hooks gap after BUG-223. The *events* are at parity;
 the *handlers* are not.
@@ -703,3 +713,124 @@ answer to a hook reaching authority the turn did not have.
 refused at parse time rather than accepted and ignored, and the Hooks tab reports
 the file as failed with the reason — so an owner writing one is told, rather than
 believing a guard is in place.
+
+---
+
+## BUG-227 — There is no LSP surface for a plugin to contribute to
+
+**Severity: Low. Area: plugins / Build / language intelligence. Status: Open —
+raised 2026-08-22 while closing BUG-221 steps 2 and 3.**
+
+**Observed.** `docs/PLUGIN_MANIFEST_SCHEMA.md` and `docs/PLUGIN_SYSTEM_SPEC.md`
+both list **LSP servers** among what a plugin declares, and both say the
+declaration stays inert until trust and approval gates pass. Grepping the runtime
+for a language-server path returns nothing: there is no LSP client, no server
+lifecycle, and no consumer of a `contributes.lsp_servers` block. The other three
+deferred kinds each had a real surface waiting behind a gate; this one has a
+manifest field and no destination.
+
+Claude Code plugins do bundle LSP servers, and Build uses language intelligence
+for navigation and diagnostics. So this is a genuine Claude Code gap — it is just
+a *smaller* one than it looks, because Raiker's graph/codemap layer
+(`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`) already answers part of what an LSP
+would be asked for.
+
+**Root cause.** The manifest schema was written against the reference platform's
+component list rather than against Raiker's own surfaces, so it names a component
+kind Raiker has no surface for. That is the opposite of the rule BUG-221 settled
+on: a plugin contributes **through a surface that already governs the thing
+contributed**, and there is no such surface here to contribute through.
+
+**Proposed fix, and the order.**
+
+1. **Decide whether Raiker wants an LSP client at all**, or whether the codemap
+   plus the governed read tools already cover the need. This is a scope decision
+   and it comes first; building a client to satisfy a manifest field would be the
+   tail wagging the dog.
+2. If yes: an LSP server is a **long-running subprocess that reads the
+   workspace**, so it belongs behind the same execution boundary
+   `CommandService` already enforces, with its own capability and lifecycle —
+   not a new one.
+3. Only then a `contributes.lsp_servers` path, and it should be an **offer** in
+   the FIXED-260 sense rather than an install: a language server is a tool source.
+
+**Until then**, the manifest schema should say plainly that the field is
+accepted-and-inert *because there is no surface*, rather than *because a gate has
+not opened* — the two are different promises and only one of them is true.
+
+---
+
+## BUG-228 — A plugin panel has no route, permission or accessibility contract
+
+**Severity: Low. Area: plugins / web UI. Status: Open — raised 2026-08-22, split
+out of BUG-221 as the last remaining contribution kind.**
+
+**Observed.** Extensions → Plugins lists four contribution kinds. Three are now
+available (hooks, skills, MCP-server offers). **Panels** is the fourth and reads
+"Not yet — needs a route, permission and accessibility contract that does not
+exist", which is accurate and has been the stated blocker since BUG-221 was
+raised. Splitting it out means BUG-221 can close when the reasoning it carries is
+no longer needed, and this can be worked on its own terms.
+
+**Root cause.** Unlike the other three, there is no existing surface that already
+governs "a page a plugin drew". A hook had an execution model; a skill had a
+validator; an MCP server had a create path. A panel needs all of the following to
+be decided before any code:
+
+* **A route.** Where a plugin's page lives in the hash router, how it is
+  addressed, and what stops two plugins claiming one path.
+* **A rendering boundary.** Raiker renders no third-party code in the browser
+  today, and "no plugin code runs in this browser" is a claim the Plugins tab
+  makes in those words. A panel either breaks that claim or is declarative —
+  a described layout Raiker renders — and that choice decides everything else.
+* **A permission model.** What data a panel may read, and how it asks; a panel
+  that can read the session list is a very different object from one that cannot.
+* **An accessibility contract.** Every other surface meets the same keyboard,
+  contrast and landmark bar. A plugin-supplied page cannot be exempt from it, so
+  it has to be *checkable*, which is easiest if it is declarative.
+
+**Proposed fix.** Take the declarative route: a panel is a described layout from
+a fixed component vocabulary, rendered by Raiker, reading only data the plugin's
+own contributions produced. That keeps "no plugin code runs in this browser"
+literally true, makes the accessibility contract enforceable at render time
+rather than by review, and matches the pattern the other three kinds established.
+
+**Not blocking anything.** No other work depends on this, and the surface already
+states it is unavailable rather than offering a control that does nothing.
+
+---
+
+## BUG-229 — Most live specs sign in only on an empty workspace
+
+**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-22 while
+running the round's own specs.**
+
+**Observed.** The Workbench greets a fresh instance with *"Welcome to your Work
+Dashboard"* and a returning owner with *"Welcome back"*, and a workspace turns
+from the first into the second the moment it holds any work. Almost every live
+spec's `signIn` waits for the first string. So a suite passes on an empty
+instance and fails on a used one — **at sign-in**, before it reaches anything it
+was written to test, and reporting a missing heading rather than the thing under
+test.
+
+**Reproduction.** Run any live spec against a workspace that has one
+conversation in it. It fails at `signIn` with
+`waiting for getByRole('heading', { name: 'Welcome to your Work Dashboard' })`.
+
+It surfaced mid-round exactly this way: the plugin specs passed, the provider
+spec then created a chat session, and the next spec could not sign in.
+
+**Root cause.** `signIn` is copy-pasted into each spec rather than shared, and
+each copy encodes an assumption about the *state* of the instance that has
+nothing to do with what the spec asserts. `hosted-provider.ts` exists precisely
+to hold the steps every live spec must take — and sign-in is not in it.
+
+**Proposed fix.** Move `signIn` into `e2e/hosted-provider.ts` beside
+`dismissFirstRunModelSetup` and `openHostedProviders`, accepting either greeting,
+and have every live spec call it. The four specs added on 2026-08-22 already
+accept both, which is the shape to lift.
+
+Not urgent, and deliberately not done in bulk this round: each older spec is the
+evidence behind a closed FIXED entry, and re-running one is how that evidence is
+refreshed — a sweeping edit across thirty of them is a change to thirty pieces of
+evidence, which deserves its own pass rather than being smuggled into another.

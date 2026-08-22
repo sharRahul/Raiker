@@ -160,3 +160,50 @@ describe("SkillsView", () => {
     expect(screen.getByText("algorithm-creator/SKILL.md")).toBeInTheDocument();
   });
 });
+
+// BUG-221 — a plugin's skill has to be readable as a plugin's, and the two
+// controls that would be undone by the next sync must not be offered.
+describe("SkillsView — skills a plugin contributed", () => {
+  const fromPlugin = () =>
+    skill({
+      skill_id: "skl_p",
+      name: "acme-review",
+      description: "Review a change against Acme's internal checklist.",
+      source: "plugin",
+      source_ref: "acme-skills",
+      active: false,
+    });
+
+  it("credits the plugin that provided it, by id", async () => {
+    stubFetch({ "GET /api/skills": { skills: [fromPlugin()] } });
+    render(SkillsView);
+    expect(await screen.findByText("from plugin")).toBeInTheDocument();
+    expect(screen.getByText(/Provided by plugin acme-skills/)).toBeInTheDocument();
+  });
+
+  it("arrives switched off, and can still be switched on here", async () => {
+    stubFetch({ "GET /api/skills": { skills: [fromPlugin()] } });
+    render(SkillsView);
+    expect(await screen.findByText("inactive")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Activate" })).toBeInTheDocument();
+  });
+
+  it("offers the plugin instead of Rename and Delete, which the next sync would undo", async () => {
+    stubFetch({ "GET /api/skills": { skills: [fromPlugin()] } });
+    render(SkillsView);
+    await screen.findByText("acme-review");
+    expect(screen.queryByRole("button", { name: "Rename" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Delete" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Manage plugin" })).toHaveAttribute(
+      "href",
+      "#/extensions?tab=plugins",
+    );
+  });
+
+  it("still lets the owner read what it says, by downloading it", async () => {
+    stubFetch({ "GET /api/skills": { skills: [fromPlugin()] } });
+    render(SkillsView);
+    await screen.findByText("acme-review");
+    expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+  });
+});

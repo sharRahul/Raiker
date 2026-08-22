@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +23,31 @@ if TYPE_CHECKING:
 # an approval). Inbound traffic is handled separately and always labelled
 # untrusted (see raiker/api/routes_channels.py). This is the one reference
 # transport for Phase 4 slice 4; other transports remain gated/fail-closed.
+
+
+def _sign_delivery(body: bytes) -> tuple[str, bool]:
+    """``(signature, signed)`` for one outbound body.
+
+    The webhook connector profile declares transport ``signed_http_callback`` and
+    auth ``signed_message_reference``. Until this existed, the executor POSTed an
+    unsigned body — so a receiver had no way to tell a Raiker delivery from
+    anything else that could reach the URL, and the profile's declaration was
+    documentation rather than a fact.
+
+    HMAC-SHA256 over the exact bytes sent, keyed by ``RAIKER_CHANNEL_OUTBOUND_SECRET``.
+    The secret is read at delivery and never stored, logged or returned.
+
+    **Unset means unsigned, not refused**, and that is deliberate: the owner
+    controls both ends of a webhook they configured, and hard-blocking their own
+    destination is prevention-by-restriction. The delivery says so in its summary
+    and its artifacts, so an unsigned delivery is a visible state rather than a
+    silent one, and a receiver that requires a signature simply rejects it.
+    """
+    secret = os.environ.get("RAIKER_CHANNEL_OUTBOUND_SECRET", "").strip()
+    if not secret:
+        return "", False
+    digest = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return f"sha256={digest}", True
 
 
 def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict | None:
@@ -55,9 +83,25 @@ class ExternalChannelExecutor:
                 reason_code="channel_not_paired_or_disabled",
                 summary="Channel delivery denied: connector is not paired/enabled.",
             )
-        body = json.dumps({"text": text, "connector_id": connector_id}).encode("utf-8")
+        delivered_at = utc_now()
+        body = json.dumps(
+            {
+                "text": text,
+                "connector_id": connector_id,
+                "delivered_at": delivered_at,
+            },
+            sort_keys=True,
+        ).encode("utf-8")
+        signature, signed = _sign_delivery(body)
+        headers = (
+            {"X-Raiker-Signature": signature, "X-Raiker-Delivered-At": delivered_at}
+            if signed
+            else {"X-Raiker-Delivered-At": delivered_at}
+        )
         try:
-            result = post_url(url, body, egress_allowlist=channel_egress_allowlist())
+            result = post_url(
+                url, body, egress_allowlist=channel_egress_allowlist(), headers=headers
+            )
         except SandboxError as exc:
             return ExecutionResult(
                 ok=False, capability=self.capability, action_id=action.action_id,
@@ -66,9 +110,18 @@ class ExternalChannelExecutor:
             )
         return ExecutionResult(
             ok=True, capability=self.capability, action_id=action.action_id,
-            summary=f"Delivered to '{connector_id}' ({result['sent_bytes']}b).",
-            # Metadata only — never the message text or the target URL.
-            artifacts={"connector_id": connector_id, "sent_bytes": result["sent_bytes"], "status": result["status"]},
+            summary=(
+                f"Delivered to '{connector_id}' ({result['sent_bytes']}b)"
+                + (", signed." if signed else ", UNSIGNED — set RAIKER_CHANNEL_OUTBOUND_SECRET.")
+            ),
+            # Metadata only — never the message text, the target URL, or the
+            # signature itself.
+            artifacts={
+                "connector_id": connector_id,
+                "sent_bytes": result["sent_bytes"],
+                "status": result["status"],
+                "signed": signed,
+            },
         )
 
 

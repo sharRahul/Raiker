@@ -526,6 +526,18 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
             if contributions.get("events")
             else ""
         ),
+        f"contributed_skills: {contributions.get('skills', 0)}"
+        + (
+            f" ({','.join(contributions.get('skill_names', []))})"
+            if contributions.get("skill_names")
+            else ""
+        ),
+        f"offered_mcp_servers: {contributions.get('mcp_servers', 0)}"
+        + (
+            f" ({','.join(contributions.get('mcp_server_names', []))})"
+            if contributions.get("mcp_server_names")
+            else ""
+        ),
     ]
     if contributions.get("refused"):
         lines.append(f"contributions_refused: {','.join(contributions['refused'])}")
@@ -557,6 +569,19 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
         )
         if written.get("path"):
             lines.append(f"Contributed hooks written: {written['path']}")
+        for skill_path in written.get("skill_paths", []):
+            lines.append(f"Contributed skill written: {skill_path}")
+        if written.get("skill_paths"):
+            lines.append(
+                "Contributed skills are installed switched off — activate each one "
+                "on Extensions → Skills before it reaches a turn."
+            )
+        if written.get("mcp_path"):
+            lines.append(f"Offered MCP servers written: {written['mcp_path']}")
+            lines.append(
+                "An offered MCP server is inert until you add it on Extensions → "
+                "MCP servers, which runs the ordinary governed create path."
+            )
     return "\n".join(lines)
 
 

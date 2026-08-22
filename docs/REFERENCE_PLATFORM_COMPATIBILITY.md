@@ -50,7 +50,7 @@ third with its reason.
 | Turn-end signalling | One `Stop`, with a separate `SubagentStop` | `Stop` and `StopFailure` are separate events: a turn parked on an approval or stopped by the owner never reports as a clean completion | **Beyond**, narrowly — see below |
 | Turning hooks off | `disableAllHooks` in settings; `--settings` for one run | Owner setting; rules stay listed and marked off rather than hidden | **At parity** (FIXED-254) |
 | Which rules actually enforce | Not established by cited source | Every rule states whether it can decide or only observes, whether its event is emitted, and which file it came from | **Beyond** (FIXED-253) |
-| Plugin contributions | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers; Cowork installs them from **Customize**. [Plugins](https://code.claude.com/docs/en/plugins) | Hook rules only, at `plugin` scope below every owner scope, behind a declared `event:hook` permission, deleted on revocation | **Partial** |
+| Plugin contributions | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers; Cowork installs them from **Customize**. [Plugins](https://code.claude.com/docs/en/plugins) | Hook rules only, at `plugin` scope below every owner scope, behind a declared `event:hook` permission, deleted on revocation | **Partial** — superseded by the second pass below, which added skills and MCP-server offers |
 | Plugin authorship verification | Claude Code and Codex verify MCP server transport, not manifest authorship | HMAC / Ed25519 manifest verification with a first-class `verified` / `present only` / `unsigned` level either way | **Beyond** (FIXED-166) |
 | Channels / inbound delivery | OpenClaw leads here; Claude Code has no equivalent | Specified in `CHANNELS_SPEC.md`; a connector registry exists, no delivery path does | **Absent** |
 
@@ -68,13 +68,15 @@ third with its reason.
 
 ### What is still behind, stated plainly
 
-* **Plugin skills, MCP servers and panels.** Tracked on BUG-221. Skills are next
-  because they run nothing and need only provenance.
+* **Plugin skills, MCP servers and panels.** *Superseded by the second pass
+  below:* skills shipped as FIXED-259 and MCP-server offers as FIXED-260; panels
+  are now BUG-228.
 * **Channels.** No inbound or outbound delivery. `CHANNELS_SPEC.md` has the
   design and `ConnectorRegistry` already validates transport, auth, pairing and
-  allowlist requirements per profile; what is missing is a decision about what a
-  channel message *is* in a turn — untrusted content from a sender who is not the
-  owner. The threat model is the gate, not the code. Tracked as BUG-225.
+  allowlist requirements per profile. *Superseded by the second pass below:* the
+  missing decision — what a channel message *is* in a turn — was made and accepted
+  as FIXED-261. *Superseded again by the second pass below:* delivery was not
+  absent, it was unreachable — see FIXED-265. Tracked as BUG-225.
 * **A marketplace or plugin directory.** Not planned; installing from a path or
   URL with a reviewed permission diff is the local-first equivalent.
 * **Hook handler types.** Two accepted (`command`, `builtin` — the second being
@@ -82,6 +84,69 @@ third with its reason.
   `prompt` and `agent` are refused at parse time: the first needs a revocable
   egress grant, `mcp_tool` would let a hook reach authority the turn did not
   have, and the last two need a model-call budget. Tracked as BUG-226.
+
+---
+
+## 2026-08-22 review, second pass — plugin skills, plugin MCP offers, channel contract
+
+The first pass of this round closed hooks, took the first slice of plugins, and
+left channels with its reason. This pass took the two plugin kinds the first pass
+named as next, and settled the decision channels were blocked on.
+
+| Area | Reference control set | Raiker after this pass | Status |
+|---|---|---|---|
+| Plugin-contributed skills | Claude Code plugins bundle skills; installing the plugin installs them **active**. [Plugins](https://code.claude.com/docs/en/plugins) | `contributes.skills` behind a declared `skill:contribute` permission, validated by the same reader an upload goes through, installed **inactive**, credited to the plugin on the row, deleted on revocation | **Beyond** (FIXED-259) |
+| Plugin-contributed MCP servers | Claude Code plugins declare MCP servers and they are configured; Codex does the same through `config.toml` | `contributes.mcp_servers` produces an **offer**. Nothing is stored as a server, connected or reachable until the owner adds it through the ordinary governed create path | **Deliberately different** (FIXED-260) |
+| Credential handling in a contributed server | An MCP declaration may carry a URL with embedded auth | `https` only; a URL carrying a username or password is refused; `auth_ref` must name an environment variable; re-validated on read so a hand-edited file cannot smuggle one in | **Beyond** (FIXED-260) |
+| Plugin-contributed panels | Claude Code plugins can ship UI surfaces | Not available. No route, permission or accessibility contract exists | **Behind** — BUG-228 |
+| Plugin-contributed LSP servers | Claude Code plugins bundle LSP servers | The manifest field is accepted and inert **because Raiker has no language-server surface at all**, not because a gate is closed | **Behind** — BUG-227 |
+| What a channel message is in a turn | OpenClaw treats channels as where external input enters, framed as guidance to the model | Accepted contract: untrusted content with a named sender who is not the owner; never a prompt, never able to raise the turn's authority, trust resolved from the pairing record | **Beyond** (FIXED-261) |
+| Channel delivery | OpenClaw ships inbound and outbound; Claude Code has no equivalent | Outbound through a capability gate and an egress allowlist; inbound behind an owner secret with sender allowlisting, recorded untrusted and quarantined. All of it was built and **unreachable** — no way to pair — until the owner surface shipped | **At parity for transport** (FIXED-265) |
+| Separating linked / enabled / trusted / reachable | No cited reference separates them; a connector is configured and then it works | Four stored facts with four remedies, shown as four things: pairing, an enable switch, a sender allowlist, and three fail-closed gates named individually | **Beyond** (FIXED-265) |
+| Channel routing modes | OpenClaw routes an inbound message into work | Recorded and quarantined only. No routing mode is implemented, so a channel message never becomes work on its own | **Behind, deliberately** — BUG-225 |
+| Channel rate limits | Present in the reference set | Fixed window per `(connector, sender)`, 60/min by default, with the refusal recorded as an event rather than a silent 429 | **At parity**, and the recorded refusal is slightly beyond (FIXED-267) |
+| Outbound webhook signing | Signed webhooks are standard | `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) plus a delivered-at header; unset secret means unsigned and **says so on the page**, rather than silently unsigned | **At parity**, and reporting it is beyond (FIXED-268) |
+| Unattended approval posture | Claude Code's `dontAsk` auto-denies anything not already allowed by a rule. [Permissions](https://code.claude.com/docs/en/permissions) | `dont_ask`, a fourth composer mode: an otherwise-eligible action is refused rather than queued, so a scheduled run carries on with what it is allowed instead of parking | **At parity** (FIXED-262) |
+| Why an unattended action was refused | Not distinguished by any cited reference | `denied_no_one_to_ask`, named apart from "the owner denied this" and "this turn writes nothing" | **Beyond**, narrowly (FIXED-262) |
+
+### Categorical confirmation — does this go beyond the reference set?
+
+| Proposed control | Meaningful improvement that could put Raiker beyond Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw, DeepSeek Harness and Hermes? | Decision |
+|---|---|---|
+| A plugin's skill arriving **inactive** | **Yes — proven, and none of the seven does it.** Claude Code and Cowork install a bundled skill active; the marketplace and the install prompt are the owner's only protection. Splitting "offer" from "run with" makes the second consent explicit, and costs one click | Shipped (FIXED-259) |
+| Crediting a contributed skill to its plugin on the row | **Yes.** OpenClaw is closest and carries no provenance on the row. "Where did this instruction come from" should be answerable from the surface, not from a directory listing | Shipped (FIXED-259) |
+| Refusing rename/delete on a contributed skill, keeping download | **Yes — small.** Both would be undone by the next reconcile, so offering them would lose the row silently. Keeping download means reading exactly what a plugin put into your turns is always possible | Shipped (FIXED-259) |
+| A plugin **offering** an MCP server instead of adding one | **Yes — the sharpest divergence in this release.** An MCP server is a tool source: the highest-authority thing a plugin could add. Every reference platform lets a plugin or config file add one directly. Costing one click to buy an explicit, gated, audited grant is the right trade, and it is the pattern to keep as further kinds land | Shipped (FIXED-260) |
+| Re-validating an offer on read, not only on write | **Yes — proven.** Otherwise the file the install wrote and the file the surface reads can diverge, and hand-editing becomes a bypass | Shipped (FIXED-260) |
+| Refusing a credential inside a contributed endpoint | **Yes.** A plugin author handing the owner a token to paste into a field not built to hold one is a realistic path to a leaked secret, and no cited reference refuses it | Shipped (FIXED-260) |
+| Deciding what a channel message **is** before building transport | **Yes — this is where Raiker should intend to lead.** Claude Code has no channel concept. OpenClaw's framing is guidance to the model rather than a structural envelope. ChatGPT Work's connectors and Hermes' inbound paths carry sender identity but no stated "cannot raise authority" rule. The transport is commodity; the contract is not | Shipped (FIXED-261) |
+| Giving channels an owner surface | **Yes — and it corrected the round's premise.** Delivery was not missing; it was unreachable, because nothing let the owner pair a connector. The lesson generalises: a gap read as "unbuilt" should be checked against the code before it is built twice | Shipped (FIXED-265) |
+| Reporting each fail-closed gate separately | **Yes.** Three defaults refuse — the capability, the egress allowlist, the inbound secret — and each has a different remedy. Every cited reference collapses this into one enable switch, which is why "it's on and nothing happens" is a support question there and a readable page here | Shipped (FIXED-265) |
+| Routing an inbound message into a turn | **No — refused.** Recording and quarantining are the safe defaults, and the routing modes in `CHANNELS_SPEC.md` are a target rather than a description. Implementing them before rate limits and the relay story would be the wrong order | Open on BUG-225 |
+| Exempting booleans from key-based redaction | **Yes — small and general.** A filter that replaces `False` with a truthy marker does not protect a secret; it states the negation of a fact, and every client reads it confidently | Shipped (FIXED-266) |
+| Bounding an allowlisted channel sender | **No — parity**, and closing a gap Raiker's own spec had named. The *recorded* refusal is the part worth keeping: a 429 with no audit trail leaves the owner unable to tell "nobody is sending" from "everything is being dropped" | Shipped (FIXED-267) |
+| Signing outbound deliveries, and saying when they are not signed | **Partly.** Signed webhooks are standard; it was Raiker that was behind its own connector profile. What goes beyond is telling the owner *on the page* that deliveries are currently unsigned — the gap between what a profile declares and what the transport does is exactly what a governed product should surface | Shipped (FIXED-268) |
+| A plugin panel that renders plugin-authored code | **No — refused.** "No plugin code runs in this browser" is a claim the Plugins tab makes in those words. A declarative panel keeps it literally true and makes the accessibility contract enforceable at render time | Recorded as the intended shape in BUG-228 |
+| Building an LSP client to satisfy a manifest field | **No — refused.** That is the tail wagging the dog. Whether Raiker wants a language-server client at all is a scope decision that comes first, and the codemap already answers part of the need | Recorded in BUG-227 |
+| A fourth approval mode that declines instead of asking | **No — parity**, and worth taking for exactly that reason: an owner arriving from Claude Code's `dontAsk` had no equivalent, and their unattended runs parked instead of proceeding | Shipped (FIXED-262) |
+| Naming *why* an unattended action was refused | **Yes — small, and free.** No cited reference separates "declined because nobody was watching" from "declined because you said no". Reading an unattended run's record afterwards, they are not the same fact: only one of them means running it again while watching would have worked | Shipped (FIXED-262) |
+| A detail line under every approval mode | **Yes — a consequence of the fourth mode.** *Skip* and *Decline* both mean "stop asking me" and do opposite things; a label alone cannot carry that, and a mode picker whose options can be misread is a safety surface that misinforms | Shipped (FIXED-262) |
+
+### What is still behind, stated plainly (superseding the list above)
+
+* **Plugin panels.** The last contribution kind. Tracked as BUG-228, split out of
+  BUG-221 so it can be worked on its own terms.
+* **Plugin LSP servers.** No surface exists to contribute to. Tracked as BUG-227.
+* **Channels.** *Superseded:* outbound and inbound both existed and are now
+  reachable (FIXED-265), rate-limited (FIXED-267) and signed (FIXED-268). What is
+  still behind is above the transport — the spec's routing modes, and resolving
+  an approval over a channel. Tracked as BUG-225.
+* **A marketplace or plugin directory.** Still not planned; installing from a
+  path or URL with a reviewed permission diff is the local-first equivalent.
+* **Hook handler types.** Unchanged from the first pass, and worth restating:
+  `command` is the only handler type **Claude Code's own hooks have**, so the four
+  Raiker refuses are a gap against Raiker's own reference document rather than
+  against Claude Code. Tracked as BUG-226.
 
 ---
 
@@ -1494,7 +1559,7 @@ was missing was everything an owner could see or trust:
 4. **Channel activation** (BUG-225), last: it is the only one of the three whose
    safe half already ships, and the only one whose gate is a threat model rather
    than an implementation.
-5. **The three refused handler types** (BUG-226). `prompt` first — it makes no
+5. **The four refused handler types** (BUG-226). `prompt` first — it makes no
    outbound request and its output is context, not a decision.
 
 ---

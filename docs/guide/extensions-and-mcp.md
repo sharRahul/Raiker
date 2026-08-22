@@ -323,22 +323,87 @@ lists what a plugin *may* contribute:
 
 | Contribution | Available |
 |---|---|
-| Hooks | yes |
-| Skills | not yet — they run nothing, and need a provenance story first |
-| MCP servers | not yet — already brokered and gated, but not contributable |
+| Hooks | yes — rules at `plugin` scope, below every scope you control |
+| Skills | yes — instruction text, installed **switched off** and credited to the plugin |
+| MCP servers | yes — a plugin may *offer* one; adding it is your action |
 | Panels | not yet — needs a route, permission and accessibility contract |
 
 so "provides nothing" and "may not provide anything" read differently.
 
 No plugin code runs in your browser.
 
+### A plugin's skills
+
+A plugin that asks for `skill:contribute` may ship `SKILL.md` documents. They go
+through the same validator an upload does, land in
+`.raiker/plugins/<id>/skills/<name>/SKILL.md`, and appear on Extensions → Skills
+marked **from plugin** with the plugin's id.
+
+They arrive **inactive**. Installing the plugin was consent to *offer* the skill,
+not to run with it — you switch each one on yourself, and that is a second,
+separate decision.
+
+Rename and Delete are not offered on a plugin's skill, because the next sync
+would undo either. **Download** is, so you can read exactly what it says. To
+remove one, revoke the plugin: that deletes the file, and the row goes with it.
+
+A plugin's skill never overwrites one of yours. If the names collide, yours stays.
+
+### A plugin's MCP servers
+
+A plugin that asks for `mcp:server` may **offer** a server — a name, a transport,
+an HTTPS endpoint or a reviewed template, and the name of the environment
+variable holding the token. It is a description, not a connection: nothing is
+added, connected, or reachable until you press **Add server** on Extensions →
+MCP servers, and that runs the same governed create path as typing it in.
+
+An offer can never carry a credential. A plaintext `http://` endpoint, a URL with
+a username or password in it, or an `auth_ref` that is not an environment
+variable name is refused at install, and re-validated when the offer is read — so
+hand-editing the file afterwards cannot smuggle one in.
+
 ## Channels
 
-The tab is intentionally empty and says so:
+A channel is the one place where content Raiker did not ask for enters a turn.
+That content is defined: **untrusted content with a named sender who is not you.**
+Never a prompt. Never able to enable a capability, widen an approval mode, or
+approve anything. Trust comes from the pairing record, never from anything inside
+the message.
 
-> Inbound and outbound delivery needs an accepted contract and threat model
-> before Raiker offers controls for it. This tab exists so the gap is visible
-> rather than silently missing.
+The tab lists every connector profile and lets you **pair** one. Pairing does not
+switch it on and does not trust anyone — linked, enabled and trusted are three
+separate facts, and the tab shows them separately:
 
-Inbound delivery is the highest-risk surface in this class — it is where external
-input enters — so the gate here is the threat model, not the code.
+- **Pair** stores the link, switched off, with whatever sender allowlist you gave
+  it. A profile that accepts inbound messages cannot be paired without one.
+- **Turn on** is a second decision.
+- **Send a test delivery** runs the *same governed path* a real delivery takes —
+  the capability gate, the decision mode, the egress allowlist and the audit
+  event all apply. It is not a shortcut that proves nothing.
+- **Unpair** deletes the link. Both the outbound executor and the inbound
+  receiver read that record, so unpairing is what actually stops the channel.
+
+Four things are fail-closed or off by default, and each has its own remedy, so
+the tab reports them one by one rather than as a single "ready":
+
+| Gate | What it is | Where you change it |
+|---|---|---|
+| Capability | `external_channel_runtime` | Permissions |
+| Egress | `RAIKER_CHANNEL_EGRESS_ALLOWLIST` — empty means deny | Your environment |
+| Signing | `RAIKER_CHANNEL_OUTBOUND_SECRET` — unset means unsigned, not refused | Your environment |
+| Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
+
+A fifth row states the **inbound budget**: 60 messages per sender per minute by
+default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Allowlisting says *who* may
+speak; the budget says how often, and they are different questions — a sender
+that goes over is refused and the refusal is recorded, so a channel that goes
+quiet is answerable from Observability rather than a mystery.
+
+**An inbound message never becomes a turn on its own.** It is recorded as a
+governed event, quarantined, and its instructions are inert whatever the sender
+wrote. Accepted and rejected messages both appear in Observability → Activity.
+
+Still unbuilt: the routing modes in the spec, and resolving an approval over a
+channel — the relay queue is deliberately pending-only, because a channel that
+can raise an approval can be used to *ask for* one.
+Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).

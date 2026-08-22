@@ -118,7 +118,7 @@ export interface SkillView {
   name: string;
   description: string;
   version: string | null;
-  source: "upload" | "url" | "builtin" | "built";
+  source: "upload" | "url" | "builtin" | "built" | "plugin";
   source_ref: string | null;
   checksum: string;
   active: boolean;
@@ -369,9 +369,71 @@ export interface PluginSignature {
 
 /** What a plugin actually provides, read from the files the runtime loads
  *  rather than from the manifest that described them (BUG-221). */
+/** One connector profile, and what is actually true of it right now (BUG-225). */
+export interface ChannelProfile {
+  connector_id: string;
+  channel_type: string;
+  display_name: string;
+  transport: string;
+  auth_method: string;
+  default_state: string;
+  requires_pairing: boolean;
+  requires_sender_allowlist: boolean;
+  requires_network: boolean;
+  /** Is there a pairing at all. */
+  linked: boolean;
+  /** Is that pairing switched on. Linked is not enabled. */
+  enabled: boolean;
+  pairing_id: string | null;
+  display_label: string | null;
+  sender_count: number;
+  senders: string[];
+}
+
+export interface ChannelsView {
+  profiles: ChannelProfile[];
+  error: string | null;
+  outbound: {
+    capability?: string;
+    gate_state?: string;
+    runtime_enabled?: boolean;
+    /** RAIKER_CHANNEL_EGRESS_ALLOWLIST names at least one host. Fail-closed. */
+    egress_configured?: boolean;
+    egress_host_count?: number;
+    /** RAIKER_CHANNEL_OUTBOUND_SECRET is set, so deliveries carry an HMAC. */
+    signing_configured?: boolean;
+  };
+  inbound: {
+    /** RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses. */
+    secret_configured?: boolean;
+    /** Messages per sender per minute. Allowlisting says who; this says how often. */
+    rate_limit_per_minute?: number;
+    quarantined?: boolean;
+    instructions_inert?: boolean;
+  };
+}
+
+/** An MCP server an installed plugin offers. Inert until the owner adds it. */
+export interface McpOffer {
+  plugin_id: string;
+  name: string;
+  transport: "http" | "stdio";
+  description: string;
+  endpoint_url?: string;
+  auth_ref?: string | null;
+  template?: string;
+  already_added: boolean;
+}
+
 export interface PluginContributions {
   hooks: number;
   events: string[];
+  /** Skills the plugin ships. They install switched off and are credited to it. */
+  skills: number;
+  skill_names: string[];
+  /** MCP servers it offers. Offers are inert until the owner adds them. */
+  mcp_servers: number;
+  mcp_server_names: string[];
   /** "unreadable" when the contributed file exists and could not be parsed. */
   error: string | null;
 }

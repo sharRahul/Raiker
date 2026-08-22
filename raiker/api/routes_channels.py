@@ -3,16 +3,27 @@ from __future__ import annotations
 import hmac
 import json
 import os
+import time
+from collections import defaultdict, deque
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
-from raiker.api.schemas import InboundChannelMessage
+from raiker.api.auth import AuthMiddleware
+from raiker.api.schemas import (
+    ChannelEnabledRequest,
+    ChannelSendersRequest,
+    ChannelTestDeliveryRequest,
+    InboundChannelMessage,
+    PairChannelRequest,
+)
+from raiker.api.sessions import ApiSession
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
+from raiker.runtime.authority.models import Principal
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -32,6 +43,195 @@ def _enabled_pairing(store: SQLiteStore, connector_id: str) -> dict[str, Any] | 
         if pairing.get("connector_id") == connector_id:
             return pairing
     return None
+
+
+# ── Inbound rate limit (BUG-225) ─────────────────────────────────────────────
+#
+# An allowlisted sender was unbounded. Allowlisting says *who* may speak; it says
+# nothing about *how often*, and the two are different questions — a compromised
+# or merely broken allowlisted client could fill the event log as fast as it
+# could post, and every message is written to durable storage before anything
+# else looks at it.
+#
+# Fixed window, in memory, per (connector, sender) — the same shape and the same
+# trade-off as `RateLimitMiddleware`: process-local, reset by a restart, and a
+# denial-of-service guardrail rather than an auth boundary. The allowlist is
+# still the gate; this is the budget behind it.
+#
+# A refusal is *recorded*, not silent: a sender that hits the limit produces a
+# `channel_message_rejected` event with `reason: rate_limited`, so a channel that
+# stops working is answerable from Observability rather than by guesswork.
+
+CHANNEL_INBOUND_WINDOW_SECONDS = 60.0
+CHANNEL_INBOUND_DEFAULT_MAX = 60
+
+_inbound_hits: dict[tuple[str, str], deque[float]] = defaultdict(deque)
+
+
+def channel_inbound_limit() -> int:
+    """Messages per sender per minute. ``RAIKER_CHANNEL_INBOUND_RATE`` overrides.
+
+    A non-numeric or non-positive override falls back to the default rather than
+    disabling the limit: "0" is far more likely to be a mistake than a request to
+    accept an unbounded stream, and this is the one setting where guessing
+    generously is the wrong way to be wrong.
+    """
+    raw = os.environ.get("RAIKER_CHANNEL_INBOUND_RATE", "").strip()
+    try:
+        value = int(raw)
+    except ValueError:
+        return CHANNEL_INBOUND_DEFAULT_MAX
+    return value if value > 0 else CHANNEL_INBOUND_DEFAULT_MAX
+
+
+def _within_inbound_budget(connector_id: str, sender_id: str) -> bool:
+    """Record this message against the sender's budget; False when it is spent."""
+    limit = channel_inbound_limit()
+    now = time.monotonic()
+    cutoff = now - CHANNEL_INBOUND_WINDOW_SECONDS
+    # Aged out and swept *before* this sender's bucket is fetched. Doing it after
+    # is subtly wrong and silently disables the limit: a `defaultdict` creates the
+    # bucket empty on access, so a sweep that drops empty buckets drops the one
+    # about to be appended to, and every message then looks like the first.
+    for key, seen in list(_inbound_hits.items()):
+        while seen and seen[0] < cutoff:
+            seen.popleft()
+        if not seen:
+            del _inbound_hits[key]
+    hits = _inbound_hits[(connector_id, sender_id)]
+    if len(hits) >= limit:
+        return False
+    hits.append(now)
+    return True
+
+
+# ── Owner surface (BUG-225) ──────────────────────────────────────────────────
+#
+# The transport existed and had no way in. These routes are the way in, and they
+# are deliberately thin: every one delegates to the control service, which is
+# human-only and owner-scoped, and the test delivery goes through the governed
+# `external_channel_runtime` capability rather than posting the webhook itself.
+
+
+def _auth(request: Request) -> tuple[ApiSession, Principal]:
+    return AuthMiddleware(_ws(request)).authenticate(request)
+
+
+def _service(request: Request) -> Any:
+    from raiker.control.dashboard import DashboardService
+
+    return DashboardService(_ws(request))
+
+
+def _channel_result(result: Any) -> dict[str, Any]:
+    """Map a ControlResult onto a response, keeping the governed reason.
+
+    422 for something the owner typed, 403 for a gate or an authority refusal —
+    the same split the MCP routes use, so one reason code has one remedy wherever
+    it is met.
+    """
+    if result.ok:
+        return {"ok": True, **result.data}
+    reason = result.reason_code or ""
+    if (
+        reason.startswith("unknown_connector")
+        or reason.startswith("unknown_channel_pairing")
+        or reason in {"channel_already_paired", "sender_allowlist_required"}
+    ):
+        code = status.HTTP_422_UNPROCESSABLE_CONTENT
+    else:
+        code = status.HTTP_403_FORBIDDEN
+    raise HTTPException(status_code=code, detail={"ok": False, "reason_code": reason})
+
+
+@router.get("/api/channels")
+async def list_channels(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Every connector profile and what is actually true of it right now.
+
+    Read-only. Reports linked, enabled, sender count, the capability gate, the
+    egress allowlist and the inbound secret as separate facts, because each has a
+    different remedy and collapsing them into one "ready" flag is what made this
+    surface unable to say anything useful in the first place.
+    """
+    return _service(request).list_channels(auth_data[0].principal_id)
+
+
+@router.post("/api/channels/pairings")
+async def pair_channel(
+    body: PairChannelRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Pair a connector. Paired is **not** enabled — that is a second decision."""
+    return _channel_result(
+        _service(request).pair_channel(
+            auth_data[0].principal_id,
+            body.connector_id,
+            body.display_name or "",
+            list(body.senders or []),
+        )
+    )
+
+
+@router.put("/api/channels/pairings/{pairing_id}/enabled")
+async def set_channel_enabled(
+    pairing_id: str,
+    body: ChannelEnabledRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _channel_result(
+        _service(request).set_channel_enabled(auth_data[0].principal_id, pairing_id, body.enabled)
+    )
+
+
+@router.put("/api/channels/pairings/{pairing_id}/senders")
+async def set_channel_senders(
+    pairing_id: str,
+    body: ChannelSendersRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Replace the sender allowlist. This is what the inbound receiver enforces."""
+    return _channel_result(
+        _service(request).set_channel_senders(
+            auth_data[0].principal_id, pairing_id, list(body.senders or [])
+        )
+    )
+
+
+@router.delete("/api/channels/pairings/{pairing_id}")
+async def unpair_channel(
+    pairing_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _channel_result(
+        _service(request).unpair_channel(auth_data[0].principal_id, pairing_id)
+    )
+
+
+@router.post("/api/channels/deliver-test")
+async def deliver_channel_test(
+    body: ChannelTestDeliveryRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Send one test delivery through the governed outbound path.
+
+    Not a shortcut: this builds a governed action and routes it through the
+    runtime authority, so a closed `external_channel_runtime` gate refuses it
+    with `disabled_by_capability_gate` and an unallowlisted host refuses it at
+    the egress boundary — exactly as a real delivery would.
+    """
+    return _channel_result(
+        _service(request).deliver_channel_test(
+            auth_data[0].principal_id, body.connector_id, body.url, body.text
+        )
+    )
 
 
 @router.post("/api/channels/{connector_id}/inbound")
@@ -96,7 +296,33 @@ async def receive_inbound(
             },
         )
 
-    # Allowlisted sender: still untrusted + quarantined; instructions are inert.
+    if not _within_inbound_budget(connector_id, body.sender_id):
+        writer.append(make_event(
+            session_id="channels",
+            turn_id=None,
+            event_type="channel_message_rejected",
+            actor="channel_receiver",
+            payload={
+                "connector_id": connector_id,
+                "channel_type": channel_type,
+                "sender_id": body.sender_id,
+                "trust_level": "untrusted",
+                "reason": "rate_limited",
+                "limit_per_minute": channel_inbound_limit(),
+            },
+        ))
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "ok": False,
+                "reason_code": "rate_limited",
+                "trust_level": "untrusted",
+                "quarantined": True,
+            },
+        )
+
+    # Allowlisted sender, within budget: still untrusted + quarantined;
+    # instructions are inert.
     writer.append(make_event(
         session_id="channels",
         turn_id=None,

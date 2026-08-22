@@ -10417,3 +10417,579 @@ a no-op would pass the type check and fail the behaviour.
 
 **Evidence.** The full web suite: 107 files, 913 passed, 1 skipped, on Node
 25.6.1. Previously 105 passed / 2 failed with 20 failing tests on the same host.
+
+---
+
+## FIXED-259 — A plugin can contribute a skill, and it arrives switched off
+
+**Severity: Medium → Low. Area: plugins / skills / extensibility. Fixed
+2026-08-22 (BUG-221 step 2).**
+
+Hooks proved the approach in FIXED-256: a plugin gets **no execution surface of
+its own** and contributes through a surface that already governs the thing
+contributed. Skills were named as the next kind for a reason — they run nothing —
+and the blocking piece was the one the entry said it was: *where a
+plugin-contributed `SKILL.md` lives, and how the Skills tab tells it from an
+uploaded one*.
+
+**What ships.** A manifest that asks for `skill:contribute` and declares
+`contributes.skills` now installs real skills. Two entry shapes — a whole
+`document`, or a `name`/`description`/`body` triple assembled the way
+`/skill-build` assembles one — both ending at `read_skill_md`, the same validator
+an upload goes through. A plugin therefore cannot express a skill Raiker would
+otherwise refuse to build.
+
+**Where it lives, and why that answers the blocking question.** The document is
+written to `.raiker/plugins/<plugin_id>/skills/<name>/SKILL.md` — *inside the
+directory revocation already deletes*, so a revoked plugin's skills disappear for
+the same structural reason its hooks do. Existence is on disk; the owner's on/off
+choice is in the skills store, which is what the runtime reads.
+`SkillsService.sync_plugin_skills` reconciles the two in one direction only: disk
+decides what exists, the store keeps the choice made about it, and
+`upsert_skill`'s existing "an update never silently re-enables a skill the owner
+turned off" property carries it across a refresh.
+
+**Two consents, and neither implied by the other.** `skill:contribute` is outside
+`SAFE_READ_ONLY`, so asking for it lands the plan on `pending_approval` and the
+owner reads it in the permission diff *before* installing. Then the skill arrives
+**inactive**. Instruction text entering the owner's turns is not harmless because
+it runs nothing, so installing the plugin is consent to *offer* the skill and
+switching it on is a separate decision the owner makes on Extensions → Skills.
+
+**What it cannot do.** It never overwrites a skill the owner owns: a name
+collision with an uploaded, built or imported skill leaves the owner's in place
+and drops the plugin's copy. Rename and Delete are refused with
+`skill_provided_by_plugin` and are not rendered — both would be undone by the
+next sync, so the surface says so rather than losing the row. **Download** stays,
+because reading exactly what a contributed skill says is the one thing the owner
+must always be able to do.
+
+**One bad entry refuses only itself.** Five skills where the third is malformed
+installs four and names the one it dropped; refusing all five would hide four
+working contributions behind one typo. More than twenty is refused whole rather
+than truncated. And a refusal on one *kind* never removes the other: a manifest
+whose hooks are malformed still installs its valid skills.
+
+**User-interface outcome.** Extensions → Skills marks the row **from plugin** and
+reads *"Provided by plugin `<id>`"*; Extensions → Plugins names the skills each
+plugin provides, says they install switched off, and links to the tab that turns
+them on; `/plugin-plan` states the count and the names before the install and
+prints each written path after it.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+goes beyond Claude Code.** Claude Code plugins bundle skills and install them
+active; the owner's protection is the marketplace and the install prompt. Raiker
+adds two things neither Claude Code nor Cowork has: the skill arrives **inactive**
+so offering and running are separate decisions, and the row is **credited to the
+plugin** so "where did this instruction come from" is answerable from the surface
+rather than from a directory listing. Codex, DeepSeek Harness and Hermes have no
+plugin-contributed instruction layer at all. OpenClaw's is closest and has no
+provenance on the row.
+
+**Evidence.** `tests/test_plugin_contributions.py` — eleven tests covering the
+permission gate, the permission diff, inactive-on-arrival, the choice surviving a
+refresh, revocation reaching the runtime, the owner's skill winning its name,
+rename/delete refusal, partial refusal, hooks and skills not costing each other,
+and the read model. `apps/web/src/lib/views/SkillsView.test.ts` and
+`ExtensionsView.test.ts` cover the two surfaces.
+
+---
+
+## FIXED-260 — A plugin can offer an MCP server, and an offer is not a server
+
+**Severity: Medium → Low. Area: plugins / MCP / extensibility. Fixed 2026-08-22
+(BUG-221 step 3).**
+
+The entry said what was missing: *"a manifest → server-profile path that goes
+through the existing trust gate rather than around it."* The shape that satisfies
+that is not a manifest that adds a server. It is a manifest that **offers** one.
+
+**What ships.** A manifest asking for `mcp:server` may declare
+`contributes.mcp_servers` — a name, a transport, and either an HTTPS endpoint
+with the *name of the environment variable* holding its token, or a reviewed
+stdio template. It is written to `.raiker/plugins/<id>/mcp-servers.json` and read
+back as an **offer**: a description of a server, listed on Extensions → MCP
+servers under *"Offered by your plugins"*, credited to the plugin.
+
+**Nothing about an offer is a connection.** No server profile is stored, no
+handshake runs, no host is reachable. Pressing **Add server** posts to the
+ordinary create route — `/api/mcp/servers/remote` or `/api/mcp/servers` — so the
+capability gate, the decision mode, the ownership check and the audit event all
+apply exactly as they would if the owner had typed the same fields in. That is
+what "through the gate rather than around it" means concretely: the plugin
+supplies the fields, the owner supplies the authority.
+
+**An offer can never carry a credential.** `https` only; a URL with a username or
+password in it is refused; `auth_ref` must match an environment-variable name, so
+a plugin author cannot hand the owner a token to paste into a field not built to
+hold one. All of it is re-validated **on read**, not only on write, so
+hand-editing the file after the install cannot smuggle in an endpoint the write
+path would have refused.
+
+**User-interface outcome.** The offer list is visually a proposal list — dashed
+border, quieter than the real servers below, and carrying no connection state of
+its own. An offer the owner has already taken up reads **Added** with no button,
+rather than a button that could only fail with `mcp_name_taken`. Extensions →
+Plugins names the offered servers and links here. Revoking the plugin withdraws
+the offers.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+is the sharpest divergence from Claude Code in this release.** Claude Code
+plugins install MCP servers directly: the plugin declares a server and it is
+configured. Codex's `config.toml` and OpenClaw do the same by file. Raiker
+deliberately does not, because an MCP server is a *tool source* — the highest-
+authority thing a plugin could add — and a plugin that can add one silently can
+add reach the owner never chose. Offering it costs one click and buys an
+explicit, audited, gated grant. This is the pattern to keep as the other kinds
+land.
+
+**Evidence.** `tests/test_plugin_contributions.py` — the permission gate, an
+offer not being a server, an offer the owner took up, refusal of plaintext and
+credential-bearing endpoints, refusal of a token in `auth_ref`, revocation
+withdrawing offers, re-validation defeating a hand-edited file, and the read
+model. `apps/web/src/lib/views/McpView.test.ts` covers the tab.
+
+---
+
+## FIXED-261 — What a channel message *is* in a turn is now decided
+
+**Severity: Medium. Area: channels / threat model. Fixed 2026-08-22 (BUG-225
+step 1).**
+
+BUG-225's own analysis said the blocker was not the registry — which already
+modelled the right things — but a missing decision: *"a channel is the point at
+which content Raiker did not ask for enters a turn. Every other input path has an
+answer for that. A channel message has no such framing yet, and neither has the
+sender."* Until that was written down, none of the delivery code had a contract
+to satisfy, and shipping delivery without it would have been worse than not
+shipping it.
+
+**What ships** is the contract, in `docs/CHANNELS_SPEC.md` → *What a channel
+message is in a turn*, with the matching rows in `docs/THREAT_MODEL.md`. A
+channel message is **untrusted content with a named sender who is not the
+owner**, and five rules follow, each enforceable rather than advisory:
+
+1. It is **never a prompt** — it arrives in an untrusted-content envelope with
+   the connector id, sender identity and trust level, so "ignore your
+   instructions" is a quoted string in a data block *structurally*, not as a
+   matter of the model's judgement.
+2. The sender is not the owner unless the sender **is** the owner and paired.
+   Trust is resolved from the pairing record, never from the message; an unpaired
+   channel resolves every sender as `untrusted`, which is what makes
+   `requires_pairing` enforcement rather than metadata.
+3. It **can never raise the turn's authority** — no capability, approval mode,
+   decision mode, install or approval. The routing modes that look like authority
+   are refused unless the sender is the paired owner, and `approval_response` is
+   refused outright until step 4 exists.
+4. **Outbound is a capability; inbound is a boundary** — different controls,
+   because the risks are not the same one seen twice.
+5. **Nothing is implicit** — linked is not enabled, enabled is not trusted,
+   allowlisted is not the owner; three separate stored facts, shown separately.
+
+**User-interface outcome.** Extensions → Channels no longer reads as a blank
+deferral. It states the accepted contract in the owner's words, then the four
+implementation steps with the state of each — step 1 **Done**, step 2 **Next** —
+so an accepted spec cannot be mistaken for a shipped feature, and a shipped
+feature cannot arrive without the reader having seen what it is allowed to be.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+is where Raiker should intend to lead.** Claude Code has no channel concept at
+all. OpenClaw ships channels and treats them as where external input enters, but
+its framing is guidance to the model rather than a structural envelope. ChatGPT
+Work's connectors and Hermes' inbound paths carry sender identity but not a
+stated "cannot raise authority" rule. Deciding this *before* the transport is the
+differentiator; the transport itself is commodity.
+
+**What is explicitly not fixed.** Steps 2, 3 and 4 — outbound delivery, inbound
+pairing and allowlist enforcement, and the approval relay. BUG-225 stays open for
+them and is reduced rather than closed.
+
+**Evidence.** `docs/CHANNELS_SPEC.md`, `docs/THREAT_MODEL.md`,
+`apps/web/src/lib/views/ExtensionsView.test.ts` — the tab names the contract, and
+distinguishes what is done from what is not.
+
+---
+
+## FIXED-262 — There is an unattended posture now: decline instead of asking
+
+**Severity: Low. Area: approval modes. Fixed 2026-08-22 (BUG-219).**
+
+The approval chip offered Manual, Auto and Skip. Claude Code also offers
+`dontAsk`, which auto-**denies** anything not already allowed by a rule instead
+of prompting for it — the posture for unattended work, where an interruption is
+worse than a refusal. Raiker had no way to express it, so a scheduled routine at
+06:00 met a prompt nobody would answer and **parked**, when it could have carried
+on with everything it was actually allowed to do.
+
+**What ships.** A fourth mode, `dont_ask`. It resolves any otherwise-eligible
+governed action to `deny` rather than to a prompt.
+
+Three properties, and each is a test:
+
+1. **It declines rather than queues.** No approval record is raised, no tool
+   starts, and nothing is written.
+2. **The refusal says why it was refused.** `denied_no_one_to_ask`, named
+   distinctly from `denied_by_decision_mode` and `denied_by_turn_posture`,
+   because *"the owner refused this"* and *"nobody was there to ask"* call for
+   different follow-ups — and only the second means re-running it attended would
+   have worked.
+3. **It never widens a gate.** It can only turn `needs_approval` into `deny`. An
+   action policy already allowed is untouched, and one policy already denied
+   keeps policy's own reason rather than borrowing this one.
+
+The conversion happens *before* the decision is recorded, because this **is** the
+decision. Recording `needs_approval` and then refusing would leave the audit log
+describing a queue entry that never existed.
+
+**One deliberate exception.** A per-turn `ask` posture normally forces `manual`,
+so the unattended modes cannot swallow a decision the owner asked to see.
+`dont_ask` is exempt: there is nobody to show it to, and forcing `manual` there
+would park the turn on a queue entry that is never read — the exact outcome the
+mode exists to avoid.
+
+**User-interface outcome.** The composer chip gains the mode, and the menu gains
+a **detail line under every option**. Four postures is one more than a label
+alone can carry: *Skip* and *Decline, don't ask* both mean "stop asking me" and
+do opposite things — one runs the action, the other refuses it — so each option
+now states which in plain English.
+
+**Reference-platform decision — is this a meaningful improvement?** **No — parity
+with Claude Code**, and worth taking for exactly that reason: an owner moving
+from `dontAsk` had no equivalent here. The *naming* of the refusal is the small
+piece that goes beyond it: no cited reference distinguishes "declined because
+nobody was watching" from "declined because you said no", and the two are not the
+same fact when reading an unattended run's record afterwards.
+
+**Evidence.** `tests/test_model_tool_call_loop.py` — declines rather than queues,
+names the reason, and never widens a gate.
+`apps/web/src/lib/approvalMode.test.ts` and
+`apps/web/src/lib/components/ApprovalModeControl.test.ts` cover the surface,
+including that skip and decline are told apart in words.
+
+---
+
+## FIXED-263 — The approval-posture menu opened into the fold
+
+**Severity: Low. Area: composer / web UI. Fixed 2026-08-22.**
+
+The posture menu dropped **below** its trigger. That trigger lives in the
+composer bar, which is pinned to the bottom of the viewport in both Chat and
+Build — so the menu opened straight into the fold, and the last option was
+unreachable on a page that does not scroll. It was already true with three
+postures; adding a fourth and a line of explanation under each made it
+unmissable, which is the only reason it was caught now.
+
+The menu is anchored to the trigger's **top** edge instead, so it opens upward
+and the whole list is on screen at every height. `left: 0` rather than
+`right: 0`, because at 390px the trigger sits near the left edge and a
+right-anchored menu ran off the other side.
+
+Found while photographing the new `dont_ask` posture (FIXED-262). It affected
+every posture, not the new one — a control the owner uses to decide how much
+Raiker may do on its own is the wrong place for an option that cannot be
+reached.
+
+**Reference-platform decision.** **No — a defect fix.**
+
+**Evidence.** `apps/web/e2e/bug-219-decline-mode-live.spec.ts` asserts every
+posture is `toBeInViewport()` at 1440px and again at 390px, where it also checks
+the page has not gained horizontal overflow. Screenshots:
+`bug-219-approval-modes.png`, `bug-219-approval-modes-mobile.png`.
+
+---
+
+## FIXED-264 — A live spec's sign-in depended on how much history the instance had
+
+**Severity: Low. Area: live test harness. Fixed 2026-08-22.**
+
+The Workbench greets a fresh instance with *"Welcome to your Work Dashboard"* and
+a returning owner with *"Welcome back"*, and a workspace turns from the first
+into the second the moment it holds any work. Every live spec's `signIn` waited
+for the first string, so a suite passed on an empty instance and failed on a used
+one — at sign-in, before reaching anything it was written to test.
+
+It surfaced mid-round: the plugin specs passed, the provider spec then created a
+chat session, and the next spec could not sign in. The failure names a heading,
+which is the least useful place to start looking when the thing under test is an
+approval posture.
+
+The four specs added this round accept either greeting. The older specs still
+carry the narrow string; they are not changed here because each is evidence for a
+closed entry and re-running one is how that evidence is refreshed — but a spec
+that fails at sign-in on a populated workspace is a trap worth knowing about, so
+it is recorded rather than left as folklore.
+
+**Reference-platform decision.** **No — test-harness correctness.**
+
+**Evidence.** `bug-219-decline-mode-live.spec.ts`,
+`bug-221-225-plugin-skills-mcp-channels-live.spec.ts`,
+`plugin-contributions-provider-live.spec.ts`, `ui-sweep-responsive-live.spec.ts`.
+
+---
+
+## FIXED-265 — Channels have an owner surface, and the tab stops denying the transport
+
+**Severity: Medium. Area: channels / extensibility. Fixed 2026-08-22 (BUG-225
+steps 2 and 3).**
+
+**The finding, corrected.** BUG-225 was raised as *"a channel can be described
+and never reached"*, and FIXED-261 closed its step 1 by writing down what a
+channel message is. Both read the gap as *"delivery is not built"*. Building it
+started with reading `raiker/channels/` — and found that it already was:
+
+* `ExternalChannelExecutor` (`external_channel_runtime`) does bounded outbound
+  webhook delivery against `channel_egress_allowlist()`, refusing a connector
+  that is not paired and enabled.
+* `POST /api/channels/{connector_id}/inbound` receives messages behind an owner
+  secret, refuses a sender that is not allowlisted, and records every accepted
+  one as **untrusted, quarantined, instructions inert** — the contract FIXED-261
+  wrote down, already enforced.
+* `ChannelApprovalRelayExecutor` queues a *pending* relay and can never resolve
+  an approval.
+* The capability is registered, policy-gated, phase-gated and audited.
+
+What was missing was **any way for the owner to pair a connector**. With no
+pairing, `list_channel_pairings()` is empty, both executors refuse, the receiver
+404s, and the Channels tab said channels did not exist. The transport was
+unreachable because there was no surface — a different problem from the one the
+entry described, with a much smaller fix, and one this repository's own standard
+names explicitly: closing backend work must not leave an invisible product
+surface. This one had been invisible for four phases.
+
+**What ships.** The surface. `pair_channel`, `set_channel_enabled`,
+`set_channel_senders`, `unpair_channel` and `deliver_channel_test` on the control
+service, five routes under `/api/channels`, and a Channels tab that is no longer
+a deferral.
+
+Four properties, each a test:
+
+1. **Linked is not enabled.** Pairing stores `enabled = False` and the tab says
+   *"It is switched off until you turn it on."* Turning it on is a second click.
+2. **Enabled is not trusted.** A profile declaring `requires_sender_allowlist`
+   cannot be paired without one — `sender_allowlist_required` — which is what
+   turns that declaration into enforcement rather than documentation. Disabling
+   keeps the allowlist, so pausing does not cost the owner their typing.
+3. **A test delivery takes the long way round.** It builds a governed action and
+   routes it through `RuntimeAuthority`, so a closed gate refuses it with
+   `disabled_by_capability_gate` and an unallowlisted host is refused at the
+   egress boundary before a socket opens. A REST endpoint that POSTed the webhook
+   itself would have answered the same question and proved nothing.
+4. **Unpairing is the stop.** The row is deleted, and both executors and the
+   receiver read that table — so there is no state where the page says unpaired
+   and a message still gets through.
+
+**The three gates are reported separately**, because each has a different remedy:
+the capability the owner sets in Permissions, the `RAIKER_CHANNEL_EGRESS_ALLOWLIST`
+host list, and the `RAIKER_CHANNEL_INBOUND_SECRET`. All three are fail-closed by
+default, which is right and is confusing to meet without being told — so the tab
+tells you, per gate, in the owner's words.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and
+the ordering is the differentiator.** OpenClaw ships channels and treats them as
+where external input enters; Claude Code has no channel concept; ChatGPT Work's
+connectors and Hermes' inbound paths carry sender identity without a stated
+"cannot raise authority" rule. What Raiker now has that none of them does is the
+*separation*: linked, enabled, trusted and reachable are four stored facts with
+four different remedies, shown as four things rather than one toggle — and the
+contract they serve was written before the surface that exposes them.
+
+**Evidence.** `tests/test_channel_owner_surface.py` (17 tests),
+`apps/web/src/lib/views/ExtensionsView.test.ts`, and
+`apps/web/e2e/bug-225-channels-live.spec.ts` (6 tests, live) covering pair →
+enable → governed test delivery → unpair, and the tab at 390 / 834 / 1440 px.
+
+---
+
+## FIXED-266 — A boolean was redacted into the opposite of the truth
+
+**Severity: Medium. Area: API redaction. Fixed 2026-08-22.**
+
+`redact_response_body` discards any value whose **key** looks like a credential —
+the right rule, and the reason a field named `secret_configured` came back as
+`"***REDACTED***"`. That string is truthy in JavaScript, so the Channels tab
+rendered **"Secret set"** while the inbound receiver was refusing every message
+for want of one.
+
+This is worse than lossy. Redacting a boolean protects nothing — `True` and
+`False` cannot carry a credential — and the replacement inverts the only thing
+the field said. Every client testing such a field for truthiness reads the
+opposite of the truth, silently, and the surface then states it with confidence.
+
+The exemption sits beside the one already there for token *counts*, and for the
+same reason: `is_token_count_field(k, v) or isinstance(v, bool)`. A real
+credential under a secret-looking key is still discarded whole.
+
+Found by comparing the rendered chip against the served payload while
+photographing the new Channels tab (FIXED-265). Nothing about it was specific to
+channels: any boolean anywhere named `*_secret*`, `*_token*`, `*_password*` or
+`*authorization*` was affected.
+
+**Reference-platform decision.** **No — a defect fix**, and a class of defect
+worth naming: a safety filter that turns a fact into its negation is more
+dangerous than one that drops it.
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the boolean survives the
+response filter and a real credential under the same kind of key does not. The
+live spec now compares the rendered chip against the served payload, so a
+recurrence fails rather than being photographed.
+
+---
+
+## FIXED-267 — An allowlisted channel sender is no longer unbounded
+
+**Severity: Medium. Area: channels / abuse resistance. Fixed 2026-08-22
+(BUG-225).**
+
+The inbound receiver refused any sender not on the pairing's allowlist and then
+accepted everything from one that was. Allowlisting answers *who may speak*; it
+says nothing about *how often*, and the two are different questions. Every
+accepted message is written to durable storage before anything else looks at it,
+so a compromised — or merely broken — allowlisted client could fill the event log
+as fast as it could open sockets.
+
+**What ships.** A fixed window per `(connector, sender)`: 60 messages a minute by
+default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Same shape and the same
+stated trade-off as `RateLimitMiddleware` — process-local, reset by a restart, a
+denial-of-service guardrail rather than an auth boundary. The allowlist stays the
+gate; this is the budget behind it.
+
+Three decisions worth naming:
+
+* **The refusal is recorded.** A sender over budget produces a
+  `channel_message_rejected` event with `reason: rate_limited` and the limit in
+  force, so a channel that goes quiet is answerable from Observability rather
+  than by guesswork. A silent 429 would have been the cheaper implementation and
+  the worse product.
+* **Per sender, not per channel.** One shared bucket would let a single noisy
+  sender silence everyone else on the same connector — the same denial the limit
+  exists to prevent, aimed inward.
+* **A nonsense override falls back rather than disabling the limit.** `0`, `-5`
+  and `lots` all yield the default. `0` is far more likely to be a mistake than a
+  request to accept an unbounded stream, and this is the one setting where
+  guessing generously is the wrong way to be wrong.
+
+**A bug the tests caught, worth recording because it would have been invisible.**
+The first implementation swept empty buckets *after* fetching the sender's own.
+`_inbound_hits` is a `defaultdict`, so fetching creates the bucket empty — and
+the sweep then deleted the bucket about to be appended to. Every message looked
+like the first, and the limit never fired once. The sweep runs before the fetch
+now, and the test that failed is the one that asserts the fourth message of four
+is refused.
+
+**User-interface outcome.** Extensions → Channels states the budget beside the
+other three gates, and says what it is for in one line: allowlisting says who,
+this says how often.
+
+**Reference-platform decision — is this a meaningful improvement?** **No —
+closing a gap Raiker's own spec had already named**, and the reference set has
+had inbound rate limits for years. The *recorded refusal* is the part that goes
+slightly beyond: a 429 with no audit trail leaves the owner unable to distinguish
+"nobody is sending" from "everything is being dropped".
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the fourth of four is
+refused, the refusal is recorded, one sender's budget is not another's, a
+nonsense override falls back, and the surface states the limit.
+
+---
+
+## FIXED-268 — A "signed HTTP callback" was posting an unsigned body
+
+**Severity: Medium. Area: channels / outbound integrity. Fixed 2026-08-22.**
+
+The webhook connector profile declares transport `signed_http_callback` and auth
+`signed_message_reference`. `ExternalChannelExecutor` POSTed a bare JSON body with
+no signature and no headers beyond `Content-Type`. A receiver had no way to tell a
+Raiker delivery from anything else that could reach the URL — so the profile's two
+most load-bearing fields were documentation, not facts about the bytes on the
+wire. `ConnectorRegistry` validates that both fields are *present*; nothing
+checked that either was *true*.
+
+**What ships.** Every delivery carries `X-Raiker-Signature: sha256=<hmac>` —
+HMAC-SHA256 over the exact bytes sent, keyed by `RAIKER_CHANNEL_OUTBOUND_SECRET`
+— alongside `X-Raiker-Delivered-At`. The body is serialised with sorted keys and
+the timestamp is inside it as well as on the header, so a receiver can recompute
+the signature without knowing how Raiker happened to order the payload, and can
+reject a replay on its own terms. The secret is read at delivery and never
+stored, logged, or returned; `post_url` sends headers verbatim and reports only
+size metadata, so neither the signature nor a token can leak through the result.
+
+**Unset means unsigned, not refused**, and that is a deliberate reading of this
+project's security posture: the owner controls both ends of a webhook they
+configured, and hard-blocking their own destination is prevention-by-restriction.
+So the state is *reported* instead — the delivery summary says `UNSIGNED — set
+RAIKER_CHANNEL_OUTBOUND_SECRET`, the artifacts carry `signed: false`, and the
+Channels tab has a **Signing** row beside the other conditions. A receiver that
+requires a signature simply rejects the delivery, which is the correct place for
+that decision to be made.
+
+**User-interface outcome.** Extensions → Channels now states five conditions, one
+row each, because each has a different remedy: the capability, the egress
+allowlist, signing, the inbound secret, and the inbound budget. The lead line
+says why: *nothing here is implicit — linked is not enabled, enabled is not
+trusted, and a channel that is all three still reaches nothing until you name the
+host.*
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes,
+narrowly, and mostly it is honesty.** Signed webhooks are standard in the
+reference set — it is Raiker that was behind its own profile. What is worth
+keeping is the *reporting*: no cited platform tells the owner, on the page, that
+its outbound deliveries are currently unsigned. The gap between what a connector
+profile declares and what the transport does is exactly the kind of thing a
+governed product should surface rather than assume.
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the signature is HMAC-SHA256
+over the exact bytes, no secret means unsigned rather than refused, and the
+surface reports which. `apps/web/e2e/bug-225-channels-live.spec.ts` asserts the
+Signing row is present at every width.
+
+**Follow-up, same day — an existing test asserted the opposite, and was
+reversed.** `tests/test_token_count_redaction.py` carried
+`test_a_count_key_holding_a_bool_is_still_redacted`, asserting that
+`{"max_tokens": True}` came back as `"***REDACTED***"`. CI caught the conflict.
+
+The rule that test defends is real and is unchanged: the *count* exemption is
+integer-only, so a **string** under a count-shaped key can never ride out as "not
+a secret". Extending the same guard to booleans, though, protected nothing and
+cost the bug above — so it is reversed, with the reasoning written into the test
+rather than left in a commit message. `_check_no_secrets` gained the identical
+exemption, because that function's own docstring requires it to prove what the
+middleware emits rather than a stricter rule the middleware never applied.
+
+---
+
+## FIXED-269 — Two overlapping reconciles could delete each other's plugin skills
+
+**Severity: Low. Area: plugins / skills. Fixed 2026-08-22.**
+
+`SkillsService.sync_plugin_skills` built the set of skills to keep from **one**
+listing of the contribution directory, taken at the top of the call, and then
+deleted every plugin-sourced row whose name was not in it. Two reconciles can
+overlap — two browser tabs on the Skills page is enough, and every `GET
+/api/skills` runs one — so a pass that listed the directory *before* a plugin
+wrote its file reached its removal loop with a set that did not name the new
+skill, and deleted the row the other pass had just created. From a listing that
+was already stale.
+
+The visible effect is a skill disappearing from a page that had just shown it,
+and reappearing on the next refresh. The next reconcile re-creates the row from
+the files, which is exactly why it took a live spec to notice: it looks like a
+flake, and it recovers on its own.
+
+**Fixed** by re-reading the contribution files *after* the upserts and keeping
+anything either pass saw. One extra directory walk on a path that already does
+several, and the window narrows to the gap between two adjacent reads.
+
+**How it was found, and what that says.** A live spec that wrote a plugin's files
+mid-test failed intermittently — twice green, once red. The easy reading is "a
+timing-sensitive test"; the correct one is that the test's timing was
+*reproducing* something real. The spec was also made deterministic (it now waits
+for the in-flight reconcile before writing), but the code fix came first: a test
+that stops flaking because it stopped racing has not fixed the race.
+
+**Reference-platform decision.** **No — a defect fix.**
+
+**Evidence.** `tests/test_plugin_contributions.py` —
+`test_two_overlapping_reconciles_do_not_delete_each_others_rows` hands the
+reconcile the stale listing directly, and reads the store rather than calling
+`list_skills` again, because a third reconcile re-creates the row and hides the
+deletion. Verified to fail with the fix reverted.

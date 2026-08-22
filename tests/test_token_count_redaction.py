@@ -44,8 +44,30 @@ class TestTokenCountRedaction:
             "input_tokens": "***REDACTED***"
         }
 
-    def test_a_count_key_holding_a_bool_is_still_redacted(self) -> None:
-        assert redact_response_body({"max_tokens": True}) == {"max_tokens": "***REDACTED***"}
+    def test_a_bool_under_a_credential_shaped_key_survives(self) -> None:
+        """Reversed on 2026-08-22, deliberately (FIXED-266).
+
+        This asserted the opposite: that ``{"max_tokens": True}`` came back
+        redacted. The rule it was defending is real and unchanged — the *count*
+        exemption is integer-only, so a **string** under a count-shaped key can
+        never ride out as "not a secret" (the test above). Extending that guard
+        to booleans protected nothing and cost something:
+
+        `True` and `False` cannot carry a credential. Replacing one does not hide
+        a secret, it replaces a fact with a **non-empty string** — so every
+        client testing the field for truthiness reads the *negation* of what the
+        server said, confidently and silently. That is what happened to
+        `inbound.secret_configured` on the Channels tab: the receiver was
+        refusing every message and the page rendered "Secret set".
+
+        A safety filter that turns a fact into its opposite is worse than one
+        that drops it, so booleans are exempt by value regardless of the key.
+        """
+        assert redact_response_body({"max_tokens": True}) == {"max_tokens": True}
+        assert redact_response_body({"secret_configured": False}) == {"secret_configured": False}
+        # And the guard agrees with the middleware, rather than being stricter
+        # than what the middleware actually emits.
+        assert_no_secrets_in_body({"secret_configured": False})
 
     def test_the_secret_assertion_accepts_counts_and_rejects_credentials(self) -> None:
         assert_no_secrets_in_body({"context_window_tokens": 200_000, "output_tokens": 12})

@@ -485,7 +485,7 @@ contributed, and they are taken in the order their authority story is written.
 | Contribution | Available | Why it is where it is |
 |---|---|---|
 | Hooks | **yes** | A hook already has an execution model, a timeout, an audit trail and a scope. `plugin` sits below `managed`, `user`, `project` and `local`, so a plugin rule can make an action stricter and can never override a deny the owner set. |
-| Skills | no | Run nothing, and need only a provenance story — the next one to take. |
+| Skills | **yes** | Instruction text Raiker never executes, validated by the same reader an uploaded `SKILL.md` goes through. Provenance is carried on the stored row and the document lives inside the directory revocation already deletes. |
 | MCP servers | no | Already brokered and gated, but not yet contributable from a manifest. |
 | Panels | no | Need a route, permission and accessibility contract that does not exist. |
 
@@ -537,17 +537,76 @@ The plan and the CLI both state what would be contributed before the install, an
 Extensions → Plugins states what each installed plugin provides — read from the
 files the runtime loads, not from the manifest that described them.
 
+### Contributing Skills
+
+A manifest declares skills under `contributes.skills`, as a list (a single
+mapping is accepted for a plugin shipping exactly one). Two shapes, both ending
+at the same validator:
+
+```json
+{
+  "id": "acme-skills",
+  "version": "2.0.0",
+  "permissions": ["skill:contribute"],
+  "contributes": {
+    "skills": [
+      {
+        "name": "acme-review",
+        "description": "Review a change against Acme's internal checklist.",
+        "body": "Check the changelog, then the tests, then the migration."
+      },
+      {
+        "name": "acme-release",
+        "document": "---\nname: acme-release\ndescription: Cut a release.\n---\n\nTag, then ship.\n"
+      }
+    ]
+  }
+}
+```
+
+`document` is a whole `SKILL.md` passed through verbatim; `body` is the prose
+alone, with the frontmatter assembled the way `/skill-build` assembles it — so a
+plugin cannot express a skill Raiker would otherwise refuse to build.
+
+A skill runs nothing, which is why it came second and not first. What it does do
+is put instruction text into the owner's turns, so five properties hold:
+
+1. **Asking is required, and it is read before the install.** The manifest must
+   ask for `skill:contribute`. It is outside `SAFE_READ_ONLY`, so the plan lands
+   on `pending_approval` and the permission diff states it.
+2. **It arrives switched off.** Installing the plugin was consent to *offer* the
+   skill, not to run with it. The owner activates each one on Extensions →
+   Skills, and that is a second, separate decision.
+3. **Existence is on disk; the owner's choice is in the store.**
+   `.raiker/plugins/<id>/skills/<name>/SKILL.md` decides what exists — it is what
+   revocation deletes — and `SkillsService.sync_plugin_skills` reconciles the two
+   in one direction only, preserving the on/off choice across a refresh.
+4. **It never overwrites a skill the owner owns.** A name collision with an
+   uploaded, built or imported skill leaves the owner's in place and drops the
+   plugin's copy. Rename and delete are refused on a contributed skill with
+   `skill_provided_by_plugin`, because the next sync would undo either; revoking
+   the plugin is the control that removes it.
+5. **One bad entry refuses only itself.** A manifest contributing five skills
+   where the third is malformed installs four and names the one it dropped. More
+   than `MAX_CONTRIBUTED_SKILLS` (20) is refused whole rather than truncated.
+
+A refusal on one kind never removes the other: a manifest whose hooks are
+malformed still installs its valid skills, and says which half it dropped.
+
 ### Revocation
 
-Revoking a plugin **deletes** its contributed rules rather than annotating the
-record. `HooksRegistry.load` reads files and has no store to consult, so leaving
+Revoking a plugin **deletes** its contributed rules and skills rather than
+annotating the record. `HooksRegistry.load` reads files and has no store to consult, so leaving
 the file behind would produce the one state revocation exists to prevent: the page
 says revoked and the runtime still runs the rule. `PluginRevocationExecutor`
 reports `contributions_removed` in its artifacts, so a removal that did not happen
 is visible rather than assumed.
 
-Re-installing replaces the file rather than adding a second one, so an upgrade
-that dropped a rule drops it here too.
+Re-installing replaces the files rather than adding a second set, so an upgrade
+that dropped a rule or a skill drops it here too. The skills store follows: a row
+whose plugin no longer has a directory is deleted on the next sync, and the
+runtime syncs before advertising what is active, so an active row cannot outlive
+the file that authorised it.
 
 ---
 

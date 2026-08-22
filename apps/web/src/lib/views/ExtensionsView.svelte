@@ -23,6 +23,8 @@
   import { api, ApiError } from "../api";
   import type {
     ApprovalView,
+    ChannelProfile,
+    ChannelsView,
     ExtensionView,
     ExtensionsOverview,
     HooksView,
@@ -85,6 +87,100 @@
     }
   }
 
+  // BUG-225 — the outbound executor, the inbound receiver, the capability gate
+  // and the egress boundary were all built, and there was no way for the owner
+  // to pair a connector. So `list_channel_pairings` stayed empty, both executors
+  // refused, and this tab reported that channels did not exist. The transport was
+  // unreachable because there was no surface — which is a different problem, with
+  // a different fix.
+  let channels = $state<ChannelsView | null>(null);
+  let channelsError = $state<string | null>(null);
+  let channelBusy = $state<string | null>(null);
+  let channelNotice = $state<string | null>(null);
+  let pairingFor = $state<string | null>(null);
+  let pairSenders = $state("");
+  let testFor = $state<string | null>(null);
+  let testUrl = $state("");
+
+  const CHANNEL_REASONS: Record<string, string> = {
+    disabled_by_capability_gate:
+      "The external channel capability is turned off. Turn it on in Permissions to deliver anything.",
+    channel_already_paired: "That connector is already paired.",
+    sender_allowlist_required:
+      "This channel accepts inbound messages, so it needs at least one allowlisted sender before it can be paired.",
+    channel_not_paired_or_disabled: "Pair the connector and switch it on first.",
+    unknown_channel_pairing: "That pairing is no longer there.",
+    not_authorized_human: "Only you can change a channel pairing.",
+  };
+
+  function channelReason(error: unknown): string {
+    if (!(error instanceof ApiError)) return "That request failed.";
+    const code = error.reasonCode ?? "";
+    if (CHANNEL_REASONS[code]) return CHANNEL_REASONS[code];
+    if (code.startsWith("egress_denied"))
+      return "That host is not on the channel egress allowlist, so delivery was refused before it left this machine.";
+    if (code.startsWith("http_error"))
+      return `The destination answered with an error (${code.split(":")[1] ?? "unknown"}).`;
+    if (code.startsWith("fetch_failed"))
+      return "The destination could not be reached.";
+    if (code.startsWith("unknown_connector")) return "That connector is not in the registry.";
+    return code || "That request failed.";
+  }
+
+  async function loadChannels() {
+    try {
+      channels = await api.channels();
+      channelsError = null;
+    } catch (error) {
+      channels = null;
+      channelsError =
+        error instanceof ApiError ? error.message : "Channel profiles are unavailable.";
+    }
+  }
+
+  async function runChannelAction(key: string, action: () => Promise<unknown>, done: string) {
+    if (channelBusy) return;
+    channelBusy = key;
+    channelsError = null;
+    channelNotice = null;
+    try {
+      await action();
+      channelNotice = done;
+      await loadChannels();
+    } catch (error) {
+      channelsError = channelReason(error);
+    } finally {
+      channelBusy = null;
+    }
+  }
+
+  function pair(profile: ChannelProfile) {
+    const senders = pairSenders
+      .split(/[\n,]/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+    void runChannelAction(
+      `pair:${profile.connector_id}`,
+      () => api.pairChannel(profile.connector_id, profile.display_name, senders),
+      // Said at the moment it happens, because "paired" is the step most likely
+      // to be read as "working".
+      `Paired ${profile.display_name}. It is switched off until you turn it on.`,
+    ).then(() => {
+      pairingFor = null;
+      pairSenders = "";
+    });
+  }
+
+  function sendTest(profile: ChannelProfile) {
+    const url = testUrl.trim();
+    if (!url) return;
+    void runChannelAction(
+      `test:${profile.connector_id}`,
+      () => api.deliverChannelTest(profile.connector_id, url, "Raiker test delivery."),
+      "Delivered. The destination accepted it.",
+    );
+  }
+
   async function loadPlugins() {
     try {
       plugins = await api.plugins();
@@ -125,10 +221,34 @@
     if (!contributions || contributions.error) {
       return "What it provides could not be read, so nothing is loaded from it.";
     }
-    if (contributions.hooks === 0) return "Provides nothing — no hook rules are loaded from it.";
-    const rules = `${contributions.hooks} hook ${contributions.hooks === 1 ? "rule" : "rules"}`;
-    return `Provides ${rules} on ${contributions.events.join(", ")}.`;
+    const parts: string[] = [];
+    if (contributions.hooks > 0) {
+      const rules = `${contributions.hooks} hook ${contributions.hooks === 1 ? "rule" : "rules"}`;
+      parts.push(`${rules} on ${contributions.events.join(", ")}`);
+    }
+    const skills = contributions.skills ?? 0;
+    if (skills > 0) {
+      const names = (contributions.skill_names ?? []).join(", ");
+      parts.push(`${skills} ${skills === 1 ? "skill" : "skills"}${names ? ` (${names})` : ""}`);
+    }
+    const servers = contributions.mcp_servers ?? 0;
+    if (servers > 0) {
+      const names = (contributions.mcp_server_names ?? []).join(", ");
+      parts.push(
+        `${servers} offered MCP ${servers === 1 ? "server" : "servers"}${names ? ` (${names})` : ""}`,
+      );
+    }
+    if (parts.length === 0) {
+      return "Provides nothing — no hook rules, no skills and no MCP servers are loaded from it.";
+    }
+    return `Provides ${parts.join(" and ")}.`;
   }
+
+  // A contributed skill installs switched off, so the row has to say where to go
+  // and that nothing is running yet — otherwise "provides 2 skills" reads as two
+  // skills already in every turn.
+  const contributedSkills = (c: PluginContributions | undefined) => c?.skills ?? 0;
+  const offeredServers = (c: PluginContributions | undefined) => c?.mcp_servers ?? 0;
 
   const KIND_LABELS: Record<string, string> = {
     hooks: "Hooks",
@@ -244,6 +364,7 @@
     void load();
     void loadPlugins();
     void loadHooks();
+    void loadChannels();
   });
 </script>
 
@@ -629,6 +750,18 @@
                       <a href="#/extensions?tab=hooks">See the rules on the Hooks tab →</a>
                     </span>
                   {/if}
+                  {#if contributedSkills(plugin.contributions) > 0}
+                    <span class="note">
+                      Its skills install switched off.
+                      <a href="#/extensions?tab=skills">Activate them on the Skills tab →</a>
+                    </span>
+                  {/if}
+                  {#if offeredServers(plugin.contributions) > 0}
+                    <span class="note">
+                      An offered server is inert until you add it.
+                      <a href="#/extensions?tab=mcp">Review it on the MCP servers tab →</a>
+                    </span>
+                  {/if}
                   <span class="note">{plugin.signature.explanation}</span>
                   {#if plugin.signature.remediation}
                     <span class="note">{plugin.signature.remediation}</span>
@@ -652,8 +785,8 @@
         <h2>What a plugin may contribute</h2>
         <p class="note">
           A plugin runs no code of its own. It contributes through a surface that already governs
-          the thing contributed — which is why hooks came first, and why the rest are still marked
-          as not available rather than quietly listed.
+          the thing contributed — which is why hooks came first, and why a kind with no such
+          surface yet is marked unavailable rather than quietly listed.
         </p>
         <ul class="event-list">
           {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}
@@ -671,14 +804,247 @@
   </div>
 {:else}
   <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
-    <section class="card deferred">
-      <h2>Channels and webhooks are not available yet</h2>
+    {#if channelsError}
+      <div class="notice notice-danger" role="alert">{channelsError}</div>
+    {/if}
+    {#if channelNotice}
+      <div class="notice notice-ok" role="status">{channelNotice}</div>
+    {/if}
+
+    <section class="card" data-testid="channel-posture">
+      <h2>What a channel message is</h2>
       <p>
-        Inbound and outbound delivery needs an accepted contract and threat model before Raiker
-        offers controls for it. Until then there is nothing to configure here, and no channel can
-        deliver work on your behalf.
+        A channel is the one place where content Raiker did not ask for enters a turn. A channel
+        message is <strong>untrusted content with a named sender who is not you</strong> — never a
+        prompt, never able to raise a turn's authority, and never trusted because it is linked.
       </p>
-      <p class="note">This tab exists so the gap is visible rather than silently missing.</p>
+      <p class="note">
+        Nothing here is implicit. Linked is not enabled, enabled is not trusted, and a channel that
+        is all three still reaches nothing until you name the host — so every condition is its own
+        row, with its own remedy.
+        <GuideLink route="extensions" label="How extension surfaces are governed" />
+      </p>
+      {#if channels !== null}
+        <ul class="event-list">
+          <li class:event-dead={!channels.outbound.runtime_enabled}>
+            <strong>Outbound</strong>
+            <span class="hook-tag" class:hook-tag-dead={!channels.outbound.runtime_enabled}>
+              {channels.outbound.runtime_enabled ? "Capability on" : "Capability off"}
+            </span>
+            <span class="note">
+              {channels.outbound.runtime_enabled
+                ? "Delivery runs as a governed action, with its own audit event."
+                : "Turn on external channel runtime in Permissions before anything can be delivered."}
+            </span>
+          </li>
+          <li class:event-dead={!channels.outbound.egress_configured}>
+            <strong>Egress</strong>
+            <span class="hook-tag" class:hook-tag-dead={!channels.outbound.egress_configured}>
+              {channels.outbound.egress_configured
+                ? `${channels.outbound.egress_host_count} host${channels.outbound.egress_host_count === 1 ? "" : "s"}`
+                : "None allowlisted"}
+            </span>
+            <span class="note">
+              Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>. It is empty by default, so a channel
+              that is linked, enabled and trusted still reaches nothing until you name the host.
+            </span>
+          </li>
+          <li class:event-dead={!channels.outbound.signing_configured}>
+            <strong>Signing</strong>
+            <span class="hook-tag" class:hook-tag-dead={!channels.outbound.signing_configured}>
+              {channels.outbound.signing_configured ? "Signed" : "Unsigned"}
+            </span>
+            <span class="note">
+              Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> and every delivery carries an
+              HMAC the destination can check. Unset still delivers — you control both ends of a
+              webhook you configured — but the receiver cannot tell a Raiker delivery from
+              anything else that reaches the URL.
+            </span>
+          </li>
+          <li class:event-dead={!channels.inbound.secret_configured}>
+            <strong>Inbound</strong>
+            <span class="hook-tag" class:hook-tag-dead={!channels.inbound.secret_configured}>
+              {channels.inbound.secret_configured ? "Secret set" : "Refusing everything"}
+            </span>
+            <span class="note">
+              Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>. Every accepted message is still
+              quarantined and its instructions are inert, whatever the sender wrote.
+            </span>
+          </li>
+          <li>
+            <strong>Rate limit</strong>
+            <span class="hook-tag">
+              {channels.inbound.rate_limit_per_minute ?? 60}/min
+            </span>
+            <span class="note">
+              Per sender, per channel. Allowlisting says <em>who</em> may speak; this says how
+              often. A sender over budget is refused and the refusal is recorded, so a channel
+              that goes quiet is answerable rather than a mystery. Override with
+              <code>RAIKER_CHANNEL_INBOUND_RATE</code>.
+            </span>
+          </li>
+        </ul>
+      {/if}
+    </section>
+
+    <section class="card" data-testid="channel-profiles">
+      <h2>Connectors</h2>
+      {#if channels === null}
+        <p class="note">{channelsError ?? "Reading connector profiles…"}</p>
+      {:else if channels.error}
+        <p class="note">The connector registry could not be read, so nothing is offered here.</p>
+      {:else}
+        <ul class="hook-list">
+          {#each channels.profiles as profile (profile.connector_id)}
+            <li>
+              <div class="channel-head">
+                <strong>{profile.display_label ?? profile.display_name}</strong>
+                <span class="hook-tag" class:hook-tag-dead={!profile.linked}>
+                  {profile.linked ? (profile.enabled ? "On" : "Linked, off") : "Not linked"}
+                </span>
+                {#if profile.requires_sender_allowlist && profile.linked}
+                  <span class="hook-tag" class:hook-tag-dead={profile.sender_count === 0}>
+                    {profile.sender_count} sender{profile.sender_count === 1 ? "" : "s"}
+                  </span>
+                {/if}
+              </div>
+              <span class="note">
+                {profile.transport} · {profile.auth_method}{profile.requires_network
+                  ? " · needs network"
+                  : " · local only"}
+              </span>
+
+              {#if profile.linked}
+                <div class="channel-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={channelBusy !== null}
+                    onclick={() =>
+                      void runChannelAction(
+                        `enable:${profile.pairing_id}`,
+                        () => api.setChannelEnabled(profile.pairing_id ?? "", !profile.enabled),
+                        profile.enabled
+                          ? `${profile.display_name} is off.`
+                          : `${profile.display_name} is on.`,
+                      )}
+                  >{profile.enabled ? "Turn off" : "Turn on"}</button>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={channelBusy !== null}
+                    onclick={() => {
+                      testFor = testFor === profile.connector_id ? null : profile.connector_id;
+                      testUrl = "";
+                    }}
+                  >Send a test delivery</button>
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    disabled={channelBusy !== null}
+                    onclick={() =>
+                      void runChannelAction(
+                        `unpair:${profile.pairing_id}`,
+                        () => api.unpairChannel(profile.pairing_id ?? ""),
+                        `${profile.display_name} is unpaired. Nothing can reach it now.`,
+                      )}
+                  >Unpair</button>
+                </div>
+                {#if testFor === profile.connector_id}
+                  <form
+                    class="channel-form"
+                    onsubmit={(event) => {
+                      event.preventDefault();
+                      sendTest(profile);
+                    }}
+                  >
+                    <label class="field-label" for={`test-${profile.connector_id}`}>
+                      Destination URL
+                    </label>
+                    <input
+                      id={`test-${profile.connector_id}`}
+                      class="input"
+                      bind:value={testUrl}
+                      placeholder="https://hooks.example.com/…"
+                      autocomplete="off"
+                    />
+                    <button
+                      class="btn btn-sm btn-primary"
+                      type="submit"
+                      disabled={channelBusy !== null || !testUrl.trim()}
+                    >{channelBusy === `test:${profile.connector_id}` ? "Sending…" : "Send"}</button>
+                    <p class="note">
+                      This runs the same governed path a real delivery takes: the capability gate,
+                      the decision mode, the egress allowlist and the audit event all apply.
+                    </p>
+                  </form>
+                {/if}
+              {:else}
+                <div class="channel-actions">
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={channelBusy !== null}
+                    onclick={() => {
+                      pairingFor = pairingFor === profile.connector_id ? null : profile.connector_id;
+                      pairSenders = "";
+                    }}
+                  >Pair</button>
+                </div>
+                {#if pairingFor === profile.connector_id}
+                  <form
+                    class="channel-form"
+                    onsubmit={(event) => {
+                      event.preventDefault();
+                      pair(profile);
+                    }}
+                  >
+                    {#if profile.requires_sender_allowlist}
+                      <label class="field-label" for={`senders-${profile.connector_id}`}>
+                        Allowed senders
+                      </label>
+                      <input
+                        id={`senders-${profile.connector_id}`}
+                        class="input"
+                        bind:value={pairSenders}
+                        placeholder="one id per line, or comma-separated"
+                        autocomplete="off"
+                      />
+                    {/if}
+                    <button
+                      class="btn btn-sm btn-primary"
+                      type="submit"
+                      disabled={channelBusy !== null}
+                    >{channelBusy === `pair:${profile.connector_id}` ? "Pairing…" : "Pair"}</button>
+                    <p class="note">
+                      Pairing does not switch it on, and it does not trust anyone. Both are separate
+                      decisions you make afterwards.
+                    </p>
+                  </form>
+                {/if}
+              {/if}
+            </li>
+          {/each}
+        </ul>
+      {/if}
+    </section>
+
+    <section class="card deferred">
+      <h2>What is still not built</h2>
+      <ol class="channel-steps">
+        <li><strong>The contract</strong> — what a channel message is in a turn. <span class="hook-tag">Done</span></li>
+        <li><strong>Outbound delivery</strong> — sending a result to a paired channel, through the capability gate and the egress allowlist. <span class="hook-tag">Done</span></li>
+        <li><strong>Inbound</strong> — paired and sender-allowlisted; every message quarantined and its instructions inert. <span class="hook-tag">Done</span></li>
+        <li><strong>Rate limits</strong> — a per-sender inbound budget, refusals recorded. <span class="hook-tag">Done</span></li>
+        <li><strong>Routing modes</strong> — turning an inbound message into work. <span class="hook-tag hook-tag-dead">Next</span></li>
+        <li><strong>Approval relay</strong> — last; a channel that can raise an approval can be used to ask for one. The queue exists and can only ever hold a <em>pending</em> relay: nothing on a channel resolves an approval. <span class="hook-tag hook-tag-dead">Not planned yet</span></li>
+      </ol>
+      <p class="note">
+        An inbound message never becomes a turn on its own. It is recorded as a governed event,
+        quarantined, and its instructions are inert whatever the sender wrote — acting on it is
+        yours. Accepted and rejected messages both appear in
+        <a href="#/observe?tab=activity">Observability → Activity</a>.
+      </p>
     </section>
   </div>
 {/if}
@@ -970,4 +1336,48 @@
      meaning to get it. */
   .measure { max-width: 46rem; }
   .deferred h2 { margin-top: 0; }
+
+  /* An ordered list of steps, not a set of findings: numbered, quiet, and with
+     the state chip inline so "Done" and "Next" read at the same weight as the
+     step they belong to. */
+  .channel-steps {
+    margin: var(--space-3) 0 0;
+    padding-left: 1.3rem;
+    display: grid;
+    gap: var(--space-2);
+    color: var(--text-2);
+    font-size: 0.88rem;
+  }
+  .channel-steps strong { color: var(--text-1); }
+  .channel-steps .hook-tag { margin-left: var(--space-2); }
+  /* The closing note is a footnote to the list, not the fifth step — it needs the
+     gap that says so. */
+  .channel-steps + .note { margin-top: var(--space-3); }
+
+  /* A connector row: identity and state on one line, the controls under it, and
+     the form under those — so the row reads the same whether it is 1440px wide
+     or 340px, and nothing has to reflow into a different order. */
+  .channel-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+  .channel-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+    margin-top: var(--space-2);
+  }
+  .channel-form {
+    display: grid;
+    gap: var(--space-2);
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+  }
+  .channel-form .note { margin: 0; max-width: 60ch; }
+  .channel-form .btn { justify-self: start; }
 </style>

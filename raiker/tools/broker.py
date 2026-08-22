@@ -1298,6 +1298,32 @@ class ToolBroker:
             timestamp=utc_now(),
         )
 
+    def _unattended_deny_decision(
+        self, action: ToolAction, base: PolicyDecision
+    ) -> PolicyDecision:
+        """Resolve an approval-eligible action to a refusal under `dont_ask` (BUG-219).
+
+        The posture for work with nobody watching: an interruption is worse than
+        a refusal, so anything not already permitted by a standing rule is denied
+        rather than queued. Named distinctly from every other denial so an audit
+        reader can tell *"the owner refused this"* from *"nobody was there to
+        ask"* — they call for different follow-ups, and only the second one means
+        re-running attended would have succeeded.
+
+        This never widens anything. It can only turn `needs_approval` into
+        `deny`; an action policy already allowed is untouched, and an action
+        policy already denied stays denied for its own reason.
+        """
+        return PolicyDecision(
+            decision_id=new_id("pol_"),
+            action_id=action.action_id,
+            decision="deny",
+            reasons=["denied_no_one_to_ask", *base.reasons],
+            requires_user_approval=False,
+            risk_level="blocked",
+            timestamp=utc_now(),
+        )
+
     def _hook_ask_decision(self, action: ToolAction, base: PolicyDecision) -> PolicyDecision:
         return PolicyDecision(
             decision_id=new_id("pol_"),
@@ -1665,7 +1691,18 @@ class ToolBroker:
             # An `ask` the owner set for this turn is a request to *see* the
             # decision, so the unattended approval modes must not swallow it —
             # including when policy had already routed the call to approval.
-            approval_mode = "manual"
+            #
+            # `dont_ask` is the exception, and deliberately so: it is the posture
+            # for a run with nobody watching, so "show me this" has no one to show
+            # it to. Forcing `manual` there would park the turn on a queue entry
+            # that is never read, which is the outcome the mode exists to avoid.
+            if approval_mode != "dont_ask":
+                approval_mode = "manual"
+        # BUG-219 — resolved before the decision is recorded, because this *is*
+        # the decision. Recording `needs_approval` and then refusing would leave
+        # the audit log describing a queue entry that never existed.
+        if decision.decision == "needs_approval" and approval_mode == "dont_ask":
+            decision = self._unattended_deny_decision(action, decision)
         self._event(
             session_id=session_id,
             turn_id=turn_id,

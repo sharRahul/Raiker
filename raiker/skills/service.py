@@ -138,8 +138,11 @@ class SkillsService:
 
     # ── read ────────────────────────────────────────────────────────────────
     def list_skills(self, principal_id: str) -> list[SkillView]:
-        """Every skill this owner has, newest first, after seeding the built-ins."""
+        """Every skill this owner has, newest first, after reconciling the sources
+        Raiker owns: the built-ins it ships and the skills installed plugins
+        contribute."""
         self.seed_builtins(principal_id)
+        self.sync_plugin_skills(principal_id)
         return [_view(row) for row in self._store.list_skills(principal_id)]
 
     def active_skill_documents(self, principal_id: str) -> list[tuple[str, str]]:
@@ -148,11 +151,79 @@ class SkillsService:
         This is the only shape the runtime needs to advertise what is installed;
         the full document is loaded on demand, not pushed into every turn.
         """
+        self.sync_plugin_skills(principal_id)
         return [
             (str(row["name"]), str(row.get("description", "")))
             for row in self._store.list_skills(principal_id)
             if row.get("active")
         ]
+
+    def sync_plugin_skills(self, principal_id: str) -> dict[str, int]:
+        """Reconcile plugin-contributed skills with what is on disk (BUG-221).
+
+        One direction only. ``.raiker/plugins/<id>/skills/`` decides what exists —
+        it is what revocation deletes — and the store keeps the owner's on/off
+        choice about it, which ``upsert_skill`` preserves across a refresh.
+
+        Three properties this has to hold, and each is a line below:
+
+        * **Inactive on arrival.** A contributed skill is instruction text
+          entering the owner's turns; installing the plugin was consent to *offer*
+          it, not to run with it. The owner switches it on afterwards.
+        * **Revocation reaches the store.** A row whose plugin no longer has a
+          directory is deleted, so a revoked plugin cannot keep contributing
+          through a row nothing would ever refresh again.
+        * **It never touches a skill the owner owns.** Only rows with
+          ``source == "plugin"`` are considered for removal, and a name collision
+          with an uploaded skill is skipped rather than overwritten.
+        """
+        from raiker.plugins.contributions import contributed_skills
+
+        contributed = contributed_skills(self._workspace_root)
+        existing = {str(row["name"]): row for row in self._store.list_skills(principal_id)}
+        wanted: set[str] = set()
+        added = 0
+        for plugin_id, package in contributed:
+            row = existing.get(package.name)
+            if row is not None and str(row.get("source", "")) != "plugin":
+                # An uploaded or built skill of the owner's wins its own name. The
+                # plugin's copy is dropped rather than silently replacing work the
+                # owner did, and the Plugins tab still reports what it shipped.
+                continue
+            wanted.add(package.name)
+            if row is not None and str(row.get("checksum", "")) == package.checksum:
+                continue
+            self._store.upsert_skill(
+                skill_id=new_id("skl_"),
+                principal_id=principal_id,
+                name=package.name,
+                description=package.description,
+                checksum=package.checksum,
+                skill_md=package.skill_md,
+                source="plugin",
+                source_ref=plugin_id,
+                version=package.version,
+                bundle=None,
+                files=list(package.files),
+                byte_size=package.byte_size,
+                active=False,
+            )
+            added += 1
+        # Re-read the contribution files *after* the upserts, and keep anything
+        # either pass saw. Two reconciles can overlap — two browser tabs on the
+        # Skills page is enough — and one that listed the directory before a
+        # newly-installed plugin wrote its file would otherwise delete the row
+        # the other had just created, from a listing that was already stale. The
+        # second read makes that window very small, and it costs one directory
+        # walk on a path that already does several.
+        keep = wanted | {package.name for _, package in contributed_skills(self._workspace_root)}
+        removed = 0
+        for name, row in existing.items():
+            if str(row.get("source", "")) != "plugin" or name in keep:
+                continue
+            if self._store.delete_skill(str(row["skill_id"]), principal_id):
+                removed += 1
+        return {"contributed": len(contributed), "refreshed": added, "removed": removed}
 
     def seed_builtins(self, principal_id: str) -> int:
         """Install the skills Raiker ships with, once per owner.
@@ -390,6 +461,12 @@ class SkillsService:
             ).name
         except SkillValidationError as exc:
             return ControlResult(ok=False, reason_code=exc.reason)
+        owned = self._store.get_skill(skill_id, principal_id)
+        if owned is not None and str(owned.get("source", "")) == "plugin":
+            # A plugin's document is not the owner's to re-title: the next sync
+            # reads the folder on disk, would not recognise the new name, and
+            # would drop the renamed row. Refusing says so instead of losing it.
+            return ControlResult(ok=False, reason_code="skill_provided_by_plugin")
         if not self._store.rename_skill(skill_id, principal_id, clean):
             return ControlResult(ok=False, reason_code="skill_rename_failed")
         self._writer.append(
@@ -426,6 +503,12 @@ class SkillsService:
         principal_id, err = self._human(acting_principal_id)
         if principal_id is None:
             return ControlResult(ok=False, reason_code=err)
+        owned = self._store.get_skill(skill_id, principal_id)
+        if owned is not None and str(owned.get("source", "")) == "plugin":
+            # Deleting the row would not remove the skill — the plugin's file is
+            # still on disk and the next sync restores it. Revoking the plugin is
+            # the control that actually removes it, so that is what this says.
+            return ControlResult(ok=False, reason_code="skill_provided_by_plugin")
         if not self._store.delete_skill(skill_id, principal_id):
             return ControlResult(ok=False, reason_code="unknown_skill")
         self._writer.append(

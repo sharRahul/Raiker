@@ -646,6 +646,34 @@ class PromptRequest:
     client_type: str | None = None
 
 
+class PairChannelRequest(BaseModel):
+    """Pair one connector profile. Paired is not enabled and not trusted."""
+
+    connector_id: str
+    display_name: str | None = None
+    #: Sender identifiers the inbound receiver will accept. Required by profiles
+    #: that declare `requires_sender_allowlist`, which is what turns that
+    #: declaration into enforcement rather than documentation.
+    senders: list[str] | None = None
+
+
+class ChannelEnabledRequest(BaseModel):
+    enabled: bool
+
+
+class ChannelSendersRequest(BaseModel):
+    senders: list[str]
+
+
+class ChannelTestDeliveryRequest(BaseModel):
+    """One test delivery through the governed outbound path."""
+
+    connector_id: str
+    url: str
+    text: str = "Raiker test delivery."
+
+
+
 @dataclass
 class InboundChannelMessage:
     # Inbound channel payload. Always treated as untrusted; never executed.

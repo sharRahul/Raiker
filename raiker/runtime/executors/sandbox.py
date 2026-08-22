@@ -243,13 +243,16 @@ def post_url(
     *,
     egress_allowlist: frozenset[str] | None = None,
     content_type: str = "application/json",
+    headers: dict[str, str] | None = None,
     max_bytes: int = 64_000,
     timeout: float = 10.0,
 ) -> dict:
     """POST ``payload`` to ``url`` only if its host matches ``egress_allowlist``.
 
     An empty/absent allowlist denies all egress (fail closed). Returns
-    response-size metadata only — never the response body.
+    response-size metadata only — never the response body. ``headers`` are sent
+    verbatim and never returned or logged, so a signature or an owner token can
+    be attached without either leaking into the result.
     """
     from urllib.parse import urlparse
     parsed = urlparse(url)
@@ -260,8 +263,9 @@ def post_url(
     if not any(fnmatch.fnmatch(parsed.netloc, pattern) for pattern in egress_allowlist):
         raise SandboxError(f"egress_denied:{parsed.netloc}")
     import urllib.request
+    merged = {"Content-Type": content_type, **(headers or {})}
     request = urllib.request.Request(  # noqa: S310 - scheme checked above
-        url, data=payload, method="POST", headers={"Content-Type": content_type},
+        url, data=payload, method="POST", headers=merged,
     )
     try:
         with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310

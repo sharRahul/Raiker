@@ -241,6 +241,19 @@ decides whether the user is paused for an ordinary eligible action.
 | **Manually approve** | Pauses for user approval before each otherwise eligible governed action. |
 | **Automatically approve** | Runs an otherwise eligible action without a user pause, while keeping normal status and preview/evidence visible. |
 | **Skip all approvals** | Runs an otherwise eligible action without a UI confirmation or generated preview. |
+| **Decline, don't ask** | Refuses an otherwise eligible action instead of queuing it. |
+
+**Skip and Decline are opposites, and the menu says so under each.** Both stop
+Raiker asking you. *Skip* then **runs** the action; *Decline* then **refuses**
+it. Decline is the posture for a run with nobody watching — a scheduled routine
+at 06:00 cannot answer a prompt, and parking on one is not the same as declining:
+only the refusal lets the rest of the work carry on. The refusal is recorded like
+any other, with its own reason (`denied_no_one_to_ask`) so an audit reader can
+tell *"you refused this"* from *"nobody was there to ask"* — and only the second
+means running it again while you are watching would have worked.
+
+Decline can only ever refuse **more**. It never widens a gate, never skips one,
+and an action policy already allows is untouched.
 
 **Skip all approvals is not an unrestricted mode.** It skips only the user
 prompt and preview step. The runtime still enforces project/path confinement,

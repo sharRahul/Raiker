@@ -316,10 +316,20 @@ Highlights, each verified against a live instance:
 
 - **A plugin contributes something, or says why it cannot** — a plugin runs no
   code of its own. It contributes through a surface that already governs the
-  thing contributed, and the first is hooks: a manifest that declares
-  `event:hook` may ship hook rules, which load at `plugin` scope *below* every
-  scope you control, so a plugin can make an action stricter and can never loosen
-  one you set. Revoking the plugin deletes its rules rather than flagging them.
+  thing contributed, and three kinds now do:
+
+  **Hook rules** load at `plugin` scope *below* every scope you control, so a
+  plugin can make an action stricter and can never loosen one you set.
+  **Skills** go through the same validator an upload does and arrive **switched
+  off** — installing the plugin was consent to *offer* the skill, not to run with
+  it — marked *from plugin* on Extensions → Skills so you can always see where an
+  instruction came from. **MCP servers** are *offered*, never added: nothing is
+  stored as a server, connected or reachable until you press **Add server**, and
+  that runs the same governed create path as typing it in yourself. An offer can
+  never carry a credential — `https` only, no auth in the URL, and `auth_ref`
+  names an environment variable rather than holding a token.
+
+  Revoking the plugin deletes everything it contributed rather than flagging it.
   Extensions → **Plugins** states what each installed plugin provides, read from
   the files the runtime loads rather than from the manifest that described them —
   and lists what a plugin *may* contribute, so "provides nothing" and "may not
@@ -346,33 +356,49 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
 
-- **Hooks are complete; plugins are partial; channels do not exist.** Of the
-  three extension surfaces Claude Code ships:
+- **Hooks are complete; plugins are one kind short; channels stop below routing.**
+  Of the three extension surfaces Claude Code ships:
 
   **Hooks** are done. All sixteen events the format accepts are emitted,
   `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
   `command` handlers execute under a bounded timeout with the program resolved
   inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
   at once and is your setting rather than a fourth config file, so a
-  `config/hooks.json` that arrived with a repository cannot re-enable itself. Two
-  of the five handler types in the reference format are unbuilt — `http`,
-  `mcp_tool`, `prompt` and `agent` need network, model and subagent surfaces that
-  are still gated.
+  `config/hooks.json` that arrived with a repository cannot re-enable itself. Of
+  the five handler types in the reference format, `command` is built and four are
+  not: `http`, `mcp_tool`, `prompt` and `agent` need network, model and subagent
+  surfaces that are still gated. (`command` is also the only handler type Claude
+  Code's own hooks have, so this is a gap against Raiker's reference document
+  rather than against Claude Code.)
 
-  **Plugins** contribute hook rules and nothing else. A plugin is validated,
-  supply-chain checked, signature-levelled and recorded, and a manifest declaring
-  `event:hook` ships real hook rules at `plugin` scope. Skills, MCP servers and
-  plugin panels are not contributable, and the Plugins tab names all four with
-  their state rather than implying a plugin does everything. No plugin code
-  executes.
+  **Plugins** contribute three of the four kinds the Plugins tab names: hook
+  rules, skills, and MCP-server *offers*. A plugin is validated, supply-chain
+  checked, signature-levelled and recorded first, and each kind needs its own
+  declared permission — `event:hook`, `skill:contribute`, `mcp:server` — none of
+  which is auto-approved, so you read it in the permission diff before installing.
+  **Panels** are the one kind still unavailable: there is no route, permission or
+  accessibility contract for a page a plugin drew. **LSP servers** are named in
+  the manifest schema and have no surface at all to contribute to. No plugin code
+  executes, in the runtime or in your browser.
 
-  **Channels** are absent: no inbound or outbound delivery, and the tab says so
-  rather than showing disabled controls. The gate is an accepted threat model,
-  not the code — inbound delivery is the highest-risk surface in this class.
+  **Channels** deliver, and you can now reach that. A channel message is
+  **untrusted content with a named sender who is not you** — never a prompt, never
+  able to raise a turn's authority, trust from the pairing record rather than from
+  the message. Outbound delivery runs through a capability gate and an egress
+  allowlist; inbound is recorded, quarantined and its instructions inert. All of
+  it existed and was unreachable until the tab gained pairing, so *linked*,
+  *enabled*, *trusted* and *reachable* are now four facts shown as four things.
+  Each condition is its own row with its own remedy — the capability, the egress
+  allowlist, whether deliveries are signed, the inbound secret, and the inbound
+  budget of 60 messages per sender per minute, since allowlisting says *who* may
+  speak and not how often. The spec's routing modes
+  and resolving an approval over a channel are not built: an inbound message
+  never becomes work on its own.
 
-  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221 (plugin contributions),
-  BUG-225 (channels) and BUG-226 (the three hook handler types this build
-  refuses: `http`, `mcp_tool` and `prompt`/`agent`).
+  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-225 (channel routing modes and
+  relay resolution), BUG-226 (the four hook handler types this build refuses),
+  BUG-227 (no LSP surface), BUG-228 (plugin panels) and BUG-229 (a live-spec
+  sign-in that only works on an empty workspace).
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each
@@ -618,12 +644,15 @@ on the shipped build, not estimated.
   production signing anchor, so live egress bypass, credential delivery/merge
   and publisher verification remain unavailable rather than configuration-
   enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
-- **Plugins and channels are behind the reference set.** Hooks reached parity on
-  2026-08-22 — every event the format accepts is emitted, with an owner off
-  switch and a page that states which rules actually enforce. Plugins contribute
-  hook rules and not skills, MCP servers or panels. Channels remain a registry
-  with no delivery path. These are the extension points other agent platforms are
-  largely defined by, and two of the three are still short.
+- **Plugins are one contribution kind short; channels stop short of routing.**
+  Hooks reached parity on 2026-08-22 — every event the format accepts is emitted,
+  with an owner off switch and a page that states which rules actually enforce.
+  Plugins went on to contribute skills and MCP-server offers the same day;
+  **panels** are the one kind left, and LSP servers have no surface to contribute
+  to. Channels gained their authority contract and then their owner surface: the
+  transport had been built and unreachable, and pairing is what reaches it. What
+  is still short there is above the transport — per-channel rate limits, the
+  spec's routing modes, and resolving an approval over a channel.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

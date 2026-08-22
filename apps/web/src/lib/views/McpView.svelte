@@ -8,6 +8,7 @@
     CapabilityGate,
     McpAgentAccess,
     McpFinding,
+    McpOffer,
     McpServer,
     McpSession,
     Notification,
@@ -25,6 +26,10 @@
   }
 
   let servers = $state<McpServer[] | null>(null);
+  // BUG-221 — servers installed plugins offer. An offer is a description, not a
+  // connection: adding one runs the ordinary governed create path, so a plugin
+  // goes *through* the trust gate rather than around it.
+  let offers = $state<McpOffer[]>([]);
   let gates = $state<CapabilityGate[]>([]);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
@@ -96,14 +101,18 @@
   async function load() {
     error = null;
     try {
-      const [list, gateList, access] = await Promise.all([
+      const [list, gateList, access, offered] = await Promise.all([
         api.mcpServers(),
         api.capabilityGates(),
         api.mcpAgentAccess().catch(() => null),
+        // An empty offer list is the normal case, so a failure here must not
+        // take the page down with it.
+        api.mcpOffers().catch(() => [] as McpOffer[]),
       ]);
       servers = list;
       gates = gateList;
       agentAccess = access;
+      offers = offered;
       if (list.length) {
         const [details, notes] = await Promise.all([
           Promise.all(list.map(async (server) => ({
@@ -136,6 +145,29 @@
       await api.createMcpServer(newName.trim(), newTemplate);
       notice = `Created “${newName.trim()}”.`;
       newName = "";
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
+  async function addOffer(offer: McpOffer) {
+    busy = `offer:${offer.plugin_id}/${offer.name}`;
+    error = null;
+    notice = null;
+    try {
+      if (offer.transport === "http") {
+        await api.createRemoteMcpServer(
+          offer.name,
+          offer.endpoint_url ?? "",
+          offer.auth_ref ?? null,
+        );
+      } else {
+        await api.createMcpServer(offer.name, offer.template ?? "");
+      }
+      notice = `Added “${offer.name}”. Nothing is connected yet — test the connection below.`;
       await load();
     } catch (e) {
       error = reason(e);
@@ -292,10 +324,58 @@
   </button>
 </form>
 
+{#if offers.length > 0}
+  <section class="offers" aria-labelledby="mcp-offers-heading">
+    <h3 id="mcp-offers-heading">Offered by your plugins</h3>
+    <p class="offers-lead">
+      A plugin can describe a server it works with. Nothing here is connected or reachable —
+      adding one runs the same governed create path as filling in the form above.
+    </p>
+    <ul class="offer-list">
+      {#each offers as offer (offer.plugin_id + "/" + offer.name)}
+        <li>
+          <div class="offer-copy">
+            <strong>{offer.name}</strong>
+            <span class="offer-meta">
+              {offer.transport === "http" ? "Remote (HTTPS)" : "Local (stdio)"} · from plugin
+              <code>{offer.plugin_id}</code>
+            </span>
+            {#if offer.description}<span class="offer-meta">{offer.description}</span>{/if}
+            {#if offer.transport === "http" && offer.endpoint_url}
+              <span class="offer-meta mono">{offer.endpoint_url}</span>
+            {/if}
+            {#if offer.auth_ref}
+              <span class="offer-meta">
+                Reads its token from <code>{offer.auth_ref}</code>. The token is never stored here.
+              </span>
+            {/if}
+          </div>
+          {#if offer.already_added}
+            <span class="offer-added">Added</span>
+          {:else}
+            <button
+              class="btn btn-sm"
+              type="button"
+              onclick={() => addOffer(offer)}
+              disabled={busy === `offer:${offer.plugin_id}/${offer.name}`}
+            >{busy === `offer:${offer.plugin_id}/${offer.name}` ? "Adding…" : "Add server"}</button>
+          {/if}
+        </li>
+      {/each}
+    </ul>
+  </section>
+{/if}
+
 {#if !servers}
   <p class="loading">Loading MCP servers…</p>
 {:else if servers.length === 0}
-  <div class="empty">No MCP servers yet. Create one from a template above.</div>
+  <!-- An empty state that ignores an offer sitting directly above it reads as a
+       contradiction. When a plugin has offered one, that is the shortest route. -->
+  <div class="empty">
+    {offers.length > 0
+      ? "No MCP servers yet. Add one your plugins offer above, or create one from a template."
+      : "No MCP servers yet. Create one from a template above."}
+  </div>
 {:else}
   <ul class="list">
     {#each servers as s (s.server_id)}
@@ -419,5 +499,35 @@
     .create { flex-direction: column; align-items: stretch; }
     .input { min-width: 0; }
     .top { align-items: flex-start; }
+  }
+
+  /* Offers are a *proposal* list, not a server list: visually quieter than the
+     real servers below, and never carrying a connection state of their own. */
+  .offers {
+    margin: var(--space-4) 0 0;
+    padding: var(--space-3);
+    border: 1px dashed var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .offers h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }
+  .offers-lead { margin: 0; color: var(--text-2); font-size: 0.84rem; max-width: 60ch; }
+  .offer-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-2); }
+  .offer-list > li {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    background: var(--surface);
+  }
+  .offer-copy { display: grid; gap: 0.15rem; min-width: 0; }
+  .offer-meta { color: var(--text-2); font-size: 0.8rem; overflow-wrap: anywhere; }
+  .offer-added { color: var(--text-3); font-size: 0.8rem; font-weight: 650; align-self: center; }
+  @media (max-width: 40rem) {
+    .offer-list > li { flex-direction: column; align-items: stretch; }
   }
 </style>

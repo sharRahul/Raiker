@@ -386,8 +386,9 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   allowlist; inbound is recorded, quarantined and its instructions inert. All of
   it existed and was unreachable until the tab gained pairing, so *linked*,
   *enabled*, *trusted* and *reachable* are now four facts shown as four things.
-  Three of them are fail-closed by default and the tab names each one and its
-  remedy, alongside the inbound budget — 60 messages per sender per minute, since
+  Each condition is its own row with its own remedy — the capability, the egress
+  allowlist, whether deliveries are signed, the inbound secret, and the inbound
+  budget — 60 messages per sender per minute, since
   allowlisting says *who* may speak and not how often. The spec's routing modes
   and resolving an approval over a channel are not built: an inbound message
   never becomes work on its own.

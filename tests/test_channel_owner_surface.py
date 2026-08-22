@@ -433,3 +433,63 @@ def test_the_surface_states_the_budget(workspace: Path, owner: str, monkeypatch:
     view = DashboardService(workspace).list_channels(owner)
 
     assert view["inbound"]["rate_limit_per_minute"] == 12
+
+
+# ── Outbound signing: the profile's declaration becomes a fact ───────────────
+
+
+def test_a_delivery_is_signed_when_the_owner_configured_a_secret(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The webhook profile declares `signed_http_callback`. It POSTed unsigned.
+
+    A receiver had no way to tell a Raiker delivery from anything else that could
+    reach the URL, so the profile's transport was documentation rather than a
+    fact about the bytes on the wire.
+    """
+    import hashlib
+    import hmac
+    import json as _json
+
+    from raiker.runtime.executors import channels as channel_executors
+
+    monkeypatch.setenv("RAIKER_CHANNEL_OUTBOUND_SECRET", "shared-with-the-receiver")
+    body = _json.dumps({"text": "hi"}, sort_keys=True).encode("utf-8")
+
+    signature, signed = channel_executors._sign_delivery(body)
+
+    assert signed is True
+    expected = hmac.new(b"shared-with-the-receiver", body, hashlib.sha256).hexdigest()
+    # Over the exact bytes sent, so a receiver can recompute it without knowing
+    # how Raiker happened to serialise the payload.
+    assert signature == f"sha256={expected}"
+
+
+def test_no_secret_means_unsigned_rather_than_refused(
+    workspace: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from raiker.runtime.executors import channels as channel_executors
+
+    monkeypatch.delenv("RAIKER_CHANNEL_OUTBOUND_SECRET", raising=False)
+
+    signature, signed = channel_executors._sign_delivery(b"{}")
+
+    # Deliberate: the owner controls both ends of a webhook they configured, and
+    # hard-blocking their own destination is prevention-by-restriction. The state
+    # is reported instead — visible, not silent.
+    assert signed is False
+    assert signature == ""
+
+
+def test_the_surface_says_whether_deliveries_are_signed(
+    workspace: Path, owner: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delenv("RAIKER_CHANNEL_OUTBOUND_SECRET", raising=False)
+    assert DashboardService(workspace).list_channels(owner)["outbound"][
+        "signing_configured"
+    ] is False
+
+    monkeypatch.setenv("RAIKER_CHANNEL_OUTBOUND_SECRET", "k")
+    assert DashboardService(workspace).list_channels(owner)["outbound"][
+        "signing_configured"
+    ] is True

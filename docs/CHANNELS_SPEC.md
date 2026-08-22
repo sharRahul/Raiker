@@ -226,7 +226,7 @@ each step is refused until the one before it is done:
 | Step | What | State |
 |---|---|---|
 | 1 | **This section**, in the spec and the threat model | **Done.** Nothing below has a contract to satisfy without it. |
-| 2 | **Outbound delivery** — connector profile, capability gate, egress allowlist, audit event | **Done.** `ExternalChannelExecutor` under `external_channel_runtime`. |
+| 2 | **Outbound delivery** — connector profile, capability gate, egress allowlist, audit event | **Done.** `ExternalChannelExecutor` under `external_channel_runtime`. Deliveries carry `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes, keyed by `RAIKER_CHANNEL_OUTBOUND_SECRET`) so `signed_http_callback` describes the wire and not just the profile. Unset means **unsigned, not refused** — the owner controls both ends of a webhook they configured — and the state is reported on the tab and in the delivery artifacts. |
 | 3 | **Inbound, paired and allowlisted** | **Done.** The receiver enforces `requires_pairing` and `requires_sender_allowlist`, and marks every accepted message untrusted, quarantined and instructions-inert. |
 | 4 | **An owner surface for all of it** | **Done (FIXED-265).** Steps 2 and 3 were built and had no way in: with no pairing the executors refuse and the receiver 404s, so the transport was unreachable and the tab reported that channels did not exist. |
 | 5 | **Rate limits** — a per-sender inbound budget | **Done.** Fixed window per `(connector, sender)`, default 60/min, `RAIKER_CHANNEL_INBOUND_RATE` overrides; a refusal is a recorded `channel_message_rejected` event with `reason: rate_limited`. Allowlisting says *who*, this says *how often*. |

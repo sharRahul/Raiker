@@ -10889,3 +10889,55 @@ slightly beyond: a 429 with no audit trail leaves the owner unable to distinguis
 **Evidence.** `tests/test_channel_owner_surface.py` — the fourth of four is
 refused, the refusal is recorded, one sender's budget is not another's, a
 nonsense override falls back, and the surface states the limit.
+
+---
+
+## FIXED-268 — A "signed HTTP callback" was posting an unsigned body
+
+**Severity: Medium. Area: channels / outbound integrity. Fixed 2026-08-22.**
+
+The webhook connector profile declares transport `signed_http_callback` and auth
+`signed_message_reference`. `ExternalChannelExecutor` POSTed a bare JSON body with
+no signature and no headers beyond `Content-Type`. A receiver had no way to tell a
+Raiker delivery from anything else that could reach the URL — so the profile's two
+most load-bearing fields were documentation, not facts about the bytes on the
+wire. `ConnectorRegistry` validates that both fields are *present*; nothing
+checked that either was *true*.
+
+**What ships.** Every delivery carries `X-Raiker-Signature: sha256=<hmac>` —
+HMAC-SHA256 over the exact bytes sent, keyed by `RAIKER_CHANNEL_OUTBOUND_SECRET`
+— alongside `X-Raiker-Delivered-At`. The body is serialised with sorted keys and
+the timestamp is inside it as well as on the header, so a receiver can recompute
+the signature without knowing how Raiker happened to order the payload, and can
+reject a replay on its own terms. The secret is read at delivery and never
+stored, logged, or returned; `post_url` sends headers verbatim and reports only
+size metadata, so neither the signature nor a token can leak through the result.
+
+**Unset means unsigned, not refused**, and that is a deliberate reading of this
+project's security posture: the owner controls both ends of a webhook they
+configured, and hard-blocking their own destination is prevention-by-restriction.
+So the state is *reported* instead — the delivery summary says `UNSIGNED — set
+RAIKER_CHANNEL_OUTBOUND_SECRET`, the artifacts carry `signed: false`, and the
+Channels tab has a **Signing** row beside the other conditions. A receiver that
+requires a signature simply rejects the delivery, which is the correct place for
+that decision to be made.
+
+**User-interface outcome.** Extensions → Channels now states five conditions, one
+row each, because each has a different remedy: the capability, the egress
+allowlist, signing, the inbound secret, and the inbound budget. The lead line
+says why: *nothing here is implicit — linked is not enabled, enabled is not
+trusted, and a channel that is all three still reaches nothing until you name the
+host.*
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes,
+narrowly, and mostly it is honesty.** Signed webhooks are standard in the
+reference set — it is Raiker that was behind its own profile. What is worth
+keeping is the *reporting*: no cited platform tells the owner, on the page, that
+its outbound deliveries are currently unsigned. The gap between what a connector
+profile declares and what the transport does is exactly the kind of thing a
+governed product should surface rather than assume.
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the signature is HMAC-SHA256
+over the exact bytes, no secret means unsigned rather than refused, and the
+surface reports which. `apps/web/e2e/bug-225-channels-live.spec.ts` asserts the
+Signing row is present at every width.

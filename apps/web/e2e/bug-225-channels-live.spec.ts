@@ -71,7 +71,7 @@ test("the tab states what a channel message is (BUG-225)", async ({ page }) => {
   // The three gates, each its own row: one is a capability the owner sets, one
   // is an environment allowlist, one is an inbound secret. Different remedies.
   const posture = page.getByTestId("channel-posture");
-  for (const fact of ["Outbound", "Egress", "Inbound", "Rate limit"]) {
+  for (const fact of ["Outbound", "Egress", "Signing", "Inbound", "Rate limit"]) {
     await expect(posture.getByText(fact, { exact: true })).toBeVisible();
   }
 

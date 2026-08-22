@@ -400,6 +400,8 @@ export interface ChannelsView {
     /** RAIKER_CHANNEL_EGRESS_ALLOWLIST names at least one host. Fail-closed. */
     egress_configured?: boolean;
     egress_host_count?: number;
+    /** RAIKER_CHANNEL_OUTBOUND_SECRET is set, so deliveries carry an HMAC. */
+    signing_configured?: boolean;
   };
   inbound: {
     /** RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses. */

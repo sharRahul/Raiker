@@ -819,7 +819,9 @@
         prompt, never able to raise a turn's authority, and never trusted because it is linked.
       </p>
       <p class="note">
-        Linked, enabled and trusted are three separate facts, and each is shown separately below.
+        Nothing here is implicit. Linked is not enabled, enabled is not trusted, and a channel that
+        is all three still reaches nothing until you name the host — so every condition is its own
+        row, with its own remedy.
         <GuideLink route="extensions" label="How extension surfaces are governed" />
       </p>
       {#if channels !== null}
@@ -845,6 +847,18 @@
             <span class="note">
               Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>. It is empty by default, so a channel
               that is linked, enabled and trusted still reaches nothing until you name the host.
+            </span>
+          </li>
+          <li class:event-dead={!channels.outbound.signing_configured}>
+            <strong>Signing</strong>
+            <span class="hook-tag" class:hook-tag-dead={!channels.outbound.signing_configured}>
+              {channels.outbound.signing_configured ? "Signed" : "Unsigned"}
+            </span>
+            <span class="note">
+              Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> and every delivery carries an
+              HMAC the destination can check. Unset still delivers — you control both ends of a
+              webhook you configured — but the receiver cannot tell a Raiker delivery from
+              anything else that reaches the URL.
             </span>
           </li>
           <li class:event-dead={!channels.inbound.secret_configured}>

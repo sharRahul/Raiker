@@ -390,6 +390,7 @@ reports them one by one rather than as a single "ready":
 |---|---|---|
 | Capability | `external_channel_runtime` | Permissions |
 | Egress | `RAIKER_CHANNEL_EGRESS_ALLOWLIST` — empty means deny | Your environment |
+| Signing | `RAIKER_CHANNEL_OUTBOUND_SECRET` — unset means unsigned, not refused | Your environment |
 | Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
 
 A fourth row states the **inbound budget**: 60 messages per sender per minute by

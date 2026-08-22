@@ -3354,6 +3354,14 @@ class DashboardService:
                 "runtime_enabled": bool(gate.runtime_enabled) if gate is not None else False,
                 "egress_configured": bool(allowlist),
                 "egress_host_count": len(allowlist),
+                # The webhook profile declares `signed_http_callback`. Without a
+                # secret the executor still delivers — the owner controls both
+                # ends of a webhook they configured — but the receiver cannot
+                # tell a Raiker delivery from anything else that reaches the URL,
+                # so the state is reported rather than assumed.
+                "signing_configured": bool(
+                    os.environ.get("RAIKER_CHANNEL_OUTBOUND_SECRET", "").strip()
+                ),
             },
             "inbound": {
                 "secret_configured": bool(

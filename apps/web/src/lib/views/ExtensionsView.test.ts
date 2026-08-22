@@ -380,6 +380,7 @@ describe("ExtensionsView", () => {
       runtime_enabled: false,
       egress_configured: false,
       egress_host_count: 0,
+      signing_configured: false,
     },
     inbound: {
       secret_configured: false,
@@ -416,6 +417,9 @@ describe("ExtensionsView", () => {
     // Allowlisting says *who* may speak; the budget says how often. An
     // allowlisted sender was unbounded until this row existed.
     expect(within(posture).getByText("Rate limit").closest("li")).toHaveTextContent("60/min");
+    // The webhook profile declares a *signed* callback. Whether a delivery is
+    // actually signed is a fact about the bytes, not about the profile.
+    expect(within(posture).getByText("Signing").closest("li")).toHaveTextContent("Unsigned");
   });
 
   it("offers pairing, and says pairing is not switching on", async () => {

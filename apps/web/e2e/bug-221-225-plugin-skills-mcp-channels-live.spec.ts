@@ -105,6 +105,12 @@ test("a plugin's skill arrives switched off and credited to it (BUG-221)", async
   await page.goto(`${BASE}/#/extensions?tab=skills`);
   await expect(page.getByRole("heading", { name: "Skills" })).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(SKILL_NAME, { exact: true })).toHaveCount(0);
+  // Let that reconcile *finish* before writing the files. Without this the write
+  // races the in-flight request, and the test measures the interleaving rather
+  // than the behaviour. (The reconcile keeps anything either of two overlapping
+  // passes saw, so the race no longer loses a row — but a test that depends on
+  // which request won is still a test about the wrong thing.)
+  await page.waitForLoadState("networkidle");
 
   writeContributions();
   await page.goto(`${BASE}/#/extensions?tab=hooks`);
@@ -171,23 +177,25 @@ test("an offered MCP server is offered, not connected (BUG-221)", async ({ page 
   await page.screenshot({ path: `${SHOTS}/bug-221-plugin-mcp-offer.png`, fullPage: true });
 });
 
-test("the channels tab states the contract and what is not built (BUG-225)", async ({ page }) => {
+// The channel *contract* is asserted here because this spec is where BUG-225's
+// step 1 was closed. Everything the surface does with it — pairing, enabling,
+// the governed test delivery, the five conditions — belongs to the channel
+// surface and is covered by `bug-225-channels-live.spec.ts`; duplicating it here
+// would mean two places to update and two chances to update only one.
+test("the channels tab states the contract (BUG-225 step 1)", async ({ page }) => {
   test.setTimeout(120_000);
   await signIn(page);
   await page.goto(`${BASE}/#/extensions?tab=channels`);
 
-  await expect(page.getByRole("heading", { name: "Channels cannot deliver yet" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "What a channel message is" })).toBeVisible({
     timeout: 30_000,
   });
   await expect(
     page.getByText(/untrusted content with a named sender who is not you/i),
   ).toBeVisible();
-  // Accepted spec and shipped feature must not read the same.
-  const steps = page.locator("ol.channel-steps > li");
-  await expect(steps).toHaveCount(4);
-  await expect(steps.nth(0)).toContainText("Done");
-  await expect(steps.nth(1)).toContainText("Next");
-  await expect(page.getByText(/no channel can send or receive work on your behalf/i)).toBeVisible();
+  // An accepted spec and a shipped feature must still not read the same, so the
+  // list of what is *not* built stays on the page beside what is.
+  await expect(page.getByRole("heading", { name: "What is still not built" })).toBeVisible();
 
   await page.screenshot({ path: `${SHOTS}/bug-225-channel-contract.png`, fullPage: true });
 });

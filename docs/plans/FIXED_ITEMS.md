@@ -10954,3 +10954,42 @@ cost the bug above — so it is reversed, with the reasoning written into the te
 rather than left in a commit message. `_check_no_secrets` gained the identical
 exemption, because that function's own docstring requires it to prove what the
 middleware emits rather than a stricter rule the middleware never applied.
+
+---
+
+## FIXED-269 — Two overlapping reconciles could delete each other's plugin skills
+
+**Severity: Low. Area: plugins / skills. Fixed 2026-08-22.**
+
+`SkillsService.sync_plugin_skills` built the set of skills to keep from **one**
+listing of the contribution directory, taken at the top of the call, and then
+deleted every plugin-sourced row whose name was not in it. Two reconciles can
+overlap — two browser tabs on the Skills page is enough, and every `GET
+/api/skills` runs one — so a pass that listed the directory *before* a plugin
+wrote its file reached its removal loop with a set that did not name the new
+skill, and deleted the row the other pass had just created. From a listing that
+was already stale.
+
+The visible effect is a skill disappearing from a page that had just shown it,
+and reappearing on the next refresh. The next reconcile re-creates the row from
+the files, which is exactly why it took a live spec to notice: it looks like a
+flake, and it recovers on its own.
+
+**Fixed** by re-reading the contribution files *after* the upserts and keeping
+anything either pass saw. One extra directory walk on a path that already does
+several, and the window narrows to the gap between two adjacent reads.
+
+**How it was found, and what that says.** A live spec that wrote a plugin's files
+mid-test failed intermittently — twice green, once red. The easy reading is "a
+timing-sensitive test"; the correct one is that the test's timing was
+*reproducing* something real. The spec was also made deterministic (it now waits
+for the in-flight reconcile before writing), but the code fix came first: a test
+that stops flaking because it stopped racing has not fixed the race.
+
+**Reference-platform decision.** **No — a defect fix.**
+
+**Evidence.** `tests/test_plugin_contributions.py` —
+`test_two_overlapping_reconciles_do_not_delete_each_others_rows` hands the
+reconcile the stale listing directly, and reads the store rather than calling
+`list_skills` again, because a third reconcile re-creates the row and hides the
+deletion. Verified to fail with the fix reverted.

@@ -209,9 +209,17 @@ class SkillsService:
                 active=False,
             )
             added += 1
+        # Re-read the contribution files *after* the upserts, and keep anything
+        # either pass saw. Two reconciles can overlap — two browser tabs on the
+        # Skills page is enough — and one that listed the directory before a
+        # newly-installed plugin wrote its file would otherwise delete the row
+        # the other had just created, from a listing that was already stale. The
+        # second read makes that window very small, and it costs one directory
+        # walk on a path that already does several.
+        keep = wanted | {package.name for _, package in contributed_skills(self._workspace_root)}
         removed = 0
         for name, row in existing.items():
-            if str(row.get("source", "")) != "plugin" or name in wanted:
+            if str(row.get("source", "")) != "plugin" or name in keep:
                 continue
             if self._store.delete_skill(str(row["skill_id"]), principal_id):
                 removed += 1

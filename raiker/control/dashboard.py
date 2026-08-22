@@ -3250,9 +3250,10 @@ class DashboardService:
                     "kind": "mcp_servers",
                     "available": True,
                     "summary": (
-                        "A plugin may *offer* a server. Nothing is connected or "
-                        "stored until you add it, and adding it runs the same "
-                        "governed create path as typing it in yourself."
+                        "A plugin may offer a server; it cannot add one. Nothing "
+                        "is connected or stored until you add it, and adding it "
+                        "runs the same governed create path as typing it in "
+                        "yourself."
                     ),
                 },
                 {

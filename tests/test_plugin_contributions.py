@@ -727,3 +727,51 @@ def test_the_plugins_tab_reports_offered_servers(workspace: Path) -> None:
     assert kinds["mcp_servers"] is True
     # Panels are still the one kind with no authority story, and still say so.
     assert kinds["panels"] is False
+
+
+def test_two_overlapping_reconciles_do_not_delete_each_others_rows(workspace: Path) -> None:
+    """Two browser tabs on the Skills page is enough to overlap two reconciles.
+
+    One that listed the contribution directory *before* a plugin wrote its file
+    reaches its removal pass with a `wanted` set that does not name the skill —
+    and would delete the row the other pass had just created, from a listing that
+    was already stale. The skill then vanishes from a page that had just shown it.
+
+    Simulated by handing the reconcile the stale listing directly, which is the
+    only part of the interleaving that matters.
+    """
+    from raiker.skills.service import SkillsService
+
+    principal_id = _owner(workspace)
+    _install(workspace, _skill_manifest())
+    service = SkillsService(workspace)
+    assert "acme-review" in [s.name for s in service.list_skills(principal_id)]
+
+    import raiker.plugins.contributions as contributions_module
+
+    original = contributions_module.contributed_skills
+    calls = {"n": 0}
+
+    def stale_first_read(root: Any) -> Any:
+        # The first call is the pass that started before the file existed; the
+        # second is the fresh read taken at removal time, which must save it.
+        calls["n"] += 1
+        return [] if calls["n"] == 1 else original(root)
+
+    contributions_module.contributed_skills = stale_first_read  # type: ignore[assignment]
+    try:
+        SkillsService(workspace).list_skills(principal_id)
+    finally:
+        contributions_module.contributed_skills = original  # type: ignore[assignment]
+
+    # Read the store directly. Calling `list_skills` again would run a *third*
+    # reconcile, which re-creates the row from the files and hides the deletion —
+    # the assertion has to be about the state the overlapping pass left behind.
+    from raiker.storage.sqlite import SQLiteStore
+
+    names = [
+        str(row["name"])
+        for row in SQLiteStore(workspace).list_skills(principal_id)
+        if str(row.get("source", "")) == "plugin"
+    ]
+    assert "acme-review" in names, "a stale listing deleted a row the files still justify"

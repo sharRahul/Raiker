@@ -785,8 +785,8 @@
         <h2>What a plugin may contribute</h2>
         <p class="note">
           A plugin runs no code of its own. It contributes through a surface that already governs
-          the thing contributed — which is why hooks came first, and why the rest are still marked
-          as not available rather than quietly listed.
+          the thing contributed — which is why hooks came first, and why a kind with no such
+          surface yet is marked unavailable rather than quietly listed.
         </p>
         <ul class="event-list">
           {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}

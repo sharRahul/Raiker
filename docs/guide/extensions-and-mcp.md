@@ -174,6 +174,78 @@ Paste a GitHub skill URL into either composer and a notice appears offering to
 real name and description; nothing is stored until you then choose **Add to
 Skills**. Dismissing leaves your prompt exactly as typed.
 
+## Hooks
+
+A hook runs your own logic at a point in a turn. It can only make an action
+**stricter**: a hook may deny a tool call or turn it into a decision you answer,
+and it can never allow one the runtime refused, skip an approval, or reach past
+the tool broker.
+
+Hooks are configured in a file, not on this page. Raiker reads three, in this
+order of authority:
+
+| File | Scope | For |
+|---|---|---|
+| `config/managed-hooks.json` | managed | Rules nothing below may override |
+| `config/hooks.json` | project | Rules that travel with the repository |
+| `.raiker/hooks.json` | local | Rules for this machine only |
+
+A lower scope can never override a higher-scope deny.
+
+```json
+{
+  "schema_version": "1.0",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "shell|process",
+        "handlers": [
+          { "id": "guard", "type": "builtin", "builtin": "block_destructive_shell" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`matcher` takes `*`, an exact tool name, `a|b` alternatives, or `re:<regex>`. An
+optional `"if"` narrows further on the arguments — `"shell(rm -rf *)"` fires only
+for a command matching that glob. A malformed guard fails closed rather than
+widening the rule.
+
+### What the Hooks tab tells you
+
+Extensions → **Hooks** reports what the runtime actually loaded, which is not
+always what you wrote. Three states are worth knowing, and each is one the file
+alone cannot show you:
+
+- **A file that did not parse.** It contributes no rules — Raiker will not guess
+  at a config it cannot read — and the tab names the file and where the parse
+  stopped. Everything else keeps working; fix the file and reload.
+- **A rule that never fires.** The schema accepts every event in
+  `docs/HOOKS_SPEC.md`, but this build emits only some of them. A rule on one it
+  does not emit parses cleanly and never runs, and is shown as such.
+- **A rule that cannot change anything.** Only `PreToolUse` and `PreCompact`
+  decisions are honoured, and only from a handler holding decision authority — a
+  builtin always has it, a `command` handler only when you set
+  `"decision_authority": true`. Everything else observes. The tab labels each
+  rule **Can deny or ask** or **Observes only**, and warns when a rule names a
+  builtin this build does not have.
+
+The tab also lists every event a rule may name and every builtin handler that
+exists, because you are writing the file by hand and guessing a name produces a
+rule that fails every time it matches.
+
+Every match, run, decision, timeout and failure is in **Observability → Audit
+log** as `hook_matched`, `hook_executed`, `hook_decision`, `hook_timeout` and
+`hook_failed`. The tab shows the recent ones inline.
+
+A `command` handler is argv only — never a shell string — its program must
+resolve **inside the workspace**, it runs with a minimal environment and a
+bounded timeout, and its output is truncated. A timeout or an error is recorded
+and the action falls through to normal policy rather than being blocked by a
+hook that did not answer.
+
 ## Plugins and Channels
 
 Both tabs are intentionally empty and say so:

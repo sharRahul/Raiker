@@ -16,6 +16,11 @@ human authorizer, runtime authority, or other literal actor.
 | `machine_identity_deactivated` | A terminal turn's machine principal was made inactive |
 | `prompt_received` | A client submitted a turn (client type, prompt length, input provenance and the composer surface — never the prompt text) |
 | `conversation_history_replayed` | Prior turns of the session were sent to the model as context (message count and character total only — never the transcript) |
+| `hook_matched` | A configured hook rule matched this event (event, matcher and scope only) |
+| `hook_executed` | One hook handler ran, with the decision it returned and whether it held authority |
+| `hook_decision` | The aggregated decision hooks reached for one event |
+| `hook_timeout` | A command handler exceeded its bounded timeout; the action falls through to normal policy |
+| `hook_failed` | A handler errored — a missing program, or a builtin name this build does not have |
 | `policy_decision` | Policy classified the requested action |
 | `approval_requested` | A human decision is required |
 | `approval_denied` | A human or policy denied the action |

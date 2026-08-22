@@ -24,8 +24,24 @@
 >   open (the action falls through to normal policy).
 > - **Events:** `hook_matched`, `hook_executed`, `hook_decision`, `hook_failed`, `hook_timeout`.
 > - **No hooks configured → no-op:** the dispatcher is inactive and the runtime is unchanged.
+> - **A file that cannot be read fails closed for itself, not for the runtime.**
+>   `HooksRegistry.load` runs inside the `AgentGateway` constructor, so a parse error used to make
+>   *every prompt in the product* fail with a raw `JSONDecodeError`. It now records a
+>   `HookSourceStatus` per source: a bad file contributes no rules and is reported, the others load
+>   normally, and the runtime is untouched. `HooksRegistry.from_config` still raises, because a
+>   caller handing over a config wants to be told it is wrong.
+> - **Owner surface:** Extensions → **Hooks** (`GET /api/hooks`) reports what the runtime loaded —
+>   each rule's event, matcher, `if` guard, scope, source file and handlers; the file it could not
+>   read; the events this build actually dispatches; the builtin handler names that exist; and the
+>   recent `hook_*` records. It is read-only: the config files are the owner's own text, and a
+>   surface that rewrote them would need its own authority story.
+> - **Three ways a configured hook still does nothing, each stated rather than implied:** its file
+>   did not parse; its event is in `HOOK_EVENTS` but not `DISPATCHED_HOOK_EVENTS`, so it parses and
+>   never fires; or nothing on it carries a decision the runtime honours — only `PreToolUse` and
+>   `PreCompact` decide (`DECIDING_HOOK_EVENTS`), and a `builtin` naming a handler this build does
+>   not ship raises at dispatch, so it is reported as unavailable rather than as enforcing.
 >
-> See `tests/test_hooks.py` for the acceptance tests and `docs/EXTENSIBILITY_MODEL.md` for how
+> See `tests/test_hooks.py` and `tests/test_hooks_surface.py` for the acceptance tests and `docs/EXTENSIBILITY_MODEL.md` for how
 > hooks sit alongside the other extension surfaces. Sections below are the full design target;
 > not every event/handler is wired yet (see the list above).
 >

@@ -55,7 +55,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "pricing",
     "posture",
   ],
-  extensions: ["connectors", "mcp", "skills", "plugins", "channels"],
+  extensions: ["connectors", "mcp", "skills", "hooks", "plugins", "channels"],
   observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that

@@ -66,7 +66,17 @@ describe("nav model", () => {
       "models",
       "extensions",
     ]);
-    expect(HUB_TABS.extensions).toEqual(["connectors", "mcp", "skills", "plugins", "channels"]);
+    // Hooks sits with the other extension surfaces rather than under Permissions:
+    // a hook is something the owner installs, and it can only ever tighten what
+    // Permissions already allows.
+    expect(HUB_TABS.extensions).toEqual([
+      "connectors",
+      "mcp",
+      "skills",
+      "hooks",
+      "plugins",
+      "channels",
+    ]);
   });
 
   it("keeps every governed surface reachable from the nav", () => {

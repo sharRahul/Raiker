@@ -72,7 +72,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | `commands` / slash commands (built-in + custom) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | ✅ 50+ inspection commands |
 | `cli-reference` (flags: `--prompt`, `--workspace`, resume/fork) | `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`, `README.md` | 🟡 `--prompt`/`--workspace` only |
 | `checkpointing` (snapshot before edit, rewind, restore code/convo) | `docs/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 write real; restore plan-only |
-| `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 📘 spec only, no code |
+| `hooks` (31 events; `command|http|mcp_tool|prompt|agent`; matchers; `if`) | `docs/HOOKS_SPEC.md` | 🟡 dispatcher, matchers and `if` real; 9 events, 2 handler types, owner surface at Extensions → Hooks |
 | `plugins-reference` (`plugin.json`; skills/agents/hooks/MCP/LSP/monitors; marketplace) | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` | 🔒 manifest validation only |
 | `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | 🔒 registry only |
 
@@ -1381,6 +1381,67 @@ Recorded here and, where they are work rather than a decision, in
 3. **A Dispatch-shaped briefing conversation.** Raiker has every part except the
    surface that owns the children and routes each to Chat or Build.
 4. **Hooks execution**, which unblocks plugins and channels behind it.
+
+---
+
+## 2026-08-22 review — hooks, and the plugins/channels remainder
+
+The largest single gap to Claude Code has been *hooks → plugins → channels* for
+several rounds. This round closed the part of it that was closable, and this
+section states exactly which part that was.
+
+Primary source read for this round:
+[Claude Code hooks reference](https://code.claude.com/docs/en/hooks) — its event
+list, five handler types, settings scopes, decision fields, matcher syntax,
+`/hooks` browser, `disableAllHooks`, and its documented behaviour on a malformed
+config.
+
+### What was actually true before this round
+
+Worth stating, because two earlier entries in this document were stale. The
+hooks *backend* was not "spec only": `raiker/hooks/` is a working dispatcher,
+wired through the gateway and the tool broker, with nine dispatched events and a
+`PreToolUse` deny that really short-circuits to a denied `PolicyDecision`. What
+was missing was everything an owner could see or trust:
+
+| Before | After |
+|---|---|
+| A typo in `.raiker/hooks.json` raised out of `HooksRegistry.load` inside the `AgentGateway` constructor, so **every prompt in the product failed** with a raw `JSONDecodeError` | A source that cannot be parsed contributes no rules and is reported; the others load; the runtime is untouched |
+| No route, no page. Hooks were written into JSON and observed by reading the audit log by hand | Extensions → **Hooks** over `GET /api/hooks` |
+| A rule on `SessionEnd` parsed, matched nothing, and looked exactly like one that worked | Marked *configured but never fires*, against a published `DISPATCHED_HOOK_EVENTS` a test derives from the call sites |
+| A rule naming a builtin this build does not ship was counted as enforcing and failed at dispatch | Reported unavailable, excluded from "can decide", with the real builtin names published beside it |
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| A read-only hooks browser | **No — parity.** Claude Code's `/hooks` is a read-only browser over events, matchers, handlers and source files | Raiker had nothing. This is the bar, not a differentiator, and the panel is deliberately read-only for the same reason `/hooks` is: the config files are the owner's own text. |
+| A malformed config named, located, and survived | **Yes** | The cited reference documents that invalid JSON "fails silently or logs errors". Raiker names the file, the line and column the parse stopped at, states that its rules did not load, and keeps every other source and the whole runtime working. Failing closed for the file without failing closed for the product is the useful half. |
+| A configured rule that can never fire, marked | **Yes — with an honest caveat** | No reference product needs this, because Claude Code emits every event it documents. Raiker does not, so the marking exists to make a Raiker gap visible rather than to beat anyone. It is a differentiator in *kind* — the surface refuses to let a dead rule look enforcing — and a consequence of being behind on event coverage. |
+| A handler naming a builtin that does not exist, marked | **Yes** | Same shape as the row above and the same reasoning: the rule parses, matches, and fails every time. Counting it as a guard would be the surface asserting a safeguard that is not there. |
+| Rules separated into **Can deny or ask** and **Observes only** | **Yes** | Claude Code documents which events can block in prose. Raiker computes it per rule, from the event *and* whether that rule's handlers hold decision authority, and prints the answer on the rule. |
+| Hooks may only ever tighten | **Yes — already true, now visible** | Claude Code hooks return `permissionDecision: "allow"`, so a hook there can *grant*. Raiker's `combine()` accepts only `deny` and `ask` from an authoritative handler; nothing a hook returns can allow an action policy refused. The panel now says so on the page rather than leaving it to the spec. |
+
+### Gaps this round identified and did **not** close
+
+| Gap | Reference | Raiker today | Compatibility requirement to close it |
+|---|---|---|---|
+| **22 of ~31 lifecycle events** | Claude Code fires `Stop`, `SubagentStart/Stop`, `TaskCreated/Completed`, `PostToolBatch`, `Notification`, `FileChanged`, `ConfigChange`, `Elicitation`, `WorktreeCreate/Remove` and more | Nine are dispatched; `SessionEnd` is accepted and never emitted | Each needs a real call site, not a schema entry. The rule this round establishes is that an event is published as dispatched only when a test can derive it from the code |
+| **Four of five handler types** | `http`, `mcp_tool`, `prompt`, `agent` | `command` and `builtin` | Each needs a gated surface Raiker keeps closed: network egress, the MCP broker, a model call, a subagent. A hook that reaches the network is an egress decision before it is a hook |
+| **A global off switch** | `disableAllHooks`, including per-run via `--settings` | Removing the rules from the file is the only way to stop them | Low effort, and it belongs to the owner rather than to a config file a project can ship. Raised as **BUG-222** |
+| **Plugin execution** | Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP; Cowork installs them from **Customize** | A plugin is validated, supply-chain checked, signature-levelled and recorded — and provides **nothing** to the runtime (`execution_enabled` is `False` by construction) | The blocking question is not packaging, it is what a plugin's code is allowed to be. Raised as **BUG-221** |
+| **Channel delivery** | Claude Code channels relay permissions and messages over MCP | Connector registry, pairing rows and an inbound receiver that quarantines and never executes; activation returns `active: false` | Unchanged from earlier rounds. Inbound quarantine is the safe half and is built; outbound delivery and sender trust are not |
+
+### Recommended improvements, in the order they are worth doing
+
+1. **`disableAllHooks`** (BUG-222). Smallest control with a real safety story:
+   an owner who cannot read a project's hook file still needs one switch.
+2. **`Stop` and `SubagentStop`.** Both have obvious call sites in the runtime
+   today and are the two most-used blocking events in the reference set.
+3. **Plugin execution** (BUG-221), which is a design task about authority before
+   it is an implementation task.
+4. **Channel activation**, last: it is the only one of the three whose safe half
+   already ships.
 
 ---
 

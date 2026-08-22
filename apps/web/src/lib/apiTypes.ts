@@ -1466,6 +1466,79 @@ export interface PromptRequestBody {
   attachments?: PromptAttachment[];
 }
 
+// GET /api/hooks (raiker/control/dashboard.py → list_hooks).
+//
+// Hooks are the one extension surface whose backend really enforces something —
+// a `PreToolUse` deny short-circuits to a denied policy decision — so the view
+// has to be exact about the three ways a configured hook can still do nothing:
+// its file did not parse, its event is never dispatched by this build, or its
+// event carries no decision the runtime honours.
+export interface HookHandlerView {
+  id: string;
+  type: string;
+  /** The argv or builtin name, already joined for display. */
+  target: string;
+  timeout_ms: number;
+  decision_authority: boolean;
+  /** False only for a builtin this build does not ship: the rule matches, the
+   *  handler raises, and nothing is enforced. */
+  available: boolean;
+}
+
+export interface HookRuleView {
+  rule_id: string;
+  event: string;
+  event_summary: string;
+  matcher: string;
+  if_guard: string | null;
+  scope: string;
+  source: string | null;
+  /** False when this build never emits the event, so the rule cannot fire. */
+  dispatched: boolean;
+  /** True only when the event is one whose decision the runtime honours *and* a
+   *  handler on it holds decision authority. */
+  can_decide: boolean;
+  handlers: HookHandlerView[];
+}
+
+export interface HookSourceView {
+  path: string;
+  scope: string;
+  exists: boolean;
+  loaded: boolean;
+  rule_count: number;
+  /** Why the file contributed nothing. Null when it loaded or is absent. */
+  error: string | null;
+}
+
+export interface HookEventView {
+  event: string;
+  summary: string;
+  dispatched: boolean;
+  can_decide: boolean;
+}
+
+export interface HookActivityView {
+  event_id: string;
+  event_type: string;
+  session_id: string;
+  timestamp: string;
+  summary: string | null;
+}
+
+export interface HooksView {
+  active: boolean;
+  rule_count: number;
+  rules: HookRuleView[];
+  sources: HookSourceView[];
+  failed_sources: HookSourceView[];
+  events: HookEventView[];
+  /** The builtin handler names this build actually has. */
+  builtins: string[];
+  activity: HookActivityView[];
+  activity_counts: Record<string, number>;
+}
+
 // POST /api/attachments response (raiker/api/routes_attachments.py) —
 // metadata only; the stored bytes are never echoed back.
 export interface UploadedAttachment {

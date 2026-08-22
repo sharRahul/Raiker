@@ -10064,3 +10064,96 @@ asserts both surfaces are offered an identical tool set.
 Build, absent on Chat, identical tools on both); `tests/test_api_prompts.py`
 (default, validation, and that every authority-bearing option is identical
 across surfaces).
+
+## FIXED-252 — One typo in a hooks file made every prompt fail
+
+**Severity: High. Area: hooks / runtime startup. Fixed 2026-08-22.**
+
+**Observed.** `HooksRegistry.load` raised on a file it could not parse, and it is
+called inside the `AgentGateway` constructor. So a misplaced brace in
+`.raiker/hooks.json` — owner-authored text on disk, with no editor and no
+validation anywhere in the product — made **every turn in Raiker fail** with a
+raw `JSONDecodeError`, and nothing on any surface said which file was wrong.
+
+Reproduced before the fix: writing `{ broken` into `.raiker/hooks.json` and
+constructing an `AgentGateway` raised `JSONDecodeError` at line 1 column 3.
+
+**Root cause.** Fail-closed was applied at the wrong scope. Refusing to guess at
+a config Raiker cannot read is right; taking the whole runtime down with it, and
+saying nothing, is not.
+
+`HooksRegistry.load` now records a `HookSourceStatus` per source — path, scope,
+whether it exists, whether it loaded, how many rules it contributed, and the
+parse error with its position. A source that fails contributes no rules; every
+other source loads normally; the runtime is untouched.
+`HooksRegistry.from_config` still raises, because a caller handing over a config
+in memory wants to be told it is invalid rather than handed an empty registry.
+
+**Reference-platform decision.** **Yes — beyond.** The
+[Claude Code hooks reference](https://code.claude.com/docs/en/hooks) documents
+that an invalid hooks config "fails silently or logs errors". Raiker names the
+file, the line and column, states that its rules did not load, and keeps working.
+
+**Evidence.** `tests/test_hooks_surface.py` — the malformed file loads no rules
+and does not raise, the gateway constructs, a broken file does not discard a good
+one, and `from_config` still refuses an invalid config. Verified live: with
+`{ "schema_version": "1.0", "hooks": { broken }` on disk, a real Anthropic turn
+returned "hooks ok" and the Hooks tab reported `invalid_json:1:39`.
+
+## FIXED-253 — Hooks enforced things nothing could see
+
+**Severity: Medium. Area: hooks / Extensions. Fixed 2026-08-22.**
+
+Hooks were the one extension surface with a real, enforcing backend and no owner
+surface at all: nine dispatched lifecycle events, a `PreToolUse` deny that
+short-circuits to a denied `PolicyDecision` — and configuration by editing JSON on
+disk, observed only by reading the audit log by hand.
+
+`GET /api/hooks` and Extensions → **Hooks** now report what the runtime actually
+loaded. The panel is exact about the three ways a configured hook still does
+nothing, because each is a safeguard the owner would otherwise believe was in
+place:
+
+- **A file that did not parse** is named with the position the parse stopped at
+  (FIXED-252), and says its rules are not loaded.
+- **A rule whose event this build never emits** is marked *configured but never
+  fires*. `DISPATCHED_HOOK_EVENTS` is published beside `HOOK_EVENTS`, and
+  `tests/test_hooks_surface.py` derives the real call sites from the source and
+  asserts they match, so the published set cannot drift from the code.
+- **A rule that cannot change an outcome** reads **Observes only** rather than
+  looking enforcing. Only `PreToolUse` and `PreCompact` decisions are honoured,
+  and only from a handler holding decision authority — so the label is computed
+  per rule from the event *and* its handlers, not from the event alone.
+
+A fourth case was found while building it and closed with the rest: a `builtin`
+handler naming a name this build does not ship raises at dispatch and is recorded
+as `hook_failed`. It was being counted as enforcing. It is now reported as
+unavailable, excluded from "can decide", and the builtin names that do exist are
+published beside the event catalogue — the file is written by hand, so guessing a
+name produced a rule that failed every time it matched.
+
+The panel is read-only on purpose. The three config files are the owner's own
+text, and a page that rewrote them would need an authority story it does not have.
+
+**Reference-platform decision.** The browser itself is **No — parity**: Claude
+Code's `/hooks` is a read-only browser over the same material, and Raiker had
+nothing. **Yes — beyond** for the three honesty rows above; the dead-rule marking
+is a differentiator in kind while also being a consequence of Raiker emitting
+nine events where the reference emits about thirty-one, and this document says so
+rather than claiming the gap as a feature. Raiker hooks may also only ever
+*tighten* — `combine()` accepts `deny` and `ask` from an authoritative handler and
+nothing else — where a Claude Code hook can return `permissionDecision: "allow"`
+and grant.
+
+**Evidence.** `tests/test_hooks_surface.py` (10 tests),
+`apps/web/src/lib/views/ExtensionsHooks.test.ts` (7 tests), the mocked Playwright
+suite's Hooks-tab spec including an axe pass, and live captures in
+`docs/plans/screenshots/working/r0821c-*.png`. Verified live against a running
+host: a Build turn's tool call produced `hook_matched → hook_decision →
+hook_failed`, and the panel showed all three.
+
+**One UI defect fixed in the same pass.** The first version quieted a dead rule
+with `opacity: 0.78`, which dropped its note text and scope chip to a 3.45:1
+contrast ratio — below the 4.5:1 floor — and the mocked suite's axe check caught
+it. Emphasis now drops through a dashed border and a sunken background, and the
+rule stays readable.

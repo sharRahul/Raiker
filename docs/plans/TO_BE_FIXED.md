@@ -66,6 +66,9 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
 | [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | Open — raised 2026-08-21 |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
+| [BUG-221](#bug-221--a-plugin-is-recorded-and-then-provides-nothing) | Medium | Plugins / extensibility | Open — raised 2026-08-22 |
+| [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | Open — raised 2026-08-22 |
+| [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | Open — raised 2026-08-22 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -469,3 +472,102 @@ task at a time.
 - A forwarded approval must not expire silently. Cowork auto-denies an unanswered
   prompt after ten minutes; if Raiker adopts that, the expiry has to be a
   **recorded decision with its reason**, not a dropped request.
+
+---
+
+## BUG-221 — A plugin is recorded and then provides nothing
+
+**Severity: Medium. Area: plugins / extensibility. Status: Open — raised
+2026-08-22 while closing the hooks half of the same gap.**
+
+**Observed.** Installing a plugin validates its manifest, checks its supply
+chain, resolves its signature to `verified` / `present_only` / `unsigned`, writes
+a `PluginInstallRecord`, and shows all of that on Extensions → Plugins. Then
+nothing happens. `PluginRegistrationPlan.execution_enabled` is `False` by
+construction, so a plugin contributes no skill, no agent, no hook, no MCP server
+and no panel. The tab says so, which is right — but the surface as a whole reads
+as an install flow for something that cannot be installed.
+
+Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers;
+Cowork installs them from **Customize**. This is the largest remaining piece of
+the hooks → plugins → channels gap.
+
+**Root cause.** Not packaging — `raiker/plugins/` already does the hard parts of
+that. The blocking question is what a plugin's *code* is allowed to be. Every
+other extension surface answers it: a skill is instructions and runs nothing, a
+connector is a brokered tool with a capability gate, a hook is argv resolved
+inside the workspace under a bounded timeout. A plugin has no such answer yet.
+
+**Proposed fix, and the constraint that decides its shape.** Take the pieces in
+the order their authority story is already written:
+
+1. **Plugin-bundled hooks first.** A hook already has a scope (`plugin` is in
+   `HOOK_SCOPES` and unused), an execution model, a timeout and an audit trail.
+   A plugin that may only contribute hook rules gains real capability without
+   inventing a new execution surface — and `HOOK_SCOPES` ordering already means a
+   plugin rule can never override a managed deny.
+2. **Then skills**, which run nothing and need only provenance.
+3. **Then MCP servers**, which are already brokered and gated.
+4. **Plugin panels last**, because they need a route, permission and
+   accessibility contract that does not exist.
+
+What must not happen is a general "plugin code runs" step. Each contribution
+should arrive through a surface that already governs it.
+
+---
+
+## BUG-222 — There is no way to turn every hook off
+
+**Severity: Low. Area: hooks. Status: Open — raised 2026-08-22.**
+
+**Observed.** Hooks are loaded from `config/managed-hooks.json`,
+`config/hooks.json` and `.raiker/hooks.json`. The only way to stop them is to
+edit or delete the files. Claude Code has `disableAllHooks` in settings and
+`--settings '{"disableAllHooks": true}'` for a single run.
+
+This matters more here than there. `config/hooks.json` travels with a
+repository, so cloning a project can bring rules that run commands on the owner's
+machine — bounded and workspace-resolved, but still theirs to refuse. The owner
+should be able to say no without editing someone else's file.
+
+**Root cause.** `HookDispatcher.is_active()` reads only whether the registry has
+rules. There is no owner-scoped setting above it.
+
+**Proposed fix.** An owner setting that makes `is_active()` return `False`, shown
+on Extensions → Hooks with the rules still listed and marked as disabled — off is
+a state to display, not a reason to hide what would otherwise run. It belongs in
+owner settings rather than in any of the three config files, because a file a
+project ships must not be able to re-enable itself.
+
+---
+
+## BUG-223 — Twenty-two lifecycle events are specified and never emitted
+
+**Severity: Medium. Area: hooks / lifecycle. Status: Open — raised 2026-08-22.**
+
+**Observed.** `docs/HOOKS_SPEC.md` lists roughly the same event surface Claude
+Code documents. Nine are dispatched: `SessionStart`, `UserPromptSubmit`,
+`PreCompact`, `PostCompact`, `PreToolUse`, `PostToolUse`, `PostToolUseFailure`,
+`PermissionRequest`, `PermissionDenied`. `SessionEnd` is accepted by the config
+schema and has no call site at all; the rest are not in `HOOK_EVENTS`, so a rule
+naming one is refused at parse time.
+
+The immediate harm — a rule that parses and silently never runs — is now
+surfaced: `DISPATCHED_HOOK_EVENTS` is published, a test derives it from the call
+sites so it cannot drift, and the Hooks tab marks such a rule as configured but
+never firing. That makes the gap visible; it does not close it.
+
+**Proposed fix, in the order the call sites already exist.**
+
+- **`Stop` / `StopFailure`** — the orchestrator already knows when a turn ends
+  and why. Both are blocking events in the reference set, which makes them the
+  most useful of the missing ones.
+- **`SubagentStart` / `SubagentStop`** — `spawn_subagent` has both boundaries.
+- **`TaskCreated` / `TaskCompleted`** — `TaskManager` already emits
+  `task_created`; the hook point is beside it.
+- **`SessionEnd`** — needs a decision about what ends a web session before it can
+  have a call site, which is why it is last despite already being in the schema.
+
+Each one is published as dispatched only when the derivation test in
+`tests/test_hooks_surface.py` can find its call site, so the surface cannot claim
+an event the runtime does not emit.

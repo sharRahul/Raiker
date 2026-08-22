@@ -479,6 +479,18 @@ async def set_capability_containment(
         ) from None
 
 
+@router.get("/api/hooks")
+async def list_hooks(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """Configured hooks, whether each can fire, and what they have done.
+
+    Read-only. The config files are the owner's own text on disk; this route
+    reports what the runtime loaded from them, including a file it could not read.
+    """
+    return _service(request).list_hooks(auth_data[1].delegated_by_user_id)
+
+
 @router.get("/api/plugins")
 async def list_plugins(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)

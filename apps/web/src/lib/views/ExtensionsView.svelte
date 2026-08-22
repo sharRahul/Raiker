@@ -25,6 +25,7 @@
     ApprovalView,
     ExtensionView,
     ExtensionsOverview,
+    HooksView,
     PluginsView,
   } from "../apiTypes";
   import { relativeTime } from "../format";
@@ -38,6 +39,22 @@
   // signing posture, so `verified` and `present only` never look identical.
   let plugins = $state<PluginsView | null>(null);
   let pluginsError = $state<string | null>(null);
+  // Hooks had a real enforcing backend and no surface at all: they were written
+  // into JSON on disk and observed only by reading the audit log by hand. This
+  // reads what the runtime actually loaded, which is the only version of the
+  // answer worth showing — including a config file it could not parse.
+  let hooks = $state<HooksView | null>(null);
+  let hooksError = $state<string | null>(null);
+
+  async function loadHooks() {
+    try {
+      hooks = await api.hooks();
+      hooksError = null;
+    } catch (error) {
+      hooks = null;
+      hooksError = error instanceof ApiError ? error.message : "Hook configuration is unavailable.";
+    }
+  }
 
   async function loadPlugins() {
     try {
@@ -69,6 +86,7 @@
       connectors: "Connectors",
       mcp: "MCP servers",
       skills: "Skills",
+      hooks: "Hooks",
       plugins: "Plugins",
       channels: "Channels",
     }[id] as string,
@@ -167,6 +185,7 @@
   onMount(() => {
     void load();
     void loadPlugins();
+    void loadHooks();
   });
 </script>
 
@@ -330,6 +349,173 @@
   <div id="panel-skills" role="tabpanel" aria-labelledby="tab-skills">
     <SkillsView />
   </div>
+{:else if tab === "hooks"}
+  <div id="panel-hooks" role="tabpanel" aria-labelledby="tab-hooks">
+    <section class="card">
+      <h2>Hooks</h2>
+      <p class="note">
+        A hook runs your own logic at a point in a turn. It can only make an action
+        <strong>stricter</strong> — a hook may deny a tool call or turn it into a decision, and can
+        never allow one the runtime refused, skip an approval, or reach past the tool broker.
+      </p>
+      {#if hooks === null}
+        <p class="note">{hooksError ?? "Reading hook configuration…"}</p>
+      {:else}
+        <p class="posture" class:posture-warn={hooks.failed_sources.length > 0}>
+          {#if hooks.failed_sources.length > 0}
+            {hooks.failed_sources.length} configuration
+            {hooks.failed_sources.length === 1 ? "file" : "files"} could not be read, so
+            {hooks.failed_sources.length === 1 ? "its rules are" : "their rules are"} not loaded.
+          {:else if hooks.active}
+            {hooks.rule_count} {hooks.rule_count === 1 ? "rule is" : "rules are"} loaded and active.
+          {:else}
+            No hooks are configured, so the runtime behaves exactly as it does without them.
+          {/if}
+        </p>
+
+        {#if hooks.failed_sources.length > 0}
+          <ul class="hook-errors">
+            {#each hooks.failed_sources as source (source.path)}
+              <li>
+                <code>{source.path}</code>
+                <span class="note">{source.error}</span>
+              </li>
+            {/each}
+          </ul>
+          <p class="note">
+            A file Raiker cannot read contributes no rules rather than being guessed at. Everything
+            else keeps working — fix the file and reload this page.
+          </p>
+        {/if}
+      {/if}
+    </section>
+
+    {#if hooks !== null && hooks.rules.length > 0}
+      <section class="card">
+        <h2>Configured rules</h2>
+        <ul class="hook-list">
+          {#each hooks.rules as rule (rule.rule_id)}
+            <li class:hook-dead={!rule.dispatched}>
+              <div class="hook-head">
+                <strong>{rule.event}</strong>
+                <code class="matcher">{rule.matcher}</code>
+                {#if rule.if_guard}<code class="matcher">if {rule.if_guard}</code>{/if}
+                <span class="hook-scope">{rule.scope}</span>
+                {#if rule.can_decide}
+                  <span class="hook-tag hook-tag-decides">Can deny or ask</span>
+                {:else if rule.dispatched}
+                  <span class="hook-tag">Observes only</span>
+                {/if}
+              </div>
+              <span class="note">{rule.event_summary}</span>
+              {#if !rule.dispatched}
+                <span class="note hook-warn">
+                  This build never emits {rule.event}, so this rule is configured but never fires.
+                </span>
+              {/if}
+              <ul class="handler-list">
+                {#each rule.handlers as handler (handler.id)}
+                  <li>
+                    <span class="handler-type">{handler.type}</span>
+                    <code>{handler.target}</code>
+                    <span class="note">{handler.timeout_ms} ms</span>
+                    {#if !handler.available}
+                      <span class="note hook-warn">
+                        no builtin by this name in this build — it will fail every time it matches
+                      </span>
+                    {:else if !handler.decision_authority}
+                      <span class="note">advisory</span>
+                    {/if}
+                  </li>
+                {/each}
+              </ul>
+              {#if rule.source}<span class="note">from <code>{rule.source}</code></span>{/if}
+            </li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
+
+    {#if hooks !== null}
+      <section class="card">
+        <h2>What fires, and what it can change</h2>
+        <p class="note">
+          Every event a configuration file may name. A rule written for an event this build does not
+          emit parses cleanly and never runs, which is why the list says which is which.
+        </p>
+        <ul class="event-list">
+          {#each hooks.events as event (event.event)}
+            <li class:event-dead={!event.dispatched}>
+              <strong>{event.event}</strong>
+              <span
+                class="hook-tag"
+                class:hook-tag-decides={event.can_decide}
+                class:hook-tag-dead={!event.dispatched}
+              >
+                {event.dispatched
+                  ? event.can_decide
+                    ? "Decides"
+                    : "Observes"
+                  : "Never fires"}
+              </span>
+              <span class="note">{event.summary}</span>
+            </li>
+          {/each}
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Built-in handlers</h2>
+        <p class="note">
+          Raiker's own code, so a builtin always carries decision authority. A rule naming anything
+          else parses, matches, and then fails every time.
+        </p>
+        <ul class="event-list">
+          {#each hooks.builtins as builtin (builtin)}
+            <li><strong>{builtin}</strong></li>
+          {/each}
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>Recent hook activity</h2>
+        {#if hooks.activity.length === 0}
+          <p class="note">
+            No hook has matched, run, decided, timed out or failed in the recorded history.
+          </p>
+        {:else}
+          <ul class="activity-list">
+            {#each hooks.activity as entry (entry.event_id)}
+              <li>
+                <span class="hook-tag">{entry.event_type.replace("hook_", "")}</span>
+                <span class="note">{relativeTime(entry.timestamp)}</span>
+                {#if entry.summary}<span class="note">{entry.summary}</span>{/if}
+              </li>
+            {/each}
+          </ul>
+        {/if}
+        <p class="note">
+          Every match, run, decision, timeout and failure is in the append-only record.
+          <a href="#/observe?tab=activity">Open the audit log →</a>
+        </p>
+      </section>
+    {/if}
+
+    <!-- Not `deferred`: hooks are not a missing feature, they are a working one
+         configured somewhere else. The class is for surfaces that do not exist
+         yet, and borrowing it here would have said the wrong thing (and rendered
+         narrower than every card above it). -->
+    <section class="card">
+      <h2>Hooks are configured in a file, not here</h2>
+      <p class="measure">
+        Raiker reads <code>config/managed-hooks.json</code>, <code>config/hooks.json</code> and
+        <code>.raiker/hooks.json</code>, in that order of authority. A lower scope can never
+        override a higher-scope deny. This page reports what the runtime loaded; it does not edit
+        those files, because a surface that rewrote your own configuration would need an authority
+        story it does not have yet.
+      </p>
+    </section>
+  </div>
 {:else if tab === "plugins"}
   <div id="panel-plugins" role="tabpanel" aria-labelledby="tab-plugins">
     <section class="card" data-testid="plugin-signing-posture">
@@ -400,6 +586,131 @@
 {/if}
 
 <style>
+  .hook-list,
+  .event-list,
+  .activity-list,
+  .hook-errors {
+    list-style: none;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-2);
+  }
+  .hook-list > li,
+  .hook-errors > li {
+    display: grid;
+    gap: 0.3rem;
+    padding: var(--space-3);
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-md);
+  }
+  /* The event catalogue is a reference list, not a set of findings. Ten bordered
+     cards for ten one-line facts read as ten things to deal with, and pushed the
+     recent-activity section a screen and a half down the page. */
+  .event-list {
+    gap: 0;
+  }
+  .event-list > li {
+    display: grid;
+    grid-template-columns: minmax(9rem, auto) auto minmax(0, 1fr);
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: 0.32rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .event-list > li:last-child {
+    border-bottom: 0;
+  }
+  .event-list > li.event-dead strong {
+    color: var(--text-3);
+  }
+  .hook-tag-dead {
+    border-style: dashed;
+  }
+  @media (max-width: 47rem) {
+    .event-list > li {
+      grid-template-columns: minmax(0, 1fr) auto;
+    }
+    .event-list > li .note {
+      grid-column: 1 / -1;
+    }
+  }
+  /* A rule that can never fire is not an error — the file is valid and a later
+     build may emit the event — so it is quieted rather than flagged red.
+     Quieted by *border*, never by opacity: dimming the subtree took the note
+     text and the scope chip below the 4.5:1 contrast floor, which axe caught.
+     The rule still has to be readable; it is the emphasis that drops, and the
+     warning line inside it says the rest. */
+  .hook-list > li.hook-dead {
+    border-style: dashed;
+    background: var(--sunken);
+  }
+  .hook-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-2);
+  }
+  .hook-scope {
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-3);
+  }
+  .hook-tag {
+    padding: 0.1rem 0.45rem;
+    border: 1px solid var(--neutral-border);
+    border-radius: var(--r-pill);
+    background: var(--sunken);
+    color: var(--text-3);
+    font-size: 0.68rem;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .hook-tag-decides {
+    border-color: var(--accent-border);
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .hook-warn {
+    color: var(--warn);
+  }
+  .matcher,
+  .handler-type {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+  }
+  .handler-list {
+    list-style: none;
+    margin: 0.2rem 0 0;
+    padding: 0;
+    display: grid;
+    gap: 0.25rem;
+  }
+  .handler-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+  .handler-type {
+    padding: 0.05rem 0.35rem;
+    border-radius: var(--r-sm);
+    background: var(--sunken);
+    color: var(--text-2);
+  }
+  .activity-list li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: 0.3rem 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .activity-list li:last-child {
+    border-bottom: 0;
+  }
   .plugin-list {
     list-style: none;
     margin: var(--space-3) 0 0;
@@ -527,5 +838,8 @@
   .note { color: var(--text-3); font-size: 0.78rem; margin: 0; }
   hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
   .deferred { max-width: 46rem; }
+  /* A reading measure for one prose paragraph, without borrowing `deferred`'s
+     meaning to get it. */
+  .measure { max-width: 46rem; }
   .deferred h2 { margin-top: 0; }
 </style>

@@ -64,6 +64,7 @@ import type {
   ModelOperation,
   PartialFiles,
   PluginsView,
+  HooksView,
   RuntimeInstallPlan,
   ModelLibraryView,
   HuggingFaceSearchResult,
@@ -762,6 +763,9 @@ export const api = {
       {},
     ),
   plugins: () => request<PluginsView>("/api/plugins"),
+  // Read-only. The hook config files are the owner's own text on disk; this
+  // reports what the runtime loaded from them, including one it could not read.
+  hooks: () => request<HooksView>("/api/hooks"),
   verifySecurityCredential: (provider: string) =>
     postJson<CredentialLifecycle>(
       `/api/security/credentials/${encodeURIComponent(provider)}/verify`,

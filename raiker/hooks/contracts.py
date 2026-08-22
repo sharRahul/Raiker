@@ -17,6 +17,52 @@ HOOK_EVENTS = {
     "PermissionRequest",
     "PermissionDenied",
 }
+
+#: The events this build actually emits. `HOOK_EVENTS` is what a config file may
+#: name; this is what the runtime really dispatches, and the two are not the same
+#: set — `SessionEnd` is accepted by the schema and has no call site, so a rule
+#: written for it never fires.
+#:
+#: A configured rule that can never run is the worst kind of safeguard: the owner
+#: believes a guard is in place and there is nothing to observe that says
+#: otherwise. Rather than accept it silently or reject it outright (a config that
+#: works on a later build should not fail to parse on this one), the set is
+#: published so every surface that lists hooks can mark such a rule as configured
+#: but never fired.
+#:
+#: `tests/test_hooks_surface.py` derives the real call sites from the source and
+#: asserts they equal this set, so it cannot drift from the code.
+DISPATCHED_HOOK_EVENTS = {
+    "SessionStart",
+    "UserPromptSubmit",
+    "PreCompact",
+    "PostCompact",
+    "PreToolUse",
+    "PostToolUse",
+    "PostToolUseFailure",
+    "PermissionRequest",
+    "PermissionDenied",
+}
+
+#: One line per event, in the owner's language, for the surfaces that list them.
+HOOK_EVENT_SUMMARIES = {
+    "SessionStart": "A conversation is created.",
+    "SessionEnd": "A conversation ends.",
+    "UserPromptSubmit": "A prompt is submitted, before the turn runs.",
+    "PreCompact": "Before older exchanges are compacted out of the context window.",
+    "PostCompact": "After compaction, with what it produced.",
+    "PreToolUse": "Before policy finalises a tool call. The only event that can change the outcome.",
+    "PostToolUse": "A tool call finished successfully.",
+    "PostToolUseFailure": "A tool call failed.",
+    "PermissionRequest": "An approval is about to be raised.",
+    "PermissionDenied": "A tool call was denied.",
+}
+
+#: The one event whose decision the runtime honours. Every other event is
+#: observation only, so a handler that returns `deny` on `PostToolUse` changes
+#: nothing — which the hooks surface has to say rather than imply.
+DECIDING_HOOK_EVENTS = {"PreToolUse", "PreCompact"}
+
 HANDLER_TYPES = {"command", "builtin"}
 HOOK_DECISIONS = {"allow", "deny", "ask", "defer", "no_decision", "add_context_only"}
 # Highest authority first. A lower scope can never override a higher-scope deny.

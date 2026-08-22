@@ -2939,6 +2939,154 @@ class DashboardService:
             raise ValueError(f"unknown_containment_action:{action}")
         return view.to_dict()
 
+    #: Event types the dispatcher writes, newest-first, for the hooks surface.
+    _HOOK_EVENT_TYPES = (
+        "hook_matched",
+        "hook_executed",
+        "hook_decision",
+        "hook_timeout",
+        "hook_failed",
+    )
+
+    def list_hooks(self, user_id: str | None = None) -> dict[str, Any]:
+        """What hooks are configured, whether they can fire, and what they did.
+
+        Hooks were the one extension surface with a real, enforcing backend and no
+        way to see it: they were configured by editing JSON on disk and observed
+        only by reading the audit log by hand. Three things have to be true of
+        this view for it to be worth more than that file:
+
+        1. **A file Raiker could not read is visible.** A malformed hooks config
+           contributes no rules by design; saying nothing about it would leave the
+           owner believing a guard is in place that is not.
+        2. **A rule that can never fire says so.** `HOOK_EVENTS` is what the schema
+           accepts; `DISPATCHED_HOOK_EVENTS` is what this build emits, and a rule
+           on the difference is configured but dead.
+        3. **A rule that cannot change an outcome says so.** Only `PreToolUse` and
+           `PreCompact` decisions are honoured, and only from a handler holding
+           decision authority. Everything else observes.
+
+        Read-only. Nothing here edits a hook: the config files are the owner's own
+        text, and a surface that rewrote them would need its own authority story.
+        """
+        from raiker.hooks.contracts import (
+            DECIDING_HOOK_EVENTS,
+            DISPATCHED_HOOK_EVENTS,
+            HOOK_EVENT_SUMMARIES,
+            HOOK_EVENTS,
+            HOOK_SCOPES,
+            HookHandler,
+        )
+        from raiker.hooks.handlers.builtin import BUILTIN_HANDLERS
+        from raiker.hooks.registry import HooksRegistry
+
+        registry = HooksRegistry.load(self.workspace_root)
+        rules: list[dict[str, Any]] = []
+        for index, rule in enumerate(
+            sorted(registry.rules, key=lambda r: (HOOK_SCOPES.index(r.scope), r.event, r.matcher))
+        ):
+            source = next(
+                (
+                    entry.path
+                    for entry in registry.sources
+                    if entry.scope == rule.scope and entry.loaded
+                ),
+                None,
+            )
+            dispatched = rule.event in DISPATCHED_HOOK_EVENTS
+            deciding = rule.event in DECIDING_HOOK_EVENTS
+            # A builtin naming a handler this build does not have raises at
+            # dispatch time and is recorded as `hook_failed`. The config parses,
+            # the rule matches, and nothing happens — so it is the same class of
+            # dead rule as an event that is never emitted, and is reported the
+            # same way rather than being left to look enforcing.
+            def _available(handler: HookHandler) -> bool:
+                return handler.type != "builtin" or (handler.builtin or "") in BUILTIN_HANDLERS
+
+            authoritative = any(
+                (handler.decision_authority or handler.type == "builtin")
+                and _available(handler)
+                for handler in rule.handlers
+            )
+            rules.append(
+                {
+                    # Stable within one read, which is all a list key needs; hook
+                    # rules have no identity of their own in the config format.
+                    "rule_id": f"{rule.scope}:{rule.event}:{index}",
+                    "event": rule.event,
+                    "event_summary": HOOK_EVENT_SUMMARIES.get(rule.event, ""),
+                    "matcher": rule.matcher,
+                    "if_guard": rule.if_guard,
+                    "scope": rule.scope,
+                    "source": source,
+                    "dispatched": dispatched,
+                    # A rule can only change an outcome when the event is one the
+                    # runtime asks about *and* a handler on it holds authority.
+                    "can_decide": dispatched and deciding and authoritative,
+                    "handlers": [
+                        {
+                            "id": handler.id,
+                            "type": handler.type,
+                            "target": (
+                                " ".join(handler.command)
+                                if handler.type == "command" and handler.command
+                                else (handler.builtin or "")
+                            ),
+                            "timeout_ms": handler.timeout_ms,
+                            # A builtin is Raiker's own code and always carries
+                            # authority; a command carries it only when the owner
+                            # said so in the config.
+                            "decision_authority": (
+                                handler.decision_authority or handler.type == "builtin"
+                            )
+                            and _available(handler),
+                            # False only for a builtin this build does not ship.
+                            # A command's program is resolved at dispatch time
+                            # inside the workspace, so it is not checked here.
+                            "available": _available(handler),
+                        }
+                        for handler in rule.handlers
+                    ],
+                }
+            )
+
+        activity: list[dict[str, Any]] = []
+        counts: dict[str, int] = {}
+        for event_type in self._HOOK_EVENT_TYPES:
+            rows = self.store.list_event_index(event_type=event_type, limit=50)
+            counts[event_type] = len(rows)
+            for row in rows:
+                activity.append(
+                    {
+                        "event_id": str(row["event_id"]),
+                        "event_type": event_type,
+                        "session_id": str(row.get("session_id", "")),
+                        "timestamp": str(row.get("timestamp", "")),
+                        "summary": row.get("summary"),
+                    }
+                )
+        activity.sort(key=lambda entry: entry["timestamp"], reverse=True)
+
+        return {
+            "active": not registry.is_empty(),
+            "rule_count": len(rules),
+            "rules": rules,
+            "sources": [entry.to_dict() for entry in registry.sources],
+            "failed_sources": [entry.to_dict() for entry in registry.failed_sources()],
+            "events": [
+                {
+                    "event": event,
+                    "summary": HOOK_EVENT_SUMMARIES.get(event, ""),
+                    "dispatched": event in DISPATCHED_HOOK_EVENTS,
+                    "can_decide": event in DECIDING_HOOK_EVENTS,
+                }
+                for event in sorted(HOOK_EVENTS)
+            ],
+            "builtins": sorted(BUILTIN_HANDLERS),
+            "activity": activity[:40],
+            "activity_counts": counts,
+        }
+
     def list_plugins(self) -> dict[str, Any]:
         """Installed plugin records plus this workspace's signing posture (BUG-79).
 

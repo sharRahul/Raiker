@@ -130,3 +130,22 @@ plan with execution disabled).
 
 The remaining pieces to complete this model are plugin execution and channel transport; both
 must register through — and be gated by — the existing broker/policy/event infrastructure.
+
+## Where each surface is seen
+
+An extension surface that cannot be inspected is one the owner has to take on
+trust, which is the opposite of what this model is for.
+
+| Surface | Owner surface | State |
+|---|---|---|
+| Connectors | Extensions → Connectors | Install, connect, enable, and the four facts behind "usable" |
+| MCP servers | Extensions → MCP servers | Create, connect, monitor |
+| Skills | Extensions → Skills | Install and review; grants nothing and runs no code |
+| Hooks | Extensions → **Hooks** | Read-only: what loaded, what can fire, what can decide, what it did |
+| Plugins | Extensions → Plugins | Install records and signature level; **no plugin code executes** |
+| Channels | Extensions → Channels | Named as unavailable rather than silently missing |
+
+Hooks are read-only on purpose. The three configuration files are the owner's own
+text on disk, and a page that rewrote them would need an authority story of its
+own — so the surface reports what the runtime loaded, including a file it could
+not read, and leaves the editing where the owner already has it.

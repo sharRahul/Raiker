@@ -297,6 +297,18 @@ Highlights, each verified against a live instance:
   fact rather than an inference — and it selects a working method only: every
   gate, decision mode, approval and tool is identical on both surfaces.
 
+- **Hooks you can see, not just write** — a hook runs your own logic at a point
+  in a turn and may only ever make an action *stricter*: it can deny a tool call
+  or turn it into a decision, and can never allow one the runtime refused. They
+  are configured in a file, and Extensions → **Hooks** reports what the runtime
+  actually loaded from it — including the three ways a rule you wrote still does
+  nothing. A file that did not parse is named with the position the parse stopped
+  at, and contributes no rules rather than being guessed at. A rule on an event
+  this build never emits is marked configured-but-never-fires. A rule that cannot
+  change an outcome reads **Observes only** instead of looking enforcing, and one
+  naming a builtin this build does not ship says so rather than being counted as a
+  guard. Every match, run, decision, timeout and failure is in the audit log.
+
 - **Governed voice in Chat and Build** — dictate into the normal editable
   composer, finish or cancel without sending, then explicitly send through the
   same prompt path as typed text. Completed replies can be read aloud manually;
@@ -317,6 +329,19 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-21:
   speaking, interruption and hands-free task control remain future work; spoken
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
+
+- **Hooks run; plugins and channels do not.** Of the three extension surfaces
+  Claude Code ships, hooks are real here: nine lifecycle events are dispatched,
+  `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
+  `command` handlers execute under a bounded timeout with the program resolved
+  inside the workspace. What is not built is the rest of the surface: `SessionEnd`
+  is accepted by the schema and never emitted (the Hooks tab marks a rule on it as
+  dead rather than letting it look enforcing), the `http`, `mcp_tool`, `prompt`
+  and `agent` handler types need network, model and subagent surfaces that are
+  still gated, **no plugin code executes** — a plugin is validated, signature-
+  checked and recorded, and provides nothing to the runtime — and channel
+  activation stays off. Each is absent from the interface rather than shown
+  disabled. Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221.
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each

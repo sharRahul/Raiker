@@ -79,6 +79,38 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/sessions") body = [];
       else if (path === "/api/approvals") body = [];
       else if (path === "/api/capabilities") body = [];
+      // One configured rule that enforces, one that never fires, and one file
+      // that did not parse: the three states the Hooks panel exists to tell
+      // apart, so a redesign that collapses them fails here.
+      else if (path === "/api/hooks") body = {
+        active: true,
+        rule_count: 2,
+        rules: [
+          {
+            rule_id: "project:PreToolUse:0", event: "PreToolUse",
+            event_summary: "Before policy finalises a tool call.",
+            matcher: "shell", if_guard: "shell(rm -rf *)", scope: "project",
+            source: "config/hooks.json", dispatched: true, can_decide: true,
+            handlers: [{ id: "guard", type: "builtin", target: "block_destructive_shell", timeout_ms: 5000, decision_authority: true, available: true }],
+          },
+          {
+            rule_id: "local:SessionEnd:1", event: "SessionEnd",
+            event_summary: "A conversation ends.",
+            matcher: "*", if_guard: null, scope: "local",
+            source: ".raiker/hooks.json", dispatched: false, can_decide: false,
+            handlers: [{ id: "on-end", type: "command", target: "scripts/end.sh", timeout_ms: 5000, decision_authority: false, available: true }],
+          },
+        ],
+        sources: [{ path: "config/hooks.json", scope: "project", exists: true, loaded: true, rule_count: 1, error: null }],
+        failed_sources: [{ path: "config/managed-hooks.json", scope: "managed", exists: true, loaded: false, rule_count: 0, error: "invalid_json:2:5" }],
+        events: [
+          { event: "PreToolUse", summary: "Before policy finalises a tool call.", dispatched: true, can_decide: true },
+          { event: "SessionEnd", summary: "A conversation ends.", dispatched: false, can_decide: false },
+        ],
+        builtins: ["block_destructive_shell"],
+        activity: [{ event_id: "evt_1", event_type: "hook_decision", session_id: "sess_1", timestamp: new Date().toISOString(), summary: "deny" }],
+        activity_counts: { hook_decision: 1 },
+      };
       await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
       return;
     }
@@ -200,6 +232,30 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.screenshot({ path: join(shots, "bug15-build-composer.png"), fullPage: true });
+});
+
+test("the Hooks tab tells an enforcing rule from a dead one and a broken file", async ({ page }) => {
+  await page.goto("http://raiker.test/#/extensions?tab=hooks");
+
+  await expect(page.getByRole("heading", { name: "Hooks", exact: true })).toBeVisible();
+
+  // 1. A file the runtime could not read is visible rather than silent.
+  await expect(page.getByText(/could not be read/i)).toBeVisible();
+  await expect(page.getByText("invalid_json:2:5")).toBeVisible();
+
+  // 2. A rule that enforces is separated from one that only observes …
+  await expect(page.getByText("Can deny or ask")).toBeVisible();
+
+  // 3. … and from one whose event this build never emits.
+  await expect(
+    page.getByText(/never emits SessionEnd, so this rule is configured but never fires/i),
+  ).toBeVisible();
+
+  // The builtin names an owner may write in the file, since there is no form.
+  await expect(page.getByRole("heading", { name: "Built-in handlers" })).toBeVisible();
+
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  await page.screenshot({ path: join(shots, "hooks-tab.png"), fullPage: true });
 });
 
 test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {

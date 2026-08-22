@@ -45,6 +45,7 @@ import type {
   InstanceLaunchResult,
   InterruptResult,
   McpAgentAccess,
+  ChannelsView,
   McpOffer,
   McpServer,
   McpSession,
@@ -665,6 +666,46 @@ export const api = {
   // Owner-scoped. Create and test-connect run through the governed capability
   // (a disabled gate returns 403 disabled_by_capability_gate); rename and
   // delete are human-only owner-scoped operations.
+  // ── Channels (BUG-225) ──────────────────────────────────────────────────
+  // Read-only listing plus the owner's pairing controls. A test delivery goes
+  // through the governed `external_channel_runtime` capability, so a closed gate
+  // refuses it exactly as it would refuse a real one.
+  channels: () => request<ChannelsView>("/api/channels"),
+  pairChannel: (connector_id: string, display_name: string, senders: string[]) =>
+    postJson<{ ok: boolean; pairing_id: string; enabled: boolean }>("/api/channels/pairings", {
+      connector_id,
+      display_name,
+      senders,
+    }),
+  setChannelEnabled: (pairingId: string, enabled: boolean) =>
+    request<{ ok: boolean; enabled: boolean }>(
+      `/api/channels/pairings/${encodeURIComponent(pairingId)}/enabled`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled }),
+      },
+    ),
+  setChannelSenders: (pairingId: string, senders: string[]) =>
+    request<{ ok: boolean; sender_count: number }>(
+      `/api/channels/pairings/${encodeURIComponent(pairingId)}/senders`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ senders }),
+      },
+    ),
+  unpairChannel: (pairingId: string) =>
+    request<{ ok: boolean; removed: boolean }>(
+      `/api/channels/pairings/${encodeURIComponent(pairingId)}`,
+      { method: "DELETE" },
+    ),
+  deliverChannelTest: (connector_id: string, url: string, text: string) =>
+    postJson<{ ok: boolean; delivered: boolean }>("/api/channels/deliver-test", {
+      connector_id,
+      url,
+      text,
+    }),
   mcpServers: () => request<McpServer[]>("/api/mcp/servers"),
   // BUG-221 — servers installed plugins *offer*. An offer is a description, not
   // a connection: adding one posts to the ordinary create routes above, so the

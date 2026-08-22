@@ -374,6 +374,73 @@ def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path:
     assert "proposal_preview" not in skip_event["payload"]  # type: ignore[operator]
 
 
+# ── BUG-219: the unattended posture ──────────────────────────────────────────
+#
+# `dont_ask` is for a run with nobody watching: a scheduled routine at 06:00
+# cannot answer a prompt, and parking on one is not the same as declining. Three
+# properties, and each is a test.
+
+
+def test_dont_ask_declines_what_would_have_needed_approval(tmp_path: Path) -> None:
+    router = FakeRouter(
+        [
+            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+            ModelResponse(text="I could not do that.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="dont_ask")
+
+    response = _handle(orchestrator, envelope)
+
+    # Declined, not queued — and nothing was written.
+    assert not (tmp_path / "report.md").exists()
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_requested" not in events
+    assert "tool_started" not in events
+    assert response.status in {"completed", "denied"}
+
+
+def test_the_refusal_says_it_was_because_nobody_was_there_to_ask(tmp_path: Path) -> None:
+    router = FakeRouter(
+        [ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls")]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="dont_ask")
+
+    _handle(orchestrator, envelope)
+
+    # "The owner refused this" and "nobody was there to ask" call for different
+    # follow-ups, and only the second means re-running attended would work. The
+    # audit record has to tell them apart.
+    decision = _event_record(orchestrator, envelope.session_id, "policy_decision")
+    assert decision["payload"]["decision"] == "deny"  # type: ignore[index]
+    assert "denied_no_one_to_ask" in decision["payload"]["reasons"]  # type: ignore[index]
+
+
+def test_dont_ask_never_widens_a_gate(tmp_path: Path) -> None:
+    router = FakeRouter(
+        [
+            ModelResponse(
+                text="",
+                tool_calls=[ToolCallProposal("call_r", "read_file", {"path": "../secret.txt"})],
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("read outside", approval_mode="dont_ask")
+
+    response = _handle(orchestrator, envelope)
+
+    # A refusal posture can only ever refuse more, never less: an action policy
+    # already denied stays denied for policy's own reason, not this one.
+    assert response.status == "denied"
+    decision = _event_record(orchestrator, envelope.session_id, "policy_decision")
+    assert "denied_no_one_to_ask" not in decision["payload"]["reasons"]  # type: ignore[index]
+    assert "tool_started" not in _events(orchestrator, envelope.session_id)
+
+
 def test_outside_workspace_read_is_denied_even_when_approvals_are_skipped(tmp_path: Path) -> None:
     router = FakeRouter(
         [

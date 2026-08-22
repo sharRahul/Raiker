@@ -100,7 +100,12 @@ named as next, and settled the decision channels were blocked on.
 | Plugin-contributed panels | Claude Code plugins can ship UI surfaces | Not available. No route, permission or accessibility contract exists | **Behind** — BUG-228 |
 | Plugin-contributed LSP servers | Claude Code plugins bundle LSP servers | The manifest field is accepted and inert **because Raiker has no language-server surface at all**, not because a gate is closed | **Behind** — BUG-227 |
 | What a channel message is in a turn | OpenClaw treats channels as where external input enters, framed as guidance to the model | Accepted contract: untrusted content with a named sender who is not the owner; never a prompt, never able to raise the turn's authority, trust resolved from the pairing record | **Beyond** (FIXED-261) |
-| Channel delivery | OpenClaw ships inbound and outbound; Claude Code has no equivalent | Still none. Step 2 of 4 | **Behind** — BUG-225 |
+| Channel delivery | OpenClaw ships inbound and outbound; Claude Code has no equivalent | Outbound through a capability gate and an egress allowlist; inbound behind an owner secret with sender allowlisting, recorded untrusted and quarantined. All of it was built and **unreachable** — no way to pair — until the owner surface shipped | **At parity for transport** (FIXED-265) |
+| Separating linked / enabled / trusted / reachable | No cited reference separates them; a connector is configured and then it works | Four stored facts with four remedies, shown as four things: pairing, an enable switch, a sender allowlist, and three fail-closed gates named individually | **Beyond** (FIXED-265) |
+| Channel routing modes | OpenClaw routes an inbound message into work | Recorded and quarantined only. No routing mode is implemented, so a channel message never becomes work on its own | **Behind, deliberately** — BUG-225 |
+| Channel rate limits | Present in the reference set | None. An allowlisted sender is unbounded | **Behind** — BUG-225 |
+| Unattended approval posture | Claude Code's `dontAsk` auto-denies anything not already allowed by a rule. [Permissions](https://code.claude.com/docs/en/permissions) | `dont_ask`, a fourth composer mode: an otherwise-eligible action is refused rather than queued, so a scheduled run carries on with what it is allowed instead of parking | **At parity** (FIXED-262) |
+| Why an unattended action was refused | Not distinguished by any cited reference | `denied_no_one_to_ask`, named apart from "the owner denied this" and "this turn writes nothing" | **Beyond**, narrowly (FIXED-262) |
 
 ### Categorical confirmation — does this go beyond the reference set?
 
@@ -113,18 +118,25 @@ named as next, and settled the decision channels were blocked on.
 | Re-validating an offer on read, not only on write | **Yes — proven.** Otherwise the file the install wrote and the file the surface reads can diverge, and hand-editing becomes a bypass | Shipped (FIXED-260) |
 | Refusing a credential inside a contributed endpoint | **Yes.** A plugin author handing the owner a token to paste into a field not built to hold one is a realistic path to a leaked secret, and no cited reference refuses it | Shipped (FIXED-260) |
 | Deciding what a channel message **is** before building transport | **Yes — this is where Raiker should intend to lead.** Claude Code has no channel concept. OpenClaw's framing is guidance to the model rather than a structural envelope. ChatGPT Work's connectors and Hermes' inbound paths carry sender identity but no stated "cannot raise authority" rule. The transport is commodity; the contract is not | Shipped (FIXED-261) |
-| Shipping channel delivery in this round | **No — refused for now.** Step 1 exists; step 2 is outbound, which is the half with no inbound risk. Shipping inbound without pairing and allowlist enforcement would be the opposite of governed | Deferred to BUG-225 steps 2–4 |
+| Giving channels an owner surface | **Yes — and it corrected the round's premise.** Delivery was not missing; it was unreachable, because nothing let the owner pair a connector. The lesson generalises: a gap read as "unbuilt" should be checked against the code before it is built twice | Shipped (FIXED-265) |
+| Reporting each fail-closed gate separately | **Yes.** Three defaults refuse — the capability, the egress allowlist, the inbound secret — and each has a different remedy. Every cited reference collapses this into one enable switch, which is why "it's on and nothing happens" is a support question there and a readable page here | Shipped (FIXED-265) |
+| Routing an inbound message into a turn | **No — refused.** Recording and quarantining are the safe defaults, and the routing modes in `CHANNELS_SPEC.md` are a target rather than a description. Implementing them before rate limits and the relay story would be the wrong order | Open on BUG-225 |
+| Exempting booleans from key-based redaction | **Yes — small and general.** A filter that replaces `False` with a truthy marker does not protect a secret; it states the negation of a fact, and every client reads it confidently | Shipped (FIXED-266) |
 | A plugin panel that renders plugin-authored code | **No — refused.** "No plugin code runs in this browser" is a claim the Plugins tab makes in those words. A declarative panel keeps it literally true and makes the accessibility contract enforceable at render time | Recorded as the intended shape in BUG-228 |
 | Building an LSP client to satisfy a manifest field | **No — refused.** That is the tail wagging the dog. Whether Raiker wants a language-server client at all is a scope decision that comes first, and the codemap already answers part of the need | Recorded in BUG-227 |
+| A fourth approval mode that declines instead of asking | **No — parity**, and worth taking for exactly that reason: an owner arriving from Claude Code's `dontAsk` had no equivalent, and their unattended runs parked instead of proceeding | Shipped (FIXED-262) |
+| Naming *why* an unattended action was refused | **Yes — small, and free.** No cited reference separates "declined because nobody was watching" from "declined because you said no". Reading an unattended run's record afterwards, they are not the same fact: only one of them means running it again while watching would have worked | Shipped (FIXED-262) |
+| A detail line under every approval mode | **Yes — a consequence of the fourth mode.** *Skip* and *Decline* both mean "stop asking me" and do opposite things; a label alone cannot carry that, and a mode picker whose options can be misread is a safety surface that misinforms | Shipped (FIXED-262) |
 
 ### What is still behind, stated plainly (superseding the list above)
 
 * **Plugin panels.** The last contribution kind. Tracked as BUG-228, split out of
   BUG-221 so it can be worked on its own terms.
 * **Plugin LSP servers.** No surface exists to contribute to. Tracked as BUG-227.
-* **Channels.** Steps 2–4: outbound delivery, then paired and allowlisted
-  inbound, then the approval relay. The contract they have to satisfy now exists.
-  Tracked as BUG-225.
+* **Channels.** *Superseded:* outbound and inbound both existed and are now
+  reachable (FIXED-265). What is still behind is above the transport —
+  per-channel rate limits, the spec's routing modes, and resolving an approval
+  over a channel. Tracked as BUG-225.
 * **A marketplace or plugin directory.** Still not planned; installing from a
   path or URL with a reviewed permission diff is the local-first equivalent.
 * **Hook handler types.** Unchanged from the first pass. Tracked as BUG-226.

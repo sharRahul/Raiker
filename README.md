@@ -379,15 +379,19 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   the manifest schema and have no surface at all to contribute to. No plugin code
   executes, in the runtime or in your browser.
 
-  **Channels** cannot deliver. What *is* settled is the contract everything else
-  depends on: a channel message is **untrusted content with a named sender who is
-  not you** — never a prompt, never able to raise a turn's authority, trust from
-  the pairing record rather than from the message. Outbound delivery is next, then
-  paired and allowlisted inbound, then the approval relay last. The tab states the
-  contract and the state of each step rather than showing disabled controls.
+  **Channels** deliver, and you can now reach that. A channel message is
+  **untrusted content with a named sender who is not you** — never a prompt, never
+  able to raise a turn's authority, trust from the pairing record rather than from
+  the message. Outbound delivery runs through a capability gate and an egress
+  allowlist; inbound is recorded, quarantined and its instructions inert. All of
+  it existed and was unreachable until the tab gained pairing, so *linked*,
+  *enabled*, *trusted* and *reachable* are now four facts shown as four things.
+  Three of them are fail-closed by default and the tab names each one and its
+  remedy. Rate limits, the spec's routing modes, and resolving an approval over a
+  channel are not built — an inbound message never becomes work on its own.
 
-  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221 (plugin contributions),
-  BUG-225 (channel delivery), BUG-226 (the hook handler types this build
+  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-225 (channel rate limits, routing
+  modes and relay resolution), BUG-226 (the hook handler types this build
   refuses: `http`, `mcp_tool`, `prompt` and `agent`), BUG-227 (no LSP surface)
   and BUG-228 (plugin panels).
 
@@ -635,15 +639,15 @@ on the shipped build, not estimated.
   production signing anchor, so live egress bypass, credential delivery/merge
   and publisher verification remain unavailable rather than configuration-
   enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
-- **Channels cannot deliver; plugins are one contribution kind short.** Hooks
-  reached parity on 2026-08-22 — every event the format accepts is emitted, with
-  an owner off switch and a page that states which rules actually enforce. Plugins
-  went on to contribute skills and MCP-server offers the same day; **panels** are
-  the one kind left, and LSP servers have no surface to contribute to. Channels
-  now have their authority contract but still no transport: no message can be
-  sent or received on your behalf. These are the extension points other agent
-  platforms are largely defined by, and channel delivery is the one still
-  materially short.
+- **Plugins are one contribution kind short; channels stop short of routing.**
+  Hooks reached parity on 2026-08-22 — every event the format accepts is emitted,
+  with an owner off switch and a page that states which rules actually enforce.
+  Plugins went on to contribute skills and MCP-server offers the same day;
+  **panels** are the one kind left, and LSP servers have no surface to contribute
+  to. Channels gained their authority contract and then their owner surface: the
+  transport had been built and unreachable, and pairing is what reaches it. What
+  is still short there is above the transport — per-channel rate limits, the
+  spec's routing modes, and resolving an approval over a channel.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

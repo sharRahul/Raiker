@@ -69,12 +69,15 @@ async function signIn(target: Page) {
   } else {
     await target.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
   }
-  const workbench = target.getByRole("heading", { name: "Welcome to your Work Dashboard" });
+  // Fresh instance and returning owner are greeted differently, and a workspace
+  // becomes the second the moment it holds any work — so sign-in must accept
+  // either rather than depending on how much history this instance has.
+  const workbench = target.getByRole("heading", { name: /Welcome (to your Work Dashboard|back)/ });
   await expect(
     target.getByRole("button", { name: "Decide later" }).or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
   await dismissFirstRunModelSetup(target);
-  await expect(workbench).toBeVisible({ timeout: 30_000 });
+  await expect(workbench.first()).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe.configure({ mode: "serial" });

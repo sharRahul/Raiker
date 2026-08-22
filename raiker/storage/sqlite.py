@@ -7976,6 +7976,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
+    def get_channel_pairing(self, pairing_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM channel_pairings WHERE pairing_id = ?", (pairing_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def get_channel_pairing_by_connector(self, connector_id: str) -> dict[str, Any] | None:
+        """The pairing for one connector, or None.
+
+        One pairing per connector by design: a second would make "is this channel
+        linked" a question with two answers, and every enforcement point that
+        reads the pairing would have to pick one.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM channel_pairings WHERE connector_id = ? ORDER BY paired_at DESC LIMIT 1",
+                (connector_id,),
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def set_channel_pairing_enabled(self, pairing_id: str, enabled: bool) -> bool:
+        """Enable or disable one pairing. Disabled is stored, not deleted: the
+        owner's sender allowlist survives a pause and does not have to be typed
+        again to resume."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE channel_pairings SET enabled = ? WHERE pairing_id = ?",
+                (1 if enabled else 0, pairing_id),
+            )
+            return cursor.rowcount > 0
+
+    def set_channel_pairing_allowlist(self, pairing_id: str, allowlist_json: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE channel_pairings SET sender_allowlist_json = ? WHERE pairing_id = ?",
+                (allowlist_json, pairing_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_channel_pairing(self, pairing_id: str) -> bool:
+        """Unpair. Both executors and the inbound receiver read the pairing table,
+        so deleting the row is what actually stops a channel — there is no state
+        where the page says unpaired and a message still gets through."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM channel_pairings WHERE pairing_id = ?", (pairing_id,)
+            )
+            return cursor.rowcount > 0
+
     def insert_approval_relay(self, relay: ApprovalRelayRecord) -> None:
         with self.connect() as connection:
             connection.execute(

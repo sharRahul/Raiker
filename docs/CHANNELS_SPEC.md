@@ -223,16 +223,23 @@ Five rules follow, and each is enforceable rather than advisory:
 The order is the order in which the authority story can actually be written, and
 each step is refused until the one before it is done:
 
-| Step | What | Why here |
+| Step | What | State |
 |---|---|---|
-| 1 | **This section**, in the spec and the threat model | Nothing below has a contract to satisfy without it. **Done.** |
-| 2 | **Outbound delivery** | The half with no inbound risk. Exercises the connector profile, the capability gate and the audit path end to end. |
-| 3 | **Inbound, paired and allowlisted** | `requires_pairing` and `requires_sender_allowlist` become enforcement, under rules 1–3 above. |
-| 4 | **Permission relay** | Last, because a channel that can raise an approval is a channel that can be used to *ask for one*. Needs an anti-phishing story that does not exist yet. |
+| 1 | **This section**, in the spec and the threat model | **Done.** Nothing below has a contract to satisfy without it. |
+| 2 | **Outbound delivery** — connector profile, capability gate, egress allowlist, audit event | **Done.** `ExternalChannelExecutor` under `external_channel_runtime`. |
+| 3 | **Inbound, paired and allowlisted** | **Done.** The receiver enforces `requires_pairing` and `requires_sender_allowlist`, and marks every accepted message untrusted, quarantined and instructions-inert. |
+| 4 | **An owner surface for all of it** | **Done (FIXED-265).** Steps 2 and 3 were built and had no way in: with no pairing the executors refuse and the receiver 404s, so the transport was unreachable and the tab reported that channels did not exist. |
+| 5 | **Rate limits** — a per-channel inbound budget | **Open.** An allowlisted sender is currently unbounded. |
+| 6 | **Routing modes** — `new_turn`, `side_question`, `interrupt`, … | **Open.** An inbound message is recorded and quarantined; none of the modes below is implemented, so a channel message never becomes work on its own. |
+| 7 | **Permission relay** | **Open, and last.** A channel that can raise an approval is a channel that can be used to *ask for one*. The relay queue exists and is deliberately pending-only; nothing on a channel resolves an approval. |
 
-Until step 2 ships, Extensions → Channels states that delivery is unavailable
-rather than offering controls for it. Saying so is the honest surface; offering a
-control that does nothing is not.
+Extensions → **Channels** states the contract above, offers pairing, enable and a
+governed test delivery, and reports each of the three fail-closed gates — the
+capability, `RAIKER_CHANNEL_EGRESS_ALLOWLIST` and `RAIKER_CHANNEL_INBOUND_SECRET`
+— separately, because each has a different remedy.
+
+**The Routing Modes table below is a target, not a description.** Only recording
+and quarantining are implemented; a mode named there does not run today.
 
 ---
 

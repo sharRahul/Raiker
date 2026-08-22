@@ -3263,6 +3263,139 @@ class DashboardService:
             ],
         }
 
+    # ── Channels (BUG-225) ──────────────────────────────────────────────────
+    def list_channels(self, principal_id: str) -> dict[str, Any]:
+        """Every connector profile, what it needs, and what is actually true today.
+
+        The Channels tab said channels did not exist. The outbound executor, the
+        inbound receiver, the capability gate and the egress boundary were all
+        built; what was missing was any way for the owner to pair a connector, so
+        `list_channel_pairings` stayed empty and both executors refused. The
+        transport was unreachable because there was no surface, not because there
+        was no transport — and the tab could not tell the difference.
+
+        This reports each of the separate facts rather than collapsing them into
+        one "ready" flag, because they have different remedies:
+
+        * **Linked** — is there a pairing at all.
+        * **Enabled** — is that pairing switched on. Linked is not enabled.
+        * **Senders** — how many are allowlisted, for a profile that requires it.
+          Enabled is not trusted.
+        * **The capability gate** — `external_channel_runtime`, which the owner
+          sets in Permissions and which no channel control here can widen.
+        * **Egress** — whether `RAIKER_CHANNEL_EGRESS_ALLOWLIST` names any host.
+          It defaults to empty and is fail-closed, so a channel that is linked,
+          enabled and trusted still delivers nothing until the owner allowlists
+          the destination.
+        * **Inbound** — whether `RAIKER_CHANNEL_INBOUND_SECRET` is set. Without
+          it the receiver refuses every message, which is the right default and a
+          confusing one to meet without being told.
+
+        Never returns a secret, a host, or a sender identifier — a count and a
+        boolean answer every question this page asks.
+        """
+        import json as _json
+        import os
+
+        from raiker.channels.registry import ConnectorRegistry
+        from raiker.runtime.executors.sandbox import channel_egress_allowlist
+
+        try:
+            profiles = ConnectorRegistry.load().profiles
+        except Exception:  # noqa: BLE001 - an unreadable registry is a reported state
+            return {
+                "profiles": [],
+                "error": "connector_registry_unavailable",
+                "outbound": {},
+                "inbound": {},
+            }
+        pairings = {
+            str(row.get("connector_id")): row for row in self.store.list_channel_pairings()
+        }
+        gate = self.control.get_capability_gate("external_channel_runtime", principal_id)
+        allowlist = channel_egress_allowlist()
+        rows: list[dict[str, Any]] = []
+        for profile in profiles:
+            pairing = pairings.get(profile.connector_id)
+            senders: list[str] = []
+            if pairing is not None:
+                try:
+                    senders = list(_json.loads(pairing.get("sender_allowlist_json") or "[]"))
+                except (ValueError, TypeError):
+                    senders = []
+            rows.append(
+                {
+                    "connector_id": profile.connector_id,
+                    "channel_type": profile.channel_type,
+                    "display_name": profile.display_name,
+                    "transport": profile.transport,
+                    "auth_method": profile.auth_method,
+                    "default_state": profile.default_state,
+                    "requires_pairing": profile.requires_pairing,
+                    "requires_sender_allowlist": profile.requires_sender_allowlist,
+                    "requires_network": profile.requires_network,
+                    "linked": pairing is not None,
+                    "enabled": bool(pairing.get("enabled")) if pairing else False,
+                    "pairing_id": pairing.get("pairing_id") if pairing else None,
+                    "display_label": pairing.get("display_name") if pairing else None,
+                    "sender_count": len(senders),
+                    # The identifiers themselves are the owner's contact list and
+                    # never leave the store; the count answers the page's question.
+                    "senders": senders,
+                }
+            )
+        return {
+            "profiles": rows,
+            "error": None,
+            "outbound": {
+                "capability": "external_channel_runtime",
+                "gate_state": gate.state if gate is not None else "unknown",
+                "runtime_enabled": bool(gate.runtime_enabled) if gate is not None else False,
+                "egress_configured": bool(allowlist),
+                "egress_host_count": len(allowlist),
+            },
+            "inbound": {
+                "secret_configured": bool(
+                    os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
+                ),
+                # Stated rather than implied: an inbound message is untrusted
+                # content from a sender who is not the owner, it is quarantined,
+                # and its instructions are inert. That is the accepted contract,
+                # and the receiver enforces it on every message.
+                "quarantined": True,
+                "instructions_inert": True,
+            },
+        }
+
+    def pair_channel(
+        self,
+        acting_principal_id: str | None,
+        connector_id: str,
+        display_name: str,
+        sender_allowlist: list[str] | None = None,
+    ) -> ControlResult:
+        return self.control.pair_channel(
+            acting_principal_id, connector_id, display_name, sender_allowlist
+        )
+
+    def set_channel_enabled(
+        self, acting_principal_id: str | None, pairing_id: str, enabled: bool
+    ) -> ControlResult:
+        return self.control.set_channel_enabled(acting_principal_id, pairing_id, enabled)
+
+    def set_channel_senders(
+        self, acting_principal_id: str | None, pairing_id: str, senders: list[str]
+    ) -> ControlResult:
+        return self.control.set_channel_senders(acting_principal_id, pairing_id, senders)
+
+    def unpair_channel(self, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
+        return self.control.unpair_channel(acting_principal_id, pairing_id)
+
+    def deliver_channel_test(
+        self, acting_principal_id: str | None, connector_id: str, url: str, text: str
+    ) -> ControlResult:
+        return self.control.deliver_channel_test(acting_principal_id, connector_id, url, text)
+
     def list_security_findings(self, principal_id: str) -> list[SecurityFindingView]:
         return [
             SecurityFindingView(

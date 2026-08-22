@@ -648,6 +648,202 @@ class RuntimeControlService:
         self._remove_generated_mcp_file(server)
         return ControlResult(ok=True, data={"server_id": server_id})
 
+    # ── Channels: pairing, enablement and a governed test delivery ──────────
+    #
+    # BUG-225. The outbound transport, the inbound receiver, the capability gate
+    # and the egress boundary were all built and had **no owner surface**, so the
+    # Channels tab said channels did not exist. That was not a lie about the
+    # code so much as a true statement about the product: with no way to pair a
+    # connector, `list_channel_pairings` is empty and both executors refuse — the
+    # transport is unreachable, and the reason is a missing surface rather than a
+    # missing feature. These are that surface.
+    #
+    # Everything here is human-only and owner-scoped. None of it delivers
+    # anything: delivery is a governed action through `external_channel_runtime`,
+    # so the capability gate, the decision mode and the audit event apply exactly
+    # as they do to every other executor.
+
+    def pair_channel(
+        self,
+        acting_principal_id: str | None,
+        connector_id: str,
+        display_name: str,
+        sender_allowlist: list[str] | None = None,
+    ) -> ControlResult:
+        """Pair one connector profile. Paired is **not** enabled (BUG-225 rule 5).
+
+        A pairing arrives disabled and with whatever sender allowlist the owner
+        gave it. Linked, enabled and trusted are three separate stored facts, and
+        this only ever sets the first.
+        """
+        import json as _json
+
+        from raiker.channels.registry import ConnectorRegistry
+        from raiker.contracts.models import ChannelPairing
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        try:
+            profiles = {profile.connector_id: profile for profile in ConnectorRegistry.load().profiles}
+        except Exception:  # noqa: BLE001 - a broken registry is a refusal, not a crash
+            return ControlResult(ok=False, reason_code="connector_registry_unavailable")
+        profile = profiles.get(connector_id)
+        if profile is None:
+            return ControlResult(ok=False, reason_code=f"unknown_connector:{connector_id}")
+        if self._store.get_channel_pairing_by_connector(connector_id) is not None:
+            return ControlResult(ok=False, reason_code="channel_already_paired")
+        senders = [str(entry).strip() for entry in (sender_allowlist or []) if str(entry).strip()]
+        if profile.requires_sender_allowlist and not senders:
+            # The profile declares the requirement; refusing here is what turns
+            # that declaration into enforcement rather than documentation.
+            return ControlResult(ok=False, reason_code="sender_allowlist_required")
+        pairing = ChannelPairing(
+            pairing_id=new_id("chn_"),
+            connector_id=connector_id,
+            channel_type=profile.channel_type,
+            display_name=(display_name or profile.display_name).strip()[:120],
+            paired_at=utc_now(),
+            paired_by=principal.principal_id,
+            enabled=False,
+            sender_allowlist_json=_json.dumps(sorted(set(senders))),
+        )
+        self._store.insert_channel_pairing(pairing)
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_paired",
+                actor="control_service",
+                payload={
+                    "pairing_id": pairing.pairing_id,
+                    "connector_id": connector_id,
+                    "channel_type": profile.channel_type,
+                    "enabled": False,
+                    "sender_count": len(senders),
+                },
+            )
+        )
+        return ControlResult(
+            ok=True, data={"pairing_id": pairing.pairing_id, "enabled": False}
+        )
+
+    def set_channel_enabled(
+        self, acting_principal_id: str | None, pairing_id: str, enabled: bool
+    ) -> ControlResult:
+        """Turn one paired channel on or off. The second of the three facts."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self._store.get_channel_pairing(pairing_id) is None:
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if not self._store.set_channel_pairing_enabled(pairing_id, enabled):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_paired" if enabled else "channel_unpaired",
+                actor="control_service",
+                payload={"pairing_id": pairing_id, "enabled": enabled},
+            )
+        )
+        return ControlResult(ok=True, data={"pairing_id": pairing_id, "enabled": enabled})
+
+    def set_channel_senders(
+        self, acting_principal_id: str | None, pairing_id: str, senders: list[str]
+    ) -> ControlResult:
+        """Replace one pairing's sender allowlist. The third fact, and the one the
+        inbound receiver actually enforces."""
+        import json as _json
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self._store.get_channel_pairing(pairing_id) is None:
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        cleaned = sorted({str(entry).strip() for entry in senders if str(entry).strip()})
+        if not self._store.set_channel_pairing_allowlist(pairing_id, _json.dumps(cleaned)):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_paired",
+                actor="control_service",
+                # The count, never the identifiers: a sender id is the owner's
+                # contact list, and the audit log is not the place for it.
+                payload={"pairing_id": pairing_id, "sender_count": len(cleaned)},
+            )
+        )
+        return ControlResult(ok=True, data={"pairing_id": pairing_id, "sender_count": len(cleaned)})
+
+    def unpair_channel(self, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
+        """Remove the pairing. Both executors and the inbound receiver read this
+        table, so deleting the row is what actually stops the channel."""
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None or not self._store.delete_channel_pairing(pairing_id):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_unpaired",
+                actor="control_service",
+                payload={
+                    "pairing_id": pairing_id,
+                    "connector_id": pairing.get("connector_id"),
+                    "removed": True,
+                },
+            )
+        )
+        return ControlResult(ok=True, data={"pairing_id": pairing_id, "removed": True})
+
+    def deliver_channel_test(
+        self, acting_principal_id: str | None, connector_id: str, url: str, text: str
+    ) -> ControlResult:
+        """Send one test delivery through the governed outbound path.
+
+        This is the *product's* way of answering "does my channel work", and it
+        deliberately takes the long way round: it builds a governed action and
+        routes it through `RuntimeAuthority`, so the capability gate, the decision
+        mode, the approval path and the audit event all apply. A REST endpoint
+        that POSTed the webhook itself would answer the same question while
+        proving nothing about the path a real delivery takes.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="external_channel_runtime",
+            tool_or_service_name="external_channel_runtime",
+            arguments={"connector_id": connector_id, "url": url, "text": text},
+            risk_level=RiskLevelValue.MEDIUM,
+        )
+        result = self._authority.route_action(action, principal)
+        # The same mapping every other governed control uses, so a closed gate
+        # reads as `disabled_by_capability_gate` here exactly as it does on the
+        # MCP page — one reason code, one remedy, wherever the owner meets it.
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})
+
     # ── Containment: instant kill switch + revocable pause (Phase C) ─────────
     # Owner-scoped, human-only lifecycle control over a monitored connection.
     # Pause is the one-call stop; kill is the instant kill switch; resume revokes

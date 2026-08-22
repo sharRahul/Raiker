@@ -369,6 +369,46 @@ export interface PluginSignature {
 
 /** What a plugin actually provides, read from the files the runtime loads
  *  rather than from the manifest that described them (BUG-221). */
+/** One connector profile, and what is actually true of it right now (BUG-225). */
+export interface ChannelProfile {
+  connector_id: string;
+  channel_type: string;
+  display_name: string;
+  transport: string;
+  auth_method: string;
+  default_state: string;
+  requires_pairing: boolean;
+  requires_sender_allowlist: boolean;
+  requires_network: boolean;
+  /** Is there a pairing at all. */
+  linked: boolean;
+  /** Is that pairing switched on. Linked is not enabled. */
+  enabled: boolean;
+  pairing_id: string | null;
+  display_label: string | null;
+  sender_count: number;
+  senders: string[];
+}
+
+export interface ChannelsView {
+  profiles: ChannelProfile[];
+  error: string | null;
+  outbound: {
+    capability?: string;
+    gate_state?: string;
+    runtime_enabled?: boolean;
+    /** RAIKER_CHANNEL_EGRESS_ALLOWLIST names at least one host. Fail-closed. */
+    egress_configured?: boolean;
+    egress_host_count?: number;
+  };
+  inbound: {
+    /** RAIKER_CHANNEL_INBOUND_SECRET is set. Without it the receiver refuses. */
+    secret_configured?: boolean;
+    quarantined?: boolean;
+    instructions_inert?: boolean;
+  };
+}
+
 /** An MCP server an installed plugin offers. Inert until the owner adds it. */
 export interface McpOffer {
   plugin_id: string;

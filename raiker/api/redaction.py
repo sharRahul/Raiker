@@ -130,10 +130,18 @@ def _redact_value(
         # A token *count* is an integer, never a credential. Without this the
         # models contract returned `context_window_tokens: "***REDACTED***"` and
         # the Chat context meter rendered "0 / NaN (NaN%)".
+        #
+        # A **boolean** is the same argument one step further: `True` and `False`
+        # cannot carry a credential, so replacing one protects nothing and
+        # destroys the only thing it said. It is worse than lossy — the
+        # replacement is a non-empty string, so a client testing the field for
+        # truthiness reads the *opposite* of the truth. That is exactly what
+        # happened to `inbound.secret_configured` on the Channels tab: the
+        # receiver was refusing every message and the page said "Secret set".
         return {
             k: (
                 v
-                if is_token_count_field(k, v)
+                if is_token_count_field(k, v) or isinstance(v, bool)
                 else REDACTED_VALUE
                 if _is_secret_key(k)
                 else _redact_value(

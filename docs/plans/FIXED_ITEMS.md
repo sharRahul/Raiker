@@ -10607,3 +10607,228 @@ them and is reduced rather than closed.
 **Evidence.** `docs/CHANNELS_SPEC.md`, `docs/THREAT_MODEL.md`,
 `apps/web/src/lib/views/ExtensionsView.test.ts` — the tab names the contract, and
 distinguishes what is done from what is not.
+
+---
+
+## FIXED-262 — There is an unattended posture now: decline instead of asking
+
+**Severity: Low. Area: approval modes. Fixed 2026-08-22 (BUG-219).**
+
+The approval chip offered Manual, Auto and Skip. Claude Code also offers
+`dontAsk`, which auto-**denies** anything not already allowed by a rule instead
+of prompting for it — the posture for unattended work, where an interruption is
+worse than a refusal. Raiker had no way to express it, so a scheduled routine at
+06:00 met a prompt nobody would answer and **parked**, when it could have carried
+on with everything it was actually allowed to do.
+
+**What ships.** A fourth mode, `dont_ask`. It resolves any otherwise-eligible
+governed action to `deny` rather than to a prompt.
+
+Three properties, and each is a test:
+
+1. **It declines rather than queues.** No approval record is raised, no tool
+   starts, and nothing is written.
+2. **The refusal says why it was refused.** `denied_no_one_to_ask`, named
+   distinctly from `denied_by_decision_mode` and `denied_by_turn_posture`,
+   because *"the owner refused this"* and *"nobody was there to ask"* call for
+   different follow-ups — and only the second means re-running it attended would
+   have worked.
+3. **It never widens a gate.** It can only turn `needs_approval` into `deny`. An
+   action policy already allowed is untouched, and one policy already denied
+   keeps policy's own reason rather than borrowing this one.
+
+The conversion happens *before* the decision is recorded, because this **is** the
+decision. Recording `needs_approval` and then refusing would leave the audit log
+describing a queue entry that never existed.
+
+**One deliberate exception.** A per-turn `ask` posture normally forces `manual`,
+so the unattended modes cannot swallow a decision the owner asked to see.
+`dont_ask` is exempt: there is nobody to show it to, and forcing `manual` there
+would park the turn on a queue entry that is never read — the exact outcome the
+mode exists to avoid.
+
+**User-interface outcome.** The composer chip gains the mode, and the menu gains
+a **detail line under every option**. Four postures is one more than a label
+alone can carry: *Skip* and *Decline, don't ask* both mean "stop asking me" and
+do opposite things — one runs the action, the other refuses it — so each option
+now states which in plain English.
+
+**Reference-platform decision — is this a meaningful improvement?** **No — parity
+with Claude Code**, and worth taking for exactly that reason: an owner moving
+from `dontAsk` had no equivalent here. The *naming* of the refusal is the small
+piece that goes beyond it: no cited reference distinguishes "declined because
+nobody was watching" from "declined because you said no", and the two are not the
+same fact when reading an unattended run's record afterwards.
+
+**Evidence.** `tests/test_model_tool_call_loop.py` — declines rather than queues,
+names the reason, and never widens a gate.
+`apps/web/src/lib/approvalMode.test.ts` and
+`apps/web/src/lib/components/ApprovalModeControl.test.ts` cover the surface,
+including that skip and decline are told apart in words.
+
+---
+
+## FIXED-263 — The approval-posture menu opened into the fold
+
+**Severity: Low. Area: composer / web UI. Fixed 2026-08-22.**
+
+The posture menu dropped **below** its trigger. That trigger lives in the
+composer bar, which is pinned to the bottom of the viewport in both Chat and
+Build — so the menu opened straight into the fold, and the last option was
+unreachable on a page that does not scroll. It was already true with three
+postures; adding a fourth and a line of explanation under each made it
+unmissable, which is the only reason it was caught now.
+
+The menu is anchored to the trigger's **top** edge instead, so it opens upward
+and the whole list is on screen at every height. `left: 0` rather than
+`right: 0`, because at 390px the trigger sits near the left edge and a
+right-anchored menu ran off the other side.
+
+Found while photographing the new `dont_ask` posture (FIXED-262). It affected
+every posture, not the new one — a control the owner uses to decide how much
+Raiker may do on its own is the wrong place for an option that cannot be
+reached.
+
+**Reference-platform decision.** **No — a defect fix.**
+
+**Evidence.** `apps/web/e2e/bug-219-decline-mode-live.spec.ts` asserts every
+posture is `toBeInViewport()` at 1440px and again at 390px, where it also checks
+the page has not gained horizontal overflow. Screenshots:
+`bug-219-approval-modes.png`, `bug-219-approval-modes-mobile.png`.
+
+---
+
+## FIXED-264 — A live spec's sign-in depended on how much history the instance had
+
+**Severity: Low. Area: live test harness. Fixed 2026-08-22.**
+
+The Workbench greets a fresh instance with *"Welcome to your Work Dashboard"* and
+a returning owner with *"Welcome back"*, and a workspace turns from the first
+into the second the moment it holds any work. Every live spec's `signIn` waited
+for the first string, so a suite passed on an empty instance and failed on a used
+one — at sign-in, before reaching anything it was written to test.
+
+It surfaced mid-round: the plugin specs passed, the provider spec then created a
+chat session, and the next spec could not sign in. The failure names a heading,
+which is the least useful place to start looking when the thing under test is an
+approval posture.
+
+The four specs added this round accept either greeting. The older specs still
+carry the narrow string; they are not changed here because each is evidence for a
+closed entry and re-running one is how that evidence is refreshed — but a spec
+that fails at sign-in on a populated workspace is a trap worth knowing about, so
+it is recorded rather than left as folklore.
+
+**Reference-platform decision.** **No — test-harness correctness.**
+
+**Evidence.** `bug-219-decline-mode-live.spec.ts`,
+`bug-221-225-plugin-skills-mcp-channels-live.spec.ts`,
+`plugin-contributions-provider-live.spec.ts`, `ui-sweep-responsive-live.spec.ts`.
+
+---
+
+## FIXED-265 — Channels have an owner surface, and the tab stops denying the transport
+
+**Severity: Medium. Area: channels / extensibility. Fixed 2026-08-22 (BUG-225
+steps 2 and 3).**
+
+**The finding, corrected.** BUG-225 was raised as *"a channel can be described
+and never reached"*, and FIXED-261 closed its step 1 by writing down what a
+channel message is. Both read the gap as *"delivery is not built"*. Building it
+started with reading `raiker/channels/` — and found that it already was:
+
+* `ExternalChannelExecutor` (`external_channel_runtime`) does bounded outbound
+  webhook delivery against `channel_egress_allowlist()`, refusing a connector
+  that is not paired and enabled.
+* `POST /api/channels/{connector_id}/inbound` receives messages behind an owner
+  secret, refuses a sender that is not allowlisted, and records every accepted
+  one as **untrusted, quarantined, instructions inert** — the contract FIXED-261
+  wrote down, already enforced.
+* `ChannelApprovalRelayExecutor` queues a *pending* relay and can never resolve
+  an approval.
+* The capability is registered, policy-gated, phase-gated and audited.
+
+What was missing was **any way for the owner to pair a connector**. With no
+pairing, `list_channel_pairings()` is empty, both executors refuse, the receiver
+404s, and the Channels tab said channels did not exist. The transport was
+unreachable because there was no surface — a different problem from the one the
+entry described, with a much smaller fix, and one this repository's own standard
+names explicitly: closing backend work must not leave an invisible product
+surface. This one had been invisible for four phases.
+
+**What ships.** The surface. `pair_channel`, `set_channel_enabled`,
+`set_channel_senders`, `unpair_channel` and `deliver_channel_test` on the control
+service, five routes under `/api/channels`, and a Channels tab that is no longer
+a deferral.
+
+Four properties, each a test:
+
+1. **Linked is not enabled.** Pairing stores `enabled = False` and the tab says
+   *"It is switched off until you turn it on."* Turning it on is a second click.
+2. **Enabled is not trusted.** A profile declaring `requires_sender_allowlist`
+   cannot be paired without one — `sender_allowlist_required` — which is what
+   turns that declaration into enforcement rather than documentation. Disabling
+   keeps the allowlist, so pausing does not cost the owner their typing.
+3. **A test delivery takes the long way round.** It builds a governed action and
+   routes it through `RuntimeAuthority`, so a closed gate refuses it with
+   `disabled_by_capability_gate` and an unallowlisted host is refused at the
+   egress boundary before a socket opens. A REST endpoint that POSTed the webhook
+   itself would have answered the same question and proved nothing.
+4. **Unpairing is the stop.** The row is deleted, and both executors and the
+   receiver read that table — so there is no state where the page says unpaired
+   and a message still gets through.
+
+**The three gates are reported separately**, because each has a different remedy:
+the capability the owner sets in Permissions, the `RAIKER_CHANNEL_EGRESS_ALLOWLIST`
+host list, and the `RAIKER_CHANNEL_INBOUND_SECRET`. All three are fail-closed by
+default, which is right and is confusing to meet without being told — so the tab
+tells you, per gate, in the owner's words.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and
+the ordering is the differentiator.** OpenClaw ships channels and treats them as
+where external input enters; Claude Code has no channel concept; ChatGPT Work's
+connectors and Hermes' inbound paths carry sender identity without a stated
+"cannot raise authority" rule. What Raiker now has that none of them does is the
+*separation*: linked, enabled, trusted and reachable are four stored facts with
+four different remedies, shown as four things rather than one toggle — and the
+contract they serve was written before the surface that exposes them.
+
+**Evidence.** `tests/test_channel_owner_surface.py` (17 tests),
+`apps/web/src/lib/views/ExtensionsView.test.ts`, and
+`apps/web/e2e/bug-225-channels-live.spec.ts` (6 tests, live) covering pair →
+enable → governed test delivery → unpair, and the tab at 390 / 834 / 1440 px.
+
+---
+
+## FIXED-266 — A boolean was redacted into the opposite of the truth
+
+**Severity: Medium. Area: API redaction. Fixed 2026-08-22.**
+
+`redact_response_body` discards any value whose **key** looks like a credential —
+the right rule, and the reason a field named `secret_configured` came back as
+`"***REDACTED***"`. That string is truthy in JavaScript, so the Channels tab
+rendered **"Secret set"** while the inbound receiver was refusing every message
+for want of one.
+
+This is worse than lossy. Redacting a boolean protects nothing — `True` and
+`False` cannot carry a credential — and the replacement inverts the only thing
+the field said. Every client testing such a field for truthiness reads the
+opposite of the truth, silently, and the surface then states it with confidence.
+
+The exemption sits beside the one already there for token *counts*, and for the
+same reason: `is_token_count_field(k, v) or isinstance(v, bool)`. A real
+credential under a secret-looking key is still discarded whole.
+
+Found by comparing the rendered chip against the served payload while
+photographing the new Channels tab (FIXED-265). Nothing about it was specific to
+channels: any boolean anywhere named `*_secret*`, `*_token*`, `*_password*` or
+`*authorization*` was affected.
+
+**Reference-platform decision.** **No — a defect fix**, and a class of defect
+worth naming: a safety filter that turns a fact into its negation is more
+dangerous than one that drops it.
+
+**Evidence.** `tests/test_channel_owner_surface.py` — the boolean survives the
+response filter and a real credential under the same kind of key does not. The
+live spec now compares the rendered chip against the served payload, so a
+recurrence fails rather than being photographed.

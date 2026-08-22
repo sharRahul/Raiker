@@ -364,23 +364,39 @@ hand-editing the file afterwards cannot smuggle one in.
 
 ## Channels
 
-No channel can send or receive work on your behalf yet, and the tab says so.
+A channel is the one place where content Raiker did not ask for enters a turn.
+That content is defined: **untrusted content with a named sender who is not you.**
+Never a prompt. Never able to enable a capability, widen an approval mode, or
+approve anything. Trust comes from the pairing record, never from anything inside
+the message.
 
-What *is* settled is the part everything else depends on. A channel is the one
-place where content Raiker did not ask for enters a turn, and that content is now
-defined: **untrusted content with a named sender who is not you.** Never a prompt.
-Never able to enable a capability, widen an approval mode, or approve anything.
-Trust comes from the pairing record, never from anything inside the message.
+The tab lists every connector profile and lets you **pair** one. Pairing does not
+switch it on and does not trust anyone — linked, enabled and trusted are three
+separate facts, and the tab shows them separately:
 
-Delivery is built on top of that, in this order:
+- **Pair** stores the link, switched off, with whatever sender allowlist you gave
+  it. A profile that accepts inbound messages cannot be paired without one.
+- **Turn on** is a second decision.
+- **Send a test delivery** runs the *same governed path* a real delivery takes —
+  the capability gate, the decision mode, the egress allowlist and the audit
+  event all apply. It is not a shortcut that proves nothing.
+- **Unpair** deletes the link. Both the outbound executor and the inbound
+  receiver read that record, so unpairing is what actually stops the channel.
 
-| Step | What | State |
+Three things are fail-closed by default, and each has its own remedy, so the tab
+reports them one by one rather than as a single "ready":
+
+| Gate | What it is | Where you change it |
 |---|---|---|
-| 1 | The contract — what a channel message is in a turn | **Done** |
-| 2 | Outbound delivery — sending you a result you asked for | Next |
-| 3 | Inbound — paired, sender-allowlisted, rate-limited | After that |
-| 4 | Approval relay | Last: a channel that can raise an approval can be used to *ask for* one |
+| Capability | `external_channel_runtime` | Permissions |
+| Egress | `RAIKER_CHANNEL_EGRESS_ALLOWLIST` — empty means deny | Your environment |
+| Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
 
-Inbound delivery is the highest-risk surface in this class, so the gate here is
-the threat model, not the code. Full contract:
-[`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).
+**An inbound message never becomes a turn on its own.** It is recorded as a
+governed event, quarantined, and its instructions are inert whatever the sender
+wrote. Accepted and rejected messages both appear in Observability → Activity.
+
+Still unbuilt: per-channel rate limits, the routing modes in the spec, and
+resolving an approval over a channel — the relay queue is deliberately
+pending-only, because a channel that can raise an approval can be used to *ask
+for* one. Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).

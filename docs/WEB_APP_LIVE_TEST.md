@@ -15,7 +15,7 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
-## Result — 2026-08-22 (plugin contributions, MCP offers, channel contract, responsive sweep)
+## Result — 2026-08-22 (plugin contributions, MCP offers, the channel surface, the unattended posture, responsive sweep)
 
 The running built SPA was unlocked with Rahul's existing account. The Anthropic
 credential was entered through the Models reconnect dialog — never a source file,
@@ -30,7 +30,11 @@ Specs:
 [`plugin-contributions-provider-live.spec.ts`](../apps/web/e2e/plugin-contributions-provider-live.spec.ts)
 (3 tests),
 [`ui-sweep-responsive-live.spec.ts`](../apps/web/e2e/ui-sweep-responsive-live.spec.ts)
-(3 tests). 15 tests, 15 passed.
+(3 tests),
+[`bug-219-decline-mode-live.spec.ts`](../apps/web/e2e/bug-219-decline-mode-live.spec.ts)
+(3 tests),
+[`bug-225-channels-live.spec.ts`](../apps/web/e2e/bug-225-channels-live.spec.ts)
+(6 tests). 24 tests, 24 passed.
 
 | Check | Result |
 |---|---|
@@ -50,13 +54,40 @@ Specs:
 | Every page fits at 390 / 834 / 1440 px | ✅ 26 pages × 3 widths: zero horizontal overflow |
 | Every icon renders a glyph | ✅ zero empty `<svg>` across the same 78 captures |
 | The selected hub tab is on screen | ✅ at every width (FIXED-257 holding) |
-| Visual review | ✅ `docs/plans/screenshots/working/bug-221-*`, `bug-225-channel-contract.png`, and `docs/plans/screenshots/pages/` |
+| The posture menu tells Skip and Decline apart in words | ✅ *"No approval is raised at all"* vs *"anything needing approval is refused, not queued"* |
+| Every posture is reachable, at 1440 px and at 390 px | ✅ all four `toBeInViewport()`; no horizontal overflow at either width |
+| **Decline, don't ask** persists across a visit | ✅ chosen, navigated away and back, still selected |
+| The Channels tab states the contract | ✅ *"untrusted content with a named sender who is not you"* |
+| Three fail-closed gates reported separately | ✅ **Capability off**, **None allowlisted**, **Refusing everything** — each with its own remedy named |
+| Pairing links without switching on | ✅ *"It is switched off until you turn it on"*; row reads **Linked, off · 2 senders** |
+| A profile that needs senders cannot be paired without them | ✅ the pairing form asks, and the control service refuses `sender_allowlist_required` |
+| A test delivery runs the governed path | ✅ refused with a readable reason — the owner's own capability gate, not a shortcut that would have "worked" |
+| Unpairing is what stops it | ✅ row returns to **Not linked**; Turn on is gone |
+| Channels tab at 390 / 834 / 1440 px | ✅ no horizontal overflow at any width |
+| Visual review | ✅ `docs/plans/screenshots/working/bug-221-*`, `bug-225-*`, `bug-219-approval-modes*.png`, and `docs/plans/screenshots/pages/` |
 
-One defect was found and fixed by the sweep rather than by a feature test: on a
-touch device the phone navigation's `:hover` background stuck after a tap, so the
-last item touched kept a highlight that read as *"you are here"* and contradicted
-the accent colour on the item that actually was. The rule is now behind
-`@media (hover: hover)`.
+Five defects were found by this round's live work rather than by a feature test,
+and all five are fixed here:
+
+* On a touch device the phone navigation's `:hover` background stuck after a tap,
+  so the last item touched kept a highlight that read as *"you are here"* and
+  contradicted the accent colour on the item that actually was. Now behind
+  `@media (hover: hover)`.
+* The approval-posture menu opened **downwards** from a trigger pinned to the
+  bottom of the viewport, so its last option was in the fold on a page that does
+  not scroll. It opens upward now (FIXED-263).
+* Every live spec's sign-in waited for the *fresh-instance* Workbench greeting,
+  so a suite passed on an empty workspace and failed on a used one — at sign-in,
+  before reaching what it was written to test (FIXED-264).
+* The API's key-based redaction filter replaced the **boolean**
+  `inbound.secret_configured` with `"***REDACTED***"` — truthy — so the Channels
+  tab read **"Secret set"** while the receiver was refusing every message. Caught
+  by comparing the rendered chip against the served payload, which the live spec
+  now does on every run (FIXED-266).
+* And the round's premise itself: channel delivery was recorded as unbuilt, and
+  reading `raiker/channels/` found the transport, the gate, the egress boundary
+  and the inbound receiver all present and **unreachable** — nothing let the owner
+  pair a connector. The fix was a surface, not a transport (FIXED-265).
 
 ## Result — 2026-08-21 (governed turn-based voice, preserved owner workspace)
 

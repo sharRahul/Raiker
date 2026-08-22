@@ -32,7 +32,7 @@ manifest, pairing, or managed policy.
 | **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/HOOKS_SPEC.md`, `raiker/hooks/` |
 | **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills) | `docs/guide/extensions-and-mcp.md`, `docs/SELF_IMPROVEMENT_MODEL.md` |
 | **Plugins** | Bundles of tools + hooks + skills + channels + servers | Plugin manifest + permission diff | Components register through their own surfaces; nothing auto-executes | 🔒 manifest validation only | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
-| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Inbound normalises to `ChannelMessageEnvelope` → gateway → same runtime | 🔒 registry only, no transport | `docs/CHANNELS_SPEC.md` |
+| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist; inbound recorded untrusted and quarantined (routing modes not implemented) | ✅ transport + owner surface (`raiker/channels/`, Extensions → Channels); rate limits and relay resolution open | `docs/CHANNELS_SPEC.md` |
 
 Legend: ✅ implemented · 🔒 phase_scheduled_disabled · 📘 specified_not_implemented.
 
@@ -111,7 +111,12 @@ plan with execution disabled).
   instruction text validated by the same reader an upload goes through and installed **switched
   off**. MCP servers and panels remain uncontributable. Revoking deletes everything the plugin
   wrote. See `PLUGIN_SYSTEM_SPEC.md`.
-- **Channels:** registry + profile validation only; **no transport** (`raiker/channels/`).
+- **Channels:** registry, profile validation, **outbound delivery** through
+  `external_channel_runtime` against an owner egress allowlist, and an **inbound
+  receiver** behind an owner secret with sender allowlisting that marks every
+  message untrusted, quarantined and instructions-inert. All of it was built and
+  unreachable until FIXED-265 gave the owner a way to pair a connector. Rate
+  limits, routing modes and approval-relay resolution remain unbuilt.
 - **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
   decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
   `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
@@ -134,9 +139,10 @@ plan with execution disabled).
     body, and any one bundled file, are read on demand through the broker like any other
     governed read — so they appear in the tool-action record and the event log.
 
-The remaining pieces to complete this model are the two contribution kinds a plugin still cannot
-provide (MCP servers and panels) and channel transport; each must register through — and be gated
-by — the existing broker/policy/event infrastructure rather than inventing an execution surface.
+The remaining pieces to complete this model are the one contribution kind a plugin still cannot
+provide (panels), and the channel work above the transport: rate limits, routing modes and
+approval-relay resolution. Each must register through — and be gated by — the existing
+broker/policy/event infrastructure rather than inventing an execution surface.
 
 ## Where each surface is seen
 
@@ -150,7 +156,7 @@ trust, which is the opposite of what this model is for.
 | Skills | Extensions → Skills | Install and review; grants nothing and runs no code. A plugin's skill is credited to it, arrives inactive, and is removed by revoking the plugin |
 | Hooks | Extensions → **Hooks** | Read-only: what loaded, what can fire, what can decide, what it did |
 | Plugins | Extensions → Plugins | Install records, signature level, and what each one provides read from the files the runtime loads; **no plugin code executes** |
-| Channels | Extensions → Channels | Named as unavailable rather than silently missing |
+| Channels | Extensions → Channels | The contract, pairing, enable, a governed test delivery, and each fail-closed gate reported separately |
 
 Hooks are read-only on purpose. The three configuration files are the owner's own
 text on disk, and a page that rewrote them would need an authority story of its

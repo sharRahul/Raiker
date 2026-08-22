@@ -31,7 +31,12 @@ CLIENT_TYPES = {
     "test_harness",
 }
 PLANNING_MODES = {"auto", "always", "never_safe_only"}
-APPROVAL_MODES = {"manual", "auto", "skip"}
+#: ``dont_ask`` (BUG-219) is the unattended posture: anything not already
+#: permitted by a standing rule is **denied** rather than queued, because a
+#: scheduled routine at 06:00 cannot answer a prompt and parking is not the same
+#: as declining. It adds no enforcement — `deny` is a decision the runtime
+#: already honours — and it can never widen a gate.
+APPROVAL_MODES = {"manual", "auto", "skip", "dont_ask"}
 VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
 #: Which conversation surface produced a prompt. It selects the operating
 #: protocol the turn is run under and nothing else: a surface can never widen

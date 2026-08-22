@@ -75,12 +75,17 @@ async function signIn(page: import("@playwright/test").Page) {
   } else {
     await page.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
   }
-  const workbench = page.getByRole("heading", { name: "Welcome to your Work Dashboard" });
+  // The Workbench greets a fresh instance and a returning owner differently
+  // ("Welcome to your Work Dashboard" vs "Welcome back"), and a workspace turns
+  // from the first into the second the moment it holds any work. Keying sign-in
+  // to one of them makes a spec pass or fail on how much history the instance
+  // happens to have, which is not what any of these tests are about.
+  const workbench = page.getByRole("heading", { name: /Welcome (to your Work Dashboard|back)/ });
   await expect(
     page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
   await dismissFirstRunModelSetup(page);
-  await expect(workbench).toBeVisible({ timeout: 30_000 });
+  await expect(workbench.first()).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe.configure({ mode: "serial" });

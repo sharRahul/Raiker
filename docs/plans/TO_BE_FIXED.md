@@ -509,23 +509,26 @@ its own, and a contributed rule runs as a **hook**, under the hook's rules.
 The Plugins tab now names all four with their state, so this gap is visible on
 the surface rather than only in this document.
 
-**Observed.** Installing a plugin validates its manifest, checks its supply
-chain, resolves its signature to `verified` / `present_only` / `unsigned`, writes
-a `PluginInstallRecord`, and shows all of that on Extensions → Plugins. Then
-nothing happens. `PluginRegistrationPlan.execution_enabled` is `False` by
-construction, so a plugin contributes no skill, no agent, no hook, no MCP server
-and no panel. The tab says so, which is right — but the surface as a whole reads
-as an install flow for something that cannot be installed.
+**Observed, as raised.** Installing a plugin validated its manifest, checked its
+supply chain, resolved its signature to `verified` / `present_only` / `unsigned`,
+wrote a `PluginInstallRecord`, and showed all of that on Extensions → Plugins.
+Then nothing happened: a plugin contributed no skill, no agent, no hook, no MCP
+server and no panel. The tab said so, which was right — but the surface as a
+whole read as an install flow for something that could not be installed.
 
 Claude Code plugins bundle skills, agents, hooks, MCP servers and LSP servers;
-Cowork installs them from **Customize**. This is the largest remaining piece of
-the hooks → plugins → channels gap.
+Cowork installs them from **Customize**. This was the largest remaining piece of
+the hooks → plugins → channels gap; since hooks reached parity and this took its
+first contribution kind, channels (BUG-225) is.
 
-**Root cause.** Not packaging — `raiker/plugins/` already does the hard parts of
-that. The blocking question is what a plugin's *code* is allowed to be. Every
+**Root cause.** Not packaging — `raiker/plugins/` already did the hard parts of
+that. The blocking question was what a plugin's *code* is allowed to be. Every
 other extension surface answers it: a skill is instructions and runs nothing, a
 connector is a brokered tool with a capability gate, a hook is argv resolved
-inside the workspace under a bounded timeout. A plugin has no such answer yet.
+inside the workspace under a bounded timeout. The answer taken for a plugin is
+that it gets **no execution surface of its own** — it contributes through one
+that already governs the thing contributed, which is why hooks came first and why
+the three remaining kinds are held to the same bar.
 
 **The constraint that decides the shape of the rest.** Step 1 is done and proved
 the approach: each contribution arrives through a surface that **already governs

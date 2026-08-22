@@ -383,8 +383,8 @@ separate facts, and the tab shows them separately:
 - **Unpair** deletes the link. Both the outbound executor and the inbound
   receiver read that record, so unpairing is what actually stops the channel.
 
-Three things are fail-closed by default, and each has its own remedy, so the tab
-reports them one by one rather than as a single "ready":
+Four things are fail-closed or off by default, and each has its own remedy, so
+the tab reports them one by one rather than as a single "ready":
 
 | Gate | What it is | Where you change it |
 |---|---|---|
@@ -393,7 +393,7 @@ reports them one by one rather than as a single "ready":
 | Signing | `RAIKER_CHANNEL_OUTBOUND_SECRET` — unset means unsigned, not refused | Your environment |
 | Inbound secret | `RAIKER_CHANNEL_INBOUND_SECRET` — unset means refuse | Your environment |
 
-A fourth row states the **inbound budget**: 60 messages per sender per minute by
+A fifth row states the **inbound budget**: 60 messages per sender per minute by
 default, `RAIKER_CHANNEL_INBOUND_RATE` to change it. Allowlisting says *who* may
 speak; the budget says how often, and they are different questions — a sender
 that goes over is refused and the refusal is recorded, so a channel that goes
@@ -404,6 +404,6 @@ governed event, quarantined, and its instructions are inert whatever the sender
 wrote. Accepted and rejected messages both appear in Observability → Activity.
 
 Still unbuilt: the routing modes in the spec, and resolving an approval over a
-channel — the relay queue is deliberately
-pending-only, because a channel that can raise an approval can be used to *ask
-for* one. Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).
+channel — the relay queue is deliberately pending-only, because a channel that
+can raise an approval can be used to *ask for* one.
+Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).

@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import McpView from "./McpView.svelte";
 import { makeGate, stubFetch } from "../test-helpers";
-import type { McpAgentAccess, McpServer } from "../apiTypes";
+import type { McpAgentAccess, McpOffer, McpServer } from "../apiTypes";
 
 function server(partial: Partial<McpServer> = {}): McpServer {
   return {
@@ -245,5 +245,88 @@ describe("McpView", () => {
     render(McpView);
     await waitFor(() => expect(screen.getByText("echo-server")).toBeInTheDocument());
     expect(screen.queryByText(/withheld from every turn/)).not.toBeInTheDocument();
+  });
+});
+
+// BUG-221 — a plugin may *offer* a server. The tab has to make "offered" and
+// "added" different things on screen, because the difference is the whole
+// safety property: an offer is inert until the owner runs the create path.
+describe("McpView — servers a plugin offers", () => {
+  const offer = (partial: Partial<McpOffer> = {}): McpOffer => ({
+    plugin_id: "acme-mcp",
+    name: "acme-docs",
+    transport: "http",
+    description: "Acme's internal documentation index.",
+    endpoint_url: "https://mcp.acme.example/v1",
+    auth_ref: "ACME_MCP_TOKEN",
+    already_added: false,
+    ...partial,
+  });
+
+  it("lists an offer, credits the plugin, and says nothing is connected", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [offer()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    expect(await screen.findByText("acme-docs")).toBeInTheDocument();
+    expect(screen.getByText(/from plugin/i)).toBeInTheDocument();
+    expect(screen.getByText(/Nothing here is connected or reachable/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add server" })).toBeInTheDocument();
+  });
+
+  it("names the environment variable rather than showing a token", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [offer()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    expect(await screen.findByText("ACME_MCP_TOKEN")).toBeInTheDocument();
+    expect(screen.getByText(/The token is never stored here/i)).toBeInTheDocument();
+  });
+
+  it("adding one posts to the ordinary governed create route", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [offer()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+      "POST /api/mcp/servers/remote": { ok: true, server_id: "mcp_1", name: "acme-docs" },
+    });
+    render(McpView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add server" }));
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) => String(url).endsWith("/api/mcp/servers/remote")),
+      ).toBe(true),
+    );
+  });
+
+  it("shows an offer the owner already took up as added, with no button", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [offer({ already_added: true })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    expect(await screen.findByText("Added")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Add server" })).not.toBeInTheDocument();
+  });
+
+  it("says nothing about offers when a plugin has not made one", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/mcp/offers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await screen.findByText(/No MCP servers yet/i);
+    expect(screen.queryByText(/Offered by your plugins/i)).not.toBeInTheDocument();
   });
 });

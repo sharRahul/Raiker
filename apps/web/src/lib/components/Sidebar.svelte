@@ -463,7 +463,12 @@
     .phone-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; inset: auto 0 0; z-index: 70; min-height: 4rem; padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-1); }
     .phone-link, .phone-more { display: grid; place-items: center; gap: 0.1rem; min-width: 0; padding: 0.4rem 0.2rem; color: var(--text-3); background: transparent; border: 0; font: inherit; font-size: 0.64rem; font-weight: 650; text-decoration: none; }
     .phone-link.active, .phone-more[aria-expanded="true"] { color: var(--accent); }
-    .phone-link:hover, .phone-more:hover { background: var(--sunken); color: var(--text-1); text-decoration: none; }
+    /* Guarded on a real pointer. On a touch device `:hover` sticks after a tap,
+       so the last item touched keeps a highlight that reads as "you are here" —
+       directly contradicting the accent colour on the item that actually is. */
+    @media (hover: hover) {
+      .phone-link:hover, .phone-more:hover { background: var(--sunken); color: var(--text-1); text-decoration: none; }
+    }
   }
   @media (min-width: 1024px) {
     .phone-nav, .tablet-toggle, .drawer-scrim, .drawer-close { display: none; }

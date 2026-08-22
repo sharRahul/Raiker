@@ -10417,3 +10417,193 @@ a no-op would pass the type check and fail the behaviour.
 
 **Evidence.** The full web suite: 107 files, 913 passed, 1 skipped, on Node
 25.6.1. Previously 105 passed / 2 failed with 20 failing tests on the same host.
+
+---
+
+## FIXED-259 — A plugin can contribute a skill, and it arrives switched off
+
+**Severity: Medium → Low. Area: plugins / skills / extensibility. Fixed
+2026-08-22 (BUG-221 step 2).**
+
+Hooks proved the approach in FIXED-256: a plugin gets **no execution surface of
+its own** and contributes through a surface that already governs the thing
+contributed. Skills were named as the next kind for a reason — they run nothing —
+and the blocking piece was the one the entry said it was: *where a
+plugin-contributed `SKILL.md` lives, and how the Skills tab tells it from an
+uploaded one*.
+
+**What ships.** A manifest that asks for `skill:contribute` and declares
+`contributes.skills` now installs real skills. Two entry shapes — a whole
+`document`, or a `name`/`description`/`body` triple assembled the way
+`/skill-build` assembles one — both ending at `read_skill_md`, the same validator
+an upload goes through. A plugin therefore cannot express a skill Raiker would
+otherwise refuse to build.
+
+**Where it lives, and why that answers the blocking question.** The document is
+written to `.raiker/plugins/<plugin_id>/skills/<name>/SKILL.md` — *inside the
+directory revocation already deletes*, so a revoked plugin's skills disappear for
+the same structural reason its hooks do. Existence is on disk; the owner's on/off
+choice is in the skills store, which is what the runtime reads.
+`SkillsService.sync_plugin_skills` reconciles the two in one direction only: disk
+decides what exists, the store keeps the choice made about it, and
+`upsert_skill`'s existing "an update never silently re-enables a skill the owner
+turned off" property carries it across a refresh.
+
+**Two consents, and neither implied by the other.** `skill:contribute` is outside
+`SAFE_READ_ONLY`, so asking for it lands the plan on `pending_approval` and the
+owner reads it in the permission diff *before* installing. Then the skill arrives
+**inactive**. Instruction text entering the owner's turns is not harmless because
+it runs nothing, so installing the plugin is consent to *offer* the skill and
+switching it on is a separate decision the owner makes on Extensions → Skills.
+
+**What it cannot do.** It never overwrites a skill the owner owns: a name
+collision with an uploaded, built or imported skill leaves the owner's in place
+and drops the plugin's copy. Rename and Delete are refused with
+`skill_provided_by_plugin` and are not rendered — both would be undone by the
+next sync, so the surface says so rather than losing the row. **Download** stays,
+because reading exactly what a contributed skill says is the one thing the owner
+must always be able to do.
+
+**One bad entry refuses only itself.** Five skills where the third is malformed
+installs four and names the one it dropped; refusing all five would hide four
+working contributions behind one typo. More than twenty is refused whole rather
+than truncated. And a refusal on one *kind* never removes the other: a manifest
+whose hooks are malformed still installs its valid skills.
+
+**User-interface outcome.** Extensions → Skills marks the row **from plugin** and
+reads *"Provided by plugin `<id>`"*; Extensions → Plugins names the skills each
+plugin provides, says they install switched off, and links to the tab that turns
+them on; `/plugin-plan` states the count and the names before the install and
+prints each written path after it.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+goes beyond Claude Code.** Claude Code plugins bundle skills and install them
+active; the owner's protection is the marketplace and the install prompt. Raiker
+adds two things neither Claude Code nor Cowork has: the skill arrives **inactive**
+so offering and running are separate decisions, and the row is **credited to the
+plugin** so "where did this instruction come from" is answerable from the surface
+rather than from a directory listing. Codex, DeepSeek Harness and Hermes have no
+plugin-contributed instruction layer at all. OpenClaw's is closest and has no
+provenance on the row.
+
+**Evidence.** `tests/test_plugin_contributions.py` — eleven tests covering the
+permission gate, the permission diff, inactive-on-arrival, the choice surviving a
+refresh, revocation reaching the runtime, the owner's skill winning its name,
+rename/delete refusal, partial refusal, hooks and skills not costing each other,
+and the read model. `apps/web/src/lib/views/SkillsView.test.ts` and
+`ExtensionsView.test.ts` cover the two surfaces.
+
+---
+
+## FIXED-260 — A plugin can offer an MCP server, and an offer is not a server
+
+**Severity: Medium → Low. Area: plugins / MCP / extensibility. Fixed 2026-08-22
+(BUG-221 step 3).**
+
+The entry said what was missing: *"a manifest → server-profile path that goes
+through the existing trust gate rather than around it."* The shape that satisfies
+that is not a manifest that adds a server. It is a manifest that **offers** one.
+
+**What ships.** A manifest asking for `mcp:server` may declare
+`contributes.mcp_servers` — a name, a transport, and either an HTTPS endpoint
+with the *name of the environment variable* holding its token, or a reviewed
+stdio template. It is written to `.raiker/plugins/<id>/mcp-servers.json` and read
+back as an **offer**: a description of a server, listed on Extensions → MCP
+servers under *"Offered by your plugins"*, credited to the plugin.
+
+**Nothing about an offer is a connection.** No server profile is stored, no
+handshake runs, no host is reachable. Pressing **Add server** posts to the
+ordinary create route — `/api/mcp/servers/remote` or `/api/mcp/servers` — so the
+capability gate, the decision mode, the ownership check and the audit event all
+apply exactly as they would if the owner had typed the same fields in. That is
+what "through the gate rather than around it" means concretely: the plugin
+supplies the fields, the owner supplies the authority.
+
+**An offer can never carry a credential.** `https` only; a URL with a username or
+password in it is refused; `auth_ref` must match an environment-variable name, so
+a plugin author cannot hand the owner a token to paste into a field not built to
+hold one. All of it is re-validated **on read**, not only on write, so
+hand-editing the file after the install cannot smuggle in an endpoint the write
+path would have refused.
+
+**User-interface outcome.** The offer list is visually a proposal list — dashed
+border, quieter than the real servers below, and carrying no connection state of
+its own. An offer the owner has already taken up reads **Added** with no button,
+rather than a button that could only fail with `mcp_name_taken`. Extensions →
+Plugins names the offered servers and links here. Revoking the plugin withdraws
+the offers.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+is the sharpest divergence from Claude Code in this release.** Claude Code
+plugins install MCP servers directly: the plugin declares a server and it is
+configured. Codex's `config.toml` and OpenClaw do the same by file. Raiker
+deliberately does not, because an MCP server is a *tool source* — the highest-
+authority thing a plugin could add — and a plugin that can add one silently can
+add reach the owner never chose. Offering it costs one click and buys an
+explicit, audited, gated grant. This is the pattern to keep as the other kinds
+land.
+
+**Evidence.** `tests/test_plugin_contributions.py` — the permission gate, an
+offer not being a server, an offer the owner took up, refusal of plaintext and
+credential-bearing endpoints, refusal of a token in `auth_ref`, revocation
+withdrawing offers, re-validation defeating a hand-edited file, and the read
+model. `apps/web/src/lib/views/McpView.test.ts` covers the tab.
+
+---
+
+## FIXED-261 — What a channel message *is* in a turn is now decided
+
+**Severity: Medium. Area: channels / threat model. Fixed 2026-08-22 (BUG-225
+step 1).**
+
+BUG-225's own analysis said the blocker was not the registry — which already
+modelled the right things — but a missing decision: *"a channel is the point at
+which content Raiker did not ask for enters a turn. Every other input path has an
+answer for that. A channel message has no such framing yet, and neither has the
+sender."* Until that was written down, none of the delivery code had a contract
+to satisfy, and shipping delivery without it would have been worse than not
+shipping it.
+
+**What ships** is the contract, in `docs/CHANNELS_SPEC.md` → *What a channel
+message is in a turn*, with the matching rows in `docs/THREAT_MODEL.md`. A
+channel message is **untrusted content with a named sender who is not the
+owner**, and five rules follow, each enforceable rather than advisory:
+
+1. It is **never a prompt** — it arrives in an untrusted-content envelope with
+   the connector id, sender identity and trust level, so "ignore your
+   instructions" is a quoted string in a data block *structurally*, not as a
+   matter of the model's judgement.
+2. The sender is not the owner unless the sender **is** the owner and paired.
+   Trust is resolved from the pairing record, never from the message; an unpaired
+   channel resolves every sender as `untrusted`, which is what makes
+   `requires_pairing` enforcement rather than metadata.
+3. It **can never raise the turn's authority** — no capability, approval mode,
+   decision mode, install or approval. The routing modes that look like authority
+   are refused unless the sender is the paired owner, and `approval_response` is
+   refused outright until step 4 exists.
+4. **Outbound is a capability; inbound is a boundary** — different controls,
+   because the risks are not the same one seen twice.
+5. **Nothing is implicit** — linked is not enabled, enabled is not trusted,
+   allowlisted is not the owner; three separate stored facts, shown separately.
+
+**User-interface outcome.** Extensions → Channels no longer reads as a blank
+deferral. It states the accepted contract in the owner's words, then the four
+implementation steps with the state of each — step 1 **Done**, step 2 **Next** —
+so an accepted spec cannot be mistaken for a shipped feature, and a shipped
+feature cannot arrive without the reader having seen what it is allowed to be.
+
+**Reference-platform decision — is this a meaningful improvement?** **Yes, and it
+is where Raiker should intend to lead.** Claude Code has no channel concept at
+all. OpenClaw ships channels and treats them as where external input enters, but
+its framing is guidance to the model rather than a structural envelope. ChatGPT
+Work's connectors and Hermes' inbound paths carry sender identity but not a
+stated "cannot raise authority" rule. Deciding this *before* the transport is the
+differentiator; the transport itself is commodity.
+
+**What is explicitly not fixed.** Steps 2, 3 and 4 — outbound delivery, inbound
+pairing and allowlist enforcement, and the approval relay. BUG-225 stays open for
+them and is reduced rather than closed.
+
+**Evidence.** `docs/CHANNELS_SPEC.md`, `docs/THREAT_MODEL.md`,
+`apps/web/src/lib/views/ExtensionsView.test.ts` — the tab names the contract, and
+distinguishes what is done from what is not.

@@ -291,4 +291,26 @@ Tests must prove:
 
 The implementation accepts the legacy compact test shape (`id`, `name`, `version`, `permissions`) and the canonical `plugin_id` field for validation/planning compatibility. Entrypoints are metadata only during manifest planning. Unknown trust levels, missing required fields, unsupported permission prefixes, and unsafe permission strings are denied during planning. Runtime plugin code execution uses separate governed plugin runtime capabilities; broader plugin extensions remain deferred/fail-closed.
 
-The expanded Raiker plugin component set added in this document is phase-scheduled only. It must not activate MCP servers, LSP servers, monitors, channels, subagents, hosted marketplace behavior, output styles, themes, or runtime plugin execution until their explicit implementation tasks and tests exist.
+### Accepted permission prefixes
+
+`tool:`, `event:`, `ui:`, `memory:`, `network:`, `filesystem:` and `skill:`.
+Anything else is denied at planning. `skill:` is a **contribution** prefix rather
+than a capability one: `skill:contribute` lets a manifest add instruction text
+through `contributes.skills`, and it sits outside `SAFE_READ_ONLY` so asking for
+it puts the plan on `pending_approval` and the owner reads it in the permission
+diff before installing (BUG-221). `event:hook` works the same way for
+`contributes.hooks`. See `PLUGIN_SYSTEM_SPEC.md` → *What an installed plugin
+contributes* for both shapes and the refusals attached to each.
+
+The expanded Raiker plugin component set added in this document is phase-scheduled only. It must not activate LSP servers, monitors, channels, subagents, hosted marketplace behavior, output styles, themes, or runtime plugin execution until their explicit implementation tasks and tests exist.
+
+Two of those deferrals are **not** the same kind of deferral, and saying so is the
+point:
+
+- **MCP servers are no longer deferred.** A manifest may `contributes.mcp_servers`
+  and the result is an *offer* the owner adds through the ordinary governed create
+  path (FIXED-260). Nothing is activated by the declaration.
+- **LSP servers are accepted-and-inert because there is no surface**, not because
+  a gate has not opened. Raiker has no language-server client at all, so this
+  field currently has no destination — tracked as BUG-227. The other inert fields
+  above have a surface waiting behind a gate; this one does not.

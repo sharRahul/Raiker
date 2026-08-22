@@ -45,6 +45,7 @@ import type {
   InstanceLaunchResult,
   InterruptResult,
   McpAgentAccess,
+  McpOffer,
   McpServer,
   McpSession,
   McpFinding,
@@ -665,6 +666,10 @@ export const api = {
   // (a disabled gate returns 403 disabled_by_capability_gate); rename and
   // delete are human-only owner-scoped operations.
   mcpServers: () => request<McpServer[]>("/api/mcp/servers"),
+  // BUG-221 — servers installed plugins *offer*. An offer is a description, not
+  // a connection: adding one posts to the ordinary create routes above, so the
+  // capability gate and the audit event apply exactly as they would by hand.
+  mcpOffers: () => request<McpOffer[]>("/api/mcp/offers"),
   // Whether a connected server's tools can actually be called in a turn. The
   // handshake and the agent's reach are separate facts, so the page states both.
   mcpAgentAccess: () => request<McpAgentAccess>("/api/mcp/agent-access"),

@@ -4,7 +4,21 @@ from dataclasses import dataclass, field
 from typing import Any
 
 REQUIRED_FIELDS = {"name", "version", "permissions"}
-ALLOWED_PERMISSION_PREFIXES = ("tool:", "event:", "ui:", "memory:", "network:", "filesystem:")
+# ``skill:`` and ``mcp:`` are contribution prefixes, not capability ones. They
+# let a manifest add instruction text and *offer* an MCP server, and both are
+# deliberately outside ``SAFE_READ_ONLY`` so asking for either puts the plugin on
+# ``pending_approval`` and the owner reads it in the permission diff before
+# installing (BUG-221).
+ALLOWED_PERMISSION_PREFIXES = (
+    "tool:",
+    "event:",
+    "ui:",
+    "memory:",
+    "network:",
+    "filesystem:",
+    "skill:",
+    "mcp:",
+)
 
 
 @dataclass(frozen=True)

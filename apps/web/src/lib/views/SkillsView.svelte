@@ -64,6 +64,8 @@
     skill_archive_url_unsupported:
       "A .skill archive cannot be imported from a link. Download it and upload the file.",
     skill_rename_failed: "That name is already used by another of your skills.",
+    skill_provided_by_plugin:
+      "This skill comes from a plugin, so it cannot be renamed or deleted here. Revoke the plugin on Extensions → Plugins to remove it.",
     unknown_skill: "That skill is no longer installed.",
     invalid_base64: "The file could not be read.",
   };
@@ -87,10 +89,17 @@
         return "Imported from a link";
       case "built":
         return "Built here";
+      // BUG-221 — a contributed skill has to be readable as a plugin's, not as
+      // something the owner installed and forgot. The plugin id is the answer to
+      // "who put this here", so it is on the row rather than only in Details.
+      case "plugin":
+        return skill.source_ref ? `Provided by plugin ${skill.source_ref}` : "Provided by a plugin";
       default:
         return "Uploaded";
     }
   }
+
+  const isPluginSkill = (skill: SkillView) => skill.source === "plugin";
 
   async function load() {
     error = null;
@@ -413,6 +422,9 @@
                   <Badge variant="idle" label="inactive" />
                 {/if}
                 {#if skill.version}<span class="version">v{skill.version}</span>{/if}
+                {#if isPluginSkill(skill)}
+                  <span class="provenance" title="Contributed by an installed plugin">from plugin</span>
+                {/if}
               {/if}
             </div>
             {#if renamingId !== skill.skill_id}
@@ -423,24 +435,33 @@
                   onclick={() => toggle(skill)}
                   disabled={busy === skill.skill_id}
                 >{skill.active ? "Deactivate" : "Activate"}</button>
-                <button
-                  type="button"
-                  class="btn btn-sm"
-                  onclick={() => startRename(skill)}
-                  disabled={busy === skill.skill_id}
-                >Rename</button>
+                {#if !isPluginSkill(skill)}
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    onclick={() => startRename(skill)}
+                    disabled={busy === skill.skill_id}
+                  >Rename</button>
+                {/if}
                 <button
                   type="button"
                   class="btn btn-sm"
                   onclick={() => download(skill)}
                   disabled={busy === skill.skill_id}
                 >Download</button>
-                <button
-                  type="button"
-                  class="btn btn-sm btn-danger"
-                  onclick={() => remove(skill)}
-                  disabled={busy === skill.skill_id}
-                >Delete</button>
+                {#if isPluginSkill(skill)}
+                  <!-- Deleting the row would not remove the skill: the plugin's
+                       file is still on disk and the next sync restores it.
+                       Revoking the plugin is the control that removes it. -->
+                  <a class="btn btn-sm" href="#/extensions?tab=plugins">Manage plugin</a>
+                {:else}
+                  <button
+                    type="button"
+                    class="btn btn-sm btn-danger"
+                    onclick={() => remove(skill)}
+                    disabled={busy === skill.skill_id}
+                  >Delete</button>
+                {/if}
               </div>
             {/if}
           </div>
@@ -542,6 +563,20 @@
   .name-block { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
   .name { font-weight: 650; }
   .version { color: var(--text-3); font-size: 0.75rem; }
+  /* Provenance, not status: a plugin's skill is neither better nor worse than an
+     uploaded one, so this is a quiet chip rather than a coloured badge — the
+     active/inactive badge beside it is the one carrying state. */
+  .provenance {
+    font-size: 0.72rem;
+    font-weight: 650;
+    letter-spacing: 0.01em;
+    color: var(--text-2);
+    background: var(--sunken);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0.08rem 0.4rem;
+    white-space: nowrap;
+  }
   .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .rename { max-width: 16rem; }
   .description { margin: 0.35rem 0 0.4rem; color: var(--text-2); }

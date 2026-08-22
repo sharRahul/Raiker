@@ -118,7 +118,7 @@ export interface SkillView {
   name: string;
   description: string;
   version: string | null;
-  source: "upload" | "url" | "builtin" | "built";
+  source: "upload" | "url" | "builtin" | "built" | "plugin";
   source_ref: string | null;
   checksum: string;
   active: boolean;
@@ -369,9 +369,27 @@ export interface PluginSignature {
 
 /** What a plugin actually provides, read from the files the runtime loads
  *  rather than from the manifest that described them (BUG-221). */
+/** An MCP server an installed plugin offers. Inert until the owner adds it. */
+export interface McpOffer {
+  plugin_id: string;
+  name: string;
+  transport: "http" | "stdio";
+  description: string;
+  endpoint_url?: string;
+  auth_ref?: string | null;
+  template?: string;
+  already_added: boolean;
+}
+
 export interface PluginContributions {
   hooks: number;
   events: string[];
+  /** Skills the plugin ships. They install switched off and are credited to it. */
+  skills: number;
+  skill_names: string[];
+  /** MCP servers it offers. Offers are inert until the owner adds them. */
+  mcp_servers: number;
+  mcp_server_names: string[];
   /** "unreadable" when the contributed file exists and could not be parsed. */
   error: string | null;
 }

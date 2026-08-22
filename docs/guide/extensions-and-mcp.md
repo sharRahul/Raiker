@@ -323,22 +323,64 @@ lists what a plugin *may* contribute:
 
 | Contribution | Available |
 |---|---|
-| Hooks | yes |
-| Skills | not yet — they run nothing, and need a provenance story first |
-| MCP servers | not yet — already brokered and gated, but not contributable |
+| Hooks | yes — rules at `plugin` scope, below every scope you control |
+| Skills | yes — instruction text, installed **switched off** and credited to the plugin |
+| MCP servers | yes — a plugin may *offer* one; adding it is your action |
 | Panels | not yet — needs a route, permission and accessibility contract |
 
 so "provides nothing" and "may not provide anything" read differently.
 
 No plugin code runs in your browser.
 
+### A plugin's skills
+
+A plugin that asks for `skill:contribute` may ship `SKILL.md` documents. They go
+through the same validator an upload does, land in
+`.raiker/plugins/<id>/skills/<name>/SKILL.md`, and appear on Extensions → Skills
+marked **from plugin** with the plugin's id.
+
+They arrive **inactive**. Installing the plugin was consent to *offer* the skill,
+not to run with it — you switch each one on yourself, and that is a second,
+separate decision.
+
+Rename and Delete are not offered on a plugin's skill, because the next sync
+would undo either. **Download** is, so you can read exactly what it says. To
+remove one, revoke the plugin: that deletes the file, and the row goes with it.
+
+A plugin's skill never overwrites one of yours. If the names collide, yours stays.
+
+### A plugin's MCP servers
+
+A plugin that asks for `mcp:server` may **offer** a server — a name, a transport,
+an HTTPS endpoint or a reviewed template, and the name of the environment
+variable holding the token. It is a description, not a connection: nothing is
+added, connected, or reachable until you press **Add server** on Extensions →
+MCP servers, and that runs the same governed create path as typing it in.
+
+An offer can never carry a credential. A plaintext `http://` endpoint, a URL with
+a username or password in it, or an `auth_ref` that is not an environment
+variable name is refused at install, and re-validated when the offer is read — so
+hand-editing the file afterwards cannot smuggle one in.
+
 ## Channels
 
-The tab is intentionally empty and says so:
+No channel can send or receive work on your behalf yet, and the tab says so.
 
-> Inbound and outbound delivery needs an accepted contract and threat model
-> before Raiker offers controls for it. This tab exists so the gap is visible
-> rather than silently missing.
+What *is* settled is the part everything else depends on. A channel is the one
+place where content Raiker did not ask for enters a turn, and that content is now
+defined: **untrusted content with a named sender who is not you.** Never a prompt.
+Never able to enable a capability, widen an approval mode, or approve anything.
+Trust comes from the pairing record, never from anything inside the message.
 
-Inbound delivery is the highest-risk surface in this class — it is where external
-input enters — so the gate here is the threat model, not the code.
+Delivery is built on top of that, in this order:
+
+| Step | What | State |
+|---|---|---|
+| 1 | The contract — what a channel message is in a turn | **Done** |
+| 2 | Outbound delivery — sending you a result you asked for | Next |
+| 3 | Inbound — paired, sender-allowlisted, rate-limited | After that |
+| 4 | Approval relay | Last: a channel that can raise an approval can be used to *ask for* one |
+
+Inbound delivery is the highest-risk surface in this class, so the gate here is
+the threat model, not the code. Full contract:
+[`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).

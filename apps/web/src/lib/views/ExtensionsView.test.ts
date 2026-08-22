@@ -214,7 +214,15 @@ describe("ExtensionsView", () => {
               explanation: "A signature is present but no key was configured to check it.",
               remediation: "",
             },
-            contributions: { hooks: 2, events: ["PostToolUse", "PreToolUse"], error: null },
+            contributions: {
+              hooks: 2,
+              events: ["PostToolUse", "PreToolUse"],
+              skills: 0,
+              skill_names: [],
+              mcp_servers: 0,
+              mcp_server_names: [],
+              error: null,
+            },
           },
         ],
         signing: { configured: false, summary: "No signing key configured." },
@@ -226,6 +234,58 @@ describe("ExtensionsView", () => {
     expect(
       await screen.findByText(/provides 2 hook rules on PostToolUse, PreToolUse/i),
     ).toBeInTheDocument();
+  });
+
+  // BUG-221 step 2 — a contributed skill is offered, not switched on. "Provides
+  // 2 skills" must not read as two skills already in every turn.
+  it("names the skills a plugin provides, and says they are not on yet", async () => {
+    stubFetch({
+      "GET /api/plugins": {
+        plugins: [
+          {
+            record_id: "plr_2",
+            plugin_id: "acme-skills",
+            version: "2.0.0",
+            trust_level: "local_dev",
+            status: "installed",
+            source_url: null,
+            installed_at: "2026-08-22T00:00:00Z",
+            installed_by: "cli",
+            checksum_present: true,
+            signature: {
+              level: "unsigned",
+              label: "Unsigned",
+              reason: "no_signature",
+              method: "none",
+              verified: false,
+              explanation: "No signature was supplied.",
+              remediation: "",
+            },
+            contributions: {
+              hooks: 0,
+              events: [],
+              skills: 2,
+              skill_names: ["acme-release", "acme-review"],
+              mcp_servers: 0,
+              mcp_server_names: [],
+              error: null,
+            },
+          },
+        ],
+        signing: { configured: false, summary: "No signing key configured." },
+        contribution_kinds: [],
+      },
+    });
+    render(ExtensionsView, { props: { tab: "plugins" } });
+
+    expect(
+      await screen.findByText(/provides 2 skills \(acme-release, acme-review\)/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Its skills install switched off/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Activate them on the Skills tab/i })).toHaveAttribute(
+      "href",
+      "#/extensions?tab=skills",
+    );
   });
 
   it("states the signing posture rather than leaving it to be inferred", async () => {
@@ -290,12 +350,27 @@ describe("ExtensionsView", () => {
     expect(screen.getByTitle("signature_present")).toHaveTextContent("Present only");
   });
 
-  it("states plainly that channels are not available yet", async () => {
+  it("states plainly that channels cannot deliver yet", async () => {
+    stubFetch({});
+    render(ExtensionsView, { props: { tab: "channels" } });
+    expect(await screen.findByText(/channels cannot deliver yet/i)).toBeInTheDocument();
+  });
+
+  // BUG-225 step 1 — the contract is the part that is done, and the tab has to
+  // distinguish "we decided what this is" from "you can use it", or an accepted
+  // spec reads as a shipped feature.
+  it("names the accepted contract and what is still not built", async () => {
     stubFetch({});
     render(ExtensionsView, { props: { tab: "channels" } });
     expect(
-      await screen.findByText(/channels and webhooks are not available yet/i),
+      await screen.findByText(/untrusted content with a named sender who is not you/i),
     ).toBeInTheDocument();
+    const contract = screen.getByText(/The contract/).closest("li");
+    expect(contract).toHaveTextContent("Done");
+    const outbound = screen.getByText(/Outbound delivery/).closest("li");
+    expect(outbound).toHaveTextContent("Next");
+    expect(screen.getByText(/no channel can send or receive work on your behalf/i))
+      .toBeInTheDocument();
   });
 
   it("mounts the Skills tab as its own destination", async () => {

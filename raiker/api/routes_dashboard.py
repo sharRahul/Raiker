@@ -207,6 +207,21 @@ async def list_mcp_servers(
     return serialize_dto(_service(request).list_mcp_servers(auth_data[0].principal_id))
 
 
+@router.get("/api/mcp/offers")
+async def list_mcp_offers(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """MCP servers installed plugins offer, and whether each is already added.
+
+    Read-only and inert: an offer is a description, not a connection. Adding one
+    posts to the ordinary create routes below, so the capability gate, the
+    decision mode and the audit event all apply exactly as they would if the
+    owner had typed the same fields in themselves (BUG-221).
+    """
+    return _service(request).list_mcp_offers(auth_data[0].principal_id)
+
+
 @router.get("/api/mcp/agent-access")
 async def get_mcp_agent_access(
     request: Request,

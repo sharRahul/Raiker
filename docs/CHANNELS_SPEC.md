@@ -170,6 +170,72 @@ Wizard steps:
 
 ---
 
+## What A Channel Message *Is* In A Turn
+
+**Status: accepted 2026-08-22 (BUG-225 step 1). This section is the contract every
+delivery path below has to satisfy, and no channel code may ship without it.**
+
+A channel is the one place where **content Raiker did not ask for enters a turn**.
+Every other input path already has an answer for that, and the answer is what
+decides how the content is framed to the model:
+
+| Input | What it is | How the turn frames it |
+|---|---|---|
+| A prompt | The owner speaking | Instructions. Authoritative. |
+| A tool result | Data the runtime fetched on the model's behalf | Data the model is told to distrust. |
+| A subagent digest | Another agent's report | Quoted as untrusted. |
+| A skill | Instruction text the owner installed and activated | Instructions, at the owner's standing consent. |
+| **A channel message** | **Content someone else sent** | **Untrusted content with a named sender who is not the owner.** |
+
+Five rules follow, and each is enforceable rather than advisory:
+
+1. **A channel message is never a prompt.** It is delivered into the turn inside
+   an untrusted-content envelope carrying the connector id, the sender identity,
+   and the sender's trust level — the same framing a tool result gets, never the
+   framing the owner's own words get. A channel message that says "ignore your
+   instructions" is a *quoted string in a data block*, not an instruction, and
+   the envelope is what makes that structurally true rather than a matter of the
+   model's judgement.
+2. **The sender is not the owner, unless the sender *is* the owner and paired.**
+   `sender.trust_level` is resolved from the pairing record, never from anything
+   in the message. The default for an unrecognised sender is `untrusted`, and an
+   unpaired channel resolves every sender that way — which is why
+   `requires_pairing` is enforcement and not metadata.
+3. **A channel message can never raise the turn's authority.** It cannot enable a
+   capability, widen an approval mode, change a decision mode, install anything,
+   or approve anything. The routing modes that *look* like authority
+   (`approval_response`, `task_control`, `channel_admin`, `model_control`) are
+   refused on any channel whose sender is not the paired owner, and
+   `approval_response` is refused outright until the anti-phishing story in step
+   4 below exists.
+4. **Outbound is a capability; inbound is a boundary.** Delivering a result the
+   owner asked for is governed by the ordinary capability gate, decision mode and
+   audit event. Accepting a message is governed by pairing, the sender allowlist,
+   and the rate limit — a different set of controls, because the risks are not
+   the same one seen twice.
+5. **Nothing is implicit.** A channel that is linked is not enabled; a channel
+   that is enabled is not trusted; a sender that is allowlisted is not the owner.
+   Each is a separate stored fact and each is shown separately on
+   Extensions → Channels.
+
+### Implementation order, and why
+
+The order is the order in which the authority story can actually be written, and
+each step is refused until the one before it is done:
+
+| Step | What | Why here |
+|---|---|---|
+| 1 | **This section**, in the spec and the threat model | Nothing below has a contract to satisfy without it. **Done.** |
+| 2 | **Outbound delivery** | The half with no inbound risk. Exercises the connector profile, the capability gate and the audit path end to end. |
+| 3 | **Inbound, paired and allowlisted** | `requires_pairing` and `requires_sender_allowlist` become enforcement, under rules 1–3 above. |
+| 4 | **Permission relay** | Last, because a channel that can raise an approval is a channel that can be used to *ask for one*. Needs an anti-phishing story that does not exist yet. |
+
+Until step 2 ships, Extensions → Channels states that delivery is unavailable
+rather than offering controls for it. Saying so is the honest surface; offering a
+control that does nothing is not.
+
+---
+
 ## Channel Message Envelope
 
 ```json

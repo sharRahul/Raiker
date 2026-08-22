@@ -104,8 +104,14 @@ plan with execution disabled).
 
 - **Tools:** implemented for the built-in safe set; plugin-provided tools are planned to register
   through the same broker.
-- **Plugins / Channels:** registry + manifest/profile validation only; **no execution/transport**
-  (`raiker/plugins/`, `raiker/channels/`).
+- **Plugins:** registry + manifest validation, and **two contribution kinds**
+  (`raiker/plugins/contributions.py`). A plugin still runs no code of its own; it contributes
+  through a surface that already governs the thing contributed — `contributes.hooks` becomes hook
+  rules at `plugin` scope, below every scope the owner controls, and `contributes.skills` becomes
+  instruction text validated by the same reader an upload goes through and installed **switched
+  off**. MCP servers and panels remain uncontributable. Revoking deletes everything the plugin
+  wrote. See `PLUGIN_SYSTEM_SPEC.md`.
+- **Channels:** registry + profile validation only; **no transport** (`raiker/channels/`).
 - **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
   decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
   `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
@@ -128,8 +134,9 @@ plan with execution disabled).
     body, and any one bundled file, are read on demand through the broker like any other
     governed read — so they appear in the tool-action record and the event log.
 
-The remaining pieces to complete this model are plugin execution and channel transport; both
-must register through — and be gated by — the existing broker/policy/event infrastructure.
+The remaining pieces to complete this model are the two contribution kinds a plugin still cannot
+provide (MCP servers and panels) and channel transport; each must register through — and be gated
+by — the existing broker/policy/event infrastructure rather than inventing an execution surface.
 
 ## Where each surface is seen
 
@@ -140,9 +147,9 @@ trust, which is the opposite of what this model is for.
 |---|---|---|
 | Connectors | Extensions → Connectors | Install, connect, enable, and the four facts behind "usable" |
 | MCP servers | Extensions → MCP servers | Create, connect, monitor |
-| Skills | Extensions → Skills | Install and review; grants nothing and runs no code |
+| Skills | Extensions → Skills | Install and review; grants nothing and runs no code. A plugin's skill is credited to it, arrives inactive, and is removed by revoking the plugin |
 | Hooks | Extensions → **Hooks** | Read-only: what loaded, what can fire, what can decide, what it did |
-| Plugins | Extensions → Plugins | Install records and signature level; **no plugin code executes** |
+| Plugins | Extensions → Plugins | Install records, signature level, and what each one provides read from the files the runtime loads; **no plugin code executes** |
 | Channels | Extensions → Channels | Named as unavailable rather than silently missing |
 
 Hooks are read-only on purpose. The three configuration files are the owner's own

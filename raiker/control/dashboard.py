@@ -2812,6 +2812,28 @@ class DashboardService:
             for row in self.store.list_mcp_servers(principal_id)
         ]
 
+    def list_mcp_offers(self, principal_id: str) -> list[dict[str, Any]]:
+        """MCP servers installed plugins *offer*, and whether each is already added.
+
+        An offer is inert (BUG-221). It is a description of a server, read from
+        the file the plugin wrote, and nothing about it is connected, stored as a
+        server profile, or reachable. Adding one is the owner's action and runs
+        the same governed create path as typing it in — which is the whole reason
+        a plugin may offer one at all: it goes *through* the trust gate rather
+        than around it.
+
+        ``already_added`` is resolved against the owner's own servers by name, so
+        an offer the owner has taken up reads as taken up rather than as a button
+        that would fail with ``mcp_name_taken``.
+        """
+        from raiker.plugins.contributions import contributed_mcp_servers
+
+        taken = {str(row.get("name")) for row in self.store.list_mcp_servers(principal_id)}
+        return [
+            {**offer, "plugin_id": plugin_id, "already_added": offer["name"] in taken}
+            for plugin_id, offer in contributed_mcp_servers(self.workspace_root)
+        ]
+
     def create_mcp_server(
         self, acting_principal_id: str | None, name: str, template: str
     ) -> ControlResult:
@@ -3187,7 +3209,15 @@ class DashboardService:
                     # would give: it provides nothing.
                     "contributions": contributions.get(
                         str(row.get("plugin_id") or ""),
-                        {"hooks": 0, "events": [], "error": None},
+                        {
+                            "hooks": 0,
+                            "events": [],
+                            "skills": 0,
+                            "skill_names": [],
+                            "mcp_servers": 0,
+                            "mcp_server_names": [],
+                            "error": None,
+                        },
                     ),
                 }
             )
@@ -3208,13 +3238,22 @@ class DashboardService:
                 },
                 {
                     "kind": "skills",
-                    "available": False,
-                    "summary": "Instructions that run nothing. Needs a provenance story first.",
+                    "available": True,
+                    "summary": (
+                        "Instruction text validated by the same reader an upload "
+                        "goes through. It arrives switched off and credited to the "
+                        "plugin, so offering a skill and running with one stay two "
+                        "separate decisions."
+                    ),
                 },
                 {
                     "kind": "mcp_servers",
-                    "available": False,
-                    "summary": "Already brokered and gated; not yet contributable from a plugin.",
+                    "available": True,
+                    "summary": (
+                        "A plugin may *offer* a server. Nothing is connected or "
+                        "stored until you add it, and adding it runs the same "
+                        "governed create path as typing it in yourself."
+                    ),
                 },
                 {
                     "kind": "panels",

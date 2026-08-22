@@ -15,6 +15,49 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-08-22 (plugin contributions, MCP offers, channel contract, responsive sweep)
+
+The running built SPA was unlocked with Rahul's existing account. The Anthropic
+credential was entered through the Models reconnect dialog — never a source file,
+a command line, or the server's environment — and `claude-haiku-4-5-20251001` was
+pinned and readiness-checked through the product's own **Test** control before
+any turn was sent. No credential appears in these results, the specs, or the
+screenshots.
+
+Specs:
+[`bug-221-225-plugin-skills-mcp-channels-live.spec.ts`](../apps/web/e2e/bug-221-225-plugin-skills-mcp-channels-live.spec.ts)
+(9 tests),
+[`plugin-contributions-provider-live.spec.ts`](../apps/web/e2e/plugin-contributions-provider-live.spec.ts)
+(3 tests),
+[`ui-sweep-responsive-live.spec.ts`](../apps/web/e2e/ui-sweep-responsive-live.spec.ts)
+(3 tests). 15 tests, 15 passed.
+
+| Check | Result |
+|---|---|
+| A plugin's skill is credited to it on the row | ✅ *from plugin* chip and *"Provided by plugin acme-toolkit"* |
+| It arrives switched off | ✅ **inactive**, with **Activate** offered — proved against an *absent* starting state, not assumed |
+| Rename and Delete are not offered on it | ✅ neither rendered; **Download** and **Manage plugin** are |
+| The owner's on/off choice survives a reconcile | ✅ switched on, navigated away and back, still on |
+| Revoking withdraws the skill **and** the offer | ✅ both surfaces empty after the directory was deleted |
+| An offered MCP server is offered, not connected | ✅ listed under *Offered by your plugins*, credited, **Add server** offered, no server profile created |
+| An offer names a variable, never a token | ✅ *"Reads its token from `ACME_MCP_TOKEN`. The token is never stored here."* |
+| The Plugins tab states three kinds available, one not | ✅ Hooks / Skills / MCP servers **Available**; Panels **Not yet** |
+| Channels states the contract and the four steps | ✅ *"untrusted content with a named sender who is not you"*, step 1 **Done**, step 2 **Next** |
+| Anthropic credential entered through the UI | ✅ connection saved into the encrypted instance vault |
+| Anthropic readiness | ✅ `claude-haiku-4-5-20251001` — *can reach* |
+| **An active contributed skill reaches a real turn** | ✅ the live Haiku 4.5 turn listed `acme-live-on` among its skills |
+| **An inactive one does not** | ✅ `acme-live-off` absent from the same answer — the second consent holding across a real provider turn |
+| Every page fits at 390 / 834 / 1440 px | ✅ 26 pages × 3 widths: zero horizontal overflow |
+| Every icon renders a glyph | ✅ zero empty `<svg>` across the same 78 captures |
+| The selected hub tab is on screen | ✅ at every width (FIXED-257 holding) |
+| Visual review | ✅ `docs/plans/screenshots/working/bug-221-*`, `bug-225-channel-contract.png`, and `docs/plans/screenshots/pages/` |
+
+One defect was found and fixed by the sweep rather than by a feature test: on a
+touch device the phone navigation's `:hover` background stuck after a tap, so the
+last item touched kept a highlight that read as *"you are here"* and contradicted
+the accent colour on the item that actually was. The rule is now behind
+`@media (hover: hover)`.
+
 ## Result — 2026-08-21 (governed turn-based voice, preserved owner workspace)
 
 The running built SPA was unlocked with Rahul's existing account and every

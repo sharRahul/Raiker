@@ -125,10 +125,34 @@
     if (!contributions || contributions.error) {
       return "What it provides could not be read, so nothing is loaded from it.";
     }
-    if (contributions.hooks === 0) return "Provides nothing — no hook rules are loaded from it.";
-    const rules = `${contributions.hooks} hook ${contributions.hooks === 1 ? "rule" : "rules"}`;
-    return `Provides ${rules} on ${contributions.events.join(", ")}.`;
+    const parts: string[] = [];
+    if (contributions.hooks > 0) {
+      const rules = `${contributions.hooks} hook ${contributions.hooks === 1 ? "rule" : "rules"}`;
+      parts.push(`${rules} on ${contributions.events.join(", ")}`);
+    }
+    const skills = contributions.skills ?? 0;
+    if (skills > 0) {
+      const names = (contributions.skill_names ?? []).join(", ");
+      parts.push(`${skills} ${skills === 1 ? "skill" : "skills"}${names ? ` (${names})` : ""}`);
+    }
+    const servers = contributions.mcp_servers ?? 0;
+    if (servers > 0) {
+      const names = (contributions.mcp_server_names ?? []).join(", ");
+      parts.push(
+        `${servers} offered MCP ${servers === 1 ? "server" : "servers"}${names ? ` (${names})` : ""}`,
+      );
+    }
+    if (parts.length === 0) {
+      return "Provides nothing — no hook rules, no skills and no MCP servers are loaded from it.";
+    }
+    return `Provides ${parts.join(" and ")}.`;
   }
+
+  // A contributed skill installs switched off, so the row has to say where to go
+  // and that nothing is running yet — otherwise "provides 2 skills" reads as two
+  // skills already in every turn.
+  const contributedSkills = (c: PluginContributions | undefined) => c?.skills ?? 0;
+  const offeredServers = (c: PluginContributions | undefined) => c?.mcp_servers ?? 0;
 
   const KIND_LABELS: Record<string, string> = {
     hooks: "Hooks",
@@ -629,6 +653,18 @@
                       <a href="#/extensions?tab=hooks">See the rules on the Hooks tab →</a>
                     </span>
                   {/if}
+                  {#if contributedSkills(plugin.contributions) > 0}
+                    <span class="note">
+                      Its skills install switched off.
+                      <a href="#/extensions?tab=skills">Activate them on the Skills tab →</a>
+                    </span>
+                  {/if}
+                  {#if offeredServers(plugin.contributions) > 0}
+                    <span class="note">
+                      An offered server is inert until you add it.
+                      <a href="#/extensions?tab=mcp">Review it on the MCP servers tab →</a>
+                    </span>
+                  {/if}
                   <span class="note">{plugin.signature.explanation}</span>
                   {#if plugin.signature.remediation}
                     <span class="note">{plugin.signature.remediation}</span>
@@ -672,13 +708,28 @@
 {:else}
   <div id="panel-channels" role="tabpanel" aria-labelledby="tab-channels">
     <section class="card deferred">
-      <h2>Channels and webhooks are not available yet</h2>
+      <h2>Channels cannot deliver yet</h2>
       <p>
-        Inbound and outbound delivery needs an accepted contract and threat model before Raiker
-        offers controls for it. Until then there is nothing to configure here, and no channel can
-        deliver work on your behalf.
+        A channel is the one place where content Raiker did not ask for enters a turn. That
+        contract is now written down and accepted: a channel message is
+        <strong>untrusted content with a named sender who is not you</strong> — never a prompt,
+        never able to raise a turn's authority, and never trusted because it is linked.
       </p>
-      <p class="note">This tab exists so the gap is visible rather than silently missing.</p>
+      <p>
+        Delivery is built on top of that, in the order the authority story allows. Until outbound
+        delivery ships there is nothing to configure here, and
+        <strong>no channel can send or receive work on your behalf</strong>.
+      </p>
+      <ol class="channel-steps">
+        <li><strong>The contract</strong> — what a channel message is in a turn. <span class="hook-tag">Done</span></li>
+        <li><strong>Outbound delivery</strong> — sending you a result you asked for. <span class="hook-tag hook-tag-dead">Next</span></li>
+        <li><strong>Inbound</strong> — paired, sender-allowlisted, rate-limited. <span class="hook-tag hook-tag-dead">After that</span></li>
+        <li><strong>Approval relay</strong> — last; a channel that can raise an approval can be used to ask for one. <span class="hook-tag hook-tag-dead">Not planned yet</span></li>
+      </ol>
+      <p class="note">
+        This tab exists so the gap is visible rather than silently missing.
+        <GuideLink route="extensions" label="How extension surfaces are governed" />
+      </p>
     </section>
   </div>
 {/if}
@@ -970,4 +1021,21 @@
      meaning to get it. */
   .measure { max-width: 46rem; }
   .deferred h2 { margin-top: 0; }
+
+  /* An ordered list of steps, not a set of findings: numbered, quiet, and with
+     the state chip inline so "Done" and "Next" read at the same weight as the
+     step they belong to. */
+  .channel-steps {
+    margin: var(--space-3) 0 0;
+    padding-left: 1.3rem;
+    display: grid;
+    gap: var(--space-2);
+    color: var(--text-2);
+    font-size: 0.88rem;
+  }
+  .channel-steps strong { color: var(--text-1); }
+  .channel-steps .hook-tag { margin-left: var(--space-2); }
+  /* The closing note is a footnote to the list, not the fifth step — it needs the
+     gap that says so. */
+  .channel-steps + .note { margin-top: var(--space-3); }
 </style>

@@ -370,7 +370,9 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   rather than showing disabled controls. The gate is an accepted threat model,
   not the code — inbound delivery is the highest-risk surface in this class.
 
-  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221.
+  Tracked in `docs/plans/TO_BE_FIXED.md` → BUG-221 (plugin contributions),
+  BUG-225 (channels) and BUG-226 (the three hook handler types this build
+  refuses: `http`, `mcp_tool` and `prompt`/`agent`).
 
 - **A governed command now runs inside a real OS boundary, and that boundary is
   measured rather than described.** Selecting **Native OS sandbox** runs each

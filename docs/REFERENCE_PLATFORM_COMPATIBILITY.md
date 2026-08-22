@@ -71,12 +71,17 @@ third with its reason.
 * **Plugin skills, MCP servers and panels.** Tracked on BUG-221. Skills are next
   because they run nothing and need only provenance.
 * **Channels.** No inbound or outbound delivery. `CHANNELS_SPEC.md` has the
-  design; the threat model is the gate, not the code.
+  design and `ConnectorRegistry` already validates transport, auth, pairing and
+  allowlist requirements per profile; what is missing is a decision about what a
+  channel message *is* in a turn — untrusted content from a sender who is not the
+  owner. The threat model is the gate, not the code. Tracked as BUG-225.
 * **A marketplace or plugin directory.** Not planned; installing from a path or
   URL with a reviewed permission diff is the local-first equivalent.
-* **Hook handler types.** Two of five (`command`, `builtin`). `http`, `mcp_tool`,
-  `prompt` and `agent` handlers are specified and unbuilt — the first two need an
-  egress story, the second two need a model-call budget.
+* **Hook handler types.** Two accepted (`command`, `builtin` — the second being
+  Raiker's own code rather than one of the reference five). `http`, `mcp_tool`,
+  `prompt` and `agent` are refused at parse time: the first needs a revocable
+  egress grant, `mcp_tool` would let a hook reach authority the turn did not
+  have, and the last two need a model-call budget. Tracked as BUG-226.
 
 ---
 

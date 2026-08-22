@@ -70,6 +70,8 @@ Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 | [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
 | [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
 | [BUG-224](#bug-224--the-node-25-web-test-run-cannot-see-jsdoms-localstorage) | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
+| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium | Channels / extensibility | Open — raised 2026-08-22 |
+| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -606,3 +608,95 @@ present is not a working `Storage`. Rather than pinning harder — which only
 defers the same break to the next Node release — the shim is a real map, because
 the code under test persists a theme choice and reads it back; a no-op stub would
 pass the type check and fail the behaviour.
+
+---
+
+## BUG-225 — A channel can be described and never reached
+
+**Severity: Medium. Area: channels / extensibility. Status: Open — raised
+2026-08-22 while closing the hooks and plugin halves of the same gap.**
+
+**Observed.** `config/channel-connectors.json` describes channel connectors in
+detail — transport, auth method, whether pairing is required, whether a sender
+allowlist is required, whether network is required, the capability policy
+template — and `ConnectorRegistry` validates every one of those fields at
+startup, refusing a profile that omits any. Then nothing consumes them for
+delivery. Extensions → **Channels** says so:
+
+> Inbound and outbound delivery needs an accepted contract and threat model
+> before Raiker offers controls for it.
+
+That is honest, and it is now the largest remaining piece of the hooks →
+plugins → channels gap: hooks reached parity 2026-08-22 (FIXED-255) and plugins
+took their first contribution kind (FIXED-256).
+
+**Root cause.** Not the registry, which already models the right things. What is
+missing is a decision about the boundary: a channel is the point at which
+**content Raiker did not ask for enters a turn**. Every other input path has an
+answer for that — a prompt is the owner speaking, a tool result is data the model
+is told to distrust, a subagent digest is quoted as untrusted. A channel message
+has no such framing yet, and neither has the sender.
+
+**What the reference set does.** OpenClaw leads here; its own documentation
+treats channels as where external input enters. Claude Code has no equivalent.
+This is therefore the one part of the three-way gap where being behind is not
+automatically a defect — shipping delivery without the framing would be worse
+than not shipping it.
+
+**Proposed fix, in the order the authority story has to be written.**
+
+1. **Decide what a channel message *is* in a turn.** It is untrusted content with
+   a named sender, and the sender is not the owner. Until that is written down —
+   in `docs/CHANNELS_SPEC.md` and the threat model — none of the code below has a
+   contract to satisfy.
+2. **Outbound first.** Delivering a result the owner asked for is the half with
+   no inbound risk, and it exercises the connector profile, the capability gate
+   and the audit path end to end.
+3. **Then inbound, paired and allowlisted.** `requires_pairing` and
+   `requires_sender_allowlist` are already fields on every profile; they become
+   enforcement.
+4. **Permission relay last**, because a channel that can raise an approval is a
+   channel that can be used to *ask for one*, and the anti-phishing story for
+   that does not exist.
+
+Until step 1 exists, the tab should keep saying so rather than offering controls.
+
+---
+
+## BUG-226 — Three of the five hook handler types do not exist
+
+**Severity: Low. Area: hooks / handlers. Status: Open — raised 2026-08-22.**
+
+**Observed.** The hooks reference Raiker maps itself against documents five
+handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. `HANDLER_TYPES`
+in `raiker/hooks/contracts.py` accepts two — `command` and `builtin`, the second
+being Raiker's own in-process code rather than one of the five. A rule naming
+`http` is refused at parse time with `unsupported_handler_type:http`, which is
+the right failure but leaves three of the reference set unavailable.
+
+This is the remainder of the hooks gap after BUG-223. The *events* are at parity;
+the *handlers* are not.
+
+**Root cause.** Each of the three needs a resource the hook path deliberately
+does not have:
+
+* `http` needs egress. A hook has no implicit network access by design, and
+  giving one an outbound request is a capability decision, not a handler type.
+* `mcp_tool` needs the MCP broker inside the hook path, which would let a hook
+  reach a tool the turn's own policy might have refused — the exact inversion the
+  hook model forbids.
+* `prompt` and `agent` need a model call, which means a token budget, a timeout
+  that is not the handler's 5-second one, and an answer to what happens when the
+  model call itself triggers hooks.
+
+**Proposed fix.** `prompt` is the cheapest and the least dangerous: it makes no
+outbound request of its own and its output is context, not a decision. Take it
+first, with its own budget and a hard refusal to nest. `http` follows only once a
+hook can be given a named, revocable egress grant of the kind the container work
+already built. `mcp_tool` and `agent` should stay refused until there is a stated
+answer to a hook reaching authority the turn did not have.
+
+**Not a regression, and visible today.** A rule naming an unsupported type is
+refused at parse time rather than accepted and ignored, and the Hooks tab reports
+the file as failed with the reason — so an owner writing one is told, rather than
+believing a guard is in place.

@@ -10261,6 +10261,17 @@ written to `config/hooks.json`, a real prompt answered, and `hook_matched` and
 `hook_executed` in Recent hook activity afterwards
 (`screenshots/working/bug-223-stop-fired-on-a-real-turn.png`).
 
+Then repeated across every backend, because a lifecycle event that only fired
+when one adapter answered would be the wrong half working:
+`bug-223-turn-end-hooks-providers-live.spec.ts` connects **Anthropic**, **OpenAI**,
+**OpenRouter** and local **Ollama** (`gemma4:31b-cloud`) through the product's own
+dialogs and requires the `hook_executed` count on the Hooks tab to *rise* for each
+one — a count rather than a presence check, since the previous provider's turn has
+already left rows. All four pass. A provider with no key is skipped **by name**:
+a run that tested one must not read like a run that tested four. The count is read
+through the page rather than by calling `/api/hooks`, because the bearer token is
+deliberately never persisted and an unauthenticated fetch reads as zero.
+
 ---
 
 ## FIXED-256 — A plugin was recorded and then provided nothing

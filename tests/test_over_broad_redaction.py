@@ -375,3 +375,61 @@ def test_commit_revisions_and_digests_survive_only_in_named_fields() -> None:
     assert redact_response_body({"revision": "sk-ant-AAAABBBBCCCCDDDD"}) != {
         "revision": "sk-ant-AAAABBBBCCCCDDDD"
     }
+
+
+class TestAnAuditExportManifestHashSurvives:
+    """BUG-231, found live: the Audit log listed every export as `[REDACTED_SE…`.
+
+    An export's `manifest_hash` is 64 hex characters taken over the exact event
+    ids and scope, and its entire purpose is to be compared *outside* Raiker. The
+    generic high-entropy fallback ate it, so the page that offers the export as
+    evidence could not show the one field that makes it evidence.
+    """
+
+    HASH = "0123456789abcdef" * 4
+
+    def test_the_hash_is_returned_intact(self) -> None:
+        body = [{"export_id": "aex_1", "manifest_hash": self.HASH, "event_count": 271}]
+        assert redact_response_body(body) == body
+
+    def test_a_bare_hash_field_survives_too(self) -> None:
+        assert redact_response_body({"hash": self.HASH}) == {"hash": self.HASH}
+
+    def test_every_spelling_of_a_digest_survives(self) -> None:
+        # Found on the same live sweep. `_sha` never matched `_sha256`, so
+        # Memory → Observations reported every observation's `content_sha256` —
+        # the value that makes a provenance record checkable — as `[REDACTED_SE…`,
+        # and a restore plan's pre-image addresses went the same way.
+        body = {
+            "checksum": self.HASH,
+            "content_checksum": self.HASH,
+            "content_sha256": self.HASH,
+            "manifest_sha256": self.HASH,
+            "pre_image_sha256": self.HASH,
+            "current_sha256": self.HASH,
+        }
+        assert redact_response_body(body) == body
+
+    def test_a_credential_named_like_a_digest_is_still_destroyed(self) -> None:
+        leaked = {"password_sha256": self.HASH, "api_key_sha256": self.HASH}
+        assert redact_response_body(leaked) == {
+            "password_sha256": "***REDACTED***",
+            "api_key_sha256": "***REDACTED***",
+        }
+
+    def test_a_credential_named_like_a_hash_is_still_destroyed(self) -> None:
+        # The secret-key sweep runs first, so a key whose *name* says credential
+        # is discarded whole however it is spelled.
+        leaked = {"password_hash": self.HASH, "token_hash": self.HASH}
+        assert redact_response_body(leaked) == {
+            "password_hash": "***REDACTED***",
+            "token_hash": "***REDACTED***",
+        }
+
+    def test_a_real_credential_under_a_hash_key_still_fails_closed(self) -> None:
+        leaked = {"manifest_hash": "sk-ant-api03-AAAABBBBCCCCDDDDEEEEFFFFGGGGHHHHIIIIJJJJKKKK"}
+        assert redact_response_body(leaked) != leaked
+
+    def test_the_same_string_in_free_form_text_is_still_scanned_strictly(self) -> None:
+        answer = {"answer": self.HASH}
+        assert redact_response_body(answer) != answer

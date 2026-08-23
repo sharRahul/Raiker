@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-23 | Targeted | `r0823-` | Anthropic, OpenAI, OpenRouter | The checkpoint rewind end to end, the audit export, the deleted second egress path, and two defects the rewind exposed |
 | 2026-08-22 | Targeted | `bug-219-`, `bug-221-`, `bug-223-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama | Hooks off switch and lifecycle events, plugin-contributed skills and MCP offers, channel owner surface, the fourth approval mode |
 | 2026-08-21 | Targeted | `r0821b-`, `r0821c-`, `2026-08-21-` | Anthropic | Governed voice, Build modes and operating protocol, the two composers, the Hooks tab, responsive sweeps |
 | 2026-08-17 | Targeted | `r0817-`, `r0817b-` | Anthropic Haiku 4.5 | FTS5 retrieval, owner-selected recall backend, background execution and a POSIX terminal, eidetic capture, restart reattachment, persistent environment |
@@ -46,6 +47,89 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-23 — the rewind, the audit export, and two defects the rewind exposed
+
+**Tier:** targeted. **Providers:** Anthropic (`claude-sonnet-5`), OpenAI
+(`gpt-4`), OpenRouter (`nvidia/nemotron-3.5-lightning:free`) — all three
+confirmed reachable in-session. Ollama Cloud was **not connected** on this
+machine and was not exercised. **Prefix:** `r0823-`.
+
+**Build:** `main` at the FIXED-270 … FIXED-276 change set, `apps/web` rebuilt,
+`raiker-web --workspace . --port 8765`, signed in as the existing owner account
+*Rahul* — an account created before any of this work, with every capability gate
+still at its per-account fail-closed default.
+
+### What it proved
+
+* **The rewind is reachable, and it is a request.** Observability → Checkpoints →
+  *Preview restore impact* named the one file a restore would rewrite;
+  acknowledging and pressing **Request this restore** answered *"Raised as
+  approval appr_830aa…. Nothing has changed yet."* and the file on disk was still
+  the agent's version. Approving it in Approvals put `live-rewind-probe.txt` back
+  to `original contents before the rewind`. The restore's own pre-image was
+  captured, so the rewind is itself rewindable. (`r0823-bug230-restore-preflight`,
+  `r0823-bug230-preflight-with-files`, `r0823-bug230-restore-approval`.)
+* **The approval for a restore reads as a restore.** The detail pane carried the
+  restore-specific notice — *"The restore captures its own pre-image first, so it
+  appears as a new checkpoint"* — and the per-file plan, recomputed server-side,
+  rather than the file-mutation wording.
+* **The audit log leaves the product.** Observability → Audit log → **Export**
+  produced 271 events as a redacted JSONL, downloaded it, and listed it with its
+  manifest hash. The export appears in the log it exported, as *"Action executed
+  — Exported 271 audit events (2026-08-19T11:40:27Z → 2026-08-23T16:35:07Z),
+  redacted."* Spot-checked: 24 redactions in the file, and no `sk-` string.
+  (`r0823-bug231-audit-export`.)
+* **The MCP revision is current, and the card says so.** A server built from the
+  bundled echo template, connected over a real stdio session, reports
+  **PROTOCOL 2026-07-28** on its card — the template answers the handshake, and
+  the negotiated revision is what is shown, not what Raiker offered
+  (`r0823-bug234-mcp-protocol`).
+* **`network_execution` is gone from Permissions.** The Network group now lists
+  Web fetch, Git push, External channels and Channel approval relay, and nothing
+  else. Web fetch's description states the guard that actually applies.
+* **Every governed step still failed closed first.** On an account with the
+  gates at their defaults, the export returned `403` until `audit_export` was
+  turned on, and enabling `hosted_model_runtime` required a threat-model
+  acknowledgement *and* a typed confirmation token. Both refusals are correct
+  behaviour and were re-confirmed here rather than assumed.
+* **Responsive.** Fourteen routes at 390 × 844 with **zero** horizontal overflow
+  on any of them, including the new export panel, which wraps rather than
+  clipping (`r0823-mobile-audit-export`).
+* **Every route at 1440 × 900, re-swept after each fix.** Twenty-one routes,
+  checked for horizontal overflow and for `NaN`, `undefined`, `[object Object]`,
+  `[REDACTED_SE…` and load errors in the rendered text. The final sweep is clean;
+  the sweep before it is what found the third redaction defect.
+
+### What it found
+
+Two defects, both raised and closed in the same round, and both **only
+observable because the rewind was finally routed**:
+
+* **BUG-235 → [FIXED-275](FIXED_ITEMS.md).** A file write approved from the
+  inbox filed its pre-image under the *API session* that resolved the approval,
+  while the checkpoints it must be restorable from belong to the *chat*. Every
+  restore plan for that conversation reported zero files. The blob existed and
+  nothing could reach it — which is the same shape as BUG-230 itself, one layer
+  down, and is why nobody had found it: without a caller for the restore, no plan
+  was ever acted on.
+* **BUG-236 → [FIXED-276](FIXED_ITEMS.md).** The export list rendered every
+  manifest hash as `[REDACTED_SE…`. The response redactor's high-entropy fallback
+  ate the 64-hex digest, so the one field that makes an export verifiable outside
+  Raiker could not be read.
+
+### What it did not cover
+
+* **Ollama** — not connected on this host; the local-runtime path was not
+  exercised.
+* **A cross-principal restore** — a single-owner instance has no second principal
+  to overwrite, so the critical path was verified by classification test rather
+  than live.
+* **An oversize file mutation** — the >8 MiB approval notice was verified by
+  test, not by writing an 8 MiB file through a live turn.
+* This was a **targeted** round. The last full sweep remains 2026-08-08.
 
 ---
 

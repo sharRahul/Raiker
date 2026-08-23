@@ -79,8 +79,30 @@ _LOCATOR_KEYS = frozenset({"subject", "path", "paths", "subpath", "url", "urls",
 # link to, or stop work in. Checked *after* the secret-key sweep, so a key that
 # names a credential is still discarded whole.
 _IDENTIFIER_KEY_SUFFIXES = ("_id", "_ids")
-_DIGEST_KEYS = frozenset({"revision", "sha", "commit_sha", "digest", "fingerprint"})
-_DIGEST_KEY_SUFFIXES = ("_revision", "_sha", "_digest", "_fingerprint")
+# A hash is a digest by another name, and `manifest_hash` is the field whose
+# *whole purpose* is to be compared outside Raiker: an audit export's 64-hex
+# content hash over the exact event ids and scope. The entropy fallback ate it,
+# so the Audit log listed every export under the same `[REDACTED_SE…` string —
+# the same failure mode as the model ids above, and worse here, because a hash
+# nobody can read cannot verify anything. `password_hash` and friends are still
+# discarded whole: the secret-key sweep runs before this one.
+# The family is spelled several ways across the API, and the entropy fallback ate
+# every spelling the list did not name. `manifest_hash` is an audit export's
+# content hash — the one field that makes an export verifiable outside Raiker —
+# and `content_sha256` is an observation's, which is what makes a provenance
+# record checkable. Both rendered as `[REDACTED_SE…`. Naming the *algorithm*
+# suffixes as well as the generic ones is what stops the next spelling repeating
+# it: `_sha` never matched `_sha256`.
+_DIGEST_KEYS = frozenset(
+    {
+        "revision", "sha", "commit_sha", "digest", "fingerprint",
+        "hash", "manifest_hash", "checksum", "sha256", "sha1", "md5",
+    }
+)
+_DIGEST_KEY_SUFFIXES = (
+    "_revision", "_sha", "_digest", "_fingerprint", "_hash", "_checksum",
+    "_sha256", "_sha1", "_md5",
+)
 
 # Field names whose values are provider model names. Same failure as the
 # locators and the identifiers above, found live against OpenRouter's 413-model

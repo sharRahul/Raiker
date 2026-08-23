@@ -41,14 +41,18 @@ Honest one-line assessments, each backed by the items below it.
 | Pillar | State | The thing in the way |
 |---|---|---|
 | **P1** Assistant | **Strong.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects | Memory does not retrieve by meaning. An assistant that cannot recall a paraphrase is not one people keep using |
-| **P2** Governed agent | **Ahead of the field, with two honest holes.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has | Recovery is not reachable (no rewind) and evidence is not exportable (no audit route). Both are *stated* properties Raiker does not yet deliver |
-| **P3** Coding agent | **Closes the loop.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review | It cannot undo. Checkpoint capture is complete; nothing proposes a restore |
-| **P4** Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client is five protocol revisions behind, which closes off three capabilities at once |
+| **P2** Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted | Governance is entered through eight modules that each re-implement the gate check (GEP-01), and fifteen capabilities have no traced governed-action path (GEP-04). Neither is a hole in the product; both are holes in the *proof* |
+| **P3** Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
+| **P4** Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client now negotiates the current revision, but implements a subset of it: no streamable-HTTP session semantics, no remote OAuth, no `server/discover`, no MCP Apps |
 
 **The single highest-value observation across all four:** three of the four
-pillars are blocked by the *same two items* — checkpoint rewind and audit export.
-Both are High priority, Low effort, and both are things Raiker already built and
-never routed. They are the cheapest work with the widest effect in the product.
+pillars were blocked by the *same two items* — checkpoint rewind and audit
+export — and both were things Raiker had already built and never routed. Both
+closed on 2026-08-23, together with the two other High/Low rows beside them and
+the MCP revision that was blocking three P4 rows at once. **The backlog's
+High-priority, Low-effort section is now empty**, which makes GEP-04 (P2) and
+MEM-10 (P1) the next things to weigh: neither is cheap, and both decide whether a
+pillar is *proven* rather than merely working.
 
 ---
 
@@ -60,9 +64,9 @@ never routed. They are the cheapest work with the widest effect in the product.
 | Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md) | Open — ~431 ms at 3 000 memories, paid every turn |
 | A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open |
 | Retention sweep | [MEM-07](MEMORY_RELIABILITY_PLAN.md) | Open — `expires_at` enforced at read time only |
-| Owner-guided summarisation of a range | [backlog #14](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
-| A structured question to the owner mid-turn | [backlog #22](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
-| Tool rows do not survive a reload | [backlog #30](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
+| Owner-guided summarisation of a range | [backlog #9](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
+| A structured question to the owner mid-turn | [backlog #17](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
+| Tool rows do not survive a reload | [backlog #25](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
 | GAP-CHAT remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 13 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
 
 **Blocking item:** MEM-10. Everything else here is polish on a surface that
@@ -72,61 +76,65 @@ already works.
 
 | Item | Where | State |
 |---|---|---|
-| **Checkpoint rewind is unreachable** | [backlog #1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — executor built, registered, tested, and no route proposes a restore |
-| **Audit export has no route** | [backlog #2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — manifest produced, never surfaced |
-| **Remove the second, weaker egress path** | [backlog #3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — two implementations of "reach the network" |
-| **An oversize checkpoint is silently unrestorable** | [backlog #4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — the approval promises a rewind it cannot give |
+| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md) | **Closed 2026-08-23** — a route, a Checkpoints action and a terminal command raise the approval |
+| Audit export | [FIXED-271](FIXED_ITEMS.md) | **Closed 2026-08-23** — an executor, a route, a listing and a download, redacted and account-scoped |
+| The second, weaker egress path | [FIXED-272](FIXED_ITEMS.md) | **Closed 2026-08-23** — deleted; `web_fetch` routes through `WebAccessService` |
+| An oversize checkpoint promised a rewind | [FIXED-273](FIXED_ITEMS.md) | **Closed 2026-08-23** — the approval notice says so before you decide |
 | Eight modules re-implement the gate check | [GEP-01](GOVERNANCE_ENTRY_PATHS.md#gep-01--eight-modules-re-implement-the-gate-check) | Open |
 | The stop switch's scope is undefined for read paths | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths) | Open — **an owner decision** |
 | `NESTED_BOUNDARIES_ARCHITECTURE.md` overstates the architecture | [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Open |
 | Fifteen capabilities have no traced governed-action path | [GEP-04](GOVERNANCE_ENTRY_PATHS.md#gep-04--fifteen-capabilities-have-no-traced-governed-action-path) | Open — **do this first**; it may reclassify others |
 | Auto mode has no alignment check | [BUG-218](TO_BE_FIXED.md) | Open |
 | Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md) | Open |
-| OpenTelemetry export | [backlog #23](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Deterministic replay | [backlog #25](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
-| Credential masking with sentinel substitution | [backlog #24](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
+| OpenTelemetry export | [backlog #18](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Deterministic replay | [backlog #20](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
+| Credential masking with sentinel substitution | [backlog #19](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
 | WebAuthn step-up, hardware root of trust | [ADD-14](TO_BE_ADDED.md), [ADD-15](TO_BE_ADDED.md) | Proposed — **owner decisions** |
 
-**Blocking items:** #1 and #2. Raiker's own documentation lists *recoverable*
-and *auditable* as properties of the runtime, and today an owner can reach
-neither. Everything else in P2 is Raiker being ahead and wanting to be further
-ahead; these two are it not being what it says.
+**No blocking item.** *Recoverable* and *auditable* were the two properties
+Raiker's own documentation claimed and an owner could not reach; both closed on
+2026-08-23. Everything left in P2 is Raiker being ahead and wanting to be further
+ahead. **Do GEP-04 first** — it may reclassify the rows above it.
 
 ## P3 — A capable coding/build agent
 
 | Item | Where | State |
 |---|---|---|
-| **Checkpoint rewind is unreachable** | [backlog #1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — shared with P2, and this is where an owner feels it |
+| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md) | **Closed 2026-08-23** — shared with P2, and this is where an owner feels it |
 | Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md) | Open — POSIX-only PTY and reattachment |
-| Filtered domain egress unproven | [backlog #11](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
-| Remote supervisor install lifecycle | [backlog #27](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
+| Filtered domain egress unproven | [backlog #6](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
+| Remote supervisor install lifecycle | [backlog #22](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
 | No resolved call graph; textual find-references | [B-tier](GAP_BUILD_CHAT.md) | Open by design, stated |
 | LSP surface | [BUG-227](TO_BE_FIXED.md) | Open — **decide whether Raiker wants one at all** |
-| Worktrees for parallel work | [backlog #32](../REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
+| Worktrees for parallel work | [backlog #27](../REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
 | GAP-BUILD remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 9 items |
 
-**Blocking item:** #1, again. A coding agent that can write but not undo makes
-the owner the undo mechanism.
+**No blocking item.** A coding agent that could write but not undo made the owner
+the undo mechanism; the rewind closed on 2026-08-23. The largest remaining item
+is BUG-194 — interactive, background and remote execution inside the sandbox.
 
 ## P4 — An extensible governed agent platform
 
 | Item | Where | State |
 |---|---|---|
-| **MCP client is five protocol revisions behind** | [backlog #9](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Open — blocks streamable HTTP, remote OAuth **and** MCP Apps at once |
+| MCP protocol revision | [FIXED-274](FIXED_ITEMS.md) | **Closed 2026-08-23** — `2026-07-28` offered, three older revisions accepted, the negotiated one shown. What Raiker *uses* of it is still the bounded session |
+| Streamable-HTTP session semantics, remote OAuth, `server/discover` | [BUG-234 remainder](TO_BE_FIXED.md) | Open — no longer blocked by the revision, now their own work |
 | Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md) | Open — an inbound message never becomes work |
 | Four hook handler types refused | [BUG-226](TO_BE_FIXED.md) | Open — `prompt` first; it needs no new surface |
-| Hook lifecycle coverage | [backlog #19](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
-| Agent Skills standard conformance | [backlog #18](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
-| MCP Apps (SEP-1865) | [backlog #33](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
+| Hook lifecycle coverage | [backlog #14](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
+| Agent Skills standard conformance | [backlog #13](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
+| MCP Apps (SEP-1865) | [backlog #28](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
 | Plugin panels | [BUG-228](TO_BE_FIXED.md) | Open, and **reassessed**: the row above is the better answer |
-| MCP tool search / deferred tool schemas | [backlog #21](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Owner-authored slash commands | [backlog #8](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
+| MCP tool search / deferred tool schemas | [backlog #16](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Owner-authored slash commands | [backlog #4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
 | Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md) | Proposed |
-| Governed browser control | [backlog #29](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
+| Governed browser control | [backlog #24](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
 | Live-spec sign-in | [BUG-229](TO_BE_FIXED.md) | Open |
 
-**Blocking item:** #9. One protocol upgrade unblocks three separate rows, which
-makes it the highest-leverage item on this pillar by a wide margin.
+**No blocking item.** The protocol upgrade landed on 2026-08-23 and unblocked
+three rows at once; each is now ordinary work rather than a dependency. The
+highest-leverage item left is MCP Apps, which supersedes plugin panels — build at
+most one of the two.
 
 ---
 

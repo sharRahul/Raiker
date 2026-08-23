@@ -21,9 +21,10 @@ The launchable local UIs are the plain local terminal client and the local web d
 `127.0.0.1`. Phase 8 deferred clients — mobile, IDE, hosted multi-user — are not
 available.
 
-Approving an action performs it: twelve capabilities execute once through the
-governed relay, each re-governed at execution time, and `process`, `network` and
-other approvals remain decision-only. Durable memory mutation is broker-governed
+Approving an action performs it: thirteen capabilities execute once through the
+governed relay, each re-governed at execution time — including the checkpoint
+rewind, so an approved restore really puts the workspace back — while `process`
+and other approvals remain decision-only. Durable memory mutation is broker-governed
 and proposable from Chat, Build and the terminal client — you see the exact text
 and decide, and approving really stores or removes the record.
 Strict non-allow blocking, role revoke governed, and capability gate per action
@@ -224,11 +225,10 @@ before you decide anything:
 | Limit | In short |
 |---|---|
 | **Memory does not retrieve by meaning** | Both halves of "hybrid" retrieval are lexical. The default vector space is a feature-hashing bag of tokens with no model, so a paraphrase is recalled only through shared words |
-| **Checkpoint rewind is not reachable** | Capture is automatic and complete before every approved mutation; no route, command or tool proposes a restore. Recovery is git |
+| **A file over 8 MiB cannot be rewound** | Checkpoint capture is capped at `MAX_PRE_IMAGE_BYTES`. The write still happens; you are told before you approve that this particular change is not reversible |
 | **Hooks cover half the reference lifecycle** | Sixteen of the thirty-one events Claude Code documents. Two handler types run (`command` and Raiker's own `builtin`); of the five the reference format specifies, only `command` is built |
 | **Voice is turn-based, not full duplex** | Editable dictation and manual playback. Continuous listening and hands-free control are future work |
-| **The audit log cannot be exported from the product** | The redacted manifest is produced into the store; no route surfaces it |
-| **Two egress implementations exist** | The `web_fetch` your agent uses enforces HTTPS, a public-address check, per-hop redirect re-governance and address pinning. A second, registered pair — `WebFetchExecutor` and `NetworkExecutor` — has a hard-coded four-host allowlist and none of that. **Nothing routes to either**, and both are still in the registry |
+| **MCP is the current revision, and a subset of it** | Raiker negotiates `2026-07-28` and accepts three older revisions. What it *uses* is the bounded session — no streamable-HTTP semantics, no remote OAuth, no `server/discover`, no MCP Apps |
 
 Open defects are in [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md), each
 with a reproduction and a proposed fix; what closing one is worth is in

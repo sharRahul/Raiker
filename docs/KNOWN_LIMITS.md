@@ -191,6 +191,22 @@ alternative would be worse.
   silently swallowed. None of this is a filter that decides whether content is
   safe — the thing that stops a hijack is that fetched text never carries
   instruction authority — but an injection attempt arrives visible and inert.
+- **A rewind is a request, never a button.** Restoring to a checkpoint raises a
+  governed approval and performs nothing until you approve it — from
+  **Observability → Checkpoints**, or with `/checkpoints restore <id> --confirm`.
+  That is deliberate: a restore is a workspace mutation like any other, and the
+  executor captures its own pre-image first, so the restore is itself reversible.
+  A restore that would overwrite work last changed by a different principal is
+  classified critical and takes the human-only, step-up lifecycle instead.
+
+- **An audit export is bounded at 10 000 events, newest first.**
+  **Observability → Audit log → Export** produces a redacted, account-scoped
+  JSONL file plus a manifest hash over the exact event ids it covers. A longer
+  history exports its most recent window rather than failing, and the manifest
+  states that window rather than implying completeness. The export is itself a
+  governed, audited action; the file it writes lives in the workspace, so
+  anything with read access to the workspace can read it afterwards.
+
 - **Remembering something is a decision, and Memory store starts off.**
   `memory_write` and `memory_forget` are offered to the model, but like every
   acting capability they answer to their own gate, which ships **off**. With it
@@ -352,18 +368,6 @@ on the shipped build, not estimated.
   per-sender rate limits and signed delivery. What is still short there is above
   the transport — the spec's routing modes, and resolving an approval over a
   channel.
-- **A checkpoint is captured before every approved mutation, and there is no
-  rewind.** `CheckpointRestoreExecutor` is implemented, registered and tested,
-  and it captures its own pre-image so a restore would itself be reversible — but
-  no route, terminal command or model tool proposes one. `/checkpoints restore`
-  and the Checkpoints view both compute a preflight and perform nothing. Capture
-  is complete; recovery is git, or asking the agent to reverse the edit. It is
-  the highest-priority, lowest-effort item in
-  [the backlog](REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
-- **The audit log cannot be exported from the product.**
-  `raiker/events/export.py` produces a redacted export manifest and the store
-  keeps it, and no REST route surfaces it. Evidence you cannot take out is
-  evidence you cannot use elsewhere.
 - ~~**Eight gated capabilities have no threat model.**~~ **Closed 2026-08-23.**
   Opening a higher-risk gate requires a threat-model acknowledgement recorded
   against your principal, and eight capabilities had nothing written to
@@ -379,26 +383,23 @@ on the shipped build, not estimated.
   rather than only by filename. A test asserts the coverage so it cannot drift
   back.
 
-- **Two egress implementations exist, and the weaker one is still registered.**
-  Found while writing the above. The model's `web_fetch` goes through
-  `WebAccessService`, which enforces HTTPS-only, no credential in the URL, a
-  public-address check, per-hop redirect re-governance and address pinning.
-  `WebFetchExecutor` and `NetworkExecutor`
-  (`raiker/runtime/executors/tier2_web.py`) reach the network through
-  `sandbox.fetch_url` with a **hard-coded four-host allowlist** and none of those
-  guards, following redirects freely. **Nothing in the product routes to
-  either** — there is no `network` tool, neither capability is in
-  `EXECUTABLE_ON_APPROVAL`, and no route constructs the action — so they are
-  exercised only by `tests/test_vertical_slice_e2e.py`. They are nevertheless in
-  the default executor registry, so a future caller reaching them by capability
-  name would get the weaker path. Written up in
-  [`threat-models/network-execution.md`](threat-models/network-execution.md); it
-  is a candidate for **removal**, not for completion.
+- **`process_execution` is a real gate with no caller.** It shares
+  `shell_execution`'s whole lifecycle — the same profile resolution, the same
+  measured boundary, the same receipts and redaction — but no tool or route
+  constructs a `process` action, and it is deliberately not relayed by an
+  approval. Turning the gate on therefore changes nothing about what the agent
+  can do; the command it actually runs answers to `shell_execution`. It is the
+  last capability in that position, and consolidating the two is tracked in
+  [the backlog](REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+  Detail: [`threat-models/process-execution.md`](threat-models/process-execution.md).
 
 - **A checkpoint over 8 MiB is captured as unrestorable, not refused.**
   `MAX_PRE_IMAGE_BYTES` is 8 MiB. A larger file is still written, and its
   pre-image is recorded with `capture_status: oversize` — restorable is exactly
-  what it is not. Capture is complete in the sense that every eligible mutation
+  what it is not. You are told **before** you approve: the approval notice for a
+  file that size drops the rewind promise and says the change cannot be undone
+  and why, and the restore preflight marks the same files as not restorable.
+  Capture is complete in the sense that every eligible mutation
   is attempted; it is not complete in the sense that every mutation can be
   undone. Only `file_write_execution` and `patch_apply_execution` are
   pre-image-captured at all (`CAPTURE_PATH_ARG`); a commit is git history rather
@@ -406,16 +407,17 @@ on the shipped build, not estimated.
   Detail in
   [`threat-models/workspace-file-mutation.md`](threat-models/workspace-file-mutation.md).
 
-- **Raiker's MCP client speaks a protocol revision five behind the current
-  one.** `MCP_PROTOCOL_VERSION` is `2024-11-05`
-  (`raiker/runtime/executors/mcp.py`); the current Model Context Protocol
-  revision is [`2026-07-28`](https://modelcontextprotocol.io/specification/versioning).
-  The stdio session Raiker runs — `initialize`, `tools/list`, `tools/call` — is
-  valid and interoperates with servers that still accept the older handshake, and
-  everything added since is unavailable: streamable HTTP session semantics,
-  structured tool output, resource links, elicitation, per-request version
-  declaration via `_meta`, and the mandatory `server/discover` RPC. It is also
-  why remote transport has no OAuth flow. This had not been stated anywhere.
+- **Raiker negotiates the current MCP revision, and implements a subset of
+  it.** `MCP_PROTOCOL_VERSION` is
+  [`2026-07-28`](https://modelcontextprotocol.io/specification/versioning), and
+  `2025-06-18`, `2025-03-26` and `2024-11-05` are accepted when a server answers
+  with one of them; a revision Raiker does not implement is refused rather than
+  guessed at. **Extensions → MCP** states the revision each server negotiated.
+  What Raiker uses of that revision is still the bounded session — `initialize`,
+  `tools/list`, `tools/call`. Streamable-HTTP session semantics, structured tool
+  output, resource links, elicitation and the `server/discover` RPC are not
+  implemented, and remote transport still has no OAuth flow; the `http`
+  transport is Raiker's own bounded client rather than the spec's.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

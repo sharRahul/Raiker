@@ -105,6 +105,12 @@ def _build_registry() -> dict[str, ActivationRequirement]:
     for cap in ("checkpoint_restore_execution", "task_management_runtime",
                 "project_assignment_runtime"):
         r[cap] = _req(cap, "1", notes="Local, reversible, owner-scoped; executor registered.")
+    # BUG-231 — the audit export. A local, redacted, account-scoped read of the
+    # owner's own record written to a file beside it: no egress, no mutation of
+    # anything the log describes, and the export is itself an audited event.
+    r["audit_export"] = _req(
+        "audit_export", "1",
+        notes="Redacted, account-scoped export of the owner's own audit log; local file only.")
     # B11 — the git write path. Local and repository-scoped like the file caps
     # above; hooks are disabled for the invocation so an approved commit cannot
     # become an un-governed code-execution path.
@@ -113,7 +119,7 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         notes="Local branch/commit in the workspace repository; repository hooks disabled.")
 
     # Tier 2
-    for cap in ("shell_execution", "process_execution", "network_execution", "web_fetch"):
+    for cap in ("shell_execution", "process_execution", "web_fetch"):
         r[cap] = _req(cap, "2", threat_ack=True, human_confirm=True,
                       notes="Sandbox, allowlist, budget required.")
     # BUG-67 — the governed push. Egress, so Tier 2 and acknowledged like the

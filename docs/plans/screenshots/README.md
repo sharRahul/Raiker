@@ -25,6 +25,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `r0823-` | **2026-08-23**, the checkpoint rewind end to end, the audit export, and the Permissions surface after `network_execution` was deleted | hosted Anthropic, OpenAI, OpenRouter |
 | `bug-221-`, `bug-223-`, `bug-225-` | **2026-08-22**, plugin contributions (skills, MCP-server offers), turn-end hooks across four providers, and the channel owner surface | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
 | `bug-219-` | **2026-08-22**, the fourth approval mode (*Decline, don't ask*) | hosted Anthropic |
 | `r0821b-`, `r0821c-` | **2026-08-21**, Build composer and operating protocol; the Hooks tab | hosted Anthropic |
@@ -35,6 +36,24 @@ forty-seven, not a missing capture.
 | `r0810-` | **2026-08-10**, closing the 2026-08-08 round's four open defects plus BUG-82 | hosted Anthropic `claude-haiku-4-5-20251001` |
 | `r0808-` | **2026-08-08**, the last full round | hosted Anthropic, all ten catalogue models |
 | `01`–`207`, `b*`, `c*`, `bug*`, `add-*`, `skills-*` | 2026-07-26 → 2026-08-04 | hosted Anthropic `claude-haiku-4-5-20251001`, local Ollama `gemma4:31b-cloud` |
+
+---
+
+## The 2026-08-23 round
+
+Six screenshots, prefix `r0823-`, driven through a real Chromium session against
+`raiker-web --workspace . --port 8765`, signed in as the existing owner account
+whose gates were all still at their per-account fail-closed defaults.
+
+| File | Shows |
+|---|---|
+| `r0823-bug230-restore-preflight.png` | FIXED-270 — the restore preflight for a checkpoint with nothing after it. **Request this restore** is disabled and the panel says why: *"There is nothing to rewind, so there is nothing to approve."* |
+| `r0823-bug230-preflight-with-files.png` | FIXED-270 / FIXED-275 — the same panel for a checkpoint that *does* have a captured mutation after it: **1 to rewrite**, the file named, and the acknowledgement gating the request. Before FIXED-275 this read zero, because the capture was filed under the API session |
+| `r0823-bug230-restore-approval.png` | FIXED-270 — the approval a restore raises: the restore-specific notice (*"The restore captures its own pre-image first"*), and the per-file plan recomputed server-side rather than taken from the caller |
+| `r0823-bug231-audit-export.png` | FIXED-271 / FIXED-276 — the audit log's **Export** panel with a produced export listed by event count and manifest hash, and the export itself in the log below it as *"Exported 271 audit events … redacted"* |
+| `r0823-permissions-audit-export-row.png` | FIXED-272 — Permissions after `network_execution` was deleted, with **Audit export** expanded showing its real description, and **Checkpoint restore** grouped under Workspace instead of falling into *Other tools* |
+| `r0823-bug234-mcp-protocol.png` | FIXED-274 — a locally built stdio MCP server after a real handshake, its card reading **PROTOCOL 2026-07-28**. Before this the client offered `2024-11-05` and nothing in the product said which revision it spoke |
+| `r0823-mobile-audit-export.png` | The export panel at 390 × 844. Fourteen routes were swept at that width with zero horizontal overflow |
 
 ---
 

@@ -31,10 +31,14 @@ carries an `authority_kind` and `authority_id`.
 | Reachable by a model? | **No.** `CAPABILITY_GATE_MAP` maps the action type `process` to it, but there is no `process` tool in `TOOL_DEFINITIONS` |
 | Executed on approval? | **No.** Not in `EXECUTABLE_ON_APPROVAL` — resolution is metadata-only, and the approval detail says so |
 
-The owner-facing consequence is the same as for
-[`network_execution`](network-execution.md): the gate is real, policy-reviewed
-and audited, and enabling it does not by itself give the agent a way to start a
-process. The command the agent actually runs answers to `shell_execution`.
+The owner-facing consequence: the gate is real, policy-reviewed and audited,
+and enabling it does not by itself give the agent a way to start a process. The
+command the agent actually runs answers to `shell_execution`. This is now the
+**only** capability in that position — `network_execution`, which shared it, was
+deleted in BUG-232 because its executor also enforced weaker controls than the
+path it duplicated. `process_execution` was kept because it does not: it enters
+the same `CommandService` lifecycle `shell_execution` does, with the same
+profile resolution, boundary, receipts and redaction.
 
 ## Threats and what stops them
 
@@ -60,9 +64,12 @@ applies unchanged, because the lifecycle is the same one. What is specific here:
   (an owner may want the parsing path and not the raw path, or the reverse), but
   an owner who turns off one and not the other has not halved their exposure —
   the one they left on runs commands.
-- **Unreachable today, registered anyway.** Like `network_execution`, this is a
-  registered executor with no product caller. Whether the capability should be
-  consolidated into `shell_execution` is tracked in
+- **Unreachable today, registered anyway.** This is a registered executor with
+  no product caller — the last one left after BUG-232 removed
+  `network_execution`. It survived that cut on the merits: it enforces exactly
+  what `shell_execution` enforces, so it is not a weaker second path, only an
+  unused one. Whether it should be consolidated into `shell_execution` is
+  tracked in
   [the prioritised backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
 
 ## Evidence

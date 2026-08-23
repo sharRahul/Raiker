@@ -48,7 +48,6 @@ PHASE_3_POLICY_READY_CAPABILITIES = {"graph_codemap_planning", "semantic_memory_
 RUNTIME_DOMAIN_CAPABILITIES = {
     "shell_execution",
     "process_execution",
-    "network_execution",
     "web_fetch",
     "file_write_execution",
     "patch_apply_execution",
@@ -179,7 +178,9 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
                          # BUG-62 — local, reversible, owner-scoped planning rows.
                          "task_management_runtime", "project_assignment_runtime",
                          # B11 — a branch and a commit are local and repository-scoped.
-                         "git_write_execution")
+                         "git_write_execution",
+                         # BUG-231 — the redacted, account-scoped audit export.
+                         "audit_export")
     for name in _TIER1_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 1, CapabilityState.DISABLED,
@@ -190,7 +191,7 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     # Tier-2 capability is: it reaches the network. The branch and the commit
     # beside it stay local and stay Tier 1.
     _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch",
-                            "network_execution", "git_push_execution")
+                            "git_push_execution")
     for name in _TIER2_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 2, CapabilityState.DISABLED,

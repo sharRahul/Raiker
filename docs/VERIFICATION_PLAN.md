@@ -99,7 +99,7 @@ a new path appears beside the governed ones and nothing breaks.
 |---|---|
 | `test_i1_route_action_callers_are_the_enumerated_ones` | `RuntimeAuthority.route_action` is called from exactly the five modules the document names. A sixth is a new entry into the governed chokepoint |
 | `test_i2_agent_gateway_is_constructed_only_by_enumerated_surfaces` | `AgentGateway` is constructed only by the four surfaces named. This is what makes "every interface enters through the Agent Gateway" checkable |
-| `test_i3_every_real_executor_capability_is_named_in_the_enumeration` | Every capability with a real executor is named in the enumeration with the path that reaches it. A new registered executor cannot appear without someone writing down how it is reached — the step nobody took for `network_execution` |
+| `test_i3_every_real_executor_capability_is_named_in_the_enumeration` | Every capability with a real executor is named in the enumeration with the path that reaches it. A new registered executor cannot appear without someone writing down how it is reached — the step nobody took for `network_execution` before it was deleted (BUG-232) |
 | `test_i3b_the_tool_reachable_set_is_exactly_fifteen` | Fifteen capabilities are reachable by a model tool through `CAPABILITY_GATE_MAP`. A change moves a capability between reachability categories |
 | `test_i4_local_gate_checks_are_the_enumerated_eight` | Exactly eight modules read a capability gate directly instead of routing through the authority. A ninth cannot appear silently |
 | `test_i5_a_hook_can_never_grant` | `combine()` returns only `deny`, `ask` or `no_decision` for every scope, decision and authority combination — an `allow` can never override a `deny` |

@@ -17,7 +17,6 @@ from raiker.runtime.executors import (
     FileWriteExecutor,
     MemoryForgetExecutor,
     MemoryWriteExecutor,
-    NetworkExecutor,
     PatchApplyExecutor,
     ProcessExecutor,
     ShellExecutor,
@@ -27,7 +26,7 @@ from raiker.storage.sqlite import SQLiteStore
 
 _TIER1_CAPS = ("approval_execution_relay", "file_write_execution", "patch_apply_execution",
                "memory_write_execution", "memory_forget_execution")
-_TIER2_CAPS = ("shell_execution", "process_execution", "web_fetch", "network_execution")
+_TIER2_CAPS = ("shell_execution", "process_execution", "web_fetch")
 
 
 def _enable_caps(store: SQLiteStore, svc: RuntimeControlService, caps: tuple[str, ...]) -> None:
@@ -96,8 +95,7 @@ def _setup(ws: Path) -> dict[str, Any]:
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))
     registry.register("shell_execution", ShellExecutor(ws))
     registry.register("process_execution", ProcessExecutor(ws))
-    registry.register("web_fetch", WebFetchExecutor(ws))
-    registry.register("network_execution", NetworkExecutor(ws))
+    registry.register("web_fetch", WebFetchExecutor(ws, store))
     return {"store": store, "registry": registry, "ws": ws}
 
 
@@ -608,7 +606,13 @@ def test_web_fetch_denied_no_url(tmp_path: Path) -> None:
     assert "missing_argument:url" in result.error
 
 
-def test_web_fetch_egress_denied(tmp_path: Path) -> None:
+def test_web_fetch_refuses_plaintext_scheme(tmp_path: Path) -> None:
+    """BUG-232: the capability executor enforces what the model-facing tool does.
+
+    The old executor called a helper whose only control was a four-host netloc
+    glob, so `http://` was fine as long as the host matched. It now routes
+    through `WebAccessService`, so a plaintext scheme is refused before DNS.
+    """
     ws = _ws(tmp_path)
     ctx = _setup(ws)
     store = ctx["store"]
@@ -626,10 +630,11 @@ def test_web_fetch_egress_denied(tmp_path: Path) -> None:
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
     assert result.error is not None
-    assert "egress_denied" in result.error
+    assert "web_url_not_https" in result.error
 
 
-def test_network_execution_egress_denied(tmp_path: Path) -> None:
+def test_web_fetch_refuses_private_address(tmp_path: Path) -> None:
+    """The address guard the old executor did not have."""
     ws = _ws(tmp_path)
     ctx = _setup(ws)
     store = ctx["store"]
@@ -640,14 +645,25 @@ def test_network_execution_egress_denied(tmp_path: Path) -> None:
     principal = _make_human(store)
     action = GovernedAction(
         action_id=new_id("act_"), principal_id="principal_owner",
-        action_type="network", tool_or_service_name="network",
-        arguments={"url": "http://evil.com/hack"},
+        action_type="web_fetch", tool_or_service_name="web_fetch",
+        arguments={"url": "https://169.254.169.254/latest/meta-data/"},
         risk_level=RiskLevelValue.LOW,
     )
     result = authority.route_action(action, principal)
     assert result.decision == "allow"
     assert result.error is not None
-    assert "egress_denied" in result.error
+    assert "web_host_not_public" in result.error
+
+
+def test_network_execution_capability_no_longer_exists(tmp_path: Path) -> None:
+    """BUG-232: the second, weaker egress capability is gone, not merely unrouted."""
+    from raiker.phase_gates import ALL_CAPABILITIES
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    assert "network_execution" not in ALL_CAPABILITIES
+    assert "network_execution" not in REAL_EXECUTOR_CAPABILITIES
+    assert "network" not in CAPABILITY_GATE_MAP
 
 
 def test_tier2_disabled_gate_blocks_execution(tmp_path: Path) -> None:

@@ -86,7 +86,7 @@ def main() -> int:
 
     # 1. All high-risk capabilities must be in the registry
     runtime_high_risk = {
-        "shell_execution", "process_execution", "network_execution",
+        "shell_execution", "process_execution",
         "file_write_execution", "patch_apply_execution",
         "memory_write_execution", "memory_forget_execution",
         "admin_mutation", "policy_mutation", "role_mutation",

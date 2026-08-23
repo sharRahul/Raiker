@@ -729,12 +729,20 @@ with separate remedies, not one enable switch.
 | **[S]** `overview` | Readiness reads true, and every blocker names its remedy |
 | `sessions` | Filter by tag, show archived, select all, bulk actions, pin, rename, archive, delete |
 | **[S]** `activity` | The audit log carries your conversations **and** the governed steps outside them — connecting a provider, pinning a model. **Refresh events** works |
-| `checkpoints` | Each checkpoint lists its files and states whether state and files can be restored. **The restore control is a preflight and performs nothing** — confirm it says so |
+| **[S]** `activity` → **Export** | The export states its scope before producing anything, downloads a redacted JSONL, and lists it with a readable manifest hash — never `[REDACTED_SECRET]`. **The export itself appears in the log it exported.** Open the file and confirm no `sk-`-shaped string survived |
+| **[S]** `checkpoints` | Each checkpoint lists its files and states whether state and files can be restored. **The preflight performs nothing** — confirm it says so, then acknowledge and press **Request this restore**: it must answer *"Nothing has changed yet"* with an approval id, and the file on disk must be unchanged. Approving that approval must really put the file back, and the restore must appear as a new checkpoint |
 | `diagnostics` | Every deferred domain is listed as fail-closed. **Refresh diagnostics** works |
 | `work` | A running turn and a background run both appear while they are running |
 | `notifications` | A notification is raised, read and cleared |
 
 Produce a **Redacted support bundle** and confirm it contains no credential.
+
+**The rewind's trap, which cost a round to find:** a file write approved from the
+**Approvals inbox** executes under a different session than the conversation that
+proposed it. Approve one *from the inbox* — not inline in Chat — and confirm the
+preflight for that conversation's checkpoint reports the file. A preflight that
+says **0 to rewrite** after a write you just approved is
+[FIXED-275](FIXED_ITEMS.md) regressing, not an empty workspace.
 
 ---
 

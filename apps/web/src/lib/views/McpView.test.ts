@@ -21,6 +21,7 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     monitor_state: "active",
     paused_reason: null,
     paused_at: null,
+    protocol_version: "2026-07-28",
     ...partial,
   };
 }

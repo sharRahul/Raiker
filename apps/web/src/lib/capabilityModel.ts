@@ -49,7 +49,6 @@ export function canDisable(gate: CapabilityGate): boolean {
 const TIER2_STEPUP_CAPS = new Set([
   "shell_execution",
   "process_execution",
-  "network_execution",
   "web_fetch",
   "mcp_builder_runtime",
   "mcp_connector_runtime",
@@ -126,12 +125,14 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   semantic_memory_runtime: "Workspace",
   vector_embedding_runtime: "Workspace",
   audit_export: "Workspace",
+  // BUG-230 — the rewind. It belongs beside the file capabilities it puts
+  // back, not in "Other tools", which is where an unmapped capability lands.
+  checkpoint_restore_execution: "Workspace",
   shell_execution: "Local execution",
   process_execution: "Local execution",
   container_execution_cap: "Local execution",
   subagents: "Local execution",
   multi_agent_teams: "Local execution",
-  network_execution: "Network",
   web_fetch: "Network",
   // BUG-67 — a push is repository work, but what makes it a separate decision is
   // that it leaves the machine. It sits with the other egress switches so the
@@ -381,11 +382,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Processes",
     description: "Start bounded local processes through the sandbox.",
   },
-  network_execution: {
-    label: "Network requests",
-    description: "Open network connections, restricted by the owner egress allowlist.",
+  web_fetch: {
+    label: "Web fetch",
+    description:
+      "Read web pages and run web searches. HTTPS only, every resolved address must be public, and each redirect is re-checked against your blocklist.",
   },
-  web_fetch: { label: "Web fetch", description: "Fetch web pages, restricted by the owner egress allowlist." },
   file_write_execution: {
     label: "File writes",
     description: "Write files in the workspace (approval-gated proposals).",
@@ -504,7 +505,8 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   },
   remote_execution_cap: {
     label: "Remote execution",
-    description: "No executor; remote command execution stays fail-closed.",
+    description:
+      "Run an approved command over SSH — only through a profile you configured, with a pinned host key.",
   },
   container_execution_cap: {
     label: "Container execution",
@@ -512,7 +514,8 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   },
   cloud_execution_cap: {
     label: "Cloud execution",
-    description: "No executor; cloud execution stays fail-closed.",
+    description:
+      "Run an approved command in a Daytona sandbox — only through a profile you configured, under a cost ceiling.",
   },
   // Memory / retrieval runtimes.
   graph_indexing_runtime: {
@@ -550,7 +553,16 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Scheduled routines",
     description: "Time-based routine metadata (no unattended execution).",
   },
-  audit_export: { label: "Audit export", description: "Export the append-only audit record." },
+  audit_export: {
+    label: "Audit export",
+    description:
+      "Export your own audit record as a redacted file plus a manifest hash over the events it covers.",
+  },
+  checkpoint_restore_execution: {
+    label: "Checkpoint restore",
+    description:
+      "Rewind workspace files to a checkpoint. Approval-gated, and the restore is captured too, so it can be rewound.",
+  },
 };
 
 export function capabilityLabel(capability: string): string {

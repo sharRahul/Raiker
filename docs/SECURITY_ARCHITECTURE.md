@@ -40,14 +40,21 @@ owner-selected SSH and Daytona commands (`remote_execution_cap`,
 a distinct path that re-checks the target's capability gate, decision
 mode, policy review, authority id, and selected environment at execution time.
 
-`process_execution` and `network_execution` are deliberately **not** on that
-list: an approved `process` or `network` action records the decision and executes
-nothing. SSH and Daytona execute only through an owner-configured, owner-selected
+`process_execution` is deliberately **not** on that list: an approved
+`process` action records the decision and executes nothing. (`network_execution`
+was a second, weaker egress capability with no caller at all; BUG-232 deleted the
+capability, its executor and its gate, so there is one implementation of "reach
+the network" — `WebAccessService`, behind `web_fetch`.) SSH and Daytona execute only through an owner-configured, owner-selected
 profile with a pinned host key and a cumulative cost ceiling; without one they
 fail closed, and a stored profile record alone is not enough. File mutations
-additionally capture the pre-image; note that capture is complete and **no owner
-surface proposes a restore**, so the pre-image is evidence rather than a
-reachable undo. For every other capability, approval
+additionally capture the pre-image, and a restore is reachable: `POST
+/api/checkpoints/{id}/restore` (Observability → Checkpoints) and
+`/checkpoints restore <id> --confirm` raise an ordinary approval for
+`checkpoint_restore_execution`, which is on the list above. A restore that would
+overwrite work last changed by a different principal is classified critical and
+takes the human-only lifecycle instead. A file whose pre-image was recorded
+`oversize` is named as not restorable in both the approval notice and the restore
+preflight. For every other capability, approval
 resolution remains metadata-only: it records the decision and executes nothing.
 Which of the two applies is computed by the server and stated to the owner
 before they decide.

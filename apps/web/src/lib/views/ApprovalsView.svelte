@@ -454,6 +454,14 @@
         <p class="diff-path mono">{selected.diff_path}</p>
       {/if}
       <pre class="diff">{selected.diff ?? "(nothing to record)"}</pre>
+    {:else if selected.preview_kind === "checkpoint_restore"}
+      <!-- BUG-230 — the rewind is decided on its own preflight: which files go
+           back, which are deleted, and which cannot be restored at all. -->
+      <h3>Files this restore would rewind</h3>
+      {#if selected.diff_path}
+        <p class="diff-path mono">{selected.diff_path}</p>
+      {/if}
+      <pre class="diff">{selected.diff ?? "(nothing to rewind)"}</pre>
     {:else if selected.preview_kind === "connector_request"}
       <h3>Proposed outbound request (redacted)</h3>
       {#if selected.diff_path}

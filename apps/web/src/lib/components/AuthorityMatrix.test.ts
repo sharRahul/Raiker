@@ -7,8 +7,8 @@ it("separates owner control from the agent's derived authority", () => {
   render(AuthorityMatrix, {
     gates: [
       makeGate({ capability: "shell_execution", state: "enabled_runtime", decision_mode: "ask" }),
-      makeGate({ capability: "web_fetch", state: "disabled", decision_mode: "allow" }),
-      makeGate({ capability: "network_execution", state: "enabled_runtime", decision_mode: "allow", readiness: { provider_ready: false } }),
+      makeGate({ capability: "process_execution", state: "disabled", decision_mode: "allow" }),
+      makeGate({ capability: "web_fetch", state: "enabled_runtime", decision_mode: "allow", readiness: { provider_ready: false } }),
     ],
   });
 

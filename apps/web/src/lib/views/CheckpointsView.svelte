@@ -5,7 +5,7 @@
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
-  import type { Checkpoint, RestorePlan } from "../apiTypes";
+  import type { Checkpoint, RestorePlan, RestoreRequestResult } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
 
   // When a project is active (topbar switcher) the list is scoped to it.
@@ -52,14 +52,25 @@
   let planError = $state<string | null>(null);
   let planBusy = $state(false);
   let acknowledged = $state(false);
+  // BUG-230 — asking for the restore. This never performs one: the server
+  // recomputes the plan, raises a governed approval and returns its id, and the
+  // workspace changes only when a human approves it in Approvals.
+  let requestBusy = $state(false);
+  let requested = $state<RestoreRequestResult | null>(null);
+  let requestError = $state<string | null>(null);
 
   const escalates = $derived(plan?.touches_other_principal === true);
+  const nothingToRestore = $derived(
+    plan !== null && plan.restore_content_count + plan.delete_count === 0,
+  );
 
   async function openPreflight(checkpoint: Checkpoint) {
     planFor = checkpoint;
     plan = null;
     planError = null;
     acknowledged = false;
+    requested = null;
+    requestError = null;
     planBusy = true;
     try {
       plan = await api.checkpointRestorePlan(checkpoint.checkpoint_id);
@@ -73,17 +84,35 @@
     }
   }
 
+  async function requestRestore() {
+    if (planFor === null || requestBusy) return;
+    requestBusy = true;
+    requestError = null;
+    try {
+      requested = await api.requestCheckpointRestore(planFor.checkpoint_id);
+    } catch (e) {
+      requestError =
+        e instanceof ApiError
+          ? `Could not raise the approval (${e.status}).`
+          : "Could not raise the approval.";
+    } finally {
+      requestBusy = false;
+    }
+  }
+
   function closePreflight() {
     planFor = null;
     plan = null;
     planError = null;
     acknowledged = false;
+    requested = null;
+    requestError = null;
   }
 
   function opLabel(op: string): string {
     if (op === "restore_content") return "Rewrite to its checkpoint state";
     if (op === "delete") return "Delete — it did not exist at the checkpoint";
-    return "Skipped — too large to have been captured";
+    return "Skipped — too large to have been captured, so it cannot be rewound";
   }
 
   async function load() {
@@ -264,13 +293,42 @@
       <input type="checkbox" bind:checked={acknowledged} />
       I have read what this would change.
     </label>
-    <p class="handoff" class:ready={acknowledged}>
-      {acknowledged
-        ? "Ask for the restore in the conversation that owns this work. The runtime raises it as a governed approval, and it only runs once you approve it there."
-        : "Confirm you have read the impact above to see how to request the restore."}
-    </p>
+
+    {#if requested}
+      <div class="notice notice-ok" role="status">
+        <Icon name="check" size={16} />
+        <span>
+          Raised as approval <span class="mono">{shortId(requested.approval_id)}</span>. Nothing has
+          changed yet.
+          {#if requested.critical}
+            It is a critical action, so only a live human can resolve it and you will be asked to
+            re-authenticate.
+          {/if}
+          <a href="#/approvals">Open Approvals</a>
+        </span>
+      </div>
+    {:else}
+      {#if requestError}
+        <p class="notice notice-danger" role="alert">{requestError}</p>
+      {/if}
+      <button
+        type="button"
+        class="btn btn-primary"
+        onclick={requestRestore}
+        disabled={!acknowledged || requestBusy || nothingToRestore}
+      >
+        {requestBusy ? "Raising approval…" : "Request this restore"}
+      </button>
+      <p class="handoff" class:ready={acknowledged}>
+        {nothingToRestore
+          ? "There is nothing to rewind, so there is nothing to approve."
+          : acknowledged
+            ? "This raises a governed approval. The rewind runs only once you approve it, and it re-passes its capability gate, policy review and posture check then."
+            : "Confirm you have read the impact above before requesting the restore."}
+      </p>
+    {/if}
     <p class="quiet">
-      This panel cannot start a restore. Raiker never executes one from a read-only view.
+      This panel never performs a restore. It asks for one, and a human decision executes it.
     </p>
   {/if}
 </SidePanel>

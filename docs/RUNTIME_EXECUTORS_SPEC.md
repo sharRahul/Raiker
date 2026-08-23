@@ -83,9 +83,8 @@ not in this table is a documentation defect, not a hidden feature.
 | `memory_write_execution` | 1 | Durable governed memory write. |
 | `memory_forget_execution` | 1 | Durable memory forget. |
 | `shell_execution` | 2 | Runs an allowlisted command in the sandbox. |
-| `process_execution` | 2 | Sandboxed subprocess. An approved `process` action is **not** relayed either — like `network`, it records the decision only. |
+| `process_execution` | 2 | Sandboxed subprocess through the same `CommandService` lifecycle `shell_execution` uses. An approved `process` action is **not** relayed — it records the decision only. |
 | `web_fetch` | 2 | Fetch one page under the owner **blocklist** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in Settings → Web access) and a non-optional public-address guard: HTTPS only, no credential in the URL, every resolved address public, re-checked on each redirect and pinned. |
-| `network_execution` | 2 | Network call over the connector egress allowlist (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty = fail closed). An approved `network` action is **not** relayed — it records the decision and executes nothing; this executor is reached by the runtime, not by an approval. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |

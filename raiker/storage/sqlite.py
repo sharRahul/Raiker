@@ -134,6 +134,8 @@ from raiker.storage.migrations import (
     MCP_CONTAINMENT_SQL,
     MCP_MONITORING_MIGRATION_ID,
     MCP_MONITORING_SQL,
+    MCP_PROTOCOL_VERSION_MIGRATION_ID,
+    MCP_PROTOCOL_VERSION_SQL,
     MCP_REMOTE_ENDPOINT_MIGRATION_ID,
     MCP_REMOTE_ENDPOINT_SQL,
     MCP_SERVER_RUNTIME_MIGRATION_ID,
@@ -1422,6 +1424,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TURN_MEMORY_PROVENANCE_MIGRATION_ID,
                 TURN_MEMORY_PROVENANCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MCP_PROTOCOL_VERSION_MIGRATION_ID,
+                MCP_PROTOCOL_VERSION_SQL,
                 connection,
             )
             self._apply_migration(
@@ -2926,6 +2933,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         tools: list[str] | None = None,
         endpoint_url: str | None = None,
         auth_ref: str | None = None,
+        protocol_version: str | None = None,
     ) -> str:
         """Upsert one owner-scoped MCP server profile.
 
@@ -2943,8 +2951,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO mcp_servers
                    (server_id, principal_id, name, command, template, transport,
                     status, created_at, last_connected_at, tools, tool_count,
-                    endpoint_url, auth_ref)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    endpoint_url, auth_ref, protocol_version)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     server_id,
                     principal_id,
@@ -2959,6 +2967,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     len(tool_list) if tool_list is not None else 0,
                     endpoint_url,
                     auth_ref,
+                    protocol_version,
                 ),
             )
         return server_id
@@ -2971,6 +2980,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         status: str,
         tools: list[str] | None = None,
         last_connected_at: str | None = None,
+        protocol_version: str | None = None,
     ) -> bool:
         """Owner-scoped update of only the *runtime* fields of a profile — status,
         discovered tool names, and last-connected time — without touching its
@@ -2991,13 +3001,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    SET status = ?,
                        last_connected_at = ?,
                        tools = COALESCE(?, tools),
-                       tool_count = COALESCE(?, tool_count)
+                       tool_count = COALESCE(?, tool_count),
+                       protocol_version = COALESCE(?, protocol_version)
                    WHERE server_id = ? AND principal_id = ?""",
                 (
                     status,
                     last_connected_at,
                     json.dumps(tool_list) if tool_list is not None else None,
                     len(tool_list) if tool_list is not None else None,
+                    protocol_version,
                     server_id,
                     principal_id,
                 ),
@@ -5958,14 +5970,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             params.append(project_id)
         if apply_user_visibility_filter:
+            # BUG-231 — this filter has to agree with the account scope the audit
+            # log *view* applies (`DashboardService.list_events`), or an export
+            # is a different record than the screen it was taken from. Both rules
+            # are: a row is visible when it belongs to one of this account's own
+            # sessions, **or to no session record at all**. The second clause is
+            # what keeps governed steps taken outside any conversation — a
+            # credential connected, a model pinned, a principal resolved, all
+            # recorded on runtime channels that are not sessions — inside the
+            # evidence. It cannot leak another account's conversation: theirs are
+            # session records, so they fail both clauses and stay filtered.
+            unowned = (
+                "events_index.session_id NOT IN (SELECT session_id FROM sessions)"
+            )
             if user_id is None:
                 conditions.append(
-                    "events_index.session_id IN (SELECT session_id FROM sessions WHERE user_id IS NULL)"
+                    "(events_index.session_id IN "
+                    "(SELECT session_id FROM sessions WHERE user_id IS NULL)"
+                    f" OR {unowned})"
                 )
             else:
                 conditions.append(
-                    "events_index.session_id IN (SELECT session_id FROM sessions "
+                    "(events_index.session_id IN (SELECT session_id FROM sessions "
                     "WHERE user_id = ? OR user_id IS NULL)"
+                    f" OR {unowned})"
                 )
                 params.append(user_id)
         if conditions:

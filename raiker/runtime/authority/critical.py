@@ -58,14 +58,13 @@ class CriticalMatch:
     detail: str
 
 
-# The four Tier-2 execution capabilities whose *relaxation* is critical. Note
+# The three Tier-2 execution capabilities whose *relaxation* is critical. Note
 # this is the set of capabilities being enabled/relaxed — not the everyday act of
 # running an already-enabled Tier-2 executor (that is governed by its own gate +
 # threat-ack + confirmation token, unchanged).
 TIER2_CAPABILITIES: frozenset[str] = frozenset({
     "shell_execution",
     "process_execution",
-    "network_execution",
     "web_fetch",
 })
 

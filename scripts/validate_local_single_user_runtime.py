@@ -56,7 +56,7 @@ def check_no_synthetic_rgm_role_auto_creation(source_path: Path) -> list[str]:
 def check_dangerous_capabilities_disabled_by_default() -> list[str]:
     errors: list[str] = []
     dangerous = {
-        "shell_execution", "process_execution", "network_execution",
+        "shell_execution", "process_execution",
         "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
         "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
         "cctv_runtime", "home_security_runtime", "hardware_operator_runtime",

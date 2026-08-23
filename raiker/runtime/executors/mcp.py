@@ -56,7 +56,24 @@ _BUILTIN_MCP_COMMANDS: frozenset[str] = frozenset({"python", "python3", "node"})
 MCP_SESSION_TIMEOUT = 20.0
 _MAX_TIMEOUT = 60.0
 MCP_MAX_OUTPUT_BYTES = 200_000
-MCP_PROTOCOL_VERSION = "2024-11-05"
+# ── Model Context Protocol revision (BUG-234) ────────────────────────────────
+#
+# Raiker negotiated `2024-11-05` for five revisions, which is not merely dated:
+# a server that implements only the current revision refuses that handshake, so
+# it could not be connected at all. The specification's backward-compatibility
+# rule is that the client offers its preferred revision and the server answers
+# with the one it will speak; a client that supports both then continues.
+#
+# So: offer the current revision, accept either, and refuse a revision we do not
+# implement rather than continuing on a protocol whose framing we cannot trust.
+# None of Raiker's own guarantees come from the protocol — the interpreter
+# allowlist, workspace-relative arguments, containment and the redacted,
+# metadata-only events are ours and are unaffected by which revision is agreed.
+MCP_PROTOCOL_VERSION = "2026-07-28"
+MCP_LEGACY_PROTOCOL_VERSION = "2024-11-05"
+MCP_SUPPORTED_PROTOCOL_VERSIONS: frozenset[str] = frozenset(
+    {MCP_PROTOCOL_VERSION, "2025-06-18", "2025-03-26", MCP_LEGACY_PROTOCOL_VERSION}
+)
 
 # Default relative directory for owner-built servers, under the workspace.
 _MCP_SERVERS_DIR = ".raiker/mcp/servers"
@@ -93,7 +110,13 @@ extend this file before pointing anything sensitive at it.
 import json
 import sys
 
-PROTOCOL_VERSION = "2024-11-05"
+# BUG-234 — the revision this template speaks, and the older ones it will still
+# accept. A server answers the handshake with the revision it will use; echoing
+# back a revision it supports is what keeps an older client working.
+PROTOCOL_VERSION = "2026-07-28"
+SUPPORTED_PROTOCOL_VERSIONS = (
+    "2026-07-28", "2025-06-18", "2025-03-26", "2024-11-05",
+)
 
 TOOLS = [
     {
@@ -138,8 +161,10 @@ def main():
         method = msg.get("method")
         request_id = msg.get("id")
         if method == "initialize":
+            requested = (msg.get("params") or {}).get("protocolVersion")
+            agreed = requested if requested in SUPPORTED_PROTOCOL_VERSIONS else PROTOCOL_VERSION
             _result(request_id, {
-                "protocolVersion": PROTOCOL_VERSION,
+                "protocolVersion": agreed,
                 "capabilities": {"tools": {}},
                 "serverInfo": {"name": "raiker-echo-mcp", "version": "1.0.0"},
             })
@@ -527,6 +552,7 @@ class McpConnectorExecutor:
         self._record_connection(
             action, principal_id, transport=ctx.transport,
             command=ctx.command, endpoint_url=ctx.endpoint_url, tools=tool_names,
+            protocol_version=negotiated_protocol_version(init_result),
         )
         label = "remote HTTP" if ctx.transport == "http" else "stdio"
         return ExecutionResult(
@@ -536,7 +562,8 @@ class McpConnectorExecutor:
             summary=f"MCP {label} session listed {len(tool_names)} tool(s); payloads withheld.",
             artifacts={
                 "server_name": str(server_info.get("name", "")),
-                "protocol_version": str(init_result.get("protocolVersion", "")),
+                "protocol_version": negotiated_protocol_version(init_result),
+                "protocol_version_offered": MCP_PROTOCOL_VERSION,
                 "transport": ctx.transport,
                 "tool_count": len(tool_names),
                 "tools": tool_names,
@@ -673,6 +700,11 @@ class McpConnectorExecutor:
         content."""
         responses: dict[Any, dict[str, Any]] = {}
         session_id: str | None = None
+        # BUG-234 — every revision from 2025-06-18 onward requires the agreed
+        # revision on each request after the handshake. Sending it is what lets a
+        # current-revision server keep the session rather than reject it as
+        # ambiguous; it is set from what the server answered, never assumed.
+        negotiated: str | None = None
         bytes_in = 0
         bytes_out = 0
         for req in requests:
@@ -682,6 +714,8 @@ class McpConnectorExecutor:
                 headers["Authorization"] = f"Bearer {token}"
             if session_id:
                 headers["Mcp-Session-Id"] = session_id
+            if negotiated:
+                headers["MCP-Protocol-Version"] = negotiated
             result = self._http_fn(
                 endpoint_url, req, headers=headers, timeout=timeout, max_bytes=MCP_MAX_OUTPUT_BYTES,
             )
@@ -695,6 +729,8 @@ class McpConnectorExecutor:
             for message in _parse_jsonrpc_body(body_text):
                 if isinstance(message, dict) and "id" in message:
                     responses[message["id"]] = message
+                    if message["id"] == 1 and isinstance(message.get("result"), dict):
+                        negotiated = negotiated_protocol_version(message["result"])
         return responses, bytes_in, bytes_out
 
     # ── stdio session ──
@@ -757,6 +793,7 @@ class McpConnectorExecutor:
         command: list[str],
         endpoint_url: str | None,
         tools: list[str] | None = None,
+        protocol_version: str | None = None,
     ) -> None:
         """Persist/refresh an owner-scoped 'connected' profile, including the tool
         names the handshake discovered (names only).
@@ -782,6 +819,7 @@ class McpConnectorExecutor:
                     # `tools=None` (a tools/call session) leaves the stored list
                     # alone; only an enumerating session rewrites it.
                     status="connected", tools=tools, last_connected_at=utc_now(),
+                    protocol_version=protocol_version,
                 )
                 return
             fallback = (
@@ -800,6 +838,7 @@ class McpConnectorExecutor:
                 last_connected_at=utc_now(),
                 tools=tools or [],
                 endpoint_url=endpoint_url,
+                protocol_version=protocol_version,
             )
         except Exception:  # noqa: BLE001 - bookkeeping must not fail the read
             return
@@ -831,6 +870,24 @@ def _initialize_rpc() -> dict[str, Any]:
     })
 
 
+def negotiated_protocol_version(init_result: dict[str, Any]) -> str:
+    """The revision the server answered with (BUG-234).
+
+    A server that omits the field is answering the revision we offered — that is
+    what the handshake means — so an absent value reads as the offered one rather
+    than as unknown.
+    """
+    return str(init_result.get("protocolVersion") or MCP_PROTOCOL_VERSION)
+
+
+def _protocol_refusal(init_result: dict[str, Any]) -> str | None:
+    """Refuse a revision Raiker does not implement, rather than guessing at it."""
+    version = negotiated_protocol_version(init_result)
+    if version in MCP_SUPPORTED_PROTOCOL_VERSIONS:
+        return None
+    return f"mcp_protocol_version_unsupported:{version}"
+
+
 def _extract_tools(
     responses: dict[Any, dict[str, Any]],
 ) -> tuple[str | None, list[str], dict[str, Any]]:
@@ -839,6 +896,9 @@ def _extract_tools(
     init = responses.get(1)
     if init is None or "result" not in init:
         return "mcp_initialize_failed", [], {}
+    refusal = _protocol_refusal(init["result"])
+    if refusal is not None:
+        return refusal, [], init["result"]
     tools_resp = responses.get(2)
     if tools_resp is None or "result" not in tools_resp:
         return "mcp_list_tools_failed", [], {}
@@ -854,6 +914,9 @@ def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int
     init = responses.get(1)
     if init is None or "result" not in init:
         return "mcp_initialize_failed", 0, 0
+    refusal = _protocol_refusal(init["result"])
+    if refusal is not None:
+        return refusal, 0, 0
     call = responses.get(3)
     if call is None:
         return "mcp_tool_call_no_response", 0, 0

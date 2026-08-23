@@ -115,32 +115,28 @@ through the brokered `github_read` tool under the `connector_github_runtime`
 gate. Scheduled agents are ordinary tasks with a cadence; each cycle is one
 discrete governed turn. See [the Build workspace](BUILD_WORKSPACE_SPEC.md).
 
-**The MCP client speaks protocol revision `2024-11-05`.**
-`MCP_PROTOCOL_VERSION` (`raiker/runtime/executors/mcp.py`) is pinned there, five
-revisions behind the current
-[`2026-07-28`](https://modelcontextprotocol.io/specification/versioning). The
-bounded stdio session — `initialize`, `tools/list`, `tools/call` — is
-`implemented_policy_gated` and interoperates with servers that still accept the
-older handshake. Everything the specification added since is **not implemented**:
-streamable-HTTP session semantics, structured tool output, resource links,
-elicitation, per-request `_meta` version declaration, the mandatory
+**The MCP client negotiates protocol revision `2026-07-28`, and implements a
+subset of it.** `MCP_PROTOCOL_VERSION` (`raiker/runtime/executors/mcp.py`) offers
+the [current revision](https://modelcontextprotocol.io/specification/versioning)
+and accepts `2025-06-18`, `2025-03-26` and `2024-11-05` when a server answers
+with one, refusing any revision Raiker does not implement rather than continuing
+on a framing it cannot trust; **Extensions → MCP** states the revision each
+server negotiated. The bounded session — `initialize`, `tools/list`,
+`tools/call` — is `implemented_policy_gated`. What the specification added since
+`2024-11-05` remains **not implemented**: streamable-HTTP session semantics,
+structured tool output, resource links, elicitation, the mandatory
 `server/discover` RPC, and MCP Apps. The `http` transport Raiker does offer is
 its own bounded client, not the spec's streamable transport.
 
-**`web_fetch` and `network_execution` have two different implementations, and
-only one is reachable.** The model's `web_fetch` and `web_search` tools go
-through `WebAccessService` (`raiker/runtime/web_access.py`), which is where the
-blocklist, the address guard, per-hop redirect re-governance and address pinning
-live. `WebFetchExecutor` and `NetworkExecutor`
-(`raiker/runtime/executors/tier2_web.py`) are registered in
-`REAL_EXECUTOR_CAPABILITIES` and reach the network through
-`sandbox.fetch_url` with a hard-coded four-host allowlist and none of those
-guards. **No product route constructs either action** — there is no `network`
-tool, and neither capability is in `EXECUTABLE_ON_APPROVAL` — so both are
-`test_only` in practice while being registered as real. Recorded in
-[`threat-models/network-execution.md`](threat-models/network-execution.md) and
-carried as a removal candidate in
-[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort).
+**There is exactly one implementation of "reach the network".** The model's
+`web_fetch` and `web_search` tools go through `WebAccessService`
+(`raiker/runtime/web_access.py`), which is where the blocklist, the address
+guard, per-hop redirect re-governance and address pinning live — and the
+capability-level `WebFetchExecutor` (`raiker/runtime/executors/tier2_web.py`)
+now delegates to that same service. `NetworkExecutor`, the `network_execution`
+capability and `sandbox.fetch_url` — whose only control was a hard-coded
+four-host netloc glob — were deleted, so no registered executor reaches the
+network with a weaker guard than the one an owner is told about.
 
 See [feature coverage](FEATURE_COVERAGE_MATRIX.md) for a concise area-by-area
 view and [open gaps](GAP_AND_TODO_ANALYSIS.md) for deferred work.

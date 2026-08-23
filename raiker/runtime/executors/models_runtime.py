@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 
 from raiker.models.endpoint_policy import classify_endpoint, model_egress_allowlist
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.runtime.executors.sandbox import SandboxError, fetch_url
+from raiker.runtime.executors.sandbox import SandboxError, get_url
 
 if TYPE_CHECKING:
     from raiker.models.contracts import EmbeddingResponse
@@ -31,7 +31,7 @@ Prober = Callable[[str, frozenset[str]], dict]
 
 
 def _default_prober(url: str, allowlist: frozenset[str]) -> dict:
-    return fetch_url(url, egress_allowlist=allowlist, max_bytes=64_000, timeout=10.0)
+    return get_url(url, egress_allowlist=allowlist, max_bytes=64_000, timeout=10.0)
 
 
 class _ModelRuntimeExecutorBase:

@@ -174,7 +174,7 @@ describe("CheckpointsView restore preflight", () => {
     expect(await screen.findByText("notes/brief.md")).toBeInTheDocument();
     expect(screen.getByText(/rewinds every workspace file changed after this checkpoint/i)).toBeInTheDocument();
     expect(screen.getByText(/it is a preview computed from stored metadata/i)).toBeInTheDocument();
-    expect(screen.getByText(/this panel cannot start a restore/i)).toBeInTheDocument();
+    expect(screen.getByText(/this panel never performs a restore/i)).toBeInTheDocument();
   });
 
   it("names a cross-principal escalation before anything is requested", async () => {
@@ -195,7 +195,7 @@ describe("CheckpointsView restore preflight", () => {
     expect(screen.getAllByText(/last changed by a different principal/i).length).toBeGreaterThan(0);
   });
 
-  it("withholds the request instructions until the impact is acknowledged", async () => {
+  it("withholds the request until the impact is acknowledged", async () => {
     stubFetch({
       "GET /api/checkpoints": CHECKPOINTS,
       "GET /api/checkpoints/cp_1/restore-plan": PLAN,
@@ -205,8 +205,41 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
 
     expect(await screen.findByText(/confirm you have read the impact/i)).toBeInTheDocument();
+    const request = screen.getByRole("button", { name: /request this restore/i });
+    expect(request).toBeDisabled();
     await fireEvent.click(screen.getByRole("checkbox"));
-    expect(screen.getByText(/raises it as a governed approval/i)).toBeInTheDocument();
+    expect(request).toBeEnabled();
+    expect(screen.getByText(/raises a governed approval/i)).toBeInTheDocument();
+  });
+
+  // BUG-230 — the rewind. The panel asks for it and never performs one: the
+  // server recomputes the plan, raises an approval and returns its id.
+  it("raises a governed approval and says nothing has changed yet", async () => {
+    stubFetch({
+      "GET /api/checkpoints": CHECKPOINTS,
+      "GET /api/checkpoints/cp_1/restore-plan": PLAN,
+      "POST /api/checkpoints/cp_1/restore": {
+        status: "approval_required",
+        approval_id: "appr_abc123",
+        action_id: "act_abc123",
+        checkpoint_id: "cp_1",
+        critical: false,
+        executes_action: false,
+        restore_content_count: 1,
+        delete_count: 0,
+        skip_count: 0,
+      },
+    });
+    render(CheckpointsView);
+    await waitFor(() => expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument());
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+    await screen.findByText(/confirm you have read the impact/i);
+    await fireEvent.click(screen.getByRole("checkbox"));
+    await fireEvent.click(screen.getByRole("button", { name: /request this restore/i }));
+
+    const status = await screen.findByRole("status");
+    expect(status).toHaveTextContent(/raised as approval/i);
+    expect(status).toHaveTextContent(/nothing has changed yet/i);
   });
 
   it("reports a failed preflight instead of an empty plan", async () => {

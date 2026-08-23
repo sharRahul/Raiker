@@ -27,7 +27,7 @@ from raiker.storage.sqlite import SQLiteStore
 # `web_fetch` with the gate enabled and its decision mode at Allow; and it named
 # capabilities in a vocabulary that no longer lined up one-to-one with the tools
 # in the schema, so the model reasoned from `network_execution` — a different
-# capability — to a neighbouring one. Naming the governed tools beside each gate
+# capability, since deleted by BUG-232 — to a neighbouring one. Naming the governed tools beside each gate
 # is what removes the second half: there is nothing left to infer across.
 #
 # Every capability here is read per principal from the same store the Permissions

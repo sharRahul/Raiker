@@ -3341,3 +3341,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_memory_candidates_turn_source
   WHERE source_turn_id IS NOT NULL AND source_role IS NOT NULL
     AND extractor_version IS NOT NULL;
 """
+
+
+# BUG-234 — the Model Context Protocol revision a server actually negotiated.
+# Raiker offered `2024-11-05` for five revisions and nothing in the product or
+# the documentation said so, which made "why will this server not connect" an
+# unanswerable question. The revision is recorded per server so Extensions → MCP
+# can state it.
+MCP_PROTOCOL_VERSION_MIGRATION_ID = "RAIKER-2039-mcp-protocol-version"
+
+MCP_PROTOCOL_VERSION_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN protocol_version TEXT;
+"""

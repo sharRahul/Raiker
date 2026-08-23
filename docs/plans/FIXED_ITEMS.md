@@ -10996,3 +10996,340 @@ that stops flaking because it stopped racing has not fixed the race.
 reconcile the stale listing directly, and reads the store rather than calling
 `list_skills` again, because a third reconcile re-creates the row and hides the
 deletion. Verified to fail with the fix reverted.
+
+---
+
+## FIXED-270 — Checkpoint rewind was built, registered, tested, and unreachable
+
+**Severity: High. Area: checkpoints / recovery. Was BUG-230.**
+
+`README.md` and `SECURITY_ARCHITECTURE.md` both listed **recoverable** as a
+property of the runtime. Capture was automatic and complete before every approved
+single-file mutation, and nothing put it back. `CheckpointRestoreExecutor`
+(`raiker/runtime/executors/tier1_checkpoint.py`) was implemented, was in
+`REAL_EXECUTOR_CAPABILITIES`, was registered by `build_default_executor_registry`,
+had a critical-classification rule, and was covered by tests. What did not exist
+was a **caller**: no route, terminal command or model tool constructed a
+`checkpoint_restore` action, so `GET /api/checkpoints/{id}/restore-plan` and
+`/checkpoints restore` both computed a preflight and performed nothing.
+
+**Fixed** by routing what already existed, and nothing else was designed:
+
+* `POST /api/checkpoints/{id}/restore` recomputes the preflight — a caller never
+  names the files — records the proposal, and returns an approval id.
+* `/checkpoints restore <id> --confirm` does the same from the terminal. Without
+  `--confirm` the command still prints the preflight, so the read stayed a read.
+* `checkpoint_restore_execution` is the thirteenth member of
+  `EXECUTABLE_ON_APPROVAL`. It belongs there for the same reason the file
+  mutations do: the executor writes its own pre-image before touching anything,
+  so a restore is itself reversible and appears as a new checkpoint.
+* A restore whose plan reports `touches_other_principal` is inserted `critical`,
+  so it takes the human-only, step-up lifecycle rather than the ordinary relay —
+  the same rule `classify_critical` applies at execution, applied at proposal
+  time so the owner is not told after they approved.
+* The approval detail grew a `checkpoint_restore` preview kind: the per-file
+  plan, recomputed server-side at read time, with a file whose pre-image is
+  `oversize` marked *not restorable* rather than listed as if it would come back.
+
+**No model tool proposes a restore.** That is deliberate and is asserted by the
+enumeration in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md): an agent
+cannot rewind the workspace on its own say-so, only a person can ask.
+
+**Interface outcome.** From **Observability → Checkpoints** an owner reads the
+preflight, ticks the acknowledgement, presses **Request this restore**, and is
+told it was raised as an approval and that *nothing has changed yet*, with a link
+to Approvals. Approving it there really rewinds the workspace.
+
+**Reference-platform decision.** **PARITY.** Claude Code and Codex both offer a
+rewind; what Raiker adds is that the rewind is an approval like any other
+mutation, and that a cross-principal rewind is a different, human-only decision.
+
+**Evidence.** `tests/test_checkpoint_restore_route.py`,
+`apps/web/src/lib/views/CheckpointsView.test.ts` — *"raises a governed approval
+and says nothing has changed yet"*.
+
+---
+
+## FIXED-271 — The audit log could not be taken out of the product
+
+**Severity: High. Area: observability / evidence. Was BUG-231.**
+
+Raiker kept an append-only, account-scoped audit log and described it as
+evidence. `raiker/events/export.py` already produced a redacted export and a
+manifest, and the store already kept it — and `audit_export` was a capability in
+`ALL_CAPABILITIES` with **no executor**, so it could not be activated, and no
+route surfaced what the code was building. `GET /api/memory/export` existing and
+working is what made the absence conspicuous rather than a matter of principle.
+
+**Fixed** by giving the capability an executor and three routes behind it:
+
+* `AuditExportExecutor` (`raiker/runtime/executors/tier1_audit.py`) calls
+  `generate_export` with `redact=True` — not a caller-supplied option on this
+  path — and with the **acting principal's own** `delegated_by_user_id`. The
+  account an export covers is read from the `Principal`, never from an argument.
+* `POST /api/audit/export`, `GET /api/audit/exports`, and
+  `GET /api/audit/exports/{id}/download`. The download re-resolves
+  `<exports>/<id>.jsonl` rather than trusting the stored path string.
+* `RuntimeControlService.export_audit_log` is human-only and routes through
+  `RuntimeAuthority`, so the gate, the policy review and the posture check all
+  apply and **the export is an event in the log it exported**.
+
+**A second defect was found while doing it, and fixed with it.** The
+`apply_user_visibility_filter` clause in `list_event_index` required a `sessions`
+row to exist, while the audit-log *view* (`DashboardService.list_events`) treats
+an event with no session record as visible — that is BUG-87's fix, and it is what
+keeps governed steps taken outside any conversation (a credential connected, a
+model pinned) inside the record. An export built on the stricter rule would have
+been a *different* record than the screen it was taken from. Both now apply the
+same rule.
+
+**Interface outcome.** **Observability → Audit log** has an **Export** control.
+It states what will be produced before producing it, downloads the file, and
+lists previous exports with the first twelve characters of each manifest hash.
+
+**Reference-platform decision.** **PARITY on the export, improvement on the
+manifest.** The hash is taken over the exact event ids and the scope, so a reader
+outside Raiker can say whether the file they were handed is the one Raiker
+produced — which is the property that makes an export evidence rather than a text
+file.
+
+**Evidence.** `tests/test_audit_export.py`, `docs/threat-models/audit-export.md`.
+
+---
+
+## FIXED-272 — Two egress implementations existed, and the weaker one was registered
+
+**Severity: High. Area: egress / governance. Was BUG-232.**
+
+Raiker had two implementations of "reach the network" and they did not enforce
+the same controls. The model-facing path — `web_fetch` and `web_search` through
+the broker — is `WebAccessService`: HTTPS only, no credential in the URL, every
+resolved address must be public, every redirect hop re-governed, the connection
+pinned to an address that already passed. `WebFetchExecutor` and `NetworkExecutor`
+(`raiker/runtime/executors/tier2_web.py`) instead called `sandbox.fetch_url`,
+which enforced **one** control: a hard-coded four-host `fnmatch` against
+`parsed.netloc`. No HTTPS requirement, no public-address check, no pinning, and
+`urllib` following redirects freely — so a redirect out of an allowlisted host
+went anywhere unchecked. The allowlist was not owner-editable.
+
+Nothing routed to either, which is why no test failed and no defect was raised
+for months.
+
+**Fixed** by removing the duplicate rather than completing it:
+
+* `NetworkExecutor`, the `network_execution` capability, its gate, its activation
+  requirement, its critical-relaxation entry, its router mapping and its
+  Permissions row are **deleted**. A gate that changes nothing when an owner
+  opens it is worse than no gate.
+* `sandbox.fetch_url` and `default_egress_allowlist` are deleted. The
+  model-endpoint reachability probe that also used `fetch_url` now uses
+  `get_url`, which refuses a non-HTTP(S) scheme and fails closed on an empty
+  allowlist.
+* `WebFetchExecutor` delegates to `WebAccessService`, so the capability-level
+  read and the model-facing read are one implementation. Decision modes are not
+  re-run there — `RuntimeAuthority` already decided before an executor is
+  reached — but the blocklist and the non-editable address guard are inside
+  `fetch()` and run on every call.
+
+**`process_execution` was assessed in the same pass and kept.** BUG-232 asked the
+same question of it. The answer is different: it enters the same `CommandService`
+lifecycle `shell_execution` does — same profile resolution, same measured
+boundary, same receipts, same redaction — so it is an *unused* path, not a
+*weaker* one. It stays recorded in
+[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) §3.5 as the one
+remaining registered-but-unreachable executor.
+
+**Interface outcome.** **Permissions** no longer offers a `network` gate, and
+`web_fetch`'s description now states what actually governs it — HTTPS only, every
+resolved address public, each redirect re-checked against the owner's blocklist —
+instead of naming an "owner egress allowlist" that stopped being how it works in
+RAIKER-2021.
+
+**Why it was High despite being unreachable.** Severity here was never "can it be
+exploited today". It is that Raiker's central claim is that no path bypasses
+governance, and a registered executor with a weaker guard was one call site away
+from making that false.
+
+**Reference-platform decision.** **YES — improvement.** Dead privileged code is a
+liability no reference platform advertises removing.
+
+**Evidence.** `tests/test_vertical_slice_e2e.py` —
+`test_web_fetch_refuses_plaintext_scheme`,
+`test_web_fetch_refuses_private_address`,
+`test_network_execution_capability_no_longer_exists`.
+
+---
+
+## FIXED-273 — An approval promised a rewind it could not give, for a file over 8 MiB
+
+**Severity: Medium. Area: checkpoints / approvals. Was BUG-233.**
+
+The approval notice for a file mutation read: *"The previous file contents are
+checkpointed first, so it can be rewound."* For a file larger than
+`MAX_PRE_IMAGE_BYTES` (8 MiB, `raiker/checkpoints/capture.py`) that sentence was
+false — the file is still written, its pre-image is recorded `oversize`, which
+means *not restorable* — and the owner read it **before** deciding. The notice
+was a constant for the whole file-mutation class and could not consult the
+capture outcome, because capture happens after the decision.
+
+**Fixed** by resolving the question at preview time instead. `_oversize_target`
+resolves the target path against the workspace and, when an **existing** file is
+over the cap, the notice drops the rewind promise and states the size, the cap,
+and that no copy of the previous contents will be kept. A file that does not
+exist yet is not oversize however large the proposed content is: there is nothing
+to rewind to either way.
+
+**Interface outcome.** An owner approving a large-file change is told, before
+approving, that this particular change cannot be rewound and why. The restore
+preflight built for FIXED-270 marks the same files *not restorable* rather than
+listing them as if they would come back.
+
+**Reference-platform decision.** **YES — differentiator.** An approval that knows
+when its own promise does not hold is the property
+[`REFERENCE_PLATFORM_COMPATIBILITY.md`](../REFERENCE_PLATFORM_COMPATIBILITY.md)
+§2.3 claims; no compared platform states the limits of its own undo at the moment
+of decision.
+
+**Evidence.** `tests/test_approval_oversize_notice.py`.
+
+---
+
+## FIXED-274 — The MCP client was five protocol revisions behind
+
+**Severity: Medium. Area: MCP / interoperability. Was BUG-234.**
+
+Raiker negotiated Model Context Protocol revision `2024-11-05`. The current
+revision is `2026-07-28`. A server implementing only the current revision could
+not be connected at all, and nothing in the product or the documentation said
+which revision Raiker spoke — which made "why will this server not connect" an
+unanswerable question.
+
+**Fixed** the way the specification's backward-compatibility section provides
+for: offer the preferred revision, accept the one the server answers with, refuse
+one Raiker does not implement.
+
+* `MCP_PROTOCOL_VERSION` is `2026-07-28`; `2025-06-18`, `2025-03-26` and
+  `2024-11-05` are accepted. A revision outside that set fails closed with
+  `mcp_protocol_version_unsupported:<v>` rather than continuing on a framing
+  Raiker cannot trust.
+* Every request after the handshake on the `http` transport carries the agreed
+  revision in the `MCP-Protocol-Version` header, which every revision from
+  `2025-06-18` onward requires. It is set from what the server answered, never
+  assumed.
+* The negotiated revision is persisted per server
+  (`RAIKER-2039-mcp-protocol-version`) and shown on the card.
+* The generated stdio server template speaks `2026-07-28` and echoes back an
+  older revision when a client asks for one it supports — which is what a server
+  is supposed to do.
+
+**Interface outcome.** **Extensions → MCP** shows a **Protocol** row on each
+server card: the revision it negotiated, or *"Not negotiated yet"* before a first
+successful handshake.
+
+**What this did not do.** It unblocked three separate rows; it did not implement
+them. Streamable-HTTP session semantics, remote OAuth, structured tool output,
+resource links, elicitation and `server/discover` remain unimplemented, and the
+`http` transport is still Raiker's own bounded client rather than the spec's.
+Those are now ordinary work rather than a dependency, and are carried as the
+BUG-234 remainder.
+
+**Reference-platform decision.** **PARITY — required to stay connectable.**
+
+**Evidence.** `tests/test_mcp_protocol_version.py`.
+
+---
+
+## FIXED-275 — A relayed write was captured under a session no checkpoint belongs to
+
+**Severity: High. Area: checkpoints / approvals. Was BUG-235, raised and closed
+2026-08-23 while verifying FIXED-270 live.**
+
+**Observed.** With the rewind finally routed, a file write approved from the
+Approvals inbox executed, reported *"The previous contents were checkpointed"*,
+and every restore plan for that conversation's checkpoints reported **zero files
+to rewrite**. The pre-image blob existed; nothing could reach it.
+
+**Root cause.** An approval resolved from the inbox executes under the **API
+session** that resolved it, and `RuntimeAuthority._commit_pre_image` filed the
+capture under `action.session_id`. The checkpoints it has to be restorable from
+belong to the **chat** that proposed the write, and
+`CheckpointService.compute_restore_plan` selects capture entries by the
+checkpoint's `session_id`. So a capture from the primary path — the approval
+relay is how a file write actually executes — landed in a session with no
+checkpoints, and was invisible to every restore plan that would ever be computed.
+
+Live evidence, before the fix:
+
+```
+checkpoint_capture_manifest: session_id = api_ses_337fcf6ed9b1826a62fdf77c
+checkpoints:                 session_id = sess_4c6ba9cee3a943adb213d9d71977dd7e
+compute_restore_plan(...)  → 0 files
+```
+
+**Fixed** by filing the capture — and its `checkpoint_captured` event — under
+`action.origin_session_id or action.session_id`. The relay already carries the
+proposing conversation in `origin_session_id` (it was added so a
+`project_assignment_runtime` action could name the chat it moves); using it here
+is what makes the capture and the checkpoint agree. The restore executor's own
+pre-image is filed the same way, so *"a restore is itself reversible"* is true of
+the plan and not only of the blob.
+
+**Why it went unnoticed.** BUG-230 is the reason: nothing ever *performed* a
+restore, so nothing ever discovered that no restore plan could see the captures
+from the path that produces most of them. Routing the rewind is what made the
+defect observable, on the first real attempt.
+
+**Interface outcome.** After approving a write from the inbox, the checkpoint for
+that conversation reports the file under *"1 to rewrite"*, and approving the
+restore really puts it back.
+
+**Reference-platform decision.** **No — a defect fix**, and one that was load-
+bearing for FIXED-270's own claim.
+
+**Evidence.** `tests/test_checkpoint_restore_route.py` —
+`test_a_relayed_write_is_captured_under_the_proposing_conversation`, which fails
+with the fix reverted. Verified live end to end: write proposed → approved →
+`live-rewind-probe.txt` rewritten → restore requested → approved → file back to
+its previous contents.
+
+---
+
+## FIXED-276 — An audit export's manifest hash was redacted into unusability
+
+**Severity: Medium. Area: API redaction / observability. Was BUG-236, raised and
+closed 2026-08-23 while verifying FIXED-271 live.**
+
+**Observed.** The Audit log's export list showed every export under the same
+string, `[REDACTED_SE…`. The manifest hash is 64 hex characters taken over the
+exact event ids and scope, and it is the **only** field that makes an export
+verifiable outside Raiker.
+
+**Root cause.** `raiker/api/redaction.py` spares locators, identifiers, digests
+and model names from the generic high-entropy fallback, by field name. A hash is
+a digest, and `manifest_hash` matched none of the digest spellings — so the
+64-character run tripped the fallback and was replaced. This is the same failure
+FIXED-02 (token counts), the locator fix and the model-id fix each recorded: the
+key is the signal, and only this layer knows it.
+
+**Fixed** by adding `hash`, `checksum` and their suffixes to the digest family.
+`password_hash` and `token_hash` are unaffected — the secret-key sweep runs
+first and discards a credential-named field whole, whatever its suffix — and a
+real credential pasted into a `manifest_hash` field still fails closed, because
+the specific credential shapes are matched before any family exemption.
+
+**A third spelling was found on the same sweep.** Memory → **Observations**
+reported every observation's `checksum` the same way. A provenance record whose
+checksum cannot be read is a record nobody can check, so `checksum` and
+`_checksum` are in the family too.
+
+**Interface outcome.** **Observability → Audit log → Export** lists each export
+with the first twelve characters of its manifest hash, so an owner can match the
+file they downloaded against the record — and **Memory → Observations** shows
+each observation's real checksum beside its retention and expiry.
+
+**Reference-platform decision.** **No — a defect fix**, and the one that made
+FIXED-271's "evidence" claim true rather than nominal.
+
+**Evidence.** `tests/test_over_broad_redaction.py` —
+`TestAnAuditExportManifestHashSurvives`, including that a credential named like a
+hash is still destroyed.

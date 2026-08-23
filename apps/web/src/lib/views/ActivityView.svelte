@@ -4,7 +4,7 @@
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { EventEntry } from "../apiTypes";
+  import type { AuditExportView, EventEntry } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
@@ -28,6 +28,49 @@
       events = null;
       loadError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
+  }
+
+  // ── BUG-231 — the record, taken out of the product ─────────────────────
+  // An audit trail that cannot leave is not usable as evidence in a review, an
+  // incident write-up, or a second tool. Asking for an export is itself a
+  // governed action and appears in the log it exported; what comes out carries
+  // the same redaction this page does and covers this account only.
+  let exports = $state<AuditExportView[] | null>(null);
+  let exportBusy = $state(false);
+  let exportError = $state<string | null>(null);
+  let exportPanelOpen = $state(false);
+
+  async function loadExports() {
+    try {
+      exports = await api.auditExports();
+    } catch {
+      exports = [];
+    }
+  }
+
+  async function createExport() {
+    if (exportBusy) return;
+    exportBusy = true;
+    exportError = null;
+    try {
+      const result = await api.createAuditExport(sessionFilter.trim() || undefined);
+      await loadExports();
+      await api.downloadAuditExport(result.export_id);
+    } catch (e) {
+      exportError =
+        e instanceof ApiError
+          ? e.status === 409
+            ? "Nothing in scope to export — adjust the session filter, or run a turn first."
+            : `Could not export the audit log (${e.status}).`
+          : "Could not export the audit log.";
+    } finally {
+      exportBusy = false;
+    }
+  }
+
+  function toggleExportPanel() {
+    exportPanelOpen = !exportPanelOpen;
+    if (exportPanelOpen && exports === null) void loadExports();
   }
 
   function riskTone(risk: string | null): string {
@@ -54,11 +97,61 @@
     pinning a model. Other people's conversations are never shown here. This is deliberately the
     deep-dive view; day-to-day work lives in Chat, Approvals, and Tasks.
   </p>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
-    <Icon name="refresh" size={15} />
-    Refresh
-  </button>
+  <div class="head-actions">
+    <button
+      type="button"
+      class="btn btn-ghost btn-sm"
+      onclick={toggleExportPanel}
+      aria-expanded={exportPanelOpen}
+      aria-controls="audit-export-panel"
+    >
+      <Icon name="download" size={15} />
+      Export
+    </button>
+    <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
+      <Icon name="refresh" size={15} />
+      Refresh
+    </button>
+  </div>
 </div>
+
+{#if exportPanelOpen}
+  <div class="card export-card" id="audit-export-panel">
+    <h2>Export this record</h2>
+    <p class="quiet">
+      Your account only, redacted exactly as this page is. Each file carries a manifest hash over
+      the event ids it covers, so a reader outside Raiker can verify it — and the export is itself
+      written to this log.
+      {#if sessionFilter.trim()}
+        Scoped to session <span class="mono">{shortId(sessionFilter.trim())}</span>.
+      {/if}
+    </p>
+    {#if exportError}
+      <p class="notice notice-danger" role="alert">{exportError}</p>
+    {/if}
+    <button type="button" class="btn btn-primary btn-sm" onclick={createExport} disabled={exportBusy}>
+      {exportBusy ? "Exporting…" : "Export and download"}
+    </button>
+    {#if exports && exports.length > 0}
+      <ul class="export-list">
+        {#each exports as ex (ex.export_id)}
+          <li>
+            <span class="mono">{shortId(ex.export_id)}</span>
+            <span class="quiet">{ex.event_count} events · {relativeTime(ex.created_at)}</span>
+            <span class="mono hash" title={ex.manifest_hash}>{ex.manifest_hash.slice(0, 12)}</span>
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => api.downloadAuditExport(ex.export_id)}
+            >
+              Download
+            </button>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+{/if}
 
 <form
   class="filters"
@@ -139,6 +232,44 @@
 {/if}
 
 <style>
+  .head-actions {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .export-card {
+    display: grid;
+    gap: var(--space-3);
+    justify-items: start;
+    margin-bottom: var(--space-4);
+  }
+  .export-card h2 {
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .export-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 0.3rem;
+    width: 100%;
+  }
+  .export-list li {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+    font-size: 0.8rem;
+  }
+  .export-list .hash {
+    color: var(--text-3);
+  }
+  .quiet {
+    color: var(--text-3);
+    font-size: 0.8rem;
+    margin: 0;
+  }
   .head-row {
     display: flex;
     align-items: flex-start;

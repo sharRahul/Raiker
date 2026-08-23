@@ -20,10 +20,10 @@ What is relayed, and what is not:
 
 * only :data:`EXECUTABLE_ON_APPROVAL` — checkpointed file mutations, the
   owner-configured remote/cloud command capabilities, bounded local ``shell``
-  commands, the two local planning mutations (a task row, a project label), and
-  the git write path (a branch, a commit, a GitHub pull request or comment).
-  ``process``, ``network`` and every other capability keep metadata-only
-  resolution.
+  commands, the two local planning mutations (a task row, a project label), the
+  checkpoint restore (BUG-230), and the git write path (a branch, a commit, a
+  GitHub pull request or comment). ``process`` and every other capability keep
+  metadata-only resolution.
 * **critical** approvals never come here. They keep the human-only, step-up
   gated lifecycle in :meth:`RuntimeAuthority.resolve_critical_approval`.
 * if either gate is off — the relay's own ``approval_execution_relay`` or the
@@ -84,6 +84,15 @@ EXECUTABLE_ON_APPROVAL: frozenset[str] = frozenset({
     # remembered.
     "memory_write_execution",
     "memory_forget_execution",
+    # BUG-230 — the rewind. `CheckpointRestoreExecutor` was implemented,
+    # registered, classified and tested, and no product path ever constructed a
+    # `checkpoint_restore` action, so "recoverable" was a claim with no control
+    # behind it. It belongs here for exactly the reason the file mutations above
+    # do: it is a local, workspace-scoped change, and the executor writes its own
+    # pre-image before touching anything, so the restore is itself reversible. A
+    # restore that would overwrite another principal's work is classified
+    # critical and never reaches this list — it keeps the human-only lifecycle.
+    "checkpoint_restore_execution",
 })
 
 

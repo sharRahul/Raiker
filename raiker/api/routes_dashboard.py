@@ -2096,6 +2096,66 @@ async def get_checkpoint_restore_plan(
     return plan
 
 
+@router.post("/api/checkpoints/{checkpoint_id}/restore")
+async def request_checkpoint_restore(
+    checkpoint_id: str,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Raise the governed approval that rewinds the workspace to a checkpoint.
+
+    BUG-230. ``CheckpointRestoreExecutor`` has been implemented, registered,
+    classified and tested since Workstream B, and nothing in the product ever
+    constructed a ``checkpoint_restore`` action — so "recoverable" was a claim
+    with no control behind it. This route is the caller.
+
+    It performs no restore of its own. It recomputes the preflight (so a caller
+    cannot name files), records the proposal, and returns an approval id. The
+    restore itself runs only when a human approves it, and re-passes its own
+    capability gate, policy review and posture check at that point. A restore
+    that would overwrite work last changed by a *different* principal is marked
+    critical here, so it takes the human-only, step-up lifecycle rather than the
+    ordinary relay — the same rule ``classify_critical`` applies at execution.
+    """
+    from raiker.contracts.ids import new_id
+    from raiker.contracts.models import ToolAction
+
+    session, principal = auth_data
+    plan = _read_models(request).checkpoint_restore_plan(
+        checkpoint_id,
+        principal_id=session.principal_id,
+        user_id=principal.delegated_by_user_id,
+    )
+    if plan is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown checkpoint: {checkpoint_id}"
+        )
+    cross_principal = bool(plan.get("touches_other_principal"))
+    action = ToolAction(
+        action_id=new_id("act_"),
+        tool_name="checkpoint_restore",
+        arguments={"checkpoint_id": checkpoint_id},
+        risk_level="high",
+        requires_approval=True,
+        proposed_by=session.principal_id,
+    )
+    approval_id = new_id("appr_")
+    store = SQLiteStore(_ws(request))
+    store.insert_tool_action(action, str(plan.get("session_id") or ""), None, "approval_required")
+    store.insert_approval(approval_id, action, critical=cross_principal)
+    return {
+        "status": "approval_required",
+        "approval_id": approval_id,
+        "action_id": action.action_id,
+        "checkpoint_id": checkpoint_id,
+        "critical": cross_principal,
+        "executes_action": False,
+        "restore_content_count": plan.get("restore_content_count", 0),
+        "delete_count": plan.get("delete_count", 0),
+        "skip_count": plan.get("skip_count", 0),
+    }
+
+
 @router.get("/api/checkpoints/{checkpoint_id}/branch-plan")
 async def get_conversation_branch_plan(
     checkpoint_id: str,

@@ -24,6 +24,19 @@ export function stubFetch(routes: Record<string, unknown>): ReturnType<typeof vi
     const key = exactKey in routes ? exactKey : `${method} ${path}`;
     if (key in routes) {
       const value = routes[key];
+      // A route may declare a non-2xx answer as `{ __status: 409 }` so a test
+      // can exercise the branch a real refusal takes, not only the happy path.
+      const declared =
+        value !== null && typeof value === "object" && "__status" in value
+          ? Number((value as { __status: unknown }).__status)
+          : 200;
+      if (declared >= 400) {
+        return {
+          ok: false,
+          status: declared,
+          json: async () => value,
+        } as Response;
+      }
       return {
         ok: true,
         status: 200,

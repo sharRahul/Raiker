@@ -76,6 +76,10 @@ COMMAND_GROUPS: tuple[CommandGroup, ...] = (
             CommandEntry("/tasks", "List tracked tasks."),
             CommandEntry("/events", "List recent events."),
             CommandEntry("/checkpoints", "List checkpoint summaries."),
+            CommandEntry(
+                "/checkpoints restore",
+                "Preview a rewind to a checkpoint; add --confirm to raise the approval.",
+            ),
         ),
     ),
     CommandGroup(

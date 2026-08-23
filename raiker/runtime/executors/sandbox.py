@@ -108,49 +108,13 @@ def run_command(
     }
 
 
-def fetch_url(
-    url: str,
-    *,
-    egress_allowlist: frozenset[str] | None = None,
-    max_bytes: int = 200_000,
-    timeout: float = 15.0,
-) -> dict:
-    from urllib.parse import urlparse
-    parsed = urlparse(url)
-    if not parsed.netloc:
-        raise SandboxError(f"invalid_url:{url}")
-    if egress_allowlist is not None:
-        allowed = any(
-            fnmatch.fnmatch(parsed.netloc, pattern)
-            for pattern in egress_allowlist
-        )
-        if not allowed:
-            raise SandboxError(f"egress_denied:{parsed.netloc}")
-    import urllib.request
-    try:
-        with urllib.request.urlopen(url, timeout=timeout) as resp:
-            data = resp.read(max_bytes + 1)
-    except Exception as exc:
-        raise SandboxError(f"fetch_failed:{exc}") from None
-    truncated = len(data) > max_bytes
-    body = data[:max_bytes]
-    return {
-        "status": resp.status if hasattr(resp, "status") else 200,
-        "body_bytes": len(body),
-        "truncated": truncated,
-    }
-
-
-_DEFAULT_EGRESS_ALLOWLIST: frozenset[str] = frozenset({
-    "api.github.com",
-    "raw.githubusercontent.com",
-    "pypi.org",
-    "files.pythonhosted.org",
-})
-
-
-def default_egress_allowlist() -> frozenset[str]:
-    return _DEFAULT_EGRESS_ALLOWLIST
+# `fetch_url()` and `default_egress_allowlist()` were removed in BUG-232. They
+# were the second, weaker implementation of "reach the network": a hard-coded
+# four-host `fnmatch` on the netloc and nothing else — no HTTPS requirement, no
+# public-address check, no pinning, and free redirect following. The agent's web
+# reads have exactly one implementation now, `raiker.runtime.web_access.
+# WebAccessService`, and the model-endpoint probe uses `get_url()` below, which
+# fails closed on an empty allowlist and refuses a non-HTTP(S) scheme.
 
 
 def channel_egress_allowlist() -> frozenset[str]:
@@ -200,7 +164,7 @@ def get_url(
     """GET ``url`` only if its host matches ``egress_allowlist``.
 
     An empty/absent allowlist denies all egress (fail closed). Unlike
-    :func:`fetch_url`, this returns the (bounded) decoded response body so a
+    :func:`post_url`, this returns the (bounded) decoded response body so a
     read connector can hand the external content back as untrusted data. Request
     headers (e.g. an ``Authorization`` bearer from owner env) are sent verbatim
     but are never returned or logged by this function.

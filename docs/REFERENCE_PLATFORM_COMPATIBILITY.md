@@ -690,7 +690,7 @@ standing:
   one**. See
   [the threat-models index](threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
 - *"`RUNTIME_EXECUTORS_SPEC.md` omits 17 capabilities"* was carried here after it
-  had already been completed. Re-checked on 2026-08-23: all 67 names in
+  had already been completed. Re-checked on 2026-08-23: all 66 names in
   `ALL_CAPABILITIES` (`raiker/phase_gates.py`), including all 45 in
   `REAL_EXECUTOR_CAPABILITIES` (`raiker/runtime/executors/__init__.py`), appear in
   [`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
@@ -701,86 +701,102 @@ pass are marked ★**.
 
 ### High priority, low effort
 
-| # | Capability | Proposed action | Governance effect | Beyond? |
-|---|---|---|---|---|
-| 1 | Checkpoint rewind is unreachable | Surface the existing `CheckpointRestoreExecutor` behind an approval — a route and a Checkpoints action — or state in the product that restore is preflight-only | Recoverability is a stated product property; today the executor exists and no owner can reach it | PARITY |
-| 2 | Audit export has no route | Expose `audit_export` over the loopback API and the Observability view | An audit an owner cannot take out of the product is evidence they cannot use | PARITY |
-| 3 ★ | **Remove the second, weaker egress path** | Delete `WebFetchExecutor` and `NetworkExecutor` and the `network_execution` capability, or route them through `WebAccessService`. Decide the same question for `process_execution`, whose lifecycle `shell_execution` already covers | Two implementations of "reach the network", one with a hard-coded four-host allowlist and **none** of the address guard — no HTTPS requirement, no public-address check, no redirect re-governance, no pinning. Neither is reachable from any product route, and both are in the default executor registry, so the weaker one is one future call site away from being live. Detail: [`threat-models/network-execution.md`](threat-models/network-execution.md) | **YES — improvement** — dead privileged code is a liability no reference platform advertises removing, and Raiker's whole claim is that no path bypasses governance |
-| 4 ★ | **An oversize checkpoint is silently unrestorable** | Tell the owner at approval time that a file over `MAX_PRE_IMAGE_BYTES` (8 MiB) will be written without a restorable pre-image, rather than only recording `capture_status: oversize` after the fact | The approval notice promises "the previous file contents are checkpointed first, so it can be rewound". For an oversize file that sentence is false, and the owner reads it before deciding. Detail: [`threat-models/workspace-file-mutation.md`](threat-models/workspace-file-mutation.md) | **YES — differentiator** — an approval that knows when its own promise does not hold is exactly the property [§2.3](#23-approvals-governance-and-audit) claims |
+**Empty as of 2026-08-23.** All four rows this section held were closed in one
+pass, and each is recorded in
+[`plans/FIXED_ITEMS.md`](plans/FIXED_ITEMS.md) with the interface outcome that
+had to be true first:
+
+* **Checkpoint rewind is reachable.** `POST /api/checkpoints/{id}/restore` and
+  `/checkpoints restore <id> --confirm` raise an ordinary approval for
+  `checkpoint_restore_execution`, now the thirteenth member of
+  `EXECUTABLE_ON_APPROVAL`. A cross-principal restore is classified critical and
+  takes the human-only lifecycle instead.
+* **Audit export has a route.** `audit_export` has an executor and `POST
+  /api/audit/export` behind it, plus a listing and a download; the export is
+  redacted as the on-screen record is, scoped to the acting principal's own
+  account, and is itself an audited event.
+* **The second, weaker egress path is deleted.** `NetworkExecutor`, the
+  `network_execution` capability and `sandbox.fetch_url` are gone, and
+  `WebFetchExecutor` delegates to `WebAccessService`. `process_execution` was
+  assessed in the same pass and **kept**: it enters the same `CommandService`
+  lifecycle `shell_execution` does, so it is an unused path rather than a weaker
+  one.
+* **An oversize file says so before you approve.** The approval notice consults
+  the target's size and, above `MAX_PRE_IMAGE_BYTES`, replaces the rewind
+  sentence with one that states the change cannot be undone and why.
 
 ### High priority, medium effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 5 | Semantic memory retrieval (MEM-10) | Let the owner select a real embedding model — a local download or an explicit provider egress — keeping the labelled hashing fallback as the default | Memory that cannot recall a paraphrase is the largest honest gap in the product | PARITY |
-| 6 | Channel routing modes and approval relay (BUG-225) | Implement the spec's routing modes behind their own gate, with the accepted authority contract unchanged | An inbound message becoming work is the highest-risk transition in the product; it needs its own gate, not the transport's | PARITY |
-| 7 | Auto mode has no alignment check (BUG-218) | Add a deterministic, auditable second check to `auto` — not a classifier | `auto` is the only mode where an action runs with no human in the loop | **YES — differentiator** |
-| 8 | Owner-authored slash commands | Extend the skill store with a trigger token, stating the authority the command carries | Reference products treat a command as a privileged harness path; Raiker's would grant nothing, which is the differentiator | **YES — improvement** |
-| 9 ★ | **MCP client is five protocol revisions behind** | Negotiate [`2026-07-28`](https://modelcontextprotocol.io/specification/versioning) while keeping the `2024-11-05` handshake for older servers, which the spec's backward-compatibility section provides for | It is the single blocker behind three matrix rows — streamable-HTTP session semantics, remote OAuth, and MCP Apps — and a server that only speaks the current revision cannot be connected at all today. Fail-closed behaviour is unaffected either way | PARITY — required to stay connectable |
+| 1 | Semantic memory retrieval (MEM-10) | Let the owner select a real embedding model — a local download or an explicit provider egress — keeping the labelled hashing fallback as the default | Memory that cannot recall a paraphrase is the largest honest gap in the product | PARITY |
+| 2 | Channel routing modes and approval relay (BUG-225) | Implement the spec's routing modes behind their own gate, with the accepted authority contract unchanged | An inbound message becoming work is the highest-risk transition in the product; it needs its own gate, not the transport's | PARITY |
+| 3 | Auto mode has no alignment check (BUG-218) | Add a deterministic, auditable second check to `auto` — not a classifier | `auto` is the only mode where an action runs with no human in the loop | **YES — differentiator** |
+| 4 | Owner-authored slash commands | Extend the skill store with a trigger token, stating the authority the command carries | Reference products treat a command as a privileged harness path; Raiker's would grant nothing, which is the differentiator | **YES — improvement** |
 
 ### High priority, high effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 10 | Vector recall is linear (MEM-10 remainder) | Add an approximate-nearest-neighbour index over the existing vector store | Recall cost is paid on every turn and grows with the owner's history | PARITY |
-| 11 | Filtered domain egress unproven | Complete the container proof for allowed traffic, bypass denial and mid-stream revocation | `filtered_network` stays false until the boundary is measured, which is the rule the sandbox card is built on | PARITY |
-| 12 | Credential delivery and delta quarantine | Finish copy-on-write delivery and the two-pass delta merge | Post-use quarantine of what a credentialed run left behind is a control no compared product exposes | **YES — differentiator** |
-| 13 | Windows PTY and restart reattachment (BUG-194) | Design an authorised Windows transport rather than porting the POSIX one | A named pipe is reachable by name from any session; the authorisation story has to come first | PARITY |
+| 5 | Vector recall is linear (MEM-10 remainder) | Add an approximate-nearest-neighbour index over the existing vector store | Recall cost is paid on every turn and grows with the owner's history | PARITY |
+| 6 | Filtered domain egress unproven | Complete the container proof for allowed traffic, bypass denial and mid-stream revocation | `filtered_network` stays false until the boundary is measured, which is the rule the sandbox card is built on | PARITY |
+| 7 | Credential delivery and delta quarantine | Finish copy-on-write delivery and the two-pass delta merge | Post-use quarantine of what a credentialed run left behind is a control no compared product exposes | **YES — differentiator** |
+| 8 | Windows PTY and restart reattachment (BUG-194) | Design an authorised Windows transport rather than porting the POSIX one | A named pipe is reachable by name from any session; the authorisation story has to come first | PARITY |
 
 ### Medium priority, low effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 14 | Owner-guided summarisation of a range | Add "summarise from here / up to here" over the existing compaction path | Context control becomes the owner's rather than a threshold's | **YES — improvement** |
-| 15 | Task cadences are four names | Accept a time-of-day and a one-shot run-at | A daily task that runs a day after it was created is not a schedule an owner chose | PARITY |
-| 16 | Nothing owns delegated child tasks (BUG-220) | Give a delegating task ownership of its children's terminal states | A parent that reports done while a child is parked is a false completion | PARITY |
-| 17 | Retention sweep (MEM-07) | Run the sweep the stored `expires_at` already describes | An expiry enforced only at read time is a policy the storage does not keep | PARITY |
-| 18 ★ | **Agent Skills standard conformance** | Validate an installed skill against [the specification](https://agentskills.io/specification) and *report* the result rather than refusing: tighten the `name` rule, cap `description` at 1024, parse `license` and `compatibility`, and move Raiker's own built-ins' `version:` under `metadata` | A skill an owner writes in Raiker should install in the other forty products that read the format, and one written elsewhere should install here. Interoperability is the cheapest kind of extensibility. **`allowed-tools` is the one field Raiker should read and refuse to honour** — a skill pre-approving its own tools is exactly the grant [§3.5](#35-a-skill-is-instruction-only) exists to prevent, and saying so out loud is better than ignoring the field | **YES — improvement** |
+| 9 | Owner-guided summarisation of a range | Add "summarise from here / up to here" over the existing compaction path | Context control becomes the owner's rather than a threshold's | **YES — improvement** |
+| 10 | Task cadences are four names | Accept a time-of-day and a one-shot run-at | A daily task that runs a day after it was created is not a schedule an owner chose | PARITY |
+| 11 | Nothing owns delegated child tasks (BUG-220) | Give a delegating task ownership of its children's terminal states | A parent that reports done while a child is parked is a false completion | PARITY |
+| 12 | Retention sweep (MEM-07) | Run the sweep the stored `expires_at` already describes | An expiry enforced only at read time is a policy the storage does not keep | PARITY |
+| 13 ★ | **Agent Skills standard conformance** | Validate an installed skill against [the specification](https://agentskills.io/specification) and *report* the result rather than refusing: tighten the `name` rule, cap `description` at 1024, parse `license` and `compatibility`, and move Raiker's own built-ins' `version:` under `metadata` | A skill an owner writes in Raiker should install in the other forty products that read the format, and one written elsewhere should install here. Interoperability is the cheapest kind of extensibility. **`allowed-tools` is the one field Raiker should read and refuse to honour** — a skill pre-approving its own tools is exactly the grant [§3.5](#35-a-skill-is-instruction-only) exists to prevent, and saying so out loud is better than ignoring the field | **YES — improvement** |
 
 ### Medium priority, medium effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 19 | Hook lifecycle coverage | Add the four Raiker-meaningful events from Claude Code's 31 — `ConfigChange`, `Notification`, `PostToolBatch`, `InstructionsLoaded`. The other eleven are assessed individually in [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding): four are N/A to a single-owner local product, five are of little value, and two are blocked behind the mid-turn question surface (item 22) | A hook surface that covers half the lifecycle can enforce guards for half of it. `ConfigChange` is the one that goes beyond parity: "the owner changed a setting" is a governance fact nothing in Raiker can currently hook | PARITY, except `ConfigChange` — **YES, differentiator** |
-| 20 | The `prompt` hook handler (BUG-226) | Build it first of the four: it makes no outbound request and its output is context, not a decision | Each refused handler needs a gated surface; this is the only one that needs none | PARITY |
-| 21 | MCP tool search and deferred tool schemas | Bound the context cost of projected MCP tools, and of the 45 built-ins that enter every turn | A connected server should not cost every turn its whole schema | **YES — improvement** |
-| 22 ★ | **A structured question to the owner mid-turn** | Add one question surface — the model asks, the owner picks, the turn continues — reusing the approval transport and the same redaction | Today Raiker's only mid-turn interruption asks *may I do this*. There is no way to ask *which of these did you mean*, so a model facing two readings guesses and the owner finds out afterwards. A question grants nothing, executes nothing and needs no gate of its own, which is what makes it cheap; MCP's `2026-07-28` elicitation would then have a surface to land on | **YES — improvement** |
-| 23 | OpenTelemetry export | Emit governed events over OTLP behind its own capability gate, metadata-only by default with content capture as an explicit opt-in | [Cowork exports six events this way](https://claude.com/docs/cowork/monitoring) — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacks is the wire to carry it anywhere | **YES — improvement** |
-| 24 | Credential masking with sentinel substitution | Generalise the git-credential loan into a sentinel/substitution path for owner-declared credentials | A command that authenticates without ever holding the secret is strictly better than one that holds it briefly | **YES — improvement** |
+| 14 | Hook lifecycle coverage | Add the four Raiker-meaningful events from Claude Code's 31 — `ConfigChange`, `Notification`, `PostToolBatch`, `InstructionsLoaded`. The other eleven are assessed individually in [`HOOKS_SPEC.md`](HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding): four are N/A to a single-owner local product, five are of little value, and two are blocked behind the mid-turn question surface (item 17) | A hook surface that covers half the lifecycle can enforce guards for half of it. `ConfigChange` is the one that goes beyond parity: "the owner changed a setting" is a governance fact nothing in Raiker can currently hook | PARITY, except `ConfigChange` — **YES, differentiator** |
+| 15 | The `prompt` hook handler (BUG-226) | Build it first of the four: it makes no outbound request and its output is context, not a decision | Each refused handler needs a gated surface; this is the only one that needs none | PARITY |
+| 16 | MCP tool search and deferred tool schemas | Bound the context cost of projected MCP tools, and of the 45 built-ins that enter every turn | A connected server should not cost every turn its whole schema | **YES — improvement** |
+| 17 ★ | **A structured question to the owner mid-turn** | Add one question surface — the model asks, the owner picks, the turn continues — reusing the approval transport and the same redaction | Today Raiker's only mid-turn interruption asks *may I do this*. There is no way to ask *which of these did you mean*, so a model facing two readings guesses and the owner finds out afterwards. A question grants nothing, executes nothing and needs no gate of its own, which is what makes it cheap; MCP's `2026-07-28` elicitation would then have a surface to land on | **YES — improvement** |
+| 18 | OpenTelemetry export | Emit governed events over OTLP behind its own capability gate, metadata-only by default with content capture as an explicit opt-in | [Cowork exports six events this way](https://claude.com/docs/cowork/monitoring) — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacks is the wire to carry it anywhere | **YES — improvement** |
+| 19 | Credential masking with sentinel substitution | Generalise the git-credential loan into a sentinel/substitution path for owner-declared credentials | A command that authenticates without ever holding the secret is strictly better than one that holds it briefly | **YES — improvement** |
 
 ### Medium priority, high effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 25 | Deterministic replay | Make the event log replayable, as DeepSeek Harness's trajectory is | Replay turns an audit trail into a verification tool | **YES — improvement** |
-| 26 | Autonomous skill creation with a review gate | Implement `SELF_IMPROVEMENT_MODEL.md` behind a zero-trust review (ADD-06) | A self-authored instruction that reaches turns without review is self-granted agency | **YES — improvement** |
-| 27 | Remote supervisor install lifecycle | Complete SSH/Daytona supervisor install, upgrade and live proof | Remote backends are adapters today and readiness-blocked in practice | PARITY |
-| 28 ★ | **A delegating task that owns its children and routes by surface** | Extend BUG-220's parent/child ownership so a parent also chooses Chat or Build per child, as [Cowork Dispatch](https://claude.com/docs/cowork/guide/dispatch) does — **without** its ten-minute auto-deny, which Raiker refuses | Raiker already has both surfaces under one governed turn contract, so this is scheduling rather than a new execution path. It is the difference between "tasks nest" and "one brief becomes finished work" | **YES — improvement** |
-| 29 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively ([Claude in Chrome](https://claude.com/docs/cowork/overview), Hermes via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
+| 20 | Deterministic replay | Make the event log replayable, as DeepSeek Harness's trajectory is | Replay turns an audit trail into a verification tool | **YES — improvement** |
+| 21 | Autonomous skill creation with a review gate | Implement `SELF_IMPROVEMENT_MODEL.md` behind a zero-trust review (ADD-06) | A self-authored instruction that reaches turns without review is self-granted agency | **YES — improvement** |
+| 22 | Remote supervisor install lifecycle | Complete SSH/Daytona supervisor install, upgrade and live proof | Remote backends are adapters today and readiness-blocked in practice | PARITY |
+| 23 ★ | **A delegating task that owns its children and routes by surface** | Extend BUG-220's parent/child ownership so a parent also chooses Chat or Build per child, as [Cowork Dispatch](https://claude.com/docs/cowork/guide/dispatch) does — **without** its ten-minute auto-deny, which Raiker refuses | Raiker already has both surfaces under one governed turn contract, so this is scheduling rather than a new execution path. It is the difference between "tasks nest" and "one brief becomes finished work" | **YES — improvement** |
+| 24 ★ | **Governed browser control** | A headless browser behind its own capability and its own threat model: destinations answer to `web_fetch`'s address guard, page text through the same sanitiser, every navigation a governed action, no screen or input control | The reference platforms reach the web interactively ([Claude in Chrome](https://claude.com/docs/cowork/overview), Hermes via CDP) and Raiker can only read a page. Doing it as a *narrow tool set* rather than as computer use is the governance argument — and keeps [§2.9](#29-assistant--raiker-chat)'s refusal of screen control intact | **YES — improvement** |
 
 ### Low priority, low effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 30 | Tool rows do not survive a reload | Rehydrate the per-turn tool rows from the durable events, as reasoning already does | A transcript that loses half its record on reload is a weaker record | PARITY |
-| 31 | Live-spec sign-in (BUG-229) | Let the live specs sign in against a non-empty workspace | A test harness that only works on an empty workspace tests an empty workspace | NO — little advantage |
+| 25 | Tool rows do not survive a reload | Rehydrate the per-turn tool rows from the durable events, as reasoning already does | A transcript that loses half its record on reload is a weaker record | PARITY |
+| 26 | Live-spec sign-in (BUG-229) | Let the live specs sign in against a non-empty workspace | A test harness that only works on an empty workspace tests an empty workspace | NO — little advantage |
 
 ### Low priority, medium effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 32 | Plugin panels (BUG-228) | If built, declarative only, so "no plugin code runs in this browser" stays literally true | A gap against Raiker's own spec. **Reassessed this pass:** the row below is the better answer to the same need, and building both would be two contradictory UI-contribution models | NO — little advantage |
-| 33 ★ | **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp))** | Once the protocol revision above lands, render a connected server's pre-declared `ui://` resource in a sandboxed iframe under its own capability gate and a per-app owner permission | This is the shape Raiker would have had to invent for panels, already specified and already reviewed by someone else: the resource is declared ahead of time so the host can fetch and inspect it before anything runs, the iframe sandbox is mandatory rather than advisory, and every message between the UI and the host is MCP JSON-RPC — auditable in the record Raiker already keeps. It also arrives with the property Raiker's plugin model insists on: the UI belongs to a server the owner already added, not to a plugin that added itself | **YES — improvement** |
-| 34 | Path-scoped project rules | Scope project instructions to path patterns | Smaller standing context is a real benefit; the authority question is already settled | NO — little advantage |
-| 35 | Conversation rewind in place | Restore a conversation to a chosen turn, as `/rewind` does | Branching already covers the safe half; in-place rewind discards a record | NO — little advantage |
+| 27 | Plugin panels (BUG-228) | If built, declarative only, so "no plugin code runs in this browser" stays literally true | A gap against Raiker's own spec. **Reassessed this pass:** the row below is the better answer to the same need, and building both would be two contradictory UI-contribution models | NO — little advantage |
+| 28 ★ | **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp))** | Once the protocol revision above lands, render a connected server's pre-declared `ui://` resource in a sandboxed iframe under its own capability gate and a per-app owner permission | This is the shape Raiker would have had to invent for panels, already specified and already reviewed by someone else: the resource is declared ahead of time so the host can fetch and inspect it before anything runs, the iframe sandbox is mandatory rather than advisory, and every message between the UI and the host is MCP JSON-RPC — auditable in the record Raiker already keeps. It also arrives with the property Raiker's plugin model insists on: the UI belongs to a server the owner already added, not to a plugin that added itself | **YES — improvement** |
+| 29 | Path-scoped project rules | Scope project instructions to path patterns | Smaller standing context is a real benefit; the authority question is already settled | NO — little advantage |
+| 30 | Conversation rewind in place | Restore a conversation to a chosen turn, as `/rewind` does | Branching already covers the safe half; in-place rewind discards a record | NO — little advantage |
 
 ### Low priority, high effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 36 | LSP surface (BUG-227) | Decide whether Raiker wants a language-server client at all before building one to satisfy a manifest field | The code map already answers part of the need | NO — little advantage |
-| 37 | Ephemeral micro-VMs (ADD-12) | Replace shared-kernel containers for the highest-risk work | A different class of boundary; only Cowork has one | NO — complexity |
-| 38 | IDE extension | Phase 8 deferred | No governance effect; a surface question | NO — little advantage |
+| 31 | LSP surface (BUG-227) | Decide whether Raiker wants a language-server client at all before building one to satisfy a manifest field | The code map already answers part of the need | NO — little advantage |
+| 32 | Ephemeral micro-VMs (ADD-12) | Replace shared-kernel containers for the highest-risk work | A different class of boundary; only Cowork has one | NO — complexity |
+| 33 | IDE extension | Phase 8 deferred | No governance effect; a surface question | NO — little advantage |
 
 ---
 

@@ -890,10 +890,13 @@ And one property Raiker's plugin model insists on and gets for free: the UI
 belongs to a **server the owner added deliberately**, not to a plugin that
 contributed it on the owner's behalf.
 
-**The work.** Blocked on BUG-234 — the `ui://` resource type does not exist in
-protocol revision `2024-11-05`. After that: a capability gate, a per-app owner
-permission, an iframe with the sandbox attributes the specification requires, and
-a CSP that permits nothing the specification does not.
+**The work.** **Unblocked 2026-08-23.** This was blocked on BUG-234 — the `ui://`
+resource type does not exist in revision `2024-11-05`, which was the only one
+Raiker's client would negotiate. [FIXED-274](FIXED_ITEMS.md) moved the client to
+`2026-07-28`, so what is left is this feature's own work rather than a
+dependency: a capability gate, a per-app owner permission, an iframe with the
+sandbox attributes the specification requires, and a CSP that permits nothing the
+specification does not.
 
 **Recommendation, stated plainly.** **Build this and drop `panels.json`.** Two
 UI-contribution models is two security reviews, two permission vocabularies and

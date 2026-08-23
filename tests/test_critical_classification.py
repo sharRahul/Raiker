@@ -86,7 +86,7 @@ def test_criterion_a_tier2_gate_enable_is_critical() -> None:
 
 
 def test_criterion_a_tier2_threat_ack_is_critical() -> None:
-    match = classify_critical("threat_model_ack", "", {"capability": "network_execution"})
+    match = classify_critical("threat_model_ack", "", {"capability": "process_execution"})
     assert match is not None and match.code == CRITICAL_TIER2_RELAXATION
 
 

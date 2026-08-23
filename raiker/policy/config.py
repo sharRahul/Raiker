@@ -51,7 +51,9 @@ class StaticPolicyConfig:
             # Checkpoint restore (Workstream B / B2) is itself a workspace
             # mutation — approval-required, routed through its own governed gate.
             "checkpoint_restore", "checkpoint_restore_execution",
-            "process", "network",
+            # BUG-231 — the redacted, account-scoped audit export.
+            "audit_export",
+            "process",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
             "plugin_install", "plugin_execution_cap", "plugin_revocation_cap",
             "plugin_runtime_cap", "plugin_sandboxed_runtime_cap", "plugin_sandbox_image_pull_cap",

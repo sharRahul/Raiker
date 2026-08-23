@@ -418,6 +418,13 @@
           <div><dt>{s.transport === "http" ? "Endpoint" : "Command"}</dt><dd><code>{s.transport === "http" ? s.endpoint_url : s.command.join(" ")}</code></dd></div>
           <div><dt>{s.transport === "http" ? "Token reference" : "Template"}</dt><dd>{s.transport === "http" ? s.auth_ref ?? "None" : templateLabel(s.template)}</dd></div>
           <div><dt>Last connected</dt><dd>{s.last_connected_at ?? "Never"}</dd></div>
+          <!-- BUG-234 — which revision of the Model Context Protocol this
+               server agreed to. Nothing said it before, so "why will this
+               server not connect" had no answer on the page. -->
+          <div>
+            <dt>Protocol</dt>
+            <dd>{s.protocol_version ?? "Not negotiated yet"}</dd>
+          </div>
         </dl>
         <div class="tools">
           <span class="tools-label">Tools ({s.tool_count})</span>

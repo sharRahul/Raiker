@@ -1,6 +1,6 @@
 // The audit log is the append-only evidence view: every governed event, with
 // the standard route-level state grammar.
-import { render, screen, waitFor } from "@testing-library/svelte";
+import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import ActivityView from "./ActivityView.svelte";
 import { stubFetch, stubFetchPending } from "../test-helpers";
@@ -91,5 +91,49 @@ describe("ActivityView", () => {
       expect(fetchMock.mock.calls.some((call) => String(call[0]).includes("session_id=sess_alpha"))).toBe(true);
     });
     expect(screen.getByLabelText("Session id")).toHaveValue("sess_alpha");
+  });
+
+  // BUG-231 — evidence that cannot leave the product is evidence that cannot be
+  // used in a review, an incident write-up, or a second tool.
+  it("offers an export, and says what it is before producing one", async () => {
+    stubFetch({
+      "GET /api/events": [],
+      "GET /api/audit/exports": [
+        {
+          export_id: "aex_1234567890abcdef",
+          manifest_hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          event_count: 42,
+          redacted: true,
+          first_timestamp: "2026-08-01T00:00:00Z",
+          last_timestamp: "2026-08-23T00:00:00Z",
+          exported_by: "principal_owner",
+          created_at: "2026-08-23T00:00:00Z",
+        },
+      ],
+    });
+    render(ActivityView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^export$/i }));
+
+    expect(screen.getByText(/your account only/i)).toBeInTheDocument();
+    expect(screen.getByText(/manifest hash over\s+the event ids it covers/i)).toBeInTheDocument();
+    expect(await screen.findByText(/42 events/)).toBeInTheDocument();
+    expect(screen.getByText("0123456789ab")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /export and download/i })).toBeEnabled();
+  });
+
+  it("explains an empty scope rather than reporting a failure", async () => {
+    stubFetch({
+      "GET /api/events": [],
+      "GET /api/audit/exports": [],
+      "POST /api/audit/export": { __status: 409 },
+    });
+    render(ActivityView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^export$/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /export and download/i }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/nothing in scope to export/i);
   });
 });

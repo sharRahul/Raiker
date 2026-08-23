@@ -106,6 +106,9 @@ export interface McpServer {
   monitor_state: "active" | "paused" | "killed";
   paused_reason: string | null;
   paused_at: string | null;
+  // BUG-234 — the MCP revision this server negotiated on its last successful
+  // handshake, or null when it has never connected.
+  protocol_version: string | null;
 }
 
 /**
@@ -1123,6 +1126,51 @@ export interface RestorePlan {
 }
 
 /**
+ * POST /api/checkpoints/{id}/restore — the governed request, not the restore.
+ * The server raises an approval and performs nothing; `executes_action` is
+ * always false, and `critical` is true when the rewind would overwrite work
+ * last changed by a different principal (human-only, step-up lifecycle).
+ */
+export interface RestoreRequestResult {
+  status: string;
+  approval_id: string;
+  action_id: string;
+  checkpoint_id: string;
+  critical: boolean;
+  executes_action: boolean;
+  restore_content_count: number;
+  delete_count: number;
+  skip_count: number;
+}
+
+/**
+ * BUG-231 — one redacted audit export. Metadata only: the manifest hash is
+ * taken over the exact event ids and scope, which is what lets someone outside
+ * Raiker say whether the file they were handed is the one it produced.
+ */
+export interface AuditExportView {
+  export_id: string;
+  manifest_hash: string;
+  event_count: number;
+  redacted: boolean;
+  first_timestamp: string | null;
+  last_timestamp: string | null;
+  exported_by: string | null;
+  created_at: string;
+}
+
+export interface AuditExportResult {
+  ok: boolean;
+  export_id: string;
+  manifest_hash: string;
+  event_count: number;
+  redacted: boolean;
+  first_event_id: string | null;
+  last_event_id: string | null;
+  export_path: string | null;
+}
+
+/**
  * One extension's lifecycle, as four independent server-derived facts. `usable`
  * is a conclusion, never a claim the browser makes on its own; `blocked_reason`
  * names the first unmet condition.
@@ -1341,8 +1389,15 @@ export interface ApprovalDetailView {
   // `connector_write`; it was missing here, so the union claimed a shape the
   // backend does not only produce. `git_change` is B11's: a commit's file list
   // and diff, or the two refs a branch moves between.
+  // `checkpoint_restore` is BUG-230's: the per-file rewind plan, recomputed by
+  // the server at read time so the decision is made on what will actually run.
   preview_kind:
-    "file_diff" | "patch" | "git_change" | "connector_request" | "arguments";
+    | "file_diff"
+    | "patch"
+    | "git_change"
+    | "connector_request"
+    | "checkpoint_restore"
+    | "arguments";
   metadata_only_notice: string;
   // Server-computed: does pressing Approve actually perform this action?
   executes_on_approval: boolean;

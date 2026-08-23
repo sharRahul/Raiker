@@ -145,9 +145,9 @@ def test_relayed_capability_count_is_stated_correctly() -> None:
     """`README.md` commits to a number; the frozenset is what decides it."""
     from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL
 
-    assert len(EXECUTABLE_ON_APPROVAL) == 12, (
+    assert len(EXECUTABLE_ON_APPROVAL) == 13, (
         "EXECUTABLE_ON_APPROVAL changed size; update README.md, "
         "docs/KNOWN_LIMITS.md and docs/THREAT_MODEL.md, which all name it"
     )
     readme = Path("README.md").read_text(encoding="utf-8")
-    assert "twelve capabilities execute once through the" in readme
+    assert "thirteen capabilities execute once through the" in readme

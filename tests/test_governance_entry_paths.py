@@ -54,9 +54,7 @@ LOCAL_GATE_CHECK_MODULES = {
 #: listed in §3.5 with its status. They are recorded rather than removed because
 #: an unreachable registered executor is the shape a future hole takes.
 KNOWN_UNREACHABLE_CAPABILITIES = {
-    "network_execution",
     "process_execution",
-    "checkpoint_restore_execution",
 }
 
 
@@ -109,7 +107,7 @@ def test_i3_every_real_executor_capability_is_named_in_the_enumeration() -> None
 
     That is enough to close the gap this test exists for. A new registered
     executor cannot appear without someone writing down how it is reached, which
-    is the step nobody took for `network_execution`.
+    is the step nobody took for `network_execution` before it was deleted (BUG-232).
     """
     from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
 

@@ -110,12 +110,26 @@ the same file twice is rejected before anything is written.
 
 **Nothing writes into `.raiker/` or `.git/`.** Ever, by any path.
 
-**Every approved mutation is checkpointed first.** The previous contents are
-captured before the write. Note the honest limit: **the checkpoint capture is
-complete and automatic, but there is no owner-facing rewind.** The Checkpoints
-view and `/checkpoints restore` both compute a *preflight* — what a restore would
-change — and perform nothing. To undo an applied change today, use git, or ask
-the agent to reverse the edit.
+**Every approved mutation is checkpointed first, and you can rewind it.** The
+previous contents are captured before the write, and a restore is a governed
+request rather than a button:
+
+1. **Observability → Checkpoints** → *Preview restore impact*. The preflight
+   names every file a restore would rewrite, delete, or skip, and whether any of
+   them was last changed by a different principal. Reading it changes nothing.
+2. Tick the acknowledgement and press **Request this restore**. That raises an
+   ordinary approval and still changes nothing.
+3. Approve it in **Approvals**. The workspace goes back, and the restore itself
+   is captured — so it can be rewound the same way.
+
+`/checkpoints restore <id>` prints the same preflight from the terminal;
+`--confirm` raises the approval.
+
+Two honest limits. A file over 8 MiB has no pre-image (`MAX_PRE_IMAGE_BYTES`), so
+it is marked *not restorable* in the preflight and the approval that wrote it
+told you so before you approved. And a restore that would overwrite work last
+changed by a different principal is **critical**: only a live human can resolve
+it, and you will be asked to re-authenticate.
 
 ## Running commands
 

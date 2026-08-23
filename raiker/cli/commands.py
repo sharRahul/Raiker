@@ -338,7 +338,9 @@ def handle_checkpoints(command: str = "/checkpoints", *, workspace_root: str | P
     parts = command.split()
     if len(parts) >= 2 and parts[1] == "restore":
         if len(parts) < 3:
-            return "Usage: /checkpoints restore <checkpoint_id>"
+            return "Usage: /checkpoints restore <checkpoint_id> [--confirm]"
+        if "--confirm" in parts[3:]:
+            return _request_restore(store, service, parts[2], workspace_root=workspace_root)
         return _render_restore_plan(service, parts[2])
     if len(parts) >= 2 and parts[1] == "fork":
         if len(parts) < 3:
@@ -354,6 +356,7 @@ def handle_checkpoints(command: str = "/checkpoints", *, workspace_root: str | P
             f"- {cp['checkpoint_id']} session={cp['session_id']} turn={cp['turn_id']} type={cp['checkpoint_type']} created={cp['created_at']} summary={summary}"
         )
     lines.append("Preview a restore with: /checkpoints restore <checkpoint_id>")
+    lines.append("Then ask for it with: /checkpoints restore <checkpoint_id> --confirm")
     lines.append("Fork a checkpoint into a new session with: /checkpoints fork <checkpoint_id>")
     return "\n".join(lines)
 
@@ -406,7 +409,68 @@ def _render_restore_plan(service: CheckpointService, checkpoint_id: str) -> str:
             f" {marker} {entry['op']:16} {entry['workspace_path']} "
             f"(now={_short_sha(entry['current_sha256'])} → {_short_sha(entry['pre_image_sha256'])})"
         )
-    lines.append("Restore is approval-required: propose it to run it through the governed queue.")
+    lines.append(
+        "Restore is approval-required. Ask for it with "
+        "`/checkpoints restore <checkpoint_id> --confirm`; it runs only once you approve."
+    )
+    return "\n".join(lines)
+
+
+def _request_restore(
+    store: SQLiteStore,
+    service: CheckpointService,
+    checkpoint_id: str,
+    *,
+    workspace_root: str | Path = ".",
+) -> str:
+    """Raise the governed approval that performs the restore (BUG-230).
+
+    This command performs no restore. It recomputes the preflight — a caller
+    never names the files — records the proposal, and hands back an approval id.
+    The rewind happens only when a human approves it, and re-passes its own
+    capability gate, policy review and posture check at that point. A restore
+    that would overwrite another principal's work is marked critical so it takes
+    the human-only, step-up lifecycle instead of the ordinary relay.
+    """
+    from raiker.contracts.ids import new_id
+    from raiker.contracts.models import ToolAction
+    from raiker.control.service import RuntimeControlService
+
+    principal_ref, err = RuntimeControlService(workspace_root).resolve_principal()
+    if principal_ref is None:
+        return f"Cannot propose a restore: {err or 'no owner principal (run /bootstrap-owner first)'}"
+    try:
+        plan = service.compute_restore_plan(
+            checkpoint_id, restoring_principal_id=principal_ref.principal_id
+        )
+    except ValueError:
+        return f"Unknown checkpoint: {checkpoint_id}"
+    cross_principal = bool(plan["touches_other_principal"])
+    action = ToolAction(
+        action_id=new_id("act_"),
+        tool_name="checkpoint_restore",
+        arguments={"checkpoint_id": checkpoint_id},
+        risk_level="high",
+        requires_approval=True,
+        proposed_by=principal_ref.principal_id,
+    )
+    approval_id = new_id("appr_")
+    store.insert_tool_action(action, str(plan["session_id"]), None, "approval_required")
+    store.insert_approval(approval_id, action, critical=cross_principal)
+    lines = [
+        f"Restore of {checkpoint_id} proposed as approval {approval_id}.",
+        (
+            f"  rewrite={plan['restore_content_count']} "
+            f"delete={plan['delete_count']} "
+            f"skip={plan['skip_count']} (not restorable — over the pre-image cap)"
+        ),
+        "Nothing has changed yet. Approve it with: /approve " + approval_id,
+    ]
+    if cross_principal:
+        lines.append(
+            "This restore overwrites work last changed by a different principal, so it is "
+            "critical: only a live human can resolve it, and re-authentication is required."
+        )
     return "\n".join(lines)
 
 
@@ -3023,7 +3087,7 @@ def handle_slash_command(command: str, *, workspace_root: str | Path = ".") -> s
         return "Exiting Raiker."
     if command == "/help":
         return (
-            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /checkpoints restore <checkpoint_id>, /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider <provider> --model <model>, /quit\n"
+            "Commands: /help, /providers, /models, /model current, /model use <profile_id>, /model use --provider <provider> --model <model>, /model health, /model capabilities, /reasoning, /reasoning status, /reasoning set <mode-or-effort>, /reasoning off, /status, /tasks, /events, /checkpoints, /checkpoints restore <checkpoint_id> [--confirm], /approvals, /approve <id>, /deny <id>, /memory, /semantic-memory, /capabilities, /execution-profiles, /workspace, /workspace-view, /clients, /plugins, /plugin-plan <manifest_path>, /graph-status, /graph-plan, /graph-readiness [--summary|--json], /memory-readiness [--summary|--json], /approval-readiness [--summary|--json], /cleanup-readiness [--summary|--json], /remote-readiness [--summary|--json], /plugin-readiness [--summary|--json], /channel-readiness [--summary|--json], /memory-review [--summary], /approval-previews, /approval-previews [--json] [--status <status>] [--limit <n>], /graph-approval-preview, /memory-approval-preview [--summary], /approval-preview <preview_id>, /approval-preview <preview_id> [--json], /approval-audit [--summary], /rollback-plan, /graph-rollback-plan, /memory-rollback-plan, /storage-lifecycle [--summary|--graph|--memory], /storage-lifecycle-retention [--summary], /storage-lifecycle-cleanup-preview [--summary], /storage-lifecycle-handoff [--summary], /storage-lifecycle-evidence [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /storage-lifecycle-policy-simulation [--summary] [--json] [--status <status>] [--target <graph|memory|rollback|storage|plugin|channel|remote>] [--limit <number>], /review [--summary] [--staged] [--path <path>] [--json] [--limit <number>] [--severity <info|low|medium|high>] [--propose-fixes] [--proposals-only] [--save-proposals], /proposals [--json] [--status <proposed|acknowledged|deferred|rejected|superseded>] [--limit <number>], /proposal <proposal_id> [--json] [--mark <proposed|acknowledged|deferred|rejected|superseded>] [--approval-preview], /doctor, /channels, /launch --provider <provider> --model <model>, /quit\n"
             "Status: Phase 3 Slice B approval planning preview is implemented. Phase 3 is complete for safe foundation/readiness slices A-P; integrated real executors are governed per action; no-executor capabilities remain disabled/fail-closed. Current launchable UI is the plain local terminal client only (RAIKER_TUI=plain, --prompt, or interactive stdin). Rich/native TUI and Desktop/Web/Dashboard/Mobile/IDE/Voice/Browser Extension/REST/API clients are Phase 8 deferred work, not launchable apps. Phase 3 and Phase 4 commands are read-only, planning, preview, or metadata-only surfaces."
         )
     if command == "/providers":

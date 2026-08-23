@@ -37,7 +37,7 @@ from raiker.runtime.authority.router import GovernedAction, GovernedActionResult
 from raiker.storage.sqlite import SQLiteStore
 
 _DANGEROUS_CAPS = frozenset({
-    "shell_execution", "process_execution", "network_execution",
+    "shell_execution", "process_execution",
     "web_fetch", "email_runtime", "calendar_runtime", "finance_runtime",
     "investment_runtime", "medical_runtime", "pregnancy_baby_runtime",
     "cctv_runtime", "home_security_runtime", "plugin_execution_cap",
@@ -843,6 +843,49 @@ class RuntimeControlService:
         if not mapped.ok:
             return mapped
         return ControlResult(ok=True, data={"delivered": True, **dict(result.artifacts or {})})
+
+    def export_audit_log(
+        self,
+        acting_principal_id: str | None,
+        *,
+        session_id: str | None = None,
+        project_id: str | None = None,
+    ) -> ControlResult:
+        """Export the acting principal's own audit log, redacted (BUG-231).
+
+        Human-only, and it takes the long way round for the same reason the
+        channel test above does: it builds a governed action and routes it
+        through :class:`RuntimeAuthority`, so the capability gate, the policy
+        review, the posture check and the audit event all apply. A route that
+        called ``generate_export`` directly would produce the same file while
+        proving nothing about the path.
+
+        The account the export covers is the acting principal's, resolved inside
+        the executor from the principal itself — never from an argument.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        arguments: dict[str, Any] = {}
+        if session_id:
+            arguments["session_id"] = session_id
+        if project_id:
+            arguments["project_id"] = project_id
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="audit_export",
+            tool_or_service_name="audit_export",
+            arguments=arguments,
+            risk_level=RiskLevelValue.LOW,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data=dict(result.artifacts or {}))
 
     # ── Containment: instant kill switch + revocable pause (Phase C) ─────────
     # Owner-scoped, human-only lifecycle control over a monitored connection.

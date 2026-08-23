@@ -1,6 +1,8 @@
 import type {
   AgentPlan,
   AgentResponse,
+  AuditExportResult,
+  AuditExportView,
   ApprovalDetailView,
   ApprovalView,
   AttachmentPreview,
@@ -89,6 +91,7 @@ import type {
   ResumableTurnsView,
   ResolveCriticalApprovalResult,
   RestorePlan,
+  RestoreRequestResult,
   RuntimeMode,
   RuntimeReadiness,
   SecurityHealth,
@@ -971,6 +974,29 @@ export const api = {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url));
   },
+  // ── BUG-231: the audit log, taken out of the product ──
+  // Asking for an export is a governed action: it passes the `audit_export`
+  // gate, the policy review and the posture check, and appears in the log it
+  // exported. Scope is the signed-in account, resolved server-side; the browser
+  // names nothing. `downloadAuditExport` fetches with the session credential —
+  // a bare <a download> cannot send one — and hands over a blob URL.
+  auditExports: () => request<AuditExportView[]>("/api/audit/exports"),
+  createAuditExport: (sessionId?: string) =>
+    postJson<AuditExportResult>(
+      withQuery("/api/audit/export", { session_id: sessionId }),
+      {},
+    ),
+  downloadAuditExport: async (exportId: string): Promise<void> => {
+    const blob = await requestBlob(
+      `/api/audit/exports/${encodeURIComponent(exportId)}/download`,
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${exportId}.jsonl`;
+    anchor.click();
+    setTimeout(() => URL.revokeObjectURL(url));
+  },
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>
@@ -1209,6 +1235,14 @@ export const api = {
   checkpointRestorePlan: (id: string) =>
     request<RestorePlan>(
       `/api/checkpoints/${encodeURIComponent(id)}/restore-plan`,
+    ),
+  // BUG-230 — the rewind. This asks for it; it never performs one. The server
+  // recomputes the preflight, records the proposal and returns an approval id,
+  // and the workspace changes only when a human approves it in Approvals.
+  requestCheckpointRestore: (id: string) =>
+    postJson<RestoreRequestResult>(
+      `/api/checkpoints/${encodeURIComponent(id)}/restore`,
+      {},
     ),
   // ── Branch from here (GAP-CHAT C14) ──────────────────────────────────
   // A branch is a *second* conversation seeded from a checkpoint's state summary

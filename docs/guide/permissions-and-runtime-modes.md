@@ -118,13 +118,13 @@ agent can derive from it. **Owner** is the gate and decision-mode control;
 its own short-lived signed machine identity, so Activity and Approvals can name
 the machine actor separately from you, the owner.
 
-**Permissions** lists all 67 gates, grouped:
+**Permissions** lists all 66 gates, grouped:
 
 | Group | Examples |
 |---|---|
 | Workspace | Audit export, Code map, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
-| Network | Network requests, Web fetch, Git push, External channels, Channel approval relay |
+| Network | Web fetch, Git push, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
 | Connectors | GitHub, Gmail, Google Calendar, Slack, Calendar (local), Email drafts, Reminders, plugin lifecycle |
 | MCP | MCP builder, MCP connector |
@@ -176,7 +176,7 @@ capability you are opening. The most consequential are
 ### Capabilities with no enable path
 
 Some capabilities show no row at all: CCTV, finance, medical,
-pregnancy/baby, home security, and hardware operation (18 of the 67 gates are
+pregnancy/baby, home security, and hardware operation (18 of the 66 gates are
 never rendered). These are **deferred**,
 not merely gated — no governed executor exists, so the runtime refuses to pretend
 one does. SSH remote and Daytona cloud execution instead require an
@@ -189,6 +189,10 @@ fail-closed.
 real executor since Workstream B, and it was unenableable only because it had no
 entry in the activation registry — a block with no requirement to satisfy. That
 entry landed with **FIXED-106**, so it turns on like any other Tier-1 capability.
+Since **FIXED-270** it also has callers: Observability → Checkpoints, and
+`/checkpoints restore <id> --confirm`. **Audit export** is beside it for the same
+reason — a capability that had no executor at all until **FIXED-271**, and now
+answers to Observability → Audit log → Export.
 Observability → Diagnostics lists them under *"Disabled / deferred
 capabilities"*.
 

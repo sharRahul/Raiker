@@ -403,7 +403,7 @@ def test_risk_acceptance_event_logged(authority: RuntimeAuthority, store: SQLite
 
 def test_all_runtime_domain_capabilities_in_registry() -> None:
     assert "shell_execution" in RUNTIME_DOMAIN_CAPABILITIES
-    assert "network_execution" in RUNTIME_DOMAIN_CAPABILITIES
+    assert "network_execution" not in RUNTIME_DOMAIN_CAPABILITIES  # BUG-232
     assert "email_runtime" in RUNTIME_DOMAIN_CAPABILITIES
     assert "medical_runtime" in RUNTIME_DOMAIN_CAPABILITIES
     assert "finance_runtime" in RUNTIME_DOMAIN_CAPABILITIES
@@ -419,7 +419,7 @@ def test_high_risk_capabilities_default_disabled() -> None:
 
     gates = default_capability_gates()
     # Integrated (real-executor) capabilities ship ENABLED (governed by default-ask).
-    for cap in ("shell_execution", "network_execution", "email_runtime", "plugin_execution_cap"):
+    for cap in ("shell_execution", "web_fetch", "email_runtime", "plugin_execution_cap"):
         assert cap in REAL_EXECUTOR_CAPABILITIES
         assert gates[cap].state == CapabilityState.ENABLED_RUNTIME, f"{cap} not enabled"
     # Not-yet-integrated (no-executor) capabilities stay DISABLED / fail closed.
@@ -1193,7 +1193,7 @@ def test_dangerous_capabilities_remain_disabled_by_default(authority: RuntimeAut
         assert cap in REAL_EXECUTOR_CAPABILITIES
         assert authority.get_effective_capability_gate(cap)["state"] == "enabled_runtime"
     # Integrated dangerous capabilities ship enabled (governed by default-ask + env allowlists).
-    for cap in ("shell_execution", "process_execution", "network_execution", "container_execution_cap"):
+    for cap in ("shell_execution", "process_execution", "web_fetch", "container_execution_cap"):
         assert cap in REAL_EXECUTOR_CAPABILITIES
         gate = authority.get_effective_capability_gate(cap)
         assert gate["state"] == "enabled_runtime", f"{cap} should be enabled, got {gate['state']}"

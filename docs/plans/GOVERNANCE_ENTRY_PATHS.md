@@ -46,8 +46,9 @@ None of that is wrong. All of it should have been written down, because the
 difference between the two chokepoints is exactly where a future mistake will
 land — and one already did: two egress implementations existed for months, one
 of them with none of the address guard, because nothing enumerated the paths that
-reach the network. See
-[`../threat-models/network-execution.md`](../threat-models/network-execution.md).
+reach the network. Enumerating them is what found it; deleting the weaker one is
+what closed it (BUG-232). There is now one implementation, and it is the one an
+owner is told about: [`../threat-models/web-fetch.md`](../threat-models/web-fetch.md).
 
 ---
 
@@ -130,10 +131,13 @@ orchestrator directly.
 
 | # | Path | Crosses | Reaches |
 |---|---|---|---|
-| 7 | **Approval resolution** | `ApprovalExecutionBridge` → **B**, with TTL, arguments-hash and posture checks first | Only the twelve in `EXECUTABLE_ON_APPROVAL`; everything else records the decision and executes nothing |
+| 7 | **Approval resolution** | `ApprovalExecutionBridge` → **B**, with TTL, arguments-hash and posture checks first | Only the thirteen in `EXECUTABLE_ON_APPROVAL`; everything else records the decision and executes nothing |
 | 8 | **Critical approval resolution** | `resolve_critical_approval` — human-only, step-up verified, **never** the ordinary relay | The critical action, once |
 | 9 | **Control-plane mutation** (open a gate, stop the runtime) | `control/service.py` → **B**; plus `runtime_gate_manager` role, reason, typed phrase, threat-model acknowledgement | The gate change, recorded against the principal |
 | 10 | **Terminal slash command** | The CLI's own governed command surface | The same capabilities, under the same gates |
+| 21 | **Checkpoint restore request** (BUG-230) | `POST /api/checkpoints/{id}/restore` → recomputed preflight → an ordinary approval; a cross-principal restore is marked `critical` and takes path 8 instead | `checkpoint_restore_execution`, once, when a human approves. The route itself performs nothing |
+| 22 | **`/checkpoints restore <id> --confirm`** | The same: recomputed preflight, ordinary approval, critical when cross-principal | Identical to 21 — the terminal is not a privileged path |
+| 23 | **Audit export** (BUG-231) | `POST /api/audit/export` → `control/service.py::export_audit_log` → **B**; human-only, and the account scope comes from the principal, never from an argument | A redacted JSONL of *this* account's record, written into the workspace. The export is an event in the log it exported |
 
 ### 3.3 Delegated and contributed execution
 
@@ -162,10 +166,18 @@ takes.
 
 | Capability | State |
 |---|---|
-| `network_execution` | Real executor, registered, **no tool and no route constructs it**. Weaker guard than `web_fetch`. Removal candidate — [backlog #3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) |
-| `process_execution` | Real executor, registered, no `process` tool, not relayed by an approval |
-| `checkpoint_restore_execution` | Real executor, registered, tested — **no route, command or tool proposes a restore**. [backlog #1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) |
-| `audit_export` | Capability with **no executor**; `raiker/events/export.py` produces a manifest no route surfaces. [backlog #2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) |
+| `process_execution` | Real executor, registered, no `process` tool, not relayed by an approval. It runs the same `CommandService` lifecycle `shell_execution` does, so it is an *unused* path rather than a *weaker* one — which is why it survived the 2026-08-23 cut and `network_execution` did not |
+
+**Three of the four rows this section held are gone, and each left for a
+different reason.** `network_execution` was deleted outright (capability,
+executor and gate): it was a second implementation of "reach the network" whose
+only control was a hard-coded four-host netloc glob, and a registered executor
+with a weaker guard is one call site away from making the no-bypass claim false.
+`checkpoint_restore_execution` gained its callers — `POST
+/api/checkpoints/{id}/restore` and `/checkpoints restore <id> --confirm`, both
+raising an ordinary approval (paths 21 and 22 in §3.2). `audit_export` gained an
+executor and `POST /api/audit/export` (path 23). What remains is one row, and it
+is recorded rather than removed for the reason this section exists.
 
 ### 3.6 Every capability with a real executor, and the path that reaches it
 
@@ -196,7 +208,9 @@ not fully traced.
 
 Twelve of these fifteen are also **relayed by an approval**
 (`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `graph_indexing_runtime` and
-`web_fetch` are not.
+`web_fetch` are not. The thirteenth relayed capability,
+`checkpoint_restore_execution`, has no model tool at all: only paths 21 and 22
+propose a restore, so an agent can never rewind the workspace on its own say-so.
 
 **Reached by a tool that checks its own gate** — the §4 pattern:
 
@@ -213,6 +227,7 @@ Twelve of these fifteen are also **relayed by an approval**
 | Capability | Where |
 |---|---|
 | `approval_execution_relay` | `ApprovalExecutionBridge`, `raiker/approvals/execution.py:197` |
+| `audit_export` | `control/service.py::export_audit_log` (path 23) |
 | `mcp_builder_runtime` | `control/service.py::_route_mcp` (`:492`) |
 | `external_channel_runtime` | `control/service.py:838` |
 
@@ -293,7 +308,7 @@ real defect this repository has already had.
 |---|---|---|
 | I1 | `route_action` has exactly six call sites, in the five modules named in §2 | A seventh entry path appearing unreviewed |
 | I2 | `AgentGateway` is constructed in exactly the four modules named in §3.1 | A surface that reaches the orchestrator without the gateway |
-| I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is reachable from a named path in §3, or listed in §3.5 | **The two-egress problem**, and the unreachable checkpoint restore |
+| I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is reachable from a named path in §3, or listed in §3.5 | **The two-egress problem** and the unreachable checkpoint restore, both since closed; the invariant is what keeps a new registered executor from repeating either |
 | I4 | Every module with a local `_ENABLED_GATE_STATES` is listed in §4 | A ninth local gate check appearing silently |
 | I5 | `combine()` never returns `allow` for a hook decision | A hook gaining grant authority |
 | I6 | Every tool in `MODEL_EXPOSED_TOOLS` has a `PolicyEngine` verdict | Already asserted — `tests/test_policy_engine.py` |

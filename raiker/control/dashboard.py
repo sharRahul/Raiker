@@ -15,6 +15,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from raiker.approval_previews import redact_secret_like_text
+from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
 from raiker.control.knowledge_scope import (
@@ -72,6 +73,7 @@ from raiker.tools.filesystem import (
     proposed_edit_snapshot,
     proposed_patch_snapshot,
     proposed_write_snapshot,
+    resolve_workspace_path,
 )
 from raiker.tools.git import (
     proposed_branch_snapshot,
@@ -240,6 +242,11 @@ class McpServerView:
     monitor_state: str = "active"
     paused_reason: str | None = None
     paused_at: str | None = None
+    # BUG-234 — the Model Context Protocol revision this server actually
+    # negotiated, recorded by the last successful handshake. Null until one has
+    # happened; nothing in the product said which revision Raiker speaks, which
+    # made "why will this server not connect" unanswerable.
+    protocol_version: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -2808,6 +2815,7 @@ class DashboardService:
                 monitor_state=str(row.get("monitor_state") or "active"),
                 paused_reason=row.get("paused_reason"),
                 paused_at=row.get("paused_at"),
+                protocol_version=row.get("protocol_version"),
             )
             for row in self.store.list_mcp_servers(principal_id)
         ]
@@ -6491,13 +6499,43 @@ class DashboardService:
                 "token, once. It leaves this machine and cannot be unsent — close "
                 "or delete it on GitHub to undo it."
             )
-        elif relays:
+        elif relays and view.tool_name == "checkpoint_restore":
+            # BUG-230 — the rewind. The wording below promises a checkpoint of
+            # the previous contents, which is exactly what this action consumes
+            # rather than produces; and the one fact an owner needs here is that
+            # the restore is itself captured, so approving is not a one-way door.
             notice = (
-                "Approving this performs the change shown above, once, in your "
-                "workspace — under a fresh capability, policy and posture check. "
-                "The previous file contents are checkpointed first, so it can be "
-                "rewound."
+                "Approving this rewinds the files listed above to their state at "
+                "the checkpoint, once, under a fresh capability, policy and posture "
+                "check. The restore captures its own pre-image first, so it appears "
+                "as a new checkpoint and can be rewound the same way. Files marked "
+                "skipped are left exactly as they are."
             )
+        elif relays:
+            # BUG-233 — the rewind sentence was a constant for the whole
+            # file-mutation class, and for a file over the pre-image cap it was
+            # false: the write still happens, its pre-image is recorded
+            # `oversize`, and nothing can put it back. The owner read the promise
+            # *before* deciding, so the check has to happen here, before the
+            # decision, rather than at capture time after it.
+            oversize = self._oversize_target(view.tool_name, raw_args)
+            if oversize is not None:
+                path, size_bytes = oversize
+                notice = (
+                    "Approving this performs the change shown above, once, in your "
+                    "workspace — under a fresh capability, policy and posture check. "
+                    f"**This change cannot be rewound.** `{path}` is "
+                    f"{size_bytes // (1024 * 1024)} MiB, over the "
+                    f"{MAX_PRE_IMAGE_BYTES // (1024 * 1024)} MiB checkpoint pre-image "
+                    "cap, so no copy of the previous contents is kept."
+                )
+            else:
+                notice = (
+                    "Approving this performs the change shown above, once, in your "
+                    "workspace — under a fresh capability, policy and posture check. "
+                    "The previous file contents are checkpointed first, so it can be "
+                    "rewound."
+                )
         else:
             notice = (
                 "Approval resolution is metadata-only. Recording a decision does "
@@ -6574,10 +6612,79 @@ class DashboardService:
             self.workspace_root, selected_repository_subpath(self.store, scope)
         )
 
+    #: Tools whose approval promises a checkpointed rewind, keyed by the argument
+    #: naming the file the promise is about.
+    _REWIND_PROMISE_TOOLS: dict[str, str] = {
+        "write_file": "path",
+        "edit_file": "path",
+        "create_document": "path",
+        "apply_patch": "path",
+    }
+
+    def _oversize_target(
+        self, tool_name: str, args: dict[str, Any]
+    ) -> tuple[str, int] | None:
+        """``(path, size)`` when the target is too large to checkpoint, else None.
+
+        BUG-233. Only an *existing* file has a pre-image to lose, so a new file is
+        not oversize however large the proposed content is: there is nothing to
+        rewind to either way. A path that does not resolve inside the workspace is
+        not this function's problem — the executor refuses it — so it reports no
+        promise rather than guessing.
+        """
+        argument = self._REWIND_PROMISE_TOOLS.get(tool_name)
+        if argument is None:
+            return None
+        raw_path = str(args.get(argument, "")).strip()
+        if not raw_path:
+            return None
+        try:
+            resolved = resolve_workspace_path(self.workspace_root, raw_path)
+        except FilesystemSafetyError:
+            return None
+        try:
+            if not resolved.is_file():
+                return None
+            size = resolved.stat().st_size
+        except OSError:
+            return None
+        return (raw_path, size) if size > MAX_PRE_IMAGE_BYTES else None
+
     def _build_preview(
         self, tool_name: str, args: dict[str, Any], *, principal_id: str | None = None
     ) -> tuple[str | None, str | None, str]:
         """Return (diff, path, preview_kind). File mutations get a unified diff; never executes."""
+        if tool_name == "checkpoint_restore":
+            # BUG-230 — the approval carries the same preflight the Checkpoints
+            # panel shows, recomputed here from the capture manifest rather than
+            # taken from the caller, so the owner decides on what will actually
+            # run. Metadata only: paths, operations and sizes, never content.
+            from raiker.checkpoints.service import CheckpointService
+
+            checkpoint_id = str(args.get("checkpoint_id", "")).strip()
+            try:
+                plan = CheckpointService(self.store).compute_restore_plan(
+                    checkpoint_id, restoring_principal_id=principal_id
+                )
+            except (ValueError, OSError):
+                return None, checkpoint_id or None, "arguments"
+            files: list[dict[str, Any]] = plan.get("files", [])  # type: ignore[assignment]
+            lines = [
+                f"Checkpoint {checkpoint_id}",
+                f"{plan['restore_content_count']} to rewrite, "
+                f"{plan['delete_count']} to delete, {plan['skip_count']} skipped "
+                f"(too large to have been captured).",
+                "",
+            ]
+            for entry in files:
+                marks: list[str] = []
+                if entry.get("changed_by_other_principal"):
+                    marks.append("last changed by a different principal")
+                if entry.get("op") == "skip_oversize":
+                    marks.append("not restorable — over the pre-image cap")
+                suffix = f"  [{'; '.join(marks)}]" if marks else ""
+                lines.append(f"{entry['op']:>16}  {entry['workspace_path']}{suffix}")
+            return "\n".join(lines), checkpoint_id or None, "checkpoint_restore"
         if tool_name == "write_file":
             try:
                 snapshot = proposed_write_snapshot(

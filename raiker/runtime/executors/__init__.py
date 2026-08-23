@@ -28,6 +28,7 @@ from raiker.runtime.executors.models_runtime import (
 from raiker.runtime.executors.reminders import ReminderRuntimeExecutor
 from raiker.runtime.executors.scheduled import ScheduledRoutinesExecutor
 from raiker.runtime.executors.tier1_approval import ApprovalExecutionRelay
+from raiker.runtime.executors.tier1_audit import AuditExportExecutor
 from raiker.runtime.executors.tier1_checkpoint import CheckpointRestoreExecutor
 from raiker.runtime.executors.tier1_files import FileWriteExecutor, PatchApplyExecutor
 from raiker.runtime.executors.tier1_git import GitPushExecutor, GitWriteExecutor
@@ -37,7 +38,7 @@ from raiker.runtime.executors.tier1_tasks import (
     TaskManagementExecutor,
 )
 from raiker.runtime.executors.tier2_shell import ProcessExecutor, ShellExecutor
-from raiker.runtime.executors.tier2_web import NetworkExecutor, WebFetchExecutor
+from raiker.runtime.executors.tier2_web import WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
     CodeMapIndexExecutor,
     GraphIndexingExecutor,
@@ -73,11 +74,12 @@ from raiker.runtime.executors.tier6_local import (
 __all__ = [
     "Executor", "ExecutionResult", "ExecutorRegistry", "SandboxError", "not_implemented",
     "REAL_EXECUTOR_CAPABILITIES", "build_default_executor_registry",
-    "ApprovalExecutionRelay", "CheckpointRestoreExecutor", "FileWriteExecutor", "PatchApplyExecutor",
+    "ApprovalExecutionRelay", "AuditExportExecutor", "CheckpointRestoreExecutor",
+    "FileWriteExecutor", "PatchApplyExecutor",
     "GitWriteExecutor", "GitPushExecutor",
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
-    "ShellExecutor", "ProcessExecutor", "WebFetchExecutor", "NetworkExecutor",
+    "ShellExecutor", "ProcessExecutor", "WebFetchExecutor",
     "GraphIndexingExecutor", "CodeMapIndexExecutor",
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
@@ -135,6 +137,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # checkpoint using B1 pre-image blobs; writes its own pre-image first, so a
     # restore is itself reversible. Approval-required governed mutation.
     "checkpoint_restore_execution",
+    # BUG-231 — the audit log, taken out of the product. A redacted, account-
+    # scoped export of the owner's own record, written locally; it reaches no
+    # network and grants nothing. Evidence that cannot leave is not evidence.
+    "audit_export",
     # BUG-62 — the two local planning mutations an approval carries out. A task
     # row and a project label are owner-scoped, reversible, and never leave the
     # machine, so approving one performs it rather than recording it.
@@ -144,7 +150,6 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     "shell_execution",
     "process_execution",
     "web_fetch",
-    "network_execution",
     # BUG-67 — the governed push. Egress like the four above it, bounded by the
     # owner's connector egress allowlist and the owner's own credential; it never
     # forces and never deletes a ref.
@@ -253,14 +258,14 @@ def build_default_executor_registry(
     registry.register("git_write_execution", GitWriteExecutor(ws, store))
     registry.register("git_push_execution", GitPushExecutor(ws, store))
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))
+    registry.register("audit_export", AuditExportExecutor(ws, store))
     registry.register("memory_write_execution", MemoryWriteExecutor(ws, store))
     registry.register("memory_forget_execution", MemoryForgetExecutor(ws))
     registry.register("task_management_runtime", TaskManagementExecutor(ws, store))
     registry.register("project_assignment_runtime", ProjectAssignmentExecutor(ws, store))
     registry.register("shell_execution", ShellExecutor(ws))
     registry.register("process_execution", ProcessExecutor(ws))
-    registry.register("web_fetch", WebFetchExecutor(ws))
-    registry.register("network_execution", NetworkExecutor(ws))
+    registry.register("web_fetch", WebFetchExecutor(ws, store))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("code_map_indexing", CodeMapIndexExecutor(ws, store))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))

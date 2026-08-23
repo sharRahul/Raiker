@@ -78,9 +78,14 @@ class CheckpointRestoreExecutor:
             # it with this restore's action id (capability = checkpoint restore).
             pre = capture.snapshot_path(path, self.capability)
             if pre is not None:
+                # BUG-235 — file this restore's own pre-image under the
+                # *conversation* whose checkpoints a later restore plan selects
+                # on, not under the API session that resolved the approval.
+                # Otherwise "the restore is itself reversible" is true of the
+                # blob and false of every plan that could reach it.
                 capture.commit(
                     pre,
-                    session_id=action.session_id,
+                    session_id=action.origin_session_id or action.session_id,
                     turn_id=action.turn_id,
                     action_id=action.action_id,
                     principal_id=principal.principal_id,

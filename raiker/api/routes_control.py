@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any, NoReturn
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi.responses import FileResponse
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
@@ -18,6 +19,7 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.control.service import RuntimeControlService
+from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.storage.sqlite import store_health
@@ -321,3 +323,101 @@ async def revoke_standing_grant(
     if not result.ok:
         _deny(result.reason_code)
     return {"ok": True, "grant_id": grant_id}
+
+
+# ── Audit export (BUG-231) ───────────────────────────────────────────────────
+# Raiker keeps an append-only, account-scoped audit log and calls it evidence.
+# Evidence that cannot leave the product is evidence that cannot be used in a
+# review, an incident write-up, or a second tool. These three routes are how it
+# leaves: ask for one, list what has been produced, and download one file.
+#
+# The export itself is a governed action — it passes the `audit_export`
+# capability gate, the policy review and the posture check, and appears in the
+# log it exported. Scope is the acting principal's own account, resolved inside
+# the executor from the principal rather than from any argument, and every
+# payload is redacted exactly as the on-screen record is.
+
+
+@router.post("/api/audit/export")
+async def create_audit_export(
+    request: Request,
+    session_id: str | None = None,
+    project_id: str | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Produce a redacted export of the acting principal's own audit log."""
+    session, _principal = auth_data
+    result = _get_service(request).export_audit_log(
+        session.principal_id, session_id=session_id, project_id=project_id
+    )
+    if not result.ok:
+        if result.reason_code == "audit_export_empty":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"ok": False, "reason_code": "audit_export_empty"},
+            )
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.get("/api/audit/exports")
+async def list_audit_exports(
+    request: Request,
+    limit: int = 20,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """The manifests already produced, newest first.
+
+    Metadata only: the id, the content hash over the exact event ids and scope,
+    the event count, the window, and whether it was redacted. Never the events.
+    """
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    from raiker.storage.sqlite import SQLiteStore
+
+    rows = SQLiteStore(ws).list_audit_exports(limit=max(1, min(limit, 200)))
+    return [
+        {
+            "export_id": str(row["export_id"]),
+            "manifest_hash": str(row["manifest_hash"]),
+            "event_count": int(row["event_count"] or 0),
+            "redacted": bool(row["redacted"]),
+            "first_timestamp": row["first_timestamp"],
+            "last_timestamp": row["last_timestamp"],
+            "exported_by": row["exported_by"],
+            "created_at": str(row["created_at"]),
+        }
+        for row in rows
+    ]
+
+
+@router.get("/api/audit/exports/{export_id}/download")
+async def download_audit_export(
+    export_id: str,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> FileResponse:
+    """Hand the export file over.
+
+    The path is read from the manifest row and re-resolved against this
+    workspace's own exports directory, so a stored value can never address a
+    file outside it.
+    """
+    ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
+    from raiker.storage.sqlite import SQLiteStore
+
+    store = SQLiteStore(ws)
+    row = store.load_audit_export(export_id)
+    if row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown export: {export_id}"
+        )
+    exports_dir = (EventLogWriter(store).events_dir.parent / "exports").resolve()
+    path = (exports_dir / f"{export_id}.jsonl").resolve()
+    if path.parent != exports_dir or not path.is_file():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "audit_export_file_missing"},
+        )
+    return FileResponse(
+        path, media_type="application/x-ndjson", filename=f"{export_id}.jsonl"
+    )

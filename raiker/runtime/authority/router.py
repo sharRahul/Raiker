@@ -77,6 +77,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "patch_apply_execution": "patch_apply_execution",
     "memory_write": "memory_write_execution",
     "memory_forget": "memory_forget_execution",
+    "audit_export": "audit_export",
     "checkpoint_restore": "checkpoint_restore_execution",
     "checkpoint_restore_execution": "checkpoint_restore_execution",
     # BUG-62 — the two local planning mutations. Naming them here is what gives
@@ -104,7 +105,6 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "remote_execute": "remote_execution_cap",
     "cloud_execute": "cloud_execution_cap",
     "process": "process_execution",
-    "network": "network_execution",
     "web_fetch": "web_fetch",
     # B12/C7 — search is the same capability pointed at an owner-configured
     # endpoint, so it answers to the same gate and the same decision mode.
@@ -339,11 +339,21 @@ class RuntimeAuthority:
         Isolated in try/except: a checkpoint-capture failure is recorded as a
         metadata event but never propagates into the mutation result.
         """
+        # BUG-235 — file the pre-image under the *conversation*, not the inbox.
+        # A file write approved from the Approvals inbox executes under the API
+        # session that resolved it, while the checkpoints it must be restorable
+        # from belong to the chat that proposed it. `compute_restore_plan`
+        # selects capture entries by the checkpoint's `session_id`, so a capture
+        # filed under the API session was invisible to every restore plan ever
+        # computed: the pre-image existed, and nothing could reach it. The relay
+        # already carries the proposing conversation in `origin_session_id`;
+        # using it is what makes the capture and the checkpoint agree.
+        capture_session_id = action.origin_session_id or action.session_id
         try:
             for item in pre_image if isinstance(pre_image, list) else [pre_image]:
                 meta = self.capture_service.commit(
                     item,
-                    session_id=action.session_id,
+                    session_id=capture_session_id,
                     turn_id=action.turn_id,
                     action_id=action.action_id,
                     principal_id=principal.principal_id,
@@ -352,7 +362,7 @@ class RuntimeAuthority:
                     event_type="checkpoint_captured",
                     actor="checkpoint_capture",
                     payload=meta,
-                    session_id=action.session_id,
+                    session_id=capture_session_id,
                     turn_id=action.turn_id,
                 )
             return self._capture_outcome(

@@ -17,6 +17,7 @@ acknowledging.
 | Capability | Threat model |
 |---|---|
 | `approval_execution_relay` | [Approval execution relay](approval-execution-relay.md) |
+| `audit_export` | [Audit export](audit-export.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
 | `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
@@ -34,7 +35,11 @@ acknowledging.
 | Capability | Threat model |
 |---|---|
 | `web_fetch` (the `web_fetch` **and** `web_search` tools) | [Web read](web-fetch.md) |
-| `network_execution` | [Generic network execution](network-execution.md) |
+
+`network_execution` was a second egress capability with a weaker guard and no
+caller. It was deleted — capability, executor and gate — in BUG-232, and its
+threat model with it. There is now exactly one answer to "what happens when
+Raiker reaches the internet": [Web read](web-fetch.md).
 
 ## Memory, knowledge and planning
 
@@ -133,18 +138,19 @@ Eleven documents close that:
 | `task_management_runtime` | [Task creation](task-management.md) | Relayed, and a task raises unattended turns later |
 | `project_assignment_runtime` | [Project assignment](project-assignment.md) | Relayed; the move changes a conversation's standing context |
 | `web_fetch` | [Web read](web-fetch.md) | Egress, and where untrusted external text enters a turn |
-| `network_execution` | [Generic network execution](network-execution.md) | Egress with a weaker guard and no reachable caller |
 | `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) | Reads the workspace and derives a durable index |
 | `code_map_indexing` | [Repository code map](code-map-indexing.md) | Reads the workspace and derives a durable symbol index |
 
 Two findings came out of writing them, and both are recorded in the pages
 themselves rather than smoothed over:
 
-- **Two egress implementations exist.** `WebFetchExecutor` and `NetworkExecutor`
-  reach the network through `sandbox.fetch_url` with a hard-coded four-host
-  allowlist and none of `WebAccessService`'s address guard. Neither is reachable
-  from any product route — the model's `web_fetch` goes through the broker — but
-  both are registered. See [`network-execution.md`](network-execution.md).
+- **Two egress implementations existed, and now do not.** `WebFetchExecutor`
+  and `NetworkExecutor` both reached the network through `sandbox.fetch_url`,
+  whose only control was a hard-coded four-host allowlist — none of
+  `WebAccessService`'s address guard. BUG-232 deleted `NetworkExecutor`, the
+  `network_execution` capability, and `fetch_url` itself, and repointed the
+  `web_fetch` executor at `WebAccessService`, so there is one implementation.
+  See [`web-fetch.md`](web-fetch.md).
 - **Checkpoint capture is bounded.** A file over 8 MiB is written and recorded
   `oversize`, which means *not restorable*. See
   [`workspace-file-mutation.md`](workspace-file-mutation.md).

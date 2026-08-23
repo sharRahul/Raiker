@@ -122,7 +122,8 @@ instead.
 | Deferred work and open gaps | [Gaps and deferred work](GAP_AND_TODO_ANALYSIS.md) |
 | The boundaries Raiker chose, and where it is behind | [Known limits](KNOWN_LIMITS.md) |
 | Acceptance tests grouped by phase | [Acceptance tests by phase](ACCEPTANCE_TESTS_BY_PHASE.md) |
-| A repeatable end-to-end browser plan and the last round's results | [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) |
+| The repeatable browser procedure — every route, tab and control, in two tiers | [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) |
+| What each dated round actually found | [Live test rounds](plans/LIVE_TEST_ROUNDS.md) |
 | Exercising the web app against a real model backend | [Web app live test](WEB_APP_LIVE_TEST.md) |
 | Recorded evidence, and what it does and does not prove | [Screenshot evidence](plans/screenshots/README.md) |
 

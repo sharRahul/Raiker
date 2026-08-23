@@ -2,7 +2,9 @@
 
 Browser screenshots captured while executing
 [the live manual test plan](../RAIKER_LIVE_MANUAL_TEST_PLAN.md) against a
-running `raiker-web` in Chromium.
+running `raiker-web` in Chromium. What each round found is written up in
+[`../LIVE_TEST_ROUNDS.md`](../LIVE_TEST_ROUNDS.md); this directory is the
+evidence those write-ups point at.
 
 | Folder | Contents |
 |---|---|

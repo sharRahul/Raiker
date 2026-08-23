@@ -117,8 +117,10 @@ matched — the difference between finding a chat from years ago and recognising
 it. A turn that used `conversation_search` records a `conversation` source, so
 the transcript shows what the answer rested on.
 
-**Evidence.** `tests/test_conversation_recall.py`; live round of
-[the manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) §18.
+**Evidence.** `tests/test_conversation_recall.py`; the memory recall round of
+2026-08-11 in [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md). The procedure that
+re-proves it is
+[the manual test plan](RAIKER_LIVE_MANUAL_TEST_PLAN.md) §10.5.
 
 ---
 

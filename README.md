@@ -247,10 +247,11 @@ The five most people want:
 | **[Security philosophy and policy](docs/SECURITY_AND_POLICY.md)** | Read before enabling any governed capability |
 
 Evidence: [the live manual test plan](docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)
-is a repeatable click-by-click round with the last full run recorded (2026-08-08,
-every model Anthropic's catalogue returned), and
-[screenshots](docs/plans/screenshots) carry the targeted rounds since, through
-2026-08-22.
+is the repeatable browser procedure — every route, tab and control, in a smoke
+tier and a full sweep — and [the round record](docs/plans/LIVE_TEST_ROUNDS.md)
+says what each dated run actually found, with
+[screenshots](docs/plans/screenshots). The last full sweep was 2026-08-08; every
+round since has been targeted at a specific change.
 
 For contribution and vulnerability reporting see
 [CONTRIBUTING.md](CONTRIBUTING.md) and [SECURITY.md](SECURITY.md).

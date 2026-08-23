@@ -12,6 +12,7 @@ evidence and [To be fixed](../plans/TO_BE_FIXED.md) for what does not work yet.
 | [Connecting a model](connecting-a-model.md) | You want Raiker to think — local, home-lab, or hosted |
 | [Permissions and the runtime](permissions-and-runtime-modes.md) | Something is refused and you need to know which control opens it |
 | [Working in Chat](working-in-chat.md) | Day-to-day conversations, attachments, approvals |
+| [Working in Build](working-in-build.md) | Coding against a repository — modes, patches, commands, commits and pushes |
 | [Tasks and projects](tasks-and-projects.md) | Scheduling work and organising sessions |
 | [Extensions and MCP](extensions-and-mcp.md) | Connectors and Model Context Protocol servers |
 | [Troubleshooting](troubleshooting.md) | You hit a reason code and want the fix |

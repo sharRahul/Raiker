@@ -43,9 +43,9 @@ If any field is missing, the requirement is not builder-proof.
 | Reference capability | Raiker requirement | Phase | Canonical docs | Acceptance proof |
 |---|---|---:|---|---|
 | Terminal coding agent | `raiker` launches first local terminal client | Phase 1 | `README.md`, `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md` | Global command smoke test |
-| Rich local workspace | TUI panels for task, approval, checkpoint, event, memory, model, permission, diagnostics | Phase 2 | `docs/UI_UX_DESIGN_SPEC.md` | TUI event-driven panel tests |
-| Desktop/web dashboard | Local app surfaces for sessions, tasks, approvals, events, memory, graph, plugins, channels | Phase 3 | `docs/UI_UX_DESIGN_SPEC.md` | Gateway parity and event stream tests |
-| Mobile app control | Apple/Android apps are equal primary interfaces, not notification-only companions | Phase 3 | `docs/UI_UX_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` | Stale mobile approval rejection tests |
+| Rich local workspace | TUI panels for task, approval, checkpoint, event, memory, model, permission, diagnostics | Phase 2 | `docs/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/VISUAL_DESIGN_SPEC.md` | TUI event-driven panel tests |
+| Desktop/web dashboard | Local app surfaces for sessions, tasks, approvals, events, memory, graph, plugins, channels | Phase 3 | `docs/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/VISUAL_DESIGN_SPEC.md` | Gateway parity and event stream tests |
+| Mobile app control | Apple/Android apps are equal primary interfaces, not notification-only companions | Phase 3 | `docs/WEB_UI_CONTROL_DECK_PLAN.md`, `docs/VISUAL_DESIGN_SPEC.md`, `docs/CHANNELS_SPEC.md` | Stale mobile approval rejection tests |
 | Chat/channel access | External messages normalise into ChannelMessageEnvelope and gateway path | Phase 4 | `docs/CHANNELS_SPEC.md` | Pairing, sender trust, rate-limit tests |
 | Interface parity | Every enabled interface uses same action contracts and policy path | Phase 1-5 | `docs/FEATURE_COVERAGE_MATRIX.md` | Equal-interface invariant tests |
 

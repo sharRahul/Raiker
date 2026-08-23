@@ -1,7 +1,34 @@
 # Raiker handoff
 
-Read this file and `docs/IMPLEMENTATION_STATUS.md` before beginning work. Deep
-history belongs in git; this is intentionally only the current pick-up point.
+> ## Currency, stated 2026-08-23
+>
+> **The dated sections of this file are a historical record and are not
+> maintained against the code.** The newest is *Current state — 2026-07-18*;
+> Raiker has changed substantially since, and several statements in those
+> sections are now false (checkpoints described as metadata-only, web egress
+> described as an allowlist, plugin and channel surfaces described as unbuilt).
+> Two obviously stale references were corrected in place during the 2026-08-23
+> documentation reconciliation and the rest is left as written, because a
+> handoff note rewritten after the fact is not a record of anything.
+>
+> **What is current:**
+>
+> | For | Read |
+> |---|---|
+> | What is implemented | [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) |
+> | Per-capability executor status | [`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md) |
+> | What is still broken | [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) |
+> | What to build next, in order | [`REFERENCE_PLATFORM_COMPATIBILITY.md` §5](REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog) |
+> | Every maintained document | [`README.md`](README.md) |
+>
+> **What is still current in this file, and is why it is kept:** the *Goal*, the
+> *Security posture* and the *Non-negotiable runtime rules* below. Those three
+> sections are the standing brief a contributor needs and are not dated.
+
+Read the three standing sections below and
+[`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md) before beginning work.
+Deep history belongs in git; everything under *Current state — 2026-07-18* and
+after is kept as a record of how Raiker reached that point.
 
 ## Goal
 
@@ -258,9 +285,10 @@ Control Deck commit.
   ruff clean; mypy 425 files clean; five validators pass; two live drives (real
   governed runtime + a real-browser authenticated HTTP drive with a screenshot).
   Threat model `docs/threat-models/mcp-monitoring.md`. **Phase D (Connections
-  "Connect via MCP" UI + live monitor panel with browser screenshots) is now
-  implemented in the current worktree** — see
-  `docs/plans/2026-07-17-monitored-mcp-connections.md`.
+  "Connect via MCP" UI + live monitor panel with browser screenshots) shipped** —
+  see `docs/threat-models/mcp-monitoring.md` and Extensions → MCP. (The
+  `docs/plans/2026-07-17-monitored-mcp-connections.md` plan this line used to
+  name was never committed to this repository.)
 - **Control Deck Tasks 7–10 are implemented locally and await commit/push.**
   The route bodies now use compact loading, error,
   and empty states without changing typed API authority; Sessions consumes
@@ -446,12 +474,16 @@ npm run build     # exit 0
   live worker's handle may be mid-query.
 - The agent can read the web (FIXED-101). `raiker/runtime/web_access.py` brokers
   `web_fetch` and `web_search` under the `web_fetch` capability gate, its decision
-  mode (default `ask` withholds), and the owner egress allowlist
-  `RAIKER_WEB_EGRESS_ALLOWLIST` — which ships **empty**, so nothing is reachable
-  until the owner names a host. Because the URL is model-supplied it is validated
-  as well as the host: HTTPS only, no embedded credentials, a destination that
-  resolves to a public address, and every redirect hop re-checked. `web_search`
-  needs `RAIKER_WEB_SEARCH_ENDPOINT`; Raiker ships no search provider.
+  mode (default `ask` withholds), and the owner **blocklist** —
+  `RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in Settings → Web access
+  (`raiker/runtime/web_policy.py`). *Superseded 2026-08-22: this used to name an
+  allowlist that shipped empty. Web reads now work on a fresh install.* Because
+  the URL is model-supplied it is validated as well as the host: HTTPS only, no
+  embedded credentials, a destination that resolves to a public address, and
+  every redirect hop re-checked — an address guard the owner cannot switch off,
+  and emptying the blocklist opens none of it. `web_search` works against a
+  keyless default endpoint; `RAIKER_WEB_SEARCH_ENDPOINT` replaces it with the
+  owner's own.
 - A running turn can be stopped or steered (FIXED-102). `turn_controls` is a
   durable per-(session, principal) row the agent loop reads at its safe boundary:
   a stop ends the turn as the `stopped` response status, keeping what it has, and
@@ -773,10 +805,13 @@ not copy old green counts into this file.
 
 ## Control Deck Pause Point — 2026-07-16
 
-The approved Control Deck work is tracked in:
+The approved Control Deck work was tracked in a design and an implementation
+plan dated 2026-07-16 that were **never committed to this repository**. What
+survives of them is the shipped product plus two maintained documents:
 
-- `docs/specs/2026-07-16-raiker-control-deck-design.md`
-- `docs/plans/2026-07-16-raiker-control-deck-implementation.md`
+- [`WEB_UI_CONTROL_DECK_PLAN.md`](WEB_UI_CONTROL_DECK_PLAN.md) — what each screen
+  is for
+- [`VISUAL_DESIGN_SPEC.md`](VISUAL_DESIGN_SPEC.md) — how anything is drawn
 
 **Status (2026-07-17): this pause is resolved.** The worktree that this section
 warned against discarding has been committed as `f97e6ce`; the tree is clean.

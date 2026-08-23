@@ -111,5 +111,17 @@ documentation gap. `tests/test_agent_plan_and_subagents.py` scans every emitted
 literal against the declared set.
 
 Event records are append-style local audit evidence, not tamper-proof logging.
-Approval resolution alone does not emit execution events because it is
-metadata-only.
+
+**Approval resolution does emit execution events.** For the twelve capabilities
+in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) the relay records
+`approval_executed` on success and `approval_execution_denied` when governance
+refused at execution time; a turn resolving its own eligible call under the
+`auto` approval mode records `approval_auto_executed`. For every other
+capability the resolution is a decision and emits no execution event, which is
+the distinction this paragraph used to collapse.
+
+**This catalogue is a reader's guide, not the registry.** The registry is
+`raiker/contracts/models.py::EVENT_TYPES`, which declares 268 event types; the
+tables above cover the ones a person reading the audit log most often needs
+explained. An event type that exists in the registry and not here is documented
+by its emitting call site, not missing from the product.

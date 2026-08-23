@@ -1,6 +1,35 @@
 # Plugin System Specification
 
-Raiker plugins package reusable platform extensions. Plugins may provide commands, hooks, skills, subagents, channels, MCP servers, LSP servers, monitors, tool adapters, themes, output styles, TUI panels, web/dashboard panels, mobile panels, memory adapters, model providers, user-configurable settings, dependency metadata, and policy fragments.
+Raiker plugins package reusable platform extensions.
+
+**What a plugin contributes today — three kinds.** A plugin runs **no code of its
+own**, in the runtime or in the browser. It contributes through a surface that
+already governs the thing contributed, and each kind needs its own declared
+permission, none of which is auto-approved:
+
+| Kind | Permission | How it arrives |
+|---|---|---|
+| **Hook rules** | `event:hook` | Loaded at `plugin` scope, *below* every scope the owner controls, so a plugin can make an action stricter and can never loosen one the owner set |
+| **Skills** | `skill:contribute` | Through the same validator an upload goes through, installed **switched off**, marked *from plugin* on Extensions → Skills |
+| **MCP servers** | `mcp:server` | As an **offer**. Nothing is stored as a server, connected or reachable until the owner presses **Add server**, which runs the ordinary governed create path. An offer can never carry a credential — `https` only, no auth in the URL, `auth_ref` names an environment variable |
+
+Revoking a plugin **deletes** what it contributed rather than flagging it.
+
+**Everything below this line is the design target, not the shipped surface.** The
+full list this document specifies — commands, subagents, channels, LSP servers,
+monitors, tool adapters, themes, output styles, TUI panels, web/dashboard panels,
+mobile panels, memory adapters, model providers, user-configurable settings and
+policy fragments — is what a plugin *may eventually* provide. Two of them are
+tracked as work (**panels**, BUG-228; **LSP servers**, BUG-227) and several are
+[deliberately refused](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused):
+a plugin-authored executable on a command's `PATH` is plugin code execution with
+an extra step, and a background monitor is a long-running command whose output
+enters the turn.
+
+Panels are worth naming precisely: they are a gap against **this document**, not
+against a reference platform. No compared platform ships plugin UI panels —
+[Claude Code's plugin components](https://code.claude.com/docs/en/plugins-reference)
+are skills, agents, hooks, MCP servers, LSP servers and monitors.
 
 Plugin execution slices are governed/default-ask unless explicitly tightened or disabled by user, project, or managed policy; broader plugin extensions remain deferred/fail-closed.
 
@@ -201,7 +230,11 @@ A plugin may provide subagent profiles. Each subagent must define:
 - whether it can ask side questions;
 - whether it can spawn other agents.
 
-Subagent runtime spawning remains disabled until Phase 4 lifecycle and approval controls exist.
+A **plugin** cannot contribute a subagent. Raiker's own subagent surface is
+implemented — `spawn_subagent` runs a caller-supplied list of read-only steps,
+each re-brokered through the policy engine, and the `subagents` capability gate
+ships off and is owner-flippable — but it is a per-turn bounded contract rather
+than a named installable agent, so there is nothing for a plugin to register.
 
 ### Channels
 

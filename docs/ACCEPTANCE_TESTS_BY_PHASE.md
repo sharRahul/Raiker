@@ -1,6 +1,22 @@
 # Acceptance Tests By Phase
 
-> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> **Status banner, refreshed 2026-08-22.** The launchable clients are the local
+> terminal client (`raiker`) and the local web dashboard (`raiker-app` /
+> `raiker-web`, loopback only). Approval resolution **executes** the twelve
+> capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) —
+> file mutations, patches, bounded local `shell`, the git write and push path, a
+> GitHub write, the two local planning rows, durable memory writes and forgets,
+> and owner-selected SSH and Daytona commands — each re-governed at execution
+> time; every other capability keeps decision-only resolution. Runtime execution
+> is **not** globally disabled: plugin slices, graph indexing, channels,
+> scheduled routines, model providers, MCP, container read tools and governed
+> local commands all have real executors and are governed per action. Sensitive
+> finance, investment, medical, pregnancy, CCTV, home-security and hardware
+> domains have no executor and fail closed. Rich/native TUI, mobile, IDE and
+> hosted multi-user clients remain deferred. The canonical statement of what is
+> implemented is [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md); where
+> this document and the code disagree, the code wins and this document must be
+> updated.
 
 
 This document defines the acceptance tests that prove Raiker is implemented according to the documentation. It complements `docs/VERIFICATION_PLAN.md` by grouping tests by phase and by implementation gate.
@@ -27,6 +43,20 @@ Every phase must preserve these rules:
 ---
 
 ## Phase 1: Secure Local Interface Core
+
+> **File names in this section are the Phase-1 names, and thirteen of them no
+> longer exist.** `tests/` has been reorganised and consolidated several times
+> since; the criteria in the right-hand column are still the acceptance bar and
+> are still covered, but the file that covers one is often named for the
+> behaviour rather than for the Phase-1 component. Treat the **assertions** as
+> normative and `tests/` as the source of truth for where they live. The names
+> known to be stale are `test_id_helpers.py`, `test_equal_interface_invariant.py`,
+> `test_event_catalog.py`, `test_path_safety.py`, `test_classifier_planner.py`,
+> `test_verification_stub.py`, `test_mock_model_provider.py`,
+> `test_model_profile_registry.py`, `test_agent_gateway.py`,
+> `test_session_manager.py`, `test_checkpoint_service.py`,
+> `test_global_command.py` and `test_terminal_registry_panels.py`.
+
 
 ### Contract Acceptance
 
@@ -242,7 +272,7 @@ Current runtime posture update: graph indexing, semantic memory, local vector em
 
 Safety status for this slice:
 
-- GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
+- GitHub Actions **run on every pull request and push to `main`** (`.github/workflows/`); the claim that they were paused for quota was true in an earlier phase and is not true now. See [`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md).
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
 - Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
 - Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.
@@ -271,7 +301,6 @@ Required assertions:
 - CLI preview commands are read-only/preview-only.
 - Plugin execution, graph runtime indexing, semantic/vector writes, external channels, remote/container execution, subagents, and multi-agent teams remain disabled.
 
-GitHub Actions remain paused due quota exhaustion; local validation evidence is mandatory and CI must be re-enabled later when quota is available.
 
 ## Phase 3 Slice F — Approval Audit and Rollback Planning
 
@@ -284,8 +313,6 @@ Safety invariants for this slice:
 - Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
 - Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
 - Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
-- GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
-- CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
 New preview-only CLI surfaces: `/approval-audit`, `/approval-audit --summary`, `/rollback-plan`, `/graph-rollback-plan`, and `/memory-rollback-plan`.
 
@@ -302,7 +329,6 @@ Safety status:
 - Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
 - Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
-- GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ## Phase 3 Slice H lifecycle retention reference
 

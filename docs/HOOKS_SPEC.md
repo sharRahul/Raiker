@@ -1,6 +1,22 @@
 # Hooks Specification
 
-> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> **Status banner, refreshed 2026-08-22.** The launchable clients are the local
+> terminal client (`raiker`) and the local web dashboard (`raiker-app` /
+> `raiker-web`, loopback only). Approval resolution **executes** the twelve
+> capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) —
+> file mutations, patches, bounded local `shell`, the git write and push path, a
+> GitHub write, the two local planning rows, durable memory writes and forgets,
+> and owner-selected SSH and Daytona commands — each re-governed at execution
+> time; every other capability keeps decision-only resolution. Runtime execution
+> is **not** globally disabled: plugin slices, graph indexing, channels,
+> scheduled routines, model providers, MCP, container read tools and governed
+> local commands all have real executors and are governed per action. Sensitive
+> finance, investment, medical, pregnancy, CCTV, home-security and hardware
+> domains have no executor and fail closed. Rich/native TUI, mobile, IDE and
+> hosted multi-user clients remain deferred. The canonical statement of what is
+> implemented is [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md); where
+> this document and the code disagree, the code wins and this document must be
+> updated.
 
 
 > **Code status: implemented (core).** `raiker/hooks/` is a working dispatcher wired through the
@@ -18,7 +34,7 @@
 > - **Config sources & scope:** `config/managed-hooks.json` (managed) > `config/hooks.json`
 >   (project) > `.raiker/hooks.json` (local), loaded by `raiker/hooks/registry.py`.
 > - **Command-hook safety:** argv list only (no shell), program must resolve **inside the
->   workspace** (reuses `raiker/tools/filesystem.resolve_workspace_path`), bounded `timeout_ms`,
+>   workspace** (reuses `raiker/tools/filesystem.py::resolve_workspace_path`), bounded `timeout_ms`,
 >   truncated output, minimal environment. Non-zero exit blocks by convention; JSON stdout
 >   `{"decision": ...}` is honored. Timeouts/errors emit `hook_timeout`/`hook_failed` and fail
 >   open (the action falls through to normal policy).
@@ -50,11 +66,30 @@
 > hooks sit alongside the other extension surfaces. Sections below are the full design target;
 > not every event/handler is wired yet (see the list above).
 >
-> **Reference alignment (Claude Code `hooks`):** the reference documents ~31 events and 5
-> handler types (`command`, `http`, `mcp_tool`, `prompt`, `agent`) using a three-level
-> `EventName → matcher → hooks[]` config with an optional `if` condition (e.g. `Bash(git *)`).
-> Raiker's event list and handler types are intentionally a superset; the matcher/`if`/
-> decision-authority semantics follow that reference.
+> **Reference alignment (Claude Code `hooks`), corrected 2026-08-23.** The
+> [reference](https://code.claude.com/docs/en/hooks) documents **31 events** and
+> **5 handler types** (`command`, `http`, `mcp_tool`, `prompt`, `agent`) using a
+> three-level `EventName → matcher → hooks[]` config with an optional `if`
+> condition (e.g. `Bash(git *)`). The matcher, `if` and decision-authority
+> semantics here follow that reference.
+>
+> Raiker's event list and handler types are a **subset**, not a superset. This
+> banner used to say the opposite. Raiker emits **16 of the 31**, and every one of
+> its 16 is one of the reference's; the 15 with no Raiker equivalent are `Setup`,
+> `UserPromptExpansion`, `PostToolBatch`, `Notification`, `MessageDisplay`,
+> `TeammateIdle`, `InstructionsLoaded`, `ConfigChange`, `CwdChanged`,
+> `DirectoryAdded`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`,
+> `Elicitation` and `ElicitationResult`. Of the 5 handler types Raiker builds
+> `command`; `builtin` is Raiker's own in-process code and is not one of the five,
+> and the remaining four are refused at parse time (BUG-226).
+>
+> Two places Raiker is deliberately **not** aligned, and will not be:
+> a Raiker hook can return only `deny` or `ask` from an authoritative handler, so
+> nothing a hook returns can allow an action policy refused — the reference's
+> `permissionDecision: "allow"` has no equivalent and will not get one; and the
+> owner off switch is a stored owner setting rather than a `disableAllHooks` key
+> in a config file a repository could ship. See
+> [reference compatibility §2.5 and §4.3](REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
 Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
 

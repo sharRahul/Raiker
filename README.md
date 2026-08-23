@@ -9,7 +9,14 @@ Raiker is a local-first AI-agent runtime. Every model interaction and tool
 action passes through policy, capability gates, approvals, and audit records, so
 local automation stays under your control.
 
-The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell`, SSH and Daytona actions likewise execute once through their dedicated governed executors; other approvals remain decision-only. Durable memory mutation is broker-governed, and a turn can now propose one from Chat and Build as well as from the terminal client — you see the exact text and decide, and approving really stores or removes the record. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
+It is one product wearing three faces: **Chat**, a polished assistant; **Build**,
+a coding agent; and the governed platform both run on. Governance, observability,
+policy awareness and security are properties of that platform, not a layer
+wrapped around it — there is no model, tool, skill, plugin, interface, runtime or
+execution path that reaches an action without crossing them, and your choice of
+model (local, home-lab, private-network or hosted) changes none of it.
+
+The launchable local UIs are the plain local terminal client and the local web dashboard — `raiker` and `raiker-app` (or `raiker-web` for explicit service control), the latter on `127.0.0.1`; Phase 8 deferred clients (mobile, IDE, hosted multi-user) are not available. Approving a proposed file change performs it once, under a fresh gate, policy and posture check, with the previous contents checkpointed. Approved local `shell` commands, patches, git branches, commits, pushes, GitHub writes, durable memory writes and forgets, task and project rows, and owner-selected SSH and Daytona actions likewise execute once through their dedicated governed executors, each re-governed at execution time; `process`, `network` and other approvals remain decision-only. Durable memory mutation is broker-governed, and a turn can now propose one from Chat and Build as well as from the terminal client — you see the exact text and decide, and approving really stores or removes the record. Strict non-allow blocking, role revoke governed, and capability gate per action are enforced.
 
 ## Quick start
 
@@ -145,7 +152,8 @@ Controls that stand between an AI-proposed action and it happening:
 |---|---|---|
 | **Agent runtime** | Settings → Runtime configuration | Whether Raiker accepts new executions at all |
 | **Capability gate** | Permissions | Whether this capability exists for you at all |
-| **Decision mode** | Permissions, or the Chat and Build composers | Ask / Allow / Auto / Deny before each action |
+| **Decision mode** | Permissions | The standing per-capability policy: Ask, Allow, Auto or Deny before each action |
+| **Turn posture** | The Chat and Build composers | This conversation's own tightening — Build's Plan / Edit / Auto, plus the approval policy (Manually approve, Automatically approve, Skip, or **Decline what needs asking**). A turn may only ever tighten; `allow` and `auto` are refused by the prompt contract |
 | **Approval** | Approvals | A human decision on the specific proposed action |
 
 Opening a higher-risk gate is a governed step-up: a human `runtime_gate_manager`,
@@ -168,8 +176,10 @@ accepting executions, or stopped.
 The approval detail says what will happen **before** you decide. A proposed
 **file change** is performed once, through the governed
 approval execution relay — re-governed at execution time, with the previous
-contents checkpointed so it can be rewound, and never into `.raiker/` or
-`.git/`. Approved **SSH remote** and **Daytona cloud** actions execute once
+contents checkpointed, and never into `.raiker/` or
+`.git/`. (Capture is automatic and complete; **an owner-facing rewind is not
+built** — every surface shows a restore preflight and performs nothing. See
+[Known limits](#known-limits).) Approved **SSH remote** and **Daytona cloud** actions execute once
 through bounded, owner-selected profiles with fresh policy, posture, credential,
 host-key, and cost-ceiling checks, and an approved local **shell** command runs
 once against an allowlist, inside the workspace, under a timeout and an output
@@ -196,7 +206,7 @@ zero-trust verification is applied at every authority boundary.
 | Knowledge | **Memory**, **Knowledge Map** |
 | Control | **Approvals**, **Permissions**, **Models**, **Extensions** |
 | Observe | **Observability** — readiness, audit log, checkpoints, live work, notifications, sessions |
-| Utilities | **Settings** — including **Web access** and **Git credential** |
+| Utilities | **Guide** — the user guide, served from this install — and **Settings**, including **Web access** and **Git credential** |
 
 Highlights, each verified against a live instance:
 
@@ -302,7 +312,10 @@ Highlights, each verified against a live instance:
   or turn it into a decision, and can never allow one the runtime refused. Every
   event the configuration format accepts is emitted — sixteen of them, covering
   the session, the prompt, the turn's two possible endings, every tool call,
-  approvals, delegations and tasks. `Stop` and `StopFailure` are separate on
+  approvals, delegations and tasks. That is **sixteen of the thirty-one**
+  [Claude Code documents](https://code.claude.com/docs/en/hooks); the fifteen
+  Raiker has no equivalent for are named in
+  [`docs/REFERENCE_PLATFORM_COMPATIBILITY.md`](docs/REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks). `Stop` and `StopFailure` are separate on
   purpose: a turn parked on an approval, or stopped by you, never reports as a
   clean completion.
 
@@ -348,7 +361,8 @@ plus drawer to 1023 px, and the full sidebar at 1024 px and above.
 
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-22:
+Raiker's documentation does not run ahead of its code. As of **2026-08-23**,
+after a full reconciliation of every document against the source:
 
 - **Voice is governed and turn-based, not full duplex.** Chat and Build support
   editable dictation and manual response playback. Continuous listening,
@@ -356,10 +370,12 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
 
-- **Hooks are complete; plugins are one kind short; channels stop below routing.**
-  Of the three extension surfaces Claude Code ships:
+- **Hooks cover half the reference lifecycle; plugins are two kinds short;
+  channels stop below routing.** Of the three extension surfaces Claude Code
+  ships:
 
-  **Hooks** are done. All sixteen events the format accepts are emitted,
+  **Hooks** are complete against *Raiker's own* event list and half-covered
+  against the reference. All sixteen events Raiker's format accepts are emitted,
   `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
   `command` handlers execute under a bounded timeout with the program resolved
   inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
@@ -367,9 +383,10 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   `config/hooks.json` that arrived with a repository cannot re-enable itself. Of
   the five handler types in the reference format, `command` is built and four are
   not: `http`, `mcp_tool`, `prompt` and `agent` need network, model and subagent
-  surfaces that are still gated. (`command` is also the only handler type Claude
-  Code's own hooks have, so this is a gap against Raiker's reference document
-  rather than against Claude Code.)
+  surfaces that are still gated. Claude Code
+  [documents all five](https://code.claude.com/docs/en/hooks), so this is a real
+  gap rather than a gap against Raiker's own document. (Raiker's second handler
+  type, `builtin`, is its own in-process code and is not one of the five.)
 
   **Plugins** contribute three of the four kinds the Plugins tab names: hook
   rules, skills, and MCP-server *offers*. A plugin is validated, supply-chain
@@ -377,9 +394,19 @@ Raiker's documentation does not run ahead of its code. As of 2026-08-22:
   declared permission — `event:hook`, `skill:contribute`, `mcp:server` — none of
   which is auto-approved, so you read it in the permission diff before installing.
   **Panels** are the one kind still unavailable: there is no route, permission or
-  accessibility contract for a page a plugin drew. **LSP servers** are named in
-  the manifest schema and have no surface at all to contribute to. No plugin code
-  executes, in the runtime or in your browser.
+  accessibility contract for a page a plugin drew — and that is a gap against
+  Raiker's own `PLUGIN_SYSTEM_SPEC.md`, not against a reference platform, because
+  [no compared platform ships plugin UI panels](https://code.claude.com/docs/en/plugins-reference).
+  **LSP servers** are named in the manifest schema and have no surface at all to
+  contribute to.
+
+  Claude Code plugins additionally contribute subagents, background monitors,
+  `bin/` executables on the Bash tool's `PATH`, themes and output styles. Raiker
+  contributes none of those, and the last three
+  [it will not](docs/REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused):
+  a plugin-authored binary on a command's `PATH` is plugin code execution with an
+  extra step, and a monitor is a long-running command whose output enters the
+  turn. No plugin code executes, in the runtime or in your browser.
 
   **Channels** deliver, and you can now reach that. A channel message is
   **untrusted content with a named sender who is not you** — never a prompt, never
@@ -644,15 +671,31 @@ on the shipped build, not estimated.
   production signing anchor, so live egress bypass, credential delivery/merge
   and publisher verification remain unavailable rather than configuration-
   enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
-- **Plugins are one contribution kind short; channels stop short of routing.**
-  Hooks reached parity on 2026-08-22 — every event the format accepts is emitted,
-  with an owner off switch and a page that states which rules actually enforce.
-  Plugins went on to contribute skills and MCP-server offers the same day;
-  **panels** are the one kind left, and LSP servers have no surface to contribute
-  to. Channels gained their authority contract and then their owner surface: the
-  transport had been built and unreachable, and pairing is what reaches it. What
-  is still short there is above the transport — per-channel rate limits, the
-  spec's routing modes, and resolving an approval over a channel.
+- **Hooks cover half the reference lifecycle; channels stop short of routing.**
+  Every event Raiker's own format accepts is emitted — sixteen — with an owner off
+  switch and a page that states which rules actually enforce. Measured against
+  [Claude Code's thirty-one](https://code.claude.com/docs/en/hooks) that is
+  **sixteen of thirty-one**, and one of five handler types. Plugins contribute
+  hook rules, skills and MCP-server offers; panels and LSP servers do not, and
+  four kinds Claude Code has — subagents, monitors, `bin/` executables, themes —
+  Raiker
+  [will not add](docs/REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused).
+  Channels gained their authority contract, then their owner surface, then
+  per-sender rate limits and signed delivery. What is still short there is above
+  the transport — the spec's routing modes, and resolving an approval over a
+  channel.
+- **A checkpoint is captured before every approved mutation, and there is no
+  rewind.** `CheckpointRestoreExecutor` is implemented, registered and tested,
+  and it captures its own pre-image so a restore would itself be reversible — but
+  no route, terminal command or model tool proposes one. `/checkpoints restore`
+  and the Checkpoints view both compute a preflight and perform nothing. Capture
+  is complete; recovery is git, or asking the agent to reverse the edit. It is
+  the highest-priority, lowest-effort item in
+  [the backlog](docs/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+- **The audit log cannot be exported from the product.**
+  `raiker/events/export.py` produces a redacted export manifest and the store
+  keeps it, and no REST route surfaces it. Evidence you cannot take out is
+  evidence you cannot use elsewhere.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is
@@ -668,12 +711,23 @@ and the interface outcome that had to be true first — in
 ## Documentation
 
 - **[User guide](docs/guide/README.md)** — install, connect a model, permissions,
-  Chat, tasks, extensions, troubleshooting. **Also inside the app**, under
-  Utilities → **Guide**: the same seven sections, served read-only from the
+  [Chat](docs/guide/working-in-chat.md), [Build](docs/guide/working-in-build.md),
+  tasks, extensions, troubleshooting. **Also inside the app**, under
+  Utilities → **Guide**: the same eight sections, served read-only from the
   install, so a running Raiker carries its own help rather than sending you to a
   repository. Set `RAIKER_GUIDE_DIR` to read a different checkout's copy.
-- **[Documentation index](docs/README.md)** — architecture, security model,
-  commands, API contracts, capability status, verification.
+- **[Documentation index](docs/README.md)** — every maintained document, with the
+  canonical one named for each question. Start there rather than guessing a
+  filename.
+- **[Reference platform compatibility](docs/REFERENCE_PLATFORM_COMPATIBILITY.md)**
+  — the canonical, source-cited comparison against Claude Cowork, Claude Code,
+  ChatGPT Chat/Work, OpenAI Codex, OpenClaw, DeepSeek Harness and Hermes Agent:
+  what Raiker has, what it is missing, what it does differently on purpose, what
+  it deliberately refuses to copy, and the prioritised backlog. **No other
+  document carries a comparison matrix.**
+- **[Implementation status](docs/IMPLEMENTATION_STATUS.md)** — what is
+  implemented right now, distinguished from what is recorded, previewed or
+  planned.
 - **[Live manual test plan](docs/plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — a
   repeatable end-to-end plan and the recorded result of the last round
   (2026-08-11, four provider connections plus a live Ollama turn), with

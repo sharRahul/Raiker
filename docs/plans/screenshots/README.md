@@ -14,6 +14,10 @@ running `raiker-web` in Chromium.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `bug-221-`, `bug-223-`, `bug-225-` | **2026-08-22**, plugin contributions (skills, MCP-server offers), turn-end hooks across four providers, and the channel owner surface | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
+| `bug-219-` | **2026-08-22**, the fourth approval mode (*Decline, don't ask*) | hosted Anthropic |
+| `r0821b-`, `r0821c-` | **2026-08-21**, Build composer and operating protocol; the Hooks tab | hosted Anthropic |
+| `2026-08-21-` | **2026-08-21**, Memory, Brain, runtime and diagnostics at three viewport widths | hosted Anthropic |
 | `r0817b-` | **2026-08-17 (second pass)**, eidetic capture wired into the runtime (MEM-04) and BUG-194's restart reattachment plus persistent environment | hosted Anthropic `claude-haiku-4-5-20251001`, connected through the product's own dialog |
 | `r0817-` | **2026-08-17**, FTS4 → FTS5 (RAIKER-2025), the owner-selected recall backend (MEM-03), and background execution with a POSIX terminal (BUG-194) | hosted Anthropic `claude-haiku-4-5-20251001`, connected through the product's own dialog |
 | `r0815-` | **2026-08-15**, the native OS sandbox | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
@@ -257,8 +261,12 @@ and once the spec could reach the provider cards again. Originally captured on
 against a running `raiker-web` holding an owner-entered Anthropic credential and
 answering live `claude-haiku-4-5-20251001` turns. The page the agent reads is
 fetched from the real internet; that host was started with
-`RAIKER_WEB_EGRESS_ALLOWLIST=pypi.org`, which is an owner setting and not a
-shipped default — the allowlist ships empty.
+`RAIKER_WEB_EGRESS_ALLOWLIST=pypi.org`, which was an owner setting and not a
+shipped default — the allowlist shipped empty. **That variable no longer exists:
+web egress now answers to an owner blocklist plus a non-optional
+public-address guard (`raiker/runtime/web_policy.py`), so a run reproducing this
+evidence today needs no egress variable at all.** The screenshots are kept as the
+record of what was observed on the day, not as current instructions.
 
 | File | Records |
 |---|---|

@@ -4,6 +4,37 @@ Raiker checkpoints provide local recovery, rewind, resume, fork, and auditabilit
 
 Checkpoints are not a replacement for Git, backups, or source control. They are a local agent-runtime safety mechanism.
 
+> **Code status, 2026-08-23. This document is the design target; two of its five
+> verbs are not reachable by an owner.**
+>
+> - **Capture — implemented and automatic.** A pre-image is written before every
+>   approved mutation (`raiker/checkpoints/capture.py`), and the gateway records a
+>   turn checkpoint (`checkpoint_created`). Deep Windows paths were made
+>   reversible in FIXED-240.
+> - **Fork — implemented.** A conversation forks from a checkpoint through
+>   `POST /api/checkpoints/{id}/branch`, with a lineage band naming the source
+>   conversation (FIXED-227). `/checkpoints fork` runs directly because a fork
+>   mutates no workspace file.
+> - **Restore — executor built, surface absent.** `CheckpointRestoreExecutor`
+>   (`raiker/runtime/executors/tier1_checkpoint.py`) recomputes the plan from the
+>   capture manifest at execution time, refuses any path outside the workspace,
+>   and captures its own pre-image so a restore would itself be reversible. It is
+>   registered and covered by `tests/test_checkpoint_restore.py`. **No route,
+>   terminal command or model tool proposes a restore.** `/checkpoints restore`
+>   and the Checkpoints view both compute a preflight and perform nothing, and
+>   `checkpoint_restore_execution` is not in `EXECUTABLE_ON_APPROVAL`, so an
+>   approval would not relay one either.
+> - **The restore events below are specified, not emitted.**
+>   `checkpoint_restore_requested`, `checkpoint_restore_approved`,
+>   `checkpoint_restored`, `checkpoint_restore_failed` and
+>   `checkpoint_restore_planned` are all declared in `EVENT_TYPES` and none has a
+>   call site. The restore path emits nothing today because nothing reaches it.
+> - **The rich TUI in §"Rich TUI" is not built.** The launchable clients are the
+>   plain terminal client and the web dashboard.
+>
+> Closing the restore gap is the highest-priority, lowest-effort item in
+> [the backlog](REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+
 ---
 
 ## Checkpoint Goals

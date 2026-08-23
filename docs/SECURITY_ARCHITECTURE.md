@@ -28,13 +28,26 @@ an acting principal. AI principals cannot hold human-only roles, including
 `RuntimeAuthority` persists and evaluates `runtime_mode_state` and
 `capability_gate_state`; owner recovery is explicit, local, and audited.
 
-Approval resolution executes a narrow allowlist: local file mutations
-(`file_write_execution`, `patch_apply_execution`) and governed local commands
-(`shell_execution`, `process_execution`), only through the approval execution relay —
+Approval resolution executes a narrow allowlist — the twelve capabilities in
+`EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`): local file mutations
+(`file_write_execution`, `patch_apply_execution`), governed local commands
+(`shell_execution`), the git write and push path (`git_write_execution`,
+`git_push_execution`), a GitHub write (`connector_github_runtime`), durable
+memory (`memory_write_execution`, `memory_forget_execution`), the two local
+planning rows (`task_management_runtime`, `project_assignment_runtime`), and
+owner-selected SSH and Daytona commands (`remote_execution_cap`,
+`cloud_execution_cap`). All of it runs only through the approval execution relay —
 a distinct path that re-checks the target's capability gate, decision
 mode, policy review, authority id, and selected environment at execution time.
-SSH/Daytona profiles are readiness-only and cannot execute. File mutations
-additionally capture the pre-image so the change is reversible. For every other capability, approval
+
+`process_execution` and `network_execution` are deliberately **not** on that
+list: an approved `process` or `network` action records the decision and executes
+nothing. SSH and Daytona execute only through an owner-configured, owner-selected
+profile with a pinned host key and a cumulative cost ceiling; without one they
+fail closed, and a stored profile record alone is not enough. File mutations
+additionally capture the pre-image; note that capture is complete and **no owner
+surface proposes a restore**, so the pre-image is evidence rather than a
+reachable undo. For every other capability, approval
 resolution remains metadata-only: it records the decision and executes nothing.
 Which of the two applies is computed by the server and stated to the owner
 before they decide.

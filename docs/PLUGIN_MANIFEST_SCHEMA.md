@@ -2,7 +2,17 @@
 
 This document is the strict schema reference for Raiker plugin manifests. It complements `docs/PLUGIN_SYSTEM_SPEC.md` and the Raiker-native inventory in [`docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](RAIKER_TOOL_AND_PLUGIN_CATALOG.md).
 
-Phase 1 must not execute plugins. Phase 3 introduces plugin validation and planning only after manifest validation, permission diff, trust checks, policy review, and tests exist. Runtime plugin execution remains disabled until explicit phase gates are complete.
+**No plugin code executes, in the runtime or in the browser.** That is the
+invariant this schema exists to keep, and it has not changed: a plugin
+contributes through a surface that already governs the thing contributed. What
+*is* implemented is manifest validation, the permission diff, supply-chain and
+dependency checks, a stated signature level, and three contribution kinds — hook
+rules, skills and MCP-server offers. The `plugin_runtime_cap` and
+`plugin_sandboxed_runtime_cap` capabilities run an installed plugin's *entrypoint*
+as a bounded subprocess, each behind its own owner allowlist that ships empty;
+they are not a path for manifest-declared components to execute. See
+[`PLUGIN_SYSTEM_SPEC.md`](PLUGIN_SYSTEM_SPEC.md) and
+[`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
 
 ---
 

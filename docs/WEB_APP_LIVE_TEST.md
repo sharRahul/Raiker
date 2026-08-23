@@ -124,7 +124,7 @@ Fresh workspace, owner registered through the browser, **every credential typed
 into the wizard's own field** — never given to the server as environment — so what
 this round proves is the product's store-key → catalogue → pin → readiness → turn
 chain from the very first screen. Spec:
-[`apps/web/e2e/wizard-workbench-composer-live.spec.ts`](../../apps/web/e2e/wizard-workbench-composer-live.spec.ts)
+[`apps/web/e2e/wizard-workbench-composer-live.spec.ts`](../apps/web/e2e/wizard-workbench-composer-live.spec.ts)
 (3 tests, 3 passed). Ollama was running locally; LM Studio was not installed, which
 is a *result* the rows are required to state.
 
@@ -142,7 +142,7 @@ is a *result* the rows are required to state.
 | The board's three groups | ✅ **Running now** / **Standing agents** / **Scheduled runs**, each stating its own emptiness |
 | A real standing agent lands in the right group | ✅ a live daily routine reads `Runs daily · next cycle …` under **Standing agents**, and is **absent** from **Running now** — an armed cadence is not a running one |
 | Safe-boundary stop from the board | ✅ **Stop** on every row, on the same governed `POST /api/interrupts` |
-| Chat composer control set | ✅ `+`, `Chat | Build`, approval mode, execution environment, context capacity, model chip, context ring, Send — one bar under a full-width prompt |
+| Chat composer control set | ✅ `+`, `Chat \| Build`, approval mode, execution environment, context capacity, model chip, context ring, Send — one bar under a full-width prompt |
 | Build composer control set | ✅ the same, with the posture as one chip and a **Mode** menu offering Plan / Edit / Auto |
 | The thinking budget lives in the model menu | ✅ **Effort** section with a **Thinking** switch; absent for a model that publishes no levels |
 | The restructured composer still sends | ✅ a real governed turn on `claude-haiku-4-5-20251001` returned the exact marker |
@@ -162,7 +162,7 @@ dialog's **Check again** reported "Check complete" having checked nothing
 **One defect found and left open.** On Windows, a workspace nested deeper than
 ~170 characters cannot open its checkpoint locks, so pre-image capture fails and
 the only trace is an event nothing displays —
-[BUG-216](plans/TO_BE_FIXED.md). Confirmed pre-existing against a pristine
+[BUG-216, closed as FIXED-240](plans/FIXED_ITEMS.md#fixed-240--deep-windows-paths-silently-made-approved-writes-irreversible). Confirmed pre-existing against a pristine
 worktree.
 
 ---
@@ -173,7 +173,7 @@ Fresh workspace, owner registered through the browser, every credential typed
 into the Models connect dialog — never given to the server as environment — so
 what this round proves is the product's connect → catalogue → readiness → turn
 chain rather than a fixture. Spec:
-[`apps/web/e2e/review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
+[`apps/web/e2e/review-provider-matrix-live.spec.ts`](../apps/web/e2e/review-provider-matrix-live.spec.ts).
 
 | Check | Result |
 |---|---|
@@ -225,8 +225,10 @@ other link in the readiness chain was.
 | Chat repeats the same verdict and keeps the draft | ✅ Send stays disabled, sentence identical to the card |
 | Browser console errors | ✅ 0 |
 
-Evidence: [`plans/screenshots/working/bug69-models-quota-readiness-live.png`](plans/screenshots/working/bug69-models-quota-readiness-live.png)
-and [`bug69-chat-quota-readiness-live.png`](plans/screenshots/working/bug69-chat-quota-readiness-live.png).
+Evidence: `bug69-models-quota-readiness-live.png` and
+`bug69-chat-quota-readiness-live.png` — **not retained in the repository**;
+the round's committed evidence is under
+[`plans/screenshots/working/`](plans/screenshots/working/).
 
 ## Result — 2026-07-11 (Task 4: Gmail read-only connector, hosted Anthropic Haiku 4.5)
 
@@ -685,4 +687,4 @@ The service and browser were stopped after the run.
 This run proves the live transcript surface end to end on hosted Anthropic: what
 a turn did, what it thought, and what it refused. It does **not** prove that
 either survives a reload — neither is persisted, which is
-[BUG-215](plans/TO_BE_FIXED.md#bug-215--reasoning-is-shown-live-and-then-forgotten).
+[BUG-215](plans/FIXED_ITEMS.md#fixed-219--reasoning-was-shown-live-and-then-forgotten-was-bug-215).

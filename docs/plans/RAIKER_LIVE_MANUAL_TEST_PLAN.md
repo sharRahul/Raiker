@@ -368,8 +368,8 @@ cited passage* — `c6-source-ledger-under-answer.png`,
 
 ## 6. Permissions / Capabilities
 
-| # | Step | Result |
-|---|---|---|
+| # | Step | Result | Evidence |
+|---|---|---|---|
 | 6.1 | Open Permissions | **67 gates defined**, of which **49 are rendered**, grouped WORKSPACE / LOCAL EXECUTION / NETWORK / MODELS / OTHER TOOLS / MCP / AUTOMATION | ✅ `r0808-20-permissions-full.png` |
 | 6.2 | Search box | Filters live | ✅ `r0808-21-permissions-search.png` |
 | 6.3 | Expand a row | Description, current decision mode in plain words, and **Turn on** | ✅ `r0808-22-permissions-row-expanded.png` |
@@ -545,8 +545,8 @@ refused by the runtime under `denied_by_turn_posture`.
 
 ### 10.1 MCP servers
 
-| # | Step | Result |
-|---|---|---|
+| # | Step | Result | Evidence |
+|---|---|---|---|
 | 10.1.1 | Open the MCP tab with the connector mode at the default `ask` | A notice naming the exact reason and the exact control: *"Connected MCP tools are withheld from every turn: the MCP decision mode is 'ask' … Change the decision mode in Capabilities."* | ✅ `r0808-54-mcp-tab.png` |
 | 10.1.2 | Name a server `live-echo`, template "Sample echo server (safe starter)", **Create server** | Card created, command `python .raiker/mcp/servers/live-echo.py`, **Test / Stop / Rename / Delete** | ✅ `r0808-55-mcp-server-created.png` |
 | 10.1.3 | **Test** | `POST /mcp/servers/<id>/connect` 200 → *"live-echo: connected · 2 tool(s)"*, TOOLS (2) `echo`, `workspace_ping`, RECENT SESSIONS `mcp_connect · 0 tool calls · ok` — and, honestly, **"Not callable yet — see above"** | ✅ `r0808-56-mcp-test-result.png` |
@@ -590,8 +590,8 @@ say why (§3). `r0808-82-extensions-*.png`.
 
 ## 12. Agentic behaviour in Chat
 
-| # | Step | Result |
-|---|---|---|
+| # | Step | Result | Evidence |
+|---|---|---|---|
 | 12.1 | *"Use `update_plan` to write a three-step plan, then carry out step one only."* | A **PLAN** checklist renders above the transcript — *1 of 3 done*, with `completed` / `pending` per step — and the agent executes only step one | ✅ `r0808-85-plan-checklist.png` |
 | 12.2 | *"Use `spawn_subagent` to investigate which markdown files exist and report only the findings."* | A bounded read-only investigation returns 5 filenames and nothing else; **SOURCES** cites `Subagent: markdown-file-finder` | ✅ `r0808-86-subagent.png` |
 | 12.3 | Turn controls while a turn runs | **Add to this turn**, **Steer**, **Stop** appear in the composer | ✅ |
@@ -638,8 +638,8 @@ Six tabs, under PERSONAL and SYSTEM headings:
 
 ## 15. Global chrome
 
-| Control | Result |
-|---|---|
+| Control | Result | Evidence |
+|---|---|---|
 | Theme toggle | Cycles **system → light → dark → system**; `data-theme` follows (`null` → `light` → `dark` → `null`); `aria-label` names the next state. Every view renders in both themes | ✅ `r0808-75-theme-*.png`, `r0808-76-*.png` |
 | Notification bell | Unread count badge; panel with **Mark all read**; the badge clears and the history stays in Observability → Notifications | ✅ `r0808-77-notification-center.png` |
 | STOP switch | Confirm dialog: *"Stop all active tasks? This requests cancellation of every task that is queued, running, paused, or waiting for your approval, at the next safe boundary. It is governed and audited — not a force-kill."* with **Cancel** / **Stop tasks** | ✅ `r0808-78-stop-switch.png` |

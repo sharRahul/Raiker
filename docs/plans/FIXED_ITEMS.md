@@ -20,9 +20,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 
 | ID | Severity | Area | Status |
 |---|---|---|---|
-| [FIXED-01](#fixed-01-model-connection-showed-a-raw-reason-codey-to-act-on-it) | High | Models | Fixed |
-| [FIXED-02](#fixed-02-context-meter-showed-0-nan-nan-token-counts-stripped-from-the-audit-log) | High | Chat / API redaction | Fixed |
-| [FIXED-03](#fixed-03-no-token-or-cost-accounting-models-showed-a-meaningless-percentage) | Medium | Models / Chat / Build | Fixed |
+| [FIXED-01](#fixed-01--model-connection-showed-a-raw-reason-code-with-no-way-to-act-on-it) | High | Models | Fixed |
+| [FIXED-02](#fixed-02--context-meter-showed-0--nan-nan-token-counts-stripped-from-the-audit-log) | High | Chat / API redaction | Fixed |
+| [FIXED-03](#fixed-03--no-token-or-cost-accounting-models-showed-a-meaningless-percentage) | Medium | Models / Chat / Build | Fixed |
 | FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
 | FIXED-05 | High | Models / policy | Fixed |
 | FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
@@ -4364,7 +4364,7 @@ in **Tasks**, and the inbox that took the decision links straight to it.
 **Status: fixed in this change, alongside FIXED-155. Was BUG-63, found while
 verifying FIXED-105.**
 
-**Observed.** `apps/web/src/lib/components/PermissionModeControl.svelte` offers
+**Observed.** `apps/web/src/lib/components/ApprovalModeControl.svelte` (named `PermissionModeControl.svelte` at the time) offers
 *Permissions: ask* / *Permissions: safe auto* / *Custom permissions…* and writes
 every capability's decision mode through `api.setCapabilityDecisionMode`. No
 file imports it. The user guide documented it as a Chat control for as long as
@@ -6893,7 +6893,7 @@ never consumed by `PolicyEngine`.
 classified as both allowed and approval-required, so the two live policy sets
 cannot silently contradict one another.
 
-**Evidence.** `tests/test_policy.py` and the full policy/runtime suite.
+**Evidence.** `tests/test_policy_engine.py` and the full policy/runtime suite.
 
 ---
 
@@ -8327,9 +8327,10 @@ back at **default**, the same conversation renders no reasoning section at all.
 Build behaves identically.
 
 Evidence:
-[`screenshots/working/bug-207-live-reasoning-streaming.png`](screenshots/working/bug-207-live-reasoning-streaming.png),
-[`screenshots/working/bug-207-live-reasoning-settled.png`](screenshots/working/bug-207-live-reasoning-settled.png),
-[`screenshots/working/bug-207-live-no-reasoning.png`](screenshots/working/bug-207-live-no-reasoning.png).
+`bug-207-live-reasoning-streaming.png`, `bug-207-live-reasoning-settled.png`
+and `bug-207-live-no-reasoning.png` — **not retained in the repository**; the
+committed evidence for this round is under
+[`screenshots/working/`](screenshots/working/).
 Specs:
 [`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
 [`tests/test_bug_206_207_tool_rows_and_reasoning.py`](../../tests/test_bug_206_207_tool_rows_and_reasoning.py).
@@ -8339,7 +8340,7 @@ fills in as it arrives and is gone when the conversation is re-opened, because
 nothing persists it. No surface claims otherwise — a reloaded turn simply shows
 its answer. Persisting it is a storage change with a retention question attached,
 and it is recorded in
-[`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-215--reasoning-is-shown-live-and-then-forgotten).
+[`TO_BE_FIXED.md`](FIXED_ITEMS.md#fixed-219--reasoning-was-shown-live-and-then-forgotten-was-bug-215).
 
 **And the one failure it can still produce says what to do about it.** If a model
 refuses both spellings — a profile declaring reasoning the model does not have in
@@ -8348,7 +8349,7 @@ answering without the thinking the owner asked for. The default sentence for an
 unknown provider code sends the owner to run a readiness check, which would
 *pass*: the model is reachable. So the code has its own sentence — *"Set Thinking
 back to default, or choose a model that supports it"* — because naming the wrong
-remedy is the defect [FIXED-01](#fixed-01-model-connection-showed-a-raw-reason-codey-to-act-on-it)
+remedy is the defect [FIXED-01](#fixed-01--model-connection-showed-a-raw-reason-code-with-no-way-to-act-on-it)
 removed from the connection card, and this is the other end of the same turn.
 
 **User-interface outcome.** A turn shows the model's own reasoning or it shows
@@ -9674,7 +9675,7 @@ before; what changed is who holds the clock.
 structure — 108 bytes on Linux — and it is the *path string* that has to fit.
 The socket beside the journal under `.raiker/command-supervisors/` exceeded that
 for any workspace nested more than shallowly, which is the same class of failure
-[BUG-216](TO_BE_FIXED.md) records for Windows `MAX_PATH`. The control endpoint
+[BUG-216, closed as FIXED-240](#fixed-240--deep-windows-paths-silently-made-approved-writes-irreversible) records for Windows `MAX_PATH`. The control endpoint
 now lives in a short per-workspace directory under the platform's runtime area,
 0700, with the socket 0600; the journal stays inside `.raiker`, where the
 sandbox denies it to every governed command. The security argument does not rest

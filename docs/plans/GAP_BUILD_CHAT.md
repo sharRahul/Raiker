@@ -274,11 +274,14 @@ git approval names the repository the change lands in.
 **B12. No web access.** ✅ **Done — see FIXED-101.** `web_fetch` returns one page
 as bounded, sanitised text framed as untrusted data, governed by the `web_fetch`
 capability gate, the per-capability decision mode (default `ask` withholds), and
-the owner egress allowlist `RAIKER_WEB_EGRESS_ALLOWLIST` (empty ⇒ fail closed).
-Because the URL is model-supplied it is checked as well as the host — HTTPS only,
-no embedded credentials, a destination that resolves to a public address, and
-every redirect hop re-checked. `web_search` sits behind the same gate and is off
-until the owner configures an endpoint.
+the owner **blocklist** `RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in
+Settings → Web access. *(Superseded 2026-08-22: this originally named an
+allowlist that shipped empty.)* Because the URL is model-supplied it is checked
+as well as the host — HTTPS only, no embedded credentials, a destination that
+resolves to a public address, and every redirect hop re-checked, none of which
+the owner can switch off. `web_search` sits behind the same gate and works
+against a keyless default endpoint until the owner points
+`RAIKER_WEB_SEARCH_ENDPOINT` at their own.
 
 ### Tier 3 — the workspace surface (UI/UX)
 

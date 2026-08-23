@@ -2,7 +2,14 @@
 
 This document defines the implementation contract for model providers. `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` defines model runtime behaviour; this file defines the interface a provider adapter must implement.
 
-Phase 1 implements only the deterministic `mock` provider. All other providers remain disabled until their build phase and policy gates are implemented.
+**Implemented adapters (2026-08-22).** `raiker/models/providers/` ships four:
+the deterministic `mock` provider, `anthropic_messages.py`,
+`openai_compatible.py` (which serves OpenAI, OpenRouter, Ollama, LM Studio and
+any owner-supplied OpenAI-compatible endpoint) and `llama_cpp_server.py`. A
+provider is reachable only once the owner configures it, its exact model passes
+readiness, and its endpoint satisfies `raiker/models/endpoint_policy.py`; an
+unconfigured provider still fails closed. See
+[Models and local inference](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md).
 
 ---
 

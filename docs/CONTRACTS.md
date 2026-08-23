@@ -29,4 +29,11 @@ transitions fail closed.
 
 An approval records an immutable proposed action and an expiry. Resolving the
 record is metadata-only unless the separately governed relay revalidates and
-executes a supported action.
+executes a supported action — the twelve capabilities in `EXECUTABLE_ON_APPROVAL`
+(`raiker/approvals/execution.py`). The relay re-checks its own gate, the target
+capability's gate, policy and posture at execution time; either gate being off
+returns the approval to metadata-only, and the surface says which before the
+owner decides.
+
+A **critical** approval never reaches the relay. It keeps the human-only,
+step-up-verified lifecycle in `RuntimeAuthority.resolve_critical_approval`.

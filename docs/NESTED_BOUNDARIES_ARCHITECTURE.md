@@ -8,7 +8,8 @@ The detailed component responsibilities remain in:
 - `docs/ARCHITECTURE.md`
 - `docs/CONTRACTS.md`
 - `docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md`
-- `docs/UI_UX_DESIGN_SPEC.md`
+- `docs/WEB_UI_CONTROL_DECK_PLAN.md` (what each screen is for)
+- `docs/VISUAL_DESIGN_SPEC.md` (how anything is drawn)
 - `docs/CHANNELS_SPEC.md`
 - `docs/TOOLS_AND_PERMISSIONS_SPEC.md`
 - `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md`

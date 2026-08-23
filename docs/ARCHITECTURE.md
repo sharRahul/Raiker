@@ -59,8 +59,10 @@ remain brokered under a signed turn identity.
 | Terminal and web dashboard | Implemented local clients; no direct authority |
 | Local model profiles | Supported through governed provider contracts |
 | Integrated executors | Governed per capability and decision mode |
-| Approval resolution | Executes approved file mutations and allowlisted, bounded shell commands through the governed relay (re-governed at execution time; file mutations checkpointed); unsupported capabilities remain metadata-only |
-| Remote/cloud and sensitive domains | Disabled and fail-closed |
+| Approval resolution | Executes the twelve capabilities in `EXECUTABLE_ON_APPROVAL` through the governed relay, re-governed at execution time; file mutations are checkpointed first. Every other capability — including `process` and `network` — remains metadata-only |
+| Checkpoints | Capture is automatic before every approved mutation. **Rewind is not reachable by an owner**: the restore executor exists and no surface proposes a restore |
+| Remote/cloud | Real foreground SSH and Daytona executors behind an owner-configured, owner-selected profile with a pinned host key and a cost ceiling; fail-closed without one |
+| Sensitive domains | No executor; disabled and fail-closed |
 
 Owner bootstrap creates a persisted principal and a human `runtime_gate_manager`.
 The runtime state and capability gate state are durable. No `/sessions` command is
@@ -72,7 +74,10 @@ See [implementation status](IMPLEMENTATION_STATUS.md) for the current capability
 ledger and [security architecture](SECURITY_ARCHITECTURE.md) for trust boundaries.
 
 Approval resolution executes approved local file mutations and allowlisted,
-workspace-contained shell commands through the governed relay. The terminal
+workspace-contained shell commands through the governed relay, along with the
+patch, git write and push, GitHub write, durable memory, local planning and
+owner-selected SSH/Daytona capabilities the relay's `EXECUTABLE_ON_APPROVAL` set
+names (`raiker/approvals/execution.py`). The terminal
 requires `RAIKER_API_TOKEN`, previews the immutable effect, and requires the id
 again before execution. Resolution is metadata-only for every other capability.
 Strict

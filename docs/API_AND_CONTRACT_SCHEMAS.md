@@ -232,8 +232,12 @@ runtime-control state. `/runtime-readiness` reports blockers and available
 governance controls.
 
 Requests that propose a mutation are subject to policy, decision mode, and
-approval requirements. Approval resolution remains metadata-only unless a
-supported action enters its separately governed execution path.
+approval requirements. Approval resolution remains metadata-only unless the
+action's capability is one of the twelve in `EXECUTABLE_ON_APPROVAL`
+(`raiker/approvals/execution.py`), in which case the separately governed relay
+revalidates and executes it once. The API tells a client which of the two an
+approval is **before** the decision, not after, so a surface never offers a
+button whose effect it cannot describe.
 
 See [contracts](CONTRACTS.md) and [commands](COMMANDS_AND_INTERACTIVE_MODE_SPEC.md).
 

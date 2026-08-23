@@ -20,17 +20,40 @@
 | `test_only` | Reserved for offline test support |
 | `disabled_deferred` | No usable executor; fails closed |
 
-Approval resolution executes approved local file mutations
-(`file_write_execution`, `patch_apply_execution`) and approved `shell` and
-`process` actions. Shell/process execution and standing-grant `run_command`
-converge on the same durable `CommandService`; the runtime stores the authority
-identity and selected environment, redacts output before persistence, and
-requires an immutable receipt for every terminal state. File mutations are
-additionally checkpointed so they stay reversible. SSH and Daytona command
-profiles remain readiness-only and fail closed; they are not executable merely
-because a profile record exists. Approval resolution remains
-metadata-only for every other capability.
+Approval resolution executes approved local file mutations, and eleven other
+capabilities besides. The complete set is `EXECUTABLE_ON_APPROVAL`
+(`raiker/approvals/execution.py`): local file
+mutations (`file_write_execution`, `patch_apply_execution`), bounded local
+`shell` commands (`shell_execution`), the git write path
+(`git_write_execution`), the push (`git_push_execution`), a GitHub write
+(`connector_github_runtime`), durable memory writes and forgets
+(`memory_write_execution`, `memory_forget_execution`), the two local planning
+rows (`task_management_runtime`, `project_assignment_runtime`), and
+owner-selected SSH and Daytona commands (`remote_execution_cap`,
+`cloud_execution_cap`). Each is relayed once and re-governed at execution time
+against its own gate, the relay's `approval_execution_relay` gate, policy and
+posture; disabling either gate returns those approvals to metadata-only.
+
+`process` and `network` are **not** relayed: an approved `process` or `network`
+action records the decision and executes nothing. Shell execution and
+standing-grant `run_command` converge on the same durable `CommandService`; the
+runtime stores the authority identity and selected environment, redacts output
+before persistence, and requires an immutable receipt for every terminal state.
+File mutations are additionally checkpointed so they stay reversible. SSH and
+Daytona execute only through an owner-configured, owner-selected profile with a
+pinned host key and a cumulative cost ceiling; without one they fail closed, and
+a profile record alone is not enough. Approval resolution remains metadata-only
+for every other capability.
 CLI durable memory mutation is `implemented_approval_required`.
+
+**Checkpoint restore is a known gap.** `CheckpointRestoreExecutor`
+(`raiker/runtime/executors/tier1_checkpoint.py`) is implemented, registered and
+tested, and it captures its own pre-image so a restore is itself reversible —
+but **no route, terminal command or model tool proposes a restore**. The CLI's
+`/checkpoints restore` and the web Checkpoints view both compute a *preflight*
+and perform nothing. Capture is automatic and complete; rewind is not reachable
+by an owner. Tracked in
+[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort).
 
 Per-turn machine identity is `implemented_verified`. Every ordinary, resumed,
 scheduled, plugin-relay, CLI-agentic, and child-agent tool call reaches the
@@ -105,7 +128,7 @@ Phase 3 is complete for the following metadata and readiness slices. Phase 4 rem
 | Slice L | Approval preview persistence is metadata-only; it records an inspectable preview and executes nothing. Its `approval_execution_enabled` / `approval_relay_runtime_enabled` flags scope to **this preview-persistence surface** (durable approval queues, workers, schedulers, watchers, daemons — all still deferred). They are not a statement about the Approvals inbox, where an approved file mutation is executed once through the governed relay. |
 | Slice M | Storage cleanup reports readiness and produces cleanup previews. Cleanup execution remains governed and fail-closed where no executor is available. |
 | Slice N | Plugin server startup readiness reports plugin capability and blockers; plugins do not become an authority bypass. |
-| Slice O | External channels and notifications expose metadata readiness only; runtime dispatch events are introduced only with a governed executor. |
+| Slice O | The historical Phase 3 readiness flag `external_channels_enabled` stays `False`; it scopes that readiness record, not the channel surface. Channels now have a real executor (`raiker/runtime/executors/channels.py`): outbound webhook delivery through the `external_channel_runtime` gate and the connector egress allowlist, signed with `X-Raiker-Signature` when a secret is set, and inbound delivery behind an owner secret with sender allowlisting, a 60-per-minute per-sender bound, and recorded quarantine. Routing modes and approval relay over a channel are not implemented — an inbound message never becomes work on its own. |
 | Slice P | The historical Phase 3 readiness record remains metadata-only. Current SSH, Daytona, and bounded container profiles have real executors and stay unavailable until an owner configures and selects one; other remote/cloud types remain fail-closed. |
 
 Strict non-allow blocking, role revoke governed, and capability gate per action are enforced. This document distinguishes metadata-only, dry-run-only, contract-only, readiness-only, implemented-read-only, and test-only surfaces from executable capabilities.

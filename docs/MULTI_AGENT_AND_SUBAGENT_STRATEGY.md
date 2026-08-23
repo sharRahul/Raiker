@@ -1,6 +1,22 @@
 # Multi-Agent And Subagent Strategy
 
-> Current truth (2026-06-21): the launchable local UIs are the plain local terminal client and the local web dashboard (`raiker-web` loopback API + the `apps/web` Svelte SPA; single-user, `127.0.0.1` only; read-only governed views + governed prompt/turn/approval/runtime-mutation flows where approval resolution is metadata-only; adds no authority of its own). Rich/native TUI, Desktop, Mobile, IDE, Voice, Browser Extension, and hosted/multi-user REST/API clients are Phase 8 deferred, specified but not implemented. Phase 3 is complete only for safe foundation/readiness slices A-P; Phase 4 memory MVP is implemented; Phase 5-7 remain metadata/readiness/contract surfaces unless code and tests explicitly prove runtime behavior. Runtime execution remains disabled for plugin execution, graph indexing, semantic/vector writes, embeddings, approval execution/relay, cleanup/rollback execution, external channels/notifications, remote/container/cloud/process/shell/network execution.
+> **Status banner, refreshed 2026-08-22.** The launchable clients are the local
+> terminal client (`raiker`) and the local web dashboard (`raiker-app` /
+> `raiker-web`, loopback only). Approval resolution **executes** the twelve
+> capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) —
+> file mutations, patches, bounded local `shell`, the git write and push path, a
+> GitHub write, the two local planning rows, durable memory writes and forgets,
+> and owner-selected SSH and Daytona commands — each re-governed at execution
+> time; every other capability keeps decision-only resolution. Runtime execution
+> is **not** globally disabled: plugin slices, graph indexing, channels,
+> scheduled routines, model providers, MCP, container read tools and governed
+> local commands all have real executors and are governed per action. Sensitive
+> finance, investment, medical, pregnancy, CCTV, home-security and hardware
+> domains have no executor and fail closed. Rich/native TUI, mobile, IDE and
+> hosted multi-user clients remain deferred. The canonical statement of what is
+> implemented is [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md); where
+> this document and the code disagree, the code wins and this document must be
+> updated.
 
 
 Raiker supports subagents and coordinated multi-agent teams through phase-scheduled implementation. The design is fully specified now; phase numbers control when behaviour is wired, not whether behaviour is defined.

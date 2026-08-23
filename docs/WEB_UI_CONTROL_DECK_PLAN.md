@@ -16,7 +16,8 @@ binding for implementation; everything else in the draft carries over.
    The acceptance anchors are the living test suites: `tests/test_security_regression_ui.py`
    (M7 security regression), `tests/test_api_contract_schemas.py`,
    `tests/test_api_m5_security_settings.py`, and `apps/web/src/a11y.test.ts`.
-   Risk classes come from `docs/foundation/06_SECURITY_MODEL.md` (which exists).
+   Risk classes come from `RISK_LEVELS` (`raiker/contracts/models.py`) and
+   [`SECURITY_ARCHITECTURE.md`](SECURITY_ARCHITECTURE.md).
 2. **The turn state machine has 19 states, not 16** (`raiker/runtime/state_machine.py`,
    `RUNTIME_STATES`). Copy referring to the expanded State Tape says "the full state
    detail", never a hardcoded count.
@@ -68,12 +69,12 @@ without redesign.
 
 Verified sources: `README.md`, `SECURITY.md`, `docs/HANDOFF.md`,
 `docs/IMPLEMENTATION_STATUS.md`, `docs/FEATURE_COVERAGE_MATRIX.md`,
-`docs/foundation/06_SECURITY_MODEL.md`, `docs/DECISION_MODES_SPEC.md`,
+`docs/SECURITY_AND_POLICY.md`, `docs/DECISION_MODES_SPEC.md`,
 `docs/CHANNELS_SPEC.md`, `docs/CHECKPOINTING_AND_REWIND_SPEC.md`,
 `docs/MEMORY_AND_CONTEXT_STRATEGY.md`, `docs/EIDETIC_MEMORY_AND_LEARNING_SPEC.md`,
 `docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`, `docs/MULTI_AGENT_AND_SUBAGENT_STRATEGY.md`,
 `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md`,
-`docs/SECURITY_ARCHITECTURE.md`, `docs/guide/manifest.json`, the threat-model set, and
+`docs/SECURITY_ARCHITECTURE.md`, `docs/guide/`, the threat-model set, and
 the code: `raiker/phase_gates.py` (53 capabilities), `raiker/runtime/executors/__init__.py`
 (`REAL_EXECUTOR_CAPABILITIES`, 29 integrated), `raiker/api/routes_*.py` (31 endpoints),
 `raiker/control/dtos.py` (gate DTO fields), `raiker/runtime/state_machine.py` (19 states),
@@ -188,7 +189,7 @@ pending/ask state. The default follows `prefers-color-scheme`; the explicit choi
 persists in `localStorage` (theme preference only — the bearer token stays
 memory-only).
 
-**Risk scale** (from `docs/foundation/06_SECURITY_MODEL.md`): low = neutral;
+**Risk scale** (from `RISK_LEVELS`, `raiker/contracts/models.py`): low = neutral;
 medium = amber; high = orange; critical = red with a 2 px left rule and shield-alert
 icon. **Trust scale:** trusted = calm green; authenticated = blue; untrusted = hatched
 amber quarantine border. All pairs meet WCAG AA in both themes; risk and trust are never
@@ -406,9 +407,11 @@ affordances anywhere.
 - **Diagnostics (Pre-flight):** readiness checklist (`GET /api/runtime-readiness`,
   `GET /api/diagnostics`) with plain-language remediation. Never claims readiness beyond
   local single-user.
-- **Docs & Help:** renders `docs/guide/manifest.json` via **(new)** `GET /api/docs` +
-  `GET /api/docs/{slug}`, with "Learn why" links from every reason code and disabled
-  control.
+- **Docs & Help:** **shipped, and at different routes than this plan proposed.**
+  Utilities → **Guide** renders the sections in `docs/guide/` through
+  `GET /api/guide` and `GET /api/guide/{slug}` (`raiker/api/routes_guide.py`,
+  `raiker/guide/`), resolved as a product asset rather than from a manifest file,
+  with "Learn why" links from reason codes and disabled controls.
 - **Preferences:** theme, density, reduced motion, State Tape verbosity. Local only.
 
 ---

@@ -386,7 +386,7 @@ Current runtime posture update: graph indexing, semantic memory, local vector em
 
 Safety status for this slice:
 
-- GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
+- GitHub Actions **run on every pull request and push to `main`** (`.github/workflows/`); the claim that they were paused for quota was true in an earlier phase and is not true now. See [`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md).
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
 - Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
 - Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.

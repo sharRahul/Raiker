@@ -689,7 +689,7 @@ Safety status:
 - Plugin slices, the reference external channel, subagent/team executors, and local container runtime are governed real executors.
 - Remote/cloud command execution remains no-executor/fail-closed.
 - Rollback execution remains disabled.
-- GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
+- GitHub Actions **run on every pull request and push to `main`** (`.github/workflows/`); the claim that they were paused for quota was true in an earlier phase and is not true now. See [`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md).
 
 ## Phase 3 Slice H Lifecycle Retention Metadata Tables
 

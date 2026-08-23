@@ -2,9 +2,13 @@
 
 Status: specification + partial implementation. This doc unifies Raiker's five extension
 surfaces — **tools, hooks, skills, plugins, channels** — into one mental model, with consistent
-trust, registration, and policy rules. It exists because these surfaces are currently described
+trust, registration, and policy rules. It exists because these surfaces are otherwise described
 in separate specs with no single overview, which makes the extensibility story hard to reason
 about as a whole.
+
+For how each surface compares with the reference platforms — including the
+contribution kinds Raiker deliberately refuses — see
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §2.5–2.6](REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
 Reference inspiration: Claude Code's extension layer (skills, MCP, hooks, subagents, plugins,
 channels) sits *on top of* a fixed agentic core; Raiker adopts the same separation. Source of
@@ -31,8 +35,8 @@ manifest, pairing, or managed policy.
 | **Tools** | New actions the agent can take | Tool broker registry | Broker → policy → (approval) → execute | ✅ built-in tools real; plugin tools planned | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/HOOKS_SPEC.md`, `raiker/hooks/` |
 | **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills) | `docs/guide/extensions-and-mcp.md`, `docs/SELF_IMPROVEMENT_MODEL.md` |
-| **Plugins** | Bundles of tools + hooks + skills + channels + servers | Plugin manifest + permission diff | Components register through their own surfaces; nothing auto-executes | 🔒 manifest validation only | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
-| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist; inbound recorded untrusted and quarantined (routing modes not implemented) | ✅ transport + owner surface (`raiker/channels/`, Extensions → Channels); rate limits and relay resolution open | `docs/CHANNELS_SPEC.md` |
+| **Plugins** | Bundles that contribute *through* the other surfaces | Plugin manifest + permission diff + supply-chain and signature checks | Each kind registers through the surface that already governs it; **no plugin code executes** | ✅ hook rules (`event:hook`), skills (`skill:contribute`, installed inactive) and MCP-server **offers** (`mcp:server`); revocation deletes what was contributed. Panels (BUG-228) and LSP (BUG-227) open | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
+| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist, signed with `X-Raiker-Signature` when a secret is set; inbound behind an owner secret with sender allowlisting, bounded to 60/min per sender, recorded untrusted and quarantined | ✅ transport, owner surface and rate limits (`raiker/channels/`, Extensions → Channels); routing modes and approval relay open (BUG-225) | `docs/CHANNELS_SPEC.md` |
 
 Legend: ✅ implemented · 🔒 phase_scheduled_disabled · 📘 specified_not_implemented.
 
@@ -83,8 +87,16 @@ plan with execution disabled).
 - Manifests are explicit and declare every permission they want.
 - A **permission diff** is shown before enable/update.
 - Plugin execution slices are **governed/default-ask** and require owner trust/allowlists; broader plugin extensions remain deferred/fail-closed.
-- Recommended (not yet implemented): manifest signing/checksums and provenance, plus a managed
-  allowlist of trusted publishers (LLM03, `docs/OWASP_GENAI_SECURITY_MAPPING.md`).
+- **Manifest checksums and signatures are implemented** (`raiker/plugins/verify.py`).
+  Checksums are always verified; a manifest signature is checked against
+  `RAIKER_PLUGIN_SIGNING_KEY` (HMAC, the owner's own) or
+  `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` (a publisher's) when either is set. With
+  neither set — the default — a signature is recorded as **Present only**: the
+  checksum still catches an accidental edit, but nothing was checked against an
+  author. Extensions → Plugins states which of the three levels each installed
+  plugin earned and what would raise it. Neither Claude Code nor Codex verifies
+  manifest authorship at all (LLM03, `docs/OWASP_GENAI_SECURITY_MAPPING.md`).
+- Still recommended and not built: a managed allowlist of trusted publishers.
 
 ---
 

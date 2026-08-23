@@ -253,7 +253,7 @@ Current runtime posture update: graph indexing, semantic memory, local vector em
 
 Safety status for this slice:
 
-- GitHub Actions remain paused due quota exhaustion; do not claim GitHub CI passed while paused.
+- GitHub Actions **run on every pull request and push to `main`** (`.github/workflows/`); the claim that they were paused for quota was true in an earlier phase and is not true now. See [`VERIFICATION_PLAN.md`](VERIFICATION_PLAN.md).
 - Local validation evidence remains mandatory under `docs/LOCAL_VALIDATION_GATE.md`.
 - Plugin execution slices are integrated governed executors; broader plugin extensions remain deferred/fail-closed.
 - Graph indexing, semantic memory, local vector embedding/search, and provider-backed embedding are integrated governed executors; broader graph/memory extensions remain deferred/fail-closed.
@@ -293,8 +293,6 @@ Safety invariants for this slice:
 - Legacy preview surfaces do not execute graph writes; the current graph indexing runtime is a separate governed real executor.
 - Legacy preview surfaces do not write semantic memory; current semantic memory and vector embedding/search runtimes are separate governed real executors.
 - Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
-- GitHub Actions remain paused due quota exhaustion; local/cloud validation evidence is mandatory.
-- CI must be re-enabled later when quota is available and must not be claimed as passed while Actions are paused.
 
 New preview-only CLI surfaces: `/approval-audit`, `/approval-audit --summary`, `/rollback-plan`, `/graph-rollback-plan`, and `/memory-rollback-plan`.
 
@@ -311,7 +309,6 @@ Safety status:
 - Legacy preview surfaces do not write semantic memory; current semantic/vector runtimes are governed real executors.
 - Rollback execution remains disabled.
 - Plugin slices, the reference external channel, subagent/team executors, local container runtime, and owner-configured SSH/Daytona command execution are governed real executors; other remote/cloud providers remain no-executor/fail-closed.
-- GitHub Actions remain paused due quota/run-limit exhaustion; local/cloud validation evidence is mandatory and GitHub CI must be re-enabled later when quota is available.
 
 ### Additional Improvements Needed
 

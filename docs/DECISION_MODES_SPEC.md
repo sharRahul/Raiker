@@ -1,8 +1,17 @@
 # Capability Decision Modes (Ask / Deny / Allow / Auto)
 
-> Runtime enablement candidate. Enforcement: strict non-allow blocking, role
-> revoke governed, capability gate per action. Approval resolution is
-> metadata-only.
+> Enforcement: strict non-allow blocking, role revoke governed, capability gate
+> per action. Approval resolution **executes** the twelve capabilities in
+> `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) and stays
+> decision-only for every other capability — see
+> [Implementation status](IMPLEMENTATION_STATUS.md).
+>
+> Decision modes are the **per-capability** standing policy described here. They
+> are not the same control as the **per-turn approval mode** a composer sends
+> (`manual`, `auto`, `skip`, `dont_ask` — `APPROVAL_MODES` in
+> `raiker/contracts/models.py`), which can only ever tighten a turn. Raiker has
+> no equivalent of a mode that skips every check; see
+> [Reference platform compatibility §4.1](REFERENCE_PLATFORM_COMPATIBILITY.md#41-a-mode-that-skips-every-check).
 
 Decision modes are a per-capability control layered **on top of** the capability
 gate. The gate still governs *whether* a capability is enabled at all: integrated

@@ -69,25 +69,30 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 
 ### Real executors — governed-flippable (`REAL_EXECUTOR_CAPABILITIES`)
 
+This table covers all 45 members of `REAL_EXECUTOR_CAPABILITIES`
+(`raiker/runtime/executors/__init__.py`). A capability that is in that set and
+not in this table is a documentation defect, not a hidden feature.
+
+
 | Capability | Tier | What it does |
 |---|---|---|
-| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for the capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) — file mutations, bounded commands, the local planning rows, and the git write path; disabling this gate returns those approvals to metadata-only. |
+| `approval_execution_relay` | 1 | Turns a recorded human approval into a real execution, re-governing the target at execution time. Reached from the Approvals API for the twelve capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) — file mutations and patches, bounded local `shell`, the git write and push path, a GitHub write, durable memory writes and forgets, the two local planning rows, and owner-selected SSH and Daytona commands; disabling this gate returns those approvals to metadata-only. |
 | `file_write_execution` | 1 | Writes a file in the workspace. Path-safe **and** refuses the `.raiker/` and `.git/` trees; the pre-image is checkpointed first. |
 | `patch_apply_execution` | 1 | Writes new file content for an approved change, under the same path rules. |
 | `git_write_execution` | 1 | Creates a branch or records a commit in the workspace repository (B11). Re-derives its own proposal before mutating, so a repository that moved since the approval fails closed with a named reason. Stages exactly the paths the owner reviewed — never `--all` — so `.raiker/` and `.git/` can never be swept into a commit, and disables the repository's own hooks for the invocation. |
 | `memory_write_execution` | 1 | Durable governed memory write. |
 | `memory_forget_execution` | 1 | Durable memory forget. |
 | `shell_execution` | 2 | Runs an allowlisted command in the sandbox. |
-| `process_execution` | 2 | Sandboxed subprocess. |
-| `web_fetch` | 2 | Fetch over the egress allowlist. |
-| `network_execution` | 2 | Network call over the egress allowlist. |
+| `process_execution` | 2 | Sandboxed subprocess. An approved `process` action is **not** relayed either — like `network`, it records the decision only. |
+| `web_fetch` | 2 | Fetch one page under the owner **blocklist** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in Settings → Web access) and a non-optional public-address guard: HTTPS only, no credential in the URL, every resolved address public, re-checked on each redirect and pinned. |
+| `network_execution` | 2 | Network call over the connector egress allowlist (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty = fail closed). An approved `network` action is **not** relayed — it records the decision and executes nothing; this executor is reached by the runtime, not by an approval. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
 | `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (owner egress allowlist + hosted/private gate state + API-key-from-env); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
 | `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
-| `external_channel_runtime` | 5 | Bounded outbound webhook delivery (owner egress allowlist); metadata-only events. |
+| `external_channel_runtime` | 5 | Bounded outbound webhook delivery over the owner connector egress allowlist, signed with `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) when a secret is configured and reported as unsigned on the Channels tab when not. Inbound delivery is recorded, rate-limited to 60 messages per sender per minute, and quarantined: a channel message is untrusted content with a named sender who is not the owner, and never raises a turn's authority. Events stay metadata-only. |
 | `channel_approval_relay` | 5 | Metadata-only **pending** approval relay for a paired channel (never resolves). |
 | `container_execution_cap` | 5 | Local Docker run: owner image allowlist, no network, no host mounts, dropped caps, read-only, resource bounds. |
 | `scheduled_routines` | 5 | Local on-demand routine runner (no daemon); runs bounded read-only subagent payloads when due. |
@@ -103,6 +108,16 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 | `plugin_revocation_cap` | 4 | Owner revocation off-switch: flips an installed plugin's record status to `revoked` so `plugin_execution_cap` fails closed for it; never deletes records, edits permissions, or runs plugin code. |
 | `plugin_runtime_cap` | 4 | Bounded subprocess execution of an installed, owner-allowlisted plugin's entrypoint (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`, empty = fail closed); interpreter allowlist (`python3`/`python`/`node`), workspace-scoped script + optional per-plugin subpath scope (`RAIKER_PLUGIN_RUNTIME_SCOPES`), timeout + output caps, metadata-only artifacts. No in-process import, no network-namespace jail, no stdout/stderr leakage. |
 | `plugin_sandboxed_runtime_cap` | 4 | Network-isolated variant of the above: runs the entrypoint inside an owner-allowlisted container (`RAIKER_PLUGIN_RUNTIME_IMAGE` ∈ `container_image_allowlist()`) with `--network none`, read-only rootfs, dropped caps, and only the single entrypoint file bind-mounted read-only. Same owner plugin allowlist + per-plugin scope; workspace is never mounted; metadata-only artifacts. |
+| `checkpoint_restore_execution` | 1 | Rewinds only the files recorded in a checkpoint's capture manifest, recomputing the plan at execution time rather than trusting a caller-supplied file list, refusing any path outside the workspace, and capturing its own pre-image first so a restore is itself reversible. **Not reachable by an owner:** no route, terminal command or model tool proposes a restore, and every surface shows a preflight only. |
+| `task_management_runtime` | 1 | Creates the owner-scoped task row an approved `create_task` describes. Local, reversible, relayed on approval. |
+| `project_assignment_runtime` | 1 | Moves the active conversation into a project. Local, reversible, relayed on approval. |
+| `git_push_execution` | 2 | Publishes a branch to an HTTPS GitHub remote. Its own gate, separate from `git_write_execution`, because a push is egress carrying repository content off the machine; requires the remote's host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a credential lent for one command under an owner grant. Never forces, never deletes a branch. |
+| `code_map_indexing` | 3 | Builds and refreshes the repository symbol index Build points at — a real parser for Python, bounded patterns for fifteen other languages, each file recording which extractor produced it. Deliberately **not** `graph_codemap_indexing`: this is a derived cache, that is the governed durable graph store. A scan that hits a bound reports `partial` and names the bound. |
+| `mcp_builder_runtime` | 4 | Writes a reviewed, dependency-free local stdio MCP server from a fixed template into the workspace. Interpreter allowlist, workspace-relative path, no network. |
+| `mcp_connector_runtime` | 4 | One bounded MCP session over `stdio` (interpreter allowlist, workspace-relative argument rule) or `http` (an owner-added remote endpoint with an optional owner token — monitored rather than allowlist-blocked, because adding the URL is the authorisation). Tool output returns as redacted metadata; the raw content and any owner token never enter artifacts or the audit event. A projected MCP tool is offered to the model only while the gate is enabled **and** the decision mode permits it. |
+| `email_runtime` | 6 | Local governed email store. No outbound send. |
+| `calendar_runtime` | 6 | Local governed calendar store. |
+| `reminder_runtime` | 6 | Local governed reminder store. |
 | `plugin_sandbox_image_pull_cap` | 4 | Pull-only acquisition for a sandbox image. Requires an exact image in `RAIKER_CONTAINER_IMAGE_ALLOWLIST` and its registry in `RAIKER_PLUGIN_IMAGE_REGISTRY_ALLOWLIST`; invokes only `docker pull <image>`, bounds/redacts output, and never builds or executes an image. Docker daemon egress remains an operator-controlled boundary. |
 | `run_command` standing grant | 4 | Executes only an exact active session/principal grant inside `RAIKER_COMMAND_SANDBOX_IMAGE`, which must also be owner-allowlisted. Docker uses `--network none`, dropped capabilities, `no-new-privileges`, bounded resources, and a workspace-only bind mount. Missing image/runtime configuration fails closed. |
 
@@ -115,10 +130,19 @@ These have an `ActivationRequirement` but **no real executor**. Activation is bl
 execution (if forced) fails closed. Each needs its own implementation task (real
 integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
 
-- **Tier 5:** `remote_execution_cap`, `cloud_execution_cap`
-  (Phase 4 promotions tracked in `docs/IMPLEMENTATION_STATUS.md`; each leaves
+*Corrected 2026-08-22: `remote_execution_cap` and `cloud_execution_cap` are no
+longer on this list. Both have real foreground executors — an exact remote
+envelope, a pinned host key, a fixed supervisor path, a cumulative cost budget
+and no host fallback — and both are relayed by an approval. What is still open
+is the supervisor install/upgrade lifecycle and live remote proof, tracked in
+[`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md) → BUG-194. Selecting a profile
+that has no installed supervisor still fails closed.*
+
+- **Tier 5 promotions**
+  (tracked in `docs/IMPLEMENTATION_STATUS.md`; each leaves
   this list only with a real integration + threat model + tests. Promoted so
-  far: `subagents` + `multi_agent_teams` — `docs/threat-models/subagents.md`;
+  far: `remote_execution_cap` + `cloud_execution_cap` —
+  `docs/threat-models/remote-cloud.md`; `subagents` + `multi_agent_teams` — `docs/threat-models/subagents.md`;
   `external_channel_runtime` + `channel_approval_relay` —
   `docs/threat-models/channels.md`; `container_execution_cap` —
   `docs/threat-models/container.md`; `scheduled_routines` —
@@ -134,8 +158,8 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
   `plugin_revocation_cap` — `docs/threat-models/plugin-revocation.md`;
   `plugin_runtime_cap` — `docs/threat-models/plugin-runtime.md`;
   `plugin_sandboxed_runtime_cap` — `docs/threat-models/plugin-sandboxed-runtime.md`.
-  Remote/cloud command execution stays fail-closed by design — see
-  `docs/threat-models/remote-cloud.md`.)
+  Every remote or cloud command still runs only through an owner-configured,
+  owner-selected profile — see `docs/threat-models/remote-cloud.md`.)
 - **Tier 6 (sensitive domains):** `finance_runtime`, `investment_runtime`,
   `medical_runtime`, `pregnancy_baby_runtime`, `cctv_runtime`,
   `home_security_runtime`, `hardware_operator_runtime`
@@ -144,6 +168,26 @@ integration + threat model + tests) before joining `REAL_EXECUTOR_CAPABILITIES`:
 
 `admin_mutation`, `policy_mutation`, `role_mutation`, `audit_export` have no separate
 executor; they are governed mutations handled through the authority path.
+
+`audit_export` is worth naming separately: `raiker/events/export.py` produces a
+redacted export manifest and the store keeps it, but **no REST route surfaces
+it**, so an owner cannot take the audit out of the product from the dashboard
+today. Recorded as high-priority, low-effort work in
+[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort).
+
+### Gate names that are not executor capabilities
+
+Ten members of `ALL_CAPABILITIES` (`raiker/phase_gates.py`) are not execution
+capabilities at all and never appear in the tables above. They are listed here so
+the set is complete:
+
+| Gate | What it is |
+|---|---|
+| `desktop_ui`, `web_ui`, `dashboard` | Read-only interface contracts, `contract_ready` by default |
+| `graph_codemap_indexing`, `graph_codemap_planning` | The Phase-3 **durable governed graph store** — nodes and edges with provenance, approval previews, rollback plans. Still a dry-run planner (`raiker/graph/planner.py`); the derived repository index is the separate `code_map_indexing` |
+| `semantic_memory_writes`, `semantic_memory_review_queue` | The Phase-3 durable semantic/vector write path, disabled outright (`raiker/memory/semantic.py`) |
+| `plugin_execution`, `remote_execution`, `container_execution` | Historical Phase-3/4 gate names superseded by the `*_cap` capabilities in the tables above; they remain declared so an old configuration is refused by name rather than silently ignored |
+| `external_channels` | The historical Phase-3 channel readiness gate. The live channel capabilities are `external_channel_runtime` and `channel_approval_relay` |
 
 ## How a UI flips a gate (end to end)
 

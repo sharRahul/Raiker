@@ -1,12 +1,13 @@
 # Models and local inference
 
-> Profiles live in **two** files that must stay identical:
-> `raiker/config/model-profiles.json` (the repo/workspace copy) and
-> `raiker/config/model-profiles.json` (the copy that travels in the wheel, for
-> installs that have no repo root beside the package). Editing one without the
-> other is caught by
-> `tests/test_config_path_resolution.py::test_packaged_config_resources_match_workspace_defaults`,
-> but only after the fact — change both in the same commit.
+> **Corrected 2026-08-23.** Profiles live in **one** file:
+> `raiker/config/model-profiles.json`, which is packaged with the wheel and
+> resolved through `raiker.config` as a package resource
+> (`raiker/models/registry.py::_BUILTIN_CONFIG_RESOURCES`), so an install with no
+> repository root beside the package reads the same bytes a checkout does. This
+> banner used to describe two copies that had to be kept identical, naming the
+> same path twice and citing a test that no longer exists; the duplication was
+> removed and the warning outlived it.
 
 Raiker does not bundle a model. Configure a supported local OpenAI-compatible
 server, then select a profile with `/model use <profile_id>`.
@@ -19,6 +20,30 @@ Model responses are untrusted proposals. Tool calls are validated and routed
 through policy and RuntimeAuthority before any executor can act. Use `/models`,
 `/model current`, `/model health`, and `/model capabilities` to inspect the
 configured model surface.
+
+## Provider adapters, and where their contracts are defined
+
+Four adapters ship in `raiker/models/providers/`. Each speaks a documented wire
+protocol; where a claim here is about a provider's behaviour rather than
+Raiker's, the provider's own documentation is the source.
+
+| Adapter | Serves | Vendor reference |
+|---|---|---|
+| `anthropic_messages.py` | Anthropic | [Messages API](https://docs.claude.com/en/api/messages), [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking), [models](https://docs.claude.com/en/docs/about-claude/models/overview) |
+| `openai_compatible.py` | OpenAI, OpenRouter, Ollama, LM Studio, and any owner-supplied OpenAI-compatible endpoint | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat), [OpenRouter](https://openrouter.ai/docs), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md), [LM Studio server](https://lmstudio.ai/docs/app/api/endpoints/openai) |
+| `llama_cpp_server.py` | A managed local `llama-server` | [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) |
+| `mock` | Deterministic offline testing | — |
+
+Model acquisition additionally reads the
+[Hugging Face Hub](https://huggingface.co/docs/hub/index) for revision-pinned
+GGUF downloads, and the [GGUF format](https://github.com/ggml-org/ggml/blob/master/docs/gguf.md)
+for local file discovery.
+
+**Shipped list prices are unverified defaults.**
+`raiker/config/model-profiles.json` seeds a price only for the models whose
+published rate is recorded there, each stamped with an `as_of` date. Check them
+against your provider's current pricing page and override anything that has
+moved; an unpriced model reports its cost as unknown rather than as zero.
 
 
 ## Readiness and model acquisition

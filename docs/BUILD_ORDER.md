@@ -1,6 +1,17 @@
 # Build Order
 
-This document defines the dependency-safe order for implementing Raiker. It complements `docs/foundation/09_IMPLEMENTATION_PLAN.md` by making the build sequence explicit enough that a builder agent does not implement UI, tools, memory, plugins, channels, or storage lifecycles before the contracts and safety rails exist.
+**Historical record.** This document defines the dependency-safe order Raiker
+was implemented in. It is not maintained against the code; for what is
+implemented now read [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md), and
+for per-capability executor status read
+[`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md).
+
+It makes the build sequence explicit enough that a builder agent does not
+implement UI, tools, memory, plugins, channels, or storage lifecycles before the
+contracts and safety rails exist. (It once complemented a
+`docs/foundation/09_IMPLEMENTATION_PLAN.md` that predates this repository and was
+never committed to it; the phase detail it referred to is now in
+[`FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md`](FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md).)
 
 Phase order controls implementation sequencing only. It does not create an interface hierarchy.
 
@@ -25,8 +36,8 @@ README.md
   -> docs/SECURITY_AND_POLICY.md
   -> docs/THREAT_MODEL.md
   -> docs/NON_GOALS_AND_BOUNDARIES.md
-  -> docs/foundation/09_IMPLEMENTATION_PLAN.md
-  -> docs/foundation/09_IMPLEMENTATION_PLAN.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
+  -> docs/FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md
   -> docs/IMPLEMENTATION_STATUS.md
   -> docs/IMPLEMENTATION_STATUS.md
   -> docs/IMPLEMENTATION_STATUS.md

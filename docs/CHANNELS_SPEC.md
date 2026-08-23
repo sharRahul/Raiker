@@ -2,6 +2,22 @@
 
 Channels allow external interfaces to send messages into Raiker sessions and receive replies, events, approvals, notifications, and task updates.
 
+**Reference and status.** The nearest reference implementations are
+[OpenClaw's channel/gateway model](https://docs.openclaw.ai/concepts/architecture)
+and Hermes Agent's [20+ messaging surfaces](https://hermes-agent.nousresearch.com/docs/user-guide/features/overview);
+Claude Code models a channel as a local MCP server declaring a `claude/channel`
+capability ([Model Context Protocol](https://modelcontextprotocol.io/), revision
+`2026-07-28`). How Raiker compares, and what it deliberately does differently, is
+in
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §2.6](REFERENCE_PLATFORM_COMPATIBILITY.md#26-extensibility--plugins-skills-mcp-channels).
+
+What ships today: pairing, an enable switch, a sender allowlist, an inbound
+secret, a fixed-window bound of 60 messages per `(connector, sender)` per minute,
+and outbound delivery signed with `X-Raiker-Signature`. What does not: the
+routing modes described below, and resolving an approval over a channel. An
+inbound message is recorded and quarantined and **never becomes work on its
+own** — tracked as BUG-225 in [`plans/TO_BE_FIXED.md`](plans/TO_BE_FIXED.md).
+
 A channel is not just a UI. It is an untrusted input surface and must be treated as a security boundary. A channel can still be an equal-status primary interface when it is linked, enabled, trusted, and policy-permitted.
 
 Implementation can be phased, but every channel type must already have a documented connector profile, setup flow, permission model, event model, action parity rule, and disabled-by-default behaviour before code is written.

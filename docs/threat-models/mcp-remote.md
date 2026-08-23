@@ -55,8 +55,7 @@ and C are **implemented** and covered by `docs/threat-models/mcp-monitoring.md`.
 - **Redirects** — the initial scheme/host is validated; cross-host redirect
   hardening is tightened in a later phase.
 - **Monitoring/containment** (anomaly detection, findings, notifications, kill
-  switch, auto-pause) are **implemented** in Phases B–C per
-  `docs/plans/2026-07-17-monitored-mcp-connections.md`; see
-  `docs/threat-models/mcp-monitoring.md`. A remote connection is recorded,
+  switch, auto-pause) are **implemented**; see
+  [`mcp-monitoring.md`](mcp-monitoring.md). A remote connection is recorded,
   anomaly-scored per session, and owner-controllable (test/rename/delete/pause/
   resume/kill).

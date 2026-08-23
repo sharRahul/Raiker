@@ -18,10 +18,15 @@ def web_fetch(
 
     Everything is enforced inside :class:`WebAccessService`: the ``web_fetch``
     capability gate (fail closed), the decision mode (default ``ask``
-    withholds), the owner egress allowlist (``RAIKER_WEB_EGRESS_ALLOWLIST``,
-    empty ⇒ fail closed), HTTPS-only model-supplied URLs, a public-address
-    check, and a re-governed check on every redirect hop. The page comes back
-    as an untrusted-data block; broker events drop the content.
+    withholds), the owner blocklist (``RAIKER_WEB_EGRESS_BLACKLIST`` plus the
+    rules stored in Settings → Web access), HTTPS-only model-supplied URLs, a
+    public-address check, and a re-governed check on every redirect hop. The
+    page comes back as an untrusted-data block; broker events drop the content.
+
+    The blocklist replaced an allowlist (``RAIKER_WEB_EGRESS_ALLOWLIST``) that
+    shipped empty; see :mod:`raiker.runtime.web_policy` for why. The
+    address guard is not part of that trade — it is not optional and emptying
+    the blocklist does not open it.
     """
     # Imported at call time for the same reason the connector tools are: the
     # runtime.authority package this pulls in transitively imports the broker.

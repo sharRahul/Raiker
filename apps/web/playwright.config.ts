@@ -14,7 +14,7 @@ const executablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE;
 //   fixture, so it is deterministic and belongs in CI. A redesign that outruns
 //   it now fails a pull request instead of rotting unnoticed.
 // * `live` drives a running `raiker-web` holding real provider credentials. It
-//   is the evidence behind the FIXED-* entries in docs/plans/TO_BE_FIXED.md and
+//   is the evidence behind the FIXED-* entries in docs/plans/FIXED_ITEMS.md and
 //   is deliberately a local, credentialled run — CI has no key and must not
 //   pretend the scenario passed.
 //

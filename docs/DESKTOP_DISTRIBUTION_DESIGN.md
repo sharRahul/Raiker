@@ -85,7 +85,7 @@ its authorized local users.
 | Moment | Required behavior |
 |---|---|
 | Install | Install signed application files only; do not create an account, model connection, or backup without user action. **Implemented** — `scripts/build_installer.py` writes only application files, and its post-install step creates the environment offline from the bundled wheels. |
-| First run | Create a local account/instance, choose a model or defer it, explain privacy, create and verify an optional encrypted backup, then open the workspace. **Implemented** — `raiker/setup/`, `/api/setup/*`, and `SetupWizard.svelte`. |
+| First run | Create a local account/instance, choose a model or defer it, explain privacy, create and verify an optional encrypted backup, then open the workspace. **Implemented** — `raiker/models/setup.py`, `raiker/api/routes_setup.py` (`/api/setup*`), and `SetupWizard.svelte`. |
 | Host start | Start the Raiker host automatically and recover unfinished approved background work safely. |
 | Browser closed | Keep the service running; scheduled work and indexing continue only within their approved policies. |
 | Pause / quit | Pause stops new background work; quit stops the service explicitly and reports any waiting work. |

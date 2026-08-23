@@ -11,6 +11,15 @@ privilege, output validation, approvals, and sandboxing.
 
 Raiker must map its controls to OWASP LLM and GenAI security risks. This document converts agent security into concrete Raiker requirements.
 
+**Source.** The list mapped here is the
+[OWASP Top 10 for Large Language Model Applications (2025)](https://genai.owasp.org/llm-top-10/),
+published by the [OWASP GenAI Security Project](https://genai.owasp.org/). The
+agentic companion — the ASI taxonomy — is mapped separately in
+[`OWASP_AGENTIC_TOP10_MAPPING.md`](OWASP_AGENTIC_TOP10_MAPPING.md); the two lists
+are different taxonomies and neither subsumes the other.
+
+**This is a self-assessment, not a certification or third-party audit.**
+
 ---
 
 ## Security Objectives
@@ -67,7 +76,7 @@ claim, and this table does not make claims.
 | ID | Risk | Doc | Code | What is enforced today, and what is not |
 |---|---|---|---|---|
 | LLM01 | Prompt injection | yes | ✅ | Structural, not prompt-level: external content is framed as untrusted data and never as instruction (`raiker/runtime/web_access.py`, `raiker/runtime/retrieval.py`, `raiker/runtime/attachments.py`), each context item carries source and trust (`raiker/context/models.py`), and hijacked intent still has to cross a deny-by-default tool gate (`raiker/policy/engine.py`). The scanning hook this document requires now exists as an **advisory** signal: `raiker/security/injection_scan.py` raises a redacted finding naming the exact page or document, and never blocks — the refusal path stays the gate. |
-| LLM02 | Sensitive information disclosure | yes | ✅ | One redaction pass covers the API surface and the event log by *shape*, not keyword (`raiker/api/redaction.py`, `raiker/context/redaction.py`); egress answers per-capability allowlists (`RAIKER_WEB_EGRESS_ALLOWLIST`, `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`); local-only profiles refuse hosted routing (`raiker/models/endpoint_policy.py`). Remaining gap: no classifier ranks *content* sensitivity before model egress — the boundary is the allowlist, not the payload. |
+| LLM02 | Sensitive information disclosure | yes | ✅ | One redaction pass covers the API surface and the event log by *shape*, not keyword (`raiker/api/redaction.py`, `raiker/context/redaction.py`); egress answers per-capability rules — an owner blocklist plus a non-optional public-address guard for `web_fetch` (`RAIKER_WEB_EGRESS_BLACKLIST`, `raiker/runtime/web_policy.py`), and an allowlist for connectors and pushes (`RAIKER_CONNECTOR_EGRESS_ALLOWLIST`, empty ⇒ fail closed); local-only profiles refuse hosted routing (`raiker/models/endpoint_policy.py`). Remaining gap: no classifier ranks *content* sensitivity before model egress — the boundary is the allowlist, not the payload. |
 | LLM03 | Supply chain | yes | 🟡 | Manifest validation, permission diff and checksums are real, and both HMAC and Ed25519 signature verification are implemented (`raiker/plugins/verify.py`). The default install has no owner key, so a signature is verified as **present-only** rather than authentic — which is now a first-class, owner-visible property of every plugin rather than a silent default (FIXED-166). A trusted-publisher allowlist is still absent. |
 | LLM04 | Data & model poisoning | yes | 🔒 | The governed memory lifecycle is real — proposal, provenance, confidence, contradiction review and forgetting (`raiker/memory/`) — and credential-shaped text is refused before the owner is asked (`raiker/memory/policy.py`). The `memory_write` / `memory_forget` gates ship **off**, so this is disabled-by-default rather than unimplemented. |
 | LLM05 | Improper output handling | yes | ✅ | Model tool calls are schema-validated at the boundary (`raiker/models/tool_call_validation.py`); unknown tools and missing arguments are rejected (`model_tool_call_rejected`) before execution. |

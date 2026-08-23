@@ -57,19 +57,25 @@ that proves it, what is missing, and the concrete work.
 Evidence: [`screenshots/not-working/`](screenshots/not-working) (defects),
 [`screenshots/working/`](screenshots/working) (verified behaviour).
 
+**This list holds only what is still open.** A row marked *Fixed* is kept in the
+index so a reader arriving with that number is not left wondering; its full
+record — observation, root cause, and the interface outcome that had to be true
+first — is in [`FIXED_ITEMS.md`](FIXED_ITEMS.md) under the FIXED number the row
+names.
+
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
-| [BUG-216](#bug-216--checkpoint-capture-fails-silently-on-a-deep-windows-path-and-only-logs-it) | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
-| [BUG-217](#bug-217--test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved-overflows-the-stack-on-windows) | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
+| BUG-216 | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
+| BUG-217 | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
 | [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
-| [BUG-219](#bug-219--there-is-no-deny-unless-preapproved-posture) | Low | Approval modes | **Fixed 2026-08-22 — FIXED-262** |
+| BUG-219 | Low | Approval modes | **Fixed 2026-08-22 — FIXED-262** |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
 | BUG-221 | Medium → Low | Plugins / extensibility | **Closed 2026-08-22 — FIXED-256, FIXED-259, FIXED-260.** Hooks, skills and MCP-server offers all contribute; panels continue as [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) |
-| [BUG-222](#bug-222--there-is-no-way-to-turn-every-hook-off) | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
-| [BUG-223](#bug-223--twenty-two-lifecycle-events-are-specified-and-never-emitted) | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
-| [BUG-224](#bug-224--the-node-25-web-test-run-cannot-see-jsdoms-localstorage) | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
+| BUG-222 | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
+| BUG-223 | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
+| BUG-224 | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
 | [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
@@ -259,128 +265,6 @@ navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 
 ---
 
-## BUG-216 — Checkpoint capture fails silently on a deep Windows path, and only logs it
-
-**Severity: High. Area: checkpoints / Windows paths. Status: Fixed 2026-08-21
-as FIXED-240.**
-
-**Resolution.** All Raiker-owned internal writers now use one idempotent
-extended-length path boundary on Windows, including UNC paths. A regression
-creates a workspace beyond 260 characters and proves bootstrap, event,
-checkpoint and pre-image I/O. Capture failures persist structured health and
-appear in Diagnostics and approval receipts while the approved mutation remains
-best-effort. See FIXED-240.
-
-**Observed.** Running the documented `python -m pytest` on Windows fails:
-
-```
-FAILED tests/test_approval_execution_wiring.py::TestApprovedWriteExecutes::
-       test_the_previous_contents_are_checkpointed_before_the_overwrite
-E   AssertionError: assert 'checkpoint_captured' in {…, 'checkpoint_capture_failed', …}
-```
-
-The approved write *executes* — `notes.md` really does contain `replaced` — but the
-pre-image that makes it reversible was never stored. The event log says
-`checkpoint_capture_failed` and nothing else in the product says anything at all.
-
-**Confirmed pre-existing** against a pristine worktree at `33cfe9b`, so it is not a
-consequence of this round's work.
-
-**Root cause: `MAX_PATH`.** The failure is a function of how deep the workspace
-sits, not of the code path. Reproduced deterministically by pointing the same flow
-at a 175-character workspace root:
-
-```
-FileNotFoundError: [Errno 2] No such file or directory:
-'…\\test_the_previous_contents_are_checkpointed_before_the_overwrite0\\ws\\.raiker
-\\events\\.locks\\c2e3adc6715dca5d203f9296c39e7d96eb298aa62f49af4c2b2a93580e197253.lock'
-```
-
-`.raiker\events\.locks\<64 hex>.lock` is ~86 characters on its own. Add a workspace
-root over ~170 characters and the absolute path crosses Windows' 260-character
-limit, so the open fails with `FileNotFoundError` rather than anything that names
-the real problem. `pytest`'s `tmp_path` is derived from the *test function name*,
-which is why a long test name is what exposes it, and why CI — Linux, with no such
-limit — is green on the same commit.
-
-**Why it is more than a test problem.** `RuntimeAuthority._commit_pre_image` is
-deliberately best-effort: a capture failure is recorded as a metadata event and
-never propagates into the mutation result, so the write proceeds. That is the right
-call for a transient failure and the wrong one for a systematic one — on an install
-whose workspace is nested deeply enough, **every** governed write is irreversible
-and the only trace is an event type nothing surfaces. Checkpointing before a write
-is a promise the product makes; a promise that fails closed silently is worse than
-one that is absent.
-
-**Required fix.** Two parts, and neither is a one-line change, which is why this is
-recorded rather than half-done:
-
-1. **Reach the path.** Apply the Windows extended-length prefix (`\\?\`) at the
-   point Raiker opens files it constructs itself under `.raiker` — the event-log
-   locks, the checkpoint blob store, the operation store. Applying it to some of
-   those and not others would leave the class open while appearing to close it, so
-   it needs one audited helper and every internal writer moved onto it.
-2. **Stop it being silent.** A capture failure that is *systematic* rather than
-   transient must reach the owner: a diagnostics readiness row, and a named reason
-   on the approval receipt for the write that could not be checkpointed. The
-   best-effort behaviour stays — a write the owner approved should not be lost to a
-   bookkeeping failure — but "this change is not reversible, and here is why" is a
-   fact the owner is entitled to before they approve the next one.
-
-**Required user-interface outcome.** Runtime/diagnostics shows a readiness row that
-fails when pre-image capture is failing, naming the path limit as the reason; and an
-approval whose pre-image could not be captured says so on the receipt rather than
-presenting as an ordinary reversible write.
-
----
-
-## BUG-217 — `test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved` overflows the stack on Windows
-
-**Severity: Low. Area: test isolation / SQLCipher posture. Status: Fixed
-2026-08-21 — FIXED-244.**
-
-**Observed.** A full `python -m pytest` run on Windows aborts the whole process at
-~87%:
-
-```
-Windows fatal exception: stack overflow
-
-Current thread (most recent call first):
-  File "raiker\storage\sqlite.py", line 832 in bootstrap
-  File "raiker\storage\sqlite.py", line 733 in __init__
-  File "tests\test_sqlcipher_memory_security.py", line 230 in
-       test_the_posture_reports_the_pragma_in_force_not_only_the_one_resolved
-```
-
-Deselecting that one test makes the entire suite pass. **Confirmed pre-existing**
-against a pristine worktree at `33cfe9b`.
-
-**Relationship to FIXED-218.** That entry closed the *ordering* half of this file's
-SQLCipher story — `cipher_memory_security` is a process-global one-way latch. This
-is a different failure with the same neighbours: opening a store that reads the
-pragma back, in a process where it has already been exercised, overflows the stack
-in the bundled Windows SQLCipher build rather than returning a value.
-
-**Why CI cannot see it.** The `python` job sets
-`RAIKER_SQLCIPHER_MEMORY_SECURITY=off` for the whole process, and its second step
-re-runs only `tests/test_sqlcipher_memory_security.py` and `test_memory_sqlcipher.py`
-in a *fresh* process where nothing has latched the pragma on. The overflow needs the
-combination this test only meets in a full local run: Windows, the bundled build,
-and a process that has already opened many stores.
-
-**Resolution.** The real child-process probe already classified this Windows build
-as `host_crash`; the test then replaced that answer with `supported` and performed
-the native operation that the probe had refused. The regression now exercises the
-process-global posture latch directly, without overriding the safety probe. The
-ordinary suite and the pristine-process 17-test SQLCipher gate both pass. See
-FIXED-244.
-
-**Required user-interface outcome.** None — this is a test-isolation defect on one
-platform. The product's memory-security posture is reported from a real probe and
-is unaffected.
-
----
-
 ## BUG-218 — Auto mode has no alignment check of its own
 
 **Severity: Medium. Area: decision modes / Build / Chat. Status: Open — raised
@@ -426,37 +310,6 @@ the Build composer already does through `standingPostureNote`.
 
 ---
 
-## BUG-219 — There is no deny-unless-preapproved posture
-
-**Severity: Low. Area: approval modes. Status: Fixed 2026-08-22 — see
-FIXED-262.**
-
-**Observed.** The approval chip offers Manual, Auto and Skip. Claude Code also
-offers `dontAsk`, which auto-**denies** anything not already allowed by a rule
-instead of prompting for it. That is the posture for unattended work where an
-interruption is worse than a refusal — a scheduled routine, a background agent —
-and Raiker has no way to express it.
-
-**Root cause.** `APPROVAL_MODES` in `raiker/contracts/models.py` and
-`apps/web/src/lib/approvalMode.ts` list three modes. The enforcement it would
-need already exists: `deny` is a decision mode the runtime honours today.
-
-**Fixed.** `dont_ask` is the fourth mode. It resolves any otherwise-eligible
-governed action to `deny` rather than to a prompt, before the decision is
-recorded — so the audit log never describes a queue entry that did not exist. The
-refusal carries its own reason, `denied_no_one_to_ask`, distinct from every other
-denial: *"the owner refused this"* and *"nobody was there to ask"* call for
-different follow-ups, and only the second means re-running attended would have
-worked. It can only ever refuse more; an action policy already allowed is
-untouched, and one policy already denied keeps policy's own reason.
-
-A per-turn `ask` posture normally forces `manual` so the unattended modes cannot
-swallow it. `dont_ask` is the deliberate exception: there is nobody to show it
-to, so forcing `manual` would park the turn on a queue entry that is never read —
-the exact outcome the mode exists to avoid.
-
----
-
 ## BUG-220 — Nothing owns a set of delegated child tasks
 
 **Severity: Medium. Area: tasks / delegation. Status: Open — raised 2026-08-21
@@ -486,82 +339,6 @@ task at a time.
 - A forwarded approval must not expire silently. Cowork auto-denies an unanswered
   prompt after ten minutes; if Raiker adopts that, the expiry has to be a
   **recorded decision with its reason**, not a dropped request.
-
----
-
-## BUG-222 — There is no way to turn every hook off
-
-**Severity: Low. Area: hooks. Status: Fixed 2026-08-22 — see FIXED-254.**
-
-**Observed.** Hooks are loaded from `config/managed-hooks.json`,
-`config/hooks.json` and `.raiker/hooks.json`. The only way to stop them is to
-edit or delete the files. Claude Code has `disableAllHooks` in settings and
-`--settings '{"disableAllHooks": true}'` for a single run.
-
-This matters more here than there. `config/hooks.json` travels with a
-repository, so cloning a project can bring rules that run commands on the owner's
-machine — bounded and workspace-resolved, but still theirs to refuse. The owner
-should be able to say no without editing someone else's file.
-
-**Root cause.** `HookDispatcher.is_active()` reads only whether the registry has
-rules. There is no owner-scoped setting above it.
-
-**Proposed fix.** An owner setting that makes `is_active()` return `False`, shown
-on Extensions → Hooks with the rules still listed and marked as disabled — off is
-a state to display, not a reason to hide what would otherwise run. It belongs in
-owner settings rather than in any of the three config files, because a file a
-project ships must not be able to re-enable itself.
-
----
-
-## BUG-223 — Twenty-two lifecycle events are specified and never emitted
-
-**Severity: Medium. Area: hooks / lifecycle. Status: Fixed 2026-08-22 — see
-FIXED-255.**
-
-**Observed.** `docs/HOOKS_SPEC.md` listed roughly the same event surface Claude
-Code documents. Nine were dispatched. `SessionEnd` was accepted by the config
-schema and had no call site at all, so a rule written for it parsed cleanly and
-never ran; the rest were not in `HOOK_EVENTS`, so a rule naming one was refused
-at parse time.
-
-**Fixed.** Seven events gained call sites — `Stop`, `StopFailure`,
-`SubagentStart`, `SubagentStop`, `TaskCreated`, `TaskCompleted` and
-`SessionEnd` — each at a boundary the runtime already knew about. `HOOK_EVENTS`
-and `DISPATCHED_HOOK_EVENTS` are now equal, and the machinery that reports a dead
-event is kept and still tested, because what makes a *future* gap visible is
-worth more than the fact that there is not one today.
-
-`docs/HOOKS_SPEC.md` now separates the target catalogue from what this build
-accepts and emits, so the two can never be read as the same list again.
-
-**BUG-224** — the Node 25 web-test environment — was raised while verifying this.
-
----
-
-## BUG-224 — The Node 25 web test run cannot see jsdom's `localStorage`
-
-**Severity: Low. Area: web tests / environment. Status: Fixed 2026-08-22 — see
-FIXED-258.**
-
-**Observed.** `npx vitest run` under Node 25.6.1 failed `src/lib/theme.test.ts`
-(5 tests) and `src/lib/views/LoginView.test.ts` (15) with
-`TypeError: window.localStorage.clear is not a function`, alongside a Node
-warning: `` `--localstorage-file` was provided without a valid path ``. The
-LoginView failures were the same cause one step downstream — cleanup never ran,
-so the next test found two of every button and failed on
-`Found multiple elements`.
-
-**Root cause.** Node 25 ships a built-in `localStorage` global. It shadows the
-one jsdom installs, and the built-in is inert unless the process was started with
-a valid `--localstorage-file`. Nothing in the repository was wrong; the
-environment changed underneath it.
-
-**Fixed.** `src/test-setup.ts` restores the storage jsdom promises when what is
-present is not a working `Storage`. Rather than pinning harder — which only
-defers the same break to the next Node release — the shim is a real map, because
-the code under test persists a theme choice and reads it back; a no-op stub would
-pass the type check and fail the behaviour.
 
 ---
 
@@ -681,16 +458,21 @@ the right failure.
 and `agent`. The title is left as raised so the anchor other documents link to
 keeps working; the count here is the accurate one.
 
-**Worth stating before the effort is spent:** `command` is the *only* handler
-type Claude Code's own hooks have. This is therefore a gap against Raiker's own
-reference document, not against Claude Code — which is why it stayed Low while
-BUG-221 and BUG-225 were taken first, and why adding a model call inside the hook
-path to satisfy it deserves more scepticism than the count alone suggests.
+**Corrected 2026-08-22.** This entry used to say `command` is the only handler
+type Claude Code's own hooks have, and that the gap was therefore against
+Raiker's own reference document rather than against Claude Code. That was wrong:
+[the Claude Code hooks reference](https://code.claude.com/docs/en/hooks)
+documents and specifies all five — `command`, `http`, `mcp_tool`, `prompt` and
+`agent` — with per-type fields. **This is a real gap against Claude Code.** It
+stays Low because each missing type needs a resource the hook path deliberately
+does not have (below), not because the reference lacks them.
 
-This is the remainder of the hooks gap after BUG-223. The *events* are at parity;
-the *handlers* are not.
+This is the remainder of the hooks gap after BUG-223 — and the *events* are not
+at parity either: Raiker emits sixteen of the thirty-one Claude Code documents.
+See
+[`../REFERENCE_PLATFORM_COMPATIBILITY.md`](../REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
-**Root cause.** Each of the three needs a resource the hook path deliberately
+**Root cause.** Each of the four needs a resource the hook path deliberately
 does not have:
 
 * `http` needs egress. A hook has no implicit network access by design, and

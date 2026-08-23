@@ -1,45 +1,50 @@
 # Raiker live manual test plan
 
-> A repeatable, click-by-click plan a person can follow against a **running**
-> Raiker instance, plus the recorded result of the round executed on
-> **2026-08-08** against hosted Anthropic. That round connected the key through
-> the web app's own Connect dialog, pinned and exercised **every one of the ten
-> models Anthropic's catalogue returned**, and drove every surface in a real
-> Chromium session against `raiker-web` serving the built SPA.
->
-> Screenshots for this round are prefixed `r0808-` in
-> [`screenshots/working/`](screenshots/working), and the defects it found are
-> `BUG-r0808-*` in [`screenshots/not-working/`](screenshots/not-working) and
-> **BUG-68 … BUG-73** in [`TO_BE_FIXED.md`](TO_BE_FIXED.md), all four of which
-> are closed there as **FIXED-154** … **FIXED-157** and re-verified live on
-> **2026-08-10** (screenshots prefixed `r0810-`).
->
-> Earlier rounds (2026-07-26 hosted Anthropic, 2026-07-28 and 2026-08-01 local
-> Ollama, 2026-08-04 source citations) are preserved where their evidence is
-> still the best record of a behaviour; their screenshots keep their original
-> numeric prefixes.
->
-> **Never commit an API key.** Keys go into the Connect dialog or the server
-> process environment, for the duration of the test only.
+**This document is the procedure. It never says what happened.** Every step
+states what to do and what **must** be true; a step that reads "on 2026-08-08
+this returned Ready" has stopped being a test and become a memory. The record of
+what actually happened on a given day is
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
+
+Run it against a **running** Raiker in a real browser. Nothing here is proven by
+reading code.
+
+**Never commit an API key.** Keys go into the Connect dialog or the server
+process environment, for the duration of the round only.
 
 ---
 
-## 0. How to read this plan
+## 0. The two tiers
 
-Each section states what to click, what should happen, and what actually
-happened on 2026-08-08. A ✅ is a behaviour observed live in the browser. A ❌
-names the defect it was filed as. Where an earlier round is the better evidence
-for something this round did not re-run, the section says so.
+Pick one before you start, and record which one you ran.
 
-The plan is ordered so each section's preconditions are satisfied by the ones
-before it. Work §1 → §17 in order.
+| Tier | When | Time | Obligation |
+|---|---|---|---|
+| **Smoke** | After any change; before asking anyone to look at a branch | ~30 min | Every step marked **[S]**. One provider is enough |
+| **Full sweep** | Before a release, and at least once a month | Several hours | **Every step in this document**, plus every manually re-verifiable item in [§20](#20-regression--what-a-run-re-proves). At least two providers, one local and one hosted |
 
-§19 onwards are **recorded rounds** — each one a dated pass with its own steps and
-result, kept because the evidence is still the best record of the behaviour it
-proves. §22 is the map from every closed entry in
-[`FIXED_ITEMS.md`](FIXED_ITEMS.md) to the section that re-verifies it, plus the
-steps that were added because nothing covered them; read it before concluding
-that something is untested.
+A round that ran Smoke says so. **A Smoke round is not evidence that the product
+works** — it is evidence that it is not obviously broken. Only a Full sweep
+closes the coverage question, and the last one is named at the top of
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
+
+### How to read a step
+
+- **[S]** — in the Smoke tier as well as the Full sweep.
+- **MUST** — a failure here is a defect. File it in
+  [`TO_BE_FIXED.md`](TO_BE_FIXED.md) with a screenshot under
+  [`screenshots/not-working/`](screenshots/not-working).
+- **Automated** — an e2e spec already asserts this. Named so you know it is
+  covered, and so you do not spend a manual round re-proving it. Do not skip it
+  in a Full sweep if the step also has a manual half.
+- A step never assumes the one before it left state behind unless it says so.
+
+### The rule that keeps this document honest
+
+**No step may record an observation.** If you learn something while running it —
+a control moved, a label changed, a check now takes longer — the fix is to change
+what the step *expects*, not to append what you saw. Observations go in
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
 
 ---
 
@@ -50,831 +55,768 @@ python -m venv .venv && .venv/bin/python -m pip install -e ".[dev]"
 npm --prefix apps/web ci
 npm --prefix apps/web run build
 
-# The model egress allowlist is process configuration by design — it is the last
-# boundary before bytes leave the machine and is deliberately NOT editable from a
-# browser session.
+# Model egress is process configuration by design — it is the last boundary
+# before bytes leave the machine and is deliberately NOT editable from a browser
+# session. Web egress is different: it needs no variable, and what you control
+# there is a blocklist inside the app.
 export RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com,api.openai.com,generativelanguage.googleapis.com,openrouter.ai'
 
 rm -rf /tmp/raiker-manual-test && mkdir -p /tmp/raiker-manual-test
 .venv/bin/raiker-web --workspace /tmp/raiker-manual-test --port 8765 --no-browser
 ```
 
-Open `http://127.0.0.1:8765`.
+**A Full sweep starts on an empty workspace.** A round run against an instance
+that already has history proves the product works for someone who has used it,
+which is not the question a sweep asks. Smoke may reuse a workspace.
 
-**Result 2026-08-08:** server up, `GET /api/health` → `{"status": "ok"}`.
+Open `http://127.0.0.1:8765` in Chromium. Keep the developer console open for the
+whole round: **MUST** end with zero uncaught console errors, and any that appear
+belong in the round record with the step that produced them.
 
----
+Prepare these before you start, so no step stalls waiting for them:
 
-## 2. First run and the lock screen
-
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 2.1 | Load `/` on a fresh workspace | Lock screen, hero "Hello! I am Raiker.", **Create a User Account** form with Username / Password / Confirm password | ✅ `r0808-01-first-run-lock-screen.png` |
-| 2.2 | Check the pre-auth status strip | "SYSTEM STATUS · Runtime operational" (from `/api/health` only) | ✅ |
-| 2.3 | Browser console | 0 errors | ✅ |
-| 2.4 | Register the owner account | Dashboard mounts at Workbench | ✅ `r0808-02-workbench-home.png` |
-| 2.5 | Reload the page | Lock screen returns — the bearer token is in memory only, never `localStorage` | ✅ by design, `r0808-02b-reload-lock-screen.png` |
-| 2.6 | Sign in again with the same credentials | Heading reads **Unlock Raiker**, not **Welcome to Raiker**; the dashboard mounts | ✅ `r0808-02c-signin-existing-owner.png` |
-
-> 2.6 exists because the lock screen keeps a **Create a User Account** link
-> visible after first run. Asserting on that string alone will make a test think
-> the owner was never persisted. Assert on the heading, or on the presence of a
-> **Confirm password** field.
-
-### 2.7 Historical failure: the first message a new user sent — BUG-69
-
-On a machine with no Ollama installed — the common case — a brand-new owner who
-registers and immediately types a message receives, as the entire reply:
-
-```
-model_unavailable: provider_error_unclassified
-```
-
-The composer meanwhile shows **Gemma 4:31B Cloud** and Models says **1 of 10
-providers set up**, because FIXED-116 made the Ollama profile the native default
-without checking that Ollama is reachable. Filed as **BUG-69**.
-`not-working/BUG-r0808-05-fresh-workspace-defaults-to-absent-ollama.png`,
-`BUG-r0808-05-models-claims-one-provider-set-up.png`,
-`BUG-r0808-05-first-turn-raw-reason-code.png`.
-
-**Closed 2026-08-09.** See §19 for the replacement first-run and readiness flow.
-
----
-
-## 3. Navigate every route
-
-There are **14 sidebar routes**, grouped Home / Work / Knowledge / Control /
-Observe / Utilities:
-
-```
-home  new-chat  build  search-chat  tasks  projects
-memory  brain  approvals  capabilities  models  extensions  observe  settings
-```
-
-and **22 hub tabs** across four hubs:
-
-| Hub | Tabs |
+| Fixture | Why |
 |---|---|
-| `models` | providers, routing, pricing, posture |
-| `extensions` | connectors, mcp, skills, plugins, channels |
-| `observe` | overview, sessions, activity, checkpoints, diagnostics, work, notifications |
-| `settings` | general, notification, personalisation, security, account, runtime |
-
-> Sessions is **no longer a sidebar route** — it is `observe?tab=sessions`.
-> `#/sessions`, `#/mcp`, `#/connections`, `#/activity`, `#/checkpoints`,
-> `#/diagnostics`, `#/work` and `#/notifications` remain as aliases that resolve
-> to their hub and open the right tab.
-
-**Result 2026-08-08:** all 14 routes and all 22 hub tabs render, **0 console
-errors on every one**, and **no horizontal overflow on any**. Screenshots
-`r0808-03-route-*.png` and `r0808-03-tab-*.png`.
-
-Deliberately-empty surfaces state *why* they are empty rather than pretending:
-
-* **Plugins** — "A plugin cannot render its own page here until Raiker has an
-  accepted route, permission, and accessibility contract for it."
-* **Channels** — "Inbound and outbound delivery needs an accepted contract and
-  threat model before Raiker offers controls for it. … This tab exists so the
-  gap is visible rather than silently missing."
+| One hosted provider key | §3, and every model-backed step |
+| A local runtime (Ollama or LM Studio) with one small model pulled | §3.4, and the local half of §4 |
+| A small git repository inside the workspace | §6 Build |
+| A `.png`, a `.pdf`, a `.docx` and a `.csv` under 5 MB | §5.6 attachments |
+| A folder on this machine with three or four text files | §9 Knowledge Map, §8 Projects |
 
 ---
 
-## 4. Connect a hosted model from the web app
+## 2. Coverage ledger
 
-No gate, allowlist entry, or vault key has to be set up first.
+**This table is the definition of "everything".** It is derived from
+`apps/web/src/lib/nav.ts` — `NAV_GROUPS` for routes, `HUB_TABS` for tabs — so a
+route or tab added to the product without a row here is a gap you can see rather
+than one you have to remember.
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 4.1 | Models → Anthropic card → **Connect** | Dialog: "Create a key at console.anthropic.com. Anthropic uses API keys only — no email login.", one `type="password"` field, an **Advanced: custom endpoint** disclosure, and "Your key is encrypted in this instance's vault and never leaves this device." | ✅ `r0808-05-anthropic-connect-dialog.png` |
-| 4.2 | Paste the key → **Connect** | `PUT /api/models/anthropic-hosted/connection` **200**; the card flips to **Connected** and grows **Reconnect / Test / Choose model… / Details** | ✅ `r0808-06-anthropic-connected.png` |
-| 4.3 | **Choose model…** | An inline picker populated from `api.anthropic.com` — 10 models on this round: Opus 5, Sonnet 5, Claude Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6, Opus 4.6, Opus 4.5, Haiku 4.5, Sonnet 4.5 | ✅ `r0808-07-anthropic-model-catalogue.png` |
-| 4.4 | Pick one → **Use model** | `PUT /api/model-selection` 200; the card names the pinned model | ✅ `r0808-08-anthropic-model-selected.png` |
+Check the ledger before you start and after you finish. **A row with no section
+is untested**, whatever the rest of this document says.
 
-### 4.5 Change every available model
-
-Pin each of the ten catalogue models in turn and send one live turn against it.
-
-**Result 2026-08-08: 10 / 10 answered, exactly as instructed.**
-
-| Model id | Card reads | Live reply |
+| Route | Tabs | Covered by |
 |---|---|---|
-| `claude-opus-5` | Opus 5 | `MODEL-OK-opus-5` |
-| `claude-sonnet-5` | Sonnet 5 | `MODEL-OK-sonnet-5` |
-| `claude-fable-5` | Claude Fable 5 | `MODEL-OK-fable-5` |
-| `claude-opus-4-8` | Opus 4.8 | `MODEL-OK-opus-4-8` |
-| `claude-opus-4-7` | Opus 4.7 | `MODEL-OK-opus-4-7` |
-| `claude-sonnet-4-6` | Sonnet 4.6 | `MODEL-OK-sonnet-4-6` |
-| `claude-opus-4-6` | Opus 4.6 | `MODEL-OK-opus-4-6` |
-| `claude-opus-4-5-20251101` | Opus 4.5 | `MODEL-OK-opus-4-5-2025` |
-| `claude-haiku-4-5-20251001` | Haiku 4.5 | `MODEL-OK-haiku-4-5-202` |
-| `claude-sonnet-4-5-20250929` | Sonnet 4.5 | `MODEL-OK-sonnet-4-5-20` |
+| `home` — Workbench | — | [§4.1](#41-workbench-s) |
+| `new-chat` — Chat | — | [§5](#5-chat) |
+| `build` — Build | — | [§6](#6-build) |
+| `search-chat` — Search Chat | — | [§5.8](#58-search-across-every-conversation-s) |
+| `tasks` — Tasks | — | [§7](#7-tasks--every-work-type) |
+| `projects` — Projects | — | [§8](#8-projects-folders-and-files) |
+| `memory` — Memory | — | [§10](#10-memory--every-kind) |
+| `brain` — Knowledge Map | — | [§9](#9-knowledge-map) |
+| `approvals` — Approvals | — | [§11](#11-approvals) |
+| `capabilities` — Permissions | — | [§12](#12-permissions) |
+| `models` — Models | `local`, `hosted`, `huggingface`, `activity`, `routing`, `pricing`, `posture` | [§3](#3-models--all-seven-tabs) |
+| `extensions` — Extensions | `connectors`, `mcp`, `skills`, `hooks`, `plugins`, `channels` | [§13](#13-extensions--all-six-tabs) |
+| `observe` — Observability | `overview`, `sessions`, `activity`, `checkpoints`, `diagnostics`, `work`, `notifications` | [§14](#14-observability--all-seven-tabs) |
+| `guide` — Guide | — | [§15](#15-guide) |
+| `settings` — Settings | `general`, `notification`, `personalisation`, `security`, `privacy`, `account`, `web-access`, `git-credential`, `runtime` | [§16](#16-settings--all-nine-sections) |
 
-`r0808-18-models-after-sweep.png`.
+**15 routes, 29 tabs.** Global chrome that belongs to no route — the sidebar, the
+top bar, the Host control, notifications, the shortcut sheet — is
+[§17](#17-global-chrome).
 
-### 4.6 Pick a provider that is not running
+### Deep links and aliases
 
-Select the Ollama profile for one turn on a machine with no Ollama.
+`ROUTE_ALIASES` in `nav.ts` keeps eight pre-hub URLs working:
+`#/connections`, `#/mcp`, `#/activity`, `#/checkpoints`, `#/diagnostics`,
+`#/work`, `#/notifications`, `#/sessions`.
 
-**Historical 2026-08-08 result:** the turn failed with the bare
-`model_unavailable: provider_error_unclassified`. The current build disables
-the action and names the missing runtime/model before dispatch; see §19.
-`r0808-19-unconfigured-local-provider-turn.png`.
+**[S]** Paste each into the address bar. Each **MUST** open its hub with the
+matching tab already selected, never the hub's first tab and never the Workbench.
+*Automated: `apps/web/src/lib/nav.test.ts`.*
 
-### 4.7 The other Models tabs
+---
+## 3. Models — all seven tabs
 
-**Routing**, **Pricing** and **Posture** render with 0 console errors
-(`r0808-03-tab-models-*.png`). Ten provider profiles are listed across LOCAL
-(llama.cpp, Ollama, LM Studio), HOSTED (Anthropic, OpenAI, Gemini) and ADVANCED
-(Ollama Cloud, OpenAI-compatible, OpenRouter, Hugging Face).
+Nothing else in this plan works until a model is ready, so this comes first.
+
+### 3.1 First run [S]
+
+1. **[S]** A fresh workspace **MUST** open owner bootstrap. Create the owner.
+2. **[S]** Setup **MUST** open on its own. Walk all five stages — account,
+   model, privacy posture, backup, finish — and confirm the progress control
+   (`aria-label="Setup progress"`) names the stage you are on.
+3. **[S]** Choose **Local-first** on one run and **Balanced** on another; the
+   posture you pick **MUST** be the one Settings → Privacy shows afterwards.
+4. **[S]** Skip setup. Every model-backed primary action — Workbench, Chat,
+   Build, Tasks — **MUST** be disabled and link to Models. Typed draft text
+   **MUST** survive the trip to Models and back.
+5. Sign out and back in. The lock screen **MUST** name the instance, and a wrong
+   password **MUST** fail without saying which half was wrong.
+
+### 3.2 `hosted` tab [S]
+
+1. **[S]** **Connect** on a provider, paste a key, save. The card **MUST** read
+   Connected and the key **MUST NOT** be rendered back into the DOM — check the
+   element inspector, not just the screen.
+2. **[S]** The catalogue **MUST** be the provider's live list, not a bundled one.
+3. **[S]** **Test** **MUST** run an exact-model readiness check, not a catalogue
+   listing. A ready model reports Ready; a model the account cannot execute
+   reports *why* — credit, quota, authentication — and links the remedy.
+4. Open **Available models** and select every model in the list in turn. Each
+   **MUST** either become ready or state its own reason. None may fail silently.
+5. **Disconnect**. The vault credential **MUST** be removed and the card **MUST**
+   return to its unconfigured state.
+6. Connect a provider that is not running (a wrong port on a local endpoint).
+   The failure **MUST** name the endpoint and **MUST NOT** surface a raw
+   provider reason code as an assistant reply.
+
+### 3.3 `local` tab
+
+1. Add an absolute model folder under **Local library**
+   (`aria-label="Absolute model folder"`) and rescan. A discovered GGUF **MUST**
+   show its name, architecture, quantization and a Deploy action.
+2. Deploy it. **Activity** (§3.6) **MUST** show the operation reaching a terminal
+   state.
+3. Pull an Ollama model from the provider matrix
+   (`aria-label="Ollama model to pull"`). The pull **MUST** be cancellable and
+   **MUST** resume rather than restart after a cancel.
+4. Serve a GGUF through managed llama.cpp
+   (`aria-label="GGUF model to serve"`). Confirm the served name and port.
+
+### 3.4 `huggingface` tab
+
+1. Search (`aria-label="Search Hugging Face models"`). Results **MUST** open on
+   the most-downloaded GGUF repositories before you type anything.
+2. Open one. Before any download is confirmed, the dialog **MUST** show the
+   immutable revision, the licence, gated status, size and format.
+3. Download a small permissive GGUF into an approved root, then deploy it.
+4. Cancel a download mid-flight. The partial file **MUST** be removed only after
+   a separate confirmation, and only inside an approved root.
+
+### 3.5 `routing` tab
+
+1. Add a fallback backend (`aria-label="Add a fallback backend"`). Reorder with
+   **Move up** / **Move down**; **Remove** one.
+2. The chain **MUST** be judged as one — readiness is a property of the chain,
+   not of its first entry.
+3. Set the advisor model (`aria-label="Advisor model profile"`) and run **Check
+   advisor**. It **MUST** carry its own readiness under its own exact key.
+4. **MUST**: with only a local provider configured, no hosted provider is ever
+   used as a silent fallback.
+
+### 3.6 `activity`, `pricing`, `posture` tabs
+
+1. **Activity** **MUST** list every model operation with a terminal state.
+2. **Pricing** **MUST** name the source of each figure, and an unpriced model
+   **MUST** report its cost as unknown rather than as zero. Run **Provider
+   synchronisation** where the provider supports it.
+3. **Posture** **MUST** state the off-machine position for each configured
+   provider.
+4. Set a **Global model** and confirm it is what a new Chat opens with.
+
+### 3.7 Per-surface defaults
+
+Set a different model on Chat, Build, Tasks and Schedule. Each surface **MUST**
+remember its own; changing one **MUST NOT** change another.
+
+---
+
+## 4. Navigation and the Workbench
+
+### 4.1 Workbench [S]
+
+1. **[S]** `#/` **MUST** open the Workbench, and it **MUST** be a board over work
+   rather than a second composer.
+2. **[S]** **Start work** opens the surface it names. **Refresh Workbench**
+   re-reads. **Needs your attention** lists only items that really need one.
+3. With a parked approval, a running task and a scheduled agent in flight, each
+   **MUST** appear in its own region, and each **MUST** link to the surface that
+   resolves it.
+
+### 4.2 Every route [S]
+
+**[S]** Visit all fifteen routes in the [ledger](#2-coverage-ledger) from the
+sidebar. Each **MUST** render its own content — not an empty state, not a
+spinner that never settles, not another route's panel. Then visit all
+twenty-nine tabs.
+
+### 4.3 Responsive [S]
+
+Resize to **375 px**, **768 px**, **1024 px** and **1440 px**. At each width:
+
+- **[S]** Below 640 px: a bottom bar plus drawer. To 1023 px: a menu trigger plus
+  drawer. At 1024 px and above: the full sidebar.
+- **MUST**: the selected tab is on the screen it was selected on — no tab strip
+  scrolls its own selection out of view.
+- **MUST**: no composer floats mid-page; both stay anchored to the bottom.
+- **MUST**: the page body never scrolls horizontally.
 
 ---
 
 ## 5. Chat
 
-### 5.1 What the composer actually offers
+### 5.1 Every composer control [S]
 
-| Control | `aria-label` | Behaviour |
+Click each, and confirm each does what its label says:
+
+| Control | `aria-label` | Must |
 |---|---|---|
-| Attach | `Add attachment` | **Image…** (`png/jpeg/webp/gif`) and **Document…** (`txt/md/csv/pdf/docx/xlsx`) |
-| Model | `Model for this turn: <name>` | Lists **configured profiles**, not individual model ids. No free-text model id |
-| Approval mode | `Approval mode: Manually approve` | The per-turn approval posture |
-| Context window | `Context window` | Opens the usage/cost popover; never compacts |
-| Background work | `Background work` | Hands the turn to the background queue |
-| Send | `Send` | Enter sends · Shift+Enter adds a line |
-| New chat | — | Starts a fresh conversation |
-| Conversation actions | `Conversation actions` (`•••`) | **Export conversation…** and **Print / Save as PDF** |
+| Attach | `Add attachment` | Opens the panel with **Upload image**, **Upload document** and **Attachment path** |
+| Model | `Models` | Lists only *configured* profiles. No free-text model id |
+| Effort | `Effort` | Appears only where the model publishes thinking levels, and offers only those |
+| Context | `Context window` | Opens a read-only popover. **MUST NOT** compact anything |
+| Approval mode | `Approval mode` | Four options — Manually approve, Automatically approve, Skip all approvals, Decline don't ask — each with a detail line |
+| Project | `Project for this chat` | Lists projects; assigning supplies bounded context and **MUST NOT** grant filesystem access |
+| Background work | `Background work` | Hands the turn to the queue instead of waiting |
+| Dictate | `Dictate` | §5.11 |
+| Conversation actions | `Conversation actions` | **Export conversation…** and **Print / Save as PDF** |
 
-> Corrections to earlier rounds: there is **no Planning (auto / Always plan /
-> Never plan) chip** and **no "Voice input (coming soon)"** control in the
-> shipped composer. Both were listed by the 2026-07-26 plan and are not present.
+**[S]** `/` at the start of the prompt **MUST** open a filtered menu, and **every
+entry MUST run a control that exists** — there is no "coming soon" row. Chat
+carries `/export`, `/schedule`, `/tasks`, `/shortcuts`, `/stop`.
+*Automated: `apps/web/src/lib/composerCommands.test.ts`.*
 
-`r0808-09-chat-empty.png`, `r0808-17-chat-model-picker.png`,
-`r0808-44-attachment-menu.png`, `r0808-39-conversation-actions-menu.png`.
+`/shortcuts` **MUST** list only bindings the handlers implement.
 
-### 5.2 A real streamed turn
+### 5.2 A real streamed turn [S]
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 5.2.1 | Chat → type a prompt → Enter | Right-aligned teal user bubble, then a left-aligned neutral reply bubble | ✅ `r0808-11-chat-live-turn.png` |
-| 5.2.2 | Inspect the transcript | No phase labels, no "completed", no cache chips, no model metadata | ✅ |
-| 5.2.3 | Console | 0 errors | ✅ |
+1. **[S]** Send a prompt. The answer **MUST** stream, and Markdown **MUST** be
+   rendered — not shown as raw text.
+2. **[S]** Every tool call **MUST** get one row above the answer, in the order
+   the model asked, with an icon, the tool in plain words and what it acted on.
+3. **MUST**: a running call says so; one waiting on a decision says so beside the
+   card that resolves it; a refused one says why and links the page that would
+   let it through.
+4. **MUST**: a URL is narrowed to its host and a command to its program — a row
+   never says more than the audit log does.
+5. Turn **Thinking** on where the model supports it. Reasoning **MUST** fill a
+   collapsed block that closes when the answer starts, and a turn that produced
+   none **MUST** show no block at all.
 
-`POST /api/prompts/stream` → 200; first token in ~3 s on Haiku 4.5.
+### 5.3 Multi-turn conversation [S]
 
-### 5.3 Does a new chat appear on the left?
+**[S]** Send at least **six** messages in one conversation, referring back to
+earlier ones. The model **MUST** have the earlier context. Reload the page
+mid-conversation: the transcript **MUST** rehydrate.
 
-**Yes.** A **RECENT CHATS** group appears in the sidebar with the chat title and
-a relative timestamp, plus a `⋯` row menu.
+Open a second conversation and confirm **MUST**: nothing from the first leaks
+into it.
 
-> The row menu holds exactly two items — **Delete chat** and **Move to
-> project…**. Earlier rounds claimed six (Copy local link, Rename, Move to
-> project, Pin, Archive, Delete); that is not what ships.
+### 5.4 Message actions
 
-`r0808-15-sidebar-recent-chats.png`.
+On your own message: **Copy this message**, **Edit this message and send it
+again**, **Send this message again**, **Branch a second conversation from this
+point**.
 
-### 5.4 Is chat searchable?
+- **MUST**: an edit **adds a new turn**. The original stays. The transcript is a
+  record.
+- **MUST**: a branch opens a *second* conversation, the first keeps every turn it
+  had, and the branch shows a lineage band naming its source.
+- **MUST**: branching a turn with no checkpoint is refused with the reason
+  stated, not offered and then failed.
+- Per-code-block copy **MUST** be present on code in the answer.
 
-**Yes** — over titles *and* message text, including text that only ever appeared
-inside an attachment's answer.
+### 5.5 Stop and steer
 
-| Query | Result |
-|---|---|
-| `FALCON-91` | 1 matching conversation (the codename only existed in an attached `.md` and the reply) |
-| `MARIGOLD` | 2 matching conversations |
-| `codename` | 1 matching conversation |
-| `governed agents` | 3 matching conversations |
-| `nonexistentzzz` | "No matching conversations · Try a different search term." |
+Start a long turn. **Stop** **MUST** end it at a safe boundary and say so.
+**Steer** **MUST** put your words into the running turn as a user message.
 
-Each hit carries a turn count and **Open conversation →**.
-`r0808-48-*`, `r0808-49-*`.
+### 5.6 Attachments — add and read
 
-### 5.5 Does a conversation remember its context?
+1. **[S]** Upload an image. It **MUST** appear as a chip before sending, and the
+   turn **MUST** be able to describe it (vision-capable model).
+2. Upload a `.pdf`, a `.docx` and a `.csv`. Text **MUST** be extracted
+   server-side, and the model **MUST** be able to quote from each.
+3. Drag and drop a file onto the composer. Same result as the button.
+4. Attach by workspace path (`aria-label="Attachment path"`).
+5. Open the file inspector on an attachment. **Close file preview** **MUST**
+   return you to the transcript with the draft intact.
+6. In the image viewport: **Zoom in**, **Zoom out**, **Fit to pane**, **Reset the
+   view** — and their `F`, `+`, `-`, `0` keys.
+7. **MUST**: an attachment renders outside the message bubble, not inside it.
 
-**Yes.**
+### 5.7 Generated documents
 
-| Step | Reply |
-|---|---|
-| "My favourite number is 8817. Reply with just: NOTED." | `NOTED.` |
-| "Repeat verbatim the first message I sent you in this conversation." | `My favourite number is 8817. Reply with just: NOTED.` ✅ |
-| **New chat** → "What codeword did I give you earlier? If you have none, say NONE." | no prior codeword surfaced ✅ |
+Ask for a Markdown file, then a DOCX, an XLSX and a PDF. Each **MUST** appear
+under **Generated documents**, **MUST** be previewable, and **MUST** download.
 
-Memory within a conversation, isolation between conversations.
-`r0808-16-context-memory-verbatim.png`, `r0808-14-cross-chat-isolation.png`.
+### 5.8 Search across every conversation [S]
 
-> **Test-authoring note.** The "remember this codeword" phrasing used by earlier
-> rounds is not a reliable probe: on this round Haiku answered *"I don't have a
-> built-in memory of conversation history"* while demonstrably holding the prior
-> turn ("you mentioned a codeword in your previous message"). That is model
-> hedging, not a runtime fault. **Ask for verbatim repetition of an earlier
-> message instead** — it distinguishes "the history was not sent" from "the model
-> declined to use it".
+1. **[S]** `#/search-chat`. Search a phrase from an earlier conversation. The
+   result **MUST** show the exchange it matched, not just the title.
+2. **MUST**: results rank by relevance, not recency — a matching exchange from
+   the oldest conversation outranks a weak match in the newest.
+3. Recent-chat list: per-row **delete** and **move to project** **MUST** work,
+   and a deleted conversation **MUST** take its dependents with it.
 
-### 5.6 Can you see how many tokens remain, and what they cost?
+### 5.9 Recall and citations
 
-**Yes.** The popover reads, against a live Anthropic turn:
+1. Ask about something discussed in another conversation. The turn **MUST** be
+   able to reach it, and the answer **MUST** cite the conversation, timestamp
+   and turn id.
+2. **Sources this answer used** **MUST** list the sources, and opening one
+   **MUST** land on the cited passage.
+3. Turn on **Incognito session**. Recall **MUST** be off for that session.
+4. **MUST**: a citation whose file has been deleted is reported as missing, not
+   dropped.
 
-```
-Context window                             0.35%
-706 tokens used
-of 200,000 available
-199,294 tokens remaining
-624 input · 82 output                      ← ✅ FIXED-154 (was BUG-68)
-Reported by anthropic · Capacity reported by runtime
-This chat                                $0.0008
-anthropic, all time                      $0.0033
-Input 1.0 · Output 5.0 · Cache write 1.25 · Cache read 0.1
-claude-haiku-4-5-20251001 — list price, as of 2026-07
-```
+### 5.10 Context and compaction
 
-Verified working: capacity from the provider's own window, used tokens from the
-provider's reported prompt count, the per-direction split, per-chat and provider
-all-time cost, and all four price components. The identical control is in the
-Build composer.
+1. **Context window** **MUST** show used, capacity, the source of the capacity,
+   and the cost with each figure's source named. It **MUST NOT** show `NaN`.
+2. Drive one conversation past **90%** of a known capacity. Older completed
+   exchanges **MUST** compact automatically, and the transcript **MUST** stay
+   unchanged.
 
-✅ **FIXED-154** (was **BUG-68**) — the split rendered `NaN input · NaN output`
-on 2026-08-08 because the API redactor discarded `session_input_tokens` /
-`session_output_tokens` as secret-shaped and the browser formatted the string
-`"***REDACTED***"`. Both names are now on the count allowlist, and a contract
-test asserts every integer field on `ContextUsageView` survives redaction, so the
-next count added cannot repeat it. Re-verified live on 2026-08-10:
-`working/r0810-bug68-context-meter-real-io-counts.png`
-(before: `not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`).
+### 5.11 Voice
 
-### 5.7 Markdown rendering
+1. **Dictate** **MUST** write into the ordinary editable draft.
+2. **Done dictating** **MUST NOT** send. **Cancel dictation** **MUST** restore
+   the exact draft from before dictation began.
+3. Navigate away while listening. The microphone **MUST** stop, and the words
+   already dictated **MUST** be kept.
+4. **Read aloud** on a completed reply **MUST** be manual, never automatic, and
+   **MUST** exclude code bodies and raw URLs.
+5. **MUST**: only Send creates a turn.
 
-Ask for a heading, a bullet list, a GFM table and a fenced code block in one
-reply. The DOM inside `<main>` returns `h2: 1, table: 1, pre: 1, code: 1,
-ul: 1, li: 2, script: 0`. Headings, tables, fenced code with a language label,
-and inline code all render through the sanitising renderer. ✅
-`r0808-11-chat-live-turn.png`.
+### 5.12 Export
 
-### 5.8 Can you generate a Markdown file and view it in the sidebar?
+Export a conversation to **HTML**, **Markdown** and **PDF**, and use **Print /
+Save as PDF**. Each **MUST** contain the transcript and **MUST NOT** contain
+retained reasoning.
 
-**Yes.** Ask Chat to `write_file` a `.md`, approve it (§7), and the turn carries
-a `live-round.md · MD · 303 B` chip. Clicking it opens a right-hand
-`complementary` region labelled **File preview** with the Markdown rendered and a
-**Download** button. `r0808-33-file-inspector-markdown.png`.
+---
 
-### 5.9 Can you convert Markdown to PDF in one click?
+## 6. Build
 
-**Yes — three separate ways, all verified live.**
+### 6.1 Repositories
 
-1. **`•••` → Print / Save as PDF** — the browser print path.
-2. **`•••` → Export conversation…** — a dialog that states what will be included
-   ("2 messages · 1 attached files"), warns that secret-shaped values are
-   redacted and attachment *contents* are never embedded, and offers **HTML**,
-   **Markdown** and **PDF**. All three downloaded real files on this round:
-   `…-li.html` (2 942 B), `…-li.md` (899 B) and `…-li.pdf` (a valid 1-page
-   PDF 1.4, 2 163 B).
-3. **Ask the agent.** *"Convert the workspace file live-round.md into a PDF named
-   live-round.pdf"* → the agent uses `create_document`, the turn carries a
-   `live-round.pdf · Ready · PDF · Created just now` card with **Preview** and
-   **Download**, and a **SOURCES** strip citing `live-round.md`. **Preview**
-   opens the PDF in the file inspector.
+1. **Repositories** (`aria-label="Repositories"`) → add a local folder inside the
+   workspace. A folder outside it **MUST** be refused.
+2. Add a GitHub `owner/repo` coordinate. It **MUST** be recorded with **no**
+   network call.
+3. Remove a repository. The folder and the remote **MUST** be untouched.
 
-> This corrects the 2026-07-26 plan, which recorded that "transcript export and
-> print controls were removed" and answered "Not from the chat transcript". Both
-> controls ship, and all three formats work.
+### 6.2 The three modes [S]
 
-`r0808-39-conversation-actions-menu.png`, `r0808-42-export-conversation-dialog.png`,
-`r0808-43-export-conversation-formats.png`, `r0808-40-markdown-to-pdf-request.png`,
-`r0808-41-pdf-preview-inspector.png`.
+1. **[S]** Build **MUST** open in **Auto** — the mode that sends no override.
+2. **[S]** `Shift+Tab` **MUST** cycle Plan → Edit → Auto without leaving the
+   prompt. The mode menu **MUST** offer the same three with a detail line each.
+3. **Plan**: ask for a file write. It **MUST** be refused by the runtime with
+   `denied_by_turn_posture` — not talked out of by the model.
+4. **Edit**: the same request **MUST** become a decision you accept or reject.
+5. **Auto**: the composer **MUST** state what your standing permissions actually
+   allow rather than implying unprompted execution.
+6. **MUST**: none of the three writes to your standing capability modes. Check
+   Permissions before and after.
 
-### 5.10 Attachments
+### 6.3 Build a small proof of concept [S]
 
-| # | Step | Result |
+This is the end-to-end coding exercise, and it is the point of the surface.
+
+1. **[S]** Ask Build to create a small working program — say a three-file
+   Python CLI with a test — in the connected repository.
+2. **[S]** Approve the patch. It **MUST** apply as **one** change set, and the
+   files **MUST** exist on disk afterwards.
+3. Ask it to run the test through the governed terminal. Approve. The command
+   **MUST** run inside the workspace under a timeout, and the output **MUST**
+   appear.
+4. Ask for a change that fails one hunk. **MUST**: the whole proposal fails —
+   there is no partial application.
+5. Ask it to create a file that already exists, and to edit one that does not.
+   Both **MUST** be refused before anything is written.
+6. **MUST**: nothing writes into `.raiker/` or `.git/`, by any path.
+
+### 6.4 Code map
+
+1. Turn on **Code map**. Index the repository.
+2. `@` in the composer **MUST** complete paths **from the map**, not the working
+   tree, and **MUST** return paths only — no symbols, no line numbers, no
+   content.
+3. With the map unbuilt, `@` **MUST** say `code_map_not_built` and offer the
+   control that builds it. With the gate off, `code_map_gate_disabled` and a
+   Permissions link. The two **MUST** be different messages.
+4. Ask where a symbol is defined, then for its references. A partial scan **MUST**
+   report `partial` and name the bound it hit.
+
+### 6.5 Git
+
+1. Ask for a branch and a commit. Approve each. **MUST**: the commit stages
+   exactly the paths you reviewed — never `--all`.
+2. Store a token in **Settings → Git credential**. Ask for a push.
+   - **MUST**: it does nothing until the remote's host is on
+     `RAIKER_CONNECTOR_EGRESS_ALLOWLIST`.
+   - **MUST**: the credential never appears in a log, an error or the command's
+     output.
+   - Grant **once**, then **for this session**. Withdraw the session grant and
+     confirm the next push asks again.
+
+### 6.6 Execution environment
+
+1. Open the environment badge (`aria-label="Execution environment"`). Select each
+   available profile.
+2. On **Native OS sandbox**: **Re-measure boundary** **MUST** report six
+   observations, each with a control arm, and an unmatched control arm **MUST**
+   read `indeterminate` rather than passing.
+3. **MUST**: a capability the boundary has not been measured to have is absent
+   from the card, not shown disabled.
+4. On a container profile: **Reset environment** and **Reset and clear cache**
+   **MUST** both be offered, and **MUST** be refused on a profile that rebuilds
+   itself around every command.
+
+### 6.7 Background work
+
+1. Start a long command with background execution. **Background work**
+   (`aria-label="Background work"`) **MUST** list it.
+2. Poll, page the log, and stop it. Reload the browser mid-run: durable output
+   **MUST** come back without replaying the command.
+3. Schedule a background agent with a **Cadence**. Each cycle **MUST** be one
+   governed turn.
+
+### 6.8 The operating protocol
+
+Run the same prompt in Chat and in Build. **MUST**: the Build turn's audit record
+names its surface, and the protocol is a working method only — every gate,
+decision mode, approval and tool is identical on both.
+
+---
+
+## 7. Tasks — every work type
+
+### 7.1 Create one of each [S]
+
+For each of the four, create it, watch it run, and confirm it appears in the list
+with the right shape:
+
+| Type | Control | Must |
 |---|---|---|
-| 5.10.1 | `+` → **Document…** → upload a `.md` naming a codename | `POST /api/attachments` 200; `brief.md · MD · 59 B` chip renders |
-| 5.10.2 | Ask what the codename is | `FALCON-91` — the content reached the model — with a **SOURCES** strip citing `brief.md` ✅ `r0808-46-document-answer.png` |
-| 5.10.3 | `+` → **Image…** → upload a 1×1 PNG | chip renders; the model answers "A single black pixel on a white background." ✅ `r0808-47-image-answer.png` |
+| **[S]** Task | `Task` | Runs now |
+| Schedule once | `Schedule once` | Requires a **Start time**; runs at it |
+| Daily routine | `Daily routine` | Requires a **Start time**; re-arms after each cycle |
+| Background agent | `Background agent` | Runs asynchronously until complete or stopped |
 
-Accepted types are enforced by the inputs themselves:
-`image/png,image/jpeg,image/webp,image/gif` and
-`text/plain,text/markdown,text/csv,application/pdf,.docx,.xlsx`.
+### 7.2 Every field
 
-### 5.11 Source citations
+- **Task title**, **Instructions** — an empty Instructions **MUST** block
+  creation with a named error.
+- **Parent work** — create a child task. It **MUST** appear nested.
+- **Priority** — low, normal, high. All three.
+- **Start time** — appears only for *Schedule once* and *Daily routine*.
+- Attachments on a task **MUST** reach the run.
+- A per-run model **MUST** be selectable and re-checked at run time.
 
-Re-confirmed on this round as a live behaviour: answers that read a file carry
-inline numbered chips and a **SOURCES** strip naming every source the turn read.
-Seen on the attachment answer (5.10.2), the PDF conversion (5.9), the Build code
-map (§9) and the subagent (§12).
+### 7.3 Lifecycle
 
-The 2026-08-04 round remains the fuller evidence for opening a source *at the
-cited passage* — `c6-source-ledger-under-answer.png`,
-`c4-source-opened-at-passage.png`, `c6-uncited-marker-stays-text.png` — driven by
-[`e2e/c6-c4-source-citations-live.spec.ts`](../../apps/web/e2e/c6-c4-source-citations-live.spec.ts).
+1. Stop a running task. It **MUST** stop at a safe boundary and record the
+   reason.
+2. Let a task hit an approval. It **MUST** read **blocked** with the reason and a
+   link to the decision — never *failed*.
+3. Resolve the approval. The run **MUST** continue.
+4. Remove a task. Remove a routine. Remove a background agent. Each **MUST**
+   disappear from the list and stop scheduling.
+5. **MUST**: a model-proposed task is parked until you press **Run now**.
+
+### 7.4 Routines
+
+Create a daily routine and let it fire twice. **MUST**: the second cycle is a
+fresh governed turn, and a missed slot is skipped rather than owed as a backlog.
 
 ---
 
-## 6. Permissions / Capabilities
+## 8. Projects, folders and files
 
-| # | Step | Result |
-|---|---|---|
-| 6.1 | Open Permissions | **67 gates defined**, of which **49 are rendered**, grouped WORKSPACE / LOCAL EXECUTION / NETWORK / MODELS / OTHER TOOLS / MCP / AUTOMATION | ✅ `r0808-20-permissions-full.png` |
-| 6.2 | Search box | Filters live | ✅ `r0808-21-permissions-search.png` |
-| 6.3 | Expand a row | Description, current decision mode in plain words, and **Turn on** | ✅ `r0808-22-permissions-row-expanded.png` |
-| 6.4 | Decision modes | Ask / Allow / Auto / Deny per capability, as a labelled `role="group"` | ✅ |
-| 6.5 | **Turn on** → step-up | "Enable File writes · Acting as principal_… This decision is recorded against your principal", a **required** reason, and **Confirm change** disabled until it is supplied | ✅ `r0808-23-stepup-dialog.png` |
-| 6.6 | Turn on 16 gates | File writes, Approval execution relay, Task creation, Patch apply, Git writes, Shell commands, Web fetch, Subagents, MCP builder, MCP connector, Memory store, Project assignment, Scheduled routines, Code map, Processes, Multi-agent teams — **all 16 reach `enabled_runtime`** | ✅ `r0808-24-permissions-after-enable.png` |
-| 6.7 | Change a decision mode from the page | The **same** step-up dialog appears ("Set MCP connector to 'Allow'") | ✅ |
+1. **[S]** Create a project (`aria-label="New project name"`).
+2. Add **Project instructions**. **MUST**: the next turn in that project has
+   them, and a turn outside it does not.
+3. Set **Project memory setting** to each of *inherit*, *enabled*, *disabled*
+   and confirm the behaviour changes.
+4. Assign a conversation to the project from the composer, and from the
+   recent-chat row. Both **MUST** work.
+5. Add files to the project. **MUST**: they reach a turn as bounded context and
+   **MUST NOT** grant filesystem access.
+6. Switch the **Active project** in the top bar. The Workbench and Chat **MUST**
+   scope to it.
+7. Delete the project. **MUST**: it says what will happen to its conversations
+   before you confirm.
 
-> **The two-step model described by earlier rounds is gone.** There is no
-> "Development preview" mode and no separate runtime-enablement step: turning a
-> gate on takes it straight to `enabled_runtime`. Settings → Runtime
-> configuration now says so in as many words — *"Raiker runs one governed
-> runtime. There is nothing to select — every capability is decided by its own
-> permission, not by a mode."*
+---
 
-### 6.8 Deferred domains
+## 9. Knowledge Map
 
-| Searched | Rendered? |
+1. **[S]** `#/brain` **MUST** render a force-directed graph, not an empty canvas.
+2. **Add workspace source** → the picker **MUST** open on **named places** — your
+   projects' files, generated files, approved memory, the encrypted database —
+   not a file browser.
+3. **Folder to grant**: grant a folder from this machine. **MUST**: it is read
+   where it is, and **MUST NOT** be copied.
+4. **File to copy into Raiker**: add a single file. **MUST**: it asks first,
+   because this one copies.
+5. **MUST**: the granted folder's files appear as nodes in the graph.
+6. Revoke the folder. **MUST**: every source indexed under it is removed with it.
+7. **Graph scope** — change it and confirm the graph changes.
+8. **Graph settings**, **Fit graph**, **Enter fullscreen**, **Record inspector**
+   — each **MUST** work and **Close** **MUST** return you to the graph.
+9. **MUST**: a citation whose file is gone is drawn as a hollow node.
+
+---
+
+## 10. Memory — every kind
+
+### 10.1 The gate [S]
+
+**[S]** With `memory_write` off, the Memory page **MUST** say so rather than
+promising proposals it cannot produce.
+
+### 10.2 Write, review, forget
+
+1. Turn the gate on. Ask Chat to remember something. **MUST**: you are shown the
+   **exact sentence** and decide.
+2. Approve. **MUST**: it is really stored, and recall can reach it.
+3. Do the same from Build, and from the terminal client. All three **MUST**
+   propose.
+4. Ask it to remember something that looks like a credential. **MUST**: refused
+   *before* you are asked.
+5. **Edit memory** and **Edit proposed memory**. **Forget memory** — the record
+   **MUST** go.
+
+### 10.3 Every filter and every kind
+
+Exercise each dropdown across its whole option set:
+
+| Control | Options |
 |---|---|
-| CCTV | **No row at all** ✅ fail-closed by absence |
-| Finance | **No row** ✅ |
-| Medical | **No row** ✅ |
-| Home security | **No row** ✅ |
-| Remote execution | **A row, with a working Turn on** ⚠ |
-| Cloud execution | **A row, with a working Turn on** ⚠ |
+| `Memory status` | all, approved, expired |
+| `Memory scope` | all, and every scope present |
+| `Memory sensitivity` | all, and every sensitivity present |
+| `Sort memories` | recently-approved, review-date |
+| `Observation kind` | all, skipped, gist, source |
+| `Recall backend` | auto, and every embedding space offered |
 
-The 18 gates that never render include the deferred lifestyle/medical/finance
-domains. Remote and cloud execution **do** render and **do** accept an enable —
-`POST /api/capability-gates/remote_execution_cap/set` returned
-`{"target_state": "enabled_runtime"}`. This is not treated as a security defect
-because the row states *"No executor; remote command execution stays
-fail-closed."* and `remote_execution` (the sibling gate that would carry the
-executor) stays `disabled`. It **is** a correction to the earlier claim that
-these two "offer no enable path".
+**MUST**: `Filter memories` narrows the list, and **Memory history** shows what
+changed and when.
 
-`r0808-25-deferred-*.png`, `r0808-26-remote-execution-attempt.png`.
+### 10.4 Observations
 
-### 6.9 ✅ Memory can be written from Chat and Build — FIXED-156 (was BUG-71)
+**Observations** **MUST** list what the runtime captured, with kind, retention,
+expiry, sensitivity and checksum — and a **refused** observation **MUST** be a
+row with its reason, so an empty list is distinguishable from a disabled feature.
 
-On 2026-08-08 `memory_write_execution` could be enabled and set to **Allow**
-while no write tool was ever offered: the agent reported only `memory_get`,
-`memory_list`, `memory_search`, and "the current mode is read_only". The broker
-already held real executors; the tools were absent from the model catalogue and
-`governed_memory_status` hard-coded `durable_writes_enabled: False`.
+### 10.5 Recall
 
-Re-run 2026-08-10: both tools are in the catalogue, `governed_memory_status`
-reads the live gate and decision mode, and an approved write really stores the
-record. With the gate **off** — the shipped default — the Memory page says so
-directly (*"Memory store is off, so no conversation can propose something to
-remember"*) with **Turn on Memory store →**, instead of promising proposals it
-cannot produce. With it on, a Chat turn proposes the exact text and the owner
-decides. `working/r0810-bug71-memory-says-the-gate-is-off.png`,
-`working/r0810-bug71-memory-says-the-gate-is-on.png`,
-`working/r0810-bug71-chat-proposes-a-memory-write.png`
-(before: `not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`).
+1. Ask a question whose answer is in an approved memory, using **the same
+   words**. It **MUST** be recalled.
+2. Ask the same question **paraphrased**. Record the result honestly — the
+   default embedding space is lexical, and this is the measurement that keeps
+   [`../KNOWN_LIMITS.md`](../KNOWN_LIMITS.md) true.
+3. **MUST**: each hit names the legs that found it, and the reply names the
+   embedding space in force.
+
+### 10.6 Export and import
+
+Export memories, then import them into a fresh workspace. **MUST**: the count
+matches and nothing is silently dropped.
 
 ---
 
-## 7. Approvals
+## 11. Approvals
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 7.1 | Ask Chat to `write_file` a report | Reply "Waiting for approval · Approval required. Nothing has run yet. Resolving it continues this turn." plus a **Review approval** link | ✅ `r0808-27-chat-write-file-request.png` (the wording was tightened with FIXED-157) |
-| 7.2 | **Review approval** | Navigates to the Approvals inbox (not straight to the detail — one more click is needed) | ✅ `r0808-37-review-approval-link-target.png` |
-| 7.3 | Approvals → Pending | Row: Write file / proposed by `Raiker agent · turn_…` / File writes / high / pending | ✅ `r0808-28-approvals-pending.png` |
-| 7.4 | **Review** | Detail with capability, risk, session link, expiry, proposer identity chip, and the **proposed unified diff** | ✅ `r0808-29-approval-detail.png` |
-| 7.5 | **Approve and execute once** | *"Executed once — wrote live-round.md. The previous contents were checkpointed."* | ✅ `r0808-30-approval-executed.png` |
-| 7.6 | Check the filesystem | `live-round.md` exists with exactly the reviewed contents | ✅ verified with `cat` |
-| 7.7 | **Continue the turn** | The paused turn resumes and answers: *"The agent continued the turn: I created the file `notes-b.md` …"* | ✅ `r0808-36-write-b-final-answer.png` |
-| 7.8 | Approve, then just reopen the conversation | The turn auto-resumes without pressing Continue and ends with an accurate summary | ✅ 3 / 4 runs, `r0808-38-post-approval-continuation-ok.png` |
-| 7.9 | Filters Pending / Approved / Executed / Denied, sort by risk / recency | All present and switchable | ✅ `r0808-31-approvals-filter-*.png` |
-
-### 7.10 ✅ A parked turn states its state, never a denial — FIXED-157 (was BUG-73)
-
-One conversation in the 2026-08-08 round ended, durably, with the assistant
-bubble *"Approval required for local action. No command was executed."* directly
-beneath the `live-round.md` chip for the file that **was** written. Three
-targeted reproductions did not recur, so it was filed as intermittent.
-
-Re-run 2026-08-10: the sentence is gone from the product. A parked turn reads
-*"Waiting for your decision. Nothing has run yet."* — a statement about the
-pause rather than a verdict on execution — and that notice is never persisted as
-the turn's answer, so a resume writes the real one over an empty row instead of
-racing to overwrite a false one. Reloading a parked conversation shows the
-parked approval, not a denial. `working/r0810-bug73-parked-turn-states-its-state.png`
-(before: `not-working/BUG-r0808-02-post-approval-answer-says-not-executed.png`).
-
-### 7.11 Earlier rounds still carry the wider approval evidence
-
-`edit_file` and `apply_patch` exactness (FIXED-23, `98`–`101`), the governed git
-write path — branch, commit, push, and record-only when the gate is off
-(FIXED-109 / FIXED-111, `b11-*`, `bug67-*`), and the terminal shell approval's
-preview/confirm/execute path (FIXED-90) were not re-run on 2026-08-08 and remain
-documented by their own rounds.
+1. **[S]** Raise one approval of each kind you can: a file write, a patch, a
+   shell command, a git commit, a push, a memory write, a task row.
+2. **[S]** Each detail **MUST** say what will happen **before** you decide, and
+   **MUST** distinguish *this will execute* from *this records a decision*.
+3. Approve a file write. **MUST**: the file changes, and a checkpoint holds the
+   previous contents.
+4. Approve a `process` or `network` action. **MUST**: it records the decision and
+   **executes nothing** — and said so before you approved.
+5. Deny one. **MUST**: the turn continues rather than ending in an error.
+6. **Approval status filter** and **Sort approvals** (risk, newest) — both.
+7. Resolve an approval in a second browser tab. **MUST**: the first tab's turn
+   continues.
+8. Reload with an approval parked. **MUST**: it survives.
+9. Turn off `approval_execution_relay`. **MUST**: file approvals return to
+   record-only, and the surface says which gate did it *before* you decide.
 
 ---
 
-## 8. Tasks — all four work types
+## 12. Permissions
 
-Tasks → **Plan work** → chip row: **Task**, **Schedule once**, **Daily routine**,
-**Background agent**.
-
-| Type | Extra field | Submit label | Result 2026-08-08 |
-|---|---|---|---|
-| Task | — | Create task | ✅ ran immediately; finished with the exact requested reply `TASKOK` |
-| Schedule once | Start time (`datetime-local`) | Schedule task | ✅ "Scheduled for 8/9/2026, 1:41:00 AM" |
-| Daily routine | Start time | Create daily routine | ✅ "Every day, next run 8/9/2026, 2:41:00 AM" |
-| Background agent | — | Start background agent | ✅ queued, then completed with a real one-sentence answer |
-
-Also verified: the **Parent work** select populates from existing tasks;
-**Priority** Low / Normal / High; a per-task **Task model** picker; **Attach**
-(Image… / Document…); the `N open / N scheduled / N finished` counters tracking
-each creation; per-task **Stop**; and Observability → **Work in action** showing
-the same records under *Tasks in action*, *How the last runs ended* and
-*Scheduled work*.
-
-Task runs are tagged `origin=task` and do **not** appear in RECENT CHATS
-(FIXED-15 holds). `r0808-50-*` … `r0808-53-*`, `r0808-73-observe-work.png`.
+1. **[S]** All **67** gates **MUST** be listed, grouped, and searchable.
+2. Expand a row. It **MUST** give a description, the current decision mode in
+   plain words, and the control that changes it.
+3. Set a capability to each of **Ask**, **Allow**, **Auto**, **Deny** and confirm
+   the runtime honours each.
+4. **Turn on** a higher-risk gate. The step-up **MUST** require a
+   `runtime_gate_manager`, a reason, a typed phrase and a threat-model
+   acknowledgement — and **MUST** explain that the phrase is not a credential.
+5. **Bulk capability actions** — exercise it.
+6. **Deferred domains** — finance, medical, CCTV, home security, hardware
+   **MUST** offer **no enable path at all**, not a disabled switch.
+7. Stop the agent runtime from Settings → Runtime. **MUST**: every surface says
+   so, and no new execution starts.
 
 ---
 
-## 9. Build
+## 13. Extensions — all six tabs
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 9.1 | Open Build with no repository | "No repository" chip; "Connect a repository to give Raiker something to work in, or just describe what you want and start from nothing." | ✅ `r0808-60-build-empty.png` |
-| 9.2 | **No repository** → connector | "Connecting a repository grants nothing. A local folder must sit inside this Raiker workspace, and GitHub content is read through the governed connector — never from this page." Local folder / GitHub tabs | ✅ `r0808-61-build-repo-connector.png` |
-| 9.3 | Enter `projects/demo-repo` → **Connect repository** | The repo is listed with a **Use** button | ✅ |
-| 9.4 | **Use** | The header chip and composer switch to `demo-repo`; the placeholder becomes "Describe the change in demo-repo…" | ✅ |
-| 9.5 | **Build index** | `POST /api/code/map/rebuild` 200 → **Code map · projects/demo-repo — 1 files, 2 declarations** | ✅ `r0808-62-build-repo-connected.png` |
-| 9.6 | Ask for `code_map_search add_numbers` | "File path: `calc.py` · Line range: 1-3", with **SOURCES** citing `projects/demo-repo` and `Code map: add_numbers`, plus a **How this turn was governed** disclosure | ✅ `r0808-63-build-code-map-answer.png` |
+### 13.1 `connectors`
 
-> Correction: the code map is **not** built by the connect itself, as the
-> 2026-08-04 round recorded. A freshly connected repository reads *"Code map · .
-> Not indexed yet."* and requires **Build index**.
+Filter by category. Install one. **MUST**: its readiness reads as separate facts
+with separate remedies, not one enable switch.
 
-### 9.7 ✅ The Plan / Edit / Auto chips — FIXED-155 (was BUG-70)
+### 13.2 `mcp`
 
-On 2026-08-08, pressing **Auto** fired four unconfirmed writes:
+1. Create a server from a template. **MUST**: the command is workspace-relative
+   and the interpreter is from the allowlist.
+2. **Test**. **MUST**: it connects and lists its tools.
+3. **MUST**: with the connector decision mode at `ask`, the tab states that
+   connected tools are withheld from every turn, and names the control.
+4. Add a **remote** server by URL. Pause, resume, rename, kill it.
+5. **MUST**: a tool result reaches the model but its content never enters the
+   audit record.
 
-```
-POST /api/capability-modes/file_write_execution/auto   200
-POST /api/capability-modes/patch_apply_execution/auto  200
-POST /api/capability-modes/shell_execution/auto        200
-POST /api/capability-modes/process_execution/auto      200
-```
+### 13.3 `skills`
 
-Permissions then showed **File writes → Auto**, globally and permanently, with no
-step-up, no reason and no acknowledgement — while the identical change from the
-Permissions page demanded all three.
+1. **[S]** Six built-ins **MUST** install on first visit.
+2. Upload a `SKILL.md`, and a `*.skill` bundle. Import one from a verified GitHub
+   link. Build one in place.
+3. Activate and deactivate one. **MUST**: a deactivated skill is withheld from
+   turns.
+4. Download one; delete one.
+5. **MUST**: a skill grants no capability and opens no gate, and Raiker runs no
+   code it ships.
 
-Re-run 2026-08-10, with the network panel open across a full Plan → Edit → Auto
-cycle: **zero** requests to `/api/capability-modes/`, and all four capabilities
-still standing exactly where they were. The mode is now the conversation's own
-posture, sent with each prompt and applied to that turn; Plan's hint reads
-*"…for this turn only … Your standing permissions are not changed."*, and Auto
-reports what the owner's standing permissions actually allow —
-*"Every write capability is set to Ask, so every change will still be proposed to
-you."* — with **Change in Permissions →** beside it.
+### 13.4 `hooks`
 
-It is a posture, not a suggestion: a Build turn in **Plan** asked to
-`write_file plan-mode-probe.md` produced no approval at all, because the call is
-refused by the runtime under `denied_by_turn_posture`.
-`working/r0810-bug70-build-auto-changes-nothing-standing.png`,
-`working/r0810-bug70-permissions-unchanged.png`,
-`working/r0810-bug70-plan-mode-refuses-the-write.png`
-(before: `not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`,
-`r0808-64-build-modes.png`).
+1. **[S]** The tab **MUST** report what the runtime **actually loaded**.
+2. Write a `PreToolUse` rule that denies a tool. **MUST**: the tool call is
+   denied.
+3. Write a rule on an event this build does not dispatch. **MUST**: it reads
+   *configured but never fires*.
+4. Write a rule that cannot change an outcome. **MUST**: it reads **Observes
+   only**, not enforcing.
+5. Name a builtin this build does not ship. **MUST**: reported unavailable, not
+   counted as a guard.
+6. Break the JSON. **MUST**: the file is named with the position the parse
+   stopped at, the other sources still load, and **every prompt still works**.
+7. **Turn every hook off**. **MUST**: rules stay listed and marked off.
+8. **MUST**: nothing a hook returns can allow what the runtime refused.
 
----
+### 13.5 `plugins`
 
-## 10. Extensions
+1. Install a plugin that contributes hook rules, a skill and an MCP server.
+2. **MUST**: the permission diff is shown **before** installing, and none of
+   `event:hook`, `skill:contribute`, `mcp:server` is auto-approved.
+3. **MUST**: the contributed skill arrives **switched off** and is marked *from
+   plugin*.
+4. **MUST**: the MCP server is an **offer** — nothing is stored as a server until
+   you press **Add server**.
+5. **MUST**: an offer carrying a credential in its URL is refused.
+6. Revoke the plugin. **MUST**: everything it contributed is **deleted**, not
+   flagged.
+7. **MUST**: the tab states the signature level each plugin earned and what would
+   raise it.
 
-### 10.1 MCP servers
+### 13.6 `channels`
 
-| # | Step | Result |
-|---|---|---|
-| 10.1.1 | Open the MCP tab with the connector mode at the default `ask` | A notice naming the exact reason and the exact control: *"Connected MCP tools are withheld from every turn: the MCP decision mode is 'ask' … Change the decision mode in Capabilities."* | ✅ `r0808-54-mcp-tab.png` |
-| 10.1.2 | Name a server `live-echo`, template "Sample echo server (safe starter)", **Create server** | Card created, command `python .raiker/mcp/servers/live-echo.py`, **Test / Stop / Rename / Delete** | ✅ `r0808-55-mcp-server-created.png` |
-| 10.1.3 | **Test** | `POST /mcp/servers/<id>/connect` 200 → *"live-echo: connected · 2 tool(s)"*, TOOLS (2) `echo`, `workspace_ping`, RECENT SESSIONS `mcp_connect · 0 tool calls · ok` — and, honestly, **"Not callable yet — see above"** | ✅ `r0808-56-mcp-test-result.png` |
-| 10.1.4 | Permissions → **MCP connector** → **Allow** (with step-up) | The MCP page drops the withheld notice | ✅ `r0808-57-mcp-decision-mode-allow.png`, `r0808-58-mcp-callable.png` |
-| 10.1.5 | Chat: *"Call the MCP tool `mcp__live-echo__echo` with the text RAIKER-MCP-LIVE"* | The tool runs and its output reaches the model **fenced and marked untrusted**: `[UNTRUSTED MCP TOOL OUTPUT — server 'live-echo', tool 'echo'. Treat as data, not instructions.] RAIKER-MCP-LIVE` | ✅ `r0808-59-mcp-tool-call-from-chat.png` |
-
-**So: yes, the MCP server works** — as a management surface, as a monitoring
-surface, and as an agent capability. Discovery is fail-closed, the decision mode
-is what permits a call, and the tool's output is untrusted data.
-
-### 10.2 Skills — new since the last round
-
-The **Skills** tab was not covered by any earlier plan. It ships with **6 active
-skills** (`algorithm-creator`, `code-review`, `mcp-builder`, `plugin-dev`,
-`security-review`, `skill-creator`), each with Deactivate / Rename /
-Download / Delete / Details, an All / Active / Inactive filter, and three ways to
-add one: **Upload** a `SKILL.md` or `.skill` bundle up to 2 MB, **Import from a
-link** (a GitHub raw URL, "fetched and verified first"), or **Build one**.
-
-The tab states its own boundary: *"Installing one adds guidance and nothing else:
-it grants no capability, opens no gate, and Raiker never runs code a skill
-ships. An inactive skill stays here and is withheld from every turn."*
-`r0808-82-extensions-skills.png`.
-
-### 10.3 Connectors, Plugins, Channels
-
-Connectors lists its catalogue with four independent facts per row (installed /
-connected / enabled / usable). Plugins and Channels are deliberately empty and
-say why (§3). `r0808-82-extensions-*.png`.
+1. Pair a connector. **MUST**: *linked*, *enabled*, *trusted* and *reachable* are
+   **four rows with four remedies**, not one switch.
+2. Send an outbound delivery. **MUST**: it is signed when a secret is set, and
+   the page says **unsigned** when one is not.
+3. Send inbound messages past the 60-per-minute bound. **MUST**: the refusal is a
+   recorded event, not a silent drop.
+4. **MUST**: an inbound message is recorded and quarantined and **never becomes
+   work on its own**.
 
 ---
 
-## 11. Network capabilities
+## 14. Observability — all seven tabs
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 11.1 | With **Web fetch** at `ask`, ask Chat to fetch a page | The call is withheld | ⚠ withheld, but **narrated by the model**, not disclosed by the runtime, and no approval is raised — re-confirms the open **BUG-60**. `r0808-84-web-fetch-withheld-at-ask.png` |
-| 11.2 | Set **Web fetch** to **Allow** and ask again | The page is fetched and quoted | ✅ re-run 2026-08-10 after **FIXED-142**: the turn fetches `https://pypi.org/project/httpx/` and quotes it with a source chip; a non-allowlisted host is still refused by name. `working/b12-web-fetch-live-page.png`, `working/b12-web-fetch-egress-denied.png` |
-
----
-
-## 12. Agentic behaviour in Chat
-
-| # | Step | Result |
-|---|---|---|
-| 12.1 | *"Use `update_plan` to write a three-step plan, then carry out step one only."* | A **PLAN** checklist renders above the transcript — *1 of 3 done*, with `completed` / `pending` per step — and the agent executes only step one | ✅ `r0808-85-plan-checklist.png` |
-| 12.2 | *"Use `spawn_subagent` to investigate which markdown files exist and report only the findings."* | A bounded read-only investigation returns 5 filenames and nothing else; **SOURCES** cites `Subagent: markdown-file-finder` | ✅ `r0808-86-subagent.png` |
-| 12.3 | Turn controls while a turn runs | **Add to this turn**, **Steer**, **Stop** appear in the composer | ✅ |
-
----
-
-## 13. Observability
-
-All seven tabs verified on real data from this round:
-
-| Tab | Observed |
+| Tab | Must |
 |---|---|
-| Overview | readiness, closed gates, pending approvals, open work, unread notifications |
-| Sessions | the round's 32 sessions |
-| Audit log | append-only, filterable, session ids redacted |
-| Checkpoints | 40 metadata-only snapshots |
-| Diagnostics | `production-ready (local)`, 32 sessions / 1280 events / 40 checkpoints / 38 tasks, readiness checks, per-profile provider status (`anthropic-hosted` → **selected**), "Configuration-derived; reachability is never probed by this page" |
-| Work in action | Tasks in action, How the last runs ended, Scheduled work |
-| Notifications | full history, newest first, read state per row |
+| **[S]** `overview` | Readiness reads true, and every blocker names its remedy |
+| `sessions` | Filter by tag, show archived, select all, bulk actions, pin, rename, archive, delete |
+| **[S]** `activity` | The audit log carries your conversations **and** the governed steps outside them — connecting a provider, pinning a model. **Refresh events** works |
+| `checkpoints` | Each checkpoint lists its files and states whether state and files can be restored. **The restore control is a preflight and performs nothing** — confirm it says so |
+| `diagnostics` | Every deferred domain is listed as fail-closed. **Refresh diagnostics** works |
+| `work` | A running turn and a background run both appear while they are running |
+| `notifications` | A notification is raised, read and cleared |
 
-`r0808-73-observe-*.png`.
+Produce a **Redacted support bundle** and confirm it contains no credential.
 
 ---
 
-## 14. Settings
+## 15. Guide
 
-Six tabs, under PERSONAL and SYSTEM headings:
+**[S]** Utilities → **Guide** **MUST** serve all **eight** sections from the
+install, deep-link to each, and be reachable from the pages that explain
+themselves — Models to *Connecting a model*, Permissions to *Permissions and the
+runtime*, Build to *Working in Build*.
 
-| Tab | Contents |
+---
+
+## 16. Settings — all nine sections
+
+| Section | Exercise |
 |---|---|
-| General | language, region, default startup view |
-| Notifications | delivery preferences |
-| Personalisation | density (Comfortable / Spacious), font (Manrope / System / Monospace) |
-| Security & sign-in | Connector Vault Key (**Active / Valid**, Generate / Reveal / Save / Clear, elevated re-auth), MFA (TOTP) enrolment, "Require MFA for Vault operations", credential security scan, breach-check opt-in |
-| Account | username fixed, display name editable, **Delete my account** |
-| Runtime configuration | *"Raiker runs one governed runtime. There is nothing to select."* — Accepting work state, change history, and **Execution targets**: Local workspace (Selected), Local container (Docker · No approved image) |
+| **[S]** `general` | **Speech language** across several options |
+| `notification` | Every toggle |
+| `personalisation` | **Theme** (system → light → dark → system, with `data-theme` following), **Density**, **Font** (sans, system, mono) |
+| `security` | Contained subjects listed with their reason and cleared in one press. Grant scope, action type and risk ceiling (low, medium, high) |
+| **[S]** `privacy` | Reasoning retention **off** by default; turn it on and confirm a re-opened turn shows the working, and that it stays out of search and export |
+| `account` | Display name; password change; recovery |
+| `web-access` | Add a domain, a wildcard, an IP, a CIDR range and a `/regex/` to the blocklist. The reachability check **MUST** answer without contacting anything. **MUST**: loopback and private addresses are refused **whatever** the blocklist says, and emptying it opens none of that |
+| `git-credential` | Store, use, withdraw |
+| `runtime` | Readiness window (1–120 minutes); stop and start the agent runtime; filtered network status |
 
-> Correction: there is **no Storage tab**. The earlier plan listed one, and did
-> not list Runtime configuration.
-
-`r0808-74-settings-*.png`.
+**MUST**: unsaved changes are announced, and leaving with them pending warns.
 
 ---
 
-## 15. Global chrome
+## 17. Global chrome
 
-| Control | Result |
+- **[S]** Sidebar: primary navigation, **More navigation**, **Recent chats**,
+  open and close on mobile.
+- **[S]** Top bar: **Active project**, **Notification panel**, **Host control**.
+- **Host control**: state, what a quit would interrupt, Pause, Restart, Quit, and
+  **Install and updates**. **MUST**: opening it makes **no outbound request**.
+- **Keyboard shortcuts** sheet opens and closes.
+- **MUST**: zero uncaught console errors for the whole round.
+
+---
+## 18. What this plan does not cover
+
+Stated so a green round is not read as more than it is.
+
+| Not covered | Why, and what does cover it |
 |---|---|
-| Theme toggle | Cycles **system → light → dark → system**; `data-theme` follows (`null` → `light` → `dark` → `null`); `aria-label` names the next state. Every view renders in both themes | ✅ `r0808-75-theme-*.png`, `r0808-76-*.png` |
-| Notification bell | Unread count badge; panel with **Mark all read**; the badge clears and the history stays in Observability → Notifications | ✅ `r0808-77-notification-center.png` |
-| STOP switch | Confirm dialog: *"Stop all active tasks? This requests cancellation of every task that is queued, running, paused, or waiting for your approval, at the next safe boundary. It is governed and audited — not a force-kill."* with **Cancel** / **Stop tasks** | ✅ `r0808-78-stop-switch.png` |
-| Host control | Host status panel | ✅ `r0808-79-host-control.png` |
-| Skip to content | Present and first in tab order | ✅ |
-| Scroll regions | The sidebar scrolls independently of the transcript; the transcript scrolls without moving the composer | ✅ |
+| The terminal client (`raiker`) | This is a browser plan. `tests/test_cli_*.py` and the command surface in [`../RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](../RAIKER_TOOL_AND_PLUGIN_CATALOG.md) |
+| The desktop payload, tray and installer | Needs a built release. [`../DESKTOP_DISTRIBUTION_DESIGN.md`](../DESKTOP_DISTRIBUTION_DESIGN.md) |
+| Windows-only execution paths | PTY and restart reattachment are POSIX-only by build. [`../KNOWN_LIMITS.md`](../KNOWN_LIMITS.md) |
+| Anything needing a container daemon | Filtered egress and credential delivery stay unproven without one — BUG-194 |
+| Multi-user and hosted operation | Not built |
 
 ---
 
-## 16. Projects and adaptive navigation
+## 19. Model backends
 
-**Projects.** Create → `POST /api/projects` 200 → a card reading
-`projects/live-round-project · 0 sessions · created just now` with **Set active /
-New chat / Details / Archive / Move / Delete**, plus a FOLDER TREE. Sessions move
-in from the sidebar row menu's **Move to project…**, and the Chat composer gains
-a **Project for this chat** select. `r0808-65-*`, `r0808-66-*`.
-
-**Adaptive navigation.**
-
-| Width | Expected | Result |
-|---|---|---|
-| 375 px | bottom bar + **More** drawer, no left rail | ✅ |
-| 768 px | top-bar menu trigger + same drawer | ✅ |
-| 1024 px | full sidebar, no drawer trigger | ✅ |
-| 1440 px | full sidebar | ✅ |
-
-At every width: **no horizontal overflow, 0 console errors**. The drawer reports
-`aria-expanded=true` on open and `false` after **Escape**, and focus returns to
-the trigger. `r0808-80-*`, `r0808-81-*`.
+Exercising the web app against **each** model backend in turn — rather than one —
+is its own procedure, because the matrix is per provider rather than per screen:
+[`../WEB_APP_LIVE_TEST.md`](../WEB_APP_LIVE_TEST.md). A Full sweep **MUST** run
+at least two backends, one local and one hosted; the matrix says what to check
+for the rest.
 
 ---
 
-## 17. Answers to the questions this round was asked
+## 20. Regression — what a run re-proves
 
-| Question | Answer |
-|---|---|
-| Can you set an API key from the web app? | **Yes** — Models → Connect → paste → Connect. No gate, allowlist, or vault key first |
-| Can you change every available model? | **Yes** — all 10 models in Anthropic's live catalogue were pinned and each answered a live turn |
-| Does a new chat create a chat on the left? | **Yes** — RECENT CHATS, with a two-item row menu (Delete chat, Move to project…) |
-| Is the chat searchable? | **Yes** — titles and message text, including text that only appeared in an attachment's answer |
-| Do multiple chats in one session remember the context? | **Yes** — verbatim recall inside a chat, isolation between chats |
-| Can you see how many tokens remain? | **Yes** — used / capacity / remaining / % / cost / the input-vs-output split, all provider-reported (the split was **BUG-68**, closed as **FIXED-154**) |
-| Can you generate a Markdown file and view it in the sidebar? | **Yes** — the turn carries a file chip that opens the right-hand File preview |
-| Can you convert Markdown to PDF in one click? | **Yes** — `•••` → Print / Save as PDF, or Export conversation… → PDF, or ask the agent to `create_document` |
-| Do the different task types work? | **Yes** — all four create, schedule, run and report |
-| Does the MCP server work? | **Yes** — create, connect, discover, and call from Chat once the decision mode allows it; output arrives marked untrusted |
-| Do Permissions / Capabilities work? | **Yes** — 67 gates, four decision modes, step-up with a required reason. The two 2026-08-08 caveats are closed: **FIXED-156** (Memory store is reachable from Chat and Build) and **FIXED-155** (Build's chips are a per-turn posture and change nothing standing) |
-| Does the network capability work? | **Yes** — once Web fetch is enabled and set to **Allow**, a turn fetches the page and quotes it; a non-allowlisted host is refused by name (**BUG-72 closed 2026-08-10**) |
-| Can you see what the agent plans to do? | **Yes** — a live `update_plan` checklist above the transcript |
-| Can the agent search without flooding the conversation? | **Yes** — `spawn_subagent` returns findings only |
-| Does a first run just work? | **Yes** — setup is prompted; without a ready model, actions stay disabled with a Models link (**BUG-69 closed 2026-08-09**) |
+**The obligation.** A Full sweep re-verifies every closed item that is manually
+re-verifiable. This section is how you know which those are, and it is the answer
+to *"if I run §1–§17, what have I re-verified?"*.
 
----
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md) holds **258** closed entries. Most are
+re-verified by a step that describes the **behaviour** rather than quoting the
+defect number — which is why the plan used to look far thinner than it is. The
+map below makes that explicit.
 
-## 18. Re-running this plan
+**Keeping it true is part of closing a defect.** When you add a `FIXED-*` entry,
+add it to one of the three tables below in the same change: covered by a step,
+covered by automation, or needing a new step. An entry in none of them is an
+untested fix, and that is the state this section exists to prevent.
 
-```bash
-rm -rf /tmp/raiker-manual-test && mkdir -p /tmp/raiker-manual-test
-export RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com'
-.venv/bin/raiker-web --workspace /tmp/raiker-manual-test --port 8765 --no-browser
-```
-
-Then work §2 → §16 in order. Two practical notes for whoever runs it next:
-
-* Complete or skip the first-run setup, then verify that no model-backed action
-  enables until the exact selection passes readiness (§19).
-* **Probe conversation memory with verbatim repetition**, not a codeword
-  (§5.5) — the codeword phrasing produces false failures.
-
-
-## 19. BUG-69 closure round — 2026-08-09
-
-Run against a fresh isolated workspace and the production web build. Provider
-credentials were entered through Models only and are absent from screenshots,
-source, and logs committed to the repository.
-
-1. Register a fresh owner. Confirm the model setup prompt opens.
-2. Skip setup, visit Workbench, Chat, Build, Tasks, and Schedule, and confirm
-   each model-backed primary action is disabled with a Models link.
-3. In Models, select local Ollama `gemma4:31b-cloud` and run **Check**. Confirm
-   exact-model Ready. A direct bounded generation returned the requested marker.
-4. Connect OpenRouter through the UI, select `openai/gpt-4o-mini`, and confirm
-   catalogue plus one-token execution readiness. A real governed turn reached
-   the approval boundary and executed no command.
-5. Connect Anthropic through the UI and select `claude-opus-4-8`. The live
-   catalogue authenticated, but the account rejected execution for insufficient
-   credit. Confirm the readiness result names current-account execution, links
-   remediation, preserves the draft, and keeps Send disabled.
-6. Add one exact local folder under **Local library**, rescan, and confirm its
-   GGUF name, llama architecture, Q4_K_M quantization, and Deploy action.
-7. Search Hugging Face for a GGUF repository. Confirm immutable revision,
-   licence, gated status, size, format, and Q4_K_M choices are visible before
-   download confirmation. Download the tiny permissive TinyStories GGUF into an
-   approved root, deploy it, and wait for the newest Activity row to reach
-   `complete`.
-
-**Result: ✅ BUG-69 closed.** No raw provider reason code became the first
-assistant reply. Screenshots: `208-BUG-69-first-run-model-setup-live.png` through
-`214-BUG-69-huggingface-download-deploy-live.png`. The Anthropic refusal is an
-expected external account state and proved the new fail-closed execution
-preflight; OpenRouter and Ollama supplied successful execution evidence.
-
-## 20. Known-limits round — 2026-08-10
-
-Run against a fresh isolated workspace (`/tmp/raiker-live`), the production web
-build, and one hosted provider credential entered through Models only. The
-credential is absent from screenshots, source, and logs committed here.
-
-Automated as `apps/web/e2e/bug-74-84-known-limits-live.spec.ts` and
-`apps/web/e2e/containment-surface-live.spec.ts`, both re-runnable against an
-already-driven workspace.
-
-1. Register a fresh owner. Confirm the model setup prompt opens, then skip it.
-2. Visit every code-split destination — Search Chat, Memory, Approvals, Tasks,
-   Knowledge Map, Projects, Permissions, Models, Extensions, Observability,
-   Settings — and confirm each mounts with content and no console error.
-   *(FIXED-161.)*
-3. Extensions → Plugins. Confirm the workspace signing posture is stated in
-   words, names the two environment variables that would raise it, and says
-   installs are unaffected. *(FIXED-166.)*
-4. Settings → Security & sign-in → **Monitored capabilities**. Confirm the
-   section explains that every capability family is watched the same way
-   monitored MCP connections are, and that an empty workspace says so rather
-   than showing nothing. *(FIXED-163, FIXED-164.)*
-5. Settings → Runtime configuration → **How long a model check stays good for**.
-   Confirm the default reads 5, change it to 30, **Save changes**, navigate away
-   and back, and confirm 30 survives the round trip. *(FIXED-169.)*
-6. Models → Activity. Confirm the durable operations surface loads and states
-   that failed work is never silently retried. *(FIXED-162.)*
-7. Models → Hosted. Connect Anthropic through the UI, pin a model from the live
-   catalogue, and press **Test**. Confirm the card reaches
-   `Ready · confirmed just now` and names the exact model it reached.
-   *(FIXED-133, FIXED-169.)*
-8. Chat. Send one bounded prompt and confirm the model answers with the exact
-   requested marker. *(FIXED-133.)*
-9. Record three consecutive failures for one connector through the same
-   `CapabilityBreaker` the runtime uses (the command is in the spec's header —
-   a browser cannot make a healthy provider fail on demand). Reload Settings →
-   Security & sign-in and confirm the subject is listed as **paused** with its
-   stated reason, its failure count and its last failure code, that a matching
-   high-severity finding appears above it, and that **Resume** returns it to
-   active in one press. *(FIXED-163, FIXED-164.)*
-
-**Result: ✅ eleven entries closed** — FIXED-133 re-verified and FIXED-161
-through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
-`round0810-11-containment-resumed.png` in
-[`screenshots/working/`](screenshots/working). The production build reports no
-chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
-the largest route chunk is Models at 82 kB.
-
-## 21. Multi-provider usage and compaction round — 2026-08-11
-
-Run against the production web build. Enter every credential through Models;
-never seed a connection through the CLI, environment, fixture, or direct API.
-Close credential and connection dialogs before taking screenshots. Use a fresh
-conversation per provider so provider attribution and model readiness are
-unambiguous.
-
-1. Run the checked-in loopback fixture and both deterministic batch specs.
-   Confirm the refusal scenario renders successive model passes as separate
-   paragraphs, and both specs use `e2e/fixtures/stub_model.py`.
-2. Connect Anthropic in Models, choose a live catalog model, complete readiness,
-   and send a bounded marker prompt in Chat.
-3. Connect OpenRouter the same way and complete a live turn. Refresh Models →
-   Activity and verify the **Provider reported** key-level weekly metric appears
-   separately from **Raiker observed**.
-4. Connect OpenAI through Models and complete a live turn. Without a separate
-   organization admin key, verify provider data says it needs one rather than
-   presenting an invented quota.
-5. Select and check Ollama `gemma4:31b-cloud`, then complete a live turn. Verify
-   the provider side says no compatible account-quota API while Raiker-observed
-   local tokens and turns remain present with no API cost.
-6. Disconnect or stop one provider and verify a provider that is no longer
-   connected/ready is absent from the rolling view.
-7. Set an owner weekly token budget in each visible row. Confirm its label says
-   **Advisory Raiker control — not a provider subscription limit**, survives a
-   reload, and can be cleared.
-8. Exercise a known small owner context capacity in the deterministic runtime.
-   Confirm the extra compaction model request has no tools, the next turn sees
-   the compacted summary plus recent exchanges, and the Context popover says the
-   transcript is unchanged. Repeat with a failed compaction and confirm bounded
-   recent history is retained.
-9. Capture provider and Context screenshots only after all credential dialogs
-   are closed. Inspect the committed image set for key-shaped strings before
-   keeping it.
-
-The automated evidence for this round includes the compaction, usage adapter,
-ledger/API, Svelte component, checked-in fixture, and live Playwright suites.
-
-**Result: deterministic and local-provider paths passed; hosted execution was
-environment-blocked.** The checked-in stub scenarios passed against the real
-FastAPI runtime, including the two-paragraph multi-call answer assertion. All
-four requested connections were entered through Models with the connection
-dialogs closed before capture. Anthropic, OpenAI, and OpenRouter then failed
-closed as **Unreachable** because this managed run could not grant the server
-outbound network access; no hosted response is represented as a live turn.
-OpenRouter's ordinary-key usage request therefore reports temporarily
-unavailable, while Anthropic and OpenAI correctly request separate organization
-admin credentials instead of inventing account limits.
-
-Ollama `gemma4:31b-cloud` passed exact-model readiness and returned both bounded
-markers in Chat. Its streamed OpenAI-compatible response exposed a live defect:
-the request omitted `stream_options.include_usage`, so the first turn did not
-reach the ledger. The adapter now requests those metrics for Ollama streams;
-the repeated turn recorded **5,405 tokens, 1 turn, 1 model request**, with **No
-API cost — local runtime**. All four connected rows accepted owner weekly token
-budgets and retained them after a server restart. The same restart exposed and
-closed a second defect: placeholder-provider cards now retain each configured
-model instead of showing `no model pinned` whenever another provider is the
-global selection. A compact 900 px pass also fixed the tablet Menu/title
-overlap and finished with no horizontal overflow.
-
-Screenshots: `bug-52-chat-refusal-does-not-end-the-turn.png`,
-`round0811-ollama-live-turn.png`,
-`round0811-hosted-provider-readiness.png`,
-`round0811-provider-usage-connected.png`, and
-`round0811-provider-usage-compact.png` in
-[`screenshots/working/`](screenshots/working). Every retained image was reviewed
-after dialogs closed; none contains a credential value.
-
-
----
-
-## 22. Regression coverage map — which section proves which closed item
-
-Added **2026-08-11** after checking every entry in
-[`FIXED_ITEMS.md`](FIXED_ITEMS.md) against this plan. 189 items are closed there;
-28 were cited by number in a step, which made the plan look far thinner than it
-is — most closed items *are* exercised, by a step that describes the behaviour
-rather than the defect number. This section makes that mapping explicit, and adds
-a step wherever the check was genuinely absent.
-
-Read it as the answer to "if I run §1–§17, what have I re-verified?"
-
-### 22.1 Already exercised by an existing section
+### 20.1 Already exercised by an existing section
 
 | Section | Closed items it re-verifies |
 |---|---|
@@ -890,7 +832,7 @@ Read it as the answer to "if I run §1–§17, what have I re-verified?"
 | §14 Settings | preferences versus governed work, settings chosen while loading, runtime configuration |
 | §16 Projects and adaptive navigation | the responsive breakpoints, Workbench activity awareness |
 
-### 22.2 Automated-only — a manual step would add nothing
+### 20.2 Automated-only — a manual step would add nothing
 
 These closed items are properties of the build, the test runtime, or a platform
 probe. They are verified by CI on every push and cannot be observed by clicking:
@@ -903,7 +845,7 @@ integrity, and project-export ordering within one second.
 
 **If one of these regresses, CI fails — do not add a manual step for it.**
 
-### 22.3 Steps added because nothing covered them
+### 20.3 Steps added because nothing covered them
 
 Run these after §16, in this order.
 
@@ -930,82 +872,34 @@ tray in a headless environment where no system tray exists. 22.1–22.3, 22.5–
 
 ---
 
-## 23. Memory recall round — 2026-08-11
+### 20.4 Items closed since this map was last rebuilt
 
-The round that verified [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md)
-MEM-01 and MEM-02, closed as FIXED-187 through FIXED-189. Run against the
-production web build with Anthropic connected through the Models dialog.
+The map above was built on 2026-08-11 against 189 closed entries. Sixty-nine have
+closed since — FIXED-190 through FIXED-269 — covering deep-path-safe I/O, the
+memory entity graph, the native sandbox, background execution and the POSIX
+terminal, restart reattachment, persistent environments, governed voice, the
+Build modes and operating protocol, the hooks surface and its lifecycle events,
+plugin contributions, channels, and the fourth approval mode.
 
-The question this round exists to answer is the one memory is actually asked:
-**can Raiker pick up a conversation from years ago and quote it exactly?**
-
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 23.1 | Register a fresh owner, take the Anthropic path through setup, finish the wizard | Lock screen, then the dashboard mounts; 0 console errors | ✅ `r0811b-01-lock-screen.png`, `r0811b-04-setup-complete.png` |
-| 23.2 | Models → Hosted → **Connect** on Anthropic; paste the key in the dialog | Card reads **Connected**; the field is masked and the key is never echoed | ✅ `r0811b-05-models-hosted.png`, `r0811b-06-connect-dialog.png`, `r0811b-07-anthropic-connected.png` |
-| 23.3 | **Choose model…**, pick a model from the live catalogue, **Use model** | The catalogue is the provider's own list | ✅ `r0811b-08-model-picker.png` |
-| 23.4 | **Test** on the Anthropic card | "1 model ready · Anthropic can reach `claude-haiku-4-5-20251001`" | ✅ `r0811b-09-model-readiness.png` |
-| 23.5 | In a new chat, state a fact worth recalling (a host name and an interval) and ask for a one-word acknowledgement | A live streamed turn; the reply is stored as the conversation record | ✅ `r0811b-11-chat-first-turn.png` |
-| 23.6 | In a **separate** chat, ask what was said earlier and require a citation | The turn calls `conversation_search`, quotes the sentence **verbatim**, and cites the conversation, its date and its id | ✅ `r0811b-12-recall-across-chats.png` |
-| 23.7 | Seed a conversation dated **three or four years back**, then ask about it with a period in the question ("back in 2022", "before 2023") | The turn narrows by date, finds the old conversation, and returns the exact figure, the quoted sentence, the date and the stated reason | ✅ `r0811b-13-recall-2022-conversation.png` |
-| 23.8 | Search Chat for a term that appears only in a message body | Each result shows the exchange that matched beneath its title, and an old conversation is grouped under its own date | ✅ `r0811b-14-search-chat.png` |
-| 23.9 | Turn **Incognito** on and repeat 23.6 | No recall item is assembled at all — the opt-out is absolute, ahead of every recall path | — written for the next round |
-| 23.10 | Sign in as a second local principal and search for the first's conversation | Nothing is returned; the index narrows candidates, `sessions.user_id` still decides visibility | Covered by `test_another_owner_never_sees_the_conversation` |
-
-> 23.6 is the step that distinguishes recall from a long context window. Start a
-> genuinely separate conversation — not a new turn in the same one — or the model
-> can answer from history it still has.
-
-**Result: passed.** The first pass of 23.6 found the right conversation and still
-could not answer, because the tool returned the index's own ~18-token snippet and
-the model was handed "…we rotate the SQLCipher key every…". That is **FIXED-189**,
-fixed and re-run in the same round; the regression test is written from the live
-transcript. 23.7 then recalled an 18 April 2022 conversation with the exact
-retention window, the verbatim sentence, the date and the reason.
+**Every one of them has a step in §3–§17 of this plan**, because those sections
+were written against the current product rather than grown from the old ones.
+What is *not* yet done is the per-entry attribution: mapping each of the
+sixty-nine to the step that proves it, in the shape of §20.1. That is the next
+piece of work on this document, and until it is finished a Full sweep should
+treat §3–§17 as the obligation and this note as the honest caveat.
 
 ---
 
-## 24. Native OS sandbox round — 2026-08-15
+## 21. Recording a round
 
-The round that closed the OS-boundary half of BUG-194 as **FIXED-195**. Run
-against the production web build on Windows 11, with all four providers
-connected **through the Models dialog**, never through the CLI.
+Do not write results here. Add a section to
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md), newest first, with the date, the
+tier you ran, the build, the providers, what it proved and what it found — then
+put screenshots under [`screenshots/working/`](screenshots/working) with a fresh
+prefix and add that prefix to [`screenshots/README.md`](screenshots/README.md).
 
-The question this round exists to answer: **is the boundary real, and does
-Raiker only claim what it measured?**
+Defects go to [`TO_BE_FIXED.md`](TO_BE_FIXED.md) with a reproduction and a
+screenshot under [`screenshots/not-working/`](screenshots/not-working).
 
-| # | Step | Expected | Result |
-|---|---|---|---|
-| 24.1 | Register a fresh owner, take Balanced through setup, open the dashboard | Lock screen, then the dashboard mounts | ✅ |
-| 24.2 | Settings → **Runtime configuration** | **Native OS sandbox** is listed with `AppContainer · network denied` and six observations | ✅ `r0815-runtime-native-sandbox-observations.png` |
-| 24.3 | Read the six observations | Command output reaches Raiker / can write inside the workspace / cannot write outside it / cannot read Raiker's own state / cannot reach the network / stopping ends every descendant — all **Enforced** | ✅ `r0815-native-sandbox-card.png` |
-| 24.4 | Read what the card says it does *not* do | "Foreground commands only. PTY, background execution, network grants and persistence are not built for this boundary and are not offered." | ✅ |
-| 24.5 | Read the re-measure disclosure | "Re-measuring opens one connection to this host's default gateway on a closed port." | ✅ |
-| 24.6 | **Select** the native sandbox | The card reads **Selected**; `execution_environment_selection` records `native_sandbox` | ✅ |
-| 24.7 | Permissions → enable **Shell commands** and **Approval execution relay**, each with a reason and a confirmation token | Both gates record `enabled_runtime` against the principal | ✅ |
-| 24.8 | Models → Hosted → **Connect** Anthropic, OpenRouter and OpenAI, pasting each key in the dialog; **Test** each | Each card reads **Connected**, then "«provider» can reach «model»" | ✅ |
-| 24.9 | Build → send "Use the shell tool to run exactly: `git --version`" | The turn proposes a `shell` action and parks: "Waiting for your decision. Nothing has run yet." | ✅ |
-| 24.10 | **Accept** | The command runs inside a per-run AppContainer; `git version 2.55.0.windows.4` comes back through the relay; the model answers from it | ✅ `r0815-build-governed-terminal-appcontainer.png` |
-| 24.11 | Read the governed terminal | `AppContainer · network denied` · "OS boundary · foreground only · no PTY, background or network grant" · the output · **Immutable receipt** with outcome, exit, isolation and authority | ✅ |
-| 24.12 | Repeat 24.9–24.10 with **OpenRouter** (Gemini 3.7 Flash), **OpenAI** (GPT-4o Mini) and **Ollama** (gemma4:31b-cloud) | Each provider drives the same path to the same executed command | ✅ six `succeeded` runs in `command_runs` |
-| 24.13 | Run `echo x > ..\escape.txt` through the runner directly | **"Access is denied."** from the OS, exit 1 — not a policy refusal | ✅ |
-| 24.14 | Run `dir .raiker` through the runner directly | **"Access is denied."** from the OS | ✅ |
-| 24.15 | Read the receipt evidence for a completed run | `boundary_constructed` names this run's profile, `network_capability: false`, the protected paths and the runner digest; `probe_observations` carries the six host measurements **and** the time they were taken | ✅ |
-
-> 24.13 and 24.14 are the steps that separate this from the argv policy. The
-> allowlist would refuse those commands anyway; running them through the runner
-> directly is what shows the *operating system* refusing them.
-
-**Result: passed, after two defects this round found and fixed.** Every
-sandboxed command initially failed with `native_sandbox_launch_failed:203` while
-the same command run by hand succeeded: an AppContainer is created with a
-redirected local profile and `CreateProcessW` resolves it from the environment
-block, which Raiker's deliberately minimal environment did not carry. And
-`portable_command` rewrote `echo` into the interpreter Raiker itself runs on,
-which lives outside the boundary, so the child died with `STATUS_DLL_NOT_FOUND`
-— an exit code rather than an error. Both are in **FIXED-195**.
-
-One defect found and **not** fixed this round: every turn rendered
-**"The turn could not continue (409)."** beneath its own successful answer, in
-all four provider rounds. Filed as **BUG-196**.
-
+**If a step here was wrong, fix the step.** That is the one edit this document
+wants from a round — not a note about what you saw.

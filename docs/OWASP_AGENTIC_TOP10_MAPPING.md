@@ -7,10 +7,17 @@ that act, not merely generate. It is the agentic companion to
 the OWASP **LLM** Top 10 (2025). The two lists are different taxonomies; neither
 subsumes the other.
 
+**Source.** The list is published by the
+[OWASP GenAI Security Project](https://genai.owasp.org/). The ten categories used
+below are its own: ASI01 Agent Goal Hijack, ASI02 Tool Misuse & Exploitation,
+ASI03 Agent Identity & Privilege Abuse, ASI04 Agentic Supply Chain Compromise,
+ASI05 Unexpected Code Execution, ASI06 Memory & Context Poisoning, ASI07 Insecure
+Inter-Agent Communication, ASI08 Cascading Agent Failures, ASI09 Human-Agent
+Trust Exploitation, ASI10 Rogue Agents.
+
 The comparison baseline is Microsoft's
 [Agent Governance Toolkit](https://github.com/microsoft/agent-governance-toolkit)
-reference architecture (`docs/compliance/owasp-agentic-top10-architecture.md`),
-which maps the same ten risks to a governance runtime. Where AGT rates its own
+reference architecture, which maps the same ten risks to a governance runtime. Where AGT rates its own
 coverage, that rating is quoted so Raiker's position is legible against a
 published peer rather than against nothing.
 

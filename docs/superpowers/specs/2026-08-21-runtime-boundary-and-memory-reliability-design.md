@@ -9,7 +9,7 @@ owner review, preserve the already-fixed unified recall behavior, and complete
 the remaining governed-command backends and safeguards through the command
 control plane designed in
 the governed shell, sandbox, environment and recovery control set — recorded
-in [`../../REFERENCE_PLATFORM_COMPATIBILITY.md`](../../REFERENCE_PLATFORM_COMPATIBILITY.md#governed-shell-sandbox-environment-and-recovery-control-set) and
+in [`../../REFERENCE_PLATFORM_COMPATIBILITY.md`](../../REFERENCE_REVIEW_LOG.md#governed-shell-sandbox-environment-and-recovery-control-set) and
 [`../../plans/TO_BE_FIXED.md`](../../plans/TO_BE_FIXED.md) → BUG-194. (The
 2026-08-14 design note this line used to link was never committed to this
 repository.)

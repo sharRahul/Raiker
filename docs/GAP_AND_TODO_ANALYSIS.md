@@ -49,12 +49,26 @@ The three highest-priority, lowest-effort items are:
    be taken out of the product. (Memory export, by contrast, *is* reachable —
    `GET /api/memory/export`, `raiker/api/routes_memory.py` — which is what makes
    the audit gap conspicuous.)
-3. **Eight gated capabilities have no threat model**, four of them relayed by an
-   approval and two of them egress. Found 2026-08-24; listed in
-   [the threat-models index](threat-models/README.md#capabilities-with-a-real-executor-and-no-threat-model).
+3. **Two egress implementations exist, and the weaker one is registered.**
+   `WebFetchExecutor` and `NetworkExecutor` reach the network through
+   `sandbox.fetch_url` with a hard-coded four-host allowlist and none of
+   `WebAccessService`'s address guard. Neither is reachable from any product
+   route, and both are in the default executor registry. Candidate for removal
+   rather than completion — see
+   [`threat-models/network-execution.md`](threat-models/network-execution.md).
+4. **Raiker's MCP client is pinned to protocol revision `2024-11-05`**, five
+   revisions behind the current
+   [`2026-07-28`](https://modelcontextprotocol.io/specification/versioning). It
+   is why remote MCP has no OAuth flow and no streamable-HTTP session semantics.
 
-`RUNTIME_EXECUTORS_SPEC.md` completeness was a third item here and is **closed**:
-re-checked on 2026-08-24, all 67 capabilities in `raiker/phase_gates.py` appear in
+The **eight capabilities with no threat model** were a third item here and are
+**closed** (2026-08-23). Re-deriving the comparison found the count understated —
+it credited a passing mention — so eleven documents were written rather than
+eight, and all forty-five capabilities with a real executor now have one. See
+[the threat-models index](threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
+
+`RUNTIME_EXECUTORS_SPEC.md` completeness was a fourth item here and is **closed**:
+re-checked on 2026-08-23, all 67 capabilities in `raiker/phase_gates.py` appear in
 it. It is kept named rather than silently dropped, because the pattern it
 represents — a canonical status document that omits capabilities — is the one
 worth watching for.

@@ -23,16 +23,33 @@ configured model surface.
 
 ## Provider adapters, and where their contracts are defined
 
-Four adapters ship in `raiker/models/providers/`. Each speaks a documented wire
+**Three adapters ship** in `raiker/models/providers/`, alongside the
+`AsyncModelProvider` protocol in `base.py`. Each speaks a documented wire
 protocol; where a claim here is about a provider's behaviour rather than
 Raiker's, the provider's own documentation is the source.
 
 | Adapter | Serves | Vendor reference |
 |---|---|---|
 | `anthropic_messages.py` | Anthropic | [Messages API](https://docs.claude.com/en/api/messages), [extended thinking](https://docs.claude.com/en/docs/build-with-claude/extended-thinking), [models](https://docs.claude.com/en/docs/about-claude/models/overview) |
-| `openai_compatible.py` | OpenAI, OpenRouter, Ollama, LM Studio, and any owner-supplied OpenAI-compatible endpoint | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat), [OpenRouter](https://openrouter.ai/docs), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md), [LM Studio server](https://lmstudio.ai/docs/app/api/endpoints/openai) |
+| `openai_compatible.py` | OpenAI, Gemini, OpenRouter, Hugging Face Inference Providers, Ollama, Ollama Cloud, LM Studio, vLLM, and any owner-supplied OpenAI-compatible endpoint | [OpenAI Chat Completions](https://platform.openai.com/docs/api-reference/chat), [Gemini OpenAI compatibility](https://ai.google.dev/gemini-api/docs/openai), [OpenRouter](https://openrouter.ai/docs), [Hugging Face Inference Providers](https://huggingface.co/docs/inference-providers/index), [Ollama API](https://github.com/ollama/ollama/blob/main/docs/api.md), [LM Studio server](https://lmstudio.ai/docs/app/api/endpoints/openai), [vLLM OpenAI server](https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html) |
 | `llama_cpp_server.py` | A managed local `llama-server` | [llama.cpp server](https://github.com/ggml-org/llama.cpp/tree/master/tools/server) |
-| `mock` | Deterministic offline testing | — |
+
+**There is no mock or test provider, and a profile that claims to be one is
+refused.** This document previously listed a fourth `mock` adapter for
+"deterministic offline testing"; no such adapter exists, and
+`AsyncProviderFactory.create` rejects `provider` of `mock` or `test`, and any
+profile carrying `test_only`, with `test_provider_not_available`. A profile whose
+`default_state` is `enabled_for_tests_only` is refused with
+`test_only_profile_not_runnable`. This matters beyond tidiness: a provider that
+answers without a real model would let every readiness gate pass over an
+endpoint that proves nothing.
+
+The accepted `provider` values are exactly: `anthropic`, `openai`, `gemini`,
+`openrouter`, `huggingface`, `ollama`, `ollama-cloud`, `lm-studio`,
+`lm-studio-remote`, `llama-cpp`, `llama.cpp`, `llama-cpp-server`, `vllm` and
+`openai-compatible`. Anything else fails closed with
+`unknown_provider:<name>`. Thirteen profiles ship in
+`raiker/config/model-profiles.json` across ten of those families.
 
 Model acquisition additionally reads the
 [Hugging Face Hub](https://huggingface.co/docs/hub/index) for revision-pinned

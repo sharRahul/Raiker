@@ -106,7 +106,7 @@ plan with execution disabled).
 |---|---|
 | Give the agent a new deterministic action | **Tool** (via plugin or built-in) |
 | React to a lifecycle event (lint on edit, block a command) | **Hook** |
-| Package a repeatable multi-step procedure | **Skill** |
+| Package a repeatable multi-step procedure | **Skill** — `SKILL.md`, close to the [Agent Skills](https://agentskills.io/specification) open standard; instruction-only, so nothing it bundles is executed |
 | Distribute a set of the above together | **Plugin** |
 | Add a new way to talk to Raiker (chat/webhook/voice) | **Channel** |
 
@@ -116,19 +116,26 @@ plan with execution disabled).
 
 - **Tools:** implemented for the built-in safe set; plugin-provided tools are planned to register
   through the same broker.
-- **Plugins:** registry + manifest validation, and **two contribution kinds**
-  (`raiker/plugins/contributions.py`). A plugin still runs no code of its own; it contributes
-  through a surface that already governs the thing contributed — `contributes.hooks` becomes hook
-  rules at `plugin` scope, below every scope the owner controls, and `contributes.skills` becomes
-  instruction text validated by the same reader an upload goes through and installed **switched
-  off**. MCP servers and panels remain uncontributable. Revoking deletes everything the plugin
-  wrote. See `PLUGIN_SYSTEM_SPEC.md`.
+- **Plugins:** registry + manifest validation, and **three contribution kinds**
+  (`raiker/plugins/contributions.py`), each behind its own declared permission. A plugin still runs
+  no code of its own; it contributes through a surface that already governs the thing contributed —
+  `contributes.hooks` (`event:hook`) becomes hook rules at `plugin` scope, below every scope the
+  owner controls; `contributes.skills` (`skill:contribute`) becomes instruction text validated by
+  the same reader an upload goes through and installed **switched off**; and
+  `contributes.mcp_servers` (`mcp:server`) becomes an **offer** — nothing is a server until the
+  owner adds it. Panels and LSP servers remain uncontributable. Revoking deletes everything the
+  plugin wrote. See `PLUGIN_SYSTEM_SPEC.md`.
 - **Channels:** registry, profile validation, **outbound delivery** through
   `external_channel_runtime` against an owner egress allowlist, and an **inbound
   receiver** behind an owner secret with sender allowlisting that marks every
   message untrusted, quarantined and instructions-inert. All of it was built and
-  unreachable until FIXED-265 gave the owner a way to pair a connector. Rate
-  limits, routing modes and approval-relay resolution remain unbuilt.
+  unreachable until FIXED-265 gave the owner a way to pair a connector.
+  **Per-sender rate limiting is built** — 60 messages per sender per minute
+  (`CHANNEL_INBOUND_DEFAULT_MAX`, `RAIKER_CHANNEL_INBOUND_RATE` overrides), with
+  a rejection recorded as `channel_message_rejected` / `rate_limited` so a
+  channel that stops working is answerable from Observability. Routing modes and
+  approval-relay resolution remain unbuilt: an inbound message never becomes work
+  on its own.
 - **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
   decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
   `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
@@ -151,10 +158,13 @@ plan with execution disabled).
     body, and any one bundled file, are read on demand through the broker like any other
     governed read — so they appear in the tool-action record and the event log.
 
-The remaining pieces to complete this model are the one contribution kind a plugin still cannot
-provide (panels), and the channel work above the transport: rate limits, routing modes and
-approval-relay resolution. Each must register through — and be gated by — the existing
-broker/policy/event infrastructure rather than inventing an execution surface.
+The remaining pieces to complete this model are the channel work above the transport — routing
+modes and approval-relay resolution — and the question of contributed UI, which is now a choice
+rather than a to-do: `PLUGIN_SYSTEM_SPEC.md`'s `panels.json` and the MCP ecosystem's
+[MCP Apps](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)
+answer the same need, and Raiker should build at most one of them. Whichever is chosen must
+register through — and be gated by — the existing broker/policy/event infrastructure rather than
+inventing an execution surface.
 
 ## Where each surface is seen
 

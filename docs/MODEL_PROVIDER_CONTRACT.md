@@ -2,14 +2,28 @@
 
 This document defines the implementation contract for model providers. `docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md` defines model runtime behaviour; this file defines the interface a provider adapter must implement.
 
-**Implemented adapters (2026-08-22).** `raiker/models/providers/` ships four:
-the deterministic `mock` provider, `anthropic_messages.py`,
-`openai_compatible.py` (which serves OpenAI, OpenRouter, Ollama, LM Studio and
-any owner-supplied OpenAI-compatible endpoint) and `llama_cpp_server.py`. A
-provider is reachable only once the owner configures it, its exact model passes
-readiness, and its endpoint satisfies `raiker/models/endpoint_policy.py`; an
-unconfigured provider still fails closed. See
-[Models and local inference](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md).
+**Implemented adapters (re-checked 2026-08-23).** `raiker/models/providers/`
+ships **three**, over the `AsyncModelProvider` protocol in `base.py`:
+`anthropic_messages.py`, `openai_compatible.py` (which serves OpenAI, Gemini,
+OpenRouter, Hugging Face Inference Providers, Ollama, Ollama Cloud, LM Studio,
+vLLM and any owner-supplied OpenAI-compatible endpoint) and
+`llama_cpp_server.py`. A provider is reachable only once the owner configures
+it, its exact model passes readiness, and its endpoint satisfies
+`raiker/models/endpoint_policy.py`; an unconfigured provider still fails closed.
+See [Models and local inference](MODEL_RUNTIME_AND_LOCAL_INFERENCE.md).
+
+> **There is no `mock` provider, and there must not be one.** This document said
+> four adapters shipped, counting a deterministic `mock`. No such adapter exists.
+> `AsyncProviderFactory.create` refuses a `provider` of `mock` or `test`, and any
+> profile carrying `test_only`, with `test_provider_not_available`; a profile
+> whose `default_state` is `enabled_for_tests_only` is refused with
+> `test_only_profile_not_runnable`. The reason is governance rather than tidiness:
+> readiness exists to prove that an **exact** model at an **exact** endpoint can
+> really answer, and a provider that answers without a model would let every
+> readiness gate pass over an endpoint that proves nothing. **A conforming
+> implementation of this contract must not be a stub.** Test doubles belong in a
+> test's own fixtures, never in the shipped provider registry, and the Phase 1
+> mock sections below are kept only as the historical record described there.
 
 ---
 
@@ -17,11 +31,15 @@ unconfigured provider still fails closed. See
 
 Every provider adapter must expose these operations:
 
-| Operation | Purpose | Phase 1 requirement |
+The "Phase 1 requirement" column is the **historical** build order and is not
+the current bar. Today every shipped adapter implements the whole interface
+against a real endpoint.
+
+| Operation | Purpose | Phase 1 requirement (historical) |
 |---|---|---|
-| `load_profile(profile)` | Validate and bind a model profile. | Required for `mock`. |
-| `health_check()` | Report availability without sending user prompt. | Required for `mock`; local providers later. |
-| `generate(request)` | Produce non-streaming output. | Required for `mock`. |
+| `load_profile(profile)` | Validate and bind a model profile. | Required. |
+| `health_check()` | Report availability without sending user prompt. | Required; local providers later. |
+| `generate(request)` | Produce non-streaming output. | Required. |
 | `stream(request)` | Yield output chunks. | Optional in Phase 1; required for streaming providers later. |
 | `cancel(request_id)` | Cancel in-flight request when supported. | Stub allowed in Phase 1. |
 | `estimate_tokens(input)` | Estimate context size. | Stub allowed in Phase 1. |
@@ -89,7 +107,7 @@ Allowed statuses: `completed`, `failed`, `cancelled`, `blocked_by_policy`, `unav
 
 | Provider class | Default policy | Required controls |
 |---|---|---|
-| `mock` | Enabled for tests | No network, deterministic output. |
+| `mock` / `test` / `test_only` | **Refused** — `test_provider_not_available` | Not a provider class Raiker serves. See the banner at the top. |
 | local HTTP provider | Disabled until Phase 2 profile enabled | Endpoint validation, local-only policy, health check. |
 | OpenAI-compatible local endpoint | Disabled until Phase 2/3 | Endpoint must be localhost/local network unless policy allows egress. |
 | hosted provider | Disabled by default | Egress approval, redaction, budget, audit event. |
@@ -151,14 +169,23 @@ reasoning block (Anthropic's `signature_delta`) are not text and must not.
 
 ---
 
-## Phase 1 Mock Provider Acceptance
+## Phase 1 Mock Provider Acceptance *(historical — superseded)*
+
+> **Superseded 2026-08-23.** Items 1–3 describe a `mock` provider that does not
+> exist and is now refused fail-closed. What replaced them is the assertion that
+> a test provider **cannot be constructed**: `AsyncProviderFactory.create` raises
+> `test_provider_not_available`. Items 4–8 still stand and are still asserted.
 
 Tests must prove:
 
-1. `mock` provider loads from registry profile;
-2. `mock` provider produces deterministic output;
-3. `mock` provider does not use network;
-4. unknown provider fails clearly;
+1. ~~`mock` provider loads from registry profile~~ → a `mock`/`test`/`test_only`
+   profile is **refused** with `test_provider_not_available`;
+2. ~~`mock` provider produces deterministic output~~ → an
+   `enabled_for_tests_only` profile is refused with
+   `test_only_profile_not_runnable`;
+3. ~~`mock` provider does not use network~~ → superseded by the endpoint policy in
+   `raiker/models/endpoint_policy.py`, which every real adapter passes;
+4. unknown provider fails clearly (`unknown_provider:<name>`);
 5. hosted providers are not called in tests;
 6. provider output cannot execute tools directly;
 7. invalid structured tool proposals are rejected before policy;

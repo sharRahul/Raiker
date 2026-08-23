@@ -109,8 +109,44 @@ version: 1.0.0
 skill applies, so it carries the triggers rather than a summary.
 
 A `*.skill` file is a zip holding `<name>/SKILL.md` plus any supporting files —
-`references/` for detail loaded only when needed, `scripts/` for code to run,
-`assets/` for templates. Bundles are capped at 2 MB.
+`references/` for detail loaded only when needed, `assets/` for templates, and
+`scripts/`, which is where the format expects executable code. **Raiker stores a
+`scripts/` file and never runs it.** A script in a Raiker skill is readable text
+the agent may open through `skill_load` like any other bundled file, and running
+what it says still means proposing a `shell` command that passes its own gate,
+its own decision mode and your approval. Bundles are capped at 2 MB.
+
+### Skills written elsewhere, and skills written here
+
+The `SKILL.md` format is an open standard —
+[Agent Skills](https://agentskills.io), with a published
+[specification](https://agentskills.io/specification) — implemented by Claude,
+Claude Code, ChatGPT and Codex, Hermes Agent, OpenClaw and around forty other
+products. Raiker reads the same file, requires the same two fields, and loads
+skills the same way (index first, body on demand), so a skill from elsewhere
+generally installs here.
+
+Two differences are worth knowing before you move one in either direction:
+
+- **Raiker runs nothing.** The standard permits an agent to execute a skill's
+  bundled scripts, and several products do. Raiker does not, and this is a
+  decision rather than an omission: a skill is instruction text, and instruction
+  text that can also execute is a capability arriving without a gate.
+- **Raiker's reader is looser than the standard, so a skill that installs here
+  may not validate elsewhere.** Raiker accepts `.` and `_` in a name where the
+  standard allows only `a-z`, `0-9` and single hyphens, and accepts a
+  description up to 2000 characters where the standard caps it at 1024. Its
+  frontmatter reader handles flat scalars rather than YAML, so the standard's
+  nested `metadata:` map does not parse, and `license`, `compatibility` and
+  `allowed-tools` are ignored — including the `version:` line in the example
+  above, which the standard would put under `metadata`. If you want a skill that
+  travels, keep to the standard's narrower rules; [`skills-ref
+  validate`](https://github.com/agentskills/agentskills/tree/main/skills-ref)
+  will tell you.
+
+`allowed-tools` is the one field Raiker would refuse to honour even after
+reading it: a skill pre-approving its own tools is exactly the grant this tab's
+"grants no capability" promise exists to prevent.
 
 ### Adding one
 

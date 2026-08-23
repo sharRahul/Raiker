@@ -26,10 +26,33 @@ a plugin-authored executable on a command's `PATH` is plugin code execution with
 an extra step, and a background monitor is a long-running command whose output
 enters the turn.
 
-Panels are worth naming precisely: they are a gap against **this document**, not
-against a reference platform. No compared platform ships plugin UI panels —
+Panels are worth naming precisely, and the precise statement changed on
+2026-08-23. No *plugin component* in any compared platform is a panel —
 [Claude Code's plugin components](https://code.claude.com/docs/en/plugins-reference)
-are skills, agents, hooks, MCP servers, LSP servers and monitors.
+are skills, agents, hooks, MCP servers, LSP servers and monitors — so as a
+**plugin** contribution this is still a gap against this document rather than
+against a reference platform.
+
+What has changed is that the industry now has a specified, sandboxed way to do
+the same job from the other side. **MCP Apps**
+([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp),
+[`modelcontextprotocol/ext-apps`](https://github.com/modelcontextprotocol/ext-apps))
+lets an MCP *server* pre-declare a UI resource under a `ui://` scheme, link it to
+a tool through metadata, and have the host render it in a **mandatory sandboxed
+iframe** with every message travelling over MCP's own JSON-RPC; Claude
+[ships it](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
+behind a per-app owner permission.
+
+That contract suits Raiker better than a plugin-drawn page would, for three
+reasons this document already argues elsewhere: the server is something the
+owner added deliberately rather than something a plugin added on its behalf; the
+resource is declared ahead of time, so it can be fetched and reviewed before
+anything runs; and the traffic is already the shape the audit log records. If
+Raiker ever renders contributed UI, **this is the route to take, and a
+`panels.json` is the route to drop** — building both would be two contradictory
+UI-contribution models. Raiker's MCP client cannot reach it while pinned to
+protocol revision `2024-11-05`; see
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §2.6](REFERENCE_PLATFORM_COMPATIBILITY.md#26-extensibility--plugins-skills-mcp-channels).
 
 Plugin execution slices are governed/default-ask unless explicitly tightened or disabled by user, project, or managed policy; broader plugin extensions remain deferred/fail-closed.
 

@@ -77,12 +77,29 @@ untrue sentence once shipped.
 | `validate_local_single_user_runtime.py` | The single-runtime status markers are present across the eleven documents that carry them |
 | `validate_runtime_enablement_readiness.py` | The enforcement phrases — strict non-allow blocking, role revoke governed, capability gate per action — are present where they are claimed |
 
+## The documentation tests in `pytest`
+
+`tests/test_docs_consistency.py` runs in the ordinary suite, so these are gates
+CI already enforces rather than a separate step. Each exists because the thing it
+asserts had actually broken:
+
+| Test | What it asserts |
+|---|---|
+| `test_required_docs_do_not_contain_stale_model_runtime_claims` | Eleven documents do not carry any of the retired model-runtime claims |
+| `test_every_real_executor_capability_has_a_threat_model` | Every name in `REAL_EXECUTOR_CAPABILITIES` appears in `docs/threat-models/README.md`. The step-up asks the owner to acknowledge a threat model; this is what stops a capability gaining an executor without one |
+| `test_documentation_links_and_anchors_resolve` | Every relative Markdown link in `README.md`, `docs/**` and `apps/web/README.md` resolves — **including its heading anchor**, using GitHub's slug algorithm |
+| `test_relayed_capability_count_is_stated_correctly` | `EXECUTABLE_ON_APPROVAL` still has twelve members, and `README.md` still says so. Changing the set without updating the documents that name the number fails here |
+
 ## What is not automated
 
-- **Link checking.** There is no link-check step in CI. Internal links, anchors
-  and repository paths were audited by hand during the 2026-08-23 documentation
-  reconciliation, and external URLs were verified where the network allowed.
-  Adding a link check is worth doing and is not yet done.
+- **External URL checking.** Internal links and anchors are now asserted by
+  `test_documentation_links_and_anchors_resolve` (see above), which closes the
+  item that stood here. **External** URLs are not fetched by CI — that would
+  make the build depend on other people's uptime and on hosts that refuse
+  automated requests. They are re-read by hand each reconciliation, and the
+  result is recorded per domain in
+  [`REFERENCE_PLATFORM_COMPATIBILITY.md` §1](REFERENCE_PLATFORM_COMPATIBILITY.md#1-reference-platforms-and-sources)
+  rather than assumed.
 - **The `live` end-to-end suite.** It needs real provider credentials; see
   [LOCAL_VALIDATION_GATE.md](LOCAL_VALIDATION_GATE.md).
 - **The manual browser round.**

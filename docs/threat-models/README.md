@@ -18,13 +18,35 @@ acknowledging.
 |---|---|
 | `approval_execution_relay` | [Approval execution relay](approval-execution-relay.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
+| `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
+| `shell_execution` | [Governed command execution](shell-execution.md) |
+| `process_execution` | [Direct process execution](process-execution.md) |
 | `git_write_execution` | [Git writes](git-write.md) |
 | `git_push_execution` | [Git push](git-push.md) |
 | `container_execution_cap` | [Local container execution](container.md) |
 | `remote_execution_cap`, `cloud_execution_cap` | [Remote / cloud execution](remote-cloud.md) |
 | `scheduled_routines` | [Scheduled routines](scheduled-routines.md) |
 | `subagents`, `multi_agent_teams` | [Subagents and multi-agent teams](subagents.md) |
+
+## Egress
+
+| Capability | Threat model |
+|---|---|
+| `web_fetch` (the `web_fetch` **and** `web_search` tools) | [Web read](web-fetch.md) |
+| `network_execution` | [Generic network execution](network-execution.md) |
+
+## Memory, knowledge and planning
+
+| Capability | Threat model |
+|---|---|
+| `memory_write_execution` | [Durable memory write](memory-write.md) |
+| `memory_forget_execution` | [Durable memory forget](memory-forget.md) |
+| `semantic_memory_runtime` | [Semantic memory search](semantic-memory.md) |
+| `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) |
+| `code_map_indexing` | [Repository code map](code-map-indexing.md) |
+| `task_management_runtime` | [Task creation](task-management.md) |
+| `project_assignment_runtime` | [Project assignment](project-assignment.md) |
 
 ## Models and inference
 
@@ -85,28 +107,50 @@ nothing to model until one is proposed. See
 
 ---
 
-## Capabilities with a real executor and no threat model
+## Coverage — every capability with a real executor has one
 
-Recorded 2026-08-24 by comparing `REAL_EXECUTOR_CAPABILITIES`
-(`raiker/runtime/executors/__init__.py`) against every document in this
-directory. **Eight of the forty-five are not named in any threat model**, here or
-in [`../THREAT_MODEL.md`](../THREAT_MODEL.md):
+Re-derived **2026-08-23** by comparing `REAL_EXECUTOR_CAPABILITIES`
+(`raiker/runtime/executors/__init__.py`) against the index above.
+**All forty-five are covered**, and every one is reachable from a table on this
+page rather than only by knowing a filename.
 
-| Capability | Why it matters that it is missing |
-|---|---|
-| `memory_write_execution` | In `EXECUTABLE_ON_APPROVAL` — approving really writes a durable record |
-| `memory_forget_execution` | In `EXECUTABLE_ON_APPROVAL` — approving really removes one |
-| `task_management_runtime` | In `EXECUTABLE_ON_APPROVAL` — approving really creates a task row |
-| `project_assignment_runtime` | In `EXECUTABLE_ON_APPROVAL` — approving really writes a project label |
-| `web_fetch` | Egress, and the point at which untrusted external text enters a turn |
-| `network_execution` | Egress. Approval is decision-only, but the gate is real |
-| `graph_indexing_runtime` | Reads the workspace and derives a durable index |
-| `code_map_indexing` | Reads the workspace and derives a durable symbol index |
+The previous audit recorded eight as missing. Re-deriving it found the count was
+**understated**, because a capability was credited to any document that mentioned
+its name in passing. Three more had no analysis of their own —
+`shell_execution` (the broadest capability in the product), `process_execution`,
+and `semantic_memory_runtime` — and `file_write_execution` /
+`patch_apply_execution` had only a section of the repository-wide
+[`../THREAT_MODEL.md`](../THREAT_MODEL.md) whose central claim had gone stale.
+Eleven documents close that:
 
-This is a **documentation** gap, not a control gap: each of the eight is gated,
-policy-reviewed and audited exactly like the capabilities that do have a
-document, and the four relayed ones re-pass their own gate at execution time.
-What is missing is the written analysis the owner acknowledges when opening the
-gate. Tracked in
-[the prioritised backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog)
-and [Known limits](../KNOWN_LIMITS.md).
+| Capability | Threat model | Why it needed one |
+|---|---|---|
+| `shell_execution` | [Governed command execution](shell-execution.md) | The broadest reach in the product, and relayed by an approval |
+| `process_execution` | [Direct process execution](process-execution.md) | Same lifecycle, deliberately *not* relayed |
+| `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) | Relayed; containment and checkpoint bounds were undocumented per-capability |
+| `memory_write_execution` | [Durable memory write](memory-write.md) | Relayed — approving really writes a durable record |
+| `memory_forget_execution` | [Durable memory forget](memory-forget.md) | Relayed — approving really removes one |
+| `task_management_runtime` | [Task creation](task-management.md) | Relayed, and a task raises unattended turns later |
+| `project_assignment_runtime` | [Project assignment](project-assignment.md) | Relayed; the move changes a conversation's standing context |
+| `web_fetch` | [Web read](web-fetch.md) | Egress, and where untrusted external text enters a turn |
+| `network_execution` | [Generic network execution](network-execution.md) | Egress with a weaker guard and no reachable caller |
+| `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) | Reads the workspace and derives a durable index |
+| `code_map_indexing` | [Repository code map](code-map-indexing.md) | Reads the workspace and derives a durable symbol index |
+
+Two findings came out of writing them, and both are recorded in the pages
+themselves rather than smoothed over:
+
+- **Two egress implementations exist.** `WebFetchExecutor` and `NetworkExecutor`
+  reach the network through `sandbox.fetch_url` with a hard-coded four-host
+  allowlist and none of `WebAccessService`'s address guard. Neither is reachable
+  from any product route — the model's `web_fetch` goes through the broker — but
+  both are registered. See [`network-execution.md`](network-execution.md).
+- **Checkpoint capture is bounded.** A file over 8 MiB is written and recorded
+  `oversize`, which means *not restorable*. See
+  [`workspace-file-mutation.md`](workspace-file-mutation.md).
+
+Both are tracked in
+[the prioritised backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+
+A test keeps this honest rather than a promise: see
+[`../VERIFICATION_PLAN.md`](../VERIFICATION_PLAN.md).

@@ -107,7 +107,7 @@ instead.
 | Topic | Document |
 |---|---|
 | Assets, trust boundaries, threats and mitigations | [Threat model](THREAT_MODEL.md) |
-| Per-capability threat models, and which capabilities have none | [Threat models index](threat-models/README.md) |
+| Per-capability threat models — one for every capability with a real executor | [Threat models index](threat-models/README.md) |
 | OWASP LLM Top 10 (2025) against enforced controls | [OWASP GenAI mapping](OWASP_GENAI_SECURITY_MAPPING.md) |
 | OWASP Agentic Top 10 (ASI01–ASI10, 2026), each row citing code | [OWASP Agentic mapping](OWASP_AGENTIC_TOP10_MAPPING.md) |
 | Licence policy and third-party obligations | [Licensing policy](licensing/LICENSING_POLICY.md) |
@@ -149,5 +149,6 @@ above, the canonical document is right.
 |---|---|
 | [Build order](BUILD_ORDER.md) | The dependency-safe implementation sequence the phases were built in |
 | [Full phase implementation blueprint](FULL_PHASE_IMPLEMENTATION_BLUEPRINT.md) | The original per-phase behaviour, storage, security and test specification |
+| [Reference review log](REFERENCE_REVIEW_LOG.md) | Every dated reference review since 2026-08-16, and the concept-to-specification maps. Split out of [`REFERENCE_PLATFORM_COMPATIBILITY.md`](REFERENCE_PLATFORM_COMPATIBILITY.md) on 2026-08-23 so the canonical comparison describes the product rather than the passes that got there |
 | [Apache 2.0 relicensing audit](licensing/APACHE_2_RELICENSING_AUDIT.md) | The audit behind the current licence |
 

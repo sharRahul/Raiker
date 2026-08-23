@@ -228,7 +228,7 @@ before you decide anything:
 | **Hooks cover half the reference lifecycle** | Sixteen of the thirty-one events Claude Code documents. Two handler types run (`command` and Raiker's own `builtin`); of the five the reference format specifies, only `command` is built |
 | **Voice is turn-based, not full duplex** | Editable dictation and manual playback. Continuous listening and hands-free control are future work |
 | **The audit log cannot be exported from the product** | The redacted manifest is produced into the store; no route surfaces it |
-| **Eight gated capabilities have no threat model** | Opening a higher-risk gate asks you to acknowledge one. For eight of the forty-five capabilities with a real executor — including the two durable-memory mutations an approval performs, and both egress capabilities — there is nothing written to acknowledge |
+| **Two egress implementations exist** | The `web_fetch` your agent uses enforces HTTPS, a public-address check, per-hop redirect re-governance and address pinning. A second, registered pair — `WebFetchExecutor` and `NetworkExecutor` — has a hard-coded four-host allowlist and none of that. **Nothing routes to either**, and both are still in the registry |
 
 Open defects are in [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md), each
 with a reproduction and a proposed fix; what closing one is worth is in

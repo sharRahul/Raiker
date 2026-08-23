@@ -364,19 +364,58 @@ on the shipped build, not estimated.
   `raiker/events/export.py` produces a redacted export manifest and the store
   keeps it, and no REST route surfaces it. Evidence you cannot take out is
   evidence you cannot use elsewhere.
-- **Eight gated capabilities have no threat model.** Opening a higher-risk gate
-  requires a threat-model acknowledgement recorded against your principal, and
-  for eight of the forty-five capabilities with a real executor there is no
-  written analysis to acknowledge: `memory_write_execution`,
-  `memory_forget_execution`, `task_management_runtime`,
-  `project_assignment_runtime`, `web_fetch`, `network_execution`,
-  `graph_indexing_runtime` and `code_map_indexing`. The first four are relayed by
-  an approval, so approving really performs them; the middle two are egress. This
-  is a documentation gap rather than a control gap — each is gated,
-  policy-reviewed and audited exactly like the capabilities that do have a
-  document — but the acknowledgement is weaker for having nothing behind it. The
-  full comparison is in
-  [the threat-models index](threat-models/README.md#capabilities-with-a-real-executor-and-no-threat-model).
+- ~~**Eight gated capabilities have no threat model.**~~ **Closed 2026-08-23.**
+  Opening a higher-risk gate requires a threat-model acknowledgement recorded
+  against your principal, and eight capabilities had nothing written to
+  acknowledge. Re-deriving the comparison found the count **understated**: it had
+  credited any document that mentioned a capability's name in passing, which hid
+  three more — `shell_execution` (the broadest capability in the product),
+  `process_execution` and `semantic_memory_runtime` — and left
+  `file_write_execution` / `patch_apply_execution` with only a section of
+  `THREAT_MODEL.md` whose central claim had gone stale. Eleven documents now
+  close it, and **all forty-five capabilities with a real executor have one**,
+  each reachable from
+  [the threat-models index](threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one)
+  rather than only by filename. A test asserts the coverage so it cannot drift
+  back.
+
+- **Two egress implementations exist, and the weaker one is still registered.**
+  Found while writing the above. The model's `web_fetch` goes through
+  `WebAccessService`, which enforces HTTPS-only, no credential in the URL, a
+  public-address check, per-hop redirect re-governance and address pinning.
+  `WebFetchExecutor` and `NetworkExecutor`
+  (`raiker/runtime/executors/tier2_web.py`) reach the network through
+  `sandbox.fetch_url` with a **hard-coded four-host allowlist** and none of those
+  guards, following redirects freely. **Nothing in the product routes to
+  either** — there is no `network` tool, neither capability is in
+  `EXECUTABLE_ON_APPROVAL`, and no route constructs the action — so they are
+  exercised only by `tests/test_vertical_slice_e2e.py`. They are nevertheless in
+  the default executor registry, so a future caller reaching them by capability
+  name would get the weaker path. Written up in
+  [`threat-models/network-execution.md`](threat-models/network-execution.md); it
+  is a candidate for **removal**, not for completion.
+
+- **A checkpoint over 8 MiB is captured as unrestorable, not refused.**
+  `MAX_PRE_IMAGE_BYTES` is 8 MiB. A larger file is still written, and its
+  pre-image is recorded with `capture_status: oversize` — restorable is exactly
+  what it is not. Capture is complete in the sense that every eligible mutation
+  is attempted; it is not complete in the sense that every mutation can be
+  undone. Only `file_write_execution` and `patch_apply_execution` are
+  pre-image-captured at all (`CAPTURE_PATH_ARG`); a commit is git history rather
+  than a file the store holds a pre-image of, and the approval notice says so.
+  Detail in
+  [`threat-models/workspace-file-mutation.md`](threat-models/workspace-file-mutation.md).
+
+- **Raiker's MCP client speaks a protocol revision five behind the current
+  one.** `MCP_PROTOCOL_VERSION` is `2024-11-05`
+  (`raiker/runtime/executors/mcp.py`); the current Model Context Protocol
+  revision is [`2026-07-28`](https://modelcontextprotocol.io/specification/versioning).
+  The stdio session Raiker runs — `initialize`, `tools/list`, `tools/call` — is
+  valid and interoperates with servers that still accept the older handshake, and
+  everything added since is unavailable: streamable HTTP session semantics,
+  structured tool output, resource links, elicitation, per-request version
+  declaration via `_meta`, and the mandatory `server/discover` RPC. It is also
+  why remote transport has no OAuth flow. This had not been stated anywhere.
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

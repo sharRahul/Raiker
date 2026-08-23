@@ -163,6 +163,16 @@ MCP) require all three of:
 
 **Confirm change** stays disabled until they are satisfied.
 
+The acknowledgement points at a real document. As of 2026-08-23 **every
+capability with a working executor has a written threat model** — what it does,
+what it could go wrong, what stops it, and what risk is left over — indexed at
+[`docs/threat-models/`](../threat-models/README.md). Read the one for the
+capability you are opening. The most consequential are
+[governed command execution](../threat-models/shell-execution.md),
+[web reads](../threat-models/web-fetch.md),
+[workspace file mutation](../threat-models/workspace-file-mutation.md) and
+[durable memory writes](../threat-models/memory-write.md).
+
 ### Capabilities with no enable path
 
 Some capabilities show no row at all: CCTV, finance, medical,

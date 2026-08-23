@@ -90,6 +90,31 @@
 > owner off switch is a stored owner setting rather than a `disableAllHooks` key
 > in a config file a repository could ship. See
 > [reference compatibility §2.5 and §4.3](REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
+>
+> **Re-verified 2026-08-23** against the reference page itself: 31 events, 5
+> handler types, both counts and all 15 missing names unchanged.
+
+### Which of the fifteen are worth adding
+
+Parity is not the goal, so the fifteen are not one backlog item. Categorically:
+
+| Event | Verdict | Why |
+|---|---|---|
+| `ConfigChange` | **Add — YES, differentiator** | "The owner changed a setting" is a governance fact Raiker records nowhere as a hook. It is the one missing event that would let an owner enforce a rule about their *own* configuration drifting |
+| `Notification` | **Add — PARITY** | Raiker already has a notification path (`raiker/notify/`); it has no hook, so nothing can react to one |
+| `PostToolBatch` | **Add — PARITY** | Raiker executes validated read-only calls concurrently and already knows when a batch ends. The event exists in the runtime in all but name |
+| `InstructionsLoaded` | **Add — PARITY** | Project instructions are owner records rather than repository files, so the event is cheap and lets a hook see what standing context a turn got |
+| `FileChanged` | **Consider — NO, little advantage** | Raiker's mutations are approved and already emit events; a filesystem watcher would be a second, weaker source of the same fact |
+| `Elicitation`, `ElicitationResult` | **Blocked, not refused** | There is no mid-turn question surface to hook. If [backlog item 22](REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) is built, these follow it |
+| `Setup`, `UserPromptExpansion`, `MessageDisplay` | **NO — little advantage** | Each names a step in the reference's own harness rather than a boundary Raiker has |
+| `TeammateIdle` | **N/A** | Raiker is single-owner; there is no teammate |
+| `CwdChanged`, `DirectoryAdded` | **N/A** | A Raiker session has one workspace, resolved once and confined |
+| `WorktreeCreate`, `WorktreeRemove` | **N/A** | Raiker has no worktree surface, deliberately — see [§2.8](REFERENCE_PLATFORM_COMPATIBILITY.md#28-coding-agent--raiker-build) |
+
+So of fifteen: **four worth adding**, two blocked behind a surface that does not
+exist, four not applicable to a single-owner local product, and five of little
+value. "Sixteen of thirty-one" is the honest count; "twenty of thirty-one" is the
+ceiling worth aiming at.
 
 Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
 

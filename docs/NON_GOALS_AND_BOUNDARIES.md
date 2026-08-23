@@ -140,7 +140,17 @@ Later phases may add optional adapters, but SQLite/JSONL local-first operation m
 
 ## Model Provider Boundaries
 
-The deterministic mock provider is the offline/test fallback. Raiker must not *require*:
+**There is no offline fallback provider, and that is deliberate.** This section
+once named "the deterministic mock provider" as the offline/test fallback; no
+such provider exists, and `AsyncProviderFactory.create` refuses `mock`, `test`
+and `test_only` profiles with `test_provider_not_available`. A fallback that
+answers without a model would defeat the readiness gate, whose whole purpose is
+to prove an exact model at an exact endpoint can really answer — so a Raiker with
+no configured provider disables every model-backed action and says so, rather
+than producing text from nothing.
+
+What the boundary below actually says is that Raiker must not **require** any
+*particular* provider. It must not require:
 
 - a llama.cpp server running;
 - LM Studio running;

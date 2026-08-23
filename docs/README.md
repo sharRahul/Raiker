@@ -107,7 +107,7 @@ instead.
 | Topic | Document |
 |---|---|
 | Assets, trust boundaries, threats and mitigations | [Threat model](THREAT_MODEL.md) |
-| Per-capability threat models | [Threat models directory](threat-models/) |
+| Per-capability threat models, and which capabilities have none | [Threat models index](threat-models/README.md) |
 | OWASP LLM Top 10 (2025) against enforced controls | [OWASP GenAI mapping](OWASP_GENAI_SECURITY_MAPPING.md) |
 | OWASP Agentic Top 10 (ASI01–ASI10, 2026), each row citing code | [OWASP Agentic mapping](OWASP_AGENTIC_TOP10_MAPPING.md) |
 | Licence policy and third-party obligations | [Licensing policy](licensing/LICENSING_POLICY.md) |

@@ -11,7 +11,7 @@ architecture. The point of comparing is to find controls worth having and
 controls worth refusing — not to reach parity for its own sake.
 
 Last full reconciliation against the code and against primary sources:
-**2026-08-23**.
+**2026-08-24**.
 
 ---
 
@@ -100,51 +100,79 @@ differ in composer, protocol and default posture, never in authority.
 
 | Platform | What it is | Raiker surface it is measured against | Primary sources |
 |---|---|---|---|
-| **Claude Cowork** | Anthropic's knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | [Cowork overview](https://claude.com/docs/cowork/overview), [Get started](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork), [Schedule recurring tasks](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork), [Projects in Cowork](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Computer use in Cowork](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [OpenTelemetry monitoring](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry) |
+| **Claude Cowork** | Anthropic's knowledge-worker agent: folder/remote sessions, delegated tasks, routines, plugins, connectors | Raiker Chat and the shared runtime | [Cowork overview](https://claude.com/docs/cowork/overview), [Get started](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork), [Schedule recurring tasks](https://support.claude.com/en/articles/13854387-schedule-recurring-tasks-in-claude-cowork), [Projects in Cowork](https://support.claude.com/en/articles/14116274-organize-your-tasks-with-projects-in-claude-cowork), [Computer use in Cowork](https://support.claude.com/en/articles/14128542-let-claude-use-your-computer-in-cowork), [Monitoring (OpenTelemetry)](https://claude.com/docs/cowork/monitoring), [OpenTelemetry monitoring (support article)](https://support.claude.com/en/articles/14477985-monitor-claude-cowork-activity-with-opentelemetry) |
 | **Claude Code** | Anthropic's coding agent: tools, permissions, sandboxing, hooks, skills, subagents, plugins, MCP | Raiker Build and the shared runtime | [Extend Claude Code](https://code.claude.com/docs/en/features-overview), [How it works](https://code.claude.com/docs/en/how-claude-code-works), [Tools reference](https://code.claude.com/docs/en/tools-reference), [Permissions](https://code.claude.com/docs/en/permissions), [Permission modes](https://code.claude.com/docs/en/permission-modes), [Sandboxing](https://code.claude.com/docs/en/sandboxing), [Sandbox environments](https://code.claude.com/docs/en/sandbox-environments), [Hooks](https://code.claude.com/docs/en/hooks), [Plugins](https://code.claude.com/docs/en/plugins), [Plugins reference](https://code.claude.com/docs/en/plugins-reference), [Plugin marketplaces](https://code.claude.com/docs/en/plugin-marketplaces), [Skills](https://code.claude.com/docs/en/skills), [Subagents](https://code.claude.com/docs/en/sub-agents), [Workflows](https://code.claude.com/docs/en/workflows), [Cross-session messaging](https://code.claude.com/docs/en/cross-session-messaging), [MCP](https://code.claude.com/docs/en/mcp), [CLAUDE.md](https://code.claude.com/docs/en/memory), [Checkpointing](https://code.claude.com/docs/en/checkpointing), [Artifacts](https://code.claude.com/docs/en/artifacts), [Managed settings](https://code.claude.com/docs/en/managed-settings), [Settings reference](https://code.claude.com/docs/en/settings-reference), [Security](https://code.claude.com/docs/en/security), [Monitoring](https://code.claude.com/docs/en/monitoring-usage), [Sandboxing engineering post](https://www.anthropic.com/engineering/claude-code-sandboxing), [Containment engineering post](https://www.anthropic.com/engineering/how-we-contain-claude) |
 | **ChatGPT Chat / Work** | OpenAI's assistant and workspace product: apps/connectors, projects, memory, agent mode, scheduled automations | Raiker Chat and the shared runtime | [Connectors in ChatGPT](https://help.openai.com/en/articles/11487775-connectors-in-chatgpt), [Projects](https://help.openai.com/en/articles/10169521-using-projects), [Memory FAQ](https://help.openai.com/en/articles/8590148-memory-in-chatgpt-faq), [Voice mode FAQ](https://help.openai.com/en/articles/8400625-voice-mode-faq), [ChatGPT Work admin FAQ](https://learn.chatgpt.com/docs/enterprise/work-admin-faq) |
-| **OpenAI Codex** | OpenAI's coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | [Codex sandboxing](https://developers.openai.com/codex/concepts/sandboxing), [Codex manual](https://developers.openai.com/codex/codex-manual.md), [Running Codex safely](https://openai.com/index/running-codex-safely/), [Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/), [Codex upgrades](https://openai.com/index/introducing-upgrades-to-codex/) |
+| **OpenAI Codex** | OpenAI's coding agent: CLI, IDE and cloud, with `sandbox_mode` and `approval_policy` as separate controls | Raiker Build and the shared runtime | [Codex sandboxing](https://learn.chatgpt.com/docs/sandboxing), [Codex manual](https://developers.openai.com/codex/codex-manual.md), [Running Codex safely](https://openai.com/index/running-codex-safely/), [Windows sandbox](https://openai.com/index/building-codex-windows-sandbox/), [Codex upgrades](https://openai.com/index/introducing-upgrades-to-codex/) |
 | **OpenClaw** | Open-source local-first personal-agent gateway: channels, exec tool, optional container sandboxing, plugins | Platform-wide, and Raiker's channel and execution surfaces | [Docs](https://docs.openclaw.ai/), [Architecture](https://docs.openclaw.ai/concepts/architecture), [Gateway sandboxing](https://github.com/openclaw/openclaw/blob/main/docs/gateway/sandboxing.md), [Exec tool](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec.md), [Exec approvals](https://github.com/openclaw/openclaw/blob/main/docs/tools/exec-approvals.md), [Control UI](https://docs.openclaw.ai/web/control-ui), [Setup wizard](https://docs.openclaw.ai/start/wizard) |
 | **DeepSeek Harness** | MIT-licensed agent harness (developer preview, v0.1, 2026-08-13) where models, tools, skills, sessions, sandboxes, storage, loops, scheduling and UI are all plugins, over an append-only trajectory | Platform-wide, and Raiker's extensibility and observability surfaces | [DeepSeek Harness](https://deepseek.com/harness/en/) |
-| **Hermes Agent** | Nous Research's self-improving agent: seven terminal backends, 40+ tools, pluggable memory providers, autonomous skill creation, 20+ messaging surfaces | Platform-wide, and Raiker's execution, memory and channel surfaces | [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/), [Features overview](https://hermes-agent.nousresearch.com/docs/user-guide/features/overview), [Tools and toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools), [Persistent memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory), [Repository](https://github.com/NousResearch/hermes-agent) |
+| **Hermes Agent** | Nous Research's self-improving agent: seven terminal backends, 40+ tools, pluggable memory providers, autonomous skill creation, 27+ messaging surfaces | Platform-wide, and Raiker's execution, memory and channel surfaces | [Hermes Agent docs](https://hermes-agent.nousresearch.com/docs/), [Features overview](https://hermes-agent.nousresearch.com/docs/user-guide/features/overview), [Tools and toolsets](https://hermes-agent.nousresearch.com/docs/user-guide/features/tools), [Persistent memory](https://hermes-agent.nousresearch.com/docs/user-guide/features/memory), [Messaging gateway](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/), [Repository](https://github.com/NousResearch/hermes-agent) |
 
 **Source discipline.** A claim about a reference platform is made only from that
-platform's own documentation. Where a source could not be re-read during this
-pass — several vendor domains are unreachable from the environment this
-reconciliation ran in — the claim is kept as previously recorded and is not
-strengthened. "Not established by cited source" is written rather than a guess.
+platform's own documentation. Where a source could not be re-read during a
+pass, the claim is kept as previously recorded and is not strengthened. "Not
+established by cited source" is written rather than a guess.
 
-**Verification status of the source list above.** Every `code.claude.com` and
-`github.com` URL cited anywhere in this document was **fetched and confirmed**
-during the 2026-08-23 reconciliation, and the reference-platform claims drawn
-from them were re-read rather than carried forward.
+**Verification status of the source list above.** Every external URL cited in
+this document was requested during the 2026-08-24 reconciliation, and the result
+recorded per domain rather than assumed. This matters because the previous pass
+(2026-08-23) ran in an environment that could not reach most vendor domains and
+said so; **that caveat no longer holds and has been removed.** Its
+carried-forward claims have now been re-read against the sources themselves.
 
-The `claude.com`, `support.claude.com`, `docs.claude.com`, `help.openai.com`,
-`learn.chatgpt.com`, `developers.openai.com`, `openai.com`, `platform.openai.com`,
-`deepseek.com`, `docs.openclaw.ai`, `hermes-agent.nousresearch.com`,
-`modelcontextprotocol.io`, `genai.owasp.org`, `huggingface.co`, `openrouter.ai`
-and `lmstudio.ai` URLs were **not reachable** from the environment this pass ran
-in. They are canonical entry points retained from earlier rounds or added from
-the vendor's own naming; none was invented, and no claim about those platforms
-was *strengthened* in this pass on the strength of an unverified source. Two
-things about them changed anyway:
+| Domain group | Status this pass | What it means for the claims drawn from it |
+|---|---|---|
+| `code.claude.com`, `github.com`, `www.anthropic.com` | Reachable, re-read | Confirmed for a second consecutive pass |
+| `claude.com`, `support.claude.com`, `docs.claude.com`, `support.anthropic.com` | **Reachable — newly verified** | Cowork claims were carried forward unverified last pass; re-read here |
+| `learn.chatgpt.com`, `developers.openai.com` | **Reachable — newly verified** | Codex sandbox and ChatGPT Work admin claims re-read here |
+| `deepseek.com`, `docs.openclaw.ai`, `openclaw.ai`, `hermes-agent.nousresearch.com` | **Reachable — newly verified** | Harness, OpenClaw and Hermes claims re-read here |
+| `modelcontextprotocol.io`, `genai.owasp.org`, `huggingface.co`, `openrouter.ai`, `lmstudio.ai`, `docs.ollama.com`, `pypi.org` | Reachable | Entry points confirmed to resolve |
+| `openai.com`, `help.openai.com`, `platform.openai.com` | **Bot-blocked (HTTP 403), not dead** | These refuse automated requests. The URLs are canonical and were not invented; claims resting on them alone are still not strengthened |
 
-- **The Hermes repository URL was wrong and is corrected.** Earlier rounds cited
-  `github.com/hermes-agent-org/hermes`, which is not the project's canonical
-  repository. It is
-  [`github.com/NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent),
-  confirmed by fetching it — which also established the seventh terminal backend
-  (Vercel Sandbox) this document had missed.
-- **One OpenAI help URL was truncated** (`…/11487775-connectors-in`) and now
-  carries its full slug.
+**What re-reading the newly reachable sources changed.** Four things, each
+carried into the rows below:
 
-**What re-reading the reachable sources changed.** Three claims about reference
-platforms in this document were wrong and are corrected in place, each marked:
-hook lifecycle events were recorded as "at parity" when Raiker covers sixteen of
-Claude Code's thirty-one; hook handler types were recorded as a gap against
-Raiker's own document on the grounds that Claude Code has only `command`, when it
-documents and specifies all five; and plugin **panels** were recorded as a gap
-against Claude Code, which has no plugin UI panel component at all.
+- **The Codex sandboxing URL had moved.**
+  `developers.openai.com/codex/concepts/sandboxing` answers `308 Permanent
+  Redirect` to [`learn.chatgpt.com/docs/sandboxing`](https://learn.chatgpt.com/docs/sandboxing),
+  which is now cited directly. The claims it backs — `read-only` /
+  `workspace-write` / `danger-full-access`, `untrusted` / `on-request` / `never`,
+  network denied by default, Seatbelt on macOS, bubblewrap plus optional Landlock
+  on Linux, and a native Windows Sandbox under PowerShell — were re-read and are
+  unchanged.
+- **Cowork's monitoring has a canonical product doc**, not just a support
+  article: [`claude.com/docs/cowork/monitoring`](https://claude.com/docs/cowork/monitoring).
+  It names six exported events — `user_prompt`, `assistant_response`,
+  `tool_result`, `api_request`, `api_error` and `tool_decision` — metadata-only
+  by default, with prompt, response and tool-argument content opt-in through
+  `otlpContentCapture`. `tool_decision` carries both the decision and its
+  *source* (`config`, `hook`, `user_permanent`, `user_temporary`, `user_abort`,
+  `user_reject`). That is the closest external analogue to Raiker's audit record,
+  and it sharpens backlog item 19 rather than changing it.
+- **Hermes supports more messaging surfaces than recorded.** The [messaging
+  gateway docs](https://hermes-agent.nousresearch.com/docs/user-guide/messaging/)
+  name **27+** platforms; this document said "20+", which was conservative rather
+  than wrong. The messaging source is now cited alongside the tools source.
+- **Hermes's seven terminal backends and 40+ tools are confirmed** from the
+  vendor's own tools page and repository README, rather than carried forward.
+
+**What earlier passes corrected, retained here.** Two URL corrections and three
+claim corrections still stand, and are not re-litigated below:
+
+- The Hermes repository URL was once cited as `github.com/hermes-agent-org/hermes`,
+  which is not the project's repository; it is
+  [`github.com/NousResearch/hermes-agent`](https://github.com/NousResearch/hermes-agent).
+  Fetching it is also what established the seventh terminal backend (Vercel
+  Sandbox) an earlier pass had missed.
+- One OpenAI help URL was truncated (`…/11487775-connectors-in`) and carries its
+  full slug.
+- Three claims about reference platforms were wrong and were corrected in place,
+  each marked where it appears: hook lifecycle events were recorded as "at parity"
+  when Raiker covers sixteen of Claude Code's thirty-one; hook handler types were
+  recorded as a gap against Raiker's own document on the grounds that Claude Code
+  has only `command`, when it documents and specifies all five; and plugin
+  **panels** were recorded as a gap against Claude Code, which has no plugin UI
+  panel component at all.
 
 ---
 
@@ -177,7 +205,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 
 | Reference capability | Platform(s) | Raiker surface | Status | Where | Gap | Beyond? |
 |---|---|---|---|---|---|---|
-| A named tool set the model may call | All | Shared runtime | Implemented | `raiker/models/tool_registry.py` — 46 tools | — | PARITY |
+| A named tool set the model may call | All | Shared runtime | Implemented | `raiker/models/tool_registry.py` — 46 `TOOL_DEFINITIONS`, of which 45 are in `MODEL_EXPOSED_TOOLS` (`vector_get` is defined but not offered to a model) | — | PARITY |
 | Every advertised tool has a policy verdict | None state it as an invariant | Shared runtime | Implemented | `PolicyEngine` hard-denies anything in neither set; `tests/test_policy_engine.py` | — | **YES — differentiator** |
 | Per-tool permission rules | Claude Code (`allow`/`ask`/`deny` rules), Codex, OpenClaw (`tools.allow`) | Permissions | Different by design | Per-capability decision modes over 67 capability gates (`raiker/phase_gates.py`) | Raiker gates a *capability*, not a tool-argument pattern; there is no `Bash(git *)` rule syntax | **Different — see [3.1](#31-a-capability-gate-instead-of-a-tool-argument-rule)** |
 | Permission modes for a session | Claude Code (`default`/`acceptEdits`/`plan`/`auto`/`dontAsk`/`bypassPermissions`), Codex (`approval_policy`) | Chat, Build composers | Implemented | `APPROVAL_MODES = {manual, auto, skip, dont_ask}`; Build adds Plan/Edit/Auto | No `bypassPermissions` equivalent — refused, see [4.1](#41-a-mode-that-skips-every-check) | **PARITY**, with one refusal |
@@ -261,7 +289,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | MCP client over remote transport | Claude Code, Codex, Cowork | Extensions → MCP | Implemented | `http` transport with owner-added URL and optional token; monitored, not allowlist-blocked | No OAuth flow; no SSE/streamable-HTTP session semantics | PARITY |
 | MCP tool search to bound context cost | Claude Code | Shared runtime | Proposed | — | Projected MCP tools all enter the turn's tool list | **YES — improvement** |
 | Building an MCP server from the product | Not established by cited source | Extensions → MCP | Implemented | `McpBuilderExecutor`, reviewed dependency-free templates | — | **YES — differentiator** |
-| Inbound channels from external messaging surfaces | OpenClaw, Hermes (20+ surfaces) | Extensions → Channels | Partial | Pairing, enable switch, sender allowlist, inbound secret, 60/min per sender, signed outbound | Routing modes and approval relay are not built (BUG-225) | PARITY |
+| Inbound channels from external messaging surfaces | OpenClaw, Hermes (27+ surfaces) | Extensions → Channels | Partial | Pairing, enable switch, sender allowlist, inbound secret, 60/min per sender, signed outbound | Routing modes and approval relay are not built (BUG-225) | PARITY |
 | A channel message can never raise a turn's authority | Not established by cited source — OpenClaw frames channel input as guidance to the model | Shared runtime | Implemented | Untrusted content with a named sender; trust from the pairing record | — | **YES — differentiator** |
 | Separating linked / enabled / trusted / reachable | None — a connector is configured and then it works | Extensions → Channels | Implemented | Four stored facts, four remedies, four rows | — | **YES — differentiator** |
 
@@ -552,13 +580,22 @@ Ordered strictly by [§0.4](#04-priority-and-effort-ordering). Every row states
 the proposed action, what it does for governance, and whether it puts Raiker
 ahead of the reference set.
 
+**Closed since the last pass.** *"`RUNTIME_EXECUTORS_SPEC.md` omits 17
+capabilities"* was carried here as a high-priority, low-effort item after it had
+already been completed. Re-checked on 2026-08-24: all 67 names in
+`ALL_CAPABILITIES` (`raiker/phase_gates.py`), including all 45 in
+`REAL_EXECUTOR_CAPABILITIES` (`raiker/runtime/executors/__init__.py`), appear in
+[`RUNTIME_EXECUTORS_SPEC.md`](RUNTIME_EXECUTORS_SPEC.md). The row is removed and
+the remainder renumbered. A backlog that lists finished work is the same defect
+as a document that claims unfinished work is done.
+
 ### High priority, low effort
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
 | 1 | Checkpoint rewind is unreachable | Surface the existing `CheckpointRestoreExecutor` behind an approval — a route and a Checkpoints action — or state in the product that restore is preflight-only | Recoverability is a stated product property; today the executor exists and no owner can reach it | PARITY |
-| 2 | `RUNTIME_EXECUTORS_SPEC.md` omits 17 capabilities | Complete the per-capability table from `raiker/phase_gates.py` | The canonical executor status document cannot be canonical while a quarter of the capabilities are missing from it | PARITY |
-| 3 | Audit export has no route | Expose `audit_export` over the loopback API and the Observability view | An audit an owner cannot take out of the product is evidence they cannot use | PARITY |
+| 2 | Audit export has no route | Expose `audit_export` over the loopback API and the Observability view | An audit an owner cannot take out of the product is evidence they cannot use | PARITY |
+| 3 | Eight gated capabilities have no threat model | Write the missing eight, listed in [the threat-models index](threat-models/README.md#capabilities-with-a-real-executor-and-no-threat-model) | Opening a higher-risk gate requires a threat-model acknowledgement. For these eight — including the two durable-memory mutations an approval really performs, and both egress capabilities — there is no written analysis to acknowledge | PARITY |
 
 ### High priority, medium effort
 
@@ -594,7 +631,7 @@ ahead of the reference set.
 | 16 | Hook lifecycle coverage | Add the Raiker-meaningful events from Claude Code's 31: `Notification`, `ConfigChange`, `PostToolBatch`, `InstructionsLoaded` | A hook surface that covers half the lifecycle can enforce guards for half of it | PARITY |
 | 17 | The `prompt` hook handler (BUG-226) | Build it first of the four: it makes no outbound request and its output is context, not a decision | Each refused handler needs a gated surface; this is the only one that needs none | PARITY |
 | 18 | MCP tool search | Bound the context cost of projected MCP tools | A connected server should not cost every turn its whole schema | **YES — improvement** |
-| 19 | OpenTelemetry export | Emit governed events over OTLP behind its own capability gate | Cowork already exports agent activity this way; an owner running Raiker beside other tooling should be able to | **YES — improvement** |
+| 19 | OpenTelemetry export | Emit governed events over OTLP behind its own capability gate, metadata-only by default with content capture as an explicit opt-in | [Cowork exports six events this way](https://claude.com/docs/cowork/monitoring) — including `tool_decision`, which carries the decision *and* its source. Raiker already records strictly more per action than that; what it lacks is the wire to carry it anywhere | **YES — improvement** |
 | 20 | Credential masking with sentinel substitution | Generalise the git-credential loan into a sentinel/substitution path for owner-declared credentials | A command that authenticates without ever holding the secret is strictly better than one that holds it briefly | **YES — improvement** |
 
 ### Medium priority, high effort

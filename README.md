@@ -91,8 +91,9 @@ subcommand (`raiker-app --workspace .`, `raiker-app service status --workspace .
 The same controls are in the app, under **Host** in the top bar. Opening it
 makes no outbound request; Raiker contacts no update service until you pin a
 channel. The desktop payload is self-contained — API, built dashboard and native
-tray — and first run is a five-stage wizard: owner, model, privacy posture,
-optional encrypted backup, workspace. Releases are built by a
+tray — and first run is a resumable five-stage wizard: owner, model choice and
+readiness, privacy posture, an optional verified encrypted backup, and
+completion. Releases are built by a
 `workflow_dispatch` pipeline that **refuses to build without code-signing
 identities**; no signed artifact has been published yet. See
 [`docs/DESKTOP_DISTRIBUTION_DESIGN.md`](docs/DESKTOP_DISTRIBUTION_DESIGN.md).
@@ -224,9 +225,10 @@ before you decide anything:
 |---|---|
 | **Memory does not retrieve by meaning** | Both halves of "hybrid" retrieval are lexical. The default vector space is a feature-hashing bag of tokens with no model, so a paraphrase is recalled only through shared words |
 | **Checkpoint rewind is not reachable** | Capture is automatic and complete before every approved mutation; no route, command or tool proposes a restore. Recovery is git |
-| **Hooks cover half the reference lifecycle** | Sixteen of the thirty-one events Claude Code documents, and one of five handler types |
+| **Hooks cover half the reference lifecycle** | Sixteen of the thirty-one events Claude Code documents. Two handler types run (`command` and Raiker's own `builtin`); of the five the reference format specifies, only `command` is built |
 | **Voice is turn-based, not full duplex** | Editable dictation and manual playback. Continuous listening and hands-free control are future work |
 | **The audit log cannot be exported from the product** | The redacted manifest is produced into the store; no route surfaces it |
+| **Eight gated capabilities have no threat model** | Opening a higher-risk gate asks you to acknowledge one. For eight of the forty-five capabilities with a real executor — including the two durable-memory mutations an approval performs, and both egress capabilities — there is nothing written to acknowledge |
 
 Open defects are in [docs/plans/TO_BE_FIXED.md](docs/plans/TO_BE_FIXED.md), each
 with a reproduction and a proposed fix; what closing one is worth is in

@@ -12,6 +12,15 @@ evidence those write-ups point at.
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full on each round by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 
+**Part of `working/` was pruned, and the write-ups still name what it held.**
+Forty-seven captures from the 2026-07-26 → 2026-08-10 rounds were removed from
+the repository to keep its size down. [Fixed items](../FIXED_ITEMS.md) still
+records each filename, because the filename is the evidence record — but it
+names them as plain text rather than as links, since a link to a file that was
+deliberately removed reads as a broken document rather than a closed one. A
+`working/` filename in a write-up that does not resolve here is one of those
+forty-seven, not a missing capture.
+
 ## Rounds
 
 | Prefix | Round | Provider |

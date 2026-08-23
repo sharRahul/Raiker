@@ -1803,7 +1803,7 @@ new-chat, project, task, and scheduling actions instead of a false resumption
 prompt. Resume copy and conversation rows appear only when named chat activity
 exists. Pending approvals, active work, runtime issues, and the runtime record
 remain visible as scan-friendly status cards. The responsive browser test and
-[`screenshots/working/workbench-dashboard-redesign.png`](screenshots/working/workbench-dashboard-redesign.png)
+`screenshots/working/workbench-dashboard-redesign.png`
 cover the empty-account state.
 
 ---
@@ -1847,9 +1847,9 @@ no model is available. Returning users see activity-aware copy and a Continue
 working list; the right rail is a role-appropriate Needs your attention area,
 and refresh reports its freshness without discarding composer state.
 Live browser coverage is recorded in
-[`screenshots/working/workbench-dashboard-live.png`](screenshots/working/workbench-dashboard-live.png),
-[`screenshots/working/settings-redesign-live.png`](screenshots/working/settings-redesign-live.png),
-and [`screenshots/working/settings-runtime-live.png`](screenshots/working/settings-runtime-live.png).
+`screenshots/working/workbench-dashboard-live.png`,
+`screenshots/working/settings-redesign-live.png`,
+and `screenshots/working/settings-runtime-live.png`.
 
 ---
 
@@ -1877,9 +1877,9 @@ honest sub-one-percent display, concise provider attribution with explanatory
 help, and a visually separate pricing footer with a direct **Configure →**
 action.
 Live browser evidence is recorded in
-[`screenshots/working/memory-redesign-live.png`](screenshots/working/memory-redesign-live.png),
-[`screenshots/working/knowledge-map-redesign-live.png`](screenshots/working/knowledge-map-redesign-live.png),
-and [`screenshots/working/context-window-redesign-live.png`](screenshots/working/context-window-redesign-live.png).
+`screenshots/working/memory-redesign-live.png`,
+`screenshots/working/knowledge-map-redesign-live.png`,
+and `screenshots/working/context-window-redesign-live.png`.
 
 ---
 
@@ -1915,7 +1915,7 @@ Chat and Build show used, available, and remaining tokens, visibly label
 cost** for local execution. Pricing remains independent from context capacity.
 
 Live browser evidence is recorded in
-[`screenshots/working/local-context-window-live.png`](screenshots/working/local-context-window-live.png).
+`screenshots/working/local-context-window-live.png`.
 
 ---
 
@@ -2013,8 +2013,8 @@ a billable model has no exact rate — including before the first turn, where th
 previous rule stayed silent and therefore read as "free".
 
 Live browser evidence:
-[`screenshots/working/120-BUG-21-pricing-registry-live.png`](screenshots/working/120-BUG-21-pricing-registry-live.png)
-and [`screenshots/working/121-BUG-21-context-price-unknown-live.png`](screenshots/working/121-BUG-21-context-price-unknown-live.png).
+`screenshots/working/120-BUG-21-pricing-registry-live.png`
+and `screenshots/working/121-BUG-21-context-price-unknown-live.png`.
 
 ---
 
@@ -2054,8 +2054,8 @@ blocks' copy buttons are dropped, turns never split across a page, and the page
 margins are set for paper.
 
 Live browser evidence:
-[`screenshots/working/122-BUG-22-chat-conversation-menu-live.png`](screenshots/working/122-BUG-22-chat-conversation-menu-live.png)
-and [`screenshots/working/123-BUG-22-build-conversation-menu-live.png`](screenshots/working/123-BUG-22-build-conversation-menu-live.png).
+`screenshots/working/122-BUG-22-chat-conversation-menu-live.png`
+and `screenshots/working/123-BUG-22-build-conversation-menu-live.png`.
 
 ---
 
@@ -2098,7 +2098,7 @@ rendered as Markdown. This is stated in
 [the composer guide](../guide/README.md) rather than left ambiguous.
 
 Live browser evidence:
-[`screenshots/working/124-BUG-23-code-block-controls-live.png`](screenshots/working/124-BUG-23-code-block-controls-live.png).
+`screenshots/working/124-BUG-23-code-block-controls-live.png`.
 
 ---
 
@@ -2137,7 +2137,7 @@ because the server replays the same suspended state. When the live channel
 cannot be reached, the card says so and offers a recoverable **Continue now**.
 
 Live browser evidence:
-[`screenshots/working/125-BUG-24-parked-turn-live.png`](screenshots/working/125-BUG-24-parked-turn-live.png).
+`screenshots/working/125-BUG-24-parked-turn-live.png`.
 
 ---
 
@@ -3035,7 +3035,7 @@ Live evidence: `working/186-visual-workbench-{light,dark}.png`,
 `working/187-visual-models-pricing-{light,dark}.png`,
 `working/188-visual-settings-density-{light,dark}.png`,
 `working/189-visual-tasks-{light,dark}.png`, and
-[`working/190-BUG-37-density-compact-live.png`](screenshots/working/190-BUG-37-density-compact-live.png).
+`working/190-BUG-37-density-compact-live.png`.
 The earlier token pass remains recorded at `working/133-*` and `working/134-*`.
 
 ---
@@ -3079,7 +3079,7 @@ fast path it was previously mistaken for.
 Regressions: `tests/test_scheduler_wakeup.py` (the signal, the coalescing, the
 cross-thread path, and the Chat/scheduled scoping) and
 `apps/web/src/lib/views/TasksView.test.ts`. Live evidence:
-[`working/193-BUG-39-approval-continues-live.png`](screenshots/working/193-BUG-39-approval-continues-live.png).
+`working/193-BUG-39-approval-continues-live.png`.
 
 ---
 
@@ -3173,8 +3173,8 @@ each platform's definition parsed and asserted on every platform, install and
 uninstall round trips, the uninstall plan and its dispositions, and the CLI) and
 `tests/test_api_host.py` (authentication, the quit-with-waiting-work report, and
 the refused restart). Live evidence:
-[`working/191-BUG-40-host-control-live.png`](screenshots/working/191-BUG-40-host-control-live.png)
-and [`working/192-BUG-40-host-paused-live.png`](screenshots/working/192-BUG-40-host-paused-live.png).
+`working/191-BUG-40-host-control-live.png`
+and `working/192-BUG-40-host-paused-live.png`.
 
 ---
 
@@ -3379,9 +3379,9 @@ local-only status read, the matrix, and the channel reported without its key),
 and `apps/web/src/lib/components/HostControl.test.ts`.
 
 Live evidence:
-[`working/199-BUG-44-source-checkout-live.png`](screenshots/working/199-BUG-44-source-checkout-live.png)
+`working/199-BUG-44-source-checkout-live.png`
 and
-[`working/200-BUG-44-packaged-unsigned-build-live.png`](screenshots/working/200-BUG-44-packaged-unsigned-build-live.png).
+`working/200-BUG-44-packaged-unsigned-build-live.png`.
 The second is a `raiker-web` started **from inside a release artifact** this
 pipeline built — `PYTHONPATH` and `RAIKER_INSTALL_ROOT` both pointing at the
 extracted payload, so the code answering is the artifact's copy — reporting
@@ -3426,9 +3426,9 @@ providers with one tested (the message occurs exactly once, inside that
 provider's row, and not inside the hosted card), both tested (two independent
 results, neither overwritten nor duplicated), and an unreachable provider named
 in its own failure. Live evidence:
-[`working/197-BUG-47-local-result-under-ollama-live.png`](screenshots/working/197-BUG-47-local-result-under-ollama-live.png)
+`working/197-BUG-47-local-result-under-ollama-live.png`
 and
-[`working/198-BUG-47-hosted-cards-keep-their-own-live.png`](screenshots/working/198-BUG-47-hosted-cards-keep-their-own-live.png).
+`working/198-BUG-47-hosted-cards-keep-their-own-live.png`.
 
 ---
 
@@ -5316,7 +5316,7 @@ either survives redaction or fails this test on the day it is added.
 **UI when closed.** The line reads e.g. `624 input · 82 output`.
 
 **Evidence.** `screenshots/not-working/BUG-r0808-01-context-popover-NaN-io-tokens.png`
-(before) and [`working/r0810-bug68-context-meter-real-io-counts.png`](screenshots/working/r0810-bug68-context-meter-real-io-counts.png)
+(before) and `working/r0810-bug68-context-meter-real-io-counts.png`
 (after, live).
 
 ---
@@ -5475,9 +5475,9 @@ says the posture applies to this conversation's turns only, and — for Auto —
 names what the owner's standing permissions actually allow.
 
 **Evidence.** `screenshots/not-working/BUG-r0808-03-build-chip-set-file-writes-auto-without-stepup.png`
-(before); [`working/r0810-bug70-build-auto-changes-nothing-standing.png`](screenshots/working/r0810-bug70-build-auto-changes-nothing-standing.png),
-[`working/r0810-bug70-permissions-unchanged.png`](screenshots/working/r0810-bug70-permissions-unchanged.png)
-and [`working/r0810-bug70-plan-mode-refuses-the-write.png`](screenshots/working/r0810-bug70-plan-mode-refuses-the-write.png)
+(before); `working/r0810-bug70-build-auto-changes-nothing-standing.png`,
+`working/r0810-bug70-permissions-unchanged.png`
+and `working/r0810-bug70-plan-mode-refuses-the-write.png`
 (after, live). Held by `tests/test_turn_capability_posture.py` and
 `apps/web/src/lib/buildModes.test.ts`.
 
@@ -5568,9 +5568,9 @@ that it is on. The capability rows say what the owner will actually experience
 rather than naming the broker.
 
 **Evidence.** `screenshots/not-working/BUG-r0808-04-memory-store-capability-has-no-executor.png`
-(before); [`working/r0810-bug71-memory-says-the-gate-is-off.png`](screenshots/working/r0810-bug71-memory-says-the-gate-is-off.png),
-[`working/r0810-bug71-memory-says-the-gate-is-on.png`](screenshots/working/r0810-bug71-memory-says-the-gate-is-on.png)
-and [`working/r0810-bug71-chat-proposes-a-memory-write.png`](screenshots/working/r0810-bug71-chat-proposes-a-memory-write.png)
+(before); `working/r0810-bug71-memory-says-the-gate-is-off.png`,
+`working/r0810-bug71-memory-says-the-gate-is-on.png`
+and `working/r0810-bug71-chat-proposes-a-memory-write.png`
 (after, live). Held by `tests/test_memory_write_path.py`.
 
 ---
@@ -6291,7 +6291,7 @@ apply exactly as before. Readiness is reporting, not authority.
 repair sentence as a provider card, and a hosted advisor pinned in the UI is
 actually reachable.
 
-**Evidence.** [`working/r0810-bug82-advisor-readiness.png`](screenshots/working/r0810-bug82-advisor-readiness.png)
+**Evidence.** `working/r0810-bug82-advisor-readiness.png`
 (live). Held by the `TestAdvisorReadiness` suite in `tests/test_advisor_model.py`.
 
 ---
@@ -6656,8 +6656,8 @@ when the owner demanded memory security, the health view, and the cached handle
 whose key pages were reclaimed.
 
 **Evidence (live).** `apps/web/e2e/critical-bugs-live.spec.ts` against a running
-host: [`working/215-FIXED-150-store-healthy-live.png`](screenshots/working/215-FIXED-150-store-healthy-live.png)
-and [`working/216-FIXED-150-store-unavailable-live.png`](screenshots/working/216-FIXED-150-store-unavailable-live.png).
+host: `working/215-FIXED-150-store-healthy-live.png`
+and `working/216-FIXED-150-store-unavailable-live.png`.
 
 **UI when closed.** Sign-in never fails for a reason unrelated to the
 credential. When the store genuinely cannot be opened, the screen names that
@@ -6709,7 +6709,7 @@ still passes.
 
 **Evidence (live).** A real Anthropic credential entered through the product's
 own dialog, a model pinned and checked, then the page read straight afterwards:
-[`working/217-FIXED-151-audit-log-live.png`](screenshots/working/217-FIXED-151-audit-log-live.png).
+`working/217-FIXED-151-audit-log-live.png`.
 
 **UI when closed.** Connecting a provider, pinning a model and running a
 readiness check are each visible in the audit log immediately after they happen.
@@ -6768,9 +6768,9 @@ indexed, one owner's grant not being another's root, and the upload refusing to
 store without consent. `apps/web/src/lib/views/BrainView.test.ts` covers the
 same boundary in the dialog, including the tick that gates the copy.
 
-**Evidence (live).** [`working/218-FIXED-152-knowledge-boundary-live.png`](screenshots/working/218-FIXED-152-knowledge-boundary-live.png)
+**Evidence (live).** `working/218-FIXED-152-knowledge-boundary-live.png`
 — the picker on a real host, and
-[`working/219-FIXED-152-granted-folder-live.png`](screenshots/working/219-FIXED-152-granted-folder-live.png)
+`working/219-FIXED-152-granted-folder-live.png`
 — a folder outside the workspace granted, browsed and reviewed without being
 copied.
 
@@ -6855,7 +6855,7 @@ database encryption separately from **Locked in memory** or **Degraded**.
 **Evidence.** `tests/test_sqlcipher_memory_security.py`, including the real
 Windows stack-overflow code and frozen-worker path; packaged health returned
 `store=ok` and `auto_probe_host_crash` without terminating. Screenshot:
-[`working/bug-46-security-live.png`](screenshots/working/bug-46-security-live.png).
+`working/bug-46-security-live.png`.
 
 ---
 
@@ -6876,9 +6876,9 @@ one-time secret for a host-control-only session and reuses the web Host routes.
 
 **Evidence.** Unit/API/component tests, a successful 75.8 MB frozen Windows
 payload smoke (`/` and `/api/health` both 200), and live screenshots:
-[`working/bug-48-setup-complete-live.png`](screenshots/working/bug-48-setup-complete-live.png),
-[`working/bug-48-setup-mobile-live.png`](screenshots/working/bug-48-setup-mobile-live.png),
-and [`working/bug-48-native-tray-menu-live.png`](screenshots/working/bug-48-native-tray-menu-live.png).
+`working/bug-48-setup-complete-live.png`,
+`working/bug-48-setup-mobile-live.png`,
+and `working/bug-48-native-tray-menu-live.png`.
 
 ---
 
@@ -6912,7 +6912,7 @@ the refusal card whatever the model says. The destination is the shipped
 
 **Evidence.** Runtime and Svelte regression tests plus the live refusal and
 deep-link check in
-[`working/bug-60-runtime-refusal-live.png`](screenshots/working/bug-60-runtime-refusal-live.png).
+`working/bug-60-runtime-refusal-live.png`.
 
 ---
 
@@ -6931,7 +6931,7 @@ separate execution decision and Tasks exposes **Run now**.
 **Evidence.** Service/API/approval tests and live verification that approval
 created one parked task, the scheduler ignored it, and only **Run now** produced
 a completed run:
-[`working/bug-64-parked-task-live.png`](screenshots/working/bug-64-parked-task-live.png).
+`working/bug-64-parked-task-live.png`.
 
 ---
 
@@ -7770,7 +7770,7 @@ Provider unreachable`. Anthropic, reachable in the same run, still goes
 Evidence:
 [`screenshots/not-working/bug198-first-run-connected-unreachable.png`](screenshots/not-working/bug198-first-run-connected-unreachable.png)
 (as found) and
-[`screenshots/working/fixed204-first-run-model-choice-labels.png`](screenshots/working/fixed204-first-run-model-choice-labels.png)
+`screenshots/working/fixed204-first-run-model-choice-labels.png`
 (after). Specs:
 [`review-first-run-honesty-live.spec.ts`](../../apps/web/e2e/review-first-run-honesty-live.spec.ts),
 [`review-provider-matrix-live.spec.ts`](../../apps/web/e2e/review-provider-matrix-live.spec.ts).
@@ -7838,7 +7838,7 @@ describing *Getting started* as `git clone https://…`.
 **Verified live**: all seven sections listed in reading order, Markdown rendered
 as elements rather than source, `#/guide?section=troubleshooting` opening the
 section it names, 0 console errors. Evidence:
-[`screenshots/working/fixed209-guide-in-product.png`](screenshots/working/fixed209-guide-in-product.png).
+`screenshots/working/fixed209-guide-in-product.png`.
 Spec: [`guide-surface-live.spec.ts`](../../apps/web/e2e/guide-surface-live.spec.ts).
 
 **User-interface outcome.** The product can open its own guide, so an owner who
@@ -7903,9 +7903,11 @@ installed, and no plugin code runs in this browser"*) and the Projects privacy
 guarantee (*"Raiker shows what changed and who changed it, never the file's
 contents"*). Both are state, not documentation, and both were restored. A blanket
 character target would cut exactly those again — so the remaining surfaces
-(`ModelsView` sub-leads, `SecurityLogin`, `Runtime`) stay named in
-[BUG-208](TO_BE_FIXED.md#bug-208--the-product-explains-itself-on-every-screen)
-per surface rather than folded into a number to hit.
+(`ModelsView` sub-leads, `SecurityLogin`, `Runtime`) stayed named in BUG-208 per
+surface rather than folded into a number to hit. They were finished in
+[FIXED-211](#fixed-211--the-last-three-teaching-surfaces-and-an-emoji-that-was-never-a-reaction),
+which closed the entry — so BUG-208 is no longer in
+[to be fixed](TO_BE_FIXED.md).
 
 **Measured:** 23,236 → **20,879 characters** (‑2,357, 10%), 216 → 202 sentences.
 Every character removed is present in `docs/guide/`.
@@ -8175,10 +8177,10 @@ read renders `Read file · ../escape.md` with
 rows from the identical data path.
 
 Evidence:
-[`screenshots/working/bug-206-live-tool-rows-settled.png`](screenshots/working/bug-206-live-tool-rows-settled.png),
-[`screenshots/working/bug-206-live-tool-row-waiting.png`](screenshots/working/bug-206-live-tool-row-waiting.png),
-[`screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png`](screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png),
-[`screenshots/working/bug-206-207-live-build-turn.png`](screenshots/working/bug-206-207-live-build-turn.png).
+`screenshots/working/bug-206-live-tool-rows-settled.png`,
+`screenshots/working/bug-206-live-tool-row-waiting.png`,
+`screenshots/working/bug-52-chat-refusal-does-not-end-the-turn.png`,
+`screenshots/working/bug-206-207-live-build-turn.png`.
 Specs:
 [`bug-206-207-tool-rows-and-reasoning-live.spec.ts`](../../apps/web/e2e/bug-206-207-tool-rows-and-reasoning-live.spec.ts),
 [`bug-52-first-pass-denial-live.spec.ts`](../../apps/web/e2e/bug-52-first-pass-denial-live.spec.ts),

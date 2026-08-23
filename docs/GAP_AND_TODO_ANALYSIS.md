@@ -39,14 +39,24 @@ supervisor install/upgrade lifecycle and live remote proof — BUG-194 in
 
 The full, prioritised, source-cited backlog is
 [§5 of the reference compatibility document](REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
-The four highest-priority, lowest-effort items are:
+The three highest-priority, lowest-effort items are:
 
-1. **Checkpoint rewind is unreachable.** The restore executor exists; no surface
-   proposes a restore.
-2. **`RUNTIME_EXECUTORS_SPEC.md` completeness**, now fixed — kept here as the
-   pattern to watch for: a canonical status document that omits capabilities.
-3. **Audit export has no route.** The manifest is produced and stored and cannot
+1. **Checkpoint rewind is unreachable.** The restore executor exists, is
+   registered and is tested; no route, terminal command or model tool proposes a
+   restore. Both `/checkpoints restore` and the web Checkpoints view compute a
+   preflight and perform nothing.
+2. **Audit export has no route.** The manifest is produced and stored and cannot
    be taken out of the product. (Memory export, by contrast, *is* reachable —
-   `GET /api/memory/export` — which is what makes the audit gap conspicuous.)
+   `GET /api/memory/export`, `raiker/api/routes_memory.py` — which is what makes
+   the audit gap conspicuous.)
+3. **Eight gated capabilities have no threat model**, four of them relayed by an
+   approval and two of them egress. Found 2026-08-24; listed in
+   [the threat-models index](threat-models/README.md#capabilities-with-a-real-executor-and-no-threat-model).
+
+`RUNTIME_EXECUTORS_SPEC.md` completeness was a third item here and is **closed**:
+re-checked on 2026-08-24, all 67 capabilities in `raiker/phase_gates.py` appear in
+it. It is kept named rather than silently dropped, because the pattern it
+represents — a canonical status document that omits capabilities — is the one
+worth watching for.
 
 Strict non-allow blocking, role revoke governed, and capability gate per action remain the baseline.

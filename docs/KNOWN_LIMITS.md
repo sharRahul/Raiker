@@ -341,7 +341,9 @@ on the shipped build, not estimated.
   Every event Raiker's own format accepts is emitted — sixteen — with an owner off
   switch and a page that states which rules actually enforce. Measured against
   [Claude Code's thirty-one](https://code.claude.com/docs/en/hooks) that is
-  **sixteen of thirty-one**, and one of five handler types. Plugins contribute
+  **sixteen of thirty-one**. Two handler types run — `command`, and Raiker's own
+  in-process `builtin` — but of the five the reference *format* specifies, only
+  `command` is built. Plugins contribute
   hook rules, skills and MCP-server offers; panels and LSP servers do not, and
   four kinds Claude Code has — subagents, monitors, `bin/` executables, themes —
   Raiker
@@ -362,6 +364,19 @@ on the shipped build, not estimated.
   `raiker/events/export.py` produces a redacted export manifest and the store
   keeps it, and no REST route surfaces it. Evidence you cannot take out is
   evidence you cannot use elsewhere.
+- **Eight gated capabilities have no threat model.** Opening a higher-risk gate
+  requires a threat-model acknowledgement recorded against your principal, and
+  for eight of the forty-five capabilities with a real executor there is no
+  written analysis to acknowledge: `memory_write_execution`,
+  `memory_forget_execution`, `task_management_runtime`,
+  `project_assignment_runtime`, `web_fetch`, `network_execution`,
+  `graph_indexing_runtime` and `code_map_indexing`. The first four are relayed by
+  an approval, so approving really performs them; the middle two are egress. This
+  is a documentation gap rather than a control gap — each is gated,
+  policy-reviewed and audited exactly like the capabilities that do have a
+  document — but the acknowledgement is weaker for having nothing behind it. The
+  full comparison is in
+  [the threat-models index](threat-models/README.md#capabilities-with-a-real-executor-and-no-threat-model).
 
 The memory items are the ones to weigh first if you are choosing Raiker for its
 memory: the full audit, with reproductions, is

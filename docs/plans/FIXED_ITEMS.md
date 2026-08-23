@@ -11333,3 +11333,141 @@ FIXED-271's "evidence" claim true rather than nominal.
 **Evidence.** `tests/test_over_broad_redaction.py` —
 `TestAnAuditExportManifestHashSurvives`, including that a credential named like a
 hash is still destroyed.
+
+---
+
+## FIXED-277 — The terminal client died on its own output under a legacy code page
+
+**Severity: Low. Area: CLI / Windows. Was BUG-237, raised and closed 2026-08-23
+while exercising the terminal half of FIXED-270.**
+
+**Observed.** `/checkpoints restore <id>` raised `UnicodeEncodeError: 'charmap'
+codec can't encode character '\u2205'` **mid-print**, on a command that works in
+an interactive console.
+
+**Root cause.** Raiker's command output is full of characters cp1252 does not
+have: an em dash between a label and its value, a middle dot between counts, and
+the empty-set sign `_short_sha` returns for a file with no pre-image. On Windows,
+`sys.stdout` falls back to the ANSI code page when the console is not UTF-8 **or
+when output is redirected to a file or a pipe** — so `raiker … > out.txt` was a
+different program than `raiker …`, and nothing in the tree reconfigured either
+stream.
+
+**Fixed** by reconfiguring `stdout` and `stderr` to UTF-8 with
+`errors="replace"` at the terminal client's entry point, and only there.
+Reconfiguring beats replacing the characters: the alternative is auditing every
+string the CLI can print and getting it wrong the next time one is added.
+`errors="replace"` keeps a console that genuinely cannot render a character from
+taking the command down with it, and a stream that cannot be reconfigured at all
+— already detached, or not a text wrapper — is left exactly as it was.
+
+**Interface outcome.** Every terminal command produces the same output whether it
+is read on screen or redirected to a file.
+
+**Reference-platform decision.** **No — a defect fix.**
+
+**Evidence.** `tests/test_cli_output_encoding.py`, which drives a real cp1252
+`TextIOWrapper` and prints the exact characters that broke it.
+
+---
+
+## FIXED-278 — Every restart asked the owner to set up a model they had already set up
+
+**Severity: High. Area: models / readiness. Was BUG-238, raised and closed
+2026-08-23.**
+
+**Observed.** Reopening Raiker — or leaving it alone for five minutes — put
+*"The last model check has expired. Check this model again before sending."* over
+the composer, offered a **Set up model** button, and **disabled Send**. The model
+was connected, the credential was valid, the selection had persisted. Nothing was
+wrong with it, and the product asked the owner to redo work they had already
+done. Hit repeatedly while live-testing the 2026-08-23 round: three separate
+turns could not be sent until the owner pressed a button that only re-ran a
+check.
+
+**Root cause — one state carrying two meanings.** A readiness observation has a
+TTL (`DEFAULT_READINESS_TTL_MINUTES`, 5) so that no turn runs on a claim older
+than the owner's window. That is a good rule. But the *same* field then decided
+whether the model was **configured at all**:
+
+* `ModelReadinessService.current()` synthesises `state = STALE` once
+  `expires_at` passes;
+* `ModelReadiness.ready` is `state is READY`, so a stale observation reports
+  `ready: false`;
+* `require_ready()` refuses the turn on `ready: false`, and the composer disables
+  **Send** and renders the setup strip on the same flag.
+
+So the TTL — a freshness bound — became the product's answer to *"is a model set
+up?"*. It is not. **Staleness is not unavailability.** It means "this worked, and
+nobody has looked recently", and the honest response is to look — which is
+exactly what the owner was being asked to do by hand.
+
+BUG-83 had already noticed half of this and added background revalidation, but it
+only ran on a 30-second interval and only in an open tab. A restart is precisely
+the moment an observation is most likely to have aged out, and the first tick was
+a full interval away — so the first thing an owner saw after reopening Raiker was
+a demand to set up their model.
+
+**Fixed** at the seam where it decides anything, so every surface gets it at
+once — Chat, Build, Tasks, the terminal client, and scheduled routines:
+
+* `ModelReadinessService.require_ready_async()` re-takes an observation that has
+  merely aged out, against the real provider, and admits the turn on the
+  **fresh** result. The gateway, the prompt routes and the task route all use it.
+* The TTL keeps its entire meaning. A turn still never runs on an observation
+  older than the window — the expired one is *replaced* by a new check before the
+  turn is admitted, rather than waved through.
+* A re-check that **fails** still refuses, and reports the fresh reason. *"The
+  provider rejected the credential"* is worth far more to an owner than *"the
+  last check expired"*.
+* `require_ready()` is kept as the pure read that never reaches a provider, and
+  is still what a caller with no `await` gets.
+
+**What this costs, stated plainly.** The first turn after an expiry now waits for
+one reachability check before it starts, and for a hosted provider that check is
+the same tiny one-token preflight the **Check again** button runs — so it can
+incur the same negligible provider charge, without the owner pressing anything.
+That is a real behaviour change and it is the right trade: it is bounded to at
+most once per TTL window, it replaces an interaction where the owner pressed a
+button and waited for *exactly the same check*, and the alternative was a product
+that refused to work until they did.
+
+**The distinction that had to be preserved.** `STALE` is written by two different
+things, and only one may be resolved without the owner:
+
+| Written by | Reason code | Meaning | Auto-re-check? |
+|---|---|---|---|
+| `current()`, on TTL expiry | `readiness_expired` | Nothing changed; nobody looked recently | **Yes** |
+| `invalidate_model_readiness()` | `runtime_changed`, `readiness_invalidated`, … | A connection, endpoint, credential or pulled model changed *under* the observation | **No** — the owner asked for that check by changing the thing |
+
+Collapsing those two would have been the same "one state, two meanings" defect
+one layer down, so the predicate reads the **reason code**, not the state alone,
+and `READINESS_EXPIRED_REASON` names it in one place.
+
+**In the browser.** A stale model no longer blocks anything: `blocksSending()`
+excludes it, and the strip renders a quiet *"Re-checking this model — you can
+still send."* instead of an alarming panel with a button. Background revalidation
+now runs **once immediately** on start rather than waiting a full tick, publishes
+what it read even when no check is due — otherwise the composer kept claiming to
+be re-checking long after the server had already done it — and asks for nothing
+before the owner has a session, which was earning a `401` and a console error on
+every page load.
+
+**Interface outcome.** After a restart, an owner with a working model opens Chat
+and sends. No strip, no button, no disabled composer. A model that is genuinely
+unavailable still says so, still names the reason, and still offers **Set up
+model** — because that is the case where the owner does have something to fix.
+
+**Reference-platform decision.** **YES — improvement.** Every compared platform
+persists a model choice; none of them re-proves the choice is *still reachable*
+before each turn. Raiker keeps that proof and stops charging the owner for it.
+
+**Evidence.** `tests/test_model_readiness_stale_recheck.py` (ten cases, including
+that the admitted observation is newly taken, that a failed re-check reports the
+fresh reason, and that a deliberately invalidated connection is **not**
+auto-re-checked), `apps/web/src/lib/modelReadinessGating.test.ts`,
+`apps/web/src/lib/components/ModelReadinessStrip.test.ts`. Verified live: the
+readiness rows were aged three hours, the server restarted, and a turn was sent
+and answered with no prompt — then the selected model was marked
+`authentication_failed` and the prompt returned exactly as it should
+(`r0823-bug238-unavailable-still-prompts`).

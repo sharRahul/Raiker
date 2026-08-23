@@ -353,14 +353,22 @@ class AgentGateway:
             role_ids=("assistant",),
         )
 
-    def _model_readiness_refusal(
+    async def _model_readiness_refusal(
         self, prompt_envelope: PromptEnvelope
     ) -> AgentResponse | None:
+        """Refuse a turn only when the model is genuinely unavailable (BUG-238).
+
+        ``require_ready_async`` re-takes an observation that has merely aged out
+        rather than treating the TTL as evidence that the model was never set
+        up. A turn still never runs on an observation older than the owner's
+        window — the stale one is replaced by a fresh check first — but an owner
+        who set a model up once is not asked to set it up again after a restart.
+        """
         try:
-            ModelReadinessService(
+            await ModelReadinessService(
                 self.store,
                 probe=ProviderCatalogueProbe(self.store),
-            ).require_ready(
+            ).require_ready_async(
                 self.owner_principal_id,
                 prompt_envelope.options.model_profile,
                 prompt_envelope.options.model,
@@ -533,7 +541,7 @@ class AgentGateway:
         if prompt_envelope is None:
             assert error is not None
             return error
-        if refusal := self._model_readiness_refusal(prompt_envelope):
+        if refusal := await self._model_readiness_refusal(prompt_envelope):
             return refusal
         identity = self._prepare_turn(prompt_envelope)
         response: AgentResponse | None = None
@@ -557,7 +565,7 @@ class AgentGateway:
             assert error is not None
             yield StreamEvent(kind=FINAL, response=error)
             return
-        if refusal := self._model_readiness_refusal(prompt_envelope):
+        if refusal := await self._model_readiness_refusal(prompt_envelope):
             yield StreamEvent(
                 kind=FINAL,
                 event_type="model_not_ready",

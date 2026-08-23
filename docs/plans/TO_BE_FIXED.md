@@ -59,7 +59,7 @@ evidence — what was observed, the root cause, and the user-interface outcome t
 had to be true before it could be called closed — but they are no longer mixed in
 with the open work, so this document answers one question: what is left.
 
-docs/GAP_BUILD_CHAT.md — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
+[`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md) — GAP-BUILD and GAP-CHAT — are not defects. They are the itemised
 distance between what Build and Chat ship today and what each is meant to be:
 Build as an autonomous coding agent that closes its own loop, Chat as a general
 agentic work assistant that acts across the owner's tools and files. They are
@@ -97,9 +97,11 @@ names.
 | BUG-231 | **High** | Observability / evidence | **Fixed 2026-08-23 — FIXED-271** |
 | BUG-232 | **High** | Egress / governance | **Fixed 2026-08-23 — FIXED-272** |
 | BUG-233 | Medium | Checkpoints / approvals | **Fixed 2026-08-23 — FIXED-273** |
+| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | BUG-235 | **High** | Checkpoints / approvals | **Fixed 2026-08-23 — FIXED-275.** Found live while verifying FIXED-270: a relayed write's pre-image was filed under the API session, so no restore plan could see it |
 | BUG-236 | Medium | API redaction / observability | **Fixed 2026-08-23 — FIXED-276.** Found live while verifying FIXED-271: an audit export's manifest hash, and on the same sweep every observation's `content_sha256`, were redacted into `[REDACTED_SECRET]` |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
+| BUG-237 | Low | CLI / Windows | **Fixed 2026-08-23 — FIXED-277.** Found live: the terminal client died on its own em dashes and empty-set sign when output was redirected under a legacy code page |
+| BUG-238 | **High** | Models / readiness | **Fixed 2026-08-23 — FIXED-278.** Every restart, and any five idle minutes, asked the owner to set up a model that was already set up: the readiness TTL was deciding whether a model was *configured* |
 | [GEP-01 … GEP-04](GOVERNANCE_ENTRY_PATHS.md#6-open-items) | Low → Unknown | Governance architecture | Open — raised 2026-08-23 in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md), not duplicated here |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |

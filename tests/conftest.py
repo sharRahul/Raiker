@@ -90,7 +90,24 @@ def offline_default_model(monkeypatch: pytest.MonkeyPatch) -> None:
         service.store.save_model_readiness(readiness)
         return readiness
 
+    async def previously_ready_async(
+        service: ModelReadinessService,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> ModelReadiness:
+        return previously_ready(service, owner_principal_id, profile_id, model)
+
     monkeypatch.setattr(ModelReadinessService, "require_ready", previously_ready)
+    # BUG-238 — the gateway and the prompt/task routes admit a turn through
+    # `require_ready_async`, which re-takes an observation that has aged out.
+    # This fixture's whole point is that readiness is not what its tests are
+    # about, so both entry points have to answer the same seeded observation;
+    # patching only the sync one let the real gate reach a provider that the
+    # fixture had just made unavailable.
+    monkeypatch.setattr(
+        ModelReadinessService, "require_ready_async", previously_ready_async
+    )
 
 
 SeedAccount = Callable[..., tuple[str, str]]

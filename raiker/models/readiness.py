@@ -73,6 +73,33 @@ class ModelReadiness:
         }
 
 
+#: The reason code `current()` synthesises when a stored READY observation has
+#: simply outlived its window. It is deliberately distinct from the reason codes
+#: `invalidate_model_readiness` writes — `runtime_changed`,
+#: `readiness_invalidated`, and the rest — because the two mean different things
+#: and only one of them is safe to resolve without the owner:
+#:
+#: * **expired** — nothing changed; nobody has looked recently. Re-looking is
+#:   exactly what the owner would do, so Raiker does it (BUG-238).
+#: * **invalidated** — something changed *under* the model: a connection, an
+#:   endpoint, a credential, a pulled model. The previous observation does not
+#:   describe reality any more, and the owner asked for that check by changing
+#:   the thing. It keeps its explicit re-check.
+READINESS_EXPIRED_REASON = "readiness_expired"
+
+
+def _has_merely_expired(readiness: ModelReadiness) -> bool:
+    """True when this observation aged out and nothing else is known to be wrong.
+
+    `STALE` carries two different meanings, and only this one may be resolved
+    without the owner. See :data:`READINESS_EXPIRED_REASON`.
+    """
+    return (
+        readiness.state is ModelReadinessState.STALE
+        and readiness.reason_code == READINESS_EXPIRED_REASON
+    )
+
+
 class ModelNotReady(RuntimeError):
     def __init__(self, readiness: ModelReadiness) -> None:
         super().__init__("model_not_ready")
@@ -559,7 +586,7 @@ class ModelReadinessService:
                     readiness,
                     state=ModelReadinessState.STALE,
                     summary="The last model check has expired.",
-                    reason_code="readiness_expired",
+                    reason_code=READINESS_EXPIRED_REASON,
                     remediation="Check this model again before sending.",
                 )
         return readiness
@@ -747,9 +774,68 @@ class ModelReadinessService:
         The primary keeps priority, so a ready primary is always the answer it
         returns. A refusal reports the primary's reason: that is the model the
         owner chose, and it is the one whose repair they came to perform.
+
+        This is the *pure read*: it never reaches a provider. Callers that can
+        await should use :meth:`require_ready_async`, which re-takes an
+        observation that has merely aged out instead of refusing on it.
         """
         chain = self.resolve_chain(owner_principal_id, profile_id, model)
         for readiness in chain:
             if readiness.ready:
                 return readiness
         raise ModelNotReady(chain[0])
+
+    async def require_ready_async(
+        self,
+        owner_principal_id: str,
+        profile_id: str | None,
+        model: str | None,
+    ) -> ModelReadiness:
+        """The same admission, re-checking a model whose observation aged out.
+
+        BUG-238. A readiness observation has a TTL so that no turn runs on a
+        claim older than the owner's window. It was also, wrongly, the thing
+        that decided whether the model was *set up at all*: once the window
+        passed, `state` became ``stale``, ``ready`` became false, and the
+        product asked the owner to **set up a model they had already set up** —
+        after every restart, and after any five idle minutes.
+
+        Staleness is not unavailability. It means "this worked, and nobody has
+        looked recently", and the honest response is to look — which is exactly
+        what the owner was being asked to do by hand. So a `stale` entry is
+        re-checked here, against the real provider, and only a check that
+        *fails* refuses the turn.
+
+        The TTL keeps its whole meaning: a turn still never runs on an
+        observation older than the window, because a stale one is replaced by a
+        fresh observation before the turn is admitted. Every other refusal —
+        authentication, quota, a missing model, a policy block — is a real
+        answer about the model and is returned unchanged, because those are the
+        cases where the owner does have something to fix.
+        """
+        chain = self.resolve_chain(owner_principal_id, profile_id, model)
+        for readiness in chain:
+            if readiness.ready:
+                return readiness
+
+        refreshed_primary: ModelReadiness | None = None
+        for readiness in chain:
+            if not _has_merely_expired(readiness):
+                continue
+            try:
+                rechecked = await self.check(
+                    readiness.key.owner_principal_id,
+                    readiness.key.profile_id,
+                    readiness.key.model,
+                    readiness.key.endpoint_fingerprint,
+                )
+            except Exception:  # noqa: BLE001 - a failed re-check refuses, never raises past here
+                continue
+            if rechecked.ready:
+                return rechecked
+            if refreshed_primary is None and readiness is chain[0]:
+                # The primary is the model the owner chose, so its *fresh*
+                # answer is the one to report — "the key was rejected" is worth
+                # far more than "the last check expired".
+                refreshed_primary = rechecked
+        raise ModelNotReady(refreshed_primary or chain[0])

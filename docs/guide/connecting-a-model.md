@@ -24,10 +24,18 @@ that can list models but cannot execute because of access or billing. Evidence
 expires after five minutes and is invalidated when credentials, endpoints,
 catalogues, selections, or managed runtimes change. There is no silent fallback.
 
-The same gate protects Chat, Build, Tasks, and Schedule. With no ready model, the
-primary action is disabled and **Set up model** opens the readiness dialog, whose
-**Check again** runs the exact-model check — or says there is no model to check
-yet, when that is the truth. (The Workbench is not in that list because it has no
+**Expired is not un-configured.** An expiry means nobody has looked recently, so
+Raiker looks: send with an expired check and the check is re-taken as the turn is
+admitted, and the turn runs on the fresh result. You are never asked to set up a
+model you already set up — not after a restart, and not after an idle afternoon.
+An *invalidation* is different: something changed under the model, so that one is
+re-checked explicitly rather than in passing.
+
+The same gate protects Chat, Build, Tasks, and Schedule. With no ready model —
+one that has never been checked, or whose check **failed** — the primary action
+is disabled and **Set up model** opens the readiness dialog, whose **Check
+again** runs the exact-model check, or says there is no model to check yet when
+that is the truth. (The Workbench is not in that list because it has no
 composer to gate: it is the board over work that is already running.)
 
 **The first-run screen can do all of this on its own.** Stage 02 of setup shows one

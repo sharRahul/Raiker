@@ -71,14 +71,23 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
     return AuthMiddleware(_ws(request)).authenticate(request)
 
 
-def _require_model_ready(
+async def _require_model_ready(
     request: Request,
     principal_id: str,
     profile_id: str | None,
     model: str | None,
 ) -> None:
+    """BUG-238 — re-check a model whose observation aged out, rather than refuse.
+
+    The route gate and the gateway gate have to agree, or a turn is refused here
+    with `model_not_ready` and would have been admitted one layer down. Both now
+    use `require_ready_async`, so an owner who set a model up once is never
+    asked to set it up again merely because the TTL passed.
+    """
     store = SQLiteStore(_ws(request))
-    ModelReadinessService(store, probe=ProviderCatalogueProbe(store)).require_ready(
+    await ModelReadinessService(
+        store, probe=ProviderCatalogueProbe(store)
+    ).require_ready_async(
         principal_id,
         profile_id,
         model,
@@ -315,7 +324,7 @@ async def submit_prompt(
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
     try:
-        _require_model_ready(
+        await _require_model_ready(
             request, session.principal_id, body.model_profile, body.model
         )
     except ModelNotReady as exc:
@@ -372,7 +381,7 @@ async def stream_prompt(
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
     try:
-        _require_model_ready(
+        await _require_model_ready(
             request, session.principal_id, body.model_profile, body.model
         )
     except ModelNotReady as exc:

@@ -53,6 +53,7 @@ whose gates were all still at their per-account fail-closed defaults.
 | `r0823-bug231-audit-export.png` | FIXED-271 / FIXED-276 — the audit log's **Export** panel with a produced export listed by event count and manifest hash, and the export itself in the log below it as *"Exported 271 audit events … redacted"* |
 | `r0823-permissions-audit-export-row.png` | FIXED-272 — Permissions after `network_execution` was deleted, with **Audit export** expanded showing its real description, and **Checkpoint restore** grouped under Workspace instead of falling into *Other tools* |
 | `r0823-bug234-mcp-protocol.png` | FIXED-274 — a locally built stdio MCP server after a real handshake, its card reading **PROTOCOL 2026-07-28**. Before this the client offered `2024-11-05` and nothing in the product said which revision it spoke |
+| `r0823-bug238-unavailable-still-prompts.png` | FIXED-278 — the half that had to keep working. A model marked `authentication_failed` still blocks **Send**, names *"The provider rejected the credential"*, and offers **Set up model**. A model whose check merely aged out gets none of that |
 | `r0823-mobile-audit-export.png` | The export panel at 390 × 844. Fourteen routes were swept at that width with zero horizontal overflow |
 
 ---

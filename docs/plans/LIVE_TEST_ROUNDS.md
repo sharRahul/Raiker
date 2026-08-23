@@ -82,6 +82,13 @@ still at its per-account fail-closed default.
   — Exported 271 audit events (2026-08-19T11:40:27Z → 2026-08-23T16:35:07Z),
   redacted."* Spot-checked: 24 redactions in the file, and no `sk-` string.
   (`r0823-bug231-audit-export`.)
+* **A restart no longer asks for a model that is already set up.** With every
+  stored observation aged three hours and the server restarted, Chat opens with
+  no strip, **Send** enabled, and a real answer from the provider — the server
+  re-takes the aged-out observation while admitting the turn. Marking the
+  selected model `authentication_failed` brings the prompt straight back, naming
+  the credential rather than the expiry
+  (`r0823-bug238-unavailable-still-prompts`).
 * **The MCP revision is current, and the card says so.** A server built from the
   bundled echo template, connected over a real stdio session, reports
   **PROTOCOL 2026-07-28** on its card — the template answers the handshake, and
@@ -105,8 +112,9 @@ still at its per-account fail-closed default.
 
 ### What it found
 
-Two defects, both raised and closed in the same round, and both **only
-observable because the rewind was finally routed**:
+Four defects, all raised and closed in the same round. Three were **only
+observable because the rewind was finally routed**; the fourth was hit simply by
+using the product across restarts:
 
 * **BUG-235 → [FIXED-275](FIXED_ITEMS.md).** A file write approved from the
   inbox filed its pre-image under the *API session* that resolved the approval,
@@ -115,6 +123,19 @@ observable because the rewind was finally routed**:
   nothing could reach it — which is the same shape as BUG-230 itself, one layer
   down, and is why nobody had found it: without a caller for the restore, no plan
   was ever acted on.
+* **BUG-238 → [FIXED-278](FIXED_ITEMS.md).** Hit three times while trying to
+  send anything at all: after a restart — and after any five idle minutes — the
+  composer said *"The last model check has expired"*, offered **Set up model**,
+  and disabled **Send**, for a model that was connected and working. The
+  readiness TTL, which exists to bound how *old* an observation may be, was also
+  deciding whether the model was **configured**. Staleness is not
+  unavailability.
+* **BUG-237 → [FIXED-277](FIXED_ITEMS.md).** Exercising the *terminal* half of
+  the rewind found that `/checkpoints restore <id>` dies with
+  `UnicodeEncodeError` when its output is redirected under a legacy Windows code
+  page — the preflight prints an empty-set sign for a file with no pre-image, and
+  nothing reconfigured the stream. `raiker … > out.txt` was a different program
+  than `raiker …`.
 * **BUG-236 → [FIXED-276](FIXED_ITEMS.md).** The export list rendered every
   manifest hash as `[REDACTED_SE…`. The response redactor's high-entropy fallback
   ate the 64-hex digest, so the one field that makes an export verifiable outside

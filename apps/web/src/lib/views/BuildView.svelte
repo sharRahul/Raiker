@@ -98,7 +98,7 @@
     sourcesForTurn,
   } from "../citations";
   import { chatProfiles, refreshModels } from "../models.svelte";
-  import { openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
+  import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
   import {
     audioSessionCoordinator,
     inputModeForDraft,
@@ -351,6 +351,10 @@
     ) ?? selectedProfile,
   );
   const modelReadiness = $derived(readinessForSelection(activeProfile));
+  // BUG-238 — a stale observation never blocks: the server re-checks it
+  // before admitting the turn, so the only thing that stops a send is a
+  // model problem the owner can actually fix.
+  const modelBlocked = $derived(blocksSending(modelReadiness));
   // BUG-207 slice B — a provider declares reasoning as an *effort* (OpenAI:
   // low/medium/high) or as a *mode* (Anthropic: adaptive). Offering only the
   // first meant the provider that ships in the box had no reasoning control at
@@ -699,7 +703,7 @@
       return;
     }
     const text = promptText.trim();
-    if (text === "" || !modelReadiness.ready || streaming || attachStore.uploading) return;
+    if (text === "" || modelBlocked || streaming || attachStore.uploading) return;
     const voiceState = {
       dictated: voiceDictated,
       typedBefore: voiceTypedBefore,
@@ -1541,7 +1545,7 @@
             <button
               type="submit"
               class="btn btn-primary send"
-              disabled={streaming || attachStore.uploading || promptText.trim() === "" || !modelReadiness.ready}
+              disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
             >
               <Icon name={streaming ? "clock" : "send"} size={15} />
               {streaming ? "Working…" : "Send"}

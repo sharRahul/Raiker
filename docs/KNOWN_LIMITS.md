@@ -268,14 +268,22 @@ alternative would be worse.
   but nothing was checked against an author. Extensions → Plugins states which of
   the three levels each installed plugin earned and what would raise it. The
   default is not silently hardened; it is stated.
-- **A model check expires, and Raiker re-confirms it quietly rather than
-  stopping you.** Before any surface will send, the exact model has to have
-  passed a reachability check; that check is good for five minutes by default and
-  1–120 minutes by your setting (Settings → Runtime). While a work surface is
-  open, the selected model is re-confirmed in the background as its window runs
-  down, so a long session does not spontaneously disable Send — and connecting,
+- **A model check expires, and Raiker re-confirms it rather than stopping
+  you.** Before any surface will send, the exact model has to have passed a
+  reachability check; that check is good for five minutes by default and 1–120
+  minutes by your setting (Settings → Runtime). **An expired check is not an
+  unset-up model.** If you send with one, Raiker re-takes the check as it admits
+  the turn and runs on the fresh result — so no turn ever runs on a claim older
+  than your window, and you are never asked to set up a model you already set up,
+  however long Raiker was closed. The cost is that the first turn after an expiry
+  waits for that check, and on a hosted provider the check is the same tiny
+  one-token preflight the **Check again** button runs — so it can incur the same
+  negligible charge without you pressing anything. Only a check that *fails*
+  stops you, and it names what failed. While a work surface is open the selected model is also
+  re-confirmed in the background as its window runs down, and connecting,
   switching model, pulling, or changing an endpoint or credential still
-  invalidates a check immediately, whatever the window is set to.
+  invalidates a check immediately — that kind of invalidation is a real change
+  under the model, so it is re-checked explicitly rather than silently.
 - **Key pages are not locked into RAM by default.** The workspace database is
   SQLCipher-encrypted. SQLCipher can additionally lock the pages holding key
   material so they never reach swap — and Raiker leaves that **off**, explicitly,

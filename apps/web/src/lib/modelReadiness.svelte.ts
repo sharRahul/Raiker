@@ -1,6 +1,6 @@
-import { api } from "./api";
+import { api, hasToken } from "./api";
 import type { ModelProfile, ModelReadinessView } from "./apiTypes";
-import { refreshModels } from "./models.svelte";
+import { refreshModels, setModels } from "./models.svelte";
 
 export const setupDialog = $state<{
   open: boolean;
@@ -35,6 +35,31 @@ export function readinessForSelection(profile: ModelProfile | null): ModelReadin
     remediation: "Open Models to connect a provider or set up a local model.",
     evidence: {}, ready: false,
   };
+}
+
+/**
+ * BUG-238 — a stale observation is not an unset-up model.
+ *
+ * A readiness observation expires so that no turn runs on a claim older than
+ * the owner's window. It was also deciding whether the model was *configured*:
+ * once the window passed, the composer disabled **Send** and offered
+ * **Set up model** — for a model the owner had already set up, after every
+ * restart and after any five idle minutes.
+ *
+ * The server now re-takes a stale observation before admitting the turn
+ * (`require_ready_async`), so the browser has nothing to block on: `stale`
+ * means "Raiker is confirming this", not "you have work to do". Every other
+ * not-ready state is a real answer about the model and still blocks, because
+ * those are the ones the owner can actually fix.
+ */
+export function isRevalidating(readiness: ModelReadinessView | null): boolean {
+  return readiness !== null && !readiness.ready && readiness.state === "stale";
+}
+
+/** True when the owner has something to fix before a turn can run. */
+export function blocksSending(readiness: ModelReadinessView | null): boolean {
+  if (readiness === null) return false;
+  return !readiness.ready && !isRevalidating(readiness);
 }
 
 export function openModelSetup(
@@ -115,10 +140,19 @@ function dueForRevalidation(profile: ModelProfile, now: number): boolean {
 
 export async function revalidateSelectedModel(): Promise<void> {
   if (revalidationInFlight) return;
+  // Nothing to revalidate before the owner has a session, and asking anyway
+  // costs a 401 on the lock screen — which is a console error on every load.
+  if (!hasToken()) return;
   if (typeof document !== "undefined" && document.visibilityState !== "visible") return;
   revalidationInFlight = true;
   try {
     const view = await api.models();
+    // BUG-238 — publish what this read already learned, even when no check is
+    // due. The server re-checks a stale model when it admits a turn, so the
+    // stored observation can become `ready` without the browser asking; without
+    // this the tick returned early and the composer kept saying "Re-checking
+    // this model" long after the turn it was re-checked by had finished.
+    setModels(view);
     const selected =
       view.profiles.find((profile) => profile.selected) ??
       view.profiles.find((profile) => profile.profile_id === view.current_profile_id) ??
@@ -138,6 +172,11 @@ export async function revalidateSelectedModel(): Promise<void> {
 /** Start background revalidation; returns the stop function. */
 export function startReadinessRevalidation(): () => void {
   if (revalidationTimer !== undefined) return stopReadinessRevalidation;
+  // BUG-238 — run once immediately. A restart is exactly the moment an
+  // observation is most likely to have aged out, and waiting a full tick before
+  // the first check is what made "set up your model" the first thing an owner
+  // saw after reopening Raiker.
+  void revalidateSelectedModel();
   revalidationTimer = setInterval(() => void revalidateSelectedModel(), REVALIDATION_TICK_MS);
   return stopReadinessRevalidation;
 }

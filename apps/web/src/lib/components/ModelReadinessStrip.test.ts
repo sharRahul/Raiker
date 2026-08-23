@@ -41,4 +41,30 @@ describe("ModelReadinessStrip", () => {
     });
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
+
+  // BUG-238 — an observation that aged out is not an unset-up model. The server
+  // re-checks it before admitting the turn, so asking the owner to "set up" a
+  // model they already set up was work invented by a timer.
+  it("says it is re-checking a stale model rather than asking for setup", () => {
+    render(ModelReadinessStrip, {
+      readiness: {
+        ...stopped,
+        state: "stale",
+        summary: "The last model check has expired.",
+        reason_code: "readiness_expired",
+        remediation: "Check this model again before sending.",
+      },
+      draftPreserved: true,
+    });
+
+    expect(screen.getByText(/re-checking this model/i)).toBeInTheDocument();
+    expect(screen.getByText(/you can still send/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Set up model" })).not.toBeInTheDocument();
+  });
+
+  it("still asks for setup when the model is genuinely unavailable", () => {
+    render(ModelReadinessStrip, { readiness: stopped });
+    expect(screen.getByRole("button", { name: "Set up model" })).toBeInTheDocument();
+    expect(screen.queryByText(/re-checking this model/i)).not.toBeInTheDocument();
+  });
 });

@@ -1581,10 +1581,13 @@ async def create_task(
         )
     if body.description.strip():
         try:
-            ModelReadinessService(
+            # BUG-238 — a task whose model observation aged out is not a task
+            # with no model. Re-check before refusing, exactly as the prompt
+            # routes and the gateway do.
+            await ModelReadinessService(
                 store,
                 probe=ProviderCatalogueProbe(store),
-            ).require_ready(
+            ).require_ready_async(
                 session.principal_id,
                 body.model_profile,
                 body.model,

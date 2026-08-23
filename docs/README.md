@@ -22,6 +22,7 @@ Read these first, and prefer them where anything else disagrees.
 | What is Raiker's security philosophy, and what does enabling a capability mean? | [Security and policy](SECURITY_AND_POLICY.md) |
 | How does Raiker compare with Claude Cowork, Claude Code, ChatGPT, Codex, OpenClaw, DeepSeek Harness and Hermes Agent? | [Reference platform compatibility](REFERENCE_PLATFORM_COMPATIBILITY.md) |
 | What does the local web API expose, and in what shape? | [API and contracts](API_AND_CONTRACT_SCHEMAS.md) |
+| What can this build **not** do? | [Known limits](KNOWN_LIMITS.md) |
 | What is still broken? | [To be fixed](plans/TO_BE_FIXED.md) |
 | What has been fixed, and how? | [Fixed items](plans/FIXED_ITEMS.md) |
 
@@ -119,6 +120,7 @@ instead.
 | The checks to run before committing | [Local validation](LOCAL_VALIDATION_GATE.md) |
 | A concise area-by-area coverage view | [Feature coverage](FEATURE_COVERAGE_MATRIX.md) |
 | Deferred work and open gaps | [Gaps and deferred work](GAP_AND_TODO_ANALYSIS.md) |
+| The boundaries Raiker chose, and where it is behind | [Known limits](KNOWN_LIMITS.md) |
 | Acceptance tests grouped by phase | [Acceptance tests by phase](ACCEPTANCE_TESTS_BY_PHASE.md) |
 | A repeatable end-to-end browser plan and the last round's results | [Live manual test plan](plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) |
 | Exercising the web app against a real model backend | [Web app live test](WEB_APP_LIVE_TEST.md) |

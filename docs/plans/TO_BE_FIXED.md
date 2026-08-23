@@ -1,14 +1,26 @@
 ## Goal
 
-Make Raiker a secure AI product that combines an AI assistant, a governed AI
-agent, and an extensible agent platform.
+Make Raiker a secure AI product that combines **four** things: a polished AI
+assistant, a governed AI agent, **a capable coding/build agent**, and an
+extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
 communicate through a polished conversational experience. As an agent, Raiker
 should be able to plan tasks, gather context, use tools, execute approved
-actions, verify outcomes, and explain what it did. As a platform, Raiker should
-provide the governed runtime foundation for models, tools, plugins, interfaces,
-memory, approvals, audit events, checkpoints, and integrations.
+actions, verify outcomes, and explain what it did. As a coding agent, Raiker
+should read a repository, make the change, run the tests, read the failure and
+iterate to green, in one governed session. As a platform, Raiker should provide
+the governed runtime foundation for models, tools, plugins, interfaces, memory,
+approvals, audit events, checkpoints, and integrations.
+
+Governance, observability, policy awareness, control and security are **inherent
+properties** of that runtime, not optional layers added around the agent.
+
+> **Which open work blocks which pillar is in [`PILLAR_MAP.md`](PILLAR_MAP.md),
+> and how an action reaches an executor at all is in
+> [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md).** This preamble is
+> repeated in several plans because each is read on its own; the pillar map is
+> the one place that says what the whole set adds up to.
 
 Raiker must support user-owned model choice across LLM backends — local models
 such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM;
@@ -81,6 +93,12 @@ names.
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
+| [BUG-230](#bug-230--checkpoint-rewind-is-built-registered-tested-and-unreachable) | **High** | Checkpoints / recovery | Open — raised 2026-08-23 |
+| [BUG-231](#bug-231--the-audit-log-cannot-be-taken-out-of-the-product) | **High** | Observability / evidence | Open — raised 2026-08-23 |
+| [BUG-232](#bug-232--two-egress-implementations-exist-and-the-weaker-one-is-registered) | **High** | Egress / governance | Open — raised 2026-08-23 |
+| [BUG-233](#bug-233--an-approval-promises-a-rewind-it-cannot-give-for-a-file-over-8-mib) | Medium | Checkpoints / approvals | Open — raised 2026-08-23 |
+| [BUG-234](#bug-234--the-mcp-client-is-five-protocol-revisions-behind) | Medium | MCP / interoperability | Open — raised 2026-08-23 |
+| [GEP-01 … GEP-04](GOVERNANCE_ENTRY_PATHS.md#6-open-items) | Low → Unknown | Governance architecture | Open — raised 2026-08-23 in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md), not duplicated here |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -616,3 +634,196 @@ Not urgent, and deliberately not done in bulk this round: each older spec is the
 evidence behind a closed FIXED entry, and re-running one is how that evidence is
 refreshed — a sweeping edit across thirty of them is a change to thirty pieces of
 evidence, which deserves its own pass rather than being smuggled into another.
+
+---
+
+## BUG-230 — Checkpoint rewind is built, registered, tested, and unreachable
+
+**Severity: High. Area: checkpoints / recovery. Status: Open — raised 2026-08-23.**
+
+**Observed.** `README.md` and `SECURITY_ARCHITECTURE.md` both list **recoverable**
+as a property of the runtime. An owner cannot recover anything. Capture is
+automatic and complete before every approved single-file mutation; nothing puts
+it back.
+
+**Reproduction.** Approve a `write_file`. Open **Observability → Checkpoints**,
+select the checkpoint, and read the preflight: it names the files a restore
+*would* touch. There is no control that performs one. `/checkpoints restore` in
+the terminal client does the same thing — computes a preflight, performs nothing.
+
+**Root cause.** `CheckpointRestoreExecutor`
+(`raiker/runtime/executors/tier1_checkpoint.py`) is implemented, is in
+`REAL_EXECUTOR_CAPABILITIES`, is registered by
+`build_default_executor_registry`, has a critical-classification rule
+(`raiker/runtime/authority/critical.py:207`) and is covered by tests. What does
+not exist is a caller: **no route, terminal command or model tool constructs a
+`checkpoint_restore` action.** `GET /api/checkpoints/{id}/restore-plan`
+(`raiker/api/routes_dashboard.py:2073`) is read-only by design, and
+`checkpoint_restore_execution` is deliberately not in `EXECUTABLE_ON_APPROVAL`.
+It is one of three registered-but-unreachable executors recorded in
+[`GOVERNANCE_ENTRY_PATHS.md` §3.5](GOVERNANCE_ENTRY_PATHS.md).
+
+**Proposed fix.** A `POST /api/checkpoints/{id}/restore` that raises an ordinary
+approval for `checkpoint_restore_execution`, plus the Checkpoints action and the
+terminal command that call it. The executor already writes its own pre-image, so
+a restore is itself reversible, and the critical-classification rule already
+routes a cross-principal restore to the human-only lifecycle. Nothing new has to
+be designed — only routed.
+
+**Interface outcome that has to be true before this closes.** From
+**Observability → Checkpoints**, an owner selects a checkpoint, reads the
+preflight naming exactly which files change, approves, and the workspace really
+goes back — with the restore itself appearing as a new checkpoint. A restore of a
+file whose pre-image is `oversize` (see BUG-233) must say so in the preflight
+rather than failing at execution.
+
+**Why High.** Every other severity in this document is measured against what the
+product claims. This is the largest distance between a claim and the product in
+the repository, it blocks two of the four pillars
+([`PILLAR_MAP.md`](PILLAR_MAP.md) → P2 and P3), and the work is routing code that
+already exists.
+
+---
+
+## BUG-231 — The audit log cannot be taken out of the product
+
+**Severity: High. Area: observability / evidence. Status: Open — raised 2026-08-23.**
+
+**Observed.** Raiker keeps an append-only, account-scoped audit log and describes
+it as evidence. Evidence that cannot leave the product is evidence that cannot be
+used anywhere it matters — a review, an incident write-up, a second tool.
+
+**Reproduction.** There is no route to reproduce against; that is the defect.
+`GET /api/memory/export` exists and works (`raiker/api/routes_memory.py`), which
+is what makes the absence conspicuous rather than an oversight of principle.
+
+**Root cause.** `raiker/events/export.py` produces a **redacted export manifest**
+and the store keeps it. `audit_export` is a capability in `ALL_CAPABILITIES` with
+**no executor**, so it is one of the twenty-two that cannot be activated, and no
+REST route surfaces the manifest the code already builds.
+
+**Proposed fix.** Give `audit_export` a real executor that returns the existing
+manifest, and a route behind it, scoped to the acting principal and passing the
+same redaction the log itself passes. The redaction is the hard part and it is
+already written.
+
+**Interface outcome.** **Observability → Audit log** offers an export; what comes
+out carries the same redaction the on-screen record does, is scoped to the
+owner's own account, and the export itself is an audited event.
+
+---
+
+## BUG-232 — Two egress implementations exist, and the weaker one is registered
+
+**Severity: High. Area: egress / governance. Status: Open — raised 2026-08-23.**
+
+**Observed.** Raiker has two different implementations of "reach the network",
+and they do not enforce the same controls. The one an owner is told about is the
+guarded one. The other is registered in the default executor registry.
+
+**Root cause.** The model-facing path — `web_fetch` and `web_search` through the
+broker — is `WebAccessService` (`raiker/runtime/web_access.py`): HTTPS only, no
+credential in the URL, every resolved address must be public, every redirect hop
+re-governed, the connection pinned to an address that already passed.
+
+`WebFetchExecutor` and `NetworkExecutor`
+(`raiker/runtime/executors/tier2_web.py`) call
+`raiker.runtime.executors.sandbox.fetch_url`, which enforces **one** control: a
+hard-coded four-host `fnmatch` against `parsed.netloc` (`api.github.com`,
+`raw.githubusercontent.com`, `pypi.org`, `files.pythonhosted.org`). No HTTPS
+requirement. No public-address check. No pinning. `urllib` follows redirects
+freely, so a redirect from an allowlisted host to anywhere is followed unchecked.
+The allowlist is not owner-editable.
+
+**Nothing currently routes to either.** There is no `network` tool, neither
+capability is in `EXECUTABLE_ON_APPROVAL`, and no route constructs the action —
+they are exercised only by `tests/test_vertical_slice_e2e.py`. That is why no
+test failed and no defect was raised for months.
+
+**Proposed fix.** Delete `WebFetchExecutor`, `NetworkExecutor`, the
+`network_execution` capability and the `fetch_url` allowlist path; or, if a
+capability-level egress executor is wanted later, route it through
+`WebAccessService` so there is one implementation. Decide the same question for
+`process_execution`, whose lifecycle `shell_execution` already covers.
+
+**Interface outcome.** **Permissions** stops offering a `network` gate that
+changes nothing when opened, and there is exactly one answer to "what happens
+when Raiker reaches the internet".
+
+**Why High despite being unreachable.** Severity here is not "can it be exploited
+today" — it cannot. It is that Raiker's central claim is that no path bypasses
+governance, and a registered executor with a weaker guard is one call site away
+from making that false. Written up in
+[`../threat-models/network-execution.md`](../threat-models/network-execution.md).
+
+---
+
+## BUG-233 — An approval promises a rewind it cannot give, for a file over 8 MiB
+
+**Severity: Medium. Area: checkpoints / approvals. Status: Open — raised 2026-08-23.**
+
+**Observed.** The approval notice for a file mutation reads: *"The previous file
+contents are checkpointed first, so it can be rewound."* For a file larger than
+8 MiB that sentence is false, and the owner reads it **before** deciding.
+
+**Root cause.** `MAX_PRE_IMAGE_BYTES` is 8 MiB
+(`raiker/checkpoints/capture.py`). A file above it is still written; its
+pre-image is recorded with `capture_status: oversize`, which means *not
+restorable*. The notice in `raiker/control/dashboard.py` is a constant for the
+whole file-mutation class and does not consult the capture outcome — and it
+cannot, because capture happens after the decision.
+
+**Proposed fix.** Compute the target's size when building the approval preview
+and, above the cap, replace the rewind sentence with one that says the change
+will not be reversible and why. The preview already resolves the path, so this is
+a `stat` and a branch.
+
+**Interface outcome.** An owner approving a large-file change is told, before
+approving, that this particular change cannot be rewound.
+
+**Related.** The same `capture_status` distinction should surface in the restore
+preflight built for BUG-230.
+
+---
+
+## BUG-234 — The MCP client is five protocol revisions behind
+
+**Severity: Medium. Area: MCP / interoperability. Status: Open — raised 2026-08-23.**
+
+**Observed.** Raiker negotiates Model Context Protocol revision **`2024-11-05`**.
+The current revision is
+[**`2026-07-28`**](https://modelcontextprotocol.io/specification/versioning). A
+server that implements only the current revision cannot be connected at all, and
+nothing in the product or the documentation said which revision Raiker speaks.
+
+**Root cause.** `MCP_PROTOCOL_VERSION = "2024-11-05"` and
+`PROTOCOL_VERSION = "2024-11-05"` in `raiker/runtime/executors/mcp.py`. The
+bounded stdio session Raiker runs — `initialize`, `tools/list`, `tools/call` — is
+valid for that revision and interoperates with servers still accepting the
+handshake-based negotiation.
+
+**What being behind costs.** Everything the specification added since is out of
+reach, and three of them are already recorded as separate gaps that share this
+single cause:
+
+* **Streamable HTTP session semantics** — Raiker's `http` transport is its own
+  bounded client, not the spec's transport.
+* **Remote OAuth** — the authorisation flow the current revision defines.
+* **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp))**
+  — sandboxed server-contributed UI, which is also the better answer to BUG-228.
+* Structured tool output, resource links, elicitation, per-request `_meta`
+  version declaration, and the mandatory `server/discover` RPC.
+
+**Proposed fix.** Negotiate `2026-07-28`, keeping the `2024-11-05` handshake for
+older servers — the specification's backward-compatibility section provides for
+exactly this. Fail-closed behaviour is unaffected either way: the interpreter
+allowlist, workspace-relative args, containment and redacted metadata-only events
+are Raiker's own and do not come from the protocol.
+
+**Interface outcome.** **Extensions → MCP** states the revision a connected
+server negotiated, and a server that speaks only the current revision connects.
+
+**Why Medium and not High.** Nothing is broken for servers Raiker can already
+talk to, and no governance property depends on the version. It is here because
+one change unblocks three separate rows, which makes it the highest-leverage item
+on the platform pillar ([`PILLAR_MAP.md`](PILLAR_MAP.md) → P4).

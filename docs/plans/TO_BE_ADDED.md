@@ -1,14 +1,26 @@
 ## Goal
 
-Make Raiker a secure AI product that combines an AI assistant, a governed AI
-agent, and an extensible agent platform.
+Make Raiker a secure AI product that combines **four** things: a polished AI
+assistant, a governed AI agent, **a capable coding/build agent**, and an
+extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
 communicate through a polished conversational experience. As an agent, Raiker
 should be able to plan tasks, gather context, use tools, execute approved
-actions, verify outcomes, and explain what it did. As a platform, Raiker should
-provide the governed runtime foundation for models, tools, plugins, interfaces,
-memory, approvals, audit events, checkpoints, and integrations.
+actions, verify outcomes, and explain what it did. As a coding agent, Raiker
+should read a repository, make the change, run the tests, read the failure and
+iterate to green, in one governed session. As a platform, Raiker should provide
+the governed runtime foundation for models, tools, plugins, interfaces, memory,
+approvals, audit events, checkpoints, and integrations.
+
+Governance, observability, policy awareness, control and security are **inherent
+properties** of that runtime, not optional layers added around the agent.
+
+> **Which open work blocks which pillar is in [`PILLAR_MAP.md`](PILLAR_MAP.md),
+> and how an action reaches an executor at all is in
+> [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md).** This preamble is
+> repeated in several plans because each is read on its own; the pillar map is
+> the one place that says what the whole set adds up to.
 
 Raiker must support user-owned model choice across LLM backends — local models
 such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM;
@@ -102,8 +114,14 @@ blast radius, so neither should precede Tier 0. Tiers 4–6 are the differentiat
 that put Raiker beyond the field, and every one of them is expensive; none should
 start before the tiers below it are closed.
 
-**Owner decisions, not implementer decisions.** ADD-11, ADD-14 and ADD-18 change
-what Raiker *is* — a machine that reaches the public internet, a machine that
+**Added 2026-08-23:** ADD-21 (Agent Skills conformance), ADD-22 (a mid-turn
+question), ADD-23 (governed browser control) and ADD-24 (MCP Apps). They came out
+of the reference audit of that date rather than from the original tiering, and
+each states its tier in its own entry. ADD-23 is an **owner decision**; ADD-24 is
+blocked on [BUG-234](TO_BE_FIXED.md) and **supersedes** the plugin-panels work.
+
+**Owner decisions, not implementer decisions.** ADD-11, ADD-14, ADD-18 and
+ADD-23 change what Raiker *is* — a machine that reaches the public internet, a machine that
 requires specific hardware, a machine with more than one principal. They belong
 to the owner. `docs/NESTED_BOUNDARIES_ARCHITECTURE.md` is where the multi-
 principal question has to be answered.
@@ -699,6 +717,191 @@ return values — which is precisely what the unit tests missed in FIXED-97.
 **Governed outcome.** Diagnostics carries a standing "when did each guardrail last
 demonstrate that it works" panel, and a guardrail that stops catching its own
 drill raises a finding before an attacker finds it first.
+
+---
+
+## ADD-21 — Conformance to the Agent Skills open standard
+
+**Status: proposed. Tier 2 (reach). Effort: low.**
+
+**What exists today.** `raiker/skills/package.py` reads a `SKILL.md` with a
+`---` frontmatter block, requires `name` and `description`, validates the name
+against `^[a-z0-9][a-z0-9._-]{0,63}$`, truncates the description at 2000
+characters, and loads progressively — index into the turn, body on demand
+through `skill_load`. Six built-in skills ship. Raiker executes nothing a skill
+bundles.
+
+**What changed underneath it.** The format is no longer a Claude Code
+convention. [Agent Skills](https://agentskills.io) is a published open standard
+with a [formal specification](https://agentskills.io/specification) and a
+[reference validator](https://github.com/agentskills/agentskills/tree/main/skills-ref),
+implemented by **all seven** of Raiker's reference platforms and roughly forty
+other products. Raiker predates it and is close to it without being conformant.
+
+**The measured differences**, all found by reading the specification against the
+code on 2026-08-23:
+
+| | Standard | Raiker |
+|---|---|---|
+| `name` | `a-z`, `0-9`, single hyphens; no leading/trailing hyphen; no `--` | Also accepts `.`, `_`, trailing hyphen, `--` — a **superset** |
+| `description` | Max 1024 characters | Truncates at 2000 |
+| `metadata` | A nested map | The frontmatter reader is not YAML, so it cannot parse |
+| `license`, `compatibility` | Optional fields | Ignored |
+| `version` | Belongs under `metadata` | Raiker's own built-ins carry it at top level |
+| `allowed-tools` | Experimental: pre-approved tools | Ignored — **and must stay refused** |
+
+**The work.** Validate an installed skill against the specification and *report*
+the result rather than refusing it: a skill that installs today must keep
+installing. Tighten the name rule for skills Raiker itself authors, cap the
+description, parse `license` and `compatibility` for display, and move the
+built-ins' `version` under `metadata`.
+
+**The one field to read and refuse.** `allowed-tools` is a skill pre-approving
+its own tools, which is exactly the capability grant that
+[§3.5](../REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
+exists to prevent. Raiker should **parse it and say out loud that it is not
+honoured**, which is stronger than ignoring a field an author believes is doing
+something.
+
+**Governed outcome.** A skill written in Raiker installs in the other forty
+products; a skill written elsewhere installs here; and where Raiker deliberately
+diverges — running no bundled `scripts/`, refusing `allowed-tools` — the
+divergence is stated against a named standard rather than asserted as taste.
+
+**Beyond the reference platforms? PARITY.** Everyone implements the format.
+What is *beyond* is being the implementation that refuses the execution parts
+and says why.
+
+---
+
+## ADD-22 — A structured question to the owner, mid-turn
+
+**Status: proposed. Tier 1 (safe autonomy). Effort: medium.**
+
+**What exists today.** Raiker's only mid-turn interruption is an **approval**.
+An approval asks *may I do this*. There is no way for a model to ask *which of
+these did you mean*, so a turn facing two readings of an instruction picks one
+and the owner discovers the choice afterwards.
+
+**What the reference set has.** Claude Code's `AskUserQuestion`; MCP's
+`elicitation`, added in a revision Raiker cannot yet negotiate (BUG-234); Cowork
+Dispatch's *Awaiting answer* task state.
+
+**The work.** One question surface, reusing the approval transport and the same
+server-side redaction: the model proposes a question and a small set of options,
+the turn parks exactly as it parks for an approval, the owner picks, and the
+answer returns as a tool result. `PermissionRequest`-shaped, but carrying no
+decision about an action.
+
+**Why the governance cost is near zero.** A question **grants nothing, executes
+nothing, and reaches nothing**. It needs no capability gate of its own, which is
+what makes this cheap relative to its effect. The one real rule: the question and
+its options are model-authored text and must be rendered as data, never as
+markup, under the same sanitiser a fetched page passes.
+
+**Governed outcome.** A turn that does not know what the owner meant asks,
+instead of guessing and being corrected after the work is done. Also gives MCP
+`elicitation` somewhere to land when BUG-234 closes.
+
+**Beyond the reference platforms? YES — improvement.** The capability is not
+novel; doing it with no authority attached, in a product where every other
+interruption carries authority, is.
+
+---
+
+## ADD-23 — Governed browser control, as a narrow tool set
+
+**Status: proposed. Tier 3 (reach). Effort: high.
+Owner decision, not an implementer decision.**
+
+**What exists today.** Raiker can *read* a page — `web_fetch` under an address
+guard, sanitised to text, framed as untrusted data. It cannot fill a form, click
+through a flow, or read a page that renders client-side.
+
+**What the reference set has.** Cowork pairs with
+[Claude in Chrome](https://claude.com/docs/cowork/overview); Hermes drives a real
+browser over CDP with local and cloud backends.
+
+**What Raiker should not build.** **Computer use** — screen capture and synthetic
+input — remains refused. It is a capability class with no bounded description of
+what an action can reach: "click at (x, y)" cannot be policy-reviewed, cannot be
+previewed in an approval, and cannot be redacted in an audit record.
+
+**What it could build instead.** A browser driven through a **named, bounded tool
+set** — navigate, read, click a named element, fill a named field — where every
+one of those is an ordinary governed action:
+
+* destinations answer to the **same address guard** `web_fetch` uses, so the
+  browser cannot reach the loopback interface or a metadata service either;
+* page text arrives through the **same sanitiser**, so it is untrusted data;
+* each navigation and each interaction is a separate policy-reviewed, auditable
+  action with a previewable argument;
+* it runs in the existing container boundary, not on the host browser, so it
+  carries none of the owner's cookies or sessions unless they are lent to it the
+  way the git credential is.
+
+**Why it is an owner decision.** It changes what Raiker *is*: a machine that
+drives an interactive session against a third party under the owner's identity.
+That is the same class of decision as ADD-11.
+
+**Governed outcome.** The reference platforms reach the interactive web with a
+capability nobody can preview. Raiker would reach it with one where every step is
+a reviewable action — which is the whole argument for doing it as a tool set
+rather than as computer use.
+
+**Beyond the reference platforms? YES — improvement.** Parity on reach,
+materially ahead on what an owner can see and refuse.
+
+---
+
+## ADD-24 — MCP Apps: sandboxed, server-contributed interactive UI
+
+**Status: proposed. Tier 3 (reach). Effort: medium — after BUG-234.
+Supersedes plugin panels.**
+
+**What exists today.** `PLUGIN_SYSTEM_SPEC.md` names `panels.json`,
+`tui_panels`, `web_panels` and `mobile_panels`. None of them has a route, a
+permission or an accessibility contract (BUG-228). No compared platform ships a
+*plugin* panel either, so it has always been a gap against Raiker's own document.
+
+**What changed.**
+[MCP Apps (SEP-1865)](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)
+specifies the same capability from the other side: an MCP **server** pre-declares
+a UI resource under a `ui://` scheme, links it to a tool through metadata, and
+the host renders it in a **mandatory sandboxed iframe** with every message
+travelling over MCP's own JSON-RPC. Claude
+[ships it](https://claude.com/docs/connectors/building/mcp-apps/getting-started)
+behind a per-app owner permission.
+
+**Why this fits Raiker better than `panels.json` ever did.** Three properties
+Raiker would have had to invent, already specified and already reviewed by
+someone else:
+
+1. **The resource is declared ahead of time**, so the host can fetch, cache and
+   security-review it *before* anything runs — the same shape as a reviewed
+   permission diff.
+2. **The sandbox is mandatory**, not advisory, so "no plugin code runs in this
+   browser" stays literally true: the code that runs is a connected server's, in
+   an iframe, under a permission the owner granted.
+3. **Every message is MCP JSON-RPC**, which is already the shape the audit log
+   records — so a UI's traffic is auditable without a new event vocabulary.
+
+And one property Raiker's plugin model insists on and gets for free: the UI
+belongs to a **server the owner added deliberately**, not to a plugin that
+contributed it on the owner's behalf.
+
+**The work.** Blocked on BUG-234 — the `ui://` resource type does not exist in
+protocol revision `2024-11-05`. After that: a capability gate, a per-app owner
+permission, an iframe with the sandbox attributes the specification requires, and
+a CSP that permits nothing the specification does not.
+
+**Recommendation, stated plainly.** **Build this and drop `panels.json`.** Two
+UI-contribution models is two security reviews, two permission vocabularies and
+two accessibility contracts for one capability. BUG-228 should close as
+*superseded*, not as *done*.
+
+**Beyond the reference platforms? YES — improvement**, and only if Raiker keeps
+the per-app permission the specification makes optional.
 
 ---
 

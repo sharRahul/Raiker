@@ -19,6 +19,7 @@ Read these first, and prefer them where anything else disagrees.
 | What are the components, and how does a governed action flow? | [Architecture](ARCHITECTURE.md) |
 | What is implemented **right now**? | [Implementation status](IMPLEMENTATION_STATUS.md) |
 | What are the trust boundaries and fail-closed controls? | [Security architecture](SECURITY_ARCHITECTURE.md) |
+| How does an action reach an executor, and what does it cross? | [Governance entry paths](plans/GOVERNANCE_ENTRY_PATHS.md) |
 | What is Raiker's security philosophy, and what does enabling a capability mean? | [Security and policy](SECURITY_AND_POLICY.md) |
 | How does Raiker compare with Claude Cowork, Claude Code, ChatGPT, Codex, OpenClaw, DeepSeek Harness and Hermes Agent? | [Reference platform compatibility](REFERENCE_PLATFORM_COMPATIBILITY.md) |
 | What does the local web API expose, and in what shape? | [API and contracts](API_AND_CONTRACT_SCHEMAS.md) |
@@ -134,6 +135,8 @@ instead.
 | The standing brief — goal, security posture, non-negotiable runtime rules | [Handoff](HANDOFF.md) (its dated sections are a historical record, not current status) |
 | Proposed additions, with tiers and reasoning | [To be added](plans/TO_BE_ADDED.md) |
 | Open Build and Chat gaps | [Build and Chat gap analysis](plans/GAP_BUILD_CHAT.md) |
+| Which open work blocks which part of the product | [Pillar map](plans/PILLAR_MAP.md) |
+| How an action reaches an executor, and what it crosses | [Governance entry paths](plans/GOVERNANCE_ENTRY_PATHS.md) |
 | Recording an architecture decision | [ADR template](ADR_TEMPLATE.md) |
 | Implementing in small, reliable steps | [Local LLM builder guide](LOCAL_LLM_BUILDER_GUIDE.md) |
 | Mapping a borrowed concept into a Raiker requirement | [Reference requirements matrix](REFERENCE_REQUIREMENTS_MATRIX.md) |

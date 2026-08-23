@@ -90,6 +90,20 @@ asserts had actually broken:
 | `test_documentation_links_and_anchors_resolve` | Every relative Markdown link in `README.md`, `docs/**` and `apps/web/README.md` resolves — **including its heading anchor**, using GitHub's slug algorithm |
 | `test_relayed_capability_count_is_stated_correctly` | `EXECUTABLE_ON_APPROVAL` still has twelve members, and `README.md` still says so. Changing the set without updating the documents that name the number fails here |
 
+`tests/test_governance_entry_paths.py` asserts the enumeration in
+[`plans/GOVERNANCE_ENTRY_PATHS.md`](plans/GOVERNANCE_ENTRY_PATHS.md), because a
+document describing every way an action reaches an executor fails **silently**:
+a new path appears beside the governed ones and nothing breaks.
+
+| Test | What it asserts |
+|---|---|
+| `test_i1_route_action_callers_are_the_enumerated_ones` | `RuntimeAuthority.route_action` is called from exactly the five modules the document names. A sixth is a new entry into the governed chokepoint |
+| `test_i2_agent_gateway_is_constructed_only_by_enumerated_surfaces` | `AgentGateway` is constructed only by the four surfaces named. This is what makes "every interface enters through the Agent Gateway" checkable |
+| `test_i3_every_real_executor_capability_is_named_in_the_enumeration` | Every capability with a real executor is named in the enumeration with the path that reaches it. A new registered executor cannot appear without someone writing down how it is reached — the step nobody took for `network_execution` |
+| `test_i3b_the_tool_reachable_set_is_exactly_fifteen` | Fifteen capabilities are reachable by a model tool through `CAPABILITY_GATE_MAP`. A change moves a capability between reachability categories |
+| `test_i4_local_gate_checks_are_the_enumerated_eight` | Exactly eight modules read a capability gate directly instead of routing through the authority. A ninth cannot appear silently |
+| `test_i5_a_hook_can_never_grant` | `combine()` returns only `deny`, `ask` or `no_decision` for every scope, decision and authority combination — an `allow` can never override a `deny` |
+
 ## What is not automated
 
 - **External URL checking.** Internal links and anchors are now asserted by

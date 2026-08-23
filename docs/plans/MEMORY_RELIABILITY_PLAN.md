@@ -11,6 +11,13 @@ the file that proves it, the proposed fix, and the user-interface outcome that
 has to be true before it can be called closed — so closing backend work cannot
 leave an invisible or misleading product surface.
 
+> **Memory is the binding constraint on Raiker's assistant pillar.** Of the four
+> things Raiker is trying to be — a polished assistant, a governed agent, a
+> coding agent, and an extensible governed platform — this document holds the
+> single item standing between it and the first: an assistant that cannot recall
+> a paraphrase is not one people keep using. See
+> [`PILLAR_MAP.md`](PILLAR_MAP.md) → P1, where MEM-10 is the blocking item.
+
 ## Security posture (read before adding any restriction)
 
 Raiker is **owner-authoritative and monitored, not prevention-by-restriction.**

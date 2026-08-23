@@ -1,0 +1,187 @@
+# Pillar map
+
+**Canonical** for *which open work blocks which part of the product*. Every other
+plan in this directory is organised by where a problem was found — a defect, a
+parity gap, a memory audit, a proposal. None of them answers the question an
+owner or a builder actually starts from: **what is standing between Raiker and
+the thing it is trying to be?**
+
+Written **2026-08-23**. It adds no new work; it re-cuts what already exists.
+
+---
+
+## The four pillars
+
+Raiker is one product wearing four faces. The first three are surfaces; the
+fourth is what the other three run on.
+
+| # | Pillar | What "done" means |
+|---|---|---|
+| **P1** | **A polished AI assistant** | Chat is the surface someone chooses over a hosted assistant for daily work — not because it is governed, but because it is good |
+| **P2** | **A governed AI agent** | Every action is policy-aware, observable, auditable, approval-driven, least-privileged, human-governed, recoverable, verifiable and fail-closed — as properties of the runtime, never as a layer around it |
+| **P3** | **A capable coding/build agent** | Build reads a repository, makes the change, runs the tests, reads the failure and iterates to green, in one governed session |
+| **P4** | **An extensible governed agent platform** | Tools, skills, plugins, hooks, channels, MCP and models extend Raiker **without any of them gaining a route around governance** |
+
+Cutting across all four, and never traded against any of them:
+
+> **User-owned model choice** — local, private-network, home-lab and hosted —
+> with no model, tool, skill, plugin, interface, runtime or execution path
+> bypassing governance.
+
+That last clause is P2's, and it is why
+[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) exists: it is the only
+document that makes the claim checkable rather than asserted.
+
+---
+
+## Where each pillar stands
+
+Honest one-line assessments, each backed by the items below it.
+
+| Pillar | State | The thing in the way |
+|---|---|---|
+| **P1** Assistant | **Strong.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects | Memory does not retrieve by meaning. An assistant that cannot recall a paraphrase is not one people keep using |
+| **P2** Governed agent | **Ahead of the field, with two honest holes.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has | Recovery is not reachable (no rewind) and evidence is not exportable (no audit route). Both are *stated* properties Raiker does not yet deliver |
+| **P3** Coding agent | **Closes the loop.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review | It cannot undo. Checkpoint capture is complete; nothing proposes a restore |
+| **P4** Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client is five protocol revisions behind, which closes off three capabilities at once |
+
+**The single highest-value observation across all four:** three of the four
+pillars are blocked by the *same two items* — checkpoint rewind and audit export.
+Both are High priority, Low effort, and both are things Raiker already built and
+never routed. They are the cheapest work with the widest effect in the product.
+
+---
+
+## P1 — A polished AI assistant
+
+| Item | Where | State |
+|---|---|---|
+| Semantic memory retrieval | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open — a default install has no embedding model to select |
+| Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md) | Open — ~431 ms at 3 000 memories, paid every turn |
+| A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open |
+| Retention sweep | [MEM-07](MEMORY_RELIABILITY_PLAN.md) | Open — `expires_at` enforced at read time only |
+| Owner-guided summarisation of a range | [backlog #14](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
+| A structured question to the owner mid-turn | [backlog #22](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
+| Tool rows do not survive a reload | [backlog #30](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
+| GAP-CHAT remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 13 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
+
+**Blocking item:** MEM-10. Everything else here is polish on a surface that
+already works.
+
+## P2 — A governed AI agent
+
+| Item | Where | State |
+|---|---|---|
+| **Checkpoint rewind is unreachable** | [backlog #1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — executor built, registered, tested, and no route proposes a restore |
+| **Audit export has no route** | [backlog #2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — manifest produced, never surfaced |
+| **Remove the second, weaker egress path** | [backlog #3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — two implementations of "reach the network" |
+| **An oversize checkpoint is silently unrestorable** | [backlog #4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — the approval promises a rewind it cannot give |
+| Eight modules re-implement the gate check | [GEP-01](GOVERNANCE_ENTRY_PATHS.md#gep-01--eight-modules-re-implement-the-gate-check) | Open |
+| The stop switch's scope is undefined for read paths | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths) | Open — **an owner decision** |
+| `NESTED_BOUNDARIES_ARCHITECTURE.md` overstates the architecture | [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Open |
+| Fifteen capabilities have no traced governed-action path | [GEP-04](GOVERNANCE_ENTRY_PATHS.md#gep-04--fifteen-capabilities-have-no-traced-governed-action-path) | Open — **do this first**; it may reclassify others |
+| Auto mode has no alignment check | [BUG-218](TO_BE_FIXED.md) | Open |
+| Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md) | Open |
+| OpenTelemetry export | [backlog #23](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Deterministic replay | [backlog #25](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
+| Credential masking with sentinel substitution | [backlog #24](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
+| WebAuthn step-up, hardware root of trust | [ADD-14](TO_BE_ADDED.md), [ADD-15](TO_BE_ADDED.md) | Proposed — **owner decisions** |
+
+**Blocking items:** #1 and #2. Raiker's own documentation lists *recoverable*
+and *auditable* as properties of the runtime, and today an owner can reach
+neither. Everything else in P2 is Raiker being ahead and wanting to be further
+ahead; these two are it not being what it says.
+
+## P3 — A capable coding/build agent
+
+| Item | Where | State |
+|---|---|---|
+| **Checkpoint rewind is unreachable** | [backlog #1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort) | Open — shared with P2, and this is where an owner feels it |
+| Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md) | Open — POSIX-only PTY and reattachment |
+| Filtered domain egress unproven | [backlog #11](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
+| Remote supervisor install lifecycle | [backlog #27](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
+| No resolved call graph; textual find-references | [B-tier](GAP_BUILD_CHAT.md) | Open by design, stated |
+| LSP surface | [BUG-227](TO_BE_FIXED.md) | Open — **decide whether Raiker wants one at all** |
+| Worktrees for parallel work | [backlog #32](../REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
+| GAP-BUILD remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 9 items |
+
+**Blocking item:** #1, again. A coding agent that can write but not undo makes
+the owner the undo mechanism.
+
+## P4 — An extensible governed agent platform
+
+| Item | Where | State |
+|---|---|---|
+| **MCP client is five protocol revisions behind** | [backlog #9](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Open — blocks streamable HTTP, remote OAuth **and** MCP Apps at once |
+| Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md) | Open — an inbound message never becomes work |
+| Four hook handler types refused | [BUG-226](TO_BE_FIXED.md) | Open — `prompt` first; it needs no new surface |
+| Hook lifecycle coverage | [backlog #19](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
+| Agent Skills standard conformance | [backlog #18](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
+| MCP Apps (SEP-1865) | [backlog #33](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
+| Plugin panels | [BUG-228](TO_BE_FIXED.md) | Open, and **reassessed**: the row above is the better answer |
+| MCP tool search / deferred tool schemas | [backlog #21](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Owner-authored slash commands | [backlog #8](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
+| Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md) | Proposed |
+| Governed browser control | [backlog #29](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
+| Live-spec sign-in | [BUG-229](TO_BE_FIXED.md) | Open |
+
+**Blocking item:** #9. One protocol upgrade unblocks three separate rows, which
+makes it the highest-leverage item on this pillar by a wide margin.
+
+---
+
+## Model choice — the cross-cutting requirement
+
+Not a pillar; a constraint on all four. It is **met today** and the open items
+are quality rather than reach.
+
+| Item | State |
+|---|---|
+| Three adapters over ten provider families, local to hosted | **Met** |
+| Exact-model readiness proven before a turn | **Met** — and ahead of the reference set |
+| Owner-ordered fallback with no silent hosted fallback | **Met** |
+| No mock or test provider can be constructed | **Met**, and deliberately |
+| Shipped list prices are unverified defaults | Open, stated, low severity |
+
+---
+
+## The order to work in
+
+Derived from the pillar analysis, not from the backlog's own ordering — the
+backlog sorts by priority and effort, this sorts by *how many pillars an item
+unblocks*.
+
+| Order | Item | Unblocks | Why here |
+|---|---|---|---|
+| 1 | [GEP-04](GOVERNANCE_ENTRY_PATHS.md#gep-04--fifteen-capabilities-have-no-traced-governed-action-path) — trace the fifteen | P2 | Cheap, and it may reclassify items below. Do the analysis before committing to the fixes |
+| 2 | **Checkpoint rewind** ([#1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
+| 3 | **Audit export** ([#2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
+| 4 | **Remove the second egress path** ([#3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
+| 5 | **Oversize checkpoint honesty** ([#4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
+| 6 | **MCP protocol revision** ([#9](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
+| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md)) | P1 | The largest honest gap, and the most expensive of the top group |
+| 8 | [GEP-01](GOVERNANCE_ENTRY_PATHS.md#gep-01--eight-modules-re-implement-the-gate-check) — shared admission helper | P2 + P4 | After GEP-04, so it is designed once |
+
+Items 2–5 are all **High priority, Low effort**, and together they close the gap
+between what Raiker's documentation says it is and what an owner can actually
+reach. Nothing further down should start before them.
+
+---
+
+## Keeping this honest
+
+This document is a re-cut, so it has no content of its own to go stale — but it
+can go **incomplete**, which is worse, because it reads as a complete picture.
+
+When an item is opened or closed in [`TO_BE_FIXED.md`](TO_BE_FIXED.md),
+[`TO_BE_ADDED.md`](TO_BE_ADDED.md),
+[`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md),
+[`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md),
+[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) or
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §5](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog),
+it belongs in exactly one pillar here.
+
+**The canonical priority order stays in the backlog.** This document says what an
+item is *for*; the backlog says what it *costs* and in what order. Where the two
+orderings differ — as they do above — the difference is the point, and the reason
+is stated in the last column.

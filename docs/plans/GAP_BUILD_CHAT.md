@@ -1,14 +1,26 @@
 ## Goal
 
-Make Raiker a secure AI product that combines an AI assistant, a governed AI
-agent, and an extensible agent platform.
+Make Raiker a secure AI product that combines **four** things: a polished AI
+assistant, a governed AI agent, **a capable coding/build agent**, and an
+extensible governed agent platform.
 
 As an assistant, Raiker should help users understand, reason, decide, and
 communicate through a polished conversational experience. As an agent, Raiker
 should be able to plan tasks, gather context, use tools, execute approved
-actions, verify outcomes, and explain what it did. As a platform, Raiker should
-provide the governed runtime foundation for models, tools, plugins, interfaces,
-memory, approvals, audit events, checkpoints, and integrations.
+actions, verify outcomes, and explain what it did. As a coding agent, Raiker
+should read a repository, make the change, run the tests, read the failure and
+iterate to green, in one governed session. As a platform, Raiker should provide
+the governed runtime foundation for models, tools, plugins, interfaces, memory,
+approvals, audit events, checkpoints, and integrations.
+
+Governance, observability, policy awareness, control and security are **inherent
+properties** of that runtime, not optional layers added around the agent.
+
+> **Which open work blocks which pillar is in [`PILLAR_MAP.md`](PILLAR_MAP.md),
+> and how an action reaches an executor at all is in
+> [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md).** This preamble is
+> repeated in several plans because each is read on its own; the pillar map is
+> the one place that says what the whole set adds up to.
 
 Raiker must support user-owned model choice across LLM backends — local models
 such as llama.cpp, Ollama, and LM Studio; home-lab runtimes such as vLLM;
@@ -399,6 +411,10 @@ lists that have to agree — schema and policy, emitted events and declared
 events, configured denials and enforced ones — with nothing holding them
 together. Each is now held together by a test rather than by care.
 
+> **This ordering covers one pillar.** The order that spans all four — and the
+> reason two items here are outranked by work in other documents — is
+> [`PILLAR_MAP.md`](PILLAR_MAP.md) → *The order to work in*.
+
 ### Suggested order
 
 B1 → B2 → B3 make Build an agent. **B1, B2, and B3's defined core scope are
@@ -616,6 +632,10 @@ memory from the transcript is still only available on the Memory route.
 There is no "what am I working on", no cross-project view, no resumption of the
 threads a routine is advancing.
 
+> **This ordering covers one pillar.** The order that spans all four — and the
+> reason two items here are outranked by work in other documents — is
+> [`PILLAR_MAP.md`](PILLAR_MAP.md) → *The order to work in*.
+
 ### Suggested order
 
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
@@ -633,11 +653,20 @@ decisions before they are implementation tasks.
 
 ## Verified working (no action needed)
 
+> **This is a dated observation, not a live status.** It records what a browser
+> round found on the day it was run, so the gaps above are read against the right
+> baseline. **Two counts in it have since moved** and are corrected inline below;
+> the rest is left as observed. For current numbers read
+> [`IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md) and
+> [`RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md), which are
+> maintained against the code.
+
 Recorded so the fixes above are read against the right baseline: first-run
 bootstrap; all 15 routes and 10 hub tabs with **0 console errors**; owner
 sign-in; vault key generate/save with elevated re-auth; capability gates
-(62 listed, four decision modes, step-up enforced, 42 deferred domains offering
-no enable path); runtime-mode activation; hosted-provider connection, live
+(~~62 listed~~ **67 as of 2026-08-23**, four decision modes, step-up enforced,
+~~42 deferred domains~~ **22 capabilities with no executor**, of which the seven
+sensitive Tier-6 domains offer no enable path at all); runtime-mode activation; hosted-provider connection, live
 provider model catalogue, and model selection; a real streamed Anthropic turn;
 recent-chat list with row menu; chat search over titles and message text;
 sessions, checkpoints, audit log, diagnostics, notifications, work-in-action;

@@ -673,6 +673,13 @@ Ordered strictly by [§0.4](#04-priority-and-effort-ordering). Every row states
 the proposed action, what it does for governance, and whether it puts Raiker
 ahead of the reference set.
 
+**This ordering is by priority then effort.** A second ordering — by *how many
+of Raiker's four pillars an item unblocks* — is in
+[`plans/PILLAR_MAP.md`](plans/PILLAR_MAP.md). Where the two differ, the
+difference is informative rather than a conflict: this document says what an item
+costs, the pillar map says what it is for. The two agree that items 1–4 come
+first.
+
 **Closed since the last pass.** Two items, both removed rather than left
 standing:
 

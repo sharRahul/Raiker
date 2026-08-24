@@ -49,3 +49,27 @@ describe("composer approval modes", () => {
     );
   });
 });
+
+// BUG-218 — Auto gained a deterministic second check, and the copy has to say
+// so. An owner arriving from a product whose Auto reviews each action will read
+// Raiker's the same way, and the promise the label makes has to be the one the
+// runtime keeps.
+describe("Auto's stated promise", () => {
+  it("says a change to an unlooked-at file waits, rather than promising a review", () => {
+    const auto = APPROVAL_MODES.find((m) => m.mode === "auto");
+    expect(auto).toBeDefined();
+    expect(auto?.detail).toMatch(/never looked at/i);
+    expect(auto?.detail).toMatch(/waits/i);
+    // Deliberately not "reviews each action for safety": the check is set
+    // membership over the turn's own record, not a judgement about safety, and
+    // copy that overclaims is the defect this closed.
+    expect(auto?.detail).not.toMatch(/safety/i);
+  });
+
+  it("leaves Skip's promise exactly as it was", () => {
+    // Skip is not alignment-checked. Its label says no approval is raised at
+    // all, and attaching a silent second check would make that untrue.
+    const skip = APPROVAL_MODES.find((m) => m.mode === "skip");
+    expect(skip?.detail).toBe("No approval is raised at all. Gates and policy still apply.");
+  });
+});

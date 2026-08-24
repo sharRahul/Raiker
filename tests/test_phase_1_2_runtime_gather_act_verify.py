@@ -182,8 +182,11 @@ def test_existing_terminal_commands_still_work(tmp_path: Path, monkeypatch) -> N
     assert isinstance(handle_approvals(workspace_root=tmp_path), str)
 
 
-def test_capability_gates_report_disabled_until_an_owner_enables_one(tmp_path: Path) -> None:
+def test_capability_gates_report_what_the_tools_will_read(tmp_path: Path) -> None:
+    """Reported state and enforced state are one answer, not two (GEP-01)."""
     from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
+    from raiker.runtime.authority.admission import capability_admission
+    from raiker.storage.sqlite import SQLiteStore
 
     bundle = ContextGatherer().gather(
         workspace_root=tmp_path,
@@ -192,5 +195,14 @@ def test_capability_gates_report_disabled_until_an_owner_enables_one(tmp_path: P
         prompt_text="x",
     )
     caps = [i for i in bundle.included_items if i.source.source_type == "capability_status"][0]
+    store = SQLiteStore(tmp_path)
     for capability in CAPABILITY_GATE_TOOLS:
-        assert caps.metadata[capability]["enabled"] is False  # type: ignore[index]
+        assert caps.metadata[capability]["enabled"] is (  # type: ignore[index]
+            capability_admission(store, None, capability).gate_enabled
+        ), capability
+    # Nothing that writes or runs is on before an owner enables it. `subagents`
+    # is deliberately not in this list: it follows the same shipped-default
+    # posture `code_map_indexing` does, so the single-user terminal client — a
+    # principal with no account — gets it on, while the web dashboard's
+    # per-principal controls stay fail-closed. See CAPABILITY_UNSET_RESOLUTION.
+    assert caps.metadata["shell_execution"]["enabled"] is False  # type: ignore[index]

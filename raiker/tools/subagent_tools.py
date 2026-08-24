@@ -21,6 +21,12 @@ What it may not do
 * **Escape governance.** Every step still runs through the same
   :class:`~raiker.tools.broker.ToolBroker`, policy engine, capability gates and
   audit path as a step the parent ran itself.
+* **Run when the owner has not allowed delegation.** GEP-04 found that the
+  ``subagents`` capability gate governed nothing: the Capabilities page showed a
+  switch, an owner could hold it off, and delegation ran anyway. It answers to
+  that gate now. The gate decides *whether the owner allows delegation at all*;
+  what a subagent may touch once delegated is still decided one step at a time
+  by the broker, which is why this is a switch rather than a second authority.
 * **Recurse.** `spawn_subagent` is not delegable, so a subagent cannot spawn
   one, and the depth budget is a second floor under that.
 * **Speak with authority.** The digest is quoted to the calling model as
@@ -61,6 +67,10 @@ SPAWNABLE_TOOLS: frozenset[str] = frozenset(DELEGABLE_TOOLS)
 DEFAULT_MAX_STEPS = 12
 DEFAULT_RUNTIME_SECONDS = 60
 DEFAULT_MAX_TOKENS = 40_000
+
+#: The owner's switch over delegation. Named here and in ``CAPABILITY_GATE_MAP``
+#: so the tool, the gate and the Capabilities page all mean the same thing.
+CAPABILITY = "subagents"
 
 # The digest the parent gets back. Bounded per step *and* in total, because the
 # whole point is that the parent's context does not grow with the search.
@@ -163,6 +173,24 @@ def spawn_subagent(
     turn_id: str,
 ) -> dict[str, Any]:
     """Run one bounded, read-only subagent and return its findings as data."""
+    # The owner's switch over delegation itself (GEP-04). Read through the one
+    # shared admission helper, so this cannot drift from the gate the
+    # Capabilities page writes or the one chokepoint B reads.
+    from raiker.runtime.authority.admission import capability_admission
+
+    admission = capability_admission(store, owner_principal_id or principal_id, CAPABILITY)
+    if not admission.gate_enabled:
+        return _failed(
+            "subagent_gate_disabled",
+            "Delegation denied: the Subagents capability is off. Turn on "
+            "**Subagents** in Capabilities to let Raiker delegate a bounded, "
+            "read-only investigation.",
+        )
+    if admission.denied_by_mode:
+        return _failed(
+            "subagent_denied_by_decision_mode",
+            "Delegation denied by the owner's decision mode for Subagents.",
+        )
     objective = str(arguments.get("objective", "")).strip()
     if not objective:
         return _failed("subagent_objective_required", "A subagent needs a stated objective.")

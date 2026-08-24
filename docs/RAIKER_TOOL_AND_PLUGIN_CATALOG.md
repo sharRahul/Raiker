@@ -85,7 +85,7 @@ worth reading in prose. This table is the whole list.
 | `shell` | Propose running a shell command (approval required). | high | acting, approval | `shell_execution` |
 | `skill_load` | Read the full instructions of one installed, active skill by name. Call this when a listed skill applies to the request, then follow what it says. The response lists any files bundled with the skill; pass… | medium | read-shaped, no approval · delegable | — |
 | `slack_read` | Read a Slack channel's info or recent history. Arguments: resource ('channel_info' or 'channel_history'), channel (the Slack channel id). Only available when the owner enabled the Slack connector; the… | medium | read-shaped, no approval | — |
-| `spawn_subagent` | Delegate a bounded, read-only investigation to a subagent and get back only its findings, so a wide search does not fill this conversation with raw output. Requires objective (what you want to know) and… | medium | read-shaped, no approval | — |
+| `spawn_subagent` | Delegate a bounded, read-only investigation to a subagent and get back only its findings, so a wide search does not fill this conversation with raw output. Requires objective (what you want to know) and… | medium | read-shaped, no approval | `subagents` |
 | `stat_path` | Return metadata for a path inside the workspace. | medium | read-shaped, no approval · delegable | — |
 | `update_plan` | Record or revise your plan for this conversation as an ordered checklist, shown live to the user. Use it for any task of more than a couple of steps: write the plan before you start, mark exactly one step… | medium | read-shaped, no approval | — |
 | `vector_get` *(not advertised to the model)* |  | medium | read-shaped, no approval · delegable | — |
@@ -248,7 +248,7 @@ governed execution path.
 | Tool Name | Descriptions | Permissions | Implemented |
 |---|---|---|---|
 | `update_plan` | Record or revise the agent's ordered plan for a conversation, one status per step | owner-scoped write of the model's own intent; no approval | Yes |
-| `spawn_subagent` | Delegate a bounded, read-only investigation and return only its findings | read-shaped; each delegated step is re-brokered | Yes, read-only |
+| `spawn_subagent` | Delegate a bounded, read-only investigation and return only its findings | `subagents` gate + decision mode; read-shaped, and each delegated step is re-brokered | Yes, read-only |
 | `mcp__<server>__<tool>` | Call one tool on a connected MCP server | `mcp_connector_runtime` gate + decision mode + containment | Yes |
 
 `update_plan` is read-shaped at the policy layer because it executes nothing: it
@@ -262,7 +262,16 @@ stored plan is left untouched.
 subagent's steps are each re-brokered through the policy engine, gates and audit
 path, and only read-only, local, non-egress tools are delegable. A step naming a
 write, a command, a connector, an MCP tool, or a nested spawn is refused before
-the subagent is created. Its findings reach the calling model as untrusted data,
+the subagent is created.
+
+**It answers to the `subagents` gate, and being read-shaped is not a reason not
+to** — the same argument that gives the owner one switch over the whole code map
+rather than half of it. The gate decides whether the owner allows delegation at
+all; what a subagent may touch once delegated is still decided one step at a
+time. It declared no capability until 2026-08-24, on the reasoning that spawning
+is no more authority than the parent already held; that is true of the second
+question and was never true of the first
+([FIXED-280](plans/FIXED_ITEMS.md)). Its findings reach the calling model as untrusted data,
 never as instructions, and the audit trail keeps the contract, the steps, and the
 tools used rather than the content.
 

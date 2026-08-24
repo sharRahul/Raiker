@@ -51,14 +51,11 @@ CAPABILITY_GATE_TOOLS: dict[str, tuple[str, ...]] = {
     "connector_slack_runtime": ("slack_read",),
     "advisor_model_runtime": ("consult_advisor",),
     "mcp_connector_runtime": ("mcp__<server>__<tool>",),
+    # GEP-04 — delegation answers to a real switch now, so the model has to be
+    # told about it. A model that does not know delegation is off spends a tool
+    # call finding out.
+    "subagents": ("spawn_subagent",),
 }
-
-# The gate states the runtime treats as on. Kept in step with the same frozenset
-# in `raiker/runtime/web_access.py` and `raiker/runtime/connectors.py`; a test
-# asserts the three agree rather than trusting that they were copied correctly.
-ENABLED_GATE_STATES = frozenset(
-    {"enabled_read_only", "enabled_policy_gated", "enabled_runtime"}
-)
 
 DEFAULT_GATE_STATE = "disabled"
 DEFAULT_DECISION_MODE_NAME = "ask"
@@ -799,24 +796,25 @@ class ContextGatherer:
     ) -> tuple[str, str]:
         """Read one capability's live gate state and decision mode.
 
-        Scoped to the principal exactly the way the tools themselves scope it
-        (``raiker/runtime/web_access.py``), so the bundle cannot report one
-        answer while the runtime enforces another. A read that fails is reported
-        as the fail-closed default rather than dropped: silence would read to the
-        model as "not gated".
+        Read through the same ``capability_admission`` helper the enforcing paths
+        use, so the bundle cannot report one answer while the runtime enforces
+        another. It could before: this method read an empty gate table as
+        ``disabled`` for every capability, while `WebAccessService` read the same
+        empty table as the shipped default. On a fresh install the model was
+        therefore told `web_fetch: disabled` and could fetch. A read that fails
+        is reported as the fail-closed default rather than dropped, because
+        silence would read to the model as "not gated".
         """
+        from raiker.runtime.authority.admission import capability_admission
+
         try:
-            scoped = store.account_scope(principal_id)
-            if scoped is not None:
-                record = store.get_principal_capability_gate_state(scoped, capability)
-                mode = store.get_principal_capability_decision_mode(scoped, capability)
-            else:
-                record = store.get_capability_gate_state(capability)
-                mode = store.get_capability_decision_mode(capability)
+            admission = capability_admission(store, principal_id, capability)
         except Exception:  # noqa: BLE001 — a broken read fails closed, like the gate itself
             return DEFAULT_GATE_STATE, DEFAULT_DECISION_MODE_NAME
-        state = str((record or {}).get("state") or DEFAULT_GATE_STATE)
-        return state, str(mode or DEFAULT_DECISION_MODE_NAME)
+        return (
+            admission.state or DEFAULT_GATE_STATE,
+            admission.decision_mode.value or DEFAULT_DECISION_MODE_NAME,
+        )
 
     def _capability_status(
         self, root: Path, store: SQLiteStore, owner_principal_id: str | None
@@ -838,6 +836,11 @@ class ContextGatherer:
             "capability gate.",
         ]
         metadata: dict[str, object] = {}
+        # Imported here, not at module scope: `raiker.runtime.authority` pulls the
+        # executor registry, which reaches back into this package through the
+        # command service. Same reason `raiker/tools/mcp_tools.py` imports it late.
+        from raiker.runtime.authority.admission import ENABLED_GATE_STATES
+
         for capability, tools in CAPABILITY_GATE_TOOLS.items():
             state, mode = self._gate_reading(store, owner_principal_id, capability)
             enabled = state in ENABLED_GATE_STATES

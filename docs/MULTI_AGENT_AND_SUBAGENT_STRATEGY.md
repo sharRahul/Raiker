@@ -35,6 +35,14 @@ while the audit trail keeps the contract, the steps, and the tools used. Model-
 driven recursion, side questions, and independently-modelled team members remain
 specified and not wired.
 
+**Delegation answers to the owner's `subagents` gate (2026-08-24,
+[FIXED-280](plans/FIXED_ITEMS.md)).** The tool declared no capability until then,
+on the argument that spawning is no more authority than the parent already held.
+That is true of *what a subagent may touch* — every step is re-brokered — and it
+was never true of *whether the owner wanted delegation at all*, so the switch the
+Capabilities page showed them governed nothing. The gate decides the second
+question only; the first is still decided one step at a time.
+
 Subagents are useful for specialised work, but they increase risk, cost, complexity, and drift. They must be bounded by contracts, permissions, event logs, and explicit task ownership.
 
 ---

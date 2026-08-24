@@ -897,7 +897,12 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
-        capability=None,
+        # GEP-04 — delegation answers to the owner's `subagents` switch. It was
+        # `None` on the argument that spawning is no more authority than the
+        # parent already held, which is true of *what a subagent may touch* and
+        # was never true of *whether the owner wanted delegation at all*. The
+        # gate governed nothing while the Capabilities page showed a switch.
+        capability="subagents",
         source_kind="subagent",
         delegable=False,
         read_shaped=True,

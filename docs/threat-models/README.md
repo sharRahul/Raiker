@@ -119,6 +119,14 @@ Re-derived **2026-08-23** by comparing `REAL_EXECUTOR_CAPABILITIES`
 **All forty-five are covered**, and every one is reachable from a table on this
 page rather than only by knowing a filename.
 
+**A threat model is not the same as a reachable path**, and the 2026-08-24 trace
+([GEP-04](../plans/GOVERNANCE_ENTRY_PATHS.md)) is what made the difference
+checkable: nine of the forty-five have a real executor that no product path
+reaches, and five more have their work governed by a control other than their own
+gate. Each keeps its threat model for the reason it keeps its gate — the day
+something reaches one of them, the analysis is what is already there.
+`raiker/runtime/authority/entry_paths.py` records which is which.
+
 The previous audit recorded eight as missing. Re-deriving it found the count was
 **understated**, because a capability was credited to any document that mentioned
 its name in passing. Three more had no analysis of their own —

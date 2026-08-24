@@ -4,9 +4,6 @@ from typing import Any
 
 from raiker.models.factory import ProviderRuntimePolicy
 
-# Gate states that count as "owner has enabled this capability".
-_ENABLED_GATE_STATES = {"enabled_read_only", "enabled_policy_gated", "enabled_runtime"}
-
 # Synthesised "nobody has decided yet" markers. `get_effective_capability_gate`
 # invents these above the store when there is no persisted row; only "persisted"
 # reflects an actual owner decision.
@@ -17,21 +14,15 @@ PRIVATE_NETWORK_MODEL_GATE = "private_network_model_runtime"
 
 
 def _gate_record(store: Any, capability: str, principal_id: str | None = None) -> Any:
-    try:
-        scoped = bool(principal_id and store.get_account(principal_id) is not None)
-        return (
-            store.get_principal_capability_gate_state(principal_id, capability)
-            if scoped else store.get_capability_gate_state(capability)
-        )
-    except Exception:  # noqa: BLE001 — an unreadable gate is simply undecided
-        return None
+    from raiker.runtime.authority.admission import capability_gate_record
+
+    return capability_gate_record(store, principal_id, capability)
 
 
 def _gate_enabled(store: Any, capability: str, principal_id: str | None = None) -> bool:
-    record = _gate_record(store, capability, principal_id)
-    if not record:
-        return False
-    return str(record.get("state", "")) in _ENABLED_GATE_STATES
+    from raiker.runtime.authority.admission import gate_enabled
+
+    return gate_enabled(store, principal_id, capability)
 
 
 def gate_explicitly_disabled(
@@ -51,7 +42,9 @@ def gate_explicitly_disabled(
     record = _gate_record(store, capability, principal_id)
     if not record:
         return False
-    if str(record.get("state", "")) in _ENABLED_GATE_STATES:
+    from raiker.runtime.authority.admission import ENABLED_GATE_STATES
+
+    if str(record.get("state", "")) in ENABLED_GATE_STATES:
         return False
     source = record.get("source")
     return source is None or str(source) not in _UNDECIDED_GATE_SOURCES

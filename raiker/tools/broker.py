@@ -28,6 +28,7 @@ from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.capture import capture_tool_observation
 from raiker.memory.governance import GovernedMemoryService
 from raiker.policy.engine import PolicyEngine
+from raiker.runtime.alignment import AlignmentVerdict, check_alignment
 from raiker.runtime.identity.contracts import (
     IDENTITY_AUDIENCE,
     MachineIdentityError,
@@ -181,6 +182,9 @@ class ToolBroker:
         # None — a non-streamed turn, the terminal client, a direct caller — the
         # broker behaves exactly as it did before.
         self.stream_sink: list[StreamEvent] | None = None
+        # BUG-218 — actions Auto's alignment check withheld this turn, so the
+        # approval raised in their place can say why. Keyed by action id.
+        self._alignment_withheld: dict[str, AlignmentVerdict] = {}
         self.command_service = CommandService.for_workspace(self.workspace_root)
         self.memory_service = GovernedMemoryService(
             self.workspace_root,
@@ -1404,6 +1408,41 @@ class ToolBroker:
             return None
         if self.store is None:
             return None
+        # BUG-218 — Auto's second check. `auto` says "approvals are granted for
+        # you"; the reference products attach a safety review to exactly that
+        # promise and Raiker did not. This one is deterministic rather than a
+        # classifier: it asks whether the turn's own record establishes the file
+        # the action is about to change, and can only withhold — returning None
+        # falls back to the ordinary approval queue, where the owner decides.
+        #
+        # `skip` is deliberately not checked. Its label says no approval is
+        # raised at all; attaching a silent second check to it would redefine a
+        # mode whose whole point is not to interrupt.
+        if approval_mode == "auto":
+            verdict = check_alignment(
+                self.store,
+                tool_name=action.tool_name,
+                arguments=action.arguments,
+                session_id=session_id,
+                turn_id=turn_id,
+                workspace_root=self.workspace_root,
+                action_id=action.action_id,
+            )
+            if not verdict.aligned:
+                self._alignment_withheld[action.action_id] = verdict
+                self._event(
+                    session_id=session_id,
+                    turn_id=turn_id,
+                    event_type="approval_auto_withheld",
+                    actor="tool_broker",
+                    payload={
+                        "action_id": action.action_id,
+                        "tool_name": action.tool_name,
+                        "alignment": verdict.to_dict(),
+                    },
+                    client=client,
+                )
+                return None
         raw_principal = self.store.get_principal(action.proposed_by)
         if raw_principal is None:
             return None
@@ -1784,6 +1823,14 @@ class ToolBroker:
                     "risk_level": "high",
                     "policy_reasons": decision.reasons,
                     "expected_effect": expected_effect,
+                    # BUG-218 — present only when Auto withheld this action. It
+                    # is evidence on the decision, so the owner is answering a
+                    # stated question rather than a mood.
+                    **(
+                        {"alignment": self._alignment_withheld[action.action_id].to_dict()}
+                        if action.action_id in self._alignment_withheld
+                        else {}
+                    ),
                     "state_changes": {
                         "files": action.tool_name in {"write_file", "create_document", "edit_file", "apply_patch"},
                         # B11 — the repository's own history, which no file-level

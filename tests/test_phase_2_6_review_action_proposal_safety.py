@@ -136,11 +136,15 @@ def test_review_package_introduces_no_unsafe_runtime_imports() -> None:
 
 
 def test_a_review_never_turns_a_capability_gate_on(tmp_path: Path) -> None:
+    # Before against after: the property is that proposing fixes changes no
+    # gate, not that every gate starts off. See the note in
+    # `test_phase_2_5_code_review_safety.py`.
     _init_repo(tmp_path)
+    before = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     CodeReviewWorkflow().review(workspace_root=tmp_path, propose_fixes=True)
-    item = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
+    after = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     for capability in CAPABILITY_GATE_TOOLS:
-        assert item.metadata[capability]["enabled"] is False  # type: ignore[index]
+        assert after.metadata[capability] == before.metadata[capability], capability  # type: ignore[index]
 
 
 def test_no_apply_or_execute_command_introduced() -> None:

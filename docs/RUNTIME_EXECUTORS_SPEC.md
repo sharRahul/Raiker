@@ -89,7 +89,7 @@ not in this table is a documentation defect, not a hidden feature.
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
 | `model_provider_runtime` | 3 | Provider-backed **semantic** embedding via an LLM provider; layered gating (owner egress allowlist + hosted/private gate state + API-key-from-env); persists a `vector_records` row (`embedding_model=<provider>:<model>`). Metadata-only artifacts; text/credentials never emitted. `embed` only. |
-| `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). |
+| `subagents` | 4 | Bounded, governed, in-process read-only subagent (no model/process/network). The gate is what the `spawn_subagent` tool answers to: it decides whether the owner allows delegation at all, while what a subagent may touch once delegated is decided one step at a time by the broker. |
 | `multi_agent_teams` | 4 | Up to 5 bounded subagents in sequence; aggregates metadata-only outcomes. |
 | `external_channel_runtime` | 5 | Bounded outbound webhook delivery over the owner connector egress allowlist, signed with `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) when a secret is configured and reported as unsigned on the Channels tab when not. Inbound delivery is recorded, rate-limited to 60 messages per sender per minute, and quarantined: a channel message is untrusted content with a named sender who is not the owner, and never raises a turn's authority. Events stay metadata-only. |
 | `channel_approval_relay` | 5 | Metadata-only **pending** approval relay for a paired channel (never resolves). |
@@ -102,12 +102,12 @@ not in this table is a documentation defect, not a hidden feature.
 | `connector_gmail_runtime` | 5 | One governed Gmail message/thread read (`gmail_read` tool). Same governed pattern as `connector_github_runtime`: default-ask decision mode withholds; owner credential is env-only (`RAIKER_GMAIL_TOKEN`), host must be on the owner connector egress allowlist (`gmail.googleapis.com`, empty = fail closed); request URL is built server-side (`format=metadata`) from validated components (resource ∈ message/thread, URL-safe id). Fetched snippet+headers returned as untrusted data; metadata-only artifacts/events — the body never emitted (resource/message_id/subject/length only). Second read connector for Task 4. |
 | `connector_gcal_runtime` | 5 | One governed Google Calendar event/calendar read (`gcal_read` tool). Same governed pattern: default-ask withholds; owner credential env-only (`RAIKER_GCAL_TOKEN`), host `www.googleapis.com` on the connector egress allowlist; request URL built server-side from validated, path-encoded components (resource ∈ event/calendar, calendar_id, event_id). Fetched summary returned as untrusted data; metadata-only artifacts/events (resource/calendar_id/event_id/title/length only). |
 | `connector_slack_runtime` | 5 | One governed Slack channel info/history read (`slack_read` tool). Same governed pattern: default-ask withholds; owner credential env-only (`RAIKER_SLACK_TOKEN`), host `slack.com` on the connector egress allowlist; request URL built server-side against a fixed Web API method (`conversations.info`/`conversations.history`) from a validated channel id; a Slack `ok:false` body is treated as a bad response, never content. Fetched summary returned as untrusted data; metadata-only artifacts/events (resource/channel/title/length only). |
-| `plugin_install` | 4 | Local manifest validation + install-record creation only; verifies checksum, safe read-only permissions, dependency pins + owner allowlist (`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST`), and manifest signature (HMAC-SHA256 vs `RAIKER_PLUGIN_SIGNING_KEY` when set, else presence marker; plus asymmetric Ed25519 vs owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` when set, fail-closed), never runs plugin code. |
+| `plugin_install` | 4 | Reached by `RuntimeControlService.install_plugin`, which the terminal's `/plugin-plan <manifest> --install` calls. Local manifest validation + install-record creation only; verifies checksum, safe read-only permissions, dependency pins + owner allowlist (`RAIKER_PLUGIN_DEPENDENCY_ALLOWLIST`), and manifest signature (HMAC-SHA256 vs `RAIKER_PLUGIN_SIGNING_KEY` when set, else presence marker; plus asymmetric Ed25519 vs owner-trusted `RAIKER_PLUGIN_ED25519_PUBLIC_KEY` when set, fail-closed), never runs plugin code. |
 | `plugin_execution_cap` | 4 | Installed-plugin brokered read-only tool invocation (`read_file`, `list_directory`, `glob`, `grep`) through ToolBroker/PolicyEngine; no plugin imports, scripts, process, network, or writes. |
 | `plugin_revocation_cap` | 4 | Owner revocation off-switch: flips an installed plugin's record status to `revoked` so `plugin_execution_cap` fails closed for it; never deletes records, edits permissions, or runs plugin code. |
 | `plugin_runtime_cap` | 4 | Bounded subprocess execution of an installed, owner-allowlisted plugin's entrypoint (`RAIKER_PLUGIN_RUNTIME_ALLOWLIST`, empty = fail closed); interpreter allowlist (`python3`/`python`/`node`), workspace-scoped script + optional per-plugin subpath scope (`RAIKER_PLUGIN_RUNTIME_SCOPES`), timeout + output caps, metadata-only artifacts. No in-process import, no network-namespace jail, no stdout/stderr leakage. |
 | `plugin_sandboxed_runtime_cap` | 4 | Network-isolated variant of the above: runs the entrypoint inside an owner-allowlisted container (`RAIKER_PLUGIN_RUNTIME_IMAGE` ∈ `container_image_allowlist()`) with `--network none`, read-only rootfs, dropped caps, and only the single entrypoint file bind-mounted read-only. Same owner plugin allowlist + per-plugin scope; workspace is never mounted; metadata-only artifacts. |
-| `checkpoint_restore_execution` | 1 | Rewinds only the files recorded in a checkpoint's capture manifest, recomputing the plan at execution time rather than trusting a caller-supplied file list, refusing any path outside the workspace, and capturing its own pre-image first so a restore is itself reversible. **Not reachable by an owner:** no route, terminal command or model tool proposes a restore, and every surface shows a preflight only. |
+| `checkpoint_restore_execution` | 1 | Rewinds only the files recorded in a checkpoint's capture manifest, recomputing the plan at execution time rather than trusting a caller-supplied file list, refusing any path outside the workspace, and capturing its own pre-image first so a restore is itself reversible. Reached by `POST /api/checkpoints/{id}/restore` and `/checkpoints restore <id> --confirm`, both raising an ordinary approval; a cross-principal restore is classified critical and takes the human-only lifecycle instead. **No model tool proposes a restore**, so an agent can never rewind the workspace on its own say-so. |
 | `task_management_runtime` | 1 | Creates the owner-scoped task row an approved `create_task` describes. Local, reversible, relayed on approval. |
 | `project_assignment_runtime` | 1 | Moves the active conversation into a project. Local, reversible, relayed on approval. |
 | `git_push_execution` | 2 | Publishes a branch to an HTTPS GitHub remote. Its own gate, separate from `git_write_execution`, because a push is egress carrying repository content off the machine; requires the remote's host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a credential lent for one command under an owner grant. Never forces, never deletes a branch. |
@@ -202,13 +202,57 @@ the set is complete:
 5. Actions then route through `route_action`; the registered executor runs and emits a
    redacted `action_executed` / `action_failed` event.
 
+## What each gate actually decides
+
+A capability with a real executor has a gate, and every gate is rendered as a
+switch on the Capabilities page. **Having a gate is not the same as that gate
+deciding anything**, and until 2026-08-24 the difference was invisible: fifteen
+switches an owner could hold on or off changed nothing at all
+([FIXED-280](plans/FIXED_ITEMS.md)).
+
+[`raiker/runtime/authority/entry_paths.py`](../raiker/runtime/authority/entry_paths.py)
+records the answer for all forty-five, and it is the source the DTO and the web
+UI read:
+
+| Value | Meaning | Example |
+|---|---|---|
+| `own_gate` | This gate decides whether the capability runs. The switch means what it says | `shell_execution`, `web_fetch`, `subagents` |
+| `governed_elsewhere` | The work happens and a **different named control** governs it. The row carries the sentence saying which | `scheduled_routines` — a scheduled task runs as one whole governed turn, so every action inside answers to its own gate |
+| `no_path` | Nothing in the product reaches this executor. The gate is what will be there when something does | `reminder_runtime`, `channel_approval_relay` |
+
+The dataclass requires a sentence for anything that is not `own_gate`, so a row
+cannot be added that names the problem without answering it.
+
+## When "nothing persisted" does not mean the same thing everywhere
+
+Three resolutions exist, and the difference is owner-visible. They are named in
+`CAPABILITY_UNSET_RESOLUTION`
+([`admission.py`](../raiker/runtime/authority/admission.py)) rather than repeated
+at each call site, because the same empty gate table used to mean different
+things in the path that enforced a capability and the surface that described it:
+
+| Resolution | With nothing persisted | Used by |
+|---|---|---|
+| `off` (default) | Off. Nothing decided is not consent | Everything not named below |
+| `shipped_default_unscoped` | An account is fail-closed; a caller with no account gets the shipped table — what `RuntimeAuthority.check_capability_gate` does, and the posture the **Model** section above documents | `code_map_indexing`, `subagents` |
+| `shipped_default` | Any caller gets the shipped table. An owner who turns it off writes a row, and that row wins | `web_fetch` (RAIKER-2021) |
+
+Every path that reads a gate — enforcing or describing — calls
+`capability_admission`, so the resolution is looked up once and the two cannot
+disagree ([FIXED-279](plans/FIXED_ITEMS.md)).
+
 ## Adding a new real executor
 
 1. Implement the executor (validate inputs, fail closed on error, redact events).
 2. Register it in `build_default_executor_registry` and add the capability to
    `REAL_EXECUTOR_CAPABILITIES`.
-3. Add policy rules / storage / events as needed; record the threat-model ack doc.
-4. Add acceptance tests (executes-when-governed, fails-closed-when-disabled) and update
+3. **Classify it in `entry_paths.py`** — how a governed action for it is
+   constructed, and whether its own gate decides whether it runs. A capability
+   with no classification fails
+   `tests/test_governance_entry_paths.py::test_every_real_executor_capability_is_classified`,
+   which is the step nobody took for `network_execution` before it was deleted.
+4. Add policy rules / storage / events as needed; record the threat-model ack doc.
+5. Add acceptance tests (executes-when-governed, fails-closed-when-disabled) and update
    this file plus `docs/IMPLEMENTATION_STATUS.md`.
-5. Update the validator's `must_not_have_default_executor` set if the capability is
+6. Update the validator's `must_not_have_default_executor` set if the capability is
    leaving the sensitive list (only after a real integration + threat model).

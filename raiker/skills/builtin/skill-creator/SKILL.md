@@ -1,7 +1,8 @@
 ---
 name: skill-creator
 description: Write a new skill, or diagnose and improve an existing one, as a SKILL.md document Raiker can install. Use this whenever someone says "make a skill", "turn this into a skill", "write a SKILL.md", "package these instructions", "save this workflow so you do it every time", or asks to review a skill before installing it. Use it too when a skill misbehaves — it never triggers, it triggers on the wrong tasks, or it triggers and gets ignored — since all three are description or structure problems with specific fixes. Reach for this even when the request is phrased as "remember to always do X this way", because that is a skill.
-version: 1.2.0
+metadata:
+  version: 1.2.0
 ---
 
 # Skill creator

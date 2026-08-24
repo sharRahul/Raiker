@@ -147,6 +147,10 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "mcp_call_tool": "mcp_connector_runtime",
     "mcp_connector_runtime": "mcp_connector_runtime",
     "subagents": "subagents",
+    # GEP-04 — the tool an owner actually meets. Naming it here is what gives
+    # them one switch over delegation, the same way `code_map_search` above
+    # gives them one switch over the whole code map rather than half of it.
+    "spawn_subagent": "subagents",
     "multi_agent_teams": "multi_agent_teams",
     "email_runtime": "email_runtime",
     "calendar_runtime": "calendar_runtime",

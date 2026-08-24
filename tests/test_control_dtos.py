@@ -119,6 +119,11 @@ class TestCapabilityGateView:
             "requires_threat_model_ack": False,
             "requires_human_confirmation": False,
             "threat_model_ack_recorded": False,
+            # GEP-04 — what this gate actually decides. A DTO that carried the
+            # state and not this let the web app render every gate as a switch
+            # that governs its capability, and for fifteen of them it did not.
+            "gate_reality": "own_gate",
+            "governance_note": "",
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -252,6 +257,8 @@ class TestRuntimeReadinessView:
                     "requires_threat_model_ack": False,
                     "requires_human_confirmation": False,
                     "threat_model_ack_recorded": False,
+                    "gate_reality": "own_gate",
+                    "governance_note": "",
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

@@ -93,6 +93,51 @@ def parse_frontmatter(text: str) -> dict[str, str]:
     return fields
 
 
+def parse_metadata_block(text: str) -> dict[str, str]:
+    """Read the standard's nested ``metadata:`` map, one level deep.
+
+    Still not a YAML parser, and deliberately so — the reason
+    :func:`parse_frontmatter` gives holds here too: an uploaded document must
+    never reach a real deserializer. What this adds is the single nesting shape
+    the Agent Skills standard actually defines:
+
+        metadata:
+          version: 1.2.0
+          author: someone
+
+    Keys indented under ``metadata:`` are captured as strings. A deeper level, a
+    list, or anything else is skipped rather than guessed at, and the skip is
+    visible to the owner as an unparsed field rather than as silence.
+    """
+    stripped = text.lstrip("\ufeff")
+    if not stripped.startswith("---"):
+        return {}
+    lines = stripped.splitlines()
+    collected: dict[str, str] = {}
+    inside = False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if not inside:
+            if line.strip().lower().startswith("metadata:") and not line.startswith((" ", "\t")):
+                inside = True
+            continue
+        if not line.strip():
+            continue
+        if not line.startswith((" ", "\t")):
+            # Dedented back to the top level: the block is over.
+            break
+        key, separator, value = line.strip().partition(":")
+        if not separator:
+            continue
+        cleaned = value.strip()
+        if len(cleaned) >= 2 and cleaned[0] == cleaned[-1] and cleaned[0] in "\"'":
+            cleaned = cleaned[1:-1]
+        if cleaned:
+            collected[key.strip().lower()] = cleaned
+    return collected
+
+
 def _validated_name(raw: str) -> str:
     name = raw.strip().lower()
     if not _NAME_RE.match(name):
@@ -118,13 +163,17 @@ def read_skill_md(text: str, *, fallback_name: str | None = None) -> SkillPackag
     description = fields.get("description", "").strip()[:MAX_DESCRIPTION_CHARS]
     if not description:
         raise SkillValidationError("skill_missing_description")
+    # A version may sit at the top level (Raiker's own history) or under
+    # `metadata:` (where the Agent Skills standard puts it). Both are read, so a
+    # skill written to the standard still shows a version on the Skills tab.
+    metadata = parse_metadata_block(text)
     return SkillPackage(
         name=name,
         description=description,
         skill_md=text,
         files=(f"{name}/{SKILL_MD_NAME}",),
         bundle=None,
-        version=fields.get("version") or None,
+        version=(fields.get("version") or metadata.get("version") or None),
     )
 
 

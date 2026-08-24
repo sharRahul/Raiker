@@ -1,7 +1,8 @@
 ---
 name: mcp-builder
-description: Build, extend, debug, review, or migrate a Model Context Protocol (MCP) server that exposes an API or local capability as tools an agent can call. Use this whenever someone mentions MCP, an MCP server, mcp.json, FastMCP, stdio or streamable-HTTP transport, or wants to "wrap this API so Claude can use it", "give the agent access to our service", "add a tool to the server", or "expose these endpoints as tools". Use it as well when designing tool names, input schemas, or error messages for an agent, when an MCP server connects but its tools never get called, when responses blow the context window, or when a tool's arguments keep coming back wrong — those are MCP design problems even when nobody says "MCP". Use it too for anything about the current protocol revision: the stateless core, `server/discover`, `_meta`, multi round-trip requests, `resultType`, cacheable list results, `subscriptions/listen`, the `Mcp-Method`/`Mcp-Name` headers, the tasks extension, or migrating a server off sessions, `initialize`, sampling, roots, or HTTP+SSE.
-version: 2.0.0
+description: Build, extend, debug, review, or migrate a Model Context Protocol (MCP) server that exposes an API or local capability as tools an agent can call. Use this whenever someone mentions MCP, an MCP server, mcp.json, FastMCP, stdio or streamable-HTTP transport, or wants to "wrap this API so Claude can use it", "give the agent access to our service", "add a tool to the server", or "expose these endpoints as tools". Use it as well when designing tool names, input schemas, or error messages, when a server connects but its tools never get called, when responses blow the context window, or when a tool's arguments keep coming back wrong — those are MCP design problems even when nobody says "MCP". Use it too for the current protocol revision: the stateless core, `server/discover`, `_meta`, multi round-trip requests, `resultType`, cacheable list results, `subscriptions/listen`, the `Mcp-Method`/`Mcp-Name` headers, the tasks extension, or migrating a server off sessions, `initialize`, sampling, roots, or HTTP+SSE.
+metadata:
+  version: 2.0.0
 ---
 
 # MCP builder

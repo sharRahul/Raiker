@@ -8,11 +8,8 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler
 
-from raiker.runtime.authority.decision_modes import (
-    DEFAULT_DECISION_MODE,
-    DecisionMode,
-    parse_decision_mode,
-)
+from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
+from raiker.runtime.authority.decision_modes import DecisionMode
 from raiker.runtime.executors.sandbox import SandboxError
 from raiker.runtime.web_policy import (
     BlocklistRule,
@@ -56,7 +53,6 @@ if TYPE_CHECKING:
 # connectors use — reduced to text, bounded, and labelled as such.
 
 _CAP = "web_fetch"
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 
 # Reaching the open internet carries the owner's IP and the request itself
 # off-machine → not low-risk, exactly like the connector reads.
@@ -91,20 +87,6 @@ def _denied(
 
 def _failed(reason: str, message: str) -> dict[str, Any]:
     return {"status": "failed", "error": {"type": reason, "message": message}}
-
-
-def _scoped_record(
-    store: SQLiteStore, principal_id: str | None, capability: str
-) -> dict[str, Any] | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_gate_state(principal_id, capability)
-    return store.get_capability_gate_state(capability)
-
-
-def _scoped_mode(store: SQLiteStore, principal_id: str | None, capability: str) -> str | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_decision_mode(principal_id, capability)
-    return store.get_capability_decision_mode(capability)
 
 
 class _TextExtractor(HTMLParser):
@@ -279,27 +261,23 @@ class WebAccessService:
         return load_blocklist(self._store, self._principal_id)
 
     # ── governance layers ────────────────────────────────────────────────
-    def _gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            # RAIKER-2021: no row means the owner has never touched this gate, not
-            # that they turned it off. Reading "unset" as "disabled" is why a
-            # fresh install advertised web_fetch to the model and refused every
-            # call — the shipped default said enabled and nothing consulted it.
-            # An owner who *does* turn it off writes a row, and that row wins.
-            from raiker.phase_gates import default_capability_gates
+    def _admission(self) -> CapabilityAdmission:
+        """The shared admission read (GEP-01).
 
-            declared = default_capability_gates().get(_CAP)
-            return declared is not None and declared.state.value in _ENABLED_GATE_STATES
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        RAIKER-2021 is why `web_fetch` is registered as ``UNSET_SHIPPED_DEFAULT``
+        in :data:`CAPABILITY_UNSET_RESOLUTION`: no row means the owner has never
+        touched this gate, not that they turned it off. Reading "unset" as
+        "disabled" is why a fresh install advertised `web_fetch` to the model and
+        refused every call. An owner who *does* turn it off writes a row, and
+        that row wins.
+        """
+        return capability_admission(self._store, self._principal_id, _CAP)
+
+    def _gate_enabled(self) -> bool:
+        return self._admission().gate_enabled
 
     def _mode(self) -> DecisionMode:
-        persisted = _scoped_mode(self._store, self._principal_id, _CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return self._admission().decision_mode
 
     def _governance_refusal(self, what: str) -> dict[str, Any] | None:
         if not self._gate_enabled():

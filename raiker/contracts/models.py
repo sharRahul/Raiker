@@ -127,6 +127,10 @@ EVENT_TYPES = {
     # otherwise ordinary, governed action was executed under the owner's
     # persisted setting; they do not relax runtime gates or critical holds.
     "approval_auto_executed",
+    # BUG-218 — `auto` promises a review, so it records when the review said no.
+    # The action falls back to the ordinary approval queue; this event is the
+    # evidence that Auto declined to grant it, with the path that did not match.
+    "approval_auto_withheld",
     "approval_preview_skipped",
     # Approval execution relay (Workstream A). `approval_executed` records that a
     # previously human-approved action was re-governed and run through its own

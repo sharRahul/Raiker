@@ -277,7 +277,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | A turn may only tighten its own posture | None — reference modes can widen | Chat, Build | Implemented | `TURN_TIGHTENING_MODES`; `allow`/`auto` refused by the prompt contract | — | **YES — differentiator** |
 | An unattended posture that declines instead of asking | Claude Code `dontAsk` | Chat, Build | Implemented | `dont_ask` (BUG-219 / FIXED-262) | — | PARITY |
 | A distinct reason for "refused because nobody was watching" | None | Platform-wide | Implemented | `denied_no_one_to_ask` | — | **YES — differentiator** |
-| Auto mode reviewed by a classifier model | Claude Code auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, not a model call | Raiker's `auto` is deterministic; it has no alignment check of its own (BUG-218) | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
+| Auto mode reviewed by a classifier model | Claude Code auto mode | Permissions | Different by design | `auto_requires_approval` keys off the action's risk level, and `raiker/runtime/alignment.py` checks the action against the turn's own record — neither is a model call | Raiker's `auto` is deterministic in both halves. Its alignment check is narrower than a classifier and says so: it catches a change to a file the turn never established, not a semantically wrong change to one it did | **Different — see [3.2](#32-a-deterministic-auto-instead-of-a-classifier)** |
 | Critical actions never auto-approved | Claude Code protected paths, Codex | Shared runtime | Implemented | `raiker/runtime/authority/critical.py`; critical risk is human-only with step-up | — | **YES — improvement** |
 | Standing per-tool grants | Claude Code "don't ask again" | Permissions, Git credential | Implemented | Decision modes; `run_command` standing grants; git-credential loan scopes | — | PARITY |
 | Deferring tool schemas to bound context cost | Claude Code `ToolSearch` over deferred tools | Shared runtime | Proposed | — | All 45 model-exposed tools enter every turn's tool list, and every projected MCP tool is added to it. A connected server costs its whole schema on every turn. Same underlying item as MCP tool search in [§2.6](#26-extensibility--plugins-skills-mcp-channels) | **YES — improvement** |
@@ -350,7 +350,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 | Manifest authorship verification | Claude Code and Codex verify MCP transport, not manifest authorship | Extensions → Plugins | Implemented | HMAC / Ed25519 with `verified` / `present only` / `unsigned` stated either way | Default install verifies checksums only, and says so | **YES — differentiator** |
 | Revocation removes what a plugin contributed | Not established by cited source | Extensions → Plugins | Implemented | Contributions are deleted, not flagged | — | **YES — improvement** |
 | Owner-authored skills as Markdown | Claude Code `SKILL.md`, Cowork, Hermes | Extensions → Skills | Implemented | `raiker/skills/`, six built-ins installed on first visit | — | PARITY |
-| Conformance to the **Agent Skills** open standard | All seven reference platforms, plus 40+ other products ([agentskills.io](https://agentskills.io)) | Extensions → Skills | Partial | `raiker/skills/package.py` — `SKILL.md` with `---` frontmatter, `name` and `description` required, progressive disclosure via `skill_load` | **Measured this pass** against the [specification](https://agentskills.io/specification). Raiker's `name` rule (`^[a-z0-9][a-z0-9._-]{0,63}$`) is a *superset*: it admits `.`, `_`, a trailing hyphen and `--`, all of which the standard forbids. `description` is truncated at 2000 characters where the standard caps at 1024. The frontmatter reader is deliberately not YAML, so the standard's nested `metadata:` map cannot parse; `license`, `compatibility` and `allowed-tools` are ignored; and Raiker's own built-ins carry a top-level `version:` the standard does not define (it belongs under `metadata`). A conformant skill still installs — the required fields match — but a Raiker skill is not guaranteed to validate elsewhere | **PARITY** |
+| Conformance to the **Agent Skills** open standard | All seven reference platforms, plus 40+ other products ([agentskills.io](https://agentskills.io)) | Extensions → Skills | Implemented | `raiker/skills/conformance.py` — every installed skill is measured against the [specification](https://agentskills.io/specification) on read and the answer is on its card; `raiker/skills/package.py` parses the nested `metadata:` map, `license` and `compatibility` | **Closed 2026-08-24.** Raiker's reader stays a *superset* deliberately — a skill that installed before keeps installing, and is now **told** where it diverges rather than refused. All six built-ins were brought to conformance (their `version:` moved under `metadata:`, one description trimmed under the 1024 cap). `allowed-tools` is the divergence Raiker keeps: parsed, listed on the card, and explicitly not honoured | **YES — improvement.** Everyone implements the format; what is beyond parity is being the implementation that refuses the execution parts, says so against a named standard, and reports rather than refuses |
 | A skill grants no capability and ships no runnable code | Claude Code skills can invoke tools and spawn forks | Extensions → Skills | Different by design | `skill_load` returns instructions only; Raiker runs nothing a skill ships | — | **Different — see [3.5](#35-a-skill-is-instruction-only)** |
 | Progressive skill loading (index first, body on demand) | Claude Code | Shared runtime | Implemented | Skill index in system context; bodies via `skill_load` | — | PARITY |
 | Autonomous skill creation from experience | Hermes | Extensions → Skills | Proposed | `docs/SELF_IMPROVEMENT_MODEL.md` is specification only | A self-authored skill needs a zero-trust review gate (ADD-06) | **YES — improvement** |
@@ -511,9 +511,20 @@ mode says.
 
 A classifier is more permissive and more useful; it is also a second model whose
 judgement the owner cannot audit, reproduce, or appeal. A governed product's
-unattended path should be one an owner can predict from a table. The honest
-counterpart is that Raiker's `auto` has **no alignment check of its own**
-(BUG-218) — it is a risk lookup, and it is described as one.
+unattended path should be one an owner can predict from a table.
+
+**As of 2026-08-24 it is a risk lookup *and* an alignment check**
+([FIXED-282](plans/FIXED_ITEMS.md)), and the second one is deterministic for the
+same reason the first is. It asks whether the turn's own record establishes the
+file an action is about to change — the owner's prompt named it, or an earlier
+completed step in the same turn read, listed or searched it — and withholds into
+the ordinary approval queue when it does not, naming the path.
+
+The honest counterpart, stated rather than implied: it is **narrower** than a
+classifier. It will not catch a semantically wrong change to a file the turn
+legitimately read, and it is not trying to. What it gives instead is a review
+with no model in the authority path, a verdict recomputable from the audit trail
+months later, and a refusal that names a file rather than expressing a doubt.
 
 ### 3.3 A plugin *offers* an MCP server; it does not add one
 
@@ -699,6 +710,24 @@ A backlog that lists finished work is the same defect as a document that claims
 unfinished work is done. Rows are renumbered; **new items from the 2026-08-23
 pass are marked ★**.
 
+**Closed 2026-08-24 — two governance-architecture items that were not on this
+list**, because both were raised in
+[`plans/GOVERNANCE_ENTRY_PATHS.md`](plans/GOVERNANCE_ENTRY_PATHS.md) and had not
+yet been prioritised here. Recorded so the omission does not read as an oversight:
+
+- **GEP-04 — fifteen capability switches governed nothing**
+  ([FIXED-280](plans/FIXED_ITEMS.md)). Not the ungoverned-action gap it was
+  raised as. `plugin_install` was a real hole — the terminal wrote an install
+  record without ever reading the gate — and `subagents` was an inert switch;
+  the other thirteen were governed elsewhere or reached by nothing. What each
+  gate decides is now a checked field the Capabilities page renders.
+  **YES — differentiator**: every compared platform ships a permission surface,
+  and none tells you which of its switches actually does something.
+- **GEP-01 — one shared capability-admission read**
+  ([FIXED-279](plans/FIXED_ITEMS.md)). Eight copies, two drifts, one of them live
+  and pointed at the model: the context bundle told it `web_fetch: disabled` on
+  an install where the tool would have fetched. **YES — improvement.**
+
 ### High priority, low effort
 
 **Empty as of 2026-08-23.** All four rows this section held were closed in one
@@ -731,7 +760,7 @@ had to be true first:
 |---|---|---|---|---|
 | 1 | Semantic memory retrieval (MEM-10) | Let the owner select a real embedding model — a local download or an explicit provider egress — keeping the labelled hashing fallback as the default | Memory that cannot recall a paraphrase is the largest honest gap in the product | PARITY |
 | 2 | Channel routing modes and approval relay (BUG-225) | Implement the spec's routing modes behind their own gate, with the accepted authority contract unchanged | An inbound message becoming work is the highest-risk transition in the product; it needs its own gate, not the transport's | PARITY |
-| 3 | Auto mode has no alignment check (BUG-218) | Add a deterministic, auditable second check to `auto` — not a classifier | `auto` is the only mode where an action runs with no human in the loop | **YES — differentiator** |
+| ~~3~~ | ~~Auto mode has no alignment check (BUG-218)~~ | **Done 2026-08-24 — [FIXED-282](plans/FIXED_ITEMS.md).** A deterministic check over the turn's own record: an existing file the turn never read, listed or was asked about falls back to the approval queue, with the path named | `auto` is the only mode where an action runs with no human in the loop, and it now performs the review its label implies | **YES — differentiator.** Both reference implementations are model judgements; this one is set membership over the audit trail, with no model in the authority path and an answer that can be recomputed months later |
 | 4 | Owner-authored slash commands | Extend the skill store with a trigger token, stating the authority the command carries | Reference products treat a command as a privileged harness path; Raiker's would grant nothing, which is the differentiator | **YES — improvement** |
 
 ### High priority, high effort
@@ -751,7 +780,7 @@ had to be true first:
 | 10 | Task cadences are four names | Accept a time-of-day and a one-shot run-at | A daily task that runs a day after it was created is not a schedule an owner chose | PARITY |
 | 11 | Nothing owns delegated child tasks (BUG-220) | Give a delegating task ownership of its children's terminal states | A parent that reports done while a child is parked is a false completion | PARITY |
 | 12 | Retention sweep (MEM-07) | Run the sweep the stored `expires_at` already describes | An expiry enforced only at read time is a policy the storage does not keep | PARITY |
-| 13 ★ | **Agent Skills standard conformance** | Validate an installed skill against [the specification](https://agentskills.io/specification) and *report* the result rather than refusing: tighten the `name` rule, cap `description` at 1024, parse `license` and `compatibility`, and move Raiker's own built-ins' `version:` under `metadata` | A skill an owner writes in Raiker should install in the other forty products that read the format, and one written elsewhere should install here. Interoperability is the cheapest kind of extensibility. **`allowed-tools` is the one field Raiker should read and refuse to honour** — a skill pre-approving its own tools is exactly the grant [§3.5](#35-a-skill-is-instruction-only) exists to prevent, and saying so out loud is better than ignoring the field | **YES — improvement** |
+| ~~13~~ | ~~**Agent Skills standard conformance**~~ | **Done 2026-08-24 — [FIXED-281](plans/FIXED_ITEMS.md).** Measured on every read and reported on the skill's card; the nested `metadata:` map, `license` and `compatibility` parse; all six built-ins conform; `allowed-tools` is parsed, listed and explicitly not honoured | A skill an owner writes in Raiker now installs in the other forty products, and the one place Raiker diverges is stated against a named standard rather than asserted as taste | **YES — improvement** |
 
 ### Medium priority, medium effort
 

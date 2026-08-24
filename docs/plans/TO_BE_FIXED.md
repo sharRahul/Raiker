@@ -81,7 +81,7 @@ names.
 | BUG-216 | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
 | BUG-217 | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
-| [BUG-218](#bug-218--auto-mode-has-no-alignment-check-of-its-own) | Medium | Decision modes / Build / Chat | Open — raised 2026-08-21 |
+| BUG-218 | Medium | Decision modes / Build / Chat | **Fixed 2026-08-24 — FIXED-282.** Auto gained a deterministic second check — not a classifier — that withholds a change to a file the turn never established, and says which path did not match |
 | BUG-219 | Low | Approval modes | **Fixed 2026-08-22 — FIXED-262** |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
 | BUG-221 | Medium → Low | Plugins / extensibility | **Closed 2026-08-22 — FIXED-256, FIXED-259, FIXED-260.** Hooks, skills and MCP-server offers all contribute; panels continue as [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) |
@@ -102,7 +102,10 @@ names.
 | BUG-236 | Medium | API redaction / observability | **Fixed 2026-08-23 — FIXED-276.** Found live while verifying FIXED-271: an audit export's manifest hash, and on the same sweep every observation's `content_sha256`, were redacted into `[REDACTED_SECRET]` |
 | BUG-237 | Low | CLI / Windows | **Fixed 2026-08-23 — FIXED-277.** Found live: the terminal client died on its own em dashes and empty-set sign when output was redirected under a legacy code page |
 | BUG-238 | **High** | Models / readiness | **Fixed 2026-08-23 — FIXED-278.** Every restart, and any five idle minutes, asked the owner to set up a model that was already set up: the readiness TTL was deciding whether a model was *configured* |
-| [GEP-01 … GEP-04](GOVERNANCE_ENTRY_PATHS.md#6-open-items) | Low → Unknown | Governance architecture | Open — raised 2026-08-23 in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md), not duplicated here |
+| GEP-01 | Low → Medium | Governance architecture | **Fixed 2026-08-24 — FIXED-279.** One shared admission helper. Reading the eight copies together found two drifts, one of them live: the context bundle told the model `web_fetch: disabled` on an install where the tool would have fetched |
+| GEP-02, GEP-03 | Low | Governance architecture / documentation | Open — in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md), not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
+| GEP-04 | Medium | Governance architecture | **Fixed 2026-08-24 — FIXED-280.** Fifteen capability switches governed nothing; `plugin_install` was a real gap and `subagents` an inert switch, both closed, and what every gate decides is now a checked field the Capabilities page renders |
+| [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |
 
@@ -289,46 +292,67 @@ navigation at 375 / 768 / 1024 / 1440 px with no horizontal overflow, correct
 
 ## BUG-218 — Auto mode has no alignment check of its own
 
-**Severity: Medium. Area: decision modes / Build / Chat. Status: Open — raised
-2026-08-21 while reviewing Claude Code and Cowork permission modes.**
+**Severity: Medium. Area: decision modes / Build / Chat.
+Status: Fixed 2026-08-24 — [FIXED-282](FIXED_ITEMS.md).**
 
-**Observed.** Raiker's **Auto** approval mode, and Build's **Auto** composer
-mode, both mean "do not add a restriction of my own" — the turn runs under the
-owner's standing permissions and nothing looks at whether a particular action is
-what the owner actually asked for.
+Raiker's **Auto** meant "do not add a restriction of my own" while the products
+an owner arrives from promise a review on exactly that mode. The check that
+closed it is deterministic rather than a classifier: it asks whether the turn's
+own durable record establishes the file an action is about to change, can only
+withhold into the ordinary approval queue, names the path that did not match,
+and fails closed. `skip` is deliberately unchanged. The full record, including
+the two failure modes found while building it, is in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md).
 
-The reference set does more than that.
-[Claude Code's `auto`](https://code.claude.com/docs/en/permissions)
-"auto-approves tool calls with background safety checks that verify actions align
-with your request", and
-[Cowork's Auto](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork)
-"reviews each action for safety" and blocks what it judges unsafe. An owner
-moving from either product to Raiker will read Raiker's **Auto** as the same
-promise, and it is not.
+---
 
-**Reproduction.** Set every write capability to allow, choose Auto, and ask for a
-change to a file unrelated to the request. It runs. Nothing records that the
-action and the request disagreed.
+## BUG-239 — An empty gate table means three different things
 
-**Root cause.** There is no reviewer between a permitted action and its
-execution. `raiker/tools/broker.py` decides on the gate and the decision mode
-only; alignment is not a concept the runtime has.
+**Severity: Low. Area: capability gates / owner decision. Status: Open — raised
+2026-08-24 while closing [GEP-01](GOVERNANCE_ENTRY_PATHS.md).**
 
-**Proposed fix, and the constraint that makes it worth building.** A classifier
-that quietly approves is worse than none — it makes Auto *feel* safer without
-being safer, and it puts a model in the authority path. Any implementation must:
+**Observed.** On a workspace where nothing has been persisted for a capability,
+three different answers are given to *is this on?*, and which one applies depends
+on the capability:
 
-- record its verdict as **evidence on the decision**, visible in the approval and
-  in the audit record, never as a silent grant;
-- be able to **withhold** an action into the ordinary approval queue, and never to
-  widen a gate or skip one;
-- state, where it withheld, which part of the request the action did not match,
-  so the owner is answering a question rather than a mood;
-- fail closed when the reviewer itself is unavailable — an unreachable reviewer
-  means Auto behaves as Manual, not as Skip.
+| Resolution | Nothing persisted means | Used by |
+|---|---|---|
+| `off` | Off. Nothing decided is not consent | Everything not named below |
+| `shipped_default_unscoped` | An account is fail-closed; a caller with no account gets the shipped table | `code_map_indexing`, `subagents` |
+| `shipped_default` | Any caller gets the shipped table | `web_fetch` |
 
-Until it is built, Raiker's Auto should keep saying exactly what it does, which
-the Build composer already does through `standingPostureNote`.
+So on a **fresh account** with an untouched gate table, `web_fetch` is on and
+`shell_execution` is off, and nothing on the Capabilities page explains why the
+two behave differently.
+
+**Why it is recorded rather than fixed.** Each resolution is individually
+justified and two of them are documented in the entries that introduced them —
+`web_fetch`'s is RAIKER-2021 (*an owner who turns web access off writes a row; an
+empty table on a fresh install is not a refusal*), and the code map's matches
+`RuntimeAuthority.check_capability_gate` exactly. Collapsing them is not a
+refactor:
+
+* Making everything `off` **tightens `web_fetch`** for the terminal client and
+  for a fresh account, and reintroduces the defect RAIKER-2021 closed.
+* Making everything fall back **loosens seven paths**, including three egress
+  ones, on any workspace whose owner has not yet visited Permissions.
+
+Both are owner-visible behaviour changes, and neither is an implementer's call.
+
+**What did ship (FIXED-279).** The fork is a named table,
+`CAPABILITY_UNSET_RESOLUTION` in
+[`raiker/runtime/authority/admission.py`](../../raiker/runtime/authority/admission.py),
+read by the enforcing path *and* by every surface that describes a gate. That
+closed the live half of this: the context bundle used to tell the model
+`web_fetch: disabled` on an install where the tool would have fetched. What is
+left is the inconsistency itself, which is now visible in one place instead of
+spread across eight.
+
+**Proposed work, once the question is answered.** Pick one resolution, change the
+table, and say on the Capabilities page what an untouched gate means — a single
+sentence, in the same place the gate's state is shown. The **user-interface
+outcome** is the point: an owner should never have to know which of three rules
+a capability uses to predict what happens before they touch it.
 
 ---
 

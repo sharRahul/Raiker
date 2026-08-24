@@ -20,6 +20,8 @@
     isDecisionMode,
     isDeferred,
     isInherent,
+    realityLabel,
+    realityNote,
     requiresStepUpToken,
     type DecisionMode,
   } from "../capabilityModel";
@@ -378,6 +380,9 @@
               </span>
               <span class="cap-name">
                 <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+                {#if realityLabel(gate)}
+                  <span class="cap-reality">{realityLabel(gate)}</span>
+                {/if}
               </span>
             </button>
 
@@ -393,6 +398,18 @@
           {#if isOpen}
             <div class="cap-detail">
               <p class="cap-desc">{capabilityDescription(gate.capability)}</p>
+              {#if realityNote(gate)}
+                <!--
+                  GEP-04 — this switch does not decide whether the capability
+                  runs. Saying so, and naming what does, is the whole point: a
+                  toggle beside a running feature that it does not govern tells
+                  the owner something untrue about their own control.
+                -->
+                <p class="cap-reality-note">
+                  <strong>{realityLabel(gate)}.</strong>
+                  {realityNote(gate)}
+                </p>
+              {/if}
               {#if isDecisionMode(mode)}
                 <p class="mode-hint">{DECISION_MODE_COPY[mode].hint}</p>
               {/if}
@@ -538,6 +555,31 @@
   }
   .cap-label {
     font-weight: 600;
+  }
+  /* GEP-04 — a switch that does not govern its own capability says so in the
+     row, before the owner opens the card. Text, not colour alone. */
+  .cap-reality {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0.05rem 0.35rem;
+    white-space: nowrap;
+  }
+  .cap-reality-note {
+    font-size: 0.82rem;
+    color: var(--text-2);
+    margin: 0 0 0.5rem;
+    padding: 0.5rem 0.6rem;
+    border-left: 2px solid var(--border-strong, var(--border));
+    background: var(--raised, transparent);
+    border-radius: var(--r-sm);
+  }
+  .cap-reality-note strong {
+    color: var(--text-1);
   }
   .cap-detail {
     border-top: 1px solid var(--border);

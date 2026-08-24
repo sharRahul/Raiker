@@ -111,11 +111,17 @@ def test_review_output_has_no_raw_secret(tmp_path: Path) -> None:
 
 
 def test_a_review_never_turns_a_capability_gate_on(tmp_path: Path) -> None:
+    # Compared before against after rather than against the literal `False`.
+    # The literal encoded a second claim — that every gate is off on a fresh
+    # workspace — which stopped being true when the reported state was made to
+    # match the enforced one (GEP-01), and which was never what this test is
+    # about: a review must change nothing, whatever the starting state.
     _init_repo(tmp_path)
+    before = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     CodeReviewWorkflow().review(workspace_root=tmp_path)
-    item = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
+    after = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     for capability in CAPABILITY_GATE_TOOLS:
-        assert item.metadata[capability]["enabled"] is False  # type: ignore[index]
+        assert after.metadata[capability] == before.metadata[capability], capability  # type: ignore[index]
 
 
 def test_review_package_introduces_no_unsafe_runtime_imports() -> None:

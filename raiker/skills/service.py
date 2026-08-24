@@ -13,7 +13,7 @@ fetched bytes are validated as a skill before anything is written.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -24,6 +24,7 @@ from raiker.control.dtos import ControlResult
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import PrincipalType
+from raiker.skills.conformance import ConformanceReport, report_for_document
 from raiker.skills.package import (
     SkillPackage,
     SkillValidationError,
@@ -63,6 +64,11 @@ class SkillView:
     byte_size: int
     created_at: str
     updated_at: str
+    # ADD-21 — how this skill measures against the Agent Skills standard, so an
+    # owner can answer "will this work anywhere else?" without leaving the page.
+    # Derived from the stored document on every read rather than persisted, so
+    # tightening a rule re-measures what is already installed.
+    conformance: ConformanceReport = field(default_factory=lambda: ConformanceReport(True))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -79,6 +85,7 @@ class SkillView:
             "byte_size": self.byte_size,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "conformance": self.conformance.to_dict(),
         }
 
 
@@ -96,6 +103,7 @@ def _view(row: dict[str, Any]) -> SkillView:
         byte_size=int(row.get("byte_size", 0) or 0),
         created_at=str(row.get("created_at", "")),
         updated_at=str(row.get("updated_at", "")),
+        conformance=report_for_document(str(row.get("skill_md", "") or "")),
     )
 
 

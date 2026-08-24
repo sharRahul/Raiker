@@ -53,6 +53,77 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+// GEP-04 — a switch beside a running feature that it does not govern tells the
+// owner something untrue about their own control. The card has to say so.
+describe("CapabilitiesView — what each switch actually decides", () => {
+  it("marks a gate whose work is governed by a different control, and names it", async () => {
+    stubFetch({
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "scheduled_routines",
+          phase: 5,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "ask",
+          gate_reality: "governed_elsewhere",
+          governance_note:
+            "A scheduled task runs as one whole governed turn through the Agent Gateway.",
+        }),
+      ],
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    const row = await screen.findByRole("button", { name: /Scheduled/i });
+    expect(within(row).getByText("Governed elsewhere")).toBeTruthy();
+
+    await fireEvent.click(row);
+    await waitFor(() =>
+      expect(
+        screen.getByText(/one whole governed turn through the Agent Gateway/i),
+      ).toBeTruthy(),
+    );
+  });
+
+  it("marks a gate nothing in the product reaches", async () => {
+    stubFetch({
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "subagents",
+          phase: 4,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "ask",
+          gate_reality: "no_path",
+          governance_note: "Nothing in the product constructs an action for this yet.",
+        }),
+      ],
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    const row = await screen.findByRole("button", { name: /Subagents/i });
+    expect(within(row).getByText("No route yet")).toBeTruthy();
+  });
+
+  it("adds no caveat to a switch that means what it says", async () => {
+    stubFetch({
+      "GET /api/capability-gates": [
+        makeGate({
+          capability: "shell_execution",
+          phase: 3,
+          state: "enabled_runtime",
+          can_current_principal_change: true,
+          allowed_transitions: ["disabled"],
+          decision_mode: "ask",
+        }),
+      ],
+    });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    const row = await screen.findByRole("button", { name: /Shell/i });
+    expect(within(row).queryByText("Governed elsewhere")).toBeNull();
+    expect(within(row).queryByText("No route yet")).toBeNull();
+  });
+});
+
 describe("CapabilitiesView", () => {
   it("groups executable tools by domain and omits non-executors entirely", async () => {
     stubFetch({ "GET /api/capability-gates": GATES });

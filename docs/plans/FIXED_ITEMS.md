@@ -11471,3 +11471,428 @@ readiness rows were aged three hours, the server restarted, and a turn was sent
 and answered with no prompt — then the selected model was marked
 `authentication_failed` and the prompt returned exactly as it should
 (`r0823-bug238-unavailable-still-prompts`).
+
+---
+
+## FIXED-279 — Eight copies of one governance check, and two of them had already drifted
+
+**Severity: Low → Medium once measured. Area: governance architecture. Was
+[GEP-01](GOVERNANCE_ENTRY_PATHS.md), raised 2026-08-23, closed 2026-08-24.**
+
+**Observed.** Eight modules read a capability gate directly instead of routing
+through `RuntimeAuthority`, each carrying its own `_ENABLED_GATE_STATES`, its own
+"is this principal account-scoped" test, and its own decision-mode read. Four of
+them are egress or subprocess paths. Every one of them, read on its own, was
+correct.
+
+**Why it was raised anyway.** Eight independent copies of a governance check is
+the precondition for drift, and this repository had already produced one instance
+of exactly that pattern in its two egress implementations (BUG-232 / FIXED-272).
+
+**What reading them side by side found — two drifts, neither visible from any
+single copy.**
+
+1. **Scope.** `RuntimeAuthority` resolves the control scope with
+   `store.account_scope`, which maps a delegated AI-agent principal onto the
+   owner account that delegated it. The eight used
+   `store.get_account(pid) is not None`, which does not. The same capability
+   could therefore read the owner's gate at chokepoint B and the workspace-wide
+   gate inside the tool. **Latent, not live** — no shipped path passes an
+   AI-agent principal to any of the eight; the subagent runner builds its broker
+   with the owner's id.
+2. **What an empty gate table means — and this one was live.** Three different
+   answers existed. Seven copies read "no persisted row" as off.
+   `codemap_service.py` fell back to the shipped gate table for a caller with no
+   account, matching `RuntimeAuthority.check_capability_gate`.
+   `web_access.py` fell back for *any* caller, scoped or not (RAIKER-2021: an
+   owner who turns web access off writes a row, so an empty table on a fresh
+   install is not a refusal).
+
+**The live consequence, and it was pointed at the model.** `ContextGatherer`
+reported gate state to the model in every turn's context bundle, and resolved an
+empty table as `disabled` for every capability. So on a fresh install the model
+was told **`web_fetch: disabled`** while `WebAccessService` would have allowed
+the fetch. Three tests asserted the bundle's version and passed, including one
+named *"capability status agrees with the gate states the tools enforce"* — it
+compared the three **frozensets**, which were identical, and never compared an
+answer.
+
+**Fixed.** `raiker/runtime/authority/admission.py`:
+`capability_admission(store, principal_id, capability)` returns the gate state,
+the decision mode, the resolved control scope and the runtime status, with one
+copy of the enabled-state set and one failure rule (a broken read is off, never
+on). All eight call it. So do the two paths added since — `subagent_tools.py`
+(FIXED-280) and `context/gatherer.py`.
+
+**The three unset resolutions were kept, not collapsed.** Unifying them would
+either loosen seven paths for the terminal client or tighten `web_fetch` for
+everyone; both are owner-visible behaviour changes, and neither is a refactor.
+They are now a named table — `CAPABILITY_UNSET_RESOLUTION` — read by the
+enforcing path *and* by every surface that describes it, so the fork survives
+while the disagreement does not.
+
+**Deliberately not changed.** `CapabilityAdmission.runtime_active` reports
+whether the runtime is accepting executions and **nothing consults it**. Whether
+"stop the agent runtime" should also stop a read that leaves the machine is
+[GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths)
+— an owner's decision. Carrying the answer costs nothing and decides nothing;
+acting on it is now a one-line change in one place.
+
+**Interface outcome.** The capability status the model is given in its context
+bundle is the state the tool will actually enforce, under both scopes. On a fresh
+workspace the bundle now reports `web_fetch: enabled (state=enabled_runtime,
+decision_mode=ask)` — enabled, and withheld pending the owner's approval, which
+is what happens — instead of `disabled`, which is not.
+
+**Reference-platform decision.** **YES — improvement.** Every compared platform
+tells the model what tools it has; none of them tells the model what the *owner's
+current permission state* for each of those tools is, and none has a test that
+the told state and the enforced state are the same read. Raiker had the first and
+was quietly failing the second.
+
+**One fail-open caught while reviewing the refactor, before it shipped.** The
+first version collapsed "the store read raised" into "nothing persisted". For
+`web_fetch` — the one capability that resolves an empty table to the shipped
+default — that would have turned a storage error into an *enabled egress
+capability*. `_read_gate` returns `(row, readable)` so the fallback is
+unreachable from the error path, and
+`test_a_broken_read_is_off_whatever_the_shipped_table_says` holds it there for
+all three resolutions.
+
+**Evidence.** `tests/test_capability_admission.py` (13 cases: the failure rule
+above, each of the three unset resolutions and which capability uses which, that
+a persisted row always wins, that a closed gate and a `deny` mode report
+different reason codes, and that the runtime status is carried without being
+acted on); `tests/test_governance_entry_paths.py` invariants I4 (every module
+reading a gate calls the shared helper and is enumerated in §4) and I4b (no
+module outside `admission.py` declares its own enabled-state set — this is what
+caught `context/gatherer.py`, which spelled the constant without a leading
+underscore and had been absent from the enumeration for that reason alone);
+`tests/test_phase_1_2_context_gatherer.py::test_capability_status_agrees_with_the_gate_states_the_tools_enforce`,
+rewritten to compare the bundle's answer against `capability_admission` **and**
+against a live `WebAccessService`, for every reported capability, under both
+scopes.
+
+---
+
+## FIXED-280 — Fifteen capability switches that governed nothing, and one that should have
+
+**Severity: Medium. Area: governance architecture. Was
+[GEP-04](GOVERNANCE_ENTRY_PATHS.md), raised 2026-08-23, closed 2026-08-24.**
+
+**Observed.** Forty-five capabilities have a real executor, and therefore a gate,
+and the Capabilities page renders every gate as a switch the owner can hold on or
+off. For **fifteen of them, flipping that switch changed nothing.**
+
+**The question as raised offered two readings, and the answer was neither.**
+GEP-04 asked whether each of the fifteen was *benign* (reached through a
+control-plane method that authorises differently) or *a gap* (a registered
+executor nothing constructs an action for — the shape `network_execution` had).
+Both readings ask whether an **action** can reach an executor ungoverned. For
+fourteen of the fifteen, it cannot.
+
+What both readings missed is that an owner holding a switch that governs nothing
+is not a smaller version of an ungoverned action. It is a different defect, and
+for a product whose whole claim is that the owner is in control, a worse one: an
+ungoverned action is a hole in the implementation; an inert switch is a hole in
+what the owner believes about their own control. The switch said `subagents:
+disabled` and subagents ran.
+
+**The trace, and what each of the fifteen turned out to be.**
+
+| Outcome | Capabilities |
+|---|---|
+| **A real gap** | `plugin_install` |
+| **A switch that governed nothing** | `subagents` |
+| **Governed elsewhere, correctly** | `container_execution_cap`, `scheduled_routines`, `semantic_memory_runtime`, `plugin_execution_cap`, `multi_agent_teams` |
+| **No path at all** | `plugin_runtime_cap`, `plugin_sandboxed_runtime_cap`, `plugin_sandbox_image_pull_cap`, `plugin_revocation_cap`, `channel_approval_relay`, `reminder_runtime`, `calendar_runtime`, `email_runtime` |
+
+**The gap: `plugin_install`.** `/plugin-plan <manifest> --install` called
+`record_plugin_install` directly. It wrote the install record, the trust level
+and the permission set, and never read the `plugin_install` gate — a capability
+that sits in `_DANGEROUS_CAPS` and needs a threat-model acknowledgement and a
+human confirmation to enable. An owner who had deliberately held it off could
+install a plugin from the terminal anyway. A governed executor for exactly this
+had existed, registered and tested, the whole time.
+
+**The inert switch: `subagents`.** `spawn_subagent` declared `capability=None`,
+on the stated argument that *"spawning is no more authority than the parent
+already held"*. That is true of **what a subagent may touch** — its steps are
+re-brokered one at a time against a read-only delegable set — and it was never
+true of **whether the owner wanted delegation at all**.
+
+**Fixed.**
+
+* **`plugin_install` is a governed action.** `RuntimeControlService.install_plugin`
+  builds one and routes it through `RuntimeAuthority`, so the capability gate,
+  the decision mode, the policy review, the critical floor and the audit event
+  all apply; the terminal calls it. The executor behind it validates strictly
+  more than the old path did — manifest size, JSON shape, plan status, supply
+  chain — so routing is an upgrade rather than a toll. This is entry path 24.
+* **`subagents` governs delegation.** `spawn_subagent` reads it through
+  `capability_admission` (the FIXED-279 helper) before validating the step list,
+  so an owner who has not allowed delegation is told that, rather than told which
+  of the steps they never authorised was invalid. The model is told too: the
+  capability joins `CAPABILITY_GATE_TOOLS` in the context bundle, so it does not
+  spend a tool call finding out.
+* **What each gate decides is a field, not an inference.**
+  `raiker/runtime/authority/entry_paths.py` records `own_gate` /
+  `governed_elsewhere` / `no_path` for all forty-five, with a sentence — required
+  by the dataclass, not by convention — for the last two. `CapabilityGateView`
+  carries it, and the Capabilities page renders it.
+
+**Deliberately not gated.** The five *governed elsewhere* capabilities are
+labelled rather than switched. Each is already governed — per action
+(`plugin_execution_cap`), per turn (`scheduled_routines`), by a different gate
+that is the one the owner actually meets (`semantic_memory_runtime` →
+`vector_embedding_runtime`), or by the owner's own act of configuring an
+execution profile (`container_execution_cap`). Adding a second switch in front of
+a choice the owner already made is exactly the wall
+[`SECURITY_AND_POLICY.md`](../SECURITY_AND_POLICY.md) → "Security Philosophy"
+exists to refuse. The nine with no path keep their gates for the reason
+[§3.5](GOVERNANCE_ENTRY_PATHS.md) keeps its list: the day something reaches one
+of them, the gate is what is already there.
+
+**Interface outcome.** On Capabilities, a switch that does not decide whether its
+capability runs carries a **Governed elsewhere** or **No route yet** tag in the
+row — text, not colour — and opening the card states in one sentence what really
+governs the work, or why nothing runs. A switch that means what it says carries
+no tag and no caveat. Turning **Subagents** off stops delegation, and the model
+is told so. `/plugin-plan --install` with **Plugin install** off refuses and names
+the switch to turn on.
+
+**Reference-platform decision.** **YES — differentiator.** Every compared
+platform ships a permission surface; Claude Code, Cowork, Codex and the Hermes
+and DeepSeek harnesses all have one. **None of them tells you which of its
+switches actually does something**, and none has a test that fails when a new
+capability ships without an answer. Raiker had the same defect and now cannot
+have it silently: `test_every_real_executor_capability_is_classified` refuses a
+registered executor that has not said how it is reached, and
+`test_model_tool_entries_match_the_tool_registry` /
+`test_approval_relay_entries_match_the_relayable_set` check every claim against
+`TOOL_DEFINITIONS` and `EXECUTABLE_ON_APPROVAL` rather than trusting the table.
+
+**Evidence.** `tests/test_governance_entry_paths.py` (13 invariants, including
+I3b — the tool-reachable set moved from fifteen to sixteen when `subagents`
+gained its gate — and I7, the entry-path table checked against the registries);
+`tests/test_agent_plan_and_subagents.py::TestSpawnSubagent::test_delegation_is_refused_when_the_owner_has_not_allowed_it`;
+`apps/web/src/lib/capabilityModel.test.ts` and
+`apps/web/src/lib/views/CapabilitiesView.test.ts` (the row tag, the sentence, and
+that a switch which means what it says gains no caveat).
+
+---
+
+## FIXED-281 — A skill written in Raiker was not guaranteed to work anywhere else
+
+**Severity: Medium. Area: skills / interoperability. Was
+[ADD-21](TO_BE_ADDED.md) and backlog item 13, raised 2026-08-23, closed
+2026-08-24.**
+
+**Observed.** `SKILL.md` stopped being one product's convention while Raiker was
+not looking. **Agent Skills** (https://agentskills.io) is a published
+specification with a reference validator, implemented by all seven of Raiker's
+reference platforms and roughly forty other products. Raiker predates it, reads
+the same file, requires the same two fields — and diverges in five measurable
+ways, none of which anything told the owner about.
+
+| | Standard | Raiker, before |
+|---|---|---|
+| `name` | `a-z`, `0-9`, single hyphens; no leading/trailing hyphen, no `--` | Also accepted `.`, `_`, a trailing hyphen and `--` — a **superset** |
+| `description` | Max 1024 characters | Truncated at 2000 |
+| `metadata` | A nested map | The frontmatter reader is not YAML, so it could not parse |
+| `license`, `compatibility` | Optional fields | Ignored |
+| `version` | Belongs under `metadata` | Raiker's own built-ins carried it at the top level |
+| `allowed-tools` | Experimental: pre-approved tools | Ignored |
+
+**Why this was worth fixing, and why it is not simply "validate harder".** The
+distance runs in one direction: every conformant skill installs in Raiker,
+because Raiker's rules are looser. What could not be answered was the question an
+owner actually has — *will the skill I just wrote work anywhere else?* Tightening
+the reader would have answered it by breaking skills people already rely on,
+which trades their working setup for a badge.
+
+**Fixed by measuring and reporting, never refusing.**
+
+* `raiker/skills/conformance.py` measures a skill against the specification and
+  returns findings at three severities: `error` (would not validate elsewhere),
+  `warning` (portable but a strict reader drops the field), and `refused` (Raiker
+  read the field and declines to act on it).
+* **Measured on read, not at install.** The report is derived from the stored
+  document every time the Skills tab loads, so tightening a rule re-measures what
+  is already installed instead of leaving old rows reporting an old answer. It
+  needed no schema change.
+* `parse_metadata_block` reads the standard's nested `metadata:` map one level
+  deep. It is still **not** a YAML parser, for exactly the reason the flat
+  reader gives: an uploaded document must never reach a real deserializer. A
+  version under `metadata:` is now read, so a standard-written skill shows its
+  version on the tab.
+* `license` and `compatibility` are parsed and displayed.
+* **All six built-in skills were brought to conformance** — their `version:`
+  moved under `metadata:`, and `mcp-builder`'s description, which had drifted to
+  1048 characters, was trimmed to 1015 by cutting the least load-bearing clause
+  rather than the newest triggers. `test_every_built_in_skill_conforms_to_the_standard`
+  keeps them there. Raiker should not ship the thing it is measuring others
+  against.
+
+**The one field read and deliberately refused.** `allowed-tools` is a skill
+pre-approving the tools it may use, which is exactly the grant
+[§3.5](../REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
+exists to prevent. Raiker parses it, lists the tools it names on the card under
+*Not pre-approved*, and states that the field is not honoured. **Ignoring it
+would leave an author believing it did something.** A refusal is not counted as
+non-conformance: the document is valid and installs elsewhere, and marking the
+skill non-conformant would blame the author for Raiker's own governance choice.
+
+**Interface outcome.** Extensions → Skills. Every skill row carries its
+conformance — **STANDARD**, **portable, with notes**, or **N portability
+issues** — and opening **Details** shows an *Agent Skills standard* block: one
+sentence saying which direction any incompatibility runs (*"works in Raiker and
+may be refused by other tools"*, never *"invalid"*), the field and rule behind
+each finding, the declared `license` and `compatibility`, and the refused
+`allowed-tools` list. A payload with no measurement renders nothing rather than a
+false pass.
+
+**One UI defect found in live testing and fixed in the same round.** Rendering
+conformance as a `Badge` in every case put two pills side by side on every skill
+row — `► active` and `► standard` — identical in glyph and tone and meaning
+nothing alike, because `active` is the lifecycle badge for *"in flight"*.
+Conformance is a **property of the document**, not a state, so it renders as a
+quiet tag and escalates to a real badge only when there is a portability issue to
+act on. Caught by looking at the screenshot rather than by a test, which is what
+the live round is for.
+
+**Reference-platform decision.** **YES — improvement.** Every compared platform
+implements the format; being conformant is parity. What is beyond it is being the
+implementation that refuses the execution parts — no bundled `scripts/` ever
+runs, `allowed-tools` is never honoured — and states each refusal against a named
+public standard rather than asserting it as taste, while reporting rather than
+refusing so an owner's existing skills keep working.
+
+**Evidence.** `tests/test_skill_standard_conformance.py` (25 cases, including
+that each non-conformant shape still installs, that a refused `allowed-tools`
+grants nothing structurally rather than by message, that the metadata reader
+stops at the next top-level key rather than behaving like a greedy YAML parser,
+and that every built-in conforms and still carries a version);
+`apps/web/src/lib/skillConformance.test.ts`;
+`apps/web/src/lib/views/SkillsView.test.ts`.
+
+---
+
+## FIXED-282 — Auto promised a review it did not perform
+
+**Severity: Medium. Area: decision modes / Build / Chat. Was BUG-218, raised
+2026-08-21, closed 2026-08-24.**
+
+**Observed.** Raiker's **Auto** approval mode, and Build's **Auto** composer
+mode, both meant *"do not add a restriction of my own"*: the turn ran under the
+owner's standing permissions and nothing looked at whether a particular action
+was what the owner had actually asked for.
+
+The reference set means something else by the same word.
+[Claude Code's `auto`](https://code.claude.com/docs/en/permissions)
+"auto-approves tool calls with background safety checks that verify actions align
+with your request";
+[Cowork's Auto](https://support.claude.com/en/articles/13345190-get-started-with-claude-cowork)
+"reviews each action for safety". An owner moving from either reads Raiker's
+**Auto** as the same promise. It was not.
+
+**Reproduction.** Set every write capability to allow, choose Auto, and ask for a
+change to a file unrelated to the request. It ran, and nothing recorded that the
+action and the request disagreed.
+
+**Why the obvious fix would have been worse than the defect.** A classifier that
+quietly approves makes Auto *feel* safer without being safer, and it puts a model
+in the authority path — the one place this runtime has refused to put one
+everywhere else. So the check is not a classifier. It asks a question with a
+factual answer:
+
+> **Has this turn established the file this action is about to change?**
+
+A target is *established* when the turn's own durable record shows it: the
+owner's prompt named it (by path or by bare filename — "fix retry.py" counts), an
+earlier **completed** step in the same turn read, listed, searched or inspected
+it, or an earlier step already wrote it. That is set membership over
+`tool_actions` rows and one prompt string: deterministic, replayable from the
+audit trail, and explainable in a sentence that names the path.
+
+**Fixed** in `raiker/runtime/alignment.py`, consulted by `ToolBroker` at the
+moment Auto would otherwise have granted the approval. Each of the four
+constraints the defect entry set is a property of the design rather than a
+promise about it:
+
+* **Evidence on the decision, never a silent grant.** A withheld action emits
+  `approval_auto_withheld` with the path, the reason code and the sentence, and
+  the same record travels onto the `approval_requested` event, so the approval
+  the owner then sees explains why it exists.
+* **Withhold only.** The check returns `None` from the pre-approval path, which
+  is the existing fallback to the ordinary approval queue. There is no branch in
+  which it widens a gate, skips one, or approves anything that was not already
+  permitted.
+* **Names what did not match.** *"Automatic approval was withheld: `deploy.sh`
+  already exists and this turn has not read, listed or been asked about it…"* —
+  a path and a rule, not a mood.
+* **Fails closed.** An unreadable record, or a turn with no recorded prompt,
+  withholds. An unreachable reviewer means Auto behaves as Manual, not as Skip.
+
+**Two scoping decisions that make it usable rather than merely correct.**
+
+* **Existing files only.** Creating a new file is not the risk: an owner who asks
+  for "the report" and gets `report.md` got what they asked for, and nothing of
+  theirs was lost. Checking creates would make Auto obstructive in the ordinary
+  case while protecting nothing — and an obstructive Auto is one an owner turns
+  off, which is a worse outcome than the defect.
+* **Scoped to the turn, never the session.** Reading a file in one turn must not
+  silently authorise writing it unprompted in the next; that is how a review
+  becomes a standing grant nobody issued.
+
+**`skip` is deliberately not checked.** Its label says no approval is raised at
+all. Attaching a silent second check to it would redefine a mode whose entire
+point is not to interrupt. Auto is the mode that promises a review, so Auto is
+the mode that gets one — and the copy for both now says exactly what each does.
+
+**Two failure modes found while building it, both now regression-tested.**
+
+1. **The check passed unconditionally on its first run.** The broker records an
+   action as `proposed` *before* the decision, so the write being checked
+   appeared in the turn's history and established its own target. Only
+   `success` rows establish anything now, and the action under check is excluded
+   by id as well.
+2. **A missing turn row read as "the owner asked for nothing".** Every surface
+   reaches the orchestrator through `AgentGateway`, which records the turn before
+   dispatching, so a missing row means the record is broken — not an empty
+   prompt. It withholds with `auto_alignment_record_unavailable` rather than
+   withholding everything with an unexplained reason.
+
+**Interface outcome.** Auto's menu entry says *"Approvals are granted for you,
+unless a change lands on a file this turn never looked at — then it waits."*
+Build's standing-posture note says the same. When Auto does withhold, the
+approval that appears opens with the sentence naming the file, above the ordinary
+notice — so an owner who did not expect an interruption is answering a stated
+question rather than a mysterious one. Skip's copy is untouched, because Skip's
+behaviour is untouched.
+
+**Reference-platform decision.** **YES — differentiator.** Both reference
+implementations of this promise are model judgements: they are opaque, they can
+be wrong in either direction, and neither can tell you *why* it allowed
+something. Raiker's answer is a set-membership test over the turn's own audit
+trail. It is weaker in reach — it will not catch a semantically wrong change to a
+file the turn legitimately read — and it is stated as such rather than implied to
+be more. What it gives instead is a review with no model in the authority path,
+an answer that can be recomputed from the record months later, and a refusal that
+names a path.
+
+**One precision issue tightened in review.** The first version added a tool
+call's *basename* to the established set as well as its path, mirroring the
+prompt rule. That let reading `src/config.py` establish `vendor/config.py`, which
+is looser than the check claims to be. The bare-name shortcut now belongs to the
+prompt only, where an owner writing "fix retry.py" genuinely may not know where
+it lives; a tool call always names a location.
+
+**Evidence.** `tests/test_auto_alignment_check.py` (24 cases, including the
+defect's exact reproduction, both failure modes above, that establishment does
+not carry across turns, that a sibling is not established by its neighbour, and
+that a target resolving outside the workspace is never waved through as a
+"create"); `tests/test_model_tool_call_loop.py` — three end-to-end cases through
+the broker: Auto withholds and the evidence reaches the approval, Auto still
+executes work the turn established, and Skip is unaffected;
+`apps/web/src/lib/approvalMode.test.ts`, `apps/web/src/lib/buildModes.test.ts`.

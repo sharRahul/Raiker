@@ -4742,6 +4742,32 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                   ),
             )
 
+    def list_turn_tool_actions(
+        self, session_id: str, turn_id: str | None
+    ) -> list[dict[str, Any]]:
+        """Every tool action proposed in one turn, oldest first.
+
+        BUG-218 — the record `auto` mode's alignment check reads. A turn's own
+        history is what makes "does this action match what was asked?" a
+        deterministic question instead of a judgement: the arguments are stored
+        verbatim, so the check is set membership over facts rather than a model's
+        opinion.
+
+        Scoped to the turn, never the session, because establishing a file in one
+        turn must not silently authorise writing it unprompted in the next.
+        """
+        if not turn_id:
+            return []
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT action_id, tool_name, arguments_json, status, proposed_at
+                   FROM tool_actions
+                   WHERE session_id = ? AND turn_id = ?
+                   ORDER BY proposed_at ASC, rowid ASC""",
+                (session_id, turn_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def load_tool_action(self, action_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(

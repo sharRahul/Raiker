@@ -6,10 +6,15 @@ import {
   enableableTargets,
   explainCapability,
   gateBadge,
+  governsItsOwnCapability,
   runtimeBlock,
   groupByPhase,
+  hasNoRoute,
   isDeferred,
   isDisabled,
+  isGovernedElsewhere,
+  realityLabel,
+  realityNote,
   requiresStepUpToken,
 } from "./capabilityModel";
 
@@ -158,5 +163,49 @@ describe("enableability for Security Settings", () => {
 
     // A gate that could not be read is treated as shut, never as open.
     expect(runtimeBlock(undefined, "MCP").kind).toBe("gate_off");
+  });
+});
+
+// ── GEP-04: what the switch actually decides ────────────────────────────────
+// The page renders every gate as a switch. For fifteen capabilities, flipping it
+// changed nothing — either nothing reached the executor, or a different control
+// governed the work. These assert the card can tell the owner which it is.
+
+describe("gate reality", () => {
+  it("treats a payload with no gate_reality as governing its own capability", () => {
+    const g = gate({ capability: "shell_execution" });
+    expect(governsItsOwnCapability(g)).toBe(true);
+    expect(realityLabel(g)).toBe("");
+    expect(realityNote(g)).toBe("");
+  });
+
+  it("labels a capability whose work runs under a different control", () => {
+    const g = gate({
+      capability: "scheduled_routines",
+      gate_reality: "governed_elsewhere",
+      governance_note: "A scheduled task runs as one whole governed turn.",
+    });
+    expect(isGovernedElsewhere(g)).toBe(true);
+    expect(governsItsOwnCapability(g)).toBe(false);
+    expect(realityLabel(g)).toBe("Governed elsewhere");
+    expect(realityNote(g)).toBe("A scheduled task runs as one whole governed turn.");
+  });
+
+  it("labels a capability nothing in the product reaches", () => {
+    const g = gate({
+      capability: "reminder_runtime",
+      gate_reality: "no_path",
+      governance_note: "Reminders have no owner surface and no model tool.",
+    });
+    expect(hasNoRoute(g)).toBe(true);
+    expect(realityLabel(g)).toBe("No route yet");
+    expect(realityNote(g)).toBe("Reminders have no owner surface and no model tool.");
+  });
+
+  it("shows no note for a switch that means what it says, even if one is sent", () => {
+    // Defensive: a note on an own_gate row would read as a caveat on a control
+    // that has none, so the model drops it rather than rendering it.
+    const g = gate({ gate_reality: "own_gate", governance_note: "stray" });
+    expect(realityNote(g)).toBe("");
   });
 });

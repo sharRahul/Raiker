@@ -41,7 +41,11 @@ from raiker.graph.codemap import (
     CodeMapScan,
     language_for,
 )
-from raiker.phase_gates import default_capability_gates
+from raiker.runtime.authority.admission import (
+    ENABLED_GATE_STATES,
+    CapabilityAdmission,
+    capability_admission,
+)
 from raiker.tools.git import (
     repository_label,
     resolve_repository_root,
@@ -53,7 +57,6 @@ if TYPE_CHECKING:
 
 CAPABILITY = "code_map_indexing"
 
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 DEFAULT_GATE_STATE = "disabled"
 
 #: Statuses an index row may carry. ``partial`` is a real outcome, not a failure:
@@ -128,29 +131,25 @@ class CodeMapService:
         Permissions page and another in the tool, so it is derived once, in the
         place that owns it.
         """
-        record = self._gate_record()
-        if record is not None:
-            return str(record.get("state", DEFAULT_GATE_STATE))
-        if self.principal_id and self.store.get_account(self.principal_id) is not None:
-            return DEFAULT_GATE_STATE
-        gate = default_capability_gates().get(CAPABILITY)
-        return gate.state.value if gate is not None else DEFAULT_GATE_STATE
+        return self._admission().state or DEFAULT_GATE_STATE
 
     def decision_mode(self) -> str:
-        if self.principal_id and self.store.get_account(self.principal_id) is not None:
-            mode = self.store.get_principal_capability_decision_mode(self.principal_id, CAPABILITY)
-        else:
-            mode = self.store.get_capability_decision_mode(CAPABILITY)
-        return str(mode or "ask")
+        return self._admission().decision_mode.value
 
-    def _gate_record(self) -> dict[str, Any] | None:
-        if self.principal_id and self.store.get_account(self.principal_id) is not None:
-            return self.store.get_principal_capability_gate_state(self.principal_id, CAPABILITY)
-        return self.store.get_capability_gate_state(CAPABILITY)
+    def _admission(self) -> CapabilityAdmission:
+        """The shared admission read (GEP-01).
+
+        `code_map_indexing` is registered as ``UNSET_SHIPPED_DEFAULT_UNSCOPED``
+        in :data:`CAPABILITY_UNSET_RESOLUTION`, which keeps the three-branch
+        resolution this method has always documented: a persisted decision wins,
+        an account with nothing persisted is fail-closed, and only a non-account
+        caller falls back to the shipped table.
+        """
+        return capability_admission(self.store, self.principal_id, CAPABILITY)
 
     def governance_refusal(self, what: str) -> dict[str, Any] | None:
         """``None`` when this account may use the code map, else the exact reason."""
-        if self.gate_state() not in _ENABLED_GATE_STATES:
+        if not self._admission().gate_enabled:
             return _denied(
                 "code_map_gate_disabled",
                 f"{what} denied: the code map is off. Turn on **Code map indexing** in "
@@ -346,7 +345,7 @@ class CodeMapService:
             "capability": CAPABILITY,
             "gate_state": gate,
             "decision_mode": self.decision_mode(),
-            "enabled": gate in _ENABLED_GATE_STATES,
+            "enabled": gate in ENABLED_GATE_STATES,
             "repository": target.label,
             "repo_id": target.repo_id,
             "status": str(index["status"]) if index else STATUS_NOT_INDEXED,

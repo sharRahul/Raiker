@@ -6,7 +6,8 @@ parity gap, a memory audit, a proposal. None of them answers the question an
 owner or a builder actually starts from: **what is standing between Raiker and
 the thing it is trying to be?**
 
-Written **2026-08-23**. It adds no new work; it re-cuts what already exists.
+Written **2026-08-23**, revised **2026-08-24**. It adds no new work; it re-cuts
+what already exists.
 
 ---
 
@@ -41,7 +42,7 @@ Honest one-line assessments, each backed by the items below it.
 | Pillar | State | The thing in the way |
 |---|---|---|
 | **P1** Assistant | **Strong.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects | Memory does not retrieve by meaning. An assistant that cannot recall a paraphrase is not one people keep using |
-| **P2** Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted | Governance is entered through eight modules that each re-implement the gate check (GEP-01), and fifteen capabilities have no traced governed-action path (GEP-04). Neither is a hole in the product; both are holes in the *proof* |
+| **P2** Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches | GEP-01, GEP-04 and BUG-218 are closed. What remains is that nothing owns a set of delegated child tasks (BUG-220), and the two owner decisions GEP-02 and ADD-14/15 |
 | **P3** Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
 | **P4** Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client now negotiates the current revision, but implements a subset of it: no streamable-HTTP session semantics, no remote OAuth, no `server/discover`, no MCP Apps |
 
@@ -50,9 +51,16 @@ pillars were blocked by the *same two items* — checkpoint rewind and audit
 export — and both were things Raiker had already built and never routed. Both
 closed on 2026-08-23, together with the two other High/Low rows beside them and
 the MCP revision that was blocking three P4 rows at once. **The backlog's
-High-priority, Low-effort section is now empty**, which makes GEP-04 (P2) and
-MEM-10 (P1) the next things to weigh: neither is cheap, and both decide whether a
-pillar is *proven* rather than merely working.
+High-priority, Low-effort section is now empty.**
+
+**The 2026-08-24 pass found the same shape a third time, in the place it is worst
+for this product.** Checkpoint rewind and audit export were controls Raiker had
+built and never routed. GEP-04 found fifteen *switches* an owner could hold on or
+off that decided nothing — subagents ran with the switch off, and the terminal
+could install a plugin with the switch off. A control that is missing is a hole
+in the implementation; a control that is *shown and inert* is a hole in what the
+owner believes. Closing it also closed GEP-01, whose shared admission helper the
+two new call sites needed. **MEM-10 (P1) is now the largest honest gap left.**
 
 ---
 
@@ -80,11 +88,12 @@ already works.
 | Audit export | [FIXED-271](FIXED_ITEMS.md) | **Closed 2026-08-23** — an executor, a route, a listing and a download, redacted and account-scoped |
 | The second, weaker egress path | [FIXED-272](FIXED_ITEMS.md) | **Closed 2026-08-23** — deleted; `web_fetch` routes through `WebAccessService` |
 | An oversize checkpoint promised a rewind | [FIXED-273](FIXED_ITEMS.md) | **Closed 2026-08-23** — the approval notice says so before you decide |
-| Eight modules re-implement the gate check | [GEP-01](GOVERNANCE_ENTRY_PATHS.md#gep-01--eight-modules-re-implement-the-gate-check) | Open |
-| The stop switch's scope is undefined for read paths | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths) | Open — **an owner decision** |
+| Eight modules re-implement the gate check | [FIXED-279](FIXED_ITEMS.md) | **Closed 2026-08-24** — one shared admission helper; two drifts found by reading the copies together, one of them live and pointed at the model |
+| The stop switch's scope is undefined for read paths | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths) | Open — **an owner decision**, and the shared admission helper now carries the answer at no cost |
+| An empty gate table means three different things | [BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things) | Open — **an owner decision**, raised 2026-08-24. The fork is one named table now; unifying it either loosens seven paths or tightens one |
 | `NESTED_BOUNDARIES_ARCHITECTURE.md` overstates the architecture | [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Open |
-| Fifteen capabilities have no traced governed-action path | [GEP-04](GOVERNANCE_ENTRY_PATHS.md#gep-04--fifteen-capabilities-have-no-traced-governed-action-path) | Open — **do this first**; it may reclassify others |
-| Auto mode has no alignment check | [BUG-218](TO_BE_FIXED.md) | Open |
+| Fifteen capabilities have no traced governed-action path | [FIXED-280](FIXED_ITEMS.md) | **Closed 2026-08-24** — not one of the two readings it offered: fifteen switches governed nothing. `plugin_install` was a real gap, `subagents` an inert switch, and what every gate decides is now a checked field |
+| Auto mode has no alignment check | [FIXED-282](FIXED_ITEMS.md) | **Closed 2026-08-24** — a deterministic check over the turn's own record, with no model in the authority path |
 | Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md) | Open |
 | OpenTelemetry export | [backlog #18](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
 | Deterministic replay | [backlog #20](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
@@ -93,8 +102,14 @@ already works.
 
 **No blocking item.** *Recoverable* and *auditable* were the two properties
 Raiker's own documentation claimed and an owner could not reach; both closed on
-2026-08-23. Everything left in P2 is Raiker being ahead and wanting to be further
-ahead. **Do GEP-04 first** — it may reclassify the rows above it.
+2026-08-23. GEP-04 turned out to be a third of the same kind — *controllable*:
+fifteen switches an owner could hold that decided nothing — and closed on
+2026-08-24 along with GEP-01, which was designed with GEP-04's two new call sites
+in view exactly as GEP-04 said it should be. Everything left in P2 is Raiker being
+ahead and wanting to be further ahead. BUG-218 — the only mode where an action
+runs with no human in the loop — closed on 2026-08-24 with a check that is
+deterministic in both halves. **BUG-220 is next**: a parent task that reports
+done while a child is parked is a false completion.
 
 ## P3 — A capable coding/build agent
 
@@ -161,18 +176,23 @@ unblocks*.
 
 | Order | Item | Unblocks | Why here |
 |---|---|---|---|
-| 1 | [GEP-04](GOVERNANCE_ENTRY_PATHS.md#gep-04--fifteen-capabilities-have-no-traced-governed-action-path) — trace the fifteen | P2 | Cheap, and it may reclassify items below. Do the analysis before committing to the fixes |
+| 1 | **Trace the fifteen** ([FIXED-280](FIXED_ITEMS.md)) | P2 | **Done 2026-08-24.** Cheap, and it did reclassify: the finding was not an ungoverned action but fifteen inert switches, which is a different defect and a worse one for this product |
 | 2 | **Checkpoint rewind** ([#1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
 | 3 | **Audit export** ([#2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
 | 4 | **Remove the second egress path** ([#3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
 | 5 | **Oversize checkpoint honesty** ([#4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
 | 6 | **MCP protocol revision** ([#9](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
 | 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md)) | P1 | The largest honest gap, and the most expensive of the top group |
-| 8 | [GEP-01](GOVERNANCE_ENTRY_PATHS.md#gep-01--eight-modules-re-implement-the-gate-check) — shared admission helper | P2 + P4 | After GEP-04, so it is designed once |
+| 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
 
-Items 2–5 are all **High priority, Low effort**, and together they close the gap
-between what Raiker's documentation says it is and what an owner can actually
-reach. Nothing further down should start before them.
+Items 1–6 and 8 are closed. **Item 7 — semantic memory (MEM-10) — is what is
+left of the top group**, and it is the largest honest gap in the product: an
+assistant that cannot recall a paraphrase is not one people keep using.
+
+Items 2–5 were all **High priority, Low effort**, and together they closed the
+gap between what Raiker's documentation says it is and what an owner can
+actually reach. Items 1 and 8 closed the gap between what an owner is *shown*
+they control and what they do.
 
 ---
 

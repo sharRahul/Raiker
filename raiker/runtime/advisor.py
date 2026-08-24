@@ -6,18 +6,13 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
-from raiker.runtime.authority.decision_modes import (
-    DEFAULT_DECISION_MODE,
-    DecisionMode,
-    auto_requires_approval,
-    parse_decision_mode,
-)
+from raiker.runtime.authority.admission import capability_admission
+from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "advisor_model_runtime"
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 MAX_QUESTION_CHARS = 8_000
 MAX_ANSWER_CHARS = 16_000
 # Sending prompt content off-machine is never low-risk, so `auto` withholds
@@ -67,30 +62,10 @@ class AdvisorService:
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
-        try:
-            scoped = bool(
-                self._principal_id and self._store.get_account(self._principal_id) is not None
-            )
-            if scoped:
-                assert self._principal_id is not None
-                record = self._store.get_principal_capability_gate_state(self._principal_id, _CAP)
-            else:
-                record = self._store.get_capability_gate_state(_CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return capability_admission(self._store, self._principal_id, _CAP).gate_enabled
 
     def _mode(self) -> DecisionMode:
-        scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
-        if scoped:
-            assert self._principal_id is not None
-            persisted = self._store.get_principal_capability_decision_mode(self._principal_id, _CAP)
-        else:
-            persisted = self._store.get_capability_decision_mode(_CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return capability_admission(self._store, self._principal_id, _CAP).decision_mode
 
     def advisor_profile_id(self) -> str | None:
         scoped = bool(self._principal_id and self._store.get_account(self._principal_id) is not None)

@@ -48,7 +48,6 @@ if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "mcp_connector_runtime"
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 
 # Reaching an owner-registered MCP server runs code Raiker does not own, so a
 # call is not low-risk: `auto` withholds it exactly like a connector read.
@@ -108,20 +107,6 @@ def _denied(reason: str, message: str) -> dict[str, Any]:
     return {"status": "denied", "error": {"type": reason, "message": message}}
 
 
-def _scoped_record(
-    store: SQLiteStore, principal_id: str | None, capability: str
-) -> dict[str, Any] | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_gate_state(principal_id, capability)
-    return store.get_capability_gate_state(capability)
-
-
-def _scoped_mode(store: SQLiteStore, principal_id: str | None, capability: str) -> str | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_decision_mode(principal_id, capability)
-    return store.get_capability_decision_mode(capability)
-
-
 class McpToolService:
     """Discovery and governed execution of projected MCP tools."""
 
@@ -139,27 +124,20 @@ class McpToolService:
         self._principal_id = principal_id
 
     # ── Governance ───────────────────────────────────────────────────────
-    def gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
-
-    def _mode(self) -> DecisionMode:
+    def _admission(self) -> Any:
         # Imported at call time: `runtime.authority` transitively imports the
         # ToolBroker, which imports this module — a module-level import here
         # would be circular. Same reason as `raiker/tools/connector_tools.py`.
-        from raiker.runtime.authority.decision_modes import (
-            DEFAULT_DECISION_MODE,
-            parse_decision_mode,
-        )
+        from raiker.runtime.authority.admission import capability_admission
 
-        persisted = _scoped_mode(self._store, self._principal_id, _CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return capability_admission(self._store, self._principal_id, _CAP)
+
+    def gate_enabled(self) -> bool:
+        return bool(self._admission().gate_enabled)
+
+    def _mode(self) -> DecisionMode:
+        mode: DecisionMode = self._admission().decision_mode
+        return mode
 
     def decision_mode(self) -> str:
         """The owner's current decision mode for MCP, as a plain string."""

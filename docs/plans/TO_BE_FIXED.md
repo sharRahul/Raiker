@@ -78,33 +78,15 @@ names.
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
-| BUG-216 | High | Checkpoints / Windows paths | **Fixed 2026-08-21 — FIXED-240** |
-| BUG-217 | Low | Test isolation / SQLCipher posture | **Fixed 2026-08-21 — FIXED-244** |
 | MEM-06 … MEM-14 | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. See [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md) |
-| BUG-218 | Medium | Decision modes / Build / Chat | **Fixed 2026-08-24 — FIXED-282.** Auto gained a deterministic second check — not a classifier — that withholds a change to a file the turn never established, and says which path did not match |
-| BUG-219 | Low | Approval modes | **Fixed 2026-08-22 — FIXED-262** |
 | [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
-| BUG-221 | Medium → Low | Plugins / extensibility | **Closed 2026-08-22 — FIXED-256, FIXED-259, FIXED-260.** Hooks, skills and MCP-server offers all contribute; panels continue as [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) |
-| BUG-222 | Low | Hooks | **Fixed 2026-08-22 — FIXED-254** |
-| BUG-223 | Medium | Hooks / lifecycle | **Fixed 2026-08-22 — FIXED-255** |
-| BUG-224 | Low | Web tests / environment | **Fixed 2026-08-22 — FIXED-258** |
 | [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
-| BUG-230 | **High** | Checkpoints / recovery | **Fixed 2026-08-23 — FIXED-270** |
-| BUG-231 | **High** | Observability / evidence | **Fixed 2026-08-23 — FIXED-271** |
-| BUG-232 | **High** | Egress / governance | **Fixed 2026-08-23 — FIXED-272** |
-| BUG-233 | Medium | Checkpoints / approvals | **Fixed 2026-08-23 — FIXED-273** |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
-| BUG-235 | **High** | Checkpoints / approvals | **Fixed 2026-08-23 — FIXED-275.** Found live while verifying FIXED-270: a relayed write's pre-image was filed under the API session, so no restore plan could see it |
-| BUG-236 | Medium | API redaction / observability | **Fixed 2026-08-23 — FIXED-276.** Found live while verifying FIXED-271: an audit export's manifest hash, and on the same sweep every observation's `content_sha256`, were redacted into `[REDACTED_SECRET]` |
-| BUG-237 | Low | CLI / Windows | **Fixed 2026-08-23 — FIXED-277.** Found live: the terminal client died on its own em dashes and empty-set sign when output was redirected under a legacy code page |
-| BUG-238 | **High** | Models / readiness | **Fixed 2026-08-23 — FIXED-278.** Every restart, and any five idle minutes, asked the owner to set up a model that was already set up: the readiness TTL was deciding whether a model was *configured* |
-| GEP-01 | Low → Medium | Governance architecture | **Fixed 2026-08-24 — FIXED-279.** One shared admission helper. Reading the eight copies together found two drifts, one of them live: the context bundle told the model `web_fetch: disabled` on an install where the tool would have fetched |
 | GEP-02, GEP-03 | Low | Governance architecture / documentation | Open — in [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md), not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
-| GEP-04 | Medium | Governance architecture | **Fixed 2026-08-24 — FIXED-280.** Fifteen capability switches governed nothing; `plugin_install` was a real gap and `subagents` an inert switch, both closed, and what every gate decides is now a checked field the Capabilities page renders |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
 | GAP-BUILD | — | Build — coding-agent parity | Analysis (B1–B9, B11, B12, B17, B19 complete; 9 items remain) |
 | GAP-CHAT | — | Chat — work-assistant parity | Analysis (C14 **complete** — branch-from-here closed as FIXED-227; 13 items remain) |

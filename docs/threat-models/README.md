@@ -2,9 +2,9 @@
 
 **Canonical** for *what could go wrong with one specific capability, and what
 stops it*. The repository-wide view — assets, trust boundaries and the threats
-that cross them — is [`../THREAT_MODEL.md`](../THREAT_MODEL.md); the standards
-mappings are [OWASP GenAI](../OWASP_GENAI_SECURITY_MAPPING.md) and
-[OWASP Agentic](../OWASP_AGENTIC_TOP10_MAPPING.md).
+that cross them — is [`../THREAT_MODEL.md`](../architecture/THREAT_MODEL.md); the standards
+mappings are [OWASP GenAI](../architecture/OWASP_GENAI_SECURITY_MAPPING.md) and
+[OWASP Agentic](../architecture/OWASP_AGENTIC_TOP10_MAPPING.md).
 
 A document here is a precondition, not a write-up after the fact. A capability
 reaches a runtime-enabled state only through the governed control plane, and
@@ -99,7 +99,7 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 The remaining Tier-6 domains — finance, investment, medical, pregnancy, CCTV,
 home security and hardware — have **no executor and no enable path**, so there is
 nothing to model until one is proposed. See
-[Known limits](../KNOWN_LIMITS.md).
+[Known limits](../architecture/KNOWN_LIMITS.md).
 
 ## Platform-wide
 
@@ -133,7 +133,7 @@ its name in passing. Three more had no analysis of their own —
 `shell_execution` (the broadest capability in the product), `process_execution`,
 and `semantic_memory_runtime` — and `file_write_execution` /
 `patch_apply_execution` had only a section of the repository-wide
-[`../THREAT_MODEL.md`](../THREAT_MODEL.md) whose central claim had gone stale.
+[`../THREAT_MODEL.md`](../architecture/THREAT_MODEL.md) whose central claim had gone stale.
 Eleven documents close that:
 
 | Capability | Threat model | Why it needed one |
@@ -164,7 +164,7 @@ themselves rather than smoothed over:
   [`workspace-file-mutation.md`](workspace-file-mutation.md).
 
 Both are tracked in
-[the prioritised backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+[the prioritised backlog](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
 
 A test keeps this honest rather than a promise: see
-[`../VERIFICATION_PLAN.md`](../VERIFICATION_PLAN.md).
+[`../VERIFICATION_PLAN.md`](../architecture/VERIFICATION_PLAN.md).

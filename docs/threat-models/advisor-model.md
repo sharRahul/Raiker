@@ -4,7 +4,7 @@
 > provider policy, default-ask decision mode, metadata-only events.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `advisor_model_runtime` may join `REAL_EXECUTOR_CAPABILITIES`.
 
 ## What this capability is

@@ -462,7 +462,7 @@ describe("Build repository context", () => {
 
     await fireEvent.click(screen.getByLabelText("Add attachment"));
     await fireEvent.input(screen.getByLabelText("Attachment path"), {
-      target: { value: "docs/HANDOFF.md" },
+      target: { value: "docs/architecture/HANDOFF.md" },
     });
     await fireEvent.click(screen.getByText("Attach"));
     await fireEvent.input(screen.getByLabelText("Describe the change"), {

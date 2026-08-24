@@ -49,7 +49,7 @@ proven** and nothing turns green on it.
 
 There is deliberately **no escape hatch**. An unavailable environment is refused,
 never rerouted to the host — see
-[§4.2](../REFERENCE_PLATFORM_COMPATIBILITY.md#42-an-escape-hatch-out-of-the-sandbox).
+[§4.2](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#42-an-escape-hatch-out-of-the-sandbox).
 
 ## Assets
 
@@ -93,7 +93,7 @@ never rerouted to the host — see
   per-approval, not per-argument: Raiker gates *the capability to run a command*
   and asks a human about the specific one, rather than matching a
   `Bash(git *)`-style rule. The reasoning is in
-  [§3.1](../REFERENCE_PLATFORM_COMPATIBILITY.md#31-a-capability-gate-instead-of-a-tool-argument-rule).
+  [§3.1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#31-a-capability-gate-instead-of-a-tool-argument-rule).
 - **Command output enters the turn.** `stdout` and `stderr` are returned in the
   artifacts. Output from a command is untrusted content like a fetched page: it
   is data, never instruction, but it *is* in context.
@@ -107,7 +107,7 @@ never rerouted to the host — see
 - `raiker/runtime/executors/tier2_shell.py`,
   `raiker/execution/commands/service.py`, `raiker/execution/profiles.py`,
   `native/`
-- [`../EXECUTION_ENVIRONMENTS_SPEC.md`](../EXECUTION_ENVIRONMENTS_SPEC.md)
+- [`../EXECUTION_ENVIRONMENTS_SPEC.md`](../architecture/EXECUTION_ENVIRONMENTS_SPEC.md)
 - [`container.md`](container.md), [`remote-cloud.md`](remote-cloud.md) — the other backends
 - [`process-execution.md`](process-execution.md) — the sibling capability
 - [`approval-execution-relay.md`](approval-execution-relay.md)

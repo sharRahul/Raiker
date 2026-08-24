@@ -60,5 +60,5 @@ when* survives, and the content does not.
 ## Evidence
 
 - `raiker/runtime/executors/tier1_memory.py`, `raiker/memory/store.py`
-- [`../MEMORY_GOVERNANCE_RULES.md`](../MEMORY_GOVERNANCE_RULES.md)
+- [`../MEMORY_GOVERNANCE_RULES.md`](../architecture/MEMORY_GOVERNANCE_RULES.md)
 - [`approval-execution-relay.md`](approval-execution-relay.md)

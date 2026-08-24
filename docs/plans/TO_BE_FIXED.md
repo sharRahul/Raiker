@@ -40,7 +40,7 @@ MCP server) by default — **allow, monitor, surface anomalies as findings +
 notifications, and give the owner an instant stop plus an automatic revocable
 pause for the irreversible/high-severity cases.** Reserve hard prevention for a
 last resort and justify it against this posture. Full statement:
-`docs/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
+`docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
 and are compatible with it:
 
 # To be fixed
@@ -427,9 +427,9 @@ guess:
 
 **2026-08-22 update — step 1 is done (FIXED-261).** The decision this entry named
 as the blocker is written down and accepted: a channel message is **untrusted
-content with a named sender who is not the owner**, in `docs/CHANNELS_SPEC.md` →
+content with a named sender who is not the owner**, in `docs/architecture/CHANNELS_SPEC.md` →
 *What a channel message is in a turn*, with the matching rows in
-`docs/THREAT_MODEL.md`. Five enforceable rules follow — never a prompt, trust from
+`docs/architecture/THREAT_MODEL.md`. Five enforceable rules follow — never a prompt, trust from
 the pairing record rather than from the message, no raising of the turn's
 authority, outbound-is-a-capability vs inbound-is-a-boundary, and nothing
 implicit. Extensions → Channels states the contract and the four steps with the
@@ -469,7 +469,7 @@ than not shipping it.
 
 1. ~~**Decide what a channel message *is* in a turn.**~~ **Done — FIXED-261.** It
    is untrusted content with a named sender, and the sender is not the owner.
-   Written down in `docs/CHANNELS_SPEC.md` and the threat model, so the code
+   Written down in `docs/architecture/CHANNELS_SPEC.md` and the threat model, so the code
    below now has a contract to satisfy.
 2. ~~**Outbound first.**~~ **Already existed; reachable since FIXED-265.** The
    executor, the capability gate, the egress allowlist and the audit path were
@@ -516,7 +516,7 @@ does not have (below), not because the reference lacks them.
 This is the remainder of the hooks gap after BUG-223 — and the *events* are not
 at parity either: Raiker emits sixteen of the thirty-one Claude Code documents.
 See
-[`../REFERENCE_PLATFORM_COMPATIBILITY.md`](../REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
+[`../REFERENCE_PLATFORM_COMPATIBILITY.md`](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
 **Root cause.** Each of the four needs a resource the hook path deliberately
 does not have:
@@ -549,7 +549,7 @@ believing a guard is in place.
 **Severity: Low. Area: plugins / Build / language intelligence. Status: Open —
 raised 2026-08-22 while closing BUG-221 steps 2 and 3.**
 
-**Observed.** `docs/PLUGIN_MANIFEST_SCHEMA.md` and `docs/PLUGIN_SYSTEM_SPEC.md`
+**Observed.** `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` and `docs/architecture/PLUGIN_SYSTEM_SPEC.md`
 both list **LSP servers** among what a plugin declares, and both say the
 declaration stays inert until trust and approval gates pass. Grepping the runtime
 for a language-server path returns nothing: there is no LSP client, no server
@@ -560,7 +560,7 @@ manifest field and no destination.
 Claude Code plugins do bundle LSP servers, and Build uses language intelligence
 for navigation and diagnostics. So this is a genuine Claude Code gap — it is just
 a *smaller* one than it looks, because Raiker's graph/codemap layer
-(`docs/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`) already answers part of what an LSP
+(`docs/architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`) already answers part of what an LSP
 would be asked for.
 
 **Root cause.** The manifest schema was written against the reference platform's

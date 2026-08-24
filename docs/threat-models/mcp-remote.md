@@ -2,7 +2,7 @@
 
 > Status marker: runtime_enablement_candidate — strict non-allow blocking,
 > role revoke governed, capability gate per action. Grounded in
-> `docs/SECURITY_AND_POLICY.md` → "Security Philosophy": owner-added remote
+> `docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy": owner-added remote
 > connections are **allowed and monitored**, not prevention-blocked.
 
 Per-capability threat model for the remote (HTTP) branch of the existing

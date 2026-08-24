@@ -7,8 +7,8 @@ on the way*. This is the enumeration behind Raiker's central claim:
 > action without crossing policy, capability gates, approvals and audit.
 
 That sentence appears in `README.md`, in
-[`NESTED_BOUNDARIES_ARCHITECTURE.md`](../NESTED_BOUNDARIES_ARCHITECTURE.md) and in
-[`SECURITY_ARCHITECTURE.md`](../SECURITY_ARCHITECTURE.md). Until this document it
+[`NESTED_BOUNDARIES_ARCHITECTURE.md`](../architecture/NESTED_BOUNDARIES_ARCHITECTURE.md) and in
+[`SECURITY_ARCHITECTURE.md`](../architecture/SECURITY_ARCHITECTURE.md). Until this document it
 was **asserted and never enumerated** — there was no list of the paths, and
 therefore no way to tell whether the claim was true, or to notice a new path
 appearing beside the governed ones.
@@ -435,7 +435,7 @@ behaviour — or *accept nothing that leaves this machine*? Both are defensible.
 Only one is currently true, and no document says which.
 
 **Proposed work.** Answer it in
-[`NESTED_BOUNDARIES_ARCHITECTURE.md`](../NESTED_BOUNDARIES_ARCHITECTURE.md),
+[`NESTED_BOUNDARIES_ARCHITECTURE.md`](../architecture/NESTED_BOUNDARIES_ARCHITECTURE.md),
 then make the code match.
 
 **GEP-01's helper is now where it lands, and it is already carrying the answer.**
@@ -500,7 +500,7 @@ implementation, and the inert switch is a hole in what the owner believes.
 `multi_agent_teams` are labelled, not gated. Each is already governed — per
 action, per turn, or by the owner's act of configuring a profile — and adding a
 second switch in front of a choice the owner already made is the wall
-[`SECURITY_AND_POLICY.md`](../SECURITY_AND_POLICY.md) → "Security Philosophy"
+[`SECURITY_AND_POLICY.md`](../architecture/SECURITY_AND_POLICY.md) → "Security Philosophy"
 exists to refuse. The nine with no path keep their gates for the same reason
 §3.5 keeps its list: the day something reaches one of them, the gate is what is
 already there.
@@ -538,7 +538,7 @@ that is [`../threat-models/`](../threat-models/README.md), one document per
 capability with a real executor.
 
 It is not the backlog. Items found here are raised as GEP-nn above and belong in
-[`REFERENCE_PLATFORM_COMPATIBILITY.md §5`](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog)
+[`REFERENCE_PLATFORM_COMPATIBILITY.md §5`](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog)
 once they are prioritised.
 
 **It must be updated when a path is added.** A new `route_action` call site, a

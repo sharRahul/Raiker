@@ -352,8 +352,8 @@ export function isDecisionMode(value: unknown): value is DecisionMode {
 }
 
 // ── Friendly copy for every registered capability ────────────────────────────
-// Descriptions are transcribed from docs/RUNTIME_EXECUTORS_SPEC.md and
-// docs/IMPLEMENTATION_STATUS.md. Unknown capabilities fall back to a humanised
+// Descriptions are transcribed from docs/architecture/RUNTIME_EXECUTORS_SPEC.md and
+// docs/architecture/IMPLEMENTATION_STATUS.md. Unknown capabilities fall back to a humanised
 // name so a new backend capability is never hidden.
 
 interface CapabilityCopy {

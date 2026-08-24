@@ -4,7 +4,7 @@ These two capabilities are what Build's premise rests on: **approving a file
 change really writes it**. Both are in
 [`EXECUTABLE_ON_APPROVAL`](../../raiker/approvals/execution.py). They are the
 original members of that set, and the repository-wide analysis in
-[`../THREAT_MODEL.md`](../THREAT_MODEL.md#tier-1-executors-approval_execution_relay-file_write_execution-patch_apply_execution)
+[`../THREAT_MODEL.md`](../architecture/THREAT_MODEL.md#tier-1-executors-approval_execution_relay-file_write_execution-patch_apply_execution)
 covers the relay they share; this page is the per-capability document the
 step-up acknowledgement points at.
 
@@ -93,7 +93,7 @@ promising a rewind it cannot give.
   model tool proposes a restore. `/checkpoints restore` and the Checkpoints view
   compute a preflight and perform nothing. Recovery is git, or asking the agent
   to reverse the edit. See [`checkpoint-restore.md`](checkpoint-restore.md) and
-  [Known limits](../KNOWN_LIMITS.md).
+  [Known limits](../architecture/KNOWN_LIMITS.md).
 - **Text only.** The write path encodes UTF-8; there is no binary write tool, and
   `read_file` refuses a file containing a NUL byte.
 - **A batch containing three edits is three decisions.** Parallel execution
@@ -104,5 +104,5 @@ promising a rewind it cannot give.
 
 - `raiker/runtime/executors/tier1_files.py`, `raiker/tools/filesystem.py`,
   `raiker/checkpoints/capture.py`
-- [`../THREAT_MODEL.md`](../THREAT_MODEL.md), [`approval-execution-relay.md`](approval-execution-relay.md)
-- [`../BUILD_WORKSPACE_SPEC.md`](../BUILD_WORKSPACE_SPEC.md)
+- [`../THREAT_MODEL.md`](../architecture/THREAT_MODEL.md), [`approval-execution-relay.md`](approval-execution-relay.md)
+- [`../BUILD_WORKSPACE_SPEC.md`](../architecture/BUILD_WORKSPACE_SPEC.md)

@@ -1,7 +1,7 @@
 <script lang="ts">
   // BUG-40 — the menu-bar control, in the app.
   //
-  // `docs/DESKTOP_DISTRIBUTION_DESIGN.md` asks for a tray/menu-bar control that
+  // `docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md` asks for a tray/menu-bar control that
   // shows running / paused / needs attention / stopped and offers Open, Pause,
   // Restart and Quit, with quitting reporting waiting work before it stops.
   // This is that control, mounted in the top bar rather than in the OS tray: a

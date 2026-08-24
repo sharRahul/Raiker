@@ -53,6 +53,6 @@ same scheduling and the same stop control. It is created with
 ## Evidence
 
 - `raiker/runtime/executors/tier1_tasks.py`, `raiker/tasks/manager.py`
-- [`../RUNTIME_ORCHESTRATION_SPEC.md`](../RUNTIME_ORCHESTRATION_SPEC.md)
+- [`../RUNTIME_ORCHESTRATION_SPEC.md`](../architecture/RUNTIME_ORCHESTRATION_SPEC.md)
 - [`scheduled-routines.md`](scheduled-routines.md) for the scheduling capability
 - [`approval-execution-relay.md`](approval-execution-relay.md)

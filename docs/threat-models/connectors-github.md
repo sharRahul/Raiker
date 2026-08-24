@@ -5,7 +5,7 @@
 > metadata-only events.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `connector_github_runtime` may join `REAL_EXECUTOR_CAPABILITIES`. This is the
 **reference slice** for Task 4 (governed service connectors); Gmail / Calendar /
 Slack replicate the same store-nothing-new pattern.

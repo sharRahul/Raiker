@@ -5,13 +5,13 @@ from pathlib import Path
 
 REQUIRED_DOCS = [
     Path("README.md"),
-    Path("docs/IMPLEMENTATION_STATUS.md"),
-    Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
-    Path("docs/EVENT_CATALOG.md"),
-    Path("docs/SECURITY_ARCHITECTURE.md"),
+    Path("docs/architecture/IMPLEMENTATION_STATUS.md"),
+    Path("docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"),
+    Path("docs/architecture/EVENT_CATALOG.md"),
+    Path("docs/architecture/SECURITY_ARCHITECTURE.md"),
 ]
 REQUIRED_MARKERS = {
-    Path("docs/IMPLEMENTATION_STATUS.md"): [
+    Path("docs/architecture/IMPLEMENTATION_STATUS.md"): [
         "Canonical Backend Capability Statuses",
         "Approval resolution executes approved local file mutations",
         "CLI durable memory mutation is `implemented_approval_required`",
@@ -19,18 +19,18 @@ REQUIRED_MARKERS = {
         "Sensitive finance/investment/medical/pregnancy/CCTV/",
         "Phase 4 memory MVP is implemented",
     ],
-    Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
+    Path("docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md"): [
         "implemented_approval_required",
         "metadata_only",
         "Each is executed once through the governed approval execution relay",
     ],
-    Path("docs/EVENT_CATALOG.md"): [
+    Path("docs/architecture/EVENT_CATALOG.md"): [
         "approval_denied",
         "tool_started",
         "tool_completed",
         "tool_failed",
     ],
-    Path("docs/SECURITY_ARCHITECTURE.md"): [
+    Path("docs/architecture/SECURITY_ARCHITECTURE.md"): [
         "Approval resolution executes a narrow allowlist",
         "SSH remote execution | unavailable until owner profile selection; approval-required",
         "Daytona cloud execution | unavailable until owner profile, credential reference, and cost ceiling; approval-required",

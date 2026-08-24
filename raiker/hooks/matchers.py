@@ -7,7 +7,7 @@ import re
 def matches(pattern: str, value: str | None) -> bool:
     """Match a hook matcher pattern against a tool/event value.
 
-    Supported forms (per docs/HOOKS_SPEC.md):
+    Supported forms (per docs/architecture/HOOKS_SPEC.md):
     - ``*``            matches anything;
     - ``re:<regex>``   regular expression (explicitly marked);
     - ``a|b|c``        pipe-separated exact alternatives;

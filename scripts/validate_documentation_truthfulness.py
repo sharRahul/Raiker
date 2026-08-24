@@ -6,26 +6,22 @@ from pathlib import Path
 
 REQUIRED_CONTENT: dict[str, list[str]] = {
     "README.md": [
-        "owner bootstrap",
-        "owner principal",
-        "acting-principal",
-        "runtime_gate_manager",
-        "recovery",
-        "deferred dangerous",
-        "approval execution relay",
-        "production_ready_local_single_user_runtime",
+        "local-first AI assistant and coding agent",
+        "docs/guide/README.md",
+        "docs/architecture/README.md",
+        "raiker-app",
     ],
-    "docs/ARCHITECTURE.md": [
+    "docs/architecture/ARCHITECTURE.md": [
         "owner bootstrap",
         "production_ready_local_single_user_runtime",
     ],
-    "docs/IMPLEMENTATION_STATUS.md": [
+    "docs/architecture/IMPLEMENTATION_STATUS.md": [
         "owner bootstrap",
         "acting-principal",
         "runtime_gate_manager",
         "production_ready_local_single_user_runtime",
     ],
-    "docs/SECURITY_ARCHITECTURE.md": [
+    "docs/architecture/SECURITY_ARCHITECTURE.md": [
         "owner bootstrap",
         "owner principal",
         "runtime_gate_manager",
@@ -37,22 +33,22 @@ REQUIRED_CONTENT: dict[str, list[str]] = {
         "recovery",
         "approval execution relay",
     ],
-    "docs/SECURITY_AND_POLICY.md": [
+    "docs/architecture/SECURITY_AND_POLICY.md": [
         "owner bootstrap",
         "ready",
     ],
-    "docs/API_AND_CONTRACT_SCHEMAS.md": [
+    "docs/architecture/API_AND_CONTRACT_SCHEMAS.md": [
         "runtime_mode_state",
         "capability_gate_state",
         "persisted principal",
         "runtime-readiness",
     ],
-    "docs/CONTRACTS.md": [
+    "docs/architecture/CONTRACTS.md": [
         "Runtime mode activation contract",
         "Capability gate transition contract",
         "Principal resolution contract",
     ],
-    "docs/GAP_AND_TODO_ANALYSIS.md": [
+    "docs/architecture/GAP_AND_TODO_ANALYSIS.md": [
         "Completed items",
         "no longer active gaps",
     ],

@@ -6,7 +6,7 @@
 > before their executors landed. Approval resolution is metadata-only.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `external_channel_runtime` and `channel_approval_relay` may join
 `REAL_EXECUTOR_CAPABILITIES`. This is the **one reference channel** (webhook
 transport) for the sandboxed-first Phase 4 rollout; other transports and

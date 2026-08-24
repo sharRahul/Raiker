@@ -24,7 +24,7 @@ RuntimeAuthority, and append-only audit log as the terminal client.
   action, and a failure's reason with its remediation. Everything else lives in
   [`docs/guide/`](../../docs/guide) and is reached from the page's own **How … works** link.
   The rule, and the test that makes it usable, are in
-  [`VISUAL_DESIGN_SPEC.md`](../../docs/VISUAL_DESIGN_SPEC.md) §2b.
+  [`VISUAL_DESIGN_SPEC.md`](../../docs/architecture/VISUAL_DESIGN_SPEC.md) §2b.
 
 ### Composer model picker
 
@@ -91,7 +91,7 @@ The typed API client lives in `src/lib/api.ts` / `src/lib/apiTypes.ts`; the back
 The Build workspace's mode mapping and cadence list are pure modules
 (`src/lib/buildModes.ts`, `src/lib/agentCadence.ts`) so the posture a label
 promises is unit-tested apart from the view. See
-[docs/BUILD_WORKSPACE_SPEC.md](../../docs/BUILD_WORKSPACE_SPEC.md).
+[docs/architecture/BUILD_WORKSPACE_SPEC.md](../../docs/architecture/BUILD_WORKSPACE_SPEC.md).
 
 Shared presentational primitives live in `src/lib/components/`: `PageState`,
 `ResponsivePage`, `SessionMenu`, and `ToolControlBoard`. They only render server

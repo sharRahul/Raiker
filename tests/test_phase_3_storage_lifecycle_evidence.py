@@ -188,7 +188,7 @@ def test_sqlite_slice_i_tables_exist_and_forbidden_runtime_tables_do_not(tmp_pat
 
 
 def test_catalog_shape_permissions_and_approval_typo() -> None:
-    catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    catalog = Path("docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     assert "| Tool Name | Descriptions | Permissions | Implemented |" in catalog
     assert "approvals:read" not in catalog
     for name in [

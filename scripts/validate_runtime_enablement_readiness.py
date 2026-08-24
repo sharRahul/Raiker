@@ -164,14 +164,13 @@ def main() -> int:
 
     # 8. Validate documentation markers
     doc_files = [
-        "README.md",
-        "docs/ARCHITECTURE.md",
-        "docs/SECURITY_AND_POLICY.md",
-        "docs/FEATURE_COVERAGE_MATRIX.md",
-        "docs/GAP_AND_TODO_ANALYSIS.md",
-        "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
-        "docs/LOCAL_VALIDATION_GATE.md",
-        "docs/IMPLEMENTATION_STATUS.md",
+        "docs/architecture/ARCHITECTURE.md",
+        "docs/architecture/SECURITY_AND_POLICY.md",
+        "docs/architecture/FEATURE_COVERAGE_MATRIX.md",
+        "docs/architecture/GAP_AND_TODO_ANALYSIS.md",
+        "docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
+        "docs/architecture/LOCAL_VALIDATION_GATE.md",
+        "docs/architecture/IMPLEMENTATION_STATUS.md",
     ]
     repo_root = Path(__file__).resolve().parent.parent
     required_markers = [

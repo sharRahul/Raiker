@@ -65,6 +65,6 @@ and **only accepted proposals reach graph recall** (MEM-06 / FIXED-241).
 
 - `raiker/runtime/executors/tier3_core.py`, `raiker/graph/indexer.py`,
   `raiker/tools/graph_tools.py`
-- [`../GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../GRAPH_MEMORY_AND_CODEMAP_SPEC.md)
-- [`../MEMORY_GOVERNANCE_RULES.md`](../MEMORY_GOVERNANCE_RULES.md)
+- [`../GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md)
+- [`../MEMORY_GOVERNANCE_RULES.md`](../architecture/MEMORY_GOVERNANCE_RULES.md)
 - [`vector-embedding.md`](vector-embedding.md) — the sibling local retrieval path

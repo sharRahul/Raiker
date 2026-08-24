@@ -6,7 +6,7 @@
 > before their executors landed. Approval resolution is metadata-only.
 
 This is the per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before the
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before the
 `subagents` and `multi_agent_teams` capabilities may join
 `REAL_EXECUTOR_CAPABILITIES`.
 

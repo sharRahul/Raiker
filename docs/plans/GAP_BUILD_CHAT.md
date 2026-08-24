@@ -40,7 +40,7 @@ MCP server) by default — **allow, monitor, surface anomalies as findings +
 notifications, and give the owner an instant stop plus an automatic revocable
 pause for the irreversible/high-severity cases.** Reserve hard prevention for a
 last resort and justify it against this posture. Full statement:
-`docs/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
+`docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
 and are compatible with it:
 
 docs/TO_BE_FIXED.md — are defects. Defects found while executing
@@ -538,7 +538,7 @@ reach them. Verified live: the model called `mcp__echo__echo` in Chat and quoted
 its answer back.
 
 **C9. No skills or reusable procedures.** `raiker/skills/` holds a candidate
-store and nothing else; `docs/SELF_IMPROVEMENT_MODEL.md` describes procedural
+store and nothing else; `docs/architecture/SELF_IMPROVEMENT_MODEL.md` describes procedural
 memory that is never consulted at turn time. A work assistant should learn "how
 we do the weekly report here" once. **Work:** promote approved procedural
 memories into a named, model-selectable skill set, injected only when relevant.
@@ -563,7 +563,7 @@ reply steers the next cycle.
 **C12. No collaboration.** No sharing of a chat, a project, or a document; no
 second participant; no per-recipient scoping. Governance is built for a single
 owner, so this is a genuine architectural decision rather than a missing screen —
-`docs/NESTED_BOUNDARIES_ARCHITECTURE.md` is the place it has to be answered.
+`docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md` is the place it has to be answered.
 
 ### Tier 3 — conversation surface (UI/UX)
 
@@ -657,8 +657,8 @@ decisions before they are implementation tasks.
 > round found on the day it was run, so the gaps above are read against the right
 > baseline. **Two counts in it have since moved** and are corrected inline below;
 > the rest is left as observed. For current numbers read
-> [`IMPLEMENTATION_STATUS.md`](../IMPLEMENTATION_STATUS.md) and
-> [`RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md), which are
+> [`IMPLEMENTATION_STATUS.md`](../architecture/IMPLEMENTATION_STATUS.md) and
+> [`RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md), which are
 > maintained against the code.
 
 Recorded so the fixes above are read against the right baseline: first-run

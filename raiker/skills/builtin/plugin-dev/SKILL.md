@@ -55,7 +55,7 @@ does nothing on someone else's computer.
 ## 3. Write the manifest as an honest authority request
 
 The manifest is read by a person deciding whether to trust you. Raiker's schema
-is in `docs/PLUGIN_MANIFEST_SCHEMA.md`; the fields that decide acceptance are:
+is in `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md`; the fields that decide acceptance are:
 
 ```json
 {
@@ -169,9 +169,9 @@ anything it ships.
   with a signing key configured, `signature` must verify or the install fails
   closed.
 
-Raiker's own references: `docs/PLUGIN_SYSTEM_SPEC.md`,
-`docs/PLUGIN_MANIFEST_SCHEMA.md`, `docs/HOOKS_SPEC.md`,
-`docs/EXTENSIBILITY_MODEL.md`.
+Raiker's own references: `docs/architecture/PLUGIN_SYSTEM_SPEC.md`,
+`docs/architecture/PLUGIN_MANIFEST_SCHEMA.md`, `docs/architecture/HOOKS_SPEC.md`,
+`docs/architecture/EXTENSIBILITY_MODEL.md`.
 
 ### Across agent surfaces
 
@@ -180,7 +180,7 @@ Raiker's own references: `docs/PLUGIN_SYSTEM_SPEC.md`,
 | Manifest | Claude Code `plugin.json`; Codex extension manifest | `raiker-plugin.json`, with a required permission block |
 | Component discovery | Convention directories | Same layout, declared in `entrypoints` |
 | Permission model | Tool allowlists at the session level | Per-permission `reason` + `expected_effect`, diffed on update |
-| Hooks | Claude Code hook events; OpenClaw gateway events | `docs/HOOKS_SPEC.md` event catalogue |
+| Hooks | Claude Code hook events; OpenClaw gateway events | `docs/architecture/HOOKS_SPEC.md` event catalogue |
 | Distribution | Marketplace / git URL | Marketplace entry or git source, with checksum and optional signature |
 | Enablement | Enabled on install | Install and enable are separate decisions; nothing runs until the gate for its class is open |
 | Updates | Version bump | Version bump **plus** a permission diff whenever authority widens |

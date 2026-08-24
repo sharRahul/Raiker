@@ -5,8 +5,8 @@ authorization — Raiker does not then ask you to satisfy a separate switch, a
 separate allowlist, and a separate key before it will use what you just
 configured.
 
-This follows the project's stated posture (`docs/HANDOFF.md` → "Security
-posture"): Raiker is **owner-authoritative and monitored, not
+This follows the project's [security posture](../architecture/HANDOFF.md#security-posture-read-before-adding-any-restriction):
+Raiker is **owner-authoritative and monitored, not
 prevention-by-restriction**. Every turn is still policy-checked, audited, and
 stoppable; what changed is that you are not made to prove a choice you already
 made.
@@ -37,6 +37,11 @@ is disabled and **Set up model** opens the readiness dialog, whose **Check
 again** runs the exact-model check, or says there is no model to check yet when
 that is the truth. (The Workbench is not in that list because it has no
 composer to gate: it is the board over work that is already running.)
+
+A successful profile carries a green **Ready** label, and the Models header says
+`1 model ready` (or the corresponding count). Labels such as **Not checked**,
+**Check expired**, **Runtime stopped**, **Model missing**, **Key rejected**, or
+**No credit** name what still needs attention.
 
 **The first-run screen can do all of this on its own.** Stage 02 of setup shows one
 row per provider. The three local runtimes are *asked* what they are serving and
@@ -69,10 +74,11 @@ without leaving the wizard.
 
 ## Connect a hosted provider
 
-**Models → Providers** → the provider's card → **Connect** → paste the key →
-**Connect**. (The Models page is split by what you came to do: **Providers** to
-connect and choose, **Routing** for fallback and the advisor, **Pricing** for
-rates, **Posture** for the read-only gate status.)
+**Models → Hosted** → the provider's card → **Connect** → paste the key →
+**Connect**. (The Models page is split by what you came to do: **Local** for
+on-device runtimes, **Hosted** for accounts and advanced endpoints, **Hugging
+Face** for discovery, **Activity** for usage, **Routing** for fallback and the
+advisor, **Pricing** for rates, and **Posture** for read-only gate status.)
 
 That is the whole flow. Behind it:
 
@@ -82,12 +88,9 @@ That is the whole flow. Behind it:
 | Add the host to `RAIKER_MODEL_EGRESS_ALLOWLIST` and restart | The endpoint on the profile you configured is authorised — that host and no other. The environment variable still works for pre-authorising hosts before you configure them. |
 | Generate a vault key in Settings first | The key is generated on first use at `0600`. Settings still owns viewing, rotating, and clearing it. |
 
-Then press **Choose model…** — Raiker asks the provider for its live catalogue —
-pick a model, and **Use model**. On 2026-08-08 Anthropic's catalogue returned ten
-models (Opus 5, Sonnet 5, Claude Fable 5, Opus 4.8, Opus 4.7, Sonnet 4.6, Opus
-4.6, Opus 4.5, Haiku 4.5, Sonnet 4.5); each was pinned in turn and each answered
-a live turn. Switching model is two clicks and takes effect on the next turn —
-the composer chip and the card both name the pinned model.
+Then press **Choose model…** — Raiker asks the provider for its current live
+catalogue — pick a model, and **Use model**. Switching model takes effect on the
+next turn; the composer chip and provider card both name the pinned model.
 
 ### What is still refused
 

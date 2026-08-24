@@ -82,7 +82,7 @@ def _enable_gate(workspace: Path, store: SQLiteStore) -> RuntimeControlService:
         connection.execute(
             "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)"
             " VALUES (?, ?, ?, ?)",
-            (_CAP, "principal_owner", utc_now(), "docs/SECURITY_AND_POLICY.md"),
+            (_CAP, "principal_owner", utc_now(), "docs/architecture/SECURITY_AND_POLICY.md"),
         )
     result = ctrl.set_capability_state(
         _CAP, "enabled_runtime", "principal_owner", "test", confirmation_token="CONFIRM"

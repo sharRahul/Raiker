@@ -1,0 +1,248 @@
+# Multi-Agent And Subagent Strategy
+
+> **Status banner, refreshed 2026-08-22.** The launchable clients are the local
+> terminal client (`raiker`) and the local web dashboard (`raiker-app` /
+> `raiker-web`, loopback only). Approval resolution **executes** the twelve
+> capabilities in `EXECUTABLE_ON_APPROVAL` (`raiker/approvals/execution.py`) —
+> file mutations, patches, bounded local `shell`, the git write and push path, a
+> GitHub write, the two local planning rows, durable memory writes and forgets,
+> and owner-selected SSH and Daytona commands — each re-governed at execution
+> time; every other capability keeps decision-only resolution. Runtime execution
+> is **not** globally disabled: plugin slices, graph indexing, channels,
+> scheduled routines, model providers, MCP, container read tools and governed
+> local commands all have real executors and are governed per action. Sensitive
+> finance, investment, medical, pregnancy, CCTV, home-security and hardware
+> domains have no executor and fail closed. Rich/native TUI, mobile, IDE and
+> hosted multi-user clients remain deferred. The canonical statement of what is
+> implemented is [`IMPLEMENTATION_STATUS.md`](IMPLEMENTATION_STATUS.md); where
+> this document and the code disagree, the code wins and this document must be
+> updated.
+
+
+Raiker supports subagents and coordinated multi-agent teams through phase-scheduled implementation. The design is fully specified now; phase numbers control when behaviour is wired, not whether behaviour is defined.
+
+**Implemented slice (B7, FIXED-95).** A model may now spawn one bounded subagent
+for itself with the `spawn_subagent` tool. It is the narrowest useful reading of
+the design above: a caller-supplied list of **read-only** steps, run in process
+under the subagent's own principal and persisted contract, with the depth, step,
+tool-call, wall-clock and token budgets this document specifies. Only local,
+non-egress read tools are delegable; a write, a command, a connector, an MCP tool
+or a nested spawn is refused before the subagent is created, so the "cannot spawn
+a child unless allowed" rule holds by construction rather than by policy check.
+What comes back to the parent is a **bounded digest** framed as untrusted data —
+the point of delegating is that the raw output never enters the parent's context —
+while the audit trail keeps the contract, the steps, and the tools used. Model-
+driven recursion, side questions, and independently-modelled team members remain
+specified and not wired.
+
+**Delegation answers to the owner's `subagents` gate (2026-08-24,
+[FIXED-280](../plans/FIXED_ITEMS.md)).** The tool declared no capability until then,
+on the argument that spawning is no more authority than the parent already held.
+That is true of *what a subagent may touch* — every step is re-brokered — and it
+was never true of *whether the owner wanted delegation at all*, so the switch the
+Capabilities page showed them governed nothing. The gate decides the second
+question only; the first is still decided one step at a time.
+
+Subagents are useful for specialised work, but they increase risk, cost, complexity, and drift. They must be bounded by contracts, permissions, event logs, and explicit task ownership.
+
+---
+
+## Goals
+
+Raiker subagents must support specialised roles, bounded delegation, independent context bundles, tool restrictions, progress reporting, side-question support, verification of subagent output, recursion limits, parent runtime oversight, memory governance, and event logging.
+
+---
+
+## Subagent Profile Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "agent_id": "security-reviewer",
+  "name": "Security Reviewer",
+  "description": "Reviews changes for security risk.",
+  "role": "security_review",
+  "build_phase": "phase_4",
+  "model_profile": "local-reviewer",
+  "allowed_tools": ["read_file", "grep", "graph_query"],
+  "denied_tools": ["shell", "write_file", "delete_file"],
+  "memory_scope": "project_read_only",
+  "max_runtime_seconds": 600,
+  "max_tool_calls": 25,
+  "can_spawn_subagents": false,
+  "can_ask_user": true,
+  "can_ask_side_questions": true,
+  "output_schema": "SubagentReport"
+}
+```
+
+---
+
+## Subagent Task Contract
+
+```json
+{
+  "schema_version": "1.0",
+  "subagent_task_id": "subtask_01H...",
+  "parent_task_id": "task_01H...",
+  "agent_id": "security-reviewer",
+  "objective": "Review docs for security gaps.",
+  "context_scope": {
+    "allowed_files": ["docs/**"],
+    "allowed_memory": ["project_memory"],
+    "redactions": []
+  },
+  "constraints": [
+    "Do not write files.",
+    "Do not run local commands."
+  ],
+  "expected_output": "Findings with severity and suggested fixes."
+}
+```
+
+---
+
+## Subagent Lifecycle
+
+Each parent turn owns a signed machine principal. A spawned subagent receives a
+new signed child principal with `parent_principal_id` pointing to the parent
+machine, while both retain the same authenticated owner scope. The child's token
+is still bound to its workspace, session, turn, audience, and own principal; it
+cannot reuse the parent's bearer or claim the human owner as actor. The broker
+applies the normal identity verification and `DELEGABLE_TOOLS` subset before
+policy and execution. Completion deactivates the child identity and audit views
+preserve the ancestry without storing bearer material.
+
+```text
+parent proposes subagent
+  -> policy review
+  -> subagent_start event
+  -> child context bundle created
+  -> child runtime executes bounded task
+  -> subagent_report produced
+  -> parent verifies report
+  -> memory candidates extracted if permitted
+  -> subagent_stop event
+```
+
+---
+
+## Agent Team Modes
+
+| Mode | Build phase | Behaviour |
+|---|---:|---|
+| `single_specialist` | Phase 4 | One subagent handles one subtask. |
+| `parallel_reviewers` | Phase 4 | Multiple read-only reviewers compare findings. |
+| `planner_executor` | Phase 4 | Planner delegates implementation to executor. |
+| `critic_refiner` | Phase 4 | Critic reviews and refiner fixes. |
+| `red_blue_team` | Phase 4 | Attacker/defender security review. |
+| `manager_planner_executor` | Phase 4 | Manager tracks objective, planner decomposes, executor acts. |
+| `memory_intelligence_team` | Phase 5 | Memory specialist, graph specialist, and skill specialist refine retrieval and learning. |
+| `swarm` | Phase 5 | Many bounded agents collaborate with strict budget, depth, and tool limits. |
+
+Phase 1 does not wire autonomous teams, but contracts and event shapes are preserved so Phase 4/5 teams can be added without redesign.
+
+---
+
+## Delegation Rules
+
+Subagents must not exceed allowed tools, access broader context than delegated, write durable memory directly, spawn other agents unless explicitly allowed, continue after parent cancellation, bypass parent policy, approve their own risky actions, or hide tool results from parent.
+
+---
+
+## Subagent Output Schema
+
+```json
+{
+  "schema_version": "1.0",
+  "subagent_task_id": "subtask_01H...",
+  "status": "completed",
+  "summary": "No critical issues found.",
+  "findings": [
+    {
+      "severity": "medium",
+      "title": "Missing timeout on hook command",
+      "evidence": "HOOKS_SPEC requires timeout but implementation missing.",
+      "recommendation": "Add timeout enforcement."
+    }
+  ],
+  "tool_calls_used": 5,
+  "memory_candidates": [],
+  "skill_candidates": []
+}
+```
+
+---
+
+## Side Questions To Subagents
+
+The Rich TUI may ask a subagent what it is doing, why it flagged something, what evidence supports it, what files it inspected, what confidence it has, and what it needs from the parent.
+
+Subagent side answers are read-only unless parent escalates.
+
+---
+
+## Hermes-Style Delegation And Learning
+
+Raiker must support parallel workstreams and learning loops:
+
+```text
+parent task
+  -> spawn bounded specialist subagents
+  -> collect reports
+  -> verify result
+  -> create memory/skill candidates
+  -> require approval before durable memory or skill update
+```
+
+Subagent trajectories can become skill candidates only after verification and approval.
+
+---
+
+## Events
+
+Required events:
+
+- `subagent_proposed`
+- `subagent_policy_decision`
+- `subagent_started`
+- `subagent_context_created`
+- `subagent_progress`
+- `subagent_tool_proposed`
+- `subagent_report_created`
+- `subagent_completed`
+- `subagent_failed`
+- `subagent_cancelled`
+- `subagent_side_question_received`
+- `subagent_side_question_answered`
+- `agent_team_started`
+- `agent_team_completed`
+- `skill_candidate_created_from_subagent`
+
+---
+
+## Security Requirements
+
+- Subagent output is untrusted until parent verifies it.
+- Subagents cannot approve their own tool calls.
+- Subagent memory writes become candidates only.
+- Parent task cancellation cascades to children.
+- Subagent context must be least-privilege.
+- Multi-agent teams require budget and recursion limits.
+- Skill learning from subagent output requires verification and approval.
+
+---
+
+## Testing Requirements
+
+Tests must prove:
+
+- subagent receives limited context;
+- denied tool cannot be used;
+- subagent output is validated;
+- parent cancellation cancels subagent;
+- subagent cannot spawn child unless allowed;
+- side question does not mutate subagent task;
+- subagent report links to event log;
+- parallel reviewers cannot write files when read-only;
+- skill candidate requires verified parent task.

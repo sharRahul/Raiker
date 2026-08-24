@@ -140,7 +140,7 @@ class ModelProviderFactory:
         # Egress for a provider the owner has configured.
         #
         # Raiker is owner-authoritative and monitored, not prevention-by-
-        # restriction (docs/HANDOFF.md, "Security posture"). Saving a credential
+        # restriction (docs/architecture/HANDOFF.md, "Security posture"). Saving a credential
         # for a provider is a deliberate, authenticated act; making the owner
         # then discover a *separate* environment allowlist before the host they
         # just chose can be reached is exactly the wall that posture rejects.

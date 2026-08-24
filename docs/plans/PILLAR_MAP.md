@@ -72,9 +72,9 @@ two new call sites needed. **MEM-10 (P1) is now the largest honest gap left.**
 | Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md) | Open — ~431 ms at 3 000 memories, paid every turn |
 | A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open |
 | Retention sweep | [MEM-07](MEMORY_RELIABILITY_PLAN.md) | Open — `expires_at` enforced at read time only |
-| Owner-guided summarisation of a range | [backlog #9](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
-| A structured question to the owner mid-turn | [backlog #17](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
-| Tool rows do not survive a reload | [backlog #25](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
+| Owner-guided summarisation of a range | [backlog #9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
+| A structured question to the owner mid-turn | [backlog #17](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
+| Tool rows do not survive a reload | [backlog #25](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
 | GAP-CHAT remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 13 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
 
 **Blocking item:** MEM-10. Everything else here is polish on a surface that
@@ -95,9 +95,9 @@ already works.
 | Fifteen capabilities have no traced governed-action path | [FIXED-280](FIXED_ITEMS.md) | **Closed 2026-08-24** — not one of the two readings it offered: fifteen switches governed nothing. `plugin_install` was a real gap, `subagents` an inert switch, and what every gate decides is now a checked field |
 | Auto mode has no alignment check | [FIXED-282](FIXED_ITEMS.md) | **Closed 2026-08-24** — a deterministic check over the turn's own record, with no model in the authority path |
 | Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md) | Open |
-| OpenTelemetry export | [backlog #18](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Deterministic replay | [backlog #20](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
-| Credential masking with sentinel substitution | [backlog #19](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
+| OpenTelemetry export | [backlog #18](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Deterministic replay | [backlog #20](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
+| Credential masking with sentinel substitution | [backlog #19](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
 | WebAuthn step-up, hardware root of trust | [ADD-14](TO_BE_ADDED.md), [ADD-15](TO_BE_ADDED.md) | Proposed — **owner decisions** |
 
 **No blocking item.** *Recoverable* and *auditable* were the two properties
@@ -117,11 +117,11 @@ done while a child is parked is a false completion.
 |---|---|---|
 | Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md) | **Closed 2026-08-23** — shared with P2, and this is where an owner feels it |
 | Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md) | Open — POSIX-only PTY and reattachment |
-| Filtered domain egress unproven | [backlog #6](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
-| Remote supervisor install lifecycle | [backlog #22](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
+| Filtered domain egress unproven | [backlog #6](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
+| Remote supervisor install lifecycle | [backlog #22](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
 | No resolved call graph; textual find-references | [B-tier](GAP_BUILD_CHAT.md) | Open by design, stated |
 | LSP surface | [BUG-227](TO_BE_FIXED.md) | Open — **decide whether Raiker wants one at all** |
-| Worktrees for parallel work | [backlog #27](../REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
+| Worktrees for parallel work | [backlog #27](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
 | GAP-BUILD remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 9 items |
 
 **No blocking item.** A coding agent that could write but not undo made the owner
@@ -136,14 +136,14 @@ is BUG-194 — interactive, background and remote execution inside the sandbox.
 | Streamable-HTTP session semantics, remote OAuth, `server/discover` | [BUG-234 remainder](TO_BE_FIXED.md) | Open — no longer blocked by the revision, now their own work |
 | Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md) | Open — an inbound message never becomes work |
 | Four hook handler types refused | [BUG-226](TO_BE_FIXED.md) | Open — `prompt` first; it needs no new surface |
-| Hook lifecycle coverage | [backlog #14](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
-| Agent Skills standard conformance | [backlog #13](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
-| MCP Apps (SEP-1865) | [backlog #28](../REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
+| Hook lifecycle coverage | [backlog #14](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
+| Agent Skills standard conformance | [backlog #13](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
+| MCP Apps (SEP-1865) | [backlog #28](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
 | Plugin panels | [BUG-228](TO_BE_FIXED.md) | Open, and **reassessed**: the row above is the better answer |
-| MCP tool search / deferred tool schemas | [backlog #16](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Owner-authored slash commands | [backlog #4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
+| MCP tool search / deferred tool schemas | [backlog #16](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
+| Owner-authored slash commands | [backlog #4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
 | Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md) | Proposed |
-| Governed browser control | [backlog #24](../REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
+| Governed browser control | [backlog #24](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
 | Live-spec sign-in | [BUG-229](TO_BE_FIXED.md) | Open |
 
 **No blocking item.** The protocol upgrade landed on 2026-08-23 and unblocked
@@ -177,11 +177,11 @@ unblocks*.
 | Order | Item | Unblocks | Why here |
 |---|---|---|---|
 | 1 | **Trace the fifteen** ([FIXED-280](FIXED_ITEMS.md)) | P2 | **Done 2026-08-24.** Cheap, and it did reclassify: the finding was not an ungoverned action but fifteen inert switches, which is a different defect and a worse one for this product |
-| 2 | **Checkpoint rewind** ([#1](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
-| 3 | **Audit export** ([#2](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
-| 4 | **Remove the second egress path** ([#3](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
-| 5 | **Oversize checkpoint honesty** ([#4](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
-| 6 | **MCP protocol revision** ([#9](../REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
+| 2 | **Checkpoint rewind** ([#1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
+| 3 | **Audit export** ([#2](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
+| 4 | **Remove the second egress path** ([#3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
+| 5 | **Oversize checkpoint honesty** ([#4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
+| 6 | **MCP protocol revision** ([#9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
 | 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md)) | P1 | The largest honest gap, and the most expensive of the top group |
 | 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
 
@@ -206,7 +206,7 @@ When an item is opened or closed in [`TO_BE_FIXED.md`](TO_BE_FIXED.md),
 [`GAP_BUILD_CHAT.md`](GAP_BUILD_CHAT.md),
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md),
 [`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) or
-[`REFERENCE_PLATFORM_COMPATIBILITY.md` §5](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog),
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog),
 it belongs in exactly one pillar here.
 
 **The canonical priority order stays in the backlog.** This document says what an

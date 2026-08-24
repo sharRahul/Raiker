@@ -40,7 +40,7 @@ MCP server) by default — **allow, monitor, surface anomalies as findings +
 notifications, and give the owner an instant stop plus an automatic revocable
 pause for the irreversible/high-severity cases.** Reserve hard prevention for a
 last resort and justify it against this posture. Full statement:
-`docs/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
+`docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy". The rules below still hold
 and are compatible with it:
 
 # To be added
@@ -126,7 +126,7 @@ below keeps the analysis and states what shipped at the top.
 **Owner decisions, not implementer decisions.** ADD-11, ADD-14, ADD-18 and
 ADD-23 change what Raiker *is* — a machine that reaches the public internet, a machine that
 requires specific hardware, a machine with more than one principal. They belong
-to the owner. `docs/NESTED_BOUNDARIES_ARCHITECTURE.md` is where the multi-
+to the owner. `docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md` is where the multi-
 principal question has to be answered.
 
 ---
@@ -156,7 +156,7 @@ the Chat/Build badge names the selected runtime.
 **Governed outcome.** A profiled safe read runs inside the selected ephemeral
 container. An unavailable runtime, disabled gate, disallowed image, unsupported
 tool, invalid bridge response, or failed cleanup is explicit; none silently runs
-on the host. Live evidence is recorded in `docs/WEB_APP_LIVE_TEST.md` and
+on the host. Live evidence is recorded in `docs/architecture/WEB_APP_LIVE_TEST.md` and
 `output/playwright/add01-container-profile-live.png`.
 
 **Governed shell extension (2026-08-14).** The separate command backend now
@@ -283,7 +283,7 @@ deactivation. Cryptographic, lifecycle, broker, connector, approval, dashboard,
 subagent, and UI tests cover the boundary. The architecture and residual host
 compromise risk are recorded in
 [`docs/threat-models/machine-identity.md`](../threat-models/machine-identity.md).
-Three-provider live evidence is recorded in `docs/WEB_APP_LIVE_TEST.md` after
+Three-provider live evidence is recorded in `docs/architecture/WEB_APP_LIVE_TEST.md` after
 the Anthropic, OpenRouter, and Ollama acceptance run.
 
 ---
@@ -324,7 +324,7 @@ untrusted source named and a one-click resume.
 install, rename, activate, download, delete, with `raiker/skills/package.py`
 validating every stored document and `raiker/skills/builtin/` shipping three
 skills. A skill is instruction text — it grants no capability, opens no gate, and
-Raiker never executes anything a skill ships. `docs/SELF_IMPROVEMENT_MODEL.md`
+Raiker never executes anything a skill ships. `docs/architecture/SELF_IMPROVEMENT_MODEL.md`
 describes procedural memory that is never consulted at turn time.
 
 **Missing.** Every skill is authored by a human. Nothing reads execution traces
@@ -780,7 +780,7 @@ built-ins' `version` under `metadata`.
 
 **The one field to read and refuse.** `allowed-tools` is a skill pre-approving
 its own tools, which is exactly the capability grant that
-[§3.5](../REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
+[§3.5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
 exists to prevent. Raiker should **parse it and say out loud that it is not
 honoured**, which is stronger than ignoring a field an author believes is doing
 something.

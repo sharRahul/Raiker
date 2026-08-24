@@ -264,7 +264,7 @@ def test_all_unsafe_runtime_features_remain_disabled() -> None:
 
 
 def test_catalog_contains_new_tools() -> None:
-    text = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    text = Path("docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     assert "Tool Name | Descriptions | Permissions | Implemented" in text
     for command in (
         "/storage-lifecycle-retention",

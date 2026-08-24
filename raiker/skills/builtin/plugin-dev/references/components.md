@@ -96,7 +96,7 @@ otherwise they compete for the same triggers and the wrong one loads.
 
 Handler types are `command`, `http`, `mcp_tool`, `prompt`, and `agent`. Which
 events exist is not a thing to remember — read the event catalogue
-(`docs/EVENT_CATALOG.md`, `docs/HOOKS_SPEC.md`) and use the exact name. A
+(`docs/architecture/EVENT_CATALOG.md`, `docs/architecture/HOOKS_SPEC.md`) and use the exact name. A
 misspelled event does not error; it simply never fires, which is the single
 hardest plugin bug to notice.
 

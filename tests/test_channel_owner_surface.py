@@ -7,7 +7,7 @@ empty, both executors refused, and the Channels tab reported that channels did
 not exist. The transport was unreachable because there was no surface, which is a
 different problem with a different fix.
 
-These tests hold that surface to the contract in `docs/CHANNELS_SPEC.md` →
+These tests hold that surface to the contract in `docs/architecture/CHANNELS_SPEC.md` →
 *What a channel message is in a turn*. Rule 5 is the one most of them are about:
 **nothing is implicit.** Linked is not enabled; enabled is not trusted; and a
 channel that is all three still delivers nothing until the owner allowlists the

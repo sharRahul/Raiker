@@ -2,7 +2,7 @@
 
 > Status marker: runtime_enablement_candidate — strict non-allow blocking,
 > role revoke governed, capability gate per action. Grounded in
-> `docs/SECURITY_AND_POLICY.md` → "Security Philosophy": owner-chosen MCP
+> `docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy": owner-chosen MCP
 > connections are **monitored and containable**, not prevention-blocked.
 
 Covers the monitoring layer (Phase B) and the containment layer (Phase C) that

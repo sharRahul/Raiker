@@ -36,7 +36,7 @@ rather than a control:
 - Raiker states this rather than letting the word "semantic" imply otherwise:
   the Memory page names the embedding space in force and says whether a
   paraphrase can recall anything at all. Tracked as MEM-10 in
-  [Known limits](../KNOWN_LIMITS.md).
+  [Known limits](../architecture/KNOWN_LIMITS.md).
 
 ## Assets
 
@@ -79,6 +79,6 @@ rather than a control:
 
 - `raiker/runtime/executors/tier3_core.py`, `raiker/memory/store.py`,
   `raiker/memory/semantic.py`, `raiker/vector/`
-- [`../MEMORY_AND_CONTEXT_STRATEGY.md`](../MEMORY_AND_CONTEXT_STRATEGY.md)
+- [`../MEMORY_AND_CONTEXT_STRATEGY.md`](../architecture/MEMORY_AND_CONTEXT_STRATEGY.md)
 - [`../plans/MEMORY_RELIABILITY_PLAN.md`](../plans/MEMORY_RELIABILITY_PLAN.md) — the full audit with reproductions
 - [`vector-embedding.md`](vector-embedding.md) — the embedding capability it ranks with

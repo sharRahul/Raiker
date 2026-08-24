@@ -1,53 +1,69 @@
 # Raiker user guide
 
-Task-shaped instructions for running Raiker's local web dashboard. Everything
-here was re-executed against a live instance on **2026-08-09**, including
-Anthropic, OpenRouter, Ollama, approved local GGUF discovery, and Hugging Face — see
-[the live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md) for the
-evidence and [To be fixed](../plans/TO_BE_FIXED.md) for what does not work yet.
+This guide explains how to install, configure, use, and safely operate Raiker.
+It is written for people using the web dashboard or terminal client; you do not
+need to understand Raiker's internal architecture first.
 
-| Guide | Read it when |
+The same task-oriented guide is available in a running Raiker under
+**Utilities → Guide**.
+
+## Start here
+
+If this is your first time using Raiker, read these pages in order:
+
+1. [Getting started](getting-started.md) — requirements, installation, first
+   launch, and the local owner account.
+2. [Connecting a model](connecting-a-model.md) — connect a local, home-lab, or
+   hosted model and confirm it is ready.
+3. [Permissions and the runtime](permissions-and-runtime-modes.md) — decide
+   what Raiker may do and when it must ask.
+4. [Dashboard and observability](dashboard-and-observability.md) — understand
+   every main area and see what Raiker is doing.
+
+## Use Raiker
+
+| Goal | Guide |
 |---|---|
-| [Getting started](getting-started.md) | First install, first run, creating your account |
-| [Connecting a model](connecting-a-model.md) | You want Raiker to think — local, home-lab, or hosted |
-| [Permissions and the runtime](permissions-and-runtime-modes.md) | Something is refused and you need to know which control opens it |
-| [Working in Chat](working-in-chat.md) | Day-to-day conversations, attachments, approvals |
-| [Working in Build](working-in-build.md) | Coding against a repository — modes, patches, commands, commits and pushes |
-| [Tasks and projects](tasks-and-projects.md) | Scheduling work and organising sessions |
-| [Extensions and MCP](extensions-and-mcp.md) | Connectors and Model Context Protocol servers |
-| [Troubleshooting](troubleshooting.md) | You hit a reason code and want the fix |
+| Have conversations, attach files, use memory, and review approvals | [Working in Chat](working-in-chat.md) |
+| Plan and change code, run commands, commit, and push | [Working in Build](working-in-build.md) |
+| Run work now, later, repeatedly, or in the background | [Tasks and projects](tasks-and-projects.md) |
+| Add connectors, MCP servers, skills, hooks, plugins, or channels | [Extensions and MCP](extensions-and-mcp.md) |
+| Start Raiker at sign-in, pause it, update it, or remove it | [Managing the Raiker host](managing-the-host.md) |
+| Understand accounts, credentials, audit records, and privacy choices | [Security and privacy](security-and-privacy.md) |
+| Check what is unavailable or deliberately restricted | [Known limits](known-limits.md) |
+| Resolve a refusal, reason code, blank page, or connection problem | [Troubleshooting](troubleshooting.md) |
 
-**You can read all of this inside Raiker.** Utilities → **Guide** serves these
-same sections from the install, and each page links to the one that explains it —
-Models to *Connecting a model*, Permissions to *Permissions and the runtime*. The
-product no longer explains itself on every screen, so this is where that
-explanation lives.
+## The two ideas that prevent most confusion
 
-For architecture, contracts, and the security model, start at
-[the documentation index](../README.md).
+### A model must be ready
 
-## The one thing to understand first
+Selecting a model records a preference. Raiker enables model-backed work only
+after the exact provider endpoint and model pass a readiness check. Open
+**Models**, connect a provider, choose a model, and run **Check again**. The
+[model guide](connecting-a-model.md) explains local and hosted setups.
 
-Raiker **fails closed**. On a fresh account every one of its 67 capability
-gates is off and no model provider is *reachable*. Nothing is broken — you have
-not opened anything yet.
+### Permission has layers
 
-A fresh install may show Ollama's `gemma4:31b-cloud` as a preference, but it is
-not **ready** until that exact model is reported by the reachable runtime. The
-setup flow opens automatically; if it is skipped, every model-backed action is
-disabled with a link to **Models**. Draft work is preserved.
+Raiker is owner-authoritative and monitored. Connecting a provider authorizes
+that provider's endpoint, but actions such as writing a file or running a
+command still pass through a capability gate, a decision mode, the current
+turn's posture, and—when required—an approval. The agent cannot increase its
+own authority. See [Permissions and the runtime](permissions-and-runtime-modes.md).
 
-**Configuring something is permission for it.** Connecting a provider in
-**Models** is the whole of the first step: that act authorises the endpoint you
-configured, the encryption key for your credential is created on first use, and
-the runtime is already accepting work on a fresh install. You are not asked to
-flip a switch, allowlist a host, and mint a key before the thing you just set up
-will run.
+## Where data lives
 
-1. **Model connection** — Models → the provider's card → **Connect**
-2. **Capability gates** — Permissions, when you want the agent to do something
-   beyond reading and answering (write a file, run a command, read the web)
+Raiker is local-first. The owner account, conversations, configuration, audit
+records, and encrypted credentials belong to the Raiker instance on your
+machine. `raiker-app` uses the normal application-data directory for your
+platform; `raiker-app --workspace PATH` instead keeps instance data in
+`PATH/.raiker/`. Run `raiker-app --print-paths` to see the exact paths before
+making backups or uninstalling.
 
-[Connecting a model](connecting-a-model.md) walks the first in ten minutes;
-[Permissions and the runtime](permissions-and-runtime-modes.md) covers the
-second.
+## Technical and project documentation
+
+The user guide describes supported workflows. For implementation details,
+contracts, security boundaries, verification evidence, and development plans,
+use the [complete documentation index](../README.md). If a user guide and a
+technical status document disagree, the
+[implementation status](../architecture/IMPLEMENTATION_STATUS.md) is the source
+of truth for what the current build implements.

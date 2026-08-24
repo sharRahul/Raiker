@@ -5,7 +5,7 @@
 > metadata-only events.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `connector_gcal_runtime` may join `REAL_EXECUTOR_CAPABILITIES`. Replicates the
 GitHub reference slice ([`connectors-github.md`](connectors-github.md)) exactly —
 same store-nothing-new governed pattern, a different host + credential +

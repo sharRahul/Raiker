@@ -62,7 +62,7 @@ problems: where the request may go, and what the response may do.
 - **Nothing stops the agent reading a public page the owner would rather it did
   not.** The default is a blocklist, not an allowlist; this is a deliberate
   trade documented in
-  [§3.8](../REFERENCE_PLATFORM_COMPATIBILITY.md#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist).
+  [§3.8](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#38-a-blocklist-plus-an-address-guard-instead-of-an-allowlist).
 - **The injection scanner is a fixed pattern set, not a classifier.** It names a
   suspicious source and raises a finding; it never blocks. The control that
   actually stops a hijack is the deny-by-default tool gate, not the scan.
@@ -82,11 +82,11 @@ problems: where the request may go, and what the response may do.
   `tests/test_vertical_slice_e2e.py`. It is nevertheless registered in the default
   executor registry, which means a future caller reaching it by capability name
   would get the weaker path. Tracked in
-  [the backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+  [the backlog](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
 
 ## Evidence
 
 - `raiker/runtime/web_access.py`, `raiker/runtime/web_policy.py`,
   `raiker/runtime/web_sanitize.py`, `raiker/tools/web_tools.py`
-- [`../KNOWN_LIMITS.md`](../KNOWN_LIMITS.md) — the owner-facing statement of the same boundaries
-- [`../OWASP_GENAI_SECURITY_MAPPING.md`](../OWASP_GENAI_SECURITY_MAPPING.md) — LLM01 prompt injection, LLM05 improper output handling
+- [`../KNOWN_LIMITS.md`](../architecture/KNOWN_LIMITS.md) — the owner-facing statement of the same boundaries
+- [`../OWASP_GENAI_SECURITY_MAPPING.md`](../architecture/OWASP_GENAI_SECURITY_MAPPING.md) — LLM01 prompt injection, LLM05 improper output handling

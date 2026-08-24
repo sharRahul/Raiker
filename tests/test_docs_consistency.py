@@ -5,17 +5,17 @@ from pathlib import Path
 
 REQUIRED_DOCS = [
     Path("README.md"),
-    Path("docs/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md"),
-    Path("docs/IMPLEMENTATION_STATUS.md"),
-    Path("docs/EVENT_CATALOG.md"),
-    Path("docs/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md"),
+    Path("docs/architecture/MODEL_RUNTIME_AND_LOCAL_INFERENCE.md"),
+    Path("docs/architecture/IMPLEMENTATION_STATUS.md"),
+    Path("docs/architecture/EVENT_CATALOG.md"),
+    Path("docs/architecture/COMMANDS_AND_INTERACTIVE_MODE_SPEC.md"),
     # docs/UI_UX_DESIGN_SPEC.md was deliberately removed (superseded by apps/web/README.md).
     Path("apps/web/README.md"),
-    Path("docs/API_AND_CONTRACT_SCHEMAS.md"),
-    Path("docs/SECURITY_AND_POLICY.md"),
-    Path("docs/RUNTIME_ORCHESTRATION_SPEC.md"),
-    Path("docs/TOOLS_AND_PERMISSIONS_SPEC.md"),
-    Path("docs/VERIFICATION_PLAN.md"),
+    Path("docs/architecture/API_AND_CONTRACT_SCHEMAS.md"),
+    Path("docs/architecture/SECURITY_AND_POLICY.md"),
+    Path("docs/architecture/RUNTIME_ORCHESTRATION_SPEC.md"),
+    Path("docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md"),
+    Path("docs/architecture/VERIFICATION_PLAN.md"),
 ]
 
 STALE_CLAIMS = [
@@ -142,12 +142,12 @@ def test_documentation_links_and_anchors_resolve() -> None:
 
 
 def test_relayed_capability_count_is_stated_correctly() -> None:
-    """`README.md` commits to a number; the frozenset is what decides it."""
+    """The technical threat model commits to the executor count."""
     from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL
 
     assert len(EXECUTABLE_ON_APPROVAL) == 13, (
-        "EXECUTABLE_ON_APPROVAL changed size; update README.md, "
-        "docs/KNOWN_LIMITS.md and docs/THREAT_MODEL.md, which all name it"
+        "EXECUTABLE_ON_APPROVAL changed size; update "
+        "docs/architecture/THREAT_MODEL.md, which names it"
     )
-    readme = Path("README.md").read_text(encoding="utf-8")
-    assert "thirteen capabilities execute once through the" in readme
+    threat_model = Path("docs/architecture/THREAT_MODEL.md").read_text(encoding="utf-8")
+    assert "explicit **thirteen**-member frozenset" in threat_model

@@ -98,7 +98,7 @@ def test_workspace_surfaces_include_semantic_memory_readiness(tmp_path: Path) ->
 
 
 def test_docs_catalog_reserve_metadata_only_events() -> None:
-    for path in ["docs/IMPLEMENTATION_STATUS.md"]:
+    for path in ["docs/architecture/IMPLEMENTATION_STATUS.md"]:
         text = Path(path).read_text(encoding="utf-8")
         assert "Phase 3 Slice K" in text
         assert "metadata-only" in text or "metadata_only" in text

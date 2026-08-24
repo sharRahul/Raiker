@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 """Prove a release artifact actually works on the platform that built it.
 
-BUG-44. ``docs/DESKTOP_DISTRIBUTION_DESIGN.md`` is explicit that *"native
+BUG-44. ``docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md`` is explicit that *"native
 encrypted-database dependencies require packaging tests on every target;
 development-machine success is insufficient"*. This is that test, and it is run
 by ``.github/workflows/release.yml`` on each target's own runner, against the

@@ -1,6 +1,6 @@
 """Owner-authoritative provider consent, and conversation history.
 
-Two behaviour changes, both grounded in `docs/HANDOFF.md` → "Security posture":
+Two behaviour changes, both grounded in `docs/architecture/HANDOFF.md` → "Security posture":
 Raiker is *owner-authoritative and monitored, not prevention-by-restriction*.
 
 1. Configuring a provider **is** the owner's authorisation to use it. A separate

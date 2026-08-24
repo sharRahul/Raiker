@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 # Lifecycle events wired into the runtime today. Config referencing anything else is rejected so
-# typos are not silently ignored (per docs/HOOKS_SPEC.md).
+# typos are not silently ignored (per docs/architecture/HOOKS_SPEC.md).
 HOOK_EVENTS = {
     "SessionStart",
     "SessionEnd",

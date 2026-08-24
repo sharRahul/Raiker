@@ -124,17 +124,16 @@ def check_docs_markers() -> list[str]:
     errors: list[str] = []
     root = Path(__file__).resolve().parent.parent
     docs_to_check = [
-        root / "README.md",
-        root / "docs/ARCHITECTURE.md",
-        root / "docs/IMPLEMENTATION_STATUS.md",
-        root / "docs/SECURITY_ARCHITECTURE.md",
-        root / "docs/SECURITY_AND_POLICY.md",
-        root / "docs/FEATURE_COVERAGE_MATRIX.md",
-        root / "docs/GAP_AND_TODO_ANALYSIS.md",
-        root / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
-        root / "docs/LOCAL_VALIDATION_GATE.md",
-        root / "docs/API_AND_CONTRACT_SCHEMAS.md",
-        root / "docs/CONTRACTS.md",
+        root / "docs/architecture/ARCHITECTURE.md",
+        root / "docs/architecture/IMPLEMENTATION_STATUS.md",
+        root / "docs/architecture/SECURITY_ARCHITECTURE.md",
+        root / "docs/architecture/SECURITY_AND_POLICY.md",
+        root / "docs/architecture/FEATURE_COVERAGE_MATRIX.md",
+        root / "docs/architecture/GAP_AND_TODO_ANALYSIS.md",
+        root / "docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
+        root / "docs/architecture/LOCAL_VALIDATION_GATE.md",
+        root / "docs/architecture/API_AND_CONTRACT_SCHEMAS.md",
+        root / "docs/architecture/CONTRACTS.md",
     ]
     required_markers = [
         "runtime_enablement_candidate: completed",

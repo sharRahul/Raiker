@@ -6,7 +6,7 @@
 > before its executor landed. Approval resolution is metadata-only.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `scheduled_routines` may join `REAL_EXECUTOR_CAPABILITIES`.
 
 ## What the executor does

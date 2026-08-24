@@ -6,7 +6,7 @@
 > before their executors landed. Approval resolution is metadata-only.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `hosted_model_runtime` and `private_network_model_runtime` may join
 `REAL_EXECUTOR_CAPABILITIES`. This slice satisfies the per-integration opt-in
 checklist recorded in [`remote-cloud.md`](remote-cloud.md) for the two

@@ -159,9 +159,9 @@ reports. It grants nothing. The controls it works inside are the runtime's:
   local fixture. Describe the path; do not fire it at a third party.
 
 Raiker's own security specs are the house model this skill should read first
-when reviewing Raiker itself: `docs/THREAT_MODEL.md`,
-`docs/SECURITY_ARCHITECTURE.md`, `docs/OWASP_AGENTIC_TOP10_MAPPING.md`, and
-`docs/USER_CENTRIC_ZERO_TRUST_POLICY.md`.
+when reviewing Raiker itself: `docs/architecture/THREAT_MODEL.md`,
+`docs/architecture/SECURITY_ARCHITECTURE.md`, `docs/architecture/OWASP_AGENTIC_TOP10_MAPPING.md`, and
+`docs/architecture/USER_CENTRIC_ZERO_TRUST_POLICY.md`.
 
 ### Across agent surfaces
 

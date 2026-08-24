@@ -466,4 +466,4 @@ wrote. Accepted and rejected messages both appear in Observability → Activity.
 Still unbuilt: the routing modes in the spec, and resolving an approval over a
 channel — the relay queue is deliberately pending-only, because a channel that
 can raise an approval can be used to *ask for* one.
-Full contract: [`docs/CHANNELS_SPEC.md`](../CHANNELS_SPEC.md).
+Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_SPEC.md).

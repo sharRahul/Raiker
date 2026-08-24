@@ -137,10 +137,10 @@ def test_without_a_sink_the_broker_behaves_exactly_as_before(tmp_path: Any) -> N
 
 
 def test_a_row_names_the_object_in_the_owners_language() -> None:
-    row = tool_row("read_file", {"path": "docs/ARCHITECTURE.md"})
+    row = tool_row("read_file", {"path": "docs/architecture/ARCHITECTURE.md"})
     assert row.family == "file-read"
     assert row.label == "Read file"
-    assert row.action == "docs/ARCHITECTURE.md"
+    assert row.action == "docs/architecture/ARCHITECTURE.md"
 
 
 def test_a_fetch_row_names_the_host_and_never_the_query() -> None:

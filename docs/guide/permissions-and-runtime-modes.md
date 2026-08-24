@@ -14,7 +14,7 @@ configure before your gates mean anything.
 
 ## Configuring something is permission for it
 
-Raiker's stated posture (`docs/HANDOFF.md` → "Security posture") is
+Raiker's stated [security posture](../architecture/HANDOFF.md#security-posture-read-before-adding-any-restriction) is
 **owner-authoritative and monitored, not prevention-by-restriction**. A gate in
 front of a choice the owner has already, deliberately made is not security — it
 is friction that teaches people to click through warnings.
@@ -118,7 +118,9 @@ agent can derive from it. **Owner** is the gate and decision-mode control;
 its own short-lived signed machine identity, so Activity and Approvals can name
 the machine actor separately from you, the owner.
 
-**Permissions** lists all 66 gates, grouped:
+Raiker's registry contains 66 capability gates. **Permissions** displays the
+owner-operable subset, grouped as follows; deliberately unavailable domains are
+kept out of the interactive list and reported in Diagnostics instead.
 
 | Group | Examples |
 |---|---|
@@ -176,14 +178,15 @@ capability you are opening. The most consequential are
 ### Capabilities with no enable path
 
 Some capabilities show no row at all: CCTV, finance, medical,
-pregnancy/baby, home security, and hardware operation (18 of the 66 gates are
-never rendered). These are **deferred**,
+pregnancy/baby, home security, and hardware operation (18 registry entries are
+not owner-operable). These are **deferred**,
 not merely gated — no governed executor exists, so the runtime refuses to pretend
 one does. SSH remote and Daytona cloud execution instead require an
 owner-configured profile, their dedicated capability gate, and approval for each
-action; their **Remote execution** and **Cloud execution** rows *are* listed and
-*can* be turned on, and each says in the row that it has no executor and stays
-fail-closed.
+action. Their **Remote execution** and **Cloud execution** rows are listed and
+can be turned on after setup. Both have governed executors, but remain
+unavailable until the owner configures and selects a compatible profile;
+unsupported remote or cloud profile types still fail closed.
 
 **Checkpoint restore** used to be listed here and is not deferred: it has had a
 real executor since Workstream B, and it was unenableable only because it had no

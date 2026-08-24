@@ -1,6 +1,6 @@
 """The Build workspace's operating protocol reaches the model, and only there.
 
-`docs/RAIKER_BUILD_PROCESS.md` is the source of the protocol a Build turn runs
+`docs/architecture/RAIKER_BUILD_PROCESS.md` is the source of the protocol a Build turn runs
 under. Two properties are worth guarding, because both are silent when they
 break:
 

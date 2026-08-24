@@ -13,7 +13,7 @@ another says so in place.
 The security posture these fixes answer to — **owner-authoritative and
 monitored, not prevention-by-restriction** — is stated at the top of
 [`TO_BE_FIXED.md`](TO_BE_FIXED.md) and in
-[`docs/SECURITY_AND_POLICY.md`](../SECURITY_AND_POLICY.md).
+[`docs/architecture/SECURITY_AND_POLICY.md`](../architecture/SECURITY_AND_POLICY.md).
 
 Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 [`screenshots/not-working/`](screenshots/not-working) (the defects as found).
@@ -328,7 +328,7 @@ therefore replaced an integer capacity with a string, and the browser divided by
 it.
 
 This also silently stripped the normalised usage numbers out of the durable
-event log, contradicting `docs/WEB_APP_LIVE_TEST.md`, which records
+event log, contradicting `docs/architecture/WEB_APP_LIVE_TEST.md`, which records
 `model_request_completed` usage as `{input_tokens: 2694, output_tokens: 37, …}`.
 
 **Fix applied.** `NON_SECRET_TOKEN_COUNT_KEYS` plus `is_token_count_field()` in
@@ -452,7 +452,7 @@ question replied `NONE`. `working/96-conversation-memory-fixed.png`,
 **Caught during this fix:** the first implementation emitted an unregistered
 event type and killed the stream mid-turn — a direct violation of HANDOFF's
 "Add a typed event to `EVENT_TYPES` before emitting it". The event is now
-registered and documented in `docs/EVENT_CATALOG.md`.
+registered and documented in `docs/architecture/EVENT_CATALOG.md`.
 
 ---
 
@@ -470,7 +470,7 @@ different surface to resolve:
 
 FIXED-01 made each one *explainable*. It did not make any of them go away.
 
-**Why they were wrong.** `docs/HANDOFF.md` → "Security posture" is explicit:
+**Why they were wrong.** `docs/architecture/HANDOFF.md` → "Security posture" is explicit:
 
 > Raiker is **owner-authoritative and monitored, not prevention-by-restriction.**
 > […] Do **not** put a hard block in front of the owner's legitimate choices by
@@ -3017,7 +3017,7 @@ specification a contributor could build a new page from.
    named explicitly rather than only the duration collapsed — a 0.01ms animation
    still paints its first frame, which is enough to flash.
 
-[`docs/VISUAL_DESIGN_SPEC.md`](../VISUAL_DESIGN_SPEC.md) states every rule above
+[`docs/architecture/VISUAL_DESIGN_SPEC.md`](../architecture/VISUAL_DESIGN_SPEC.md) states every rule above
 with its reason, names the test that enforces it, and ends with the seven steps
 for building a new page. `apps/web/src/lib/appCss.test.ts` and
 `apps/web/src/lib/icons.test.ts` fail if the scale loses a step, density stops
@@ -3090,7 +3090,7 @@ signed-update rows were split out as BUG-44, and are closed by FIXED-92.**
 
 **Observed.** FIXED-66 made Raiker *start* like an application once Python and
 the package were present. Everything around that start was unimplemented:
-`docs/DESKTOP_DISTRIBUTION_DESIGN.md` specifies background service registration,
+`docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md` specifies background service registration,
 tray/menu-bar control, pause and quit with waiting work reported, signed updates,
 and an uninstall that offers to retain, export, or securely erase each instance.
 None of it existed, so "closing the browser does not stop the host" was true only
@@ -3297,7 +3297,7 @@ burst does not leave the next page waiting behind it.
 the first-run wizard and the native tray icon are split out as BUG-48.**
 
 **Observed.** FIXED-88 implemented the lifecycle around the host but not the two
-rows of `docs/DESKTOP_DISTRIBUTION_DESIGN.md` that a source checkout cannot
+rows of `docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md` that a source checkout cannot
 build: the **Install** row's *"Install signed application files only"* and the
 **Update** row's *"verify signature, back up before migration, migrate
 atomically, and retain a rollback path on failure"*. `raiker/app/update.py` held
@@ -6045,7 +6045,7 @@ behind it.
 **Status: fixed in this change. Was BUG-80, found on 2026-08-09 while mapping
 Raiker to the OWASP Agentic Top 10.**
 
-**Observed.** `docs/OWASP_GENAI_SECURITY_MAPPING.md` rated LLM09
+**Observed.** `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md` rated LLM09
 (Misinformation) with the note "Verifier is a stub
 (`raiker/runtime/verifier.py`)". That had not been true since the real
 `Verifier` landed in `raiker/verification/verifier.py`, and several other rows
@@ -6077,7 +6077,7 @@ whose every row matches shipped code.
 **Status: fixed in this change. Was BUG-81, found on 2026-08-09 while mapping
 Raiker to the OWASP Agentic Top 10 (ASI01 — agent goal hijack).**
 
-**Observed.** `docs/OWASP_GENAI_SECURITY_MAPPING.md` states that Raiker must
+**Observed.** `docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md` states that Raiker must
 "support prompt-injection scanning hooks". No such hook existed:
 `raiker/runtime/classifier.py` is an intent router, not a detector, and nothing
 evaluated input at the point it entered the model context.
@@ -10055,7 +10055,7 @@ The prompt envelope now carries `surface`, validated against a closed set
 (`chat` / `build`) at the HTTP schema, in the envelope builder and again in the
 gateway, which writes it into `prompt_received`. A Build turn receives the
 compressed operating protocol from
-[`docs/RAIKER_BUILD_PROCESS.md`](../RAIKER_BUILD_PROCESS.md) as a second system
+[`docs/architecture/RAIKER_BUILD_PROCESS.md`](../architecture/RAIKER_BUILD_PROCESS.md) as a second system
 message; a Chat turn does not, because answering a one-line question with a
 pre-mortem is its own failure.
 
@@ -10203,7 +10203,7 @@ turn with the switch off produced `hook_matched → hook_decision → hook_faile
 
 **Severity: Medium. Area: hooks / lifecycle. Fixed 2026-08-22 (BUG-223).**
 
-`docs/HOOKS_SPEC.md` described roughly the event surface Claude Code documents.
+`docs/architecture/HOOKS_SPEC.md` described roughly the event surface Claude Code documents.
 Nine were dispatched. `SessionEnd` was accepted by the config schema and had no
 call site at all, so a rule written for it parsed cleanly and never ran; the rest
 were not in `HOOK_EVENTS`, so a rule naming one was refused at parse time.
@@ -10567,8 +10567,8 @@ sender."* Until that was written down, none of the delivery code had a contract
 to satisfy, and shipping delivery without it would have been worse than not
 shipping it.
 
-**What ships** is the contract, in `docs/CHANNELS_SPEC.md` → *What a channel
-message is in a turn*, with the matching rows in `docs/THREAT_MODEL.md`. A
+**What ships** is the contract, in `docs/architecture/CHANNELS_SPEC.md` → *What a channel
+message is in a turn*, with the matching rows in `docs/architecture/THREAT_MODEL.md`. A
 channel message is **untrusted content with a named sender who is not the
 owner**, and five rules follow, each enforceable rather than advisory:
 
@@ -10607,7 +10607,7 @@ differentiator; the transport itself is commodity.
 pairing and allowlist enforcement, and the approval relay. BUG-225 stays open for
 them and is reduced rather than closed.
 
-**Evidence.** `docs/CHANNELS_SPEC.md`, `docs/THREAT_MODEL.md`,
+**Evidence.** `docs/architecture/CHANNELS_SPEC.md`, `docs/architecture/THREAT_MODEL.md`,
 `apps/web/src/lib/views/ExtensionsView.test.ts` — the tab names the contract, and
 distinguishes what is done from what is not.
 
@@ -11186,7 +11186,7 @@ listing them as if they would come back.
 
 **Reference-platform decision.** **YES — differentiator.** An approval that knows
 when its own promise does not hold is the property
-[`REFERENCE_PLATFORM_COMPATIBILITY.md`](../REFERENCE_PLATFORM_COMPATIBILITY.md)
+[`REFERENCE_PLATFORM_COMPATIBILITY.md`](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md)
 §2.3 claims; no compared platform states the limits of its own undo at the moment
 of decision.
 
@@ -11648,7 +11648,7 @@ that is the one the owner actually meets (`semantic_memory_runtime` →
 `vector_embedding_runtime`), or by the owner's own act of configuring an
 execution profile (`container_execution_cap`). Adding a second switch in front of
 a choice the owner already made is exactly the wall
-[`SECURITY_AND_POLICY.md`](../SECURITY_AND_POLICY.md) → "Security Philosophy"
+[`SECURITY_AND_POLICY.md`](../architecture/SECURITY_AND_POLICY.md) → "Security Philosophy"
 exists to refuse. The nine with no path keep their gates for the reason
 [§3.5](GOVERNANCE_ENTRY_PATHS.md) keeps its list: the day something reaches one
 of them, the gate is what is already there.
@@ -11736,7 +11736,7 @@ which trades their working setup for a badge.
 
 **The one field read and deliberately refused.** `allowed-tools` is a skill
 pre-approving the tools it may use, which is exactly the grant
-[§3.5](../REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
+[§3.5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#35-a-skill-is-instruction-only)
 exists to prevent. Raiker parses it, lists the tools it names on the card under
 *Not pre-approved*, and states that the field is not honoured. **Ignoring it
 would leave an author believing it did something.** A refusal is not counted as

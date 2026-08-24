@@ -6,6 +6,11 @@
 - Node 20 or newer (to build the dashboard)
 - Git
 
+Raiker currently runs from a source checkout; no signed desktop release has
+been published. The dashboard and terminal client support local single-user
+operation. Hosted multi-user, dedicated mobile, and IDE clients are not part of
+the current release.
+
 ## Install
 
 ```bash
@@ -69,13 +74,14 @@ npm --prefix apps/web run build
 ## Run
 
 ```bash
-raiker-app --workspace .
+raiker-app
 ```
 
 `raiker-app` is the primary application command. It starts Raiker on loopback
-and opens the dashboard in your default browser. Passing `--workspace .` keeps
-runtime state in `.raiker/` inside the repository. Use the same workspace for
-every lifecycle command, including background startup:
+and opens the dashboard in your default browser. By default it uses the normal
+application-data directory for your platform. Passing `--workspace .` instead
+keeps runtime state in `.raiker/` inside the repository. Use the same workspace
+for every lifecycle command, including background startup:
 
 ```bash
 raiker-app --workspace . service install
@@ -83,8 +89,9 @@ raiker-app service status --workspace .
 raiker-app status --workspace .
 ```
 
-Run `raiker-app --help` for pause, resume, quit, service, and uninstall
-commands.
+Run `raiker-app --help` for pause, resume, quit, service, update, and uninstall
+commands. [Managing the Raiker host](managing-the-host.md) explains what each
+command changes, where instance data lives, and how to keep or export it.
 
 For explicit server control without the application lifecycle wrapper, use
 `raiker-web`:
@@ -137,15 +144,15 @@ The sidebar groups every destination:
 | Knowledge | Memory, Knowledge Map |
 | Control | Approvals, Permissions, Models, Extensions |
 | Observe | Observability — overview, sessions, activity, checkpoints, diagnostics, live work, notifications |
-| Utilities | Settings |
+| Utilities | Guide, Settings |
 
 **Sessions is inside Observability**, not a destination of its own: it is the
 complete record of every conversation *and* every task run, which is why the
 sidebar's RECENT CHATS list stays conversations only. **Models** and
-**Extensions** are tabbed the same way — Models by Providers / Routing /
-Pricing / Posture, Extensions by Connectors / MCP servers / Skills / Plugins /
-Channels. Old links to the pages these absorbed still resolve and open the right
-tab.
+**Extensions** are tabbed the same way — Models by Local / Hosted / Hugging
+Face / Activity / Routing / Pricing / Posture, Extensions by Connectors / MCP
+servers / Skills / Plugins / Channels. Old links to the pages these absorbed
+still resolve and open the right tab.
 
 The top bar carries the notification bell, the theme toggle
 (system → light → dark), and the **STOP** switch, which requests cancellation of
@@ -154,3 +161,7 @@ next safe boundary. It is governed and audited — not a force-kill.
 
 The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
 plus drawer from 640–1023 px, and the full sidebar at 1024 px and wider.
+
+Continue with [Connecting a model](connecting-a-model.md). For a tour of every
+destination and its evidence views, see
+[Dashboard and observability](dashboard-and-observability.md).

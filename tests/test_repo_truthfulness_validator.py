@@ -88,8 +88,8 @@ def test_disabled_runtime_flags_remain_false(tmp_path: Path) -> None:
 
 
 def test_architecture_and_security_docs_state_current_truth() -> None:
-    architecture = Path("docs/ARCHITECTURE.md").read_text(encoding="utf-8")
-    security = Path("docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
+    architecture = Path("docs/architecture/ARCHITECTURE.md").read_text(encoding="utf-8")
+    security = Path("docs/architecture/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
     assert "Current Backend Capability Matrix" in architecture
     assert "gateway finalisation events" in architecture
     assert "no `/sessions` command is currently implemented" in architecture
@@ -102,7 +102,7 @@ def test_architecture_and_security_docs_state_current_truth() -> None:
 
 
 def test_catalog_marks_memory_and_approval_semantics_precisely() -> None:
-    catalog = Path("docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    catalog = Path("docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     assert "implemented_approval_required" in catalog
     assert "metadata_only" in catalog
     assert "executed once through the governed approval execution relay" in catalog
@@ -114,7 +114,7 @@ def test_truthfulness_validator_detects_known_overclaim_patterns() -> None:
     from scripts import validate_repo_truthfulness as validator
 
     errors = validator._validate_snippet(  # type: ignore[attr-defined]
-        "docs/SECURITY_ARCHITECTURE.md",
+        "docs/architecture/SECURITY_ARCHITECTURE.md",
         "Approval resolution executes any approved action. no-executor domains work. plugin execution enabled.",
     )
     joined = "\n".join(errors).lower()
@@ -132,7 +132,7 @@ def test_truthfulness_validator_still_requires_the_execution_boundary_to_be_stat
     from scripts import validate_repo_truthfulness as validator
 
     errors = validator._validate_snippet(  # type: ignore[attr-defined]
-        "docs/SECURITY_ARCHITECTURE.md",
+        "docs/architecture/SECURITY_ARCHITECTURE.md",
         "Approval resolution executes an approved local file mutation. fail-closed elsewhere. metadata-only preview.",
     )
     assert any("execution-boundary" in error for error in errors)

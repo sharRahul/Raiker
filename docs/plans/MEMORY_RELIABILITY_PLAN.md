@@ -27,17 +27,17 @@ is *yes, and it should say where it came from* — not a gate that makes the
 owner's own history unreachable. What stays governed is **mutation** (a turn
 proposing a durable memory) and **egress** (anything that would send a memory
 off the machine), never the owner reading their own transcript back. Full
-statement: `docs/SECURITY_AND_POLICY.md` → "Security Philosophy".
+statement: `docs/architecture/SECURITY_AND_POLICY.md` → "Security Philosophy".
 
 # Memory reliability
 
 Gaps found while auditing `raiker/memory`, `raiker/vector`, `raiker/graph` and
 `raiker/context` against
-[`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`](../HYBRID_MEMORY_IMPLEMENTATION_PLAN.md),
-[`GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../GRAPH_MEMORY_AND_CODEMAP_SPEC.md),
-[`EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](../EIDETIC_MEMORY_AND_LEARNING_SPEC.md),
-[`MEMORY_AND_CONTEXT_STRATEGY.md`](../MEMORY_AND_CONTEXT_STRATEGY.md) and
-[`STORAGE_DATABASE_AND_SEARCH_SPEC.md`](../STORAGE_DATABASE_AND_SEARCH_SPEC.md)
+[`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`](../architecture/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md),
+[`GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md),
+[`EIDETIC_MEMORY_AND_LEARNING_SPEC.md`](../architecture/EIDETIC_MEMORY_AND_LEARNING_SPEC.md),
+[`MEMORY_AND_CONTEXT_STRATEGY.md`](../architecture/MEMORY_AND_CONTEXT_STRATEGY.md) and
+[`STORAGE_DATABASE_AND_SEARCH_SPEC.md`](../architecture/STORAGE_DATABASE_AND_SEARCH_SPEC.md)
 on **2026-08-11**.
 
 The audit's headline is narrower than the specs suggest. Phases A–E of the

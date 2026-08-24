@@ -110,7 +110,7 @@ def test_workspace_surfaces_include_plugin_readiness(tmp_path: Path) -> None:
 
 def test_docs_catalog_event_consistency() -> None:
     for path in [
-        Path("docs/IMPLEMENTATION_STATUS.md"),
+        Path("docs/architecture/IMPLEMENTATION_STATUS.md"),
     ]:
         text = path.read_text(encoding="utf-8")
         assert "Slice N" in text

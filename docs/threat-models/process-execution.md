@@ -70,7 +70,7 @@ applies unchanged, because the lifecycle is the same one. What is specific here:
   what `shell_execution` enforces, so it is not a weaker second path, only an
   unused one. Whether it should be consolidated into `shell_execution` is
   tracked in
-  [the prioritised backlog](../REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
+  [the prioritised backlog](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#5-prioritised-backlog).
 
 ## Evidence
 

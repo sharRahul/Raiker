@@ -456,13 +456,13 @@ describe("ChatView streaming transcript", () => {
     // The "+" button reveals the attachment path input.
     await fireEvent.click(screen.getByLabelText("Add attachment"));
     const attach = screen.getByLabelText("Attachment path") as HTMLInputElement;
-    await fireEvent.input(attach, { target: { value: "docs/HANDOFF.md" } });
+    await fireEvent.input(attach, { target: { value: "docs/architecture/HANDOFF.md" } });
     await fireEvent.click(screen.getByText("Attach"));
     // The card names the file and, underneath, where in the workspace it is —
     // both on one line each, ellipsised, so adding files never rewraps the
     // composer under the text being typed.
     expect(screen.getByText("HANDOFF.md")).toBeInTheDocument();
-    expect(screen.getByText("docs/HANDOFF.md")).toBeInTheDocument();
+    expect(screen.getByText("docs/architecture/HANDOFF.md")).toBeInTheDocument();
 
     const box = screen.getByRole("textbox", { name: /prompt/i });
     await fireEvent.input(box, { target: { value: "summarize the attachment" } });
@@ -470,7 +470,7 @@ describe("ChatView streaming transcript", () => {
 
     await waitFor(() => expect(streamPromptMock).toHaveBeenCalledOnce());
     const body = streamPromptMock.mock.calls[0][0] as Record<string, unknown>;
-    expect(body.attachments).toEqual([{ type: "path", path: "docs/HANDOFF.md" }]);
+    expect(body.attachments).toEqual([{ type: "path", path: "docs/architecture/HANDOFF.md" }]);
     // The sent turn shows the attachment chip; the composer input is cleared.
     expect((screen.getByLabelText("Attachment path") as HTMLInputElement).value).toBe("");
     expect(screen.getByText("HANDOFF.md").closest(".message-bubble-user")).toBeNull();

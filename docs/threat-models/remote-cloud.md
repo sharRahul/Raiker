@@ -26,7 +26,7 @@ blast-radius risk that demands its own integration + threat model + tests.
 ## What a future per-integration opt-in MUST satisfy
 
 Promoting any of these to a real executor (the documented process in
-`docs/RUNTIME_EXECUTORS_SPEC.md`) requires, per capability:
+`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`) requires, per capability:
 
 1. A real integration that injects credentials from an owner secret store
    (never from model/action args), over TLS, to an **owner-allowlisted**

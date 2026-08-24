@@ -195,7 +195,7 @@ It is sent as a system message on every `surface: "build"` turn, and the surface
 travels with the prompt into the audit record — so which protocol a turn ran
 under is a fact rather than an inference. **It grants nothing**: every gate,
 decision mode, approval and tool is identical on both surfaces. The full protocol
-is [`RAIKER_BUILD_PROCESS.md`](../RAIKER_BUILD_PROCESS.md).
+is [`RAIKER_BUILD_PROCESS.md`](../architecture/RAIKER_BUILD_PROCESS.md).
 
 ## Background work and scheduled agents
 
@@ -232,5 +232,5 @@ Reason codes and their fixes are in [Troubleshooting](troubleshooting.md).
 - [Working in Chat](working-in-chat.md) — the assistant surface, and the controls
   the two share
 - [Tasks and projects](tasks-and-projects.md) — scheduling and organising work
-- [`BUILD_WORKSPACE_SPEC.md`](../BUILD_WORKSPACE_SPEC.md) — the specification
+- [`BUILD_WORKSPACE_SPEC.md`](../architecture/BUILD_WORKSPACE_SPEC.md) — the specification
   behind this page

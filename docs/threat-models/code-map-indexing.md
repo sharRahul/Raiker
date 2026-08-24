@@ -97,5 +97,5 @@ produced it**, so the map never implies a precision it does not have.
 
 - `raiker/runtime/executors/tier3_core.py`, `raiker/graph/codemap.py`,
   `raiker/graph/codemap_service.py`, `raiker/tools/codemap_tools.py`
-- [`../GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../GRAPH_MEMORY_AND_CODEMAP_SPEC.md)
-- [`../BUILD_WORKSPACE_SPEC.md`](../BUILD_WORKSPACE_SPEC.md)
+- [`../GRAPH_MEMORY_AND_CODEMAP_SPEC.md`](../architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md)
+- [`../BUILD_WORKSPACE_SPEC.md`](../architecture/BUILD_WORKSPACE_SPEC.md)

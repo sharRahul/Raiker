@@ -22,7 +22,7 @@ describe("tool activity", () => {
         tool_name: "read_file",
         family: "file-read",
         label: "Read file",
-        action: "docs/ARCHITECTURE.md",
+        action: "docs/architecture/ARCHITECTURE.md",
         status: "running",
       }),
       toolEvent({
@@ -30,7 +30,7 @@ describe("tool activity", () => {
         tool_name: "read_file",
         family: "file-read",
         label: "Read file",
-        action: "docs/ARCHITECTURE.md",
+        action: "docs/architecture/ARCHITECTURE.md",
         status: "success",
       }),
     ];
@@ -40,7 +40,7 @@ describe("tool activity", () => {
     expect(rows[0]).toMatchObject({
       actionId: "act_1",
       label: "Read file",
-      action: "docs/ARCHITECTURE.md",
+      action: "docs/architecture/ARCHITECTURE.md",
       state: "success",
     });
     expect(hasRunningTool(rows)).toBe(false);

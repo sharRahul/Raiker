@@ -9,15 +9,15 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = [ROOT / "README.md", *(ROOT / "docs").glob("*.md")]
 CANONICAL_DOCS = [
     ROOT / "README.md",
-    ROOT / "docs/ARCHITECTURE.md",
-    ROOT / "docs/IMPLEMENTATION_STATUS.md",
-    ROOT / "docs/FEATURE_COVERAGE_MATRIX.md",
-    ROOT / "docs/GAP_AND_TODO_ANALYSIS.md",
-    ROOT / "docs/SECURITY_AND_POLICY.md",
-    ROOT / "docs/SECURITY_ARCHITECTURE.md",
-    ROOT / "docs/MEMORY_GOVERNANCE_RULES.md",
-    ROOT / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
-    ROOT / "docs/LOCAL_VALIDATION_GATE.md",
+    ROOT / "docs/architecture/ARCHITECTURE.md",
+    ROOT / "docs/architecture/IMPLEMENTATION_STATUS.md",
+    ROOT / "docs/architecture/FEATURE_COVERAGE_MATRIX.md",
+    ROOT / "docs/architecture/GAP_AND_TODO_ANALYSIS.md",
+    ROOT / "docs/architecture/SECURITY_AND_POLICY.md",
+    ROOT / "docs/architecture/SECURITY_ARCHITECTURE.md",
+    ROOT / "docs/architecture/MEMORY_GOVERNANCE_RULES.md",
+    ROOT / "docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md",
+    ROOT / "docs/architecture/LOCAL_VALIDATION_GATE.md",
 ]
 CANONICAL_STATUSES = {
     "implemented_read_only",
@@ -157,7 +157,7 @@ APPROVAL_BOUNDARY_MARKERS = (
 
 
 def _catalog_commands() -> set[str]:
-    text = (ROOT / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    text = (ROOT / "docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     match = re.search(r"## CLI Command Surface.*?```text\n(.*?)\n```", text, re.S)
     if not match:
         return set()
@@ -225,18 +225,17 @@ def main() -> int:
             errors.append(f"missing_disabled_runtime_marker:{marker}")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    normalized_readme = " ".join(readme.split())
     for marker in (
-        # Alignment (not loosening): the launchable local surfaces are BOTH the plain terminal
-        # client and the local web dashboard. Native/hosted clients stay Phase 8 deferred (below).
-        "launchable local UIs are the plain local terminal client and the local web dashboard",
-        "Phase 8 deferred",
-        "other approvals remain decision-only",
-        "durable memory mutation is broker-governed",
+        "web dashboard and terminal client are available",
+        "hosted multi-user",
+        "docs/guide/README.md",
+        "docs/architecture/README.md",
     ):
-        if marker.lower() not in readme.lower():
+        if marker.lower() not in normalized_readme.lower():
             errors.append(f"README missing truth marker: {marker}")
 
-    architecture = (ROOT / "docs/ARCHITECTURE.md").read_text(encoding="utf-8")
+    architecture = (ROOT / "docs/architecture/ARCHITECTURE.md").read_text(encoding="utf-8")
     for marker in (
         "Current Backend Capability Matrix",
         "checkpoint_created` and `turn_closed` are gateway finalisation events",
@@ -245,7 +244,7 @@ def main() -> int:
         if marker not in architecture:
             errors.append(f"ARCHITECTURE missing marker: {marker}")
 
-    security_arch = (ROOT / "docs/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
+    security_arch = (ROOT / "docs/architecture/SECURITY_ARCHITECTURE.md").read_text(encoding="utf-8")
     for marker in (
         "SSH remote execution | unavailable until owner profile selection",
         "Daytona cloud execution | unavailable until owner profile",
@@ -257,7 +256,7 @@ def main() -> int:
         if marker.lower() not in security_arch.lower():
             errors.append(f"SECURITY_ARCHITECTURE missing marker: {marker}")
 
-    memory_rules = (ROOT / "docs/MEMORY_GOVERNANCE_RULES.md").read_text(encoding="utf-8")
+    memory_rules = (ROOT / "docs/architecture/MEMORY_GOVERNANCE_RULES.md").read_text(encoding="utf-8")
     for marker in (
         "/memory-store` and `/memory-forget` are brokered approval-required requests",
         "secret/credential-like durable memory content is denied before approval creation",
@@ -271,7 +270,7 @@ def main() -> int:
     missing = REQUIRED_COMMANDS - catalog_commands
     if missing:
         errors.append("catalog_missing_commands:" + ",".join(sorted(missing)))
-    catalog = (ROOT / "docs/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
+    catalog = (ROOT / "docs/architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md").read_text(encoding="utf-8")
     for marker in (
         "implemented_approval_required",
         "metadata_only",

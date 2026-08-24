@@ -1,6 +1,6 @@
 """BUG-40 — the lifecycle around ``raiker-app``: state, service, uninstall.
 
-The three obligations from ``docs/DESKTOP_DISTRIBUTION_DESIGN.md`` that these
+The three obligations from ``docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md`` that these
 tests hold to: the host reports a state an owner can act on, background start is
 registered with the *platform's own* manager rather than a Raiker daemon, and an
 uninstall states what it takes before it takes it.

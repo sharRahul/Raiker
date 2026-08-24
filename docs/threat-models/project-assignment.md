@@ -45,7 +45,7 @@ than a silent write.
 - **Project instructions are not re-approved on the move.** Instructions the
   owner wrote for the project apply to the moved conversation from its next turn.
   They are owner records rather than repository files
-  ([why](../REFERENCE_PLATFORM_COMPATIBILITY.md#37-project-instructions-are-owner-records-not-repository-files)),
+  ([why](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#37-project-instructions-are-owner-records-not-repository-files)),
   so nothing untrusted enters this way — but the context does change.
 
 ## Evidence

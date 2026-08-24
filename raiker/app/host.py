@@ -1,6 +1,6 @@
 """Is the host running, is it paused, and what would quitting interrupt?
 
-BUG-40. ``docs/DESKTOP_DISTRIBUTION_DESIGN.md`` requires a control that reports
+BUG-40. ``docs/architecture/DESKTOP_DISTRIBUTION_DESIGN.md`` requires a control that reports
 ``running``, ``paused``, ``needs attention`` or ``stopped`` and offers Open,
 Pause, Restart and Quit — and requires that quitting *reports any waiting work*
 before it stops. That last clause is the whole point: a governed agent host is

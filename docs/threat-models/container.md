@@ -6,7 +6,7 @@
 > before its executor landed. Approval resolution is metadata-only.
 
 Per-capability threat model required by
-[`docs/RUNTIME_EXECUTORS_SPEC.md`](../RUNTIME_EXECUTORS_SPEC.md) before
+[`docs/architecture/RUNTIME_EXECUTORS_SPEC.md`](../architecture/RUNTIME_EXECUTORS_SPEC.md) before
 `container_execution_cap` may join `REAL_EXECUTOR_CAPABILITIES`. This covers
 **local** Docker only; SSH/Daytona use separate owner-profile-gated executors,
 and other remote/cloud providers stay fail-closed.

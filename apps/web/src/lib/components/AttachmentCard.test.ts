@@ -71,13 +71,13 @@ describe("AttachmentCard", () => {
         attachment: {
           kind: "path",
           label: "HANDOFF.md",
-          detail: "docs/HANDOFF.md",
-          path: "docs/HANDOFF.md",
+          detail: "docs/architecture/HANDOFF.md",
+          path: "docs/architecture/HANDOFF.md",
         },
       },
     });
     expect(await screen.findByText("HANDOFF.md")).toBeInTheDocument();
-    expect(screen.getByText("docs/HANDOFF.md")).toBeInTheDocument();
+    expect(screen.getByText("docs/architecture/HANDOFF.md")).toBeInTheDocument();
   });
 
   it("is inert unless it is given something to open", async () => {

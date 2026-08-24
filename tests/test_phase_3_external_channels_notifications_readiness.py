@@ -125,12 +125,12 @@ def test_workspace_inspection_and_view_summary_fields(tmp_path: Path) -> None:
 
 def test_docs_catalog_event_consistency() -> None:
     paths = [
-        "docs/IMPLEMENTATION_STATUS.md",
+        "docs/architecture/IMPLEMENTATION_STATUS.md",
     ]
     for path in paths:
         text = Path(path).read_text(encoding="utf-8")
         assert "Slice O" in text
         assert "metadata" in text.lower()
-    event_text = Path("docs/EVENT_CATALOG.md").read_text(encoding="utf-8")
+    event_text = Path("docs/architecture/EVENT_CATALOG.md").read_text(encoding="utf-8")
     assert "phase3.external_channels_notifications.readiness.metadata_defined" in event_text
     assert "runtime dispatch events are introduced" in event_text

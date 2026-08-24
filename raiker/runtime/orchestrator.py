@@ -181,7 +181,7 @@ _SYSTEM_PROMPT = (
 )
 
 
-#: The Build workspace's operating protocol (`docs/RAIKER_BUILD_PROCESS.md`).
+#: The Build workspace's operating protocol (`docs/architecture/RAIKER_BUILD_PROCESS.md`).
 #:
 #: Build is where a turn changes a repository, and almost every bad change from
 #: a capable model is a process failure rather than a knowledge failure: it

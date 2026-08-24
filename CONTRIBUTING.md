@@ -1,7 +1,7 @@
 # Contributing to Raiker
 
 Keep changes focused, update the affected canonical documentation, and run the
-validation commands in [docs/LOCAL_VALIDATION_GATE.md](docs/LOCAL_VALIDATION_GATE.md).
+validation commands in [docs/architecture/LOCAL_VALIDATION_GATE.md](docs/architecture/LOCAL_VALIDATION_GATE.md).
 
 Use Python 3.11+, install `.[dev]`, and keep generated caches, build outputs,
 virtual environments, and credentials out of commits. Add or update tests for

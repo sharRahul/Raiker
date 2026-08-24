@@ -1,6 +1,6 @@
 """Deterministic prompt-injection scanning over untrusted context (BUG-81).
 
-``docs/OWASP_GENAI_SECURITY_MAPPING.md`` states that Raiker must support
+``docs/architecture/OWASP_GENAI_SECURITY_MAPPING.md`` states that Raiker must support
 prompt-injection scanning hooks, and until this module none existed:
 ``raiker/runtime/classifier.py`` is an intent router, not a detector, and nothing
 evaluated content at the point it entered the model's context.

@@ -195,13 +195,13 @@ def test_workspace_inspection_and_view_summary_fields(tmp_path: Path) -> None:
 
 def test_docs_catalog_event_consistency(tmp_path: Path) -> None:
     paths = [
-        "docs/IMPLEMENTATION_STATUS.md",
+        "docs/architecture/IMPLEMENTATION_STATUS.md",
     ]
     for path in paths:
         text = Path(path).read_text(encoding="utf-8")
         assert "Slice P" in text
         assert "metadata" in text.lower()
-    event_text = Path("docs/EVENT_CATALOG.md").read_text(encoding="utf-8")
+    event_text = Path("docs/architecture/EVENT_CATALOG.md").read_text(encoding="utf-8")
     assert "phase3.remote_container_cloud_readiness.metadata_created" in event_text
     assert "phase3.remote_container_cloud_readiness.summary_viewed" in event_text
     assert "phase3.remote_container_cloud_readiness.exported" in event_text

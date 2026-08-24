@@ -600,7 +600,7 @@ row with its reason, so an empty list is distinguishable from a disabled feature
    words**. It **MUST** be recalled.
 2. Ask the same question **paraphrased**. Record the result honestly — the
    default embedding space is lexical, and this is the measurement that keeps
-   [`../KNOWN_LIMITS.md`](../KNOWN_LIMITS.md) true.
+   [`../KNOWN_LIMITS.md`](../architecture/KNOWN_LIMITS.md) true.
 3. **MUST**: each hit names the legs that found it, and the reply names the
    embedding space in force.
 
@@ -790,9 +790,9 @@ Stated so a green round is not read as more than it is.
 
 | Not covered | Why, and what does cover it |
 |---|---|
-| The terminal client (`raiker`) | This is a browser plan. `tests/test_cli_*.py` and the command surface in [`../RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](../RAIKER_TOOL_AND_PLUGIN_CATALOG.md) |
-| The desktop payload, tray and installer | Needs a built release. [`../DESKTOP_DISTRIBUTION_DESIGN.md`](../DESKTOP_DISTRIBUTION_DESIGN.md) |
-| Windows-only execution paths | PTY and restart reattachment are POSIX-only by build. [`../KNOWN_LIMITS.md`](../KNOWN_LIMITS.md) |
+| The terminal client (`raiker`) | This is a browser plan. `tests/test_cli_*.py` and the command surface in [`../RAIKER_TOOL_AND_PLUGIN_CATALOG.md`](../architecture/RAIKER_TOOL_AND_PLUGIN_CATALOG.md) |
+| The desktop payload, tray and installer | Needs a built release. [`../DESKTOP_DISTRIBUTION_DESIGN.md`](../architecture/DESKTOP_DISTRIBUTION_DESIGN.md) |
+| Windows-only execution paths | PTY and restart reattachment are POSIX-only by build. [`../KNOWN_LIMITS.md`](../architecture/KNOWN_LIMITS.md) |
 | Anything needing a container daemon | Filtered egress and credential delivery stay unproven without one — BUG-194 |
 | Multi-user and hosted operation | Not built |
 
@@ -802,7 +802,7 @@ Stated so a green round is not read as more than it is.
 
 Exercising the web app against **each** model backend in turn — rather than one —
 is its own procedure, because the matrix is per provider rather than per screen:
-[`../WEB_APP_LIVE_TEST.md`](../WEB_APP_LIVE_TEST.md). A Full sweep **MUST** run
+[`../WEB_APP_LIVE_TEST.md`](../architecture/WEB_APP_LIVE_TEST.md). A Full sweep **MUST** run
 at least two backends, one local and one hosted; the matrix says what to check
 for the rest.
 

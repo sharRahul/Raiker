@@ -13,7 +13,7 @@ Raiker provides two main workspaces:
 
 Raiker is ready for local, single-user use from a source checkout. The web dashboard
 and terminal client are available. Features without a governed executor
-fail closed. Read the
+fail closed. Hosted multi-user operation is deferred. Read the
 [current limitations](docs/guide/known-limits.md) before relying on Raiker for
 important work.
 

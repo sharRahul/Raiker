@@ -74,6 +74,14 @@ class CapabilityGateView:
     requires_threat_model_ack: bool = False
     requires_human_confirmation: bool = False
     threat_model_ack_recorded: bool = False
+    # GEP-04 — what this gate actually decides: `own_gate`, `governed_elsewhere`
+    # or `no_path`. A switch beside a running feature that it does not govern is
+    # worse than no switch, so the surface says which it is rather than letting
+    # the toggle imply an authority it does not have.
+    gate_reality: str = "own_gate"
+    # For anything other than `own_gate`: the sentence naming what really
+    # governs the work, or why nothing runs. Empty for `own_gate`.
+    governance_note: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -91,6 +99,8 @@ class CapabilityGateView:
             "requires_threat_model_ack": self.requires_threat_model_ack,
             "requires_human_confirmation": self.requires_human_confirmation,
             "threat_model_ack_recorded": self.threat_model_ack_recorded,
+            "gate_reality": self.gate_reality,
+            "governance_note": self.governance_note,
         }
 
 

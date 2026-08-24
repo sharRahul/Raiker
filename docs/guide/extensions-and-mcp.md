@@ -96,7 +96,8 @@ Markdown with a `---` frontmatter block carrying at least `name` and
 ---
 name: release-notes
 description: Draft release notes. Use when cutting a release or summarising a diff.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Release notes
@@ -106,7 +107,10 @@ version: 1.0.0
 ```
 
 `name` must be a lowercase slug. The `description` is what decides *when* the
-skill applies, so it carries the triggers rather than a summary.
+skill applies, so it carries the triggers rather than a summary. A version goes
+under `metadata:`, which is where the standard puts it — Raiker also reads a
+top-level `version:` for skills written before the standard existed, and says on
+the card that a strict reader elsewhere would drop it.
 
 A `*.skill` file is a zip holding `<name>/SKILL.md` plus any supporting files —
 `references/` for detail loaded only when needed, `assets/` for templates, and
@@ -126,27 +130,41 @@ products. Raiker reads the same file, requires the same two fields, and loads
 skills the same way (index first, body on demand), so a skill from elsewhere
 generally installs here.
 
-Two differences are worth knowing before you move one in either direction:
+**Every installed skill is measured against the standard, and the answer is on
+its card.** Open **Details** on any skill and the *Agent Skills standard* block
+says whether it would install in the other forty products, names any field that
+would stop it, and shows its `license` and `compatibility` if it declares them.
+
+**The measurement never refuses a skill.** Raiker's reader is deliberately
+*looser* than the standard — it accepts `.` and `_` in a name where the standard
+allows only `a-z`, `0-9` and single hyphens, and keeps a description up to 2000
+characters where the standard caps it at 1024 — and a skill you already rely on
+keeps working. What changes is that you are told, rather than finding out when
+you try to use it somewhere else. The card distinguishes:
+
+| What you see | What it means |
+|---|---|
+| **standard** | It should install in any tool that reads the format |
+| **portable, with notes** | It installs everywhere; a strict reader may drop a field, such as a top-level `version:` that belongs under `metadata:` |
+| **N portability issues** | It works in Raiker and another tool may refuse it. The finding names the field and the rule |
+
+Two differences are deliberate rather than gaps:
 
 - **Raiker runs nothing.** The standard permits an agent to execute a skill's
   bundled scripts, and several products do. Raiker does not, and this is a
   decision rather than an omission: a skill is instruction text, and instruction
   text that can also execute is a capability arriving without a gate.
-- **Raiker's reader is looser than the standard, so a skill that installs here
-  may not validate elsewhere.** Raiker accepts `.` and `_` in a name where the
-  standard allows only `a-z`, `0-9` and single hyphens, and accepts a
-  description up to 2000 characters where the standard caps it at 1024. Its
-  frontmatter reader handles flat scalars rather than YAML, so the standard's
-  nested `metadata:` map does not parse, and `license`, `compatibility` and
-  `allowed-tools` are ignored — including the `version:` line in the example
-  above, which the standard would put under `metadata`. If you want a skill that
-  travels, keep to the standard's narrower rules; [`skills-ref
-  validate`](https://github.com/agentskills/agentskills/tree/main/skills-ref)
-  will tell you.
+- **`allowed-tools` is read and refused.** A skill pre-approving its own tools
+  is exactly the grant this tab's "grants no capability" promise exists to
+  prevent. Raiker parses the field, lists the tools it names on the card under
+  *Not pre-approved*, and says plainly that it is not honoured — which is
+  stronger than ignoring a field its author believes is doing something. Every
+  tool call a turn makes while following that skill is governed exactly as it
+  would be otherwise.
 
-`allowed-tools` is the one field Raiker would refuse to honour even after
-reading it: a skill pre-approving its own tools is exactly the grant this tab's
-"grants no capability" promise exists to prevent.
+If you want a skill that travels, the card's findings are the checklist;
+[`skills-ref validate`](https://github.com/agentskills/agentskills/tree/main/skills-ref)
+is the standard's own validator and will say the same thing.
 
 ### Adding one
 

@@ -1,7 +1,8 @@
 ---
 name: code-review
 description: Review a diff, a branch, a pull request, or a working tree for defects that will actually bite — correctness bugs, missed reuse, needless complexity, and gaps in test coverage — and report only findings worth someone's time. Use whenever someone says "review this", "review my PR", "look over this change", "what did I miss", "is this ready to merge", "sanity-check this diff", or asks for a second pass before shipping. Use it too when a review is expected to leave comments on a pull request, when a change touches code with a house style to honour (CLAUDE.md, CONTRIBUTING.md, a style guide), or when someone asks why a review keeps producing noise. Do not use it for security auditing — the security-review skill is aimed at that and applies different thresholds.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Code review

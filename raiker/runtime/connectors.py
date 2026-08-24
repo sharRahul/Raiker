@@ -7,12 +7,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
-from raiker.runtime.authority.decision_modes import (
-    DEFAULT_DECISION_MODE,
-    DecisionMode,
-    auto_requires_approval,
-    parse_decision_mode,
-)
+from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
+from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
 from raiker.runtime.executors.sandbox import (
     SandboxError,
     connector_egress_allowlist,
@@ -39,7 +35,6 @@ if TYPE_CHECKING:
 # closed) — this slice ships only the read executor.
 
 _CAP = "connector_github_runtime"
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 
 GITHUB_TOKEN_ENV = "RAIKER_GITHUB_TOKEN"
 GITHUB_HOST = "api.github.com"
@@ -56,16 +51,12 @@ _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
 _BRANCH_REF_RE = re.compile(r"^[A-Za-z0-9_.\-/]{1,255}$")
 
 
-def _scoped_record(store: SQLiteStore, principal_id: str | None, capability: str) -> dict[str, Any] | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_gate_state(principal_id, capability)
-    return store.get_capability_gate_state(capability)
-
-
-def _scoped_mode(store: SQLiteStore, principal_id: str | None, capability: str) -> str | None:
-    if principal_id and store.get_account(principal_id) is not None:
-        return store.get_principal_capability_decision_mode(principal_id, capability)
-    return store.get_capability_decision_mode(capability)
+# The four connector services below all ask the same question of the same store.
+# One helper (GEP-01), so a fifth connector cannot answer it slightly differently.
+def _admission(
+    store: SQLiteStore, principal_id: str | None, capability: str
+) -> CapabilityAdmission:
+    return capability_admission(store, principal_id, capability)
 
 
 class GithubConnectorService:
@@ -102,18 +93,10 @@ class GithubConnectorService:
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return _admission(self._store, self._principal_id, _CAP).gate_enabled
 
     def _mode(self) -> DecisionMode:
-        persisted = _scoped_mode(self._store, self._principal_id, _CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return _admission(self._store, self._principal_id, _CAP).decision_mode
 
     @staticmethod
     def credential_configured() -> bool:
@@ -547,18 +530,10 @@ class GmailConnectorService:
 
     # ── Governance checks ────────────────────────────────────────────────
     def _gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _GMAIL_CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return _admission(self._store, self._principal_id, _GMAIL_CAP).gate_enabled
 
     def _mode(self) -> DecisionMode:
-        persisted = _scoped_mode(self._store, self._principal_id, _GMAIL_CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return _admission(self._store, self._principal_id, _GMAIL_CAP).decision_mode
 
     @staticmethod
     def credential_configured() -> bool:
@@ -779,18 +754,10 @@ class GcalConnectorService:
         self._principal_id = principal_id
 
     def _gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _GCAL_CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return _admission(self._store, self._principal_id, _GCAL_CAP).gate_enabled
 
     def _mode(self) -> DecisionMode:
-        persisted = _scoped_mode(self._store, self._principal_id, _GCAL_CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return _admission(self._store, self._principal_id, _GCAL_CAP).decision_mode
 
     @staticmethod
     def credential_configured() -> bool:
@@ -1002,18 +969,10 @@ class SlackConnectorService:
         self._principal_id = principal_id
 
     def _gate_enabled(self) -> bool:
-        try:
-            record = _scoped_record(self._store, self._principal_id, _SLACK_CAP)
-        except Exception:  # noqa: BLE001 — a broken read fails closed
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return _admission(self._store, self._principal_id, _SLACK_CAP).gate_enabled
 
     def _mode(self) -> DecisionMode:
-        persisted = _scoped_mode(self._store, self._principal_id, _SLACK_CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return _admission(self._store, self._principal_id, _SLACK_CAP).decision_mode
 
     @staticmethod
     def credential_configured() -> bool:

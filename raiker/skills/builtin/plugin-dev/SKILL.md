@@ -1,7 +1,8 @@
 ---
 name: plugin-dev
 description: Design, build, validate, or debug a plugin — a bundle that adds commands, skills, agents, hooks, MCP servers, panels, or themes to an agent runtime. Use whenever someone says "write a plugin", "package this as a plugin", "add a slash command", "add a hook", "raiker-plugin.json", "plugin.json", "my plugin isn't loading", "the marketplace rejected it", or asks how to distribute a workflow so other people can install it. Use it too when deciding whether something should be a plugin at all rather than a skill, a command, or an MCP server — that choice is made before any file is written and is the one most often got wrong. Do not use it for writing a lone SKILL.md (skill-creator) or a standalone MCP server (mcp-builder); a plugin that bundles either of those is this skill's business.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Plugin developer

@@ -78,6 +78,15 @@ def _orchestrator(tmp_path: Path, router: FakeRouter) -> RuntimeOrchestrator:
 def _handle(
     orchestrator: RuntimeOrchestrator, envelope: PromptEnvelope
 ) -> AgentResponse:
+    # `AgentGateway` records the turn before dispatching (`sessions.track_turn`),
+    # and this harness drives the orchestrator directly. Recording it here keeps
+    # the harness faithful to the one path a real surface takes — BUG-218's
+    # alignment check reads the turn's prompt, and a harness that never wrote one
+    # would be testing a state no owner can reach.
+    store = orchestrator.tool_broker.store
+    if store is not None:
+        store.create_session(envelope.session_id, str(orchestrator.workspace_root))
+        store.insert_turn(envelope.session_id, envelope.turn_id, envelope.prompt.text)
     identity = TurnMachineIdentityLifecycle(
         orchestrator.workspace_root,
         orchestrator.tool_broker.store,
@@ -351,6 +360,101 @@ def test_auto_approval_executes_an_ordinary_file_write_with_preview_evidence(tmp
     assert str(stored_actor["proposed_by"]).startswith("principal_turn_agent_")
     executed = _event_record(orchestrator, envelope.session_id, "action_executed")
     assert executed["payload"]["posture"]["principal_id"] == stored_actor["proposed_by"]  # type: ignore[index]
+
+
+def test_auto_withholds_a_write_to_an_existing_file_the_turn_never_looked_at(
+    tmp_path: Path,
+) -> None:
+    """BUG-218 — Auto's alignment check, end to end through the broker.
+
+    The exact reproduction the defect entry gives: every write capability
+    permitted, Auto selected, and a change to a file unrelated to the request.
+    It used to run. It now falls back to the ordinary approval queue, and the
+    approval says which path did not match.
+    """
+    (tmp_path / "deploy.sh").write_text("#!/bin/sh\nreal deployment\n", encoding="utf-8")
+    unrelated = ToolCallProposal(
+        call_id="call_write",
+        tool_name="write_file",
+        arguments={"path": "deploy.sh", "text": "rm -rf /"},
+    )
+    router = FakeRouter(
+        [ModelResponse(text="", tool_calls=[unrelated], finish_reason="tool_calls")]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="auto")
+
+    response = _handle(orchestrator, envelope)
+
+    assert response.status == "needs_approval"
+    # The file the owner never mentioned is untouched.
+    assert (tmp_path / "deploy.sh").read_text(encoding="utf-8") == "#!/bin/sh\nreal deployment\n"
+
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_auto_executed" not in events
+    assert "approval_auto_withheld" in events
+    assert "approval_requested" in events
+
+    withheld = _event_record(orchestrator, envelope.session_id, "approval_auto_withheld")
+    alignment = withheld["payload"]["alignment"]  # type: ignore[index]
+    assert alignment["aligned"] is False
+    assert alignment["target"] == "deploy.sh"
+
+    # And the evidence travels onto the approval the owner is shown, so they are
+    # answering a stated question rather than an unexplained interruption.
+    requested = _event_record(orchestrator, envelope.session_id, "approval_requested")
+    assert requested["payload"]["alignment"]["target"] == "deploy.sh"  # type: ignore[index]
+
+
+def test_auto_still_executes_a_write_the_turn_established(tmp_path: Path) -> None:
+    """The check must not turn Auto into Manual for the work that was asked for."""
+    (tmp_path / "report.md").write_text("old", encoding="utf-8")
+    router = FakeRouter(
+        [
+            ModelResponse(text="", tool_calls=[_write_call()], finish_reason="tool_calls"),
+            ModelResponse(text="Done.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    # The owner named the file, so an existing `report.md` is established.
+    envelope = _envelope("rewrite report.md", approval_mode="auto")
+
+    response = _handle(orchestrator, envelope)
+
+    assert response.status == "completed"
+    assert (tmp_path / "report.md").read_text(encoding="utf-8") == "# Report\n"
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_auto_executed" in events
+    assert "approval_auto_withheld" not in events
+
+
+def test_skip_is_deliberately_not_alignment_checked(tmp_path: Path) -> None:
+    """Skip says no approval is raised at all, and that stays true.
+
+    Attaching a silent second check to Skip would redefine a mode whose entire
+    point is not to interrupt. Auto is the mode that promises a review.
+    """
+    (tmp_path / "deploy.sh").write_text("real deployment\n", encoding="utf-8")
+    unrelated = ToolCallProposal(
+        call_id="call_write",
+        tool_name="write_file",
+        arguments={"path": "deploy.sh", "text": "changed"},
+    )
+    router = FakeRouter(
+        [
+            ModelResponse(text="", tool_calls=[unrelated], finish_reason="tool_calls"),
+            ModelResponse(text="Done.", finish_reason="stop"),
+        ]
+    )
+    orchestrator = _orchestrator(tmp_path, router)
+    envelope = _envelope("write the report", approval_mode="skip")
+
+    response = _handle(orchestrator, envelope)
+
+    assert response.status == "completed"
+    events = _events(orchestrator, envelope.session_id)
+    assert "approval_auto_withheld" not in events
+    assert "approval_preview_skipped" in events
 
 
 def test_skip_approval_executes_an_ordinary_file_write_without_preview(tmp_path: Path) -> None:

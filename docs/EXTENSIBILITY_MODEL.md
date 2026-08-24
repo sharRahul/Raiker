@@ -34,7 +34,7 @@ manifest, pairing, or managed policy.
 |---|---|---|---|---|---|
 | **Tools** | New actions the agent can take | Tool broker registry | Broker → policy → (approval) → execute | ✅ built-in tools real; plugin tools planned | `docs/TOOLS_AND_PERMISSIONS_SPEC.md` |
 | **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/HOOKS_SPEC.md`, `raiker/hooks/` |
-| **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills) | `docs/guide/extensions-and-mcp.md`, `docs/SELF_IMPROVEMENT_MODEL.md` |
+| **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store; measured against the [Agent Skills standard](https://agentskills.io/specification) and **reported, never refused** | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills), including standard conformance and the deliberate refusal of `allowed-tools` | `docs/guide/extensions-and-mcp.md`, `docs/SELF_IMPROVEMENT_MODEL.md` |
 | **Plugins** | Bundles that contribute *through* the other surfaces | Plugin manifest + permission diff + supply-chain and signature checks | Each kind registers through the surface that already governs it; **no plugin code executes** | ✅ hook rules (`event:hook`), skills (`skill:contribute`, installed inactive) and MCP-server **offers** (`mcp:server`); revocation deletes what was contributed. Panels (BUG-228) and LSP (BUG-227) open | `docs/PLUGIN_SYSTEM_SPEC.md`, `docs/PLUGIN_MANIFEST_SCHEMA.md` |
 | **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist, signed with `X-Raiker-Signature` when a secret is set; inbound behind an owner secret with sender allowlisting, bounded to 60/min per sender, recorded untrusted and quarantined | ✅ transport, owner surface and rate limits (`raiker/channels/`, Extensions → Channels); routing modes and approval relay open (BUG-225) | `docs/CHANNELS_SPEC.md` |
 
@@ -106,7 +106,7 @@ plan with execution disabled).
 |---|---|
 | Give the agent a new deterministic action | **Tool** (via plugin or built-in) |
 | React to a lifecycle event (lint on edit, block a command) | **Hook** |
-| Package a repeatable multi-step procedure | **Skill** — `SKILL.md`, close to the [Agent Skills](https://agentskills.io/specification) open standard; instruction-only, so nothing it bundles is executed |
+| Package a repeatable multi-step procedure | **Skill** — `SKILL.md`, measured against the [Agent Skills](https://agentskills.io/specification) open standard on every read; instruction-only, so nothing it bundles is executed and `allowed-tools` is read and refused |
 | Distribute a set of the above together | **Plugin** |
 | Add a new way to talk to Raiker (chat/webhook/voice) | **Channel** |
 

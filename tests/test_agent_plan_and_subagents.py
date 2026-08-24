@@ -24,6 +24,7 @@ from typing import Any
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ToolAction
 from raiker.models.contracts import ToolCallProposal
 from raiker.models.tool_call_validation import (
@@ -61,7 +62,37 @@ def workspace(tmp_path: Path) -> Path:
 
 @pytest.fixture
 def store(workspace: Path) -> SQLiteStore:
-    return SQLiteStore(workspace)
+    store = SQLiteStore(workspace)
+    _set_delegation_gate(workspace, store, "enabled_runtime")
+    return store
+
+
+def _set_delegation_gate(workspace: Path, store: SQLiteStore, state: str) -> None:
+    """Set the owner's `subagents` switch through the product's own control path.
+
+    GEP-04 — delegation answers to a real gate now. Every test below is about
+    what a subagent may *do* once the owner has allowed delegation, so they each
+    start from an owner who has. The refusal when they have not is asserted on
+    its own, in `test_delegation_is_refused_when_the_owner_has_not_allowed_it`.
+
+    Written through `RuntimeControlService` rather than straight into the store
+    so the row lands wherever the runtime will look for it — the scoped table for
+    an account, the workspace-wide one otherwise.
+    """
+    from raiker.control.service import RuntimeControlService
+
+    control = RuntimeControlService(workspace)
+    control.activate_runtime_mode("local_single_user_runtime", _OWNER, "test")
+    with store.connect() as connection:
+        connection.execute(
+            "INSERT OR IGNORE INTO threat_model_acks (capability, acked_by, acked_at, doc_ref)"
+            " VALUES (?, ?, ?, ?)",
+            ("subagents", _OWNER, utc_now(), "docs/threat-models/subagents.md"),
+        )
+    result = control.set_capability_state(
+        "subagents", state, _OWNER, "test", confirmation_token="CONFIRM"
+    )
+    assert result.ok, result.reason_code
 
 
 def _broker(workspace: Path, store: SQLiteStore) -> ToolBroker:
@@ -296,6 +327,27 @@ class TestSpawnSubagent:
             "create_document",
         ):
             assert forbidden not in SPAWNABLE_TOOLS
+
+    def test_delegation_is_refused_when_the_owner_has_not_allowed_it(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        """GEP-04 — the `subagents` switch decides, and it decides first.
+
+        The gate is read before the step list is validated, so an owner who has
+        not allowed delegation is told that, rather than being told which of the
+        steps they never authorised was the invalid one.
+        """
+        _set_delegation_gate(workspace, store, "disabled")
+        result, _ = _run(
+            _broker(workspace, store),
+            "spawn_subagent",
+            {
+                "objective": "Look around",
+                "steps": [{"tool_name": "read_file", "arguments": {"path": "a.txt"}}],
+            },
+        )
+        assert result.status == "failed"
+        assert (result.error or {})["type"] == "subagent_gate_disabled"
 
     def test_a_write_step_is_refused_before_anything_runs(
         self, workspace: Path, store: SQLiteStore

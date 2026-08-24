@@ -14,8 +14,6 @@ if TYPE_CHECKING:
 MEMORY_WRITE_CAPABILITY = "memory_write_execution"
 MEMORY_FORGET_CAPABILITY = "memory_forget_execution"
 
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
-
 
 @dataclass(frozen=True)
 class MemoryCandidate:
@@ -50,31 +48,19 @@ def create_deferred_candidate(
     )
 
 
+# The one shared admission read (GEP-01). Imported inside the functions because
+# `raiker.runtime.authority` pulls the executor registry, which reaches back into
+# this module through the context gatherer.
 def _gate_enabled(store: SQLiteStore, principal_id: str | None, capability: str) -> bool:
-    try:
-        if principal_id and store.get_account(principal_id) is not None:
-            record = store.get_principal_capability_gate_state(principal_id, capability)
-        else:
-            record = store.get_capability_gate_state(capability)
-    except Exception:  # noqa: BLE001 — an unreadable gate reports "off", never "on"
-        return False
-    if not record:
-        return False
-    return str(record.get("state", "")) in _ENABLED_GATE_STATES
+    from raiker.runtime.authority.admission import capability_admission
+
+    return capability_admission(store, principal_id, capability).gate_enabled
 
 
 def _decision_mode(store: SQLiteStore, principal_id: str | None, capability: str) -> str:
-    from raiker.runtime.authority.decision_modes import DEFAULT_DECISION_MODE, parse_decision_mode
+    from raiker.runtime.authority.admission import capability_admission
 
-    try:
-        if principal_id and store.get_account(principal_id) is not None:
-            persisted = store.get_principal_capability_decision_mode(principal_id, capability)
-        else:
-            persisted = store.get_capability_decision_mode(capability)
-    except Exception:  # noqa: BLE001 — an unreadable mode falls back to the safe default
-        persisted = None
-    mode = parse_decision_mode(persisted) if persisted else None
-    return (mode or DEFAULT_DECISION_MODE).value
+    return capability_admission(store, principal_id, capability).decision_mode.value
 
 
 def governed_memory_status(

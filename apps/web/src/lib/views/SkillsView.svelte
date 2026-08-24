@@ -20,6 +20,12 @@
   import { api, ApiError } from "../api";
   import type { SkillView } from "../apiTypes";
   import { relativeTime } from "../format";
+  import {
+    conformanceBadge,
+    conformanceLabel,
+    conformanceSummary,
+    needsAttention,
+  } from "../skillConformance";
 
   let skills = $state<SkillView[] | null>(null);
   let error = $state<string | null>(null);
@@ -422,6 +428,22 @@
                   <Badge variant="idle" label="inactive" />
                 {/if}
                 {#if skill.version}<span class="version">v{skill.version}</span>{/if}
+                {#if skill.conformance}
+                  <!-- Conformance is a property of the document, not a
+                       lifecycle state. A quiet tag unless there is something to
+                       act on, so it does not compete with the active/inactive
+                       badge beside it. -->
+                  {#if needsAttention(skill.conformance)}
+                    <Badge
+                      variant={conformanceBadge(skill.conformance)}
+                      label={conformanceLabel(skill.conformance)}
+                    />
+                  {:else}
+                    <span class="standard-tag" title="Measured against the Agent Skills standard">
+                      {conformanceLabel(skill.conformance)}
+                    </span>
+                  {/if}
+                {/if}
                 {#if isPluginSkill(skill)}
                   <span class="provenance" title="Contributed by an installed plugin">from plugin</span>
                 {/if}
@@ -482,6 +504,48 @@
           </div>
 
           {#if expanded === skill.skill_id}
+            {#if skill.conformance}
+              <!-- ADD-21 — measured against the Agent Skills standard and
+                   reported, never enforced: a skill that installs today keeps
+                   installing. The one field Raiker reads and refuses is
+                   `allowed-tools`, and saying so is stronger than ignoring a
+                   field its author believes is doing something. -->
+              <section class="conformance">
+                <h4>
+                  Agent Skills standard
+                  <a
+                    class="link"
+                    href={skill.conformance.spec_url}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >specification →</a>
+                </h4>
+                <p class="conformance-summary">{conformanceSummary(skill.conformance)}</p>
+                {#if skill.conformance.license || skill.conformance.compatibility}
+                  <p class="conformance-fields">
+                    {#if skill.conformance.license}<span>License: {skill.conformance.license}</span>{/if}
+                    {#if skill.conformance.compatibility}<span>Compatibility: {skill.conformance.compatibility}</span>{/if}
+                  </p>
+                {/if}
+                {#if skill.conformance.findings.length > 0}
+                  <ul class="findings">
+                    {#each skill.conformance.findings as finding (finding.code + finding.field)}
+                      <li class="finding" data-severity={finding.severity}>
+                        <span class="finding-field mono">{finding.field}</span>
+                        <span class="finding-severity">{finding.severity}</span>
+                        <span class="finding-message">{finding.message}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+                {#if skill.conformance.refused_allowed_tools.length > 0}
+                  <p class="conformance-refused">
+                    Not pre-approved:
+                    <span class="mono">{skill.conformance.refused_allowed_tools.join(", ")}</span>
+                  </p>
+                {/if}
+              </section>
+            {/if}
             <dl class="property-list">
               <dt>Checksum</dt><dd class="mono">{skill.checksum.slice(0, 16)}…</dd>
               {#if skill.source_ref}
@@ -508,6 +572,95 @@
 </section>
 
 <style>
+  .standard-tag {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0.05rem 0.35rem;
+    white-space: nowrap;
+  }
+  /* ADD-21 — the standard-conformance block. Severity is carried by a text
+     label as well as by colour, so the row reads the same to a screen reader
+     and in a high-contrast theme. */
+  .conformance {
+    margin: var(--space-3) 0 0;
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .conformance h4 {
+    margin: 0 0 0.3rem;
+    font-size: 0.82rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  .conformance-summary {
+    margin: 0 0 0.5rem;
+    font-size: 0.84rem;
+    color: var(--text-2);
+  }
+  .conformance-fields {
+    margin: 0 0 0.5rem;
+    font-size: 0.8rem;
+    color: var(--text-3);
+    display: flex;
+    gap: 0.9rem;
+    flex-wrap: wrap;
+  }
+  .findings {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .finding {
+    display: grid;
+    grid-template-columns: auto auto 1fr;
+    gap: 0.5rem;
+    align-items: baseline;
+    font-size: 0.82rem;
+  }
+  .finding-field {
+    font-weight: 600;
+  }
+  .finding-severity {
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    padding: 0.02rem 0.3rem;
+    color: var(--text-3);
+    white-space: nowrap;
+  }
+  .finding[data-severity="error"] .finding-severity {
+    color: var(--danger, var(--text-1));
+    border-color: var(--danger, var(--border));
+  }
+  .finding-message {
+    color: var(--text-2);
+  }
+  .conformance-refused {
+    margin: 0.5rem 0 0;
+    font-size: 0.8rem;
+    color: var(--text-3);
+  }
+  @media (max-width: 40rem) {
+    .finding {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .header {
     display: flex;
     align-items: flex-start;

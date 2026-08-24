@@ -1,7 +1,8 @@
 ---
 name: security-review
 description: Audit a change, a branch, or a whole component for exploitable security defects — injection, authentication and authorisation flaws, secret and PII exposure, unsafe deserialisation, weak cryptography, SSRF, path traversal, prompt injection and tool-permission escalation — and report only findings with a real exploit path. Use whenever someone says "security review", "is this safe", "can this be exploited", "audit this for vulnerabilities", "threat model this", "check this before we expose it", or asks about handling untrusted input, credentials, tokens, or file paths that come from a user. Use it as well when a change touches authentication, permissions, an approval gate, a sandbox boundary, an agent tool surface, or anything that parses data from outside the process. Do not use it for ordinary correctness review — code-review is aimed at that.
-version: 1.0.0
+metadata:
+  version: 1.0.0
 ---
 
 # Security review

@@ -12,6 +12,15 @@
 > `raiker/contracts/models.py`), which can only ever tighten a turn. Raiker has
 > no equivalent of a mode that skips every check; see
 > [Reference platform compatibility §4.1](REFERENCE_PLATFORM_COMPATIBILITY.md#41-a-mode-that-skips-every-check).
+>
+> **The two `auto`s are different controls with the same name, and both are
+> deterministic.** The per-capability `auto` below is a risk lookup. The
+> composer's `auto` approval mode grants an ordinary approval on the owner's
+> behalf, and since 2026-08-24 it runs an **alignment check** first
+> ([`raiker/runtime/alignment.py`](../raiker/runtime/alignment.py),
+> [FIXED-282](plans/FIXED_ITEMS.md)): a change to an existing file the turn never
+> read, listed or was asked about falls back to the ordinary approval queue with
+> the path named. It can only withhold, and `skip` is not checked.
 
 Decision modes are a per-capability control layered **on top of** the capability
 gate. The gate still governs *whether* a capability is enabled at all: integrated
@@ -47,6 +56,12 @@ or `auto`.
 - **`auto` is deterministic and auditable** — it keys off the action's risk level
   (`raiker/runtime/authority/decision_modes.py::auto_requires_approval`), not an
   opaque model call. Only `low`-risk actions run unprompted.
+- **The composer's `auto` approval mode adds a second deterministic check.** It
+  answers "has this turn established the file this action is about to change?"
+  from the turn's own `tool_actions` rows and its prompt, withholds into the
+  ordinary approval queue when it has not, records
+  `approval_auto_withheld` with the path, and fails closed on an unreadable
+  record. It never widens a gate and never skips one.
 - **Human principals** self-authorize as before; decision modes primarily govern
   **AI-proposed** actions.
 

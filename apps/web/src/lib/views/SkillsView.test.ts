@@ -6,7 +6,7 @@ import { fireEvent } from "@testing-library/dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SkillsView from "./SkillsView.svelte";
 import { stubFetch } from "../test-helpers";
-import type { SkillView } from "../apiTypes";
+import type { SkillConformance, SkillView } from "../apiTypes";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -205,5 +205,102 @@ describe("SkillsView — skills a plugin contributed", () => {
     render(SkillsView);
     await screen.findByText("acme-review");
     expect(screen.getByRole("button", { name: "Download" })).toBeInTheDocument();
+  });
+});
+
+// ADD-21 — `SKILL.md` is an open standard now. The tab answers the question an
+// owner actually has about an installed skill: will this work anywhere else?
+// It reports and never refuses, so a skill that installs today keeps installing.
+describe("SkillsView — Agent Skills standard conformance", () => {
+  function conformance(partial: Partial<SkillConformance> = {}): SkillConformance {
+    return {
+      conformant: true,
+      spec_url: "https://agentskills.io/specification",
+      findings: [],
+      license: "",
+      compatibility: "",
+      metadata: {},
+      refused_allowed_tools: [],
+      ...partial,
+    };
+  }
+
+  it("marks a conformant skill and says it will install elsewhere", async () => {
+    stubFetch({ "GET /api/skills": { skills: [skill({ conformance: conformance() })] } });
+    render(SkillsView);
+    expect(await screen.findByText("standard")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: /Details/i }));
+    expect(
+      await screen.findByText(/should install in any tool that reads it/i),
+    ).toBeInTheDocument();
+  });
+
+  it("says which direction an incompatibility runs, rather than just failing it", async () => {
+    stubFetch({
+      "GET /api/skills": {
+        skills: [
+          skill({
+            conformance: conformance({
+              conformant: false,
+              findings: [
+                {
+                  field: "name",
+                  code: "name_not_standard",
+                  severity: "error",
+                  message: "The standard allows lowercase letters and digits only.",
+                },
+              ],
+            }),
+          }),
+        ],
+      },
+    });
+    render(SkillsView);
+    expect(await screen.findByText("1 portability issue")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: /Details/i }));
+    // The skill works here. That is the half an owner would otherwise assume away.
+    expect(
+      await screen.findByText(/works in Raiker and may be refused by other tools/i),
+    ).toBeInTheDocument();
+  });
+
+  it("names the tools a skill asked to pre-approve, and that they were not", async () => {
+    stubFetch({
+      "GET /api/skills": {
+        skills: [
+          skill({
+            conformance: conformance({
+              findings: [
+                {
+                  field: "allowed-tools",
+                  code: "allowed_tools_not_honoured",
+                  severity: "refused",
+                  message: "Read and deliberately not honoured.",
+                },
+              ],
+              refused_allowed_tools: ["shell", "write_file"],
+            }),
+          }),
+        ],
+      },
+    });
+    render(SkillsView);
+    // A refusal is Raiker's choice, not the author's mistake, so the row still
+    // reads as conformant.
+    expect(await screen.findByText("standard")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: /Details/i }));
+    expect(await screen.findByText(/Not pre-approved:/i)).toBeInTheDocument();
+    expect(screen.getByText("shell, write_file")).toBeInTheDocument();
+  });
+
+  it("renders nothing about the standard when the payload did not measure", async () => {
+    stubFetch({ "GET /api/skills": { skills: [skill()] } });
+    render(SkillsView);
+    await screen.findByText("algorithm-creator");
+    expect(screen.queryByText("standard")).toBeNull();
+    expect(screen.queryByText("1 portability issue")).toBeNull();
   });
 });

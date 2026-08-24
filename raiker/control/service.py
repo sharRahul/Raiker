@@ -26,6 +26,7 @@ from raiker.runtime.authority.activation import (
     has_executor,
     has_threat_model_ack,
 )
+from raiker.runtime.authority.entry_paths import OWN_GATE, entry_for
 from raiker.runtime.authority.models import (
     RAIKER_RUNTIME,
     RUNTIME_STATUS_ACTIVE,
@@ -128,6 +129,7 @@ class RuntimeControlService:
             capability, principal.principal_id if principal else None
         )
         req = get_activation_requirement(capability)
+        entry = entry_for(capability)
         state: str = effective["state"]
         default_gate = gates.get(capability)
         default_state: str = default_gate.state.value if default_gate else "disabled"
@@ -171,6 +173,8 @@ class RuntimeControlService:
             requires_threat_model_ack=(req.requires_threat_model_ack if req else False),
             requires_human_confirmation=(req.requires_human_confirmation_to_enable if req else False),
             threat_model_ack_recorded=has_threat_model_ack(capability, self._store),
+            gate_reality=entry.reality if entry is not None else OWN_GATE,
+            governance_note=entry.note if entry is not None else "",
         )
 
     # -- read methods -------------------------------------------------------
@@ -515,6 +519,46 @@ class RuntimeControlService:
         return ControlResult(
             ok=True, data={"server_id": row["server_id"] if row else None, "name": normalized}
         )
+
+    def install_plugin(
+        self, acting_principal_id: str | None, manifest_path: str
+    ) -> ControlResult:
+        """Governed install of a validated local plugin manifest (GEP-04).
+
+        The terminal used to call ``record_plugin_install`` directly. That wrote
+        the install record, the trust level and the permission set without ever
+        reading the ``plugin_install`` gate — so an owner who had deliberately
+        held that capability off could install a plugin anyway, and the switch
+        the Capabilities page showed them governed nothing.
+
+        This takes the long way round for the same reason the channel test and
+        the audit export do: it builds a governed action and routes it through
+        :class:`RuntimeAuthority`, so the capability gate, the decision mode, the
+        policy review, the critical floor and the audit event all apply. The
+        executor behind it also validates strictly more than the old path did —
+        manifest size, JSON shape, plan status and supply-chain fields — so
+        routing is an upgrade rather than a toll.
+
+        Human-only: installing a plugin is an owner's act, never an agent's.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="plugin_install",
+            tool_or_service_name="plugin_install",
+            arguments={"manifest_path": manifest_path},
+            risk_level=RiskLevelValue.HIGH,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data=dict(result.artifacts or {}))
 
     def create_remote_mcp_server(
         self, acting_principal_id: str | None, name: str, endpoint_url: str, auth_ref: str | None

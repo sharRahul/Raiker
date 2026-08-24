@@ -14,14 +14,17 @@ therefore no way to tell whether the claim was true, or to notice a new path
 appearing beside the governed ones.
 
 It exists because a claim nobody can check is not a control. Written **2026-08-23**,
-derived from the code rather than from the other documents.
+derived from the code rather than from the other documents. **Revised 2026-08-24**:
+GEP-04's trace is complete, GEP-01's shared admission helper ships, and both are
+recorded below with what the trace found.
 
 ---
 
 ## 1. The finding that motivated this document
 
-**The documentation says one chokepoint. The code has two, plus eight local
-re-implementations of one check.**
+**The documentation says one chokepoint. The code has two, plus ten callers that
+read one of the checks themselves** — eight when this was written, each with its
+own copy of the lookup; they now share one (GEP-01).
 
 `NESTED_BOUNDARIES_ARCHITECTURE.md:278` says:
 
@@ -138,6 +141,7 @@ orchestrator directly.
 | 21 | **Checkpoint restore request** (BUG-230) | `POST /api/checkpoints/{id}/restore` → recomputed preflight → an ordinary approval; a cross-principal restore is marked `critical` and takes path 8 instead | `checkpoint_restore_execution`, once, when a human approves. The route itself performs nothing |
 | 22 | **`/checkpoints restore <id> --confirm`** | The same: recomputed preflight, ordinary approval, critical when cross-principal | Identical to 21 — the terminal is not a privileged path |
 | 23 | **Audit export** (BUG-231) | `POST /api/audit/export` → `control/service.py::export_audit_log` → **B**; human-only, and the account scope comes from the principal, never from an argument | A redacted JSONL of *this* account's record, written into the workspace. The export is an event in the log it exported |
+| 24 | **Plugin install** (GEP-04) | `/plugin-plan <manifest> --install` → `control/service.py::install_plugin` → **B**; human-only. The executor re-validates the manifest's size, JSON shape, plan status and supply-chain fields before it records anything | One install record for a manifest that passed the safe-install policy. Plugin *execution* stays disabled; the contributed hooks, skills and MCP offers are written only after the record exists |
 
 ### 3.3 Delegated and contributed execution
 
@@ -164,12 +168,35 @@ orchestrator directly.
 Recorded because an unreachable registered executor is the shape a future hole
 takes.
 
-| Capability | State |
-|---|---|
-| `process_execution` | Real executor, registered, no `process` tool, not relayed by an approval. It runs the same `CommandService` lifecycle `shell_execution` does, so it is an *unused* path rather than a *weaker* one — which is why it survived the 2026-08-23 cut and `network_execution` did not |
+**Nine rows, not one.** The 2026-08-23 pass recorded `process_execution` here and
+left the question of the other fifteen open as GEP-04. Tracing them found that
+nine capabilities have a real, registered executor that **no product path
+reaches**, and the table below is now generated from the same source the runtime
+and the Capabilities page read —
+[`raiker/runtime/authority/entry_paths.py`](../../raiker/runtime/authority/entry_paths.py)
+— rather than maintained by hand.
 
-**Three of the four rows this section held are gone, and each left for a
-different reason.** `network_execution` was deleted outright (capability,
+| Capability | Why nothing reaches it |
+|---|---|
+| `process_execution` | No `process` tool, not relayed by an approval. It runs the same `CommandService` lifecycle `shell_execution` does, so it is an *unused* path rather than a *weaker* one — which is why it survived the 2026-08-23 cut and `network_execution` did not |
+| `plugin_runtime_cap` | Running an installed plugin's entrypoint has no owner surface |
+| `plugin_sandboxed_runtime_cap` | The container-isolated plugin runtime has no owner surface |
+| `plugin_sandbox_image_pull_cap` | Nothing runs a sandboxed plugin, so nothing pulls its image |
+| `plugin_revocation_cap` | Revocation is performed by the plugin registry directly; no governed action is constructed for it |
+| `channel_approval_relay` | An inbound channel message never becomes work, so no approval is ever relayed to a channel ([BUG-225](TO_BE_FIXED.md)) |
+| `reminder_runtime` | No owner surface and no model tool. Nothing creates, lists or delivers a reminder |
+| `calendar_runtime` | No owner surface and no model tool. Nothing syncs and nothing creates an event |
+| `email_runtime` | No owner surface and no model tool. Nothing drafts, and nothing has ever sent |
+
+**None of the nine is a hole.** An executor nothing constructs an action for
+cannot run at all; the risk it carries is the opposite one, and it is the reason
+this section exists — an unreachable registered executor is the shape a future
+hole takes, because the day something *does* reach it, nobody re-reads the guard.
+What the nine did cost the owner is recorded in §6 under GEP-04: each has a
+switch on the Capabilities page that governed nothing.
+
+**Three of the four rows this section held on 2026-08-23 are gone, and each left
+for a different reason.** `network_execution` was deleted outright (capability,
 executor and gate): it was a second implementation of "reach the network" whose
 only control was a hard-coded four-host netloc glob, and a registered executor
 with a weaker guard is one call site away from making the no-bypass claim false.
@@ -186,7 +213,7 @@ first column is computed (`CAPABILITY_GATE_MAP` over `TOOL_DEFINITIONS`,
 `EXECUTABLE_ON_APPROVAL`); the rest is read from the code and marked where it was
 not fully traced.
 
-**Reached by a model tool** — fifteen, each entering chokepoint B by name:
+**Reached by a model tool** — sixteen, each entering chokepoint B by name:
 
 | Capability | Tool(s) |
 |---|---|
@@ -205,10 +232,11 @@ not fully traced.
 | `web_fetch` | `web_fetch`, `web_search` |
 | `remote_execution_cap` | `remote_execute` |
 | `cloud_execution_cap` | `cloud_execute` |
+| `subagents` | `spawn_subagent` |
 
-Twelve of these fifteen are also **relayed by an approval**
-(`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `graph_indexing_runtime` and
-`web_fetch` are not. The thirteenth relayed capability,
+Twelve of these sixteen are also **relayed by an approval**
+(`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `graph_indexing_runtime`,
+`web_fetch` and `subagents` are not. The thirteenth relayed capability,
 `checkpoint_restore_execution`, has no model tool at all: only paths 21 and 22
 propose a restore, so an agent can never rewind the workspace on its own say-so.
 
@@ -231,49 +259,77 @@ propose a restore, so an agent can never rewind the workspace on its own say-so.
 | `mcp_builder_runtime` | `control/service.py::_route_mcp` (`:492`) |
 | `external_channel_runtime` | `control/service.py:838` |
 
-**Not traced to a `GovernedAction` construction** — recorded honestly rather
-than assumed. Each has a real executor and a real gate; what has *not* been
-established is whether any path builds a governed action for it, or whether it is
-reached through a control-plane service method that authorises differently:
+**Traced 2026-08-24 — the fifteen that had no traced path.** GEP-04 asked
+whether each was benign (reached through a control-plane method that authorises
+differently) or a gap (a registered executor nothing constructs an action for).
+The answer was neither of the two readings the question offered. It was three:
 
-`plugin_install` · `plugin_execution_cap` · `plugin_runtime_cap` ·
-`plugin_revocation_cap` · `plugin_sandboxed_runtime_cap` ·
-`plugin_sandbox_image_pull_cap` · `container_execution_cap` ·
-`scheduled_routines` · `subagents` · `multi_agent_teams` ·
-`channel_approval_relay` · `semantic_memory_runtime` · `calendar_runtime` ·
-`email_runtime` · `reminder_runtime`
+| Capability | What the trace found |
+|---|---|
+| `plugin_install` | **A gap, and closed.** `/plugin-plan <manifest> --install` called `record_plugin_install` directly — it wrote the install record, the trust level and the permission set without ever reading the `plugin_install` gate. It now builds a governed action through `RuntimeControlService.install_plugin` (path 24) |
+| `subagents` | **A switch that governed nothing, and closed.** Delegation ran through path 11 whatever the gate said. `spawn_subagent` now answers to it |
+| `container_execution_cap` | **Governed elsewhere, and correctly.** Running a tool in a container is chosen by enabling a container execution profile, and each call inside it is brokered under its own gate. Configuring the profile is the owner's act of authorisation |
+| `scheduled_routines` | **Governed elsewhere.** A scheduled task runs as one whole governed turn through the Agent Gateway (path 6), so every action inside it answers to that action's gate |
+| `semantic_memory_runtime` | **Governed elsewhere.** Recall answers to `vector_embedding_runtime`, which is the gate the retrieval path reads and the Memory page shows |
+| `plugin_execution_cap` | **Governed elsewhere.** A plugin's brokered tool call runs through the ordinary broker against its validated read-only set (path 13), so each call answers to the gate of the tool it names |
+| `multi_agent_teams` | **Governed elsewhere, prospectively.** No surface offers a team; when one does, each member runs as a subagent under the `subagents` gate |
+| The other eight | **No path at all** — §3.5 |
 
-**This is the open question, not a finding.** `GovernedAction(` is constructed in
-exactly four modules outside the executor package — `control/service.py` (×2),
-`tools/broker.py`, `tools/mcp_tools.py` and `approvals/execution.py` — and none
-of them names these fifteen. Plugin installation, for instance, goes through
-`record_plugin_install` from the CLI and the dashboard: a human, owner-scoped,
-control-plane action that is authorised, but **not** through the capability's own
-gate. Whether that is correct is [GEP-04](#gep-04--fifteen-capabilities-have-no-traced-governed-action-path).
+**What the gate does is now a field, not an inference.**
+[`entry_paths.py`](../../raiker/runtime/authority/entry_paths.py) records
+`own_gate` / `governed_elsewhere` / `no_path` for all forty-five, the capability
+DTO carries it, and the Capabilities page renders it beside the switch. A
+capability whose switch does not decide whether it runs says so, and says what
+does.
 
 ---
 
 ## 4. The eight modules that check the gate themselves
 
-These re-implement the capability-gate lookup rather than calling
-`RuntimeAuthority.check_capability_gate` through `route_action`. Each is
-identified by a local `_ENABLED_GATE_STATES` constant.
+These read the capability gate directly rather than calling
+`RuntimeAuthority.check_capability_gate` through `route_action`. **Since
+2026-08-24 they no longer each carry a copy of the lookup**: all of them call
+`capability_admission` in
+[`raiker/runtime/authority/admission.py`](../../raiker/runtime/authority/admission.py),
+which is GEP-01 closed.
 
 | Module | Capability | Shape |
 |---|---|---|
 | `raiker/runtime/web_access.py` | `web_fetch` | **Egress** |
-| `raiker/runtime/connectors.py` | `connector_github_runtime` | **Egress** |
+| `raiker/runtime/connectors.py` | `connector_github_runtime` and the three other read connectors | **Egress** |
 | `raiker/runtime/advisor.py` | `advisor_model_runtime` | **Egress** |
 | `raiker/tools/mcp_tools.py` | `mcp_connector_runtime` | **Subprocess + egress** |
 | `raiker/graph/codemap_service.py` | `code_map_indexing` | Local read-derived |
 | `raiker/runtime/retrieval.py` | `vector_embedding_runtime` | Local read |
 | `raiker/memory/candidates.py` | memory candidates | Local read |
 | `raiker/models/policy_state.py` | provider gate state | Local read |
+| `raiker/tools/subagent_tools.py` | `subagents` | Local delegation (GEP-04) |
+| `raiker/context/gatherer.py` | every gate it reports | **Describes rather than enforces** |
 
 **This is defensible and it is not free.** The design intent is stated in
 `raiker/policy/engine.py:132–138`: a projected MCP tool is *read-shaped at the
 policy layer* because what actually governs it is enforced inside the tool. The
-same argument covers the other seven.
+same argument covers the others.
+
+**Two drifts were live in the eight copies, and neither was visible from any one
+of them.** Both are closed by the shared helper:
+
+* **Scope.** `RuntimeAuthority` resolves the control scope with
+  `store.account_scope`, which maps a delegated AI-agent principal onto the owner
+  account that delegated it. The eight used `store.get_account(pid) is not None`,
+  which does not — so the same capability could read the owner's gate at
+  chokepoint B and the workspace-wide gate inside the tool. No shipped path
+  passed an AI-agent principal to any of the eight, so this was **latent, not
+  live**.
+* **What an empty gate table means.** Three different answers. Seven read "no row"
+  as off. `codemap_service.py` fell back to the shipped table for a caller with
+  no account, matching `check_capability_gate`. `web_access.py` fell back for
+  *any* caller (RAIKER-2021). This one **was live, and it was visible to the
+  model**: the context bundle reported `web_fetch: disabled` on a fresh install
+  while `WebAccessService` would have allowed the fetch. The three resolutions
+  still exist — unifying them would either loosen seven paths or tighten one —
+  but they are now one table, `CAPABILITY_UNSET_RESOLUTION`, read by the
+  enforcing path *and* by every surface that describes it.
 
 What each of them therefore does **not** get, because it never enters chokepoint B:
 
@@ -299,22 +355,30 @@ other or from the authority. Tracked as [GEP-01](#gep-01--eight-modules-re-imple
 
 ---
 
-## 5. Invariants worth asserting by test
+## 5. Invariants asserted by test
 
-None of these are asserted today. Each is cheap, and each would have caught a
-real defect this repository has already had.
+**All of them are asserted**, in
+[`tests/test_governance_entry_paths.py`](../../tests/test_governance_entry_paths.py)
+unless another file is named. Each is cheap, and each would have caught a real
+defect this repository has already had.
 
 | # | Invariant | Would have caught |
 |---|---|---|
 | I1 | `route_action` has exactly six call sites, in the five modules named in §2 | A seventh entry path appearing unreviewed |
 | I2 | `AgentGateway` is constructed in exactly the four modules named in §3.1 | A surface that reaches the orchestrator without the gateway |
-| I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is reachable from a named path in §3, or listed in §3.5 | **The two-egress problem** and the unreachable checkpoint restore, both since closed; the invariant is what keeps a new registered executor from repeating either |
-| I4 | Every module with a local `_ENABLED_GATE_STATES` is listed in §4 | A ninth local gate check appearing silently |
+| I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is named in this document **and** classified in `entry_paths.py` | **The two-egress problem** and the unreachable checkpoint restore, both since closed; the invariant is what keeps a new registered executor from repeating either |
+| I3b | The tool-reachable set is exactly sixteen | A capability moving between §3.6's categories without the document moving |
+| I4 | Every module reading a capability gate itself calls `capability_admission`, and is listed in §4 | A further local gate check appearing silently. **The original form of this — "has a local `_ENABLED_GATE_STATES`" — already missed one**: `context/gatherer.py` spelled the constant without the leading underscore and was absent from §4 for that reason alone |
+| I4b | No module outside `admission.py` declares its own enabled-state set | The three-way fork in what an empty gate table means |
 | I5 | `combine()` never returns `allow` for a hook decision | A hook gaining grant authority |
-| I6 | Every tool in `MODEL_EXPOSED_TOOLS` has a `PolicyEngine` verdict | Already asserted — `tests/test_policy_engine.py` |
+| I6 | Every tool in `MODEL_EXPOSED_TOOLS` has a `PolicyEngine` verdict | `tests/test_policy_engine.py` |
+| I7 | Every `own_gate` claim matches `TOOL_DEFINITIONS` / `EXECUTABLE_ON_APPROVAL`, and every non-`own_gate` row carries a sentence naming what really governs it | A gate labelled as governing something it does not, which is the whole of GEP-04 |
 
-I3 is the one to build first: it is the invariant whose absence produced the
-finding at the top of this document.
+**I4's first form is the lesson worth keeping.** It watched for a *marker* — a
+constant with a particular name — rather than for the *behaviour*. A module could
+drop the marker and keep the drift, and one module never had the marker in the
+first place. It now watches for callers of the shared helper, which is the actual
+seam.
 
 ---
 
@@ -322,24 +386,40 @@ finding at the top of this document.
 
 ### GEP-01 — Eight modules re-implement the gate check
 
-**Severity: Low. Area: governance architecture. Status: Open — raised 2026-08-23.**
+**Severity: Low. Area: governance architecture.
+Status: Closed 2026-08-24 — [FIXED-279](FIXED_ITEMS.md).**
 
-**Observed.** Eight modules carry their own `_ENABLED_GATE_STATES` and read the
+**Observed.** Eight modules carried their own `_ENABLED_GATE_STATES` and read the
 gate state directly from the store. Four of them are egress or subprocess paths.
 
-**Why it matters.** Not because any of them is currently wrong — each was read
-and each enforces its gate and its decision mode correctly. It matters because
-*eight independent copies of a governance check* is the precondition for drift,
-and this repository has already produced one instance of exactly that pattern in
-the two egress implementations. It also means the agent-runtime stop switch does
-not reach them (§4).
+**Why it mattered.** Not because any of them was *wrong* — each enforced its gate
+and its decision mode correctly. It mattered because eight independent copies of
+a governance check is the precondition for drift, and this repository had already
+produced one instance of exactly that pattern in the two egress implementations.
 
-**Proposed work.** One shared `capability_admission(store, principal_id, capability)`
-helper returning gate state, decision mode **and** the runtime-gate answer.
-Replace all eight call sites with it. Add invariant I4.
+**And it had already drifted, twice.** Reading the eight side by side is what
+found it; neither is visible from any one of them. §4 records both. One was
+latent (scope, for a delegated AI principal). **One was live and visible to the
+model**: three different answers to "what does an empty gate table mean", so the
+context bundle told the model `web_fetch: disabled` on a fresh install while the
+tool would have allowed the fetch. That is the same class of defect as GEP-04 —
+a stated control that is not the enforced one — arrived at from the other end.
 
-**Governed outcome.** An owner who stops the agent runtime stops every path, and
-a ninth local gate check cannot appear without failing a test.
+**What shipped.** `capability_admission(store, principal_id, capability)` in
+`raiker/runtime/authority/admission.py`, returning gate state, decision mode,
+control scope and the runtime status. All eight call it, and so do the two paths
+added since (`subagent_tools.py`, `context/gatherer.py`). The three unset
+resolutions survive as a named table, `CAPABILITY_UNSET_RESOLUTION`, because
+collapsing them would either loosen seven paths or tighten one — an owner-visible
+change, not a refactor — but every surface that *describes* a gate now reads the
+same rule the enforcing path does. Invariants I4 and I4b assert it.
+
+**What did not ship, and why.** The helper reports `runtime_active` and nothing
+consults it. Whether stopping the agent runtime should also stop a read that
+leaves the machine is GEP-02 below — an owner's decision, not an implementer's.
+Making the helper carry the answer costs nothing and decides nothing; flipping it
+is now a one-line change in one place, which is the most this item should do
+before that question is answered.
 
 ### GEP-02 — The stop switch's scope is undefined for read paths
 
@@ -356,8 +436,13 @@ Only one is currently true, and no document says which.
 
 **Proposed work.** Answer it in
 [`NESTED_BOUNDARIES_ARCHITECTURE.md`](../NESTED_BOUNDARIES_ARCHITECTURE.md),
-then make the code match. If the answer is the wider one, GEP-01's shared helper
-is where it lands.
+then make the code match.
+
+**GEP-01's helper is now where it lands, and it is already carrying the answer.**
+`CapabilityAdmission.runtime_active` reports whether the runtime is accepting
+executions; no call site consults it. Choosing the wider reading is a one-line
+change in one place — which is deliberately as far as an implementer should take
+an owner's decision.
 
 ### GEP-03 — `NESTED_BOUNDARIES_ARCHITECTURE.md:278` overstates the architecture
 
@@ -375,8 +460,52 @@ everywhere else.
 
 ### GEP-04 — Fifteen capabilities have no traced governed-action path
 
-**Severity: Unknown — that is the point. Area: governance architecture.
-Status: Open — raised 2026-08-23.**
+**Severity: Unknown when raised; Medium once traced. Area: governance
+architecture. Status: Closed 2026-08-24 — [FIXED-280](FIXED_ITEMS.md).**
+
+**The trace is in §3.6 and §3.5. What it found is that neither of the two
+readings below was right, and the thing they both missed is the finding.**
+
+Both readings asked whether an *action* could reach an executor ungoverned. For
+fourteen of the fifteen the answer was no. But every one of the fifteen has a
+gate, the Capabilities page renders every gate as a switch, and for all fifteen
+**flipping that switch changed nothing**. Nine had no executor path at all. Five
+had their work governed by a different control the gate never consults. One —
+`plugin_install` — was the gap the second reading described.
+
+An owner holding a switch that governs nothing is not a smaller version of an
+ungoverned action. It is a different defect, and for a product whose claim is
+that the owner is in control, a worse one: the ungoverned action is a hole in the
+implementation, and the inert switch is a hole in what the owner believes.
+
+**What shipped.**
+
+* `plugin_install` is a governed action (§3.2 path 24). The terminal's
+  `/plugin-plan --install` went straight to `record_plugin_install`; an owner who
+  had deliberately held that capability off could install a plugin anyway.
+* `subagents` governs delegation. `spawn_subagent` had `capability=None` on the
+  argument that spawning is no more authority than the parent already held —
+  true of *what a subagent may touch*, never true of *whether the owner wanted
+  delegation at all*.
+* `entry_paths.py` records `own_gate` / `governed_elsewhere` / `no_path` for all
+  forty-five, with a required sentence for the last two. The DTO carries it and
+  the Capabilities page renders it beside the switch, so a gate that does not
+  decide whether its capability runs says so, and says what does.
+* Invariant I7 checks every claim in that table against `TOOL_DEFINITIONS` and
+  `EXECUTABLE_ON_APPROVAL`, so a new executor cannot ship without classifying
+  itself.
+
+**What was deliberately not changed.** `container_execution_cap`,
+`scheduled_routines`, `semantic_memory_runtime`, `plugin_execution_cap` and
+`multi_agent_teams` are labelled, not gated. Each is already governed — per
+action, per turn, or by the owner's act of configuring a profile — and adding a
+second switch in front of a choice the owner already made is the wall
+[`SECURITY_AND_POLICY.md`](../SECURITY_AND_POLICY.md) → "Security Philosophy"
+exists to refuse. The nine with no path keep their gates for the same reason
+§3.5 keeps its list: the day something reaches one of them, the gate is what is
+already there.
+
+**The original question, kept because it is what was actually asked:**
 
 **Observed.** `GovernedAction(` is constructed in four modules outside the
 executor package. Between them they name `mcp_builder_runtime`,
@@ -395,14 +524,10 @@ establish which is true:
    shape `network_execution` had, and that one turned out to be a weaker
    duplicate of a guarded path that nobody noticed for months.
 
-**Proposed work.** Trace each of the fifteen to its caller and record the answer
-in §3.6. Where the answer is (1), say which control-plane method and what
-authorises it. Where it is (2), it belongs in
-[`TO_BE_FIXED.md`](TO_BE_FIXED.md) as a defect.
-
-**Do this before GEP-01.** GEP-01 proposes a shared admission helper for the
-eight local gate checks; if some of these fifteen also need it, the helper should
-be designed once with both in view.
+**Doing this before GEP-01 was the right call, and for the reason given.** Two of
+the fifteen did need the shared helper — `subagents` reads its gate through
+`capability_admission`, and so does the context bundle that describes it — so the
+helper was designed once with both in view rather than twice.
 
 ---
 

@@ -23,6 +23,15 @@ export interface CapabilityGate {
   requires_threat_model_ack?: boolean;
   requires_human_confirmation?: boolean;
   threat_model_ack_recorded?: boolean;
+  // GEP-04 — what this gate actually decides. "own_gate" means the switch
+  // governs the capability; "governed_elsewhere" means the work happens under a
+  // different named control; "no_path" means nothing in the product reaches the
+  // executor. Optional so older payloads and fixtures stay valid, and absent is
+  // read as "own_gate".
+  gate_reality?: "own_gate" | "governed_elsewhere" | "no_path";
+  // The sentence naming what really governs the work, for anything that is not
+  // "own_gate". Empty otherwise.
+  governance_note?: string;
 }
 
 export interface ComposerApprovalModeSettings {
@@ -116,6 +125,27 @@ export interface McpServer {
  * stays stored and is withheld from every turn. The stored document is never
  * carried in a list — it is read on an explicit download or by the runtime.
  */
+/** One way an installed skill differs from the Agent Skills standard. */
+export interface SkillConformanceFinding {
+  field: string;
+  code: string;
+  // "error" — would not validate elsewhere; "warning" — portable but untidy;
+  // "refused" — Raiker read the field and deliberately does not honour it.
+  severity: "error" | "warning" | "refused";
+  message: string;
+}
+
+/** How an installed skill measures against https://agentskills.io/specification. */
+export interface SkillConformance {
+  conformant: boolean;
+  spec_url: string;
+  findings: SkillConformanceFinding[];
+  license: string;
+  compatibility: string;
+  metadata: Record<string, string>;
+  refused_allowed_tools: string[];
+}
+
 export interface SkillView {
   skill_id: string;
   name: string;
@@ -130,6 +160,9 @@ export interface SkillView {
   byte_size: number;
   created_at: string;
   updated_at: string;
+  // Optional so older payloads and existing test fixtures stay valid; absent is
+  // read as "not measured", which renders nothing rather than a false pass.
+  conformance?: SkillConformance;
 }
 
 /** What a linked skill turned out to be, reported before anything is stored. */

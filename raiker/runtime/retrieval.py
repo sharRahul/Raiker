@@ -5,18 +5,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from raiker.runtime.authority.decision_modes import (
-    DEFAULT_DECISION_MODE,
-    DecisionMode,
-    parse_decision_mode,
-)
+from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
+from raiker.runtime.authority.decision_modes import DecisionMode
 from raiker.vector import LOCAL_EMBEDDING_MODEL, VectorIndex, embed_text
 
 if TYPE_CHECKING:
     from raiker.storage.sqlite import SQLiteStore
 
 _CAP = "vector_embedding_runtime"
-_ENABLED_GATE_STATES = frozenset({"enabled_read_only", "enabled_policy_gated", "enabled_runtime"})
 _DIMENSIONS = 384
 _DEFAULT_TOP_K = 3
 _PREVIEW_CAP = 200
@@ -69,30 +65,14 @@ class RetrievalAugmentor:
         self._store = store
         self._principal_id = principal_id
 
-    def _scoped(self) -> bool:
-        return bool(self._principal_id and self._store.get_account(self._principal_id) is not None)
+    def _admission(self) -> CapabilityAdmission:
+        return capability_admission(self._store, self._principal_id, _CAP)
 
     def _gate_enabled(self) -> bool:
-        try:
-            if self._scoped():
-                assert self._principal_id is not None
-                record = self._store.get_principal_capability_gate_state(self._principal_id, _CAP)
-            else:
-                record = self._store.get_capability_gate_state(_CAP)
-        except Exception:
-            return False
-        if not record:
-            return False
-        return str(record.get("state", "")) in _ENABLED_GATE_STATES
+        return self._admission().gate_enabled
 
     def _mode(self) -> DecisionMode:
-        if self._scoped():
-            assert self._principal_id is not None
-            persisted = self._store.get_principal_capability_decision_mode(self._principal_id, _CAP)
-        else:
-            persisted = self._store.get_capability_decision_mode(_CAP)
-        mode = parse_decision_mode(persisted) if persisted else None
-        return mode or DEFAULT_DECISION_MODE
+        return self._admission().decision_mode
 
     def plan(self, prompt_text: str, *, top_k: int = _DEFAULT_TOP_K) -> RetrievalPlan:
         if not self._gate_enabled():
@@ -128,7 +108,10 @@ class RetrievalAugmentor:
             return []
         query_vector = embed_text(prompt_text, _DIMENSIONS)
         index = VectorIndex(_DIMENSIONS)
-        owner_principal_id = self._principal_id if self._scoped() else None
+        # The same control scope the gate was read under, so the vectors a turn
+        # can recall are the owner's own — never wider than the account whose
+        # switch admitted the read (GEP-01).
+        owner_principal_id = self._admission().control_scope
         for row in self._store.list_active_memory_vector_embeddings(
             LOCAL_EMBEDDING_MODEL, owner_principal_id=owner_principal_id
         ):

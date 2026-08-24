@@ -100,9 +100,12 @@ a new path appears beside the governed ones and nothing breaks.
 | `test_i1_route_action_callers_are_the_enumerated_ones` | `RuntimeAuthority.route_action` is called from exactly the five modules the document names. A sixth is a new entry into the governed chokepoint |
 | `test_i2_agent_gateway_is_constructed_only_by_enumerated_surfaces` | `AgentGateway` is constructed only by the four surfaces named. This is what makes "every interface enters through the Agent Gateway" checkable |
 | `test_i3_every_real_executor_capability_is_named_in_the_enumeration` | Every capability with a real executor is named in the enumeration with the path that reaches it. A new registered executor cannot appear without someone writing down how it is reached — the step nobody took for `network_execution` before it was deleted (BUG-232) |
-| `test_i3b_the_tool_reachable_set_is_exactly_fifteen` | Fifteen capabilities are reachable by a model tool through `CAPABILITY_GATE_MAP`. A change moves a capability between reachability categories |
-| `test_i4_local_gate_checks_are_the_enumerated_eight` | Exactly eight modules read a capability gate directly instead of routing through the authority. A ninth cannot appear silently |
+| `test_i3b_the_tool_reachable_set_is_exactly_sixteen` | Sixteen capabilities are reachable by a model tool through `CAPABILITY_GATE_MAP`. A change moves a capability between reachability categories |
+| `test_i4_local_gate_checks_are_the_enumerated_ones` | Every module that reads a capability gate directly calls the one shared `capability_admission` helper and is enumerated. A further one cannot appear silently |
+| `test_i4b_no_module_carries_its_own_copy_of_the_gate_lookup` | No module outside `admission.py` declares its own enabled-state set. The original I4 watched for a *marker* rather than the behaviour, and missed a module that spelled the constant differently |
 | `test_i5_a_hook_can_never_grant` | `combine()` returns only `deny`, `ask` or `no_decision` for every scope, decision and authority combination — an `allow` can never override a `deny` |
+| `test_every_real_executor_capability_is_classified` | Every capability with a real executor says whether its own gate decides anything, or what does instead. A registered executor cannot ship without an answer (GEP-04) |
+| `test_model_tool_entries_match_the_tool_registry`, `test_approval_relay_entries_match_the_relayable_set` | The entry-path table's claims are checked against `TOOL_DEFINITIONS` and `EXECUTABLE_ON_APPROVAL` rather than trusted |
 
 ## What is not automated
 

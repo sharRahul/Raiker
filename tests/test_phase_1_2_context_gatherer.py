@@ -2,11 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raiker.context.gatherer import (
-    CAPABILITY_GATE_TOOLS,
-    ENABLED_GATE_STATES,
-    ContextGatherer,
-)
+from raiker.context.gatherer import CAPABILITY_GATE_TOOLS, ContextGatherer
 from raiker.context.models import SOURCE_TYPES, ContextBundle, ContextGathererConfig
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
@@ -128,20 +124,37 @@ def test_workspace_summary_reports_the_live_runtime_rather_than_a_fixed_string(
     assert summary.metadata["agent_runtime"] == "disabled"
 
 
-def test_capability_status_reports_every_gate_disabled_on_a_fresh_workspace(
+def test_capability_status_reports_what_the_tools_will_actually_do(
     tmp_path: Path,
 ) -> None:
+    """GEP-01 — the bundle reports the gate the *tool* will read, not its own.
+
+    This used to assert every gate reads ``disabled`` on a fresh workspace, and
+    that was not true of the product: `web_fetch` resolves an empty gate table
+    to the shipped default (RAIKER-2021), so the model was told the capability
+    was off while `WebAccessService` would have allowed the fetch. Both now read
+    through ``capability_admission``, so there is one answer rather than two.
+    """
+    from raiker.runtime.authority.admission import capability_admission
+    from raiker.storage.sqlite import SQLiteStore
+
     bundle = _gather(tmp_path)
     caps = [i for i in bundle.included_items if i.source.source_type == "capability_status"]
     assert len(caps) == 1
     content = caps[0].content
+    store = SQLiteStore(tmp_path)
     for capability, tools in CAPABILITY_GATE_TOOLS.items():
-        assert f"{capability}: disabled" in content
+        expected = capability_admission(store, None, capability).gate_enabled
+        assert caps[0].metadata[capability]["enabled"] is expected, capability  # type: ignore[index]
+        assert f"{capability}: {'enabled' if expected else 'disabled'}" in content
         # BUG-57: naming the tools each gate governs is what stops a model
         # reasoning from one capability's state to a neighbouring one.
         for tool in tools:
             assert tool in content
-        assert caps[0].metadata[capability]["enabled"] is False  # type: ignore[index]
+
+    # The shape the old assertion was reaching for, stated exactly: nothing that
+    # writes or runs is reported on before an owner switches it on.
+    assert caps[0].metadata["shell_execution"]["enabled"] is False  # type: ignore[index]
 
 
 def test_capability_status_reports_a_gate_the_owner_enabled(tmp_path: Path) -> None:
@@ -161,13 +174,38 @@ def test_capability_status_reports_a_gate_the_owner_enabled(tmp_path: Path) -> N
     assert caps.metadata["shell_execution"]["enabled"] is False  # type: ignore[index]
 
 
-def test_capability_status_agrees_with_the_gate_states_the_tools_enforce() -> None:
-    """The bundle and the tools must not hold two copies of "enabled"."""
+def test_capability_status_agrees_with_the_gate_states_the_tools_enforce(
+    tmp_path: Path,
+) -> None:
+    """The bundle and the tools must not hold two answers for "enabled".
 
-    from raiker.runtime.connectors import _ENABLED_GATE_STATES as connector_states
-    from raiker.runtime.web_access import _ENABLED_GATE_STATES as web_states
+    The old version of this test compared three copies of the *frozenset* and
+    passed while the two disagreed, because the disagreement was never in which
+    states count as on — it was in what an empty gate table means. So this
+    compares the answers instead, for every capability the bundle reports and
+    under both scopes, which is the thing that has to hold.
+    """
+    from raiker.runtime.authority.admission import capability_admission
+    from raiker.runtime.web_access import WebAccessService
+    from raiker.storage.sqlite import SQLiteStore
 
-    assert ENABLED_GATE_STATES == web_states == connector_states
+    store = SQLiteStore(tmp_path)
+    principal_id = _account(store)
+    _enable_principal_gate(store, principal_id, "shell_execution", decision_mode="allow")
+
+    for scope in (None, principal_id):
+        bundle = _gather(tmp_path, owner_principal_id=scope)
+        caps = [
+            i for i in bundle.included_items if i.source.source_type == "capability_status"
+        ][0]
+        for capability in CAPABILITY_GATE_TOOLS:
+            assert caps.metadata[capability]["enabled"] is (  # type: ignore[index]
+                capability_admission(store, scope, capability).gate_enabled
+            ), (capability, scope)
+        # And against a real enforcing service rather than the helper alone.
+        assert caps.metadata["web_fetch"]["enabled"] is (  # type: ignore[index]
+            WebAccessService(tmp_path, store, principal_id=scope)._gate_enabled()  # noqa: SLF001
+        )
 
 
 def test_recent_events_are_bounded(tmp_path: Path) -> None:

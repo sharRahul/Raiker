@@ -606,21 +606,24 @@ def handle_plugin_plan(command: str, *, workspace_root: str | Path = ".") -> str
     if contributions.get("refused"):
         lines.append(f"contributions_refused: {','.join(contributions['refused'])}")
     if install_flag and plan["status"] != "denied":
-        supply_chain = manifest.get("supply_chain") or {}
-        from raiker.plugins.registry import record_plugin_install
+        # GEP-04 — the install is a governed action. This used to call
+        # `record_plugin_install` directly, which wrote the install record
+        # without ever reading the `plugin_install` gate: the switch on the
+        # Capabilities page governed nothing, and an owner who had held that
+        # capability off could install a plugin from the terminal anyway.
+        from raiker.control.service import RuntimeControlService
 
-        record = record_plugin_install(
-            store=SQLiteStore(workspace_root),
-            plugin_id=str(plan["plugin_id"]),
-            version=str(manifest.get("version", "0.0.0")),
-            trust_level=str(plan["trust_level"]),
-            permissions_json=json.dumps(plan["permissions"], sort_keys=True),
-            checksum=supply_chain.get("checksum"),
-            signature=supply_chain.get("signature"),
-            source_url=supply_chain.get("source_url"),
-            commit_sha=supply_chain.get("commit_sha"),
-        )
-        lines.append(f"Installed: {record.record_id}")
+        result = RuntimeControlService(workspace_root).install_plugin(None, str(path))
+        if not result.ok:
+            if result.reason_code == "disabled_by_capability_gate":
+                lines.append(
+                    "Install denied: the Plugin install capability is off. Turn on "
+                    "**Plugin install** in Capabilities and run this again."
+                )
+            else:
+                lines.append(f"Install denied: {result.reason_code}")
+            return "\n".join(lines)
+        lines.append(f"Installed: {result.data.get('record_id', '')}")
         # Written only after the record exists, so a workspace can never hold a
         # plugin's rules without the install that authorised them.
         from raiker.plugins.contributions import install_contributions

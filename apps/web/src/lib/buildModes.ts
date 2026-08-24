@@ -162,7 +162,10 @@ export function standingPostureNote(
   if (asking > 0 || denied > 0) {
     return `${asking + denied} of ${observed.length} write capabilities are still set to Ask or Deny, so some changes will be proposed rather than run.`;
   }
-  return "Your standing permissions let low-risk changes run unprompted; medium and higher still ask.";
+  // BUG-218 — Auto gained a second check, and the note that describes Auto has
+  // to describe it too. It is deterministic and can only withhold, so the
+  // sentence promises a pause rather than a judgement.
+  return "Your standing permissions let low-risk changes run unprompted; medium and higher still ask. A change to a file this turn never looked at waits for you either way.";
 }
 
 /**

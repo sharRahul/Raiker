@@ -206,12 +206,15 @@ def test_review_and_lifecycle_modules_no_unsafe_imports() -> None:
 
 
 def test_a_proposal_never_turns_a_capability_gate_on(tmp_path: Path) -> None:
+    # Before against after: saving a proposal must change no gate, whatever the
+    # starting state. See `test_phase_2_5_code_review_safety.py`.
     _init_repo(tmp_path)
     store = _store(tmp_path)
+    before = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     store.save_proposals([_proposal()], review_id="rev_1")
-    item = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
+    after = ContextGatherer()._capability_status(tmp_path, SQLiteStore(tmp_path), None)
     for capability in CAPABILITY_GATE_TOOLS:
-        assert item.metadata[capability]["enabled"] is False  # type: ignore[index]
+        assert after.metadata[capability] == before.metadata[capability], capability  # type: ignore[index]
 
 
 def test_no_apply_or_execute_command_introduced() -> None:

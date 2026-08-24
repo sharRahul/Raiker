@@ -38,7 +38,13 @@ GATEWAY_CONSTRUCTORS = {
 
 #: Modules that read a capability gate themselves instead of routing through
 #: `RuntimeAuthority`. Each is listed in §4 of the document with the checks it
-#: therefore does not get. A ninth appearing silently is the thing to prevent.
+#: therefore does not get. A tenth appearing silently is the thing to prevent.
+#:
+#: They no longer each carry a copy of the lookup — GEP-01 replaced eight copies
+#: with `capability_admission` — so the shape this test watches for changed from
+#: "a local `_ENABLED_GATE_STATES`" to "a caller of the shared helper". That is
+#: strictly better: the old marker could be dropped while the drift stayed, and
+#: this one names the actual seam.
 LOCAL_GATE_CHECK_MODULES = {
     "raiker/graph/codemap_service.py",
     "raiker/memory/candidates.py",
@@ -48,6 +54,15 @@ LOCAL_GATE_CHECK_MODULES = {
     "raiker/runtime/retrieval.py",
     "raiker/runtime/web_access.py",
     "raiker/tools/mcp_tools.py",
+    # GEP-04 — delegation answers to the `subagents` gate now. It is read here
+    # rather than at chokepoint B because `spawn_subagent` is read-shaped, the
+    # same reason `code_map_search` reads its own gate.
+    "raiker/tools/subagent_tools.py",
+    # Reads the gate to *describe* it to the model rather than to enforce it.
+    # It is in this list for the same reason the others are: it used to resolve
+    # an empty gate table differently from the path it was describing, and told
+    # the model `web_fetch: disabled` on an install where web_fetch worked.
+    "raiker/context/gatherer.py",
 }
 
 #: Capabilities with a real executor that no product path constructs. Each is
@@ -120,10 +135,10 @@ def test_i3_every_real_executor_capability_is_named_in_the_enumeration() -> None
     )
 
 
-def test_i3b_the_tool_reachable_set_is_exactly_fifteen() -> None:
+def test_i3b_the_tool_reachable_set_is_exactly_sixteen() -> None:
     """The one reachability fact that *is* exactly computable.
 
-    Fifteen capabilities are reached by a model tool through
+    Sixteen capabilities are reached by a model tool through
     `CAPABILITY_GATE_MAP`. Everything else is reached by an approval, by the
     control plane, by a tool that checks its own gate (§4), or by nothing at all
     (§3.5). A change here moves a capability between those categories and the
@@ -136,19 +151,21 @@ def test_i3b_the_tool_reachable_set_is_exactly_fifteen() -> None:
     by_tool = {
         CAPABILITY_GATE_MAP.get(d.name, d.name) for d in TOOL_DEFINITIONS
     } & REAL_EXECUTOR_CAPABILITIES
-    assert len(by_tool) == 15, (
+    assert len(by_tool) == 16, (
         "The number of capabilities a model tool can name changed "
-        f"({len(by_tool)}, was 15). Update §3.6 of {ENTRY_PATHS_DOC}: "
+        f"({len(by_tool)}, was 16). Update §3.6 of {ENTRY_PATHS_DOC}: "
         f"{sorted(by_tool)}"
     )
 
 
-def test_i4_local_gate_checks_are_the_enumerated_eight() -> None:
-    """I4 — a ninth module re-implementing the gate check cannot appear silently."""
+def test_i4_local_gate_checks_are_the_enumerated_ones() -> None:
+    """I4 — a further module reading the gate itself cannot appear silently."""
     found = {
         path
         for path, text in _sources()
-        if re.search(r"^_ENABLED_GATE_STATES\s*[:=]", text, re.M)
+        if path != "raiker/runtime/authority/admission.py"
+        and re.search(r"\b(capability_admission|capability_gate_record|gate_enabled)\b", text)
+        and "raiker.runtime.authority.admission import" in text
     }
     assert found == LOCAL_GATE_CHECK_MODULES, (
         "The set of modules reading a capability gate directly changed. Each one "
@@ -157,6 +174,26 @@ def test_i4_local_gate_checks_are_the_enumerated_eight() -> None:
         f"posture check. Update LOCAL_GATE_CHECK_MODULES *and* §4 of {ENTRY_PATHS_DOC}: "
         f"added={sorted(found - LOCAL_GATE_CHECK_MODULES)}, "
         f"removed={sorted(LOCAL_GATE_CHECK_MODULES - found)}"
+    )
+
+
+def test_i4b_no_module_carries_its_own_copy_of_the_gate_lookup() -> None:
+    """GEP-01 — one copy of the enabled-state set, and it lives in `admission`.
+
+    The eight copies were each correct. What made them worth removing is that
+    the same empty gate table meant three different things across them, and two
+    of the three were only discoverable by reading all eight side by side.
+    """
+    offenders = sorted(
+        path
+        for path, text in _sources()
+        if path != "raiker/runtime/authority/admission.py"
+        and re.search(r"^_?ENABLED_GATE_STATES\s*[:=]", text, re.M)
+    )
+    assert offenders == [], (
+        "A module declared its own set of enabled gate states. Call "
+        "`raiker.runtime.authority.admission.capability_admission` instead — it "
+        f"is the one copy, and it names which unset-resolution it uses: {offenders}"
     )
 
 
@@ -200,3 +237,103 @@ def test_the_entry_path_document_names_both_chokepoints() -> None:
     doc = ENTRY_PATHS_DOC.read_text(encoding="utf-8")
     for required in ("PolicyEngine.review", "RuntimeAuthority.route_action"):
         assert required in doc, f"{ENTRY_PATHS_DOC} must name {required}"
+
+
+# ── GEP-04: what each gate actually decides ─────────────────────────────────
+# The finding that motivated these: fifteen capabilities had a gate, a switch on
+# the Capabilities page, and no traced path. Some had none because nothing
+# reaches the executor; some because the work happens under a *different*
+# control. Either way the owner was shown a switch that governed nothing, which
+# is the one failure mode a governance product cannot have.
+
+
+def test_every_real_executor_capability_is_classified() -> None:
+    """A new registered executor must say how it is reached before it ships."""
+    from raiker.runtime.authority.entry_paths import CAPABILITY_ENTRY_PATHS
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    missing = sorted(REAL_EXECUTOR_CAPABILITIES - set(CAPABILITY_ENTRY_PATHS))
+    extra = sorted(set(CAPABILITY_ENTRY_PATHS) - REAL_EXECUTOR_CAPABILITIES)
+    assert missing == [], (
+        "A capability has a real executor and no entry-path classification. Add "
+        "it to raiker/runtime/authority/entry_paths.py saying what reaches it, "
+        f"or that nothing does: {missing}"
+    )
+    assert extra == [], (
+        "An entry-path row names a capability with no real executor. Remove it "
+        f"or register the executor: {extra}"
+    )
+
+
+def test_model_tool_entries_match_the_tool_registry() -> None:
+    """`ENTRY_MODEL_TOOL` is a claim the tool registry can confirm or refute."""
+    from raiker.models.tool_registry import TOOL_DEFINITIONS
+    from raiker.runtime.authority.entry_paths import (
+        CAPABILITY_ENTRY_PATHS,
+        ENTRY_MODEL_TOOL,
+    )
+    from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    by_tool = {
+        CAPABILITY_GATE_MAP.get(d.name, d.name) for d in TOOL_DEFINITIONS
+    } & REAL_EXECUTOR_CAPABILITIES
+    claimed = {
+        cap
+        for cap, entry in CAPABILITY_ENTRY_PATHS.items()
+        if ENTRY_MODEL_TOOL in entry.entries
+    }
+    assert claimed == by_tool, (
+        "The set of capabilities a model tool names disagrees with the "
+        f"entry-path table: claimed_only={sorted(claimed - by_tool)}, "
+        f"registry_only={sorted(by_tool - claimed)}"
+    )
+
+
+def test_approval_relay_entries_match_the_relayable_set() -> None:
+    """`ENTRY_APPROVAL_RELAY` is a claim `EXECUTABLE_ON_APPROVAL` can confirm."""
+    from raiker.approvals.execution import EXECUTABLE_ON_APPROVAL
+    from raiker.runtime.authority.entry_paths import (
+        CAPABILITY_ENTRY_PATHS,
+        ENTRY_APPROVAL_RELAY,
+    )
+
+    claimed = {
+        cap
+        for cap, entry in CAPABILITY_ENTRY_PATHS.items()
+        if ENTRY_APPROVAL_RELAY in entry.entries
+    }
+    assert claimed == set(EXECUTABLE_ON_APPROVAL), (
+        "The set of capabilities an approval relays disagrees with the "
+        f"entry-path table: claimed_only={sorted(claimed - EXECUTABLE_ON_APPROVAL)}, "
+        f"relay_only={sorted(EXECUTABLE_ON_APPROVAL - claimed)}"
+    )
+
+
+def test_an_inert_gate_says_what_really_governs_it() -> None:
+    """The sentence is the deliverable, so it cannot be empty or a restatement."""
+    from raiker.runtime.authority.entry_paths import (
+        CAPABILITY_ENTRY_PATHS,
+        OWN_GATE,
+    )
+
+    for cap, entry in sorted(CAPABILITY_ENTRY_PATHS.items()):
+        if entry.reality == OWN_GATE:
+            continue
+        assert len(entry.note.split()) >= 12, (
+            f"{cap} is not governed by its own gate and its note is too short to "
+            f"tell an owner what is: {entry.note!r}"
+        )
+
+
+def test_the_known_unreachable_set_is_derived_not_duplicated() -> None:
+    """§3.5's list and the table cannot disagree, because one derives the other."""
+    from raiker.runtime.authority.entry_paths import CAPABILITY_ENTRY_PATHS, NO_PATH
+
+    no_path = {
+        cap for cap, entry in CAPABILITY_ENTRY_PATHS.items() if entry.reality == NO_PATH
+    }
+    assert no_path >= KNOWN_UNREACHABLE_CAPABILITIES, (
+        "A capability recorded in §3.5 as unreachable is classified as reached: "
+        f"{sorted(KNOWN_UNREACHABLE_CAPABILITIES - no_path)}"
+    )

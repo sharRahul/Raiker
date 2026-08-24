@@ -120,6 +120,9 @@ of the reference audit of that date rather than from the original tiering, and
 each states its tier in its own entry. ADD-23 is an **owner decision**; ADD-24 is
 blocked on [BUG-234](TO_BE_FIXED.md) and **supersedes** the plugin-panels work.
 
+**Implemented 2026-08-24:** ADD-21, as [FIXED-281](FIXED_ITEMS.md). Its entry
+below keeps the analysis and states what shipped at the top.
+
 **Owner decisions, not implementer decisions.** ADD-11, ADD-14, ADD-18 and
 ADD-23 change what Raiker *is* — a machine that reaches the public internet, a machine that
 requires specific hardware, a machine with more than one principal. They belong
@@ -722,9 +725,28 @@ drill raises a finding before an attacker finds it first.
 
 ## ADD-21 — Conformance to the Agent Skills open standard
 
-**Status: proposed. Tier 2 (reach). Effort: low.**
+**Status: implemented 2026-08-24 — [FIXED-281](FIXED_ITEMS.md). Tier 2 (reach).
+Effort: low, as estimated.**
 
-**What exists today.** `raiker/skills/package.py` reads a `SKILL.md` with a
+**What shipped.** `raiker/skills/conformance.py` measures every installed skill
+against the specification on read — not at install, so tightening a rule
+re-measures what is already stored — and the Skills tab shows the answer.
+`parse_metadata_block` reads the standard's nested `metadata:` map one level
+deep (still not a YAML parser, for the reason the flat reader gives), `license`
+and `compatibility` are parsed for display, and all six built-ins were brought
+to conformance: their `version:` moved under `metadata:`, and one description
+that had drifted 24 characters past the 1024 cap was trimmed.
+
+**Nothing was tightened into a refusal.** Raiker's `name` rule stays a superset
+and its description cap stays at 2000. A skill that installed before installs
+now; what changed is that the owner is told where it diverges, and in which
+direction — a skill can be perfectly good here and refused by a stricter reader.
+`allowed-tools` is parsed, its tools are listed on the card under *Not
+pre-approved*, and the card says the field is not honoured.
+
+**What follows is the analysis as written on 2026-08-23, kept for the record.**
+
+**What existed then.** `raiker/skills/package.py` reads a `SKILL.md` with a
 `---` frontmatter block, requires `name` and `description`, validates the name
 against `^[a-z0-9][a-z0-9._-]{0,63}$`, truncates the description at 2000
 characters, and loads progressively — index into the turn, body on demand

@@ -1,7 +1,8 @@
 ---
 name: algorithm-creator
 description: Design, specify, and verify an algorithm before writing production code. Use this whenever the task needs a correct procedure rather than glue — sorting, searching, scheduling, graph or tree traversal, dynamic programming, matching, dedup, ranking, pathfinding, numeric or geometric routines — or whenever someone says code is "too slow", "times out", "runs out of memory", "O(n²)", "needs optimizing", or "what's the efficient way to do X". Use it too when an implementation is suspected of being wrong on edge cases, when a data structure has to be chosen, or when a coding-interview-style problem shows up. Reach for this even if the request just describes a computation in plain words and never uses the word "algorithm".
-version: 1.1.0
+metadata:
+  version: 1.1.0
 ---
 
 # Algorithm creator

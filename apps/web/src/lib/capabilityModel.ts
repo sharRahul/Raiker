@@ -66,6 +66,44 @@ export function gateBadge(gate: CapabilityGate): BadgeVariant {
   return "disabled";
 }
 
+// ── What the switch actually decides (GEP-04) ────────────────────────────────
+// Forty-five capabilities have a real executor and therefore a gate, and this
+// page renders every gate as a switch. For fifteen of them, flipping it changed
+// nothing: either nothing in the product reaches the executor, or the work
+// happens under a different control the gate never consults. An owner holding a
+// switch that governs nothing is the one failure mode a governance product
+// cannot have, so the card says which kind of switch it is.
+
+/** True when this gate's own state decides whether the capability runs. */
+export function governsItsOwnCapability(gate: CapabilityGate): boolean {
+  return (gate.gate_reality ?? "own_gate") === "own_gate";
+}
+
+/** True when the work runs and a *different* named control governs it. */
+export function isGovernedElsewhere(gate: CapabilityGate): boolean {
+  return gate.gate_reality === "governed_elsewhere";
+}
+
+/** True when nothing in the product reaches this capability's executor. */
+export function hasNoRoute(gate: CapabilityGate): boolean {
+  return gate.gate_reality === "no_path";
+}
+
+/** The short label for a switch that does not govern its own capability. */
+export function realityLabel(gate: CapabilityGate): string {
+  if (isGovernedElsewhere(gate)) return "Governed elsewhere";
+  if (hasNoRoute(gate)) return "No route yet";
+  return "";
+}
+
+/**
+ * The sentence to show beside such a switch — what really governs the work, or
+ * why nothing runs. Empty when the switch means what it says.
+ */
+export function realityNote(gate: CapabilityGate): string {
+  return governsItsOwnCapability(gate) ? "" : (gate.governance_note ?? "").trim();
+}
+
 /** Group gates by backend phase (a real backend field) for the matrix. */
 export function groupByPhase(gates: CapabilityGate[]): { phase: number; gates: CapabilityGate[] }[] {
   const byPhase = new Map<number, CapabilityGate[]>();

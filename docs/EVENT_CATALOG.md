@@ -120,8 +120,17 @@ refused at execution time; a turn resolving its own eligible call under the
 capability the resolution is a decision and emits no execution event, which is
 the distinction this paragraph used to collapse.
 
+**`auto` also records when it declines to grant.** `approval_auto_withheld`
+(BUG-218) is written when Auto's deterministic alignment check finds that the
+turn's own record does not establish the file an action is about to change: the
+payload carries the path, the reason code and the sentence the owner is shown,
+and the action falls back to the ordinary approval queue. An `auto` turn that
+withholds therefore emits `approval_auto_withheld` followed by
+`approval_requested`, never `approval_auto_executed`. `skip` is not
+alignment-checked and never emits it.
+
 **This catalogue is a reader's guide, not the registry.** The registry is
-`raiker/contracts/models.py::EVENT_TYPES`, which declares 268 event types; the
+`raiker/contracts/models.py::EVENT_TYPES`, which declares 269 event types; the
 tables above cover the ones a person reading the audit log most often needs
 explained. An event type that exists in the registry and not here is documented
 by its emitting call site, not missing from the product.

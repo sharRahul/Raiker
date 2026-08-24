@@ -57,6 +57,28 @@ def _gateway(tmp_path: Path) -> AgentGateway:
     return gateway
 
 
+def _allow_delegation(store: Any, owner_principal_id: str) -> None:
+    """Turn the owner's `subagents` gate on, wherever the runtime will read it."""
+    now = utc_now()
+    row = {
+        "capability": "subagents",
+        "state": "enabled_runtime",
+        "requested_by": owner_principal_id,
+        "requested_at": now,
+        "activated_by": owner_principal_id,
+        "activated_at": now,
+        "reason": "test",
+        "readiness_snapshot_json": "",
+        "created_at": now,
+        "updated_at": now,
+    }
+    scope = store.account_scope(owner_principal_id)
+    if scope is not None:
+        store.upsert_principal_capability_gate_state(scope, row)
+    else:
+        store.upsert_capability_gate_state(row)
+
+
 def _action(tool_name: str = "web_fetch", **arguments: Any) -> ToolAction:
     return ToolAction(
         action_id=new_id("act_"),
@@ -243,6 +265,10 @@ class TestADelegatedResultMustProveItsSpawn:
         gateway = _gateway(tmp_path)
         envelope = _envelope()
         owner = gateway.runtime._source_owner(envelope)
+        # GEP-04 — delegation answers to the owner's `subagents` switch. This
+        # test is about the spawn/sign/verify/cite loop, so it starts from an
+        # owner who has allowed delegation.
+        _allow_delegation(gateway.store, owner)
         (tmp_path / "note.txt").write_text("hello from the workspace", encoding="utf-8")
         from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
 

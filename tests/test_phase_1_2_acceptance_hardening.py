@@ -29,9 +29,19 @@ REQUIRED_GATED_CAPABILITIES = (
 )
 
 
-def test_required_capability_gates_are_reported_disabled_on_a_fresh_workspace(
+def test_required_capability_gates_are_reported_as_the_tools_will_read_them(
     tmp_path: Path,
 ) -> None:
+    """Every gated capability is reported, and reported truthfully.
+
+    Previously this asserted all of them read ``disabled`` on a fresh workspace.
+    That was true of the bundle and untrue of the product: `web_fetch` resolves
+    an empty gate table to the shipped default, so the model was told the
+    capability was off while the tool would have allowed the call (GEP-01).
+    """
+    from raiker.runtime.authority.admission import capability_admission
+    from raiker.storage.sqlite import SQLiteStore
+
     assert set(REQUIRED_GATED_CAPABILITIES).issubset(set(CAPABILITY_GATE_TOOLS))
 
     bundle = ContextGatherer().gather(
@@ -44,11 +54,17 @@ def test_required_capability_gates_are_reported_disabled_on_a_fresh_workspace(
         item for item in bundle.included_items if item.source.source_type == "capability_status"
     ][0]
 
+    store = SQLiteStore(tmp_path)
     for name in REQUIRED_GATED_CAPABILITIES:
-        assert capability.metadata[name]["enabled"] is False  # type: ignore[index]
-        assert f"{name}: disabled" in capability.content
+        expected = capability_admission(store, None, name).gate_enabled
+        assert capability.metadata[name]["enabled"] is expected, name  # type: ignore[index]
+        assert f"{name}: {'enabled' if expected else 'disabled'}" in capability.content
         for tool in CAPABILITY_GATE_TOOLS[name]:
             assert tool in capability.content
+
+    # The claim worth keeping literal: nothing that executes is on before the
+    # owner says so.
+    assert capability.metadata["shell_execution"]["enabled"] is False  # type: ignore[index]
 
 
 def test_context_gathered_event_payload_is_metadata_only_and_redacted(tmp_path: Path) -> None:

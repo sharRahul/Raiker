@@ -6541,6 +6541,12 @@ class DashboardService:
                 "Approval resolution is metadata-only. Recording a decision does "
                 "NOT execute the action."
             )
+        # BUG-218 — when Auto withheld this action rather than granting it, the
+        # owner is looking at an approval they did not expect to see. Saying why,
+        # first, is what makes it a question they can answer.
+        withheld = self._alignment_withheld(view.approval_id, turn_id=view.turn_id)
+        if withheld:
+            notice = f"{withheld}\n\n{notice}"
         return ApprovalDetailView(
             approval=view,
             arguments=arguments,
@@ -6553,6 +6559,33 @@ class DashboardService:
                 view.approval_id, turn_id=view.turn_id
             ),
         )
+
+    def _alignment_withheld(self, approval_id: str, *, turn_id: str | None) -> str:
+        """The sentence Auto's alignment check left behind, or ``""``.
+
+        BUG-218 — read from the durable ``approval_requested`` event rather than
+        recomputed here. The check is deterministic and would give the same
+        answer, but recomputing it would also attach the sentence to approvals
+        raised in **manual** mode, where the check never ran and Auto promised
+        nothing. What the owner is told has to match what actually happened.
+        """
+        from raiker.events.query import EventViewer
+
+        if not turn_id:
+            return ""
+        viewer = EventViewer(self.store)
+        for row in viewer.list_events(
+            turn_id=turn_id, event_type="approval_requested", limit=50
+        ):
+            event = viewer.read_event_payload(str(row.get("event_id", "")))
+            payload = event.get("payload") if isinstance(event, dict) else None
+            if not isinstance(payload, dict) or payload.get("approval_id") != approval_id:
+                continue
+            alignment = payload.get("alignment")
+            if isinstance(alignment, dict) and not alignment.get("aligned", True):
+                return str(alignment.get("message") or "")
+            return ""
+        return ""
 
     def _approval_execution_evidence(
         self, approval_id: str, *, turn_id: str | None

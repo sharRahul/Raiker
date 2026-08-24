@@ -29,7 +29,11 @@ export const APPROVAL_MODES: ReadonlyArray<{
   {
     mode: "auto",
     label: "Automatically approve",
-    detail: "Approvals are granted for you, and every one is still recorded.",
+    // BUG-218 — Auto now runs a second check before granting, so the copy says
+    // so. The check is deterministic, not a classifier: it asks whether this
+    // turn read, listed or was asked about the file, and can only withhold.
+    detail:
+      "Approvals are granted for you, unless a change lands on a file this turn never looked at — then it waits.",
     icon: "fast-forward",
   },
   {

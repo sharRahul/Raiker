@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-24 | Targeted | `r0824-` | Anthropic (`claude-haiku-4-5-20251001`) | What each capability switch actually decides, Agent Skills conformance on the Skills tab, and Auto's alignment check against a real turn |
 | 2026-08-23 | Targeted | `r0823-` | Anthropic, OpenAI, OpenRouter | The checkpoint rewind end to end, the audit export, the deleted second egress path, and two defects the rewind exposed |
 | 2026-08-22 | Targeted | `bug-219-`, `bug-221-`, `bug-223-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama | Hooks off switch and lifecycle events, plugin-contributed skills and MCP offers, channel owner surface, the fourth approval mode |
 | 2026-08-21 | Targeted | `r0821b-`, `r0821c-`, `2026-08-21-` | Anthropic | Governed voice, Build modes and operating protocol, the two composers, the Hooks tab, responsive sweeps |
@@ -47,6 +48,86 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-24 — what each switch decides, skills against a standard, and Auto's second check
+
+**Tier:** targeted. **Providers:** Anthropic (`claude-haiku-4-5-20251001`),
+connected through the product's own Connect dialog with
+`RAIKER_MODEL_EGRESS_ALLOWLIST=api.anthropic.com` on the host. No other provider
+was exercised. **Prefix:** `r0824-`.
+
+**Build:** the FIXED-279 … FIXED-282 change set, `apps/web` rebuilt, a **fresh
+workspace** at `/tmp/raiker-live` with the owner account created in-session, so
+every capability gate started at its per-account fail-closed default.
+
+### What it proved
+
+* **A capability switch says whether it decides anything.** Permissions renders
+  **GOVERNED ELSEWHERE** beside *Scheduled routines*, *Semantic memory*, *Plugin
+  execution*, *Container execution* and *Multi-agent teams*, and **NO ROUTE YET**
+  beside the nine with no path — *Plugin runtime*, *Plugin sandbox image pull*,
+  *Plugin sandbox runtime*, *Reminders (local)* and the rest. Opening a marked
+  card states what really governs the work: *"A scheduled task runs as one whole
+  governed turn through the Agent Gateway, so every action inside it answers to
+  that action's own gate and decision mode."* Shell, File writes and Subagents
+  carry no tag, because their switches mean what they say
+  (`r0824-gate-reality-governed-elsewhere`).
+* **Delegation has a switch that is real.** `Subagents` reads as an ordinary
+  capability rather than an inert one — `spawn_subagent` answers to it now.
+* **Every shipped skill reports against the Agent Skills standard.** Extensions →
+  Skills shows **STANDARD** on all six built-ins, and opening **Details** gives
+  the *Agent Skills standard* block, a link to the published specification, and
+  *"This skill matches the Agent Skills standard and should install in any tool
+  that reads it."* (`r0824-skill-standard-conformance`.)
+* **Auto states the promise it now keeps.** The composer's mode menu reads
+  *"Approvals are granted for you, unless a change lands on a file this turn
+  never looked at — then it waits."* Skip's line is unchanged
+  (`r0824-auto-alignment-promise`).
+* **Auto does not obstruct the work that was asked for.** Under Auto, with a real
+  Haiku turn: creating `alignment-notes.md` ran unprompted, and so did changing
+  the *existing* `ops/deploy.sh` when the prompt named it. This is the half that
+  decides whether an owner leaves Auto switched on
+  (`r0824-auto-aligned-write-ran`).
+* **And it withholds when the turn established nothing.** In the *next* turn of
+  the same conversation — *"Do exactly that again, with text repeated"* — the
+  model repeated the write, Auto declined to grant it, and the file stayed
+  `named`. The approval that appeared opens with *"Automatic approval was
+  withheld: ops/deploy.sh already exists and this turn has not read, listed or
+  been asked about it, so changing it is outside what you asked for."* above the
+  ordinary notice, with the diff `-named +repeated`
+  (`r0824-auto-withheld-approval`). **Establishment is scoped to the turn**, and
+  this is what that looks like from the owner's side.
+
+### What it found
+
+**One UI defect, fixed in the round.** Rendering skill conformance as a `Badge`
+put two pills side by side on every skill row — `► active` and `► standard` —
+identical in glyph and tone and meaning nothing alike, because `active` is the
+lifecycle badge for *"in flight"*. Conformance is a property of the document, not
+a state, so it now renders as a quiet tag and escalates to a real badge only when
+there is a portability issue to act on. Covered by
+`apps/web/src/lib/skillConformance.test.ts::"keeps conformance a quiet tag unless
+there is something to act on"`.
+
+**One test defect, in this round's own spec.** The first version of the
+withholding scenario instructed the model with `path "ops/deploy.sh"` in the
+prompt — which *establishes* the path, so Auto correctly granted the write and
+the spec asserted something impossible. The rule is not a bug; naming a file is
+asking about it. Rewritten around turn scoping, which reproduces the
+unestablished case deterministically with a real model. Recorded because a live
+spec that asserts an impossible state is worse than no spec.
+
+### Deliberately not covered
+
+* **A model choosing an unrelated file on its own.** No prompt that instructs a
+  write can also be the unestablished case, and a live spec that waits for a
+  model to volunteer one would be flaky. That shape is proven deterministically
+  at the broker level instead —
+  `tests/test_model_tool_call_loop.py::test_auto_withholds_a_write_to_an_existing_file_the_turn_never_looked_at`.
+* **The other providers.** Only Anthropic was connected on this host.
+* This was a **targeted** round. The last full sweep remains 2026-08-08.
 
 ---
 

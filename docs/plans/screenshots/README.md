@@ -25,6 +25,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `r0824-` | **2026-08-24**, what each capability switch actually decides, Agent Skills standard conformance on the Skills tab, and Auto's alignment check against a real turn | hosted Anthropic (`claude-haiku-4-5-20251001`) |
 | `r0823-` | **2026-08-23**, the checkpoint rewind end to end, the audit export, and the Permissions surface after `network_execution` was deleted | hosted Anthropic, OpenAI, OpenRouter |
 | `bug-221-`, `bug-223-`, `bug-225-` | **2026-08-22**, plugin contributions (skills, MCP-server offers), turn-end hooks across four providers, and the channel owner surface | hosted Anthropic, OpenAI, OpenRouter, local Ollama |
 | `bug-219-` | **2026-08-22**, the fourth approval mode (*Decline, don't ask*) | hosted Anthropic |

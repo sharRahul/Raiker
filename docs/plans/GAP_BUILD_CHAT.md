@@ -60,30 +60,46 @@ agentic work assistant that acts across the owner's tools and files. They are
 written to the same standard as the defects: what exists today with the file
 that proves it, what is missing, and the concrete work.
 
-| ID | GAP | Tier| Status |
+| ID | GAP | Tier | Status |
 |---|---|---|---|
-| B1 | BUILD | TIER 0 | Done |
-| B2 | BUILD | TIER 0 | Done |
-| B3 | BUILD | TIER 0 | Complete |
-| B4 | BUILD | TIER 1 | Done |
-| B5 | BUILD | TIER 1 | Done |
-| B6 | BUILD | TIER 1 | Done |
-| B7 | BUILD | TIER 1 | Done |
-| B8 | BUILD | TIER 1 | Complete |
-| B9 | BUILD | TIER 2 | Done |
-| B11 | BUILD | TIER 2 | Complete |
-| B12 | BUILD | TIER 2 | Done |
-| B17 | BUILD | TIER 2 | Done |
-| B19 | BUILD | TIER 3 | Done — composer commands, `@` mentions, keyboard map, message actions (FIXED-220) |
-| C1 | BUILD | TIER 0 | Done |
-| C2 | BUILD | TIER 0 | Complete |
-| C3 | BUILD | TIER 0 | Done |
-| C4 | CHAT | TIER 1 | Complete |
-| C6 | CHAT | TIER 1 | Done |
-| C7 | BUILD | TIER 0 | Done |
-| C8 | BUILD | TIER 0 | Done |
-| C13 | BUILD | TIER 0 | Done |
-| C14 | CHAT | TIER 3 | **Complete** — copy, edit-and-resend, retry (FIXED-220); branch-from-here (FIXED-227) |
+| [B1](#b1--an-approved-action-must-actually-execute) | BUILD | TIER 0 | Done |
+| [B2](#b2--the-turn-resumes-after-an-approval) | BUILD | TIER 0 | Done |
+| [B3](#b3--real-patch-application) | BUILD | TIER 0 | Done |
+| [B4](#b4--parallel-tool-calls-are-silently-dropped) | BUILD | TIER 1 | Done |
+| [B5](#b5--testcommand-feedback-channel) | BUILD | TIER 1 | Done |
+| [B6](#b6--no-taskplan-state-across-the-loop) | BUILD | TIER 1 | Done |
+| [B7](#b7--no-subagents-at-the-models-disposal) | BUILD | TIER 1 | Done |
+| [B8](#b8--mcp-tools-are-unreachable) | BUILD | TIER 1 | Done |
+| [B9](#b9--no-repository-index) | BUILD | TIER 2 | Done |
+| [B10](#b10--no-language-intelligence) | BUILD | TIER 2 | Open |
+| [B11](#b11--no-git-write-path) | BUILD | TIER 2 | Done |
+| [B12](#b12--no-web-access) | BUILD | TIER 2 | Done |
+| [B13](#b13--no-file-tree-and-no-editor) | BUILD | TIER 3 | Open |
+| [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Open |
+| [B15](#b15--terminaloutput-pane) | BUILD | TIER 3 | Partial |
+| [B16](#b16--tool-activity-is-buried) | BUILD | TIER 3 | Open |
+| [B17](#b17--no-way-to-stop-or-steer-a-running-turn) | BUILD | TIER 3 | Done |
+| [B18](#b18--no-checkpoint-or-rewind-control-where-the-work-happens) | BUILD | TIER 3 | Open |
+| [B19](#b19--composer-ergonomics) | BUILD | TIER 3 | Done |
+| [B20](#b20--sandboxed-execution-environment) | BUILD | TIER 3 | Partial |
+| [C1](#c1--first-class-document-output) | CHAT | TIER 0 | Done |
+| [C2](#c2--acting-in-the-owners-tools) | CHAT | TIER 0 | Done |
+| [C3](#c3--recall-outside-the-current-chat) | CHAT | TIER 0 | Done |
+| [C4](#c4--file-inspector) | CHAT | TIER 1 | Done |
+| [C5](#c5--chat-file-output--done) | CHAT | TIER 1 | Done |
+| [C6](#c6--no-citations-on-tool-derived-answers) | CHAT | TIER 1 | Done |
+| [C7](#c7--no-web-access) | CHAT | TIER 1 | Done |
+| [C8](#c8--mcp-tools-unreachable) | CHAT | TIER 1 | Done |
+| [C9](#c9--no-skills-or-reusable-procedures) | CHAT | TIER 1 | Open |
+| [C10](#c10--the-assistant-lives-in-one-browser-tab) | CHAT | TIER 2 | Open |
+| [C11](#c11--background-work-is-not-conversational) | CHAT | TIER 2 | Open |
+| [C12](#c12--no-collaboration) | CHAT | TIER 2 | Open |
+| [C13](#c13--no-stop-or-steer) | CHAT | TIER 3 | Done |
+| [C14](#c14--no-message-level-actions) | CHAT | TIER 3 | Done |
+| [C15](#c15--attachments-are-one-way) | CHAT | TIER 3 | Open |
+| [C16](#c16--governed-turn-based-voice) | CHAT | TIER 3 | Done |
+| [C17](#c17--recall-is-invisible) | CHAT | TIER 3 | Open |
+| [C18](#c18--no-cross-chat-surface) | CHAT | TIER 3 | Open |
 
 **2026-08-21 compatibility update.** BUG-216 and MEM-06 are closed. Build now
 has foreground SSH/Daytona command adapters, a persistent container boundary,
@@ -120,7 +136,9 @@ approval instead of ending at it; Build can now make a narrow, hunk-level edit.
 
 ### Tier 0 — the blocking three (without these, nothing else matters)
 
-**B1. An approved action must actually execute.** ✅ **Done — see FIXED-08.**
+#### B1 — An approved action must actually execute
+
+✅ **Done — see FIXED-08.**
 The Approvals resolution path now invokes `ApprovalExecutionRelay` for
 `file_write_execution` and `patch_apply_execution`, so an approved file change
 is genuinely written, re-governed at execution time, and checkpointed first.
@@ -135,12 +153,16 @@ authority or unavailable selected backend fails closed. The executed/refused
 outcome is threaded back into the transcript as a real tool result by B2
 (FIXED-09).
 
-**B2. The turn resumes after an approval.** ✅ **Done — see FIXED-09.** The loop
+#### B2 — The turn resumes after an approval
+
+✅ **Done — see FIXED-09.** The loop
 parks its working state against the approval and picks the same turn up on
 resolution, with the real result (or an honest refusal) appended as the tool
 result. Build no longer stops dead at its first write.
 
-**B3. Real patch application.** ✅ **Complete — see FIXED-23, FIXED-29, and
+#### B3 — Real patch application
+
+✅ **Complete — see FIXED-23, FIXED-29, and
 FIXED-34.** `edit_file` now replaces
 `old_text` only when it occurs exactly once, and `apply_patch` calculates a
 unified-diff candidates from exact hunk context before the approval is
@@ -157,7 +179,9 @@ checkpoint evidence under the same governed action.
 
 ### Tier 1 — loop mechanics
 
-**B4. Parallel tool calls are silently dropped.** ✅ **Done — see FIXED-39.**
+#### B4 — Parallel tool calls are silently dropped
+
+✅ **Done — see FIXED-39.**
 Every validated read-only proposal in a model response now runs concurrently
 and every result is returned under its matching call id in one provider-valid
 batch. Mutations remain serial and stop at the first approval boundary.
@@ -171,7 +195,9 @@ than the batch, wherever in the batch it falls, and reaches the transcript as
 `model_tool_call_refused` — so `model_tool_calls_dropped` is left meaning only
 what it says.
 
-**B5. Test/command feedback channel.** ✅ **Done — see FIXED-44, FIXED-47, and
+#### B5 — Test/command feedback channel
+
+✅ **Done — see FIXED-44, FIXED-47, and
 the governed-shell implementation commits dated 2026-08-14.**
 A standing, expiring, revocable per-session
 command-prefix grant now returns bounded stdout/stderr and exit status with the
@@ -183,7 +209,9 @@ pinned container runs there with no network and no host fallback; explicit
 isolation. Unsupported container, SSH, or Daytona features are refused rather
 than substituted.
 
-**B6. No task/plan state across the loop.** ✅ **Done — see FIXED-94.**
+#### B6 — No task/plan state across the loop
+
+✅ **Done — see FIXED-94.**
 `update_plan` writes an ordered checklist — one status per step, at most one
 `in_progress` — into an owner-scoped, session-keyed row that outlives the turn.
 It is streamed live as `agent_plan_updated` and rendered as a checklist above the
@@ -193,7 +221,9 @@ a progress bar. Validation is fail-closed and names every rejection, so a
 malformed plan never replaces a good one. It grants nothing: every step it names
 is governed again when it is actually attempted.
 
-**B7. No subagents at the model's disposal.** ✅ **Done — see FIXED-95.**
+#### B7 — No subagents at the model's disposal
+
+✅ **Done — see FIXED-95.**
 `spawn_subagent` runs a bounded, read-only investigation under its own principal
 and contract and returns a bounded digest, so a wide search no longer sits in the
 parent's context for the rest of the conversation. Only read-only, local,
@@ -203,7 +233,9 @@ named. Every step is re-brokered through the same policy engine and gates, and
 the findings reach the calling model as untrusted data and the audit trail as
 counts.
 
-**B8. MCP tools are unreachable.** ✅ **Complete — see FIXED-17 and FIXED-96.**
+#### B8 — MCP tools are unreachable
+
+✅ **Complete — see FIXED-17 and FIXED-96.**
 FIXED-17 made a connected server's tools callable as `mcp__<server>__<tool>`.
 Reviewing this entry against the running product found the *surface* had not
 caught up, and FIXED-96 closes that: discovery now answers the capability gate
@@ -217,7 +249,9 @@ trail.
 
 ### Tier 2 — what the agent can see
 
-**B9. No repository index.** ✅ **Done — see FIXED-113.** A bounded, deterministic
+#### B9 — No repository index
+
+✅ **Done — see FIXED-113.** A bounded, deterministic
 scan (`raiker/graph/codemap.py`) records what each file is and what it declares —
 Python exactly via `ast`, fifteen other languages approximately via bounded
 patterns, with each file recording which extractor produced it. It is built when
@@ -250,12 +284,16 @@ declarations, which is what makes it find a *definition* rather than a mention.
 memories, and it is called on every turn by the context gatherer, not only by the
 evaluation harness as this entry used to claim.
 
-**B10. No language intelligence.** No symbol lookup, no
+#### B10 — No language intelligence
+
+No symbol lookup, no
 definition/reference navigation, no type or lint feedback loop. **Work:** an
 LSP-backed read tool set (`find_definition`, `find_references`,
 `document_symbols`, `diagnostics`) — read-only, so it needs no approval path.
 
-**B11. No git write path.** ✅ **Complete — see FIXED-109, FIXED-110 and
+#### B11 — No git write path
+
+✅ **Complete — see FIXED-109, FIXED-110 and
 FIXED-111.** `git_branch` and
 `git_commit` are governed, approval-required proposals whose preview *is* the
 computation the execution re-derives: for a commit the exact file list and the
@@ -283,7 +321,9 @@ open a pull request against. The git tools also resolve against the repository
 the owner *selected* in Build rather than always the workspace root, and every
 git approval names the repository the change lands in.
 
-**B12. No web access.** ✅ **Done — see FIXED-101.** `web_fetch` returns one page
+#### B12 — No web access
+
+✅ **Done — see FIXED-101.** `web_fetch` returns one page
 as bounded, sanitised text framed as untrusted data, governed by the `web_fetch`
 capability gate, the per-capability decision mode (default `ask` withholds), and
 the owner **blocklist** `RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in
@@ -301,20 +341,26 @@ Build's transcript is a chat column plus a background-work rail
 (`BuildSidePanel.svelte`) and a "Waiting on you" decisions block. A coding agent
 needs a workbench.
 
-**B13. No file tree and no editor.** `ProjectTreeNode.svelte` exists but Build
+#### B13 — No file tree and no editor
+
+`ProjectTreeNode.svelte` exists but Build
 mounts no explorer, so a user cannot see the repository the agent is working in,
 open a file, or read the result of a change without leaving the app.
 **Work:** a resizable left explorer over the connected repository plus a
 read-only viewer with syntax highlighting, promoted to an editor once B1 lands.
 
-**B14. No diff review surface in Build.** The unified diff lives in the
+#### B14 — No diff review surface in Build
+
+The unified diff lives in the
 Approvals inbox, in a different route — so the core act of coding review is a
 context switch away, and it is all-or-nothing: no per-hunk accept, no edit
 before accept, no partial rejection. **Work:** an inline side-by-side diff in
 the Build transcript with per-hunk accept/reject and an "edit then accept" path,
 resolving straight into the existing approval record.
 
-**B15. Terminal/output pane.** 🟡 **Partly complete (2026-08-14).** Build now has
+#### B15 — Terminal/output pane
+
+🟡 **Partly complete (2026-08-14).** Build now has
 a responsive governed-terminal pane with selected-environment posture, durable
 redacted output catch-up, live status, process-tree stop, authority evidence,
 and immutable receipt inspection. It survives a browser reload because output
@@ -323,13 +369,17 @@ controls, stream filters, failure-coordinate navigation, credential-delta
 review, and backend restart reattachment remain open and are tracked in the
 compatibility matrix and `TO_BE_FIXED.md`; the UI does not advertise them.
 
-**B16. Tool activity is buried.** Tool events render inside a collapsed
+#### B16 — Tool activity is buried
+
+Tool events render inside a collapsed
 governance `details`, so during a long turn the transcript looks idle.
 **Work:** promote tool calls to first-class transcript rows — file read, files
 matched, command started — with a progress affordance, keeping the full
 governed record in the disclosure.
 
-**B17. No way to stop or steer a running turn.** ✅ **Done — see FIXED-102.**
+#### B17 — No way to stop or steer a running turn
+
+✅ **Done — see FIXED-102.**
 While a turn streams, the composer becomes its control surface: **Stop** ends the
 turn at its next safe boundary and it reports as `stopped` — a decision, not a
 failure — keeping the text it had already produced, and a steer field queues the
@@ -337,13 +387,17 @@ owner's own words into the running turn, where they arrive as a user message
 before the model is asked anything else. Both go through the same governed
 `POST /api/interrupts` the top-bar STOP switch uses.
 
-**B18. No checkpoint or rewind control where the work happens.** Checkpoints are
+#### B18 — No checkpoint or rewind control where the work happens
+
+Checkpoints are
 recorded and browsable in their own route, but Build offers no "rewind to before
 this turn" — the one control that makes an autonomous agent safe to let run.
 **Work:** a per-turn rewind in the transcript, restoring workspace and
 conversation state from the existing checkpoint manifest.
 
-**B19. Composer ergonomics.** ✅ **Done — see FIXED-220.** Both composers share
+#### B19 — Composer ergonomics
+
+✅ **Done — see FIXED-220.** Both composers share
 one module (`apps/web/src/lib/composerCommands.ts`), so the assistant composer
 and the coding-agent composer cannot drift into two different keyboards. Build
 carries `/plan-mode`, `/edit-mode`, `/auto-mode`, `/terminal` and `/repos`
@@ -360,7 +414,9 @@ per-code-block copy already ships) and owner-authored custom slash commands,
 which is a governance design task rather than a parser change, because an
 honest custom command has to state what authority it carries.
 
-**B20. Sandboxed execution environment.** 🟡 **Partly complete (2026-08-14).**
+#### B20 — Sandboxed execution environment
+
+🟡 **Partly complete (2026-08-14).**
 The selected container command path is real rather than record-only: it requires
 a digest-pinned image, creates a non-networked read-only/capability-dropped
 worker with bounded CPU, memory, and PIDs, masks `.raiker`, mounts `.git`
@@ -456,13 +512,17 @@ cannot act on the tools it can read, and it cannot remember across the work.
 
 ### Tier 0 — the blocking three
 
-**C1. First-class document output.** ✅ **Done — see FIXED-40 and FIXED-43.**
+#### C1 — First-class document output
+
+✅ **Done — see FIXED-40 and FIXED-43.**
 `create_document` creates Markdown, DOCX, XLSX, and PDF artifacts locally
 without a file-creation approval prompt. The completed document is preserved in
 the owner-scoped attachment store, bound to its exact trusted session/turn, and
 shown by the existing Chat inspector.
 
-**C2. Acting in the owner's tools.** ✅ **Complete for repeated manifest-driven
+#### C2 — Acting in the owner's tools
+
+✅ **Complete for repeated manifest-driven
 execution — see FIXED-37 and FIXED-41.**
 This is the one place the approval loop is already closed end to end, and it
 should be read as the precedent for C1 rather than as a gap in itself:
@@ -483,7 +543,9 @@ FIXED-38 adds explicit manifest compensation metadata without inventing undo for
 operations that do not declare it. Multiple read calls execute together; write
 calls remain ordered and each consumes its own approval exactly once.
 
-**C3. Recall outside the current chat.** ✅ **Done — see FIXED-42.** The
+#### C3 — Recall outside the current chat
+
+✅ **Done — see FIXED-42.** The
 read-side `memory_search`, `memory_list`, and `memory_get` tools are model-visible
 without approval. Context gathering runs owner-scoped hybrid retrieval and adds
 bounded, attributed metadata for old Chat and Build sessions and Projects,
@@ -496,7 +558,9 @@ off, nothing can be proposed and every surface says so.
 
 ### Tier 1 — working with the owner's material
 
-**C4. File inspector.** ✅ **Complete — see FIXED-107.** FIXED-10
+#### C4 — File inspector
+
+✅ **Complete — see FIXED-107.** FIXED-10
 shipped the first two tasks of the chat file inspector: chips are buttons and
 open a session-authorized, view-only pane, reusing the sanitising renderer from
 FIXED-06 for the Markdown case. FIXED-19 and FIXED-20 record a supported,
@@ -508,14 +572,18 @@ citation chip opens the source **at the run the citing sentence rests on**,
 located by exact match against the source's own text, and every case that cannot
 be located says which one it is instead of marking something near it.
 
-**C5. Chat file output — done.** FIXED-19 keeps per-response copy but removes
+#### C5 — Chat file output — done
+
+FIXED-19 keeps per-response copy but removes
 per-chat Markdown download and browser print/Save as PDF. Generated artifacts
 and stored attachments use the right-hand inspector rather than a general
 download surface; FIXED-20/FIXED-22 preserve artifacts once without automatic
 deletion. FIXED-45 adds the response-linked generated-document card and explicit
 preview action.
 
-**C6. No citations on tool-derived answers.** ✅ **Done — see FIXED-107.** Every
+#### C6 — No citations on tool-derived answers
+
+✅ **Done — see FIXED-107.** Every
 governed call that really returned material, and every file the owner attached,
 enters a per-turn **source ledger** and is handed to the model as a `cite_as`
 marker (`[s1]`). The transcript shows the ledger under the answer as clickable
@@ -524,20 +592,26 @@ same chip inline. The two claims are kept apart on purpose: the ledger is a fact
 the runtime recorded, a citation is the model's claim about which sentence rests
 on it, and a marker the ledger does not know stays the characters it is.
 
-**C7. No web access.** ✅ **Done — as B12 (FIXED-101).** `web_fetch` and
+#### C7 — No web access
+
+✅ **Done — as B12 (FIXED-101).** `web_fetch` and
 `web_search` are callable in Chat under the same gate, decision mode, egress
 allowlist and audit path, and what they return is untrusted data. Verified live:
 withheld with its reason, then — once the owner enabled the capability and raised
 the mode — a real page read and quoted back, with a non-allowlisted host still
 refused.
 
-**C8. MCP tools unreachable.** ✅ **Done — as B8 (FIXED-17, FIXED-96).** A
+#### C8 — MCP tools unreachable
+
+✅ **Done — as B8 (FIXED-17, FIXED-96).** A
 connected server's tools are callable in Chat under the same gate, decision mode,
 containment and audit path, and the Extensions page states whether the agent can
 reach them. Verified live: the model called `mcp__echo__echo` in Chat and quoted
 its answer back.
 
-**C9. No skills or reusable procedures.** `raiker/skills/` holds a candidate
+#### C9 — No skills or reusable procedures
+
+`raiker/skills/` holds a candidate
 store and nothing else; `docs/architecture/SELF_IMPROVEMENT_MODEL.md` describes procedural
 memory that is never consulted at turn time. A work assistant should learn "how
 we do the weekly report here" once. **Work:** promote approved procedural
@@ -545,7 +619,9 @@ memories into a named, model-selectable skill set, injected only when relevant.
 
 ### Tier 2 — presence and continuity
 
-**C10. The assistant lives in one browser tab.** `raiker/config/channel-connectors.json`
+#### C10 — The assistant lives in one browser tab
+
+`raiker/config/channel-connectors.json`
 declares cli, tui, rest, web_ui, desktop, dashboard, ide, apple_mobile,
 android_mobile and webhooks — but `external_channels_enabled` and
 `notifications_enabled` are both hardcoded `False`
@@ -554,24 +630,32 @@ where the assistant reaches the owner. Scheduled routines therefore run and
 finish with nobody told. **Work:** enable the notification path first (it is the
 cheapest and it makes routines useful), then one external channel end to end.
 
-**C11. Background work is not conversational.** Scheduled and background tasks
+#### C11 — Background work is not conversational
+
+Scheduled and background tasks
 run as isolated turns; their output lands in a task record, not in a thread the
 owner can reply to. **Work:** file each routine's cycle into a durable
 conversation, so "what did the overnight run find?" is answerable in Chat and a
 reply steers the next cycle.
 
-**C12. No collaboration.** No sharing of a chat, a project, or a document; no
+#### C12 — No collaboration
+
+No sharing of a chat, a project, or a document; no
 second participant; no per-recipient scoping. Governance is built for a single
 owner, so this is a genuine architectural decision rather than a missing screen —
 `docs/architecture/NESTED_BOUNDARIES_ARCHITECTURE.md` is the place it has to be answered.
 
 ### Tier 3 — conversation surface (UI/UX)
 
-**C13. No stop or steer.** ✅ **Done — as B17 (FIXED-102).** Chat's composer
+#### C13 — No stop or steer
+
+✅ **Done — as B17 (FIXED-102).** Chat's composer
 carries the same Stop and steer controls as Build's, on the same governed
 endpoint, and a stopped turn says so in the transcript instead of simply ending.
 
-**C14. No message-level actions.** ✅ **Complete — see FIXED-220 and FIXED-227.** Copy, **Edit** and **Retry** are on the owner's own
+#### C14 — No message-level actions
+
+✅ **Complete — see FIXED-220 and FIXED-227.** Copy, **Edit** and **Retry** are on the owner's own
 message in both Chat and Build. Edit puts the prompt back in the composer and
 **does not rewrite the transcript**: the original turn stays and the edited one
 is a new turn beneath it — ChatGPT and Claude replace the edited message and
@@ -591,10 +675,14 @@ Per-message feedback is not planned — there is no model to send it to, and a
 control that files a rating nowhere is the kind of surface this document exists
 to prevent.
 
-**C15. Attachments are one-way.** The composer uploads; the transcript cannot
+#### C15 — Attachments are one-way
+
+The composer uploads; the transcript cannot
 hand a file back (C1), preview one (C4), or let the owner drag one out.
 
-**C16. Governed turn-based voice.** ✅ **Complete — see FIXED-247, re-verified
+#### C16 — Governed turn-based voice
+
+✅ **Complete — see FIXED-247, re-verified
 2026-08-21 and corrected by FIXED-249.** The re-verification checked all ten
 claims against the code rather than against the closure note: nine held as
 written, and the tenth did not. "Listening stops on a route change" was
@@ -621,14 +709,18 @@ owner, and the same gateway/policy/audit route as a typed control. This is
 would go beyond them only if every accepted or refused spoken control carried
 visible authority, confirmation and receipt evidence.
 
-**C17. Recall is invisible.** Once C3 lands, the owner must be able to see what
+#### C17 — Recall is invisible
+
+Once C3 lands, the owner must be able to see what
 was remembered, why it was injected, and correct or forget it inline. The
 Memory route exists for management; the *moment of use* is in Chat. C6 has since
 closed the *reading* half for one class of recall — a `memory_search` that really
 returned rows is a citable source like any other — but correcting or forgetting a
 memory from the transcript is still only available on the Memory route.
 
-**C18. No cross-chat surface.** Chat search covers titles and message text only.
+#### C18 — No cross-chat surface
+
+Chat search covers titles and message text only.
 There is no "what am I working on", no cross-project view, no resumption of the
 threads a routine is advancing.
 

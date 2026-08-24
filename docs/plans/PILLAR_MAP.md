@@ -18,10 +18,10 @@ fourth is what the other three run on.
 
 | # | Pillar | What "done" means |
 |---|---|---|
-| **P1** | **A polished AI assistant** | Chat is the surface someone chooses over a hosted assistant for daily work — not because it is governed, but because it is good |
-| **P2** | **A governed AI agent** | Every action is policy-aware, observable, auditable, approval-driven, least-privileged, human-governed, recoverable, verifiable and fail-closed — as properties of the runtime, never as a layer around it |
-| **P3** | **A capable coding/build agent** | Build reads a repository, makes the change, runs the tests, reads the failure and iterates to green, in one governed session |
-| **P4** | **An extensible governed agent platform** | Tools, skills, plugins, hooks, channels, MCP and models extend Raiker **without any of them gaining a route around governance** |
+| [**P1**](#p1--a-polished-ai-assistant) | **A polished AI assistant** | Chat is the surface someone chooses over a hosted assistant for daily work — not because it is governed, but because it is good |
+| [**P2**](#p2--a-governed-ai-agent) | **A governed AI agent** | Every action is policy-aware, observable, auditable, approval-driven, least-privileged, human-governed, recoverable, verifiable and fail-closed — as properties of the runtime, never as a layer around it |
+| [**P3**](#p3--a-capable-codingbuild-agent) | **A capable coding/build agent** | Build reads a repository, makes the change, runs the tests, reads the failure and iterates to green, in one governed session |
+| [**P4**](#p4--an-extensible-governed-agent-platform) | **An extensible governed agent platform** | Tools, skills, plugins, hooks, channels, MCP and models extend Raiker **without any of them gaining a route around governance** |
 
 Cutting across all four, and never traded against any of them:
 
@@ -41,10 +41,10 @@ Honest one-line assessments, each backed by the items below it.
 
 | Pillar | State | The thing in the way |
 |---|---|---|
-| **P1** Assistant | **Strong.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects | Memory does not retrieve by meaning. An assistant that cannot recall a paraphrase is not one people keep using |
-| **P2** Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches | GEP-01, GEP-04 and BUG-218 are closed. What remains is that nothing owns a set of delegated child tasks (BUG-220), and the two owner decisions GEP-02 and ADD-14/15 |
-| **P3** Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
-| **P4** Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client now negotiates the current revision, but implements a subset of it: no streamable-HTTP session semantics, no remote OAuth, no `server/discover`, no MCP Apps |
+| [**P1**](#p1--a-polished-ai-assistant) Assistant | **Strong.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects | Memory does not retrieve by meaning. An assistant that cannot recall a paraphrase is not one people keep using |
+| [**P2**](#p2--a-governed-ai-agent) Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches | GEP-01, GEP-04 and BUG-218 are closed. What remains is that nothing owns a set of delegated child tasks (BUG-220), and the two owner decisions GEP-02 and ADD-14/15 |
+| [**P3**](#p3--a-capable-codingbuild-agent) Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
+| [**P4**](#p4--an-extensible-governed-agent-platform) Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client now negotiates the current revision, but implements a subset of it: no streamable-HTTP session semantics, no remote OAuth, no `server/discover`, no MCP Apps |
 
 **The single highest-value observation across all four:** three of the four
 pillars were blocked by the *same two items* — checkpoint rewind and audit
@@ -68,14 +68,14 @@ two new call sites needed. **MEM-10 (P1) is now the largest honest gap left.**
 
 | Item | Where | State |
 |---|---|---|
-| Semantic memory retrieval | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open — a default install has no embedding model to select |
-| Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md) | Open — ~431 ms at 3 000 memories, paid every turn |
-| A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md) | Open |
-| Retention sweep | [MEM-07](MEMORY_RELIABILITY_PLAN.md) | Open — `expires_at` enforced at read time only |
+| Semantic memory retrieval | [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open — a default install has no embedding model to select |
+| Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open — ~431 ms at 3 000 memories, paid every turn |
+| A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open |
+| Retention sweep | [MEM-07](MEMORY_RELIABILITY_PLAN.md#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Open — `expires_at` enforced at read time only |
 | Owner-guided summarisation of a range | [backlog #9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
-| A structured question to the owner mid-turn | [backlog #17](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md) | Proposed — the model cannot ask *which did you mean* |
+| A structured question to the owner mid-turn | [backlog #17](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md#add-22--a-structured-question-to-the-owner-mid-turn) | Proposed — the model cannot ask *which did you mean* |
 | Tool rows do not survive a reload | [backlog #25](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-low-effort) | Open |
-| GAP-CHAT remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 13 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
+| GAP-CHAT remainder | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | 7 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
 
 **Blocking item:** MEM-10. Everything else here is polish on a surface that
 already works.
@@ -84,21 +84,21 @@ already works.
 
 | Item | Where | State |
 |---|---|---|
-| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md) | **Closed 2026-08-23** — a route, a Checkpoints action and a terminal command raise the approval |
-| Audit export | [FIXED-271](FIXED_ITEMS.md) | **Closed 2026-08-23** — an executor, a route, a listing and a download, redacted and account-scoped |
-| The second, weaker egress path | [FIXED-272](FIXED_ITEMS.md) | **Closed 2026-08-23** — deleted; `web_fetch` routes through `WebAccessService` |
-| An oversize checkpoint promised a rewind | [FIXED-273](FIXED_ITEMS.md) | **Closed 2026-08-23** — the approval notice says so before you decide |
-| Eight modules re-implement the gate check | [FIXED-279](FIXED_ITEMS.md) | **Closed 2026-08-24** — one shared admission helper; two drifts found by reading the copies together, one of them live and pointed at the model |
+| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md#fixed-270--checkpoint-rewind-was-built-registered-tested-and-unreachable) | **Closed 2026-08-23** — a route, a Checkpoints action and a terminal command raise the approval |
+| Audit export | [FIXED-271](FIXED_ITEMS.md#fixed-271--the-audit-log-could-not-be-taken-out-of-the-product) | **Closed 2026-08-23** — an executor, a route, a listing and a download, redacted and account-scoped |
+| The second, weaker egress path | [FIXED-272](FIXED_ITEMS.md#fixed-272--two-egress-implementations-existed-and-the-weaker-one-was-registered) | **Closed 2026-08-23** — deleted; `web_fetch` routes through `WebAccessService` |
+| An oversize checkpoint promised a rewind | [FIXED-273](FIXED_ITEMS.md#fixed-273--an-approval-promised-a-rewind-it-could-not-give-for-a-file-over-8-mib) | **Closed 2026-08-23** — the approval notice says so before you decide |
+| Eight modules re-implement the gate check | [FIXED-279](FIXED_ITEMS.md#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted) | **Closed 2026-08-24** — one shared admission helper; two drifts found by reading the copies together, one of them live and pointed at the model |
 | The stop switch's scope is undefined for read paths | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths) | Open — **an owner decision**, and the shared admission helper now carries the answer at no cost |
 | An empty gate table means three different things | [BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things) | Open — **an owner decision**, raised 2026-08-24. The fork is one named table now; unifying it either loosens seven paths or tightens one |
 | `NESTED_BOUNDARIES_ARCHITECTURE.md` overstates the architecture | [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Open |
-| Fifteen capabilities have no traced governed-action path | [FIXED-280](FIXED_ITEMS.md) | **Closed 2026-08-24** — not one of the two readings it offered: fifteen switches governed nothing. `plugin_install` was a real gap, `subagents` an inert switch, and what every gate decides is now a checked field |
-| Auto mode has no alignment check | [FIXED-282](FIXED_ITEMS.md) | **Closed 2026-08-24** — a deterministic check over the turn's own record, with no model in the authority path |
-| Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md) | Open |
+| Fifteen capabilities have no traced governed-action path | [FIXED-280](FIXED_ITEMS.md#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have) | **Closed 2026-08-24** — not one of the two readings it offered: fifteen switches governed nothing. `plugin_install` was a real gap, `subagents` an inert switch, and what every gate decides is now a checked field |
+| Auto mode has no alignment check | [FIXED-282](FIXED_ITEMS.md#fixed-282--auto-promised-a-review-it-did-not-perform) | **Closed 2026-08-24** — a deterministic check over the turn's own record, with no model in the authority path |
+| Nothing owns a set of delegated child tasks | [BUG-220](TO_BE_FIXED.md#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Open |
 | OpenTelemetry export | [backlog #18](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Deterministic replay | [backlog #20](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md) |
-| Credential masking with sentinel substitution | [backlog #19](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md) |
-| WebAuthn step-up, hardware root of trust | [ADD-14](TO_BE_ADDED.md), [ADD-15](TO_BE_ADDED.md) | Proposed — **owner decisions** |
+| Deterministic replay | [backlog #20](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Proposed — [ADD-08](TO_BE_ADDED.md#add-08--event-sourced-deterministic-replay) |
+| Credential masking with sentinel substitution | [backlog #19](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed — [ADD-10](TO_BE_ADDED.md#add-10--credential-cloaking-and-ast-level-sanitisation) |
+| WebAuthn step-up, hardware root of trust | [ADD-14](TO_BE_ADDED.md#add-14--a-hardware-root-of-trust), [ADD-15](TO_BE_ADDED.md#add-15--webauthn-step-up-instead-of-a-typed-phrase) | Proposed — **owner decisions** |
 
 **No blocking item.** *Recoverable* and *auditable* were the two properties
 Raiker's own documentation claimed and an owner could not reach; both closed on
@@ -115,14 +115,14 @@ done while a child is parked is a false completion.
 
 | Item | Where | State |
 |---|---|---|
-| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md) | **Closed 2026-08-23** — shared with P2, and this is where an owner feels it |
-| Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md) | Open — POSIX-only PTY and reattachment |
+| Checkpoint rewind | [FIXED-270](FIXED_ITEMS.md#fixed-270--checkpoint-rewind-was-built-registered-tested-and-unreachable) | **Closed 2026-08-23** — shared with P2, and this is where an owner feels it |
+| Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Open — POSIX-only PTY and reattachment |
 | Filtered domain egress unproven | [backlog #6](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
 | Remote supervisor install lifecycle | [backlog #22](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
-| No resolved call graph; textual find-references | [B-tier](GAP_BUILD_CHAT.md) | Open by design, stated |
-| LSP surface | [BUG-227](TO_BE_FIXED.md) | Open — **decide whether Raiker wants one at all** |
+| No resolved call graph; textual find-references | [B10](GAP_BUILD_CHAT.md#b10--no-language-intelligence) | Open by design, stated |
+| LSP surface | [BUG-227](TO_BE_FIXED.md#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Open — **decide whether Raiker wants one at all** |
 | Worktrees for parallel work | [backlog #27](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
-| GAP-BUILD remainder | [GAP_BUILD_CHAT.md](GAP_BUILD_CHAT.md) | 9 items |
+| GAP-BUILD remainder | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | 7 items (5 open, 2 partial) |
 
 **No blocking item.** A coding agent that could write but not undo made the owner
 the undo mechanism; the rewind closed on 2026-08-23. The largest remaining item
@@ -132,19 +132,19 @@ is BUG-194 — interactive, background and remote execution inside the sandbox.
 
 | Item | Where | State |
 |---|---|---|
-| MCP protocol revision | [FIXED-274](FIXED_ITEMS.md) | **Closed 2026-08-23** — `2026-07-28` offered, three older revisions accepted, the negotiated one shown. What Raiker *uses* of it is still the bounded session |
-| Streamable-HTTP session semantics, remote OAuth, `server/discover` | [BUG-234 remainder](TO_BE_FIXED.md) | Open — no longer blocked by the revision, now their own work |
-| Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md) | Open — an inbound message never becomes work |
-| Four hook handler types refused | [BUG-226](TO_BE_FIXED.md) | Open — `prompt` first; it needs no new surface |
+| MCP protocol revision | [FIXED-274](FIXED_ITEMS.md#fixed-274--the-mcp-client-was-five-protocol-revisions-behind) | **Closed 2026-08-23** — `2026-07-28` offered, three older revisions accepted, the negotiated one shown. What Raiker *uses* of it is still the bounded session |
+| Streamable-HTTP session semantics, remote OAuth, `server/discover` | [BUG-234 remainder](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Open — no longer blocked by the revision, now their own work |
+| Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md#bug-225--a-channel-can-be-described-and-never-reached) | Open — an inbound message never becomes work |
+| Four hook handler types refused | [BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Open — `prompt` first; it needs no new surface |
 | Hook lifecycle coverage | [backlog #14](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
-| Agent Skills standard conformance | [backlog #13](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md) | Proposed — interoperability with ~40 products for very little work |
-| MCP Apps (SEP-1865) | [backlog #28](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md) | Proposed — **and it supersedes plugin panels**; build at most one |
-| Plugin panels | [BUG-228](TO_BE_FIXED.md) | Open, and **reassessed**: the row above is the better answer |
+| Agent Skills standard conformance | [backlog #13](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md#add-21--conformance-to-the-agent-skills-open-standard) | Proposed — interoperability with ~40 products for very little work |
+| MCP Apps (SEP-1865) | [backlog #28](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Proposed — **and it supersedes plugin panels**; build at most one |
+| Plugin panels | [BUG-228](TO_BE_FIXED.md#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Open, and **reassessed**: the row above is the better answer |
 | MCP tool search / deferred tool schemas | [backlog #16](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
 | Owner-authored slash commands | [backlog #4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
-| Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md) | Proposed |
-| Governed browser control | [backlog #24](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md) | Proposed — **an owner decision** |
-| Live-spec sign-in | [BUG-229](TO_BE_FIXED.md) | Open |
+| Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md#add-06--a-zero-trust-gate-for-self-authored-skills) | Proposed |
+| Governed browser control | [backlog #24](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md#add-23--governed-browser-control-as-a-narrow-tool-set) | Proposed — **an owner decision** |
+| Live-spec sign-in | [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Open |
 
 **No blocking item.** The protocol upgrade landed on 2026-08-23 and unblocked
 three rows at once; each is now ordinary work rather than a dependency. The
@@ -176,14 +176,14 @@ unblocks*.
 
 | Order | Item | Unblocks | Why here |
 |---|---|---|---|
-| 1 | **Trace the fifteen** ([FIXED-280](FIXED_ITEMS.md)) | P2 | **Done 2026-08-24.** Cheap, and it did reclassify: the finding was not an ungoverned action but fifteen inert switches, which is a different defect and a worse one for this product |
+| 1 | **Trace the fifteen** ([FIXED-280](FIXED_ITEMS.md#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have)) | P2 | **Done 2026-08-24.** Cheap, and it did reclassify: the finding was not an ungoverned action but fifteen inert switches, which is a different defect and a worse one for this product |
 | 2 | **Checkpoint rewind** ([#1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
 | 3 | **Audit export** ([#2](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
 | 4 | **Remove the second egress path** ([#3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
 | 5 | **Oversize checkpoint honesty** ([#4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
 | 6 | **MCP protocol revision** ([#9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
-| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md)) | P1 | The largest honest gap, and the most expensive of the top group |
-| 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
+| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select)) | P1 | The largest honest gap, and the most expensive of the top group |
+| 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
 
 Items 1–6 and 8 are closed. **Item 7 — semantic memory (MEM-10) — is what is
 left of the top group**, and it is the largest honest gap in the product: an

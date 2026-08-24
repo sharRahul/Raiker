@@ -73,23 +73,30 @@ that would put Raiker ahead of the field.
 
 | ID | Tier | Area | Status |
 |---|---|---|---|
-| ADD-01 | Tier 0 | Execution / container backend | Shipped (see FIXED-47 and FIXED-117) |
-| ADD-02 | Tier 0 | Runtime / tool queue and gates | Shipped |
-| ADD-03 | Tier 0 | Identity / agent attestation | Shipped |
-| ADD-04 | Tier 0 | Audit / transaction lineage | Proposal |
-| ADD-05 | Tier 1 | Skills / self-evaluation loop | Proposal |
-| ADD-06 | Tier 1 | Skills / zero-trust authoring gate | Proposal |
-| ADD-07 | Tier 1 | Policy / policy-as-code | Proposal |
-| ADD-08 | Tier 1 | Audit / deterministic replay | Proposal |
-| ADD-09 | Tier 2 | Models / context and cost tiering | Proposal |
-| ADD-10 | Tier 2 | Security / credential cloaking | Proposal |
-| ADD-11 | Tier 3 | Channels / inverted gateway | Proposal |
-| ADD-12 | Tier 4 | Execution / ephemeral micro-VMs | Proposal |
-| ADD-13 | Tier 4 | Extensions / MCP supply chain | Proposal |
-| ADD-14 | Tier 4 | Platform / hardware root of trust | Proposal |
-| ADD-15 | Tier 5 | Approvals / WebAuthn step-up | Proposal |
-| ADD-16 | Tier 5 | Runtime / adversarial intent modelling | Proposal |
-| ADD-17 | Tier 5 | Runtime / internal debate core | Proposal |
+| [ADD-01](#add-01--containerised-tool-execution-instead-of-a-record-only-mode) | Tier 0 | Execution / container backend | Shipped (see FIXED-47 and FIXED-117) |
+| [ADD-02](#add-02--a-sequential-tool-queue-with-per-call-approval-gates) | Tier 0 | Runtime / tool queue and gates | Shipped |
+| [ADD-03](#add-03--the-agent-needs-its-own-identity-not-the-owners) | Tier 0 | Identity / agent attestation | Shipped |
+| [ADD-04](#add-04--bounded-transaction-lineage-and-an-automatic-kill-switch) | Tier 0 | Audit / transaction lineage | Proposal |
+| [ADD-05](#add-05--a-self-evaluation-loop-over-the-audit-log) | Tier 1 | Skills / self-evaluation loop | Proposal |
+| [ADD-06](#add-06--a-zero-trust-gate-for-self-authored-skills) | Tier 1 | Skills / zero-trust authoring gate | Proposal |
+| [ADD-07](#add-07--a-policy-as-code-engine) | Tier 1 | Policy / policy-as-code | Proposal |
+| [ADD-08](#add-08--event-sourced-deterministic-replay) | Tier 1 | Audit / deterministic replay | Proposal |
+| [ADD-09](#add-09--context-compaction-tiering-with-model-asymmetry) | Tier 2 | Models / context and cost tiering | Proposal |
+| [ADD-10](#add-10--credential-cloaking-and-ast-level-sanitisation) | Tier 2 | Security / credential cloaking | Proposal |
+| [ADD-11](#add-11--the-inverted-gateway-reaching-the-owner-off-the-machine) | Tier 3 | Channels / inverted gateway | Proposal — owner decision |
+| [ADD-12](#add-12--ephemeral-micro-vms-instead-of-shared-kernel-containers) | Tier 4 | Execution / ephemeral micro-VMs | Proposal |
+| [ADD-13](#add-13--an-mcp-analysis-gateway-and-a-supply-chain-kill-switch) | Tier 4 | Extensions / MCP supply chain | Proposal |
+| [ADD-14](#add-14--a-hardware-root-of-trust) | Tier 4 | Platform / hardware root of trust | Proposal — owner decision |
+| [ADD-15](#add-15--webauthn-step-up-instead-of-a-typed-phrase) | Tier 5 | Approvals / WebAuthn step-up | Proposal |
+| [ADD-16](#add-16--a-safety-critic-running-alongside-the-turn) | Tier 5 | Runtime / adversarial intent modelling | Proposal |
+| [ADD-17](#add-17--an-internal-debate-core) | Tier 5 | Runtime / internal debate core | Proposal |
+| [ADD-18](#add-18--relationship-based-access-control-between-agents) | Tier 5 | Agents / relationship-based access control | Proposal — owner decision |
+| [ADD-19](#add-19--code-provenance-watermarking-and-signed-commits) | Tier 6 | Build / code provenance watermarking | Proposal |
+| [ADD-20](#add-20--continuous-chaos-injection) | Tier 6 | Verification / continuous chaos injection | Proposal |
+| [ADD-21](#add-21--conformance-to-the-agent-skills-open-standard) | Tier 2 | Skills / Agent Skills interoperability | Implemented 2026-08-24 as FIXED-281 |
+| [ADD-22](#add-22--a-structured-question-to-the-owner-mid-turn) | Tier 1 | Runtime / structured mid-turn question | Proposal |
+| [ADD-23](#add-23--governed-browser-control-as-a-narrow-tool-set) | Tier 3 | Browser / governed control | Proposal — owner decision |
+| [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
 
 **2026-08-21 review against the reference platforms.** Evidence-bound graph
 review and visible checkpoint failure are proven meaningful differentiators and
@@ -100,9 +107,6 @@ code and honest UI exist, but they do not graduate to “shipped” until the li
 container and external trust-anchor proofs recorded under BUG-194 pass. Windows
 PTY or reattachment outside a proven sandbox transport is categorically **not**
 an improvement and is not promoted to an ADD item.
-| ADD-18 | Tier 5 | Agents / relationship-based access control | Proposal |
-| ADD-19 | Tier 6 | Build / code provenance watermarking | Proposal |
-| ADD-20 | Tier 6 | Verification / continuous chaos injection | Proposal |
 
 ### Tier order
 

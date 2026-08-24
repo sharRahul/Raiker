@@ -151,3 +151,49 @@ def test_relayed_capability_count_is_stated_correctly() -> None:
     )
     threat_model = Path("docs/architecture/THREAT_MODEL.md").read_text(encoding="utf-8")
     assert "explicit **thirteen**-member frozenset" in threat_model
+
+
+def _first_id_table(text: str) -> str:
+    match = re.search(
+        r"^\| ID \|.*\n^\|---\|.*\n(?P<rows>(?:^\|.*\|\n)+)",
+        text,
+        re.MULTILINE,
+    )
+    assert match is not None
+    return match.group("rows")
+
+
+def test_plan_tracker_indexes_cover_and_link_their_authoritative_headings() -> None:
+    trackers = {
+        Path("docs/plans/FIXED_ITEMS.md"): r"FIXED-\d+",
+        Path("docs/plans/TO_BE_ADDED.md"): r"ADD-\d+",
+        Path("docs/plans/MEMORY_RELIABILITY_PLAN.md"): r"MEM-\d+",
+        Path("docs/plans/GAP_BUILD_CHAT.md"): r"[BC]\d+",
+    }
+    failures: list[str] = []
+
+    for path, id_pattern in trackers.items():
+        text = path.read_text(encoding="utf-8")
+        headings = {
+            match.group(1): _slugify(f"{match.group(1)} — {match.group(2)}")
+            for match in re.finditer(
+                rf"^#{{2,4}} ({id_pattern})\s+—\s+(.+)$", text, re.MULTILINE
+            )
+        }
+        rows = _first_id_table(text)
+        row_links = {
+            match.group(1): match.group(2)
+            for match in re.finditer(
+                rf"^\| \[({id_pattern})\]\(([^)]+)\)", rows, re.MULTILINE
+            )
+        }
+        missing = sorted(set(headings) - set(row_links))
+        if missing:
+            failures.append(f"{path}: headings missing from index: {missing}")
+        for item_id, anchor in headings.items():
+            target = row_links.get(item_id)
+            expected = f"#{anchor}"
+            if target is not None and target != expected:
+                failures.append(f"{path}: {item_id} links to {target}, expected {expected}")
+
+    assert failures == [], "plan tracker index drift:\n" + "\n".join(failures)

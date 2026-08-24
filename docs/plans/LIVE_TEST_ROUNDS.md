@@ -249,7 +249,7 @@ using the product across restarts:
 
 | Area | Evidence | Closed as |
 |---|---|---|
-| Turn-end hooks fire on every backend, not just the one that was tested | `bug-223-stop-anthropic.png`, `bug-223-stop-openai.png`, `bug-223-stop-openrouter.png`, `bug-223-stop-ollama.png`, `bug-223-stop-fired-on-a-real-turn.png` | [FIXED-255](FIXED_ITEMS.md) |
+| Turn-end hooks fire on every backend, not just the one that was tested | `bug-223-stop-anthropic.png`, `bug-223-stop-openai.png`, `bug-223-stop-openrouter.png`, `bug-223-stop-ollama.png`, `bug-223-stop-fired-on-a-real-turn.png` | [FIXED-255](FIXED_ITEMS.md#fixed-255--seven-lifecycle-events-were-specified-and-never-emitted) |
 | The hook event catalogue the tab publishes | `bug-223-hook-event-catalogue.png` | FIXED-253, FIXED-255 |
 | A plugin contributes a skill, and it arrives switched off | `bug-221-plugin-skill-inactive.png`, `bug-221-live-skill-in-turn.png`, and desktop/tablet/mobile at `bug-221-plugin-skill-*.png` | FIXED-259 |
 | A plugin offers an MCP server, and an offer is not a server | `bug-221-plugin-mcp-offer.png` | FIXED-260 |

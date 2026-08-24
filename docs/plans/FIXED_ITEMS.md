@@ -23,185 +23,196 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-01](#fixed-01--model-connection-showed-a-raw-reason-code-with-no-way-to-act-on-it) | High | Models | Fixed |
 | [FIXED-02](#fixed-02--context-meter-showed-0--nan-nan-token-counts-stripped-from-the-audit-log) | High | Chat / API redaction | Fixed |
 | [FIXED-03](#fixed-03--no-token-or-cost-accounting-models-showed-a-meaningless-percentage) | Medium | Models / Chat / Build | Fixed |
-| FIXED-04 | **Critical** | Chat orchestration | Fixed (was BUG-02) |
-| FIXED-05 | High | Models / policy | Fixed |
-| FIXED-06 | High | Chat / Build rendering | Fixed (was BUG-03) |
-| FIXED-07 | High | API redaction | Fixed (was BUG-04) |
-| FIXED-08 | **Critical** | Approvals / file output | Fixed (was BUG-06) |
-| FIXED-09 | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
-| FIXED-10 | Medium | Chat / attachments | Fixed (was BUG-07) |
-| FIXED-11 | High | API redaction | Fixed (found while fixing BUG-07) |
-| FIXED-12 | Medium | Export | Superseded by FIXED-19 (was BUG-08) |
-| FIXED-13 | Medium | Tasks | Fixed (was BUG-09) |
-| FIXED-14 | High | API redaction | Fixed (found while fixing BUG-09) |
-| FIXED-15 | Low | Chat / Tasks | Fixed (was BUG-10) |
-| FIXED-16 | Medium | Permissions | Fixed (was BUG-11) |
-| FIXED-17 | High | MCP | Fixed (was BUG-12) |
-| FIXED-18 | Low | Permissions | Fixed (was BUG-13) |
-| FIXED-19 | Medium | Chat / file output | Fixed (found while fixing BUG-13) |
-| FIXED-20 | High | Chat / Build file retention | Fixed (found while fixing BUG-14) |
-| FIXED-21 | Low | CI quality gates | Fixed (found while verifying BUG-14) |
-| FIXED-22 | Low | Chat / Build file retention | Fixed (found while fixing BUG-14) |
-| FIXED-23 | High | Build / patch application | Fixed (was GAP-BUILD B3) |
-| FIXED-24 | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
-| FIXED-25 | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
-| FIXED-26 | Low | Chat / cost presentation tests | Fixed (was BUG-14) |
-| FIXED-27 | Low | CI / action runtime | Fixed (was BUG-15) |
-| FIXED-28 | Low | Web test runtime | Fixed (was BUG-16) |
-| FIXED-29 | Medium | Build / patch application | Fixed (B3 single-target expansion) |
-| FIXED-30 | Medium | Models / credential persistence | Fixed |
-| FIXED-31 | Medium | Chat / Build composer | Fixed |
-| FIXED-32 | High | Web development dependencies | Fixed (was BUG-17) |
-| FIXED-33 | Low | Python test dependencies | Fixed (was BUG-18) |
-| FIXED-34 | High | Build / multi-file patch application | Fixed (B3 expansion) |
-| FIXED-35 | Medium | Settings / Models | Fixed |
-| FIXED-36 | Medium | Writing quality | Fixed (optional local integration) |
-| FIXED-37 | High | Chat / connector actions | Fixed (C2 inventory and preview) |
-| FIXED-38 | Medium | Chat / connector compensation | Fixed (was BUG-19) |
-| FIXED-39 | High | Build / parallel tool execution | Fixed (was B4) |
-| FIXED-40 | High | Chat / document output | Fixed (was C1) |
-| FIXED-41 | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
-| FIXED-42 | High | Chat / cross-work recall | Fixed (was C3) |
-| FIXED-43 | High | Chat / document output | Fixed (C1 format expansion) |
-| FIXED-44 | High | Build / command feedback | Fixed except host network containment (B5) |
-| FIXED-45 | Medium | Chat / file inspector and output | Fixed (C4/C5 validation and presentation) |
-| FIXED-46 | Medium | Workbench | Fixed (activity-aware dashboard redesign) |
-| FIXED-47 | High | Build / command containment | Fixed (was BUG-20) |
-| FIXED-48 | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
-| FIXED-49 | Medium | Memory / Knowledge Map / context window | Fixed (visual control redesign) |
-| FIXED-50 | High | Local models / context capacity | Fixed (runtime capacity discovery) |
-| FIXED-51 | High | Knowledge Map / force simulation | Fixed (found during live Playwright verification) |
-| FIXED-52 | Medium | Knowledge Map / theme integration | Fixed (found during visual review) |
-| FIXED-53 | Medium | Models / pricing | Fixed (was BUG-21) |
-| FIXED-54 | Medium | Chat / Build export | Fixed (was BUG-22) |
-| FIXED-55 | Low | Chat / Build code ergonomics | Fixed (was BUG-23) |
-| FIXED-56 | High | Approvals / cross-tab continuation | Fixed (was BUG-24) |
-| FIXED-57 | Low | Models / shipped configuration | Fixed (found while fixing BUG-21) |
-| FIXED-58 | Low | Web test runtime | Fixed (found while verifying BUG-21) |
-| FIXED-59 | High | Tasks / approval continuation | Fixed (was BUG-25) |
-| FIXED-60 | Low | File inspector / images | Fixed (was BUG-26) |
-| FIXED-61 | Medium | Memory / provenance | Fixed (was BUG-27) |
-| FIXED-62 | Medium | Chat / artifact download | Fixed (was BUG-28) |
-| FIXED-63 | High | Runtime | Fixed (single runtime; no mode selection) |
-| FIXED-64 | Low | Build / composer attachments | Fixed (was BUG-35) |
-| FIXED-65 | Medium | Composers / Chat, Build, Workbench | Fixed (shared composer) |
-| FIXED-66 | Medium | Distribution / cross-platform launch | Fixed (`raiker-app`) |
-| FIXED-67 | Medium | Composers / attachment presentation | Fixed (attached files look like files) |
-| FIXED-68 | High | Memory / governed lifecycle | Fixed (was BUG-29) |
-| FIXED-69 | Medium | Knowledge Map / sources and scale | Fixed (was BUG-30) |
-| FIXED-70 | High | Build / remote execution containment | Fixed (was BUG-31) |
-| FIXED-71 | Medium | Local models / capacity administration | Fixed (was BUG-33) |
-| FIXED-72 | Medium | Chat / restored approval state | Fixed (was BUG-34) |
-| FIXED-73 | Low | Chat / Build attachment layout | Fixed |
-| FIXED-74 | Medium | Build / Windows container sandbox | Fixed (found during verification) |
-| FIXED-75 | Low | Models / capacity history ordering | Fixed (found in GitHub CI) |
-| FIXED-76 | Low | Models / shipped price review cadence | Fixed (was BUG-36) |
-| FIXED-77 | Medium | Memory / source coordinates | Fixed (was BUG-38) |
-| FIXED-78 | Medium | Cloud execution / billing | Fixed (was BUG-42) |
-| FIXED-79 | Low | Web / accessibility | Fixed (was BUG-43) |
-| FIXED-80 | Low | Schedule / attachments | Fixed (consistency improvement) |
-| FIXED-81 | Medium | Chat / Build / Workbench / Tasks | Fixed (found during live verification) |
-| FIXED-82 | Medium | Export / Knowledge Map accessibility | Fixed (found by live axe verification) |
-| FIXED-83 | Medium | Chat / export keyboard activation | Fixed (found during live verification) |
-| FIXED-84 | Low | CI / dependency licensing | Fixed (found during workflow verification) |
-| FIXED-85 | Medium | Settings / concurrent load | Fixed (found while verifying BUG-37) |
-| FIXED-86 | Low | Design system / visual language | Fixed (was BUG-37) |
-| FIXED-87 | Low | Scheduler / continuation latency | Fixed (was BUG-39) |
-| FIXED-88 | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — closed by FIXED-92) |
-| FIXED-89 | Low | Web / e2e regression suite | Fixed (was BUG-41) |
-| FIXED-90 | Medium | Terminal / approval execution | Fixed (was BUG-32) |
-| FIXED-91 | Low | Storage / per-request key derivation | Fixed (was BUG-45) |
-| FIXED-92 | Medium | Distribution / release pipeline and signed updates | Fixed (was BUG-44, less the wizard and tray — see BUG-48) |
-| FIXED-93 | Low | Models / provider test feedback | Fixed (was BUG-47) |
-| FIXED-94 | High | Build / turn plan state | Fixed (was B6) |
-| FIXED-95 | High | Build / model-spawned subagents | Fixed (was B7) |
-| FIXED-96 | Medium | Extensions / MCP agent reachability | Fixed (B8 review; found the surface was silent) |
-| FIXED-97 | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
-| FIXED-98 | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
-| FIXED-99 | Medium | Runtime / batched policy refusal | Fixed (was BUG-52) |
-| FIXED-100 | Medium | Storage / connection cache holds every workspace open | Fixed (was BUG-50) |
-| FIXED-101 | High | Chat / Build — governed web access | Fixed (was B12/C7) |
-| FIXED-102 | High | Chat / Build — stop and steer a running turn | Fixed (was B17/C13) |
-| FIXED-103 | Low | Documentation / README known limits are stale | Fixed (was BUG-58) |
-| FIXED-115 | Low | Tests / a shipped-skill check breaks after `compileall` | Fixed (was BUG-56) |
-| FIXED-104 | Medium | Context / stale capability flags mislead the model | Fixed (was BUG-57) |
-| FIXED-105 | Medium | Documentation / the user guide's "Known limits" are entirely stale | Fixed (was BUG-61) |
-| FIXED-106 | Medium | Tasks / an approved task is really created | Fixed (was BUG-62) |
-| FIXED-159 | Low | Web / a composer permission control shipped unused | Fixed (was BUG-63, closed with FIXED-155) |
-| FIXED-107 | High | Chat / Build — source citations and the passage used | Fixed (was C6 and the last of C4) |
-| FIXED-108 | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
-| FIXED-109 | High | Build / Chat — the governed git write path | Fixed (was B11) |
-| FIXED-110 | Low | Build / git tools and the selected repository | Fixed (was BUG-66) |
-| FIXED-111 | Medium | Build / Chat — the governed push | Fixed (was BUG-67) |
-| FIXED-112 | Medium | Runtime / an unperformable proposal raised as a decision | Fixed (found while verifying FIXED-111) |
-| FIXED-113 | High | Build / Chat — the repository code map | Fixed (was B9) |
-| FIXED-114 | Low | Build / stale repository state after a visit elsewhere | Fixed (found while verifying FIXED-113) |
-| FIXED-116 | High | Models / first-run default | Fixed (Ollama `gemma4:31b-cloud` is the visible and runtime default) |
-| FIXED-117 | High | Container tools / cold start and stdin bridge | Fixed (found during ADD-01 live Docker verification) |
-| FIXED-118 | Medium | Web / execution-environment deep link | Fixed (found during ADD-01 Playwright verification) |
-| FIXED-119 | Low | Tests / live Ollama leaked into offline scenarios | Fixed (found during ADD-01 baseline verification) |
-| FIXED-120 | Low | Activity / machine identity density | Fixed (found during ADD-03 screenshot review) |
-| FIXED-121 | Low | Web tests / export download navigation noise | Fixed (found during ADD-03 full verification) |
-| FIXED-122 | High | Windows host status / destructive PID probe | Fixed (found during ADD-03 full verification) |
-| FIXED-123 | Medium | Plugin execution / invalid fallback turn id | Fixed (found during ADD-03 full verification) |
-| FIXED-124 | Medium | Project export / unstable same-second event order | Fixed (found during ADD-03 full verification) |
-| FIXED-125 | High | Auto/skip runtime / human principal replaced the signed machine actor | Fixed (found during ADD-03 independent review) |
-| FIXED-126 | High | Machine identity / abnormal and delegated paths leaked active principals | Fixed (found during ADD-03 independent review) |
-| FIXED-127 | Medium | Activity / contextual turn identity hid the literal event actor | Fixed (found during ADD-03 independent review) |
-| FIXED-128 | High | Approvals / resume rotation rewrote proposal identity timestamps | Fixed (found during ADD-03 independent review) |
-| FIXED-129 | Low | Permissions / authority matrix ignored readiness failures | Fixed (found during ADD-03 independent review) |
-| FIXED-130 | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
-| FIXED-131 | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
-| FIXED-132 | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
-| FIXED-154 | Medium | Chat / Build — context meter read `NaN input · NaN output` | Fixed (was BUG-68) |
-| FIXED-133 | High | First run / universal exact-model readiness and setup (BUG-69) | Fixed (2026-08-09 live round) |
-| FIXED-134 | High | Local library / redaction corrupted path-derived deployment IDs | Fixed (found in BUG-69 live download/deploy) |
-| FIXED-135 | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
-| FIXED-136 | High | Managed llama.cpp / graceful host shutdown could leave the child alive | Fixed (found in BUG-69 shutdown verification) |
-| FIXED-137 | High | API redaction / an unprefixed `path` field was destroyed | Fixed (found in GitHub CI after BUG-69) |
-| FIXED-138 | High | Model readiness / an empty account balance was reported as an unreachable provider | Fixed (found in the BUG-69 parity review) |
-| FIXED-139 | High | Model readiness / the gate ignored the fallback chain the runtime actually tries | Fixed (found in the BUG-69 parity review) |
-| FIXED-140 | High | Models UI / the page counted saved credentials as "set up" and Test proved nothing | Fixed (found in the BUG-69 parity review) |
-| FIXED-141 | Medium | Models navigation / three tabs were unreachable by deep link and silently opened Providers | Fixed (found while splitting the Models page) |
-| FIXED-155 | Medium | Build / mode chips rewrote global decision modes with no step-up | Fixed (was BUG-70) |
-| FIXED-156 | Medium | Memory / a gated capability no turn could ever reach | Fixed (was BUG-71) |
-| FIXED-142 | High | Runtime / a tool call that blocked the event loop killed its own turn | Fixed (was BUG-72) |
-| FIXED-157 | Medium | Chat / a resumed turn could deny an execution that happened | Fixed (was BUG-73) |
-| FIXED-161 | Low | Web build / the main production JavaScript chunk exceeded the 500 kB warning threshold | Fixed (was BUG-74) |
-| FIXED-162 | Medium | Model activity / retry, cancellation and partial-file cleanup were record-only for some job types | Fixed (was BUG-75) |
-| FIXED-163 | Medium | Runtime / a failing tool or provider was retried until its budget ran out, every turn | Fixed (was BUG-76) |
-| FIXED-164 | High | Security monitoring / anomaly detection and containment covered MCP connections only | Fixed (was BUG-77) |
-| FIXED-165 | Medium | Subagents / a delegated result carried no identity binding to the spawn that produced it | Fixed (was BUG-78) |
-| FIXED-166 | Medium | Plugins / a manifest signature was a presence marker by default and the owner was never told | Fixed (was BUG-79) |
-| FIXED-167 | Low | Documentation / the GenAI mapping called the verifier a stub | Fixed (was BUG-80) |
-| FIXED-168 | Low | Context / no prompt-injection scanning hook existed, though the security mapping requires one | Fixed (was BUG-81) |
-| FIXED-158 | Medium | Model readiness / the advisor model was never readiness-checked or surfaced | Fixed (was BUG-82) |
-| FIXED-160 | Low | Models / a throttled read reported only `Unavailable (429)` | Fixed (found while verifying FIXED-158 live) |
-| FIXED-169 | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Fixed (was BUG-83) |
-| FIXED-170 | Low | Live tests / the BUG-69 acceptance spec could not run with a single provider key | Fixed (was BUG-84) |
-| FIXED-171 | Medium | Storage / Windows locked memory | Fixed (was BUG-46) |
-| FIXED-172 | Medium | Distribution / setup wizard and native tray | Fixed (was BUG-48) |
-| FIXED-173 | Low | Policy / dead `denied_actions` configuration | Fixed (was BUG-51) |
-| FIXED-174 | Low | Runtime / governed refusal destination and disclosure | Fixed (was BUG-59 and BUG-60) |
-| FIXED-175 | Low | Tasks / creation and execution intent | Fixed (was BUG-64) |
-| FIXED-176 | Low | Export / portable citation ledgers | Fixed (was BUG-65) |
-| FIXED-177 | Low | Web / loopback and public-bind rate limits | Fixed (was BUG-88) |
-| FIXED-178 | Low | Models / remove a provider credential in-app | Fixed (found during live verification) |
-| FIXED-179 | Low | CI / immutable release artifact actions | Fixed (was BUG-49) |
-| FIXED-180 | Medium | CI / Linux SQLCipher test throughput | Fixed (found during hosted verification) |
-| FIXED-181 | Low | Chat / multi-call answer separation | Fixed (was BUG-53) |
-| FIXED-182 | Medium | Web e2e / checked-in deterministic model stub | Fixed (was BUG-54) |
-| FIXED-183 | Low | Chat / disabled transcript implementation | Fixed (was BUG-55) |
-| FIXED-184 | High | Runtime / automatic context compaction | Fixed (former Known Limit) |
-| FIXED-185 | Medium | Models / connected-provider rolling usage | Fixed (former Known Limit) |
-| FIXED-186 | High | Audit / concurrent event writers could tear JSONL and its hash chain | Fixed (found during final verification) |
-| FIXED-187 | **Critical** | Recall / a turn could not read a past conversation | Fixed (was MEM-01) |
-| FIXED-188 | High | Context assembly / ambient recall offered the eight most recent chats | Fixed (was MEM-02) |
-| FIXED-189 | Medium | Recall / a search result was truncated mid-sentence for the model | Fixed (found during the live round) |
-| FIXED-190 | Medium | Build / the code map had no reference search | Fixed (was a README known limit) |
-| FIXED-191 | Medium | Build / matching failed on whitespace the model mis-transcribed | Fixed (was a README known limit) |
-| FIXED-192 | Medium | Desktop / the tray drew its own icon and the AppImage shipped an empty one | Fixed |
-| FIXED-193 | Low | Visual consistency / eight views re-declared the same control styling | Fixed |
+| [FIXED-04](#fixed-04--chat-had-no-conversation-memory-at-all-was-bug-02-critical) | **Critical** | Chat orchestration | Fixed (was BUG-02) |
+| [FIXED-05](#fixed-05--three-separate-walls-in-front-of-a-provider-the-owner-had-already-chosen) | High | Models / policy | Fixed |
+| [FIXED-06](#fixed-06--markdown-is-not-rendered-in-chat) | High | Chat / Build rendering | Fixed (was BUG-03) |
+| [FIXED-07](#fixed-07--over-broad-redaction-destroyed-legitimate-assistant-text-and-chat-titles-was-bug-04) | High | API redaction | Fixed (was BUG-04) |
+| [FIXED-08](#fixed-08--nothing-in-the-app-could-actually-write-a-file-was-bug-06) | **Critical** | Approvals / file output | Fixed (was BUG-06) |
+| [FIXED-09](#fixed-09--the-agent-stopped-dead-at-its-first-write-was-gap-build-b2) | **Critical** | Build / Chat agent loop | Fixed (was GAP-BUILD B2) |
+| [FIXED-10](#fixed-10--no-file-inspector-attachment-chips-were-not-interactive) | Medium | Chat / attachments | Fixed (was BUG-07) |
+| [FIXED-11](#fixed-11--redaction-destroyed-every-server-issued-path-and-url) | High | API redaction | Fixed (found while fixing BUG-07) |
+| [FIXED-12](#fixed-12--chat-transcript-export-path-was-bug-08-superseded-by-fixed-19) | Medium | Export | Superseded by FIXED-19 (was BUG-08) |
+| [FIXED-13](#fixed-13--a-background-agent-run-reported-task-failed-with-no-user-facing-reason-was-bug-09) | Medium | Tasks | Fixed (was BUG-09) |
+| [FIXED-14](#fixed-14--redaction-destroyed-every-server-issued-record-id) | High | API redaction | Fixed (found while fixing BUG-09) |
+| [FIXED-15](#fixed-15--task-runs-polluted-recent-chats-was-bug-10) | Low | Chat / Tasks | Fixed (was BUG-10) |
+| [FIXED-16](#fixed-16--a-surface-blocked-by-runtime-mode-did-not-say-so-was-bug-11) | Medium | Permissions | Fixed (was BUG-11) |
+| [FIXED-17](#fixed-17--mcp-servers-could-not-be-used-by-the-agent-was-bug-12) | High | MCP | Fixed (was BUG-12) |
+| [FIXED-18](#fixed-18--confirmation-token-is-explained-in-the-step-up-dialog-was-bug-13) | Low | Permissions | Fixed (was BUG-13) |
+| [FIXED-19](#fixed-19--chat-transcripts-were-offered-as-files-even-when-no-file-existed) | Medium | Chat / file output | Fixed (found while fixing BUG-13) |
+| [FIXED-20](#fixed-20--approved-chat-and-build-files-could-be-lost-from-their-session) | High | Chat / Build file retention | Fixed (found while fixing BUG-14) |
+| [FIXED-21](#fixed-21--ci-validation-had-stale-import-and-typing-debt) | Low | CI quality gates | Fixed (found while verifying BUG-14) |
+| [FIXED-22](#fixed-22--repeated-file-recording-could-duplicate-a-session-artifact) | Low | Chat / Build file retention | Fixed (found while fixing BUG-14) |
+| [FIXED-23](#fixed-23--builds-edit-and-patch-tools-overwrote-whole-files-was-gap-build-b3) | High | Build / patch application | Fixed (was GAP-BUILD B3) |
+| [FIXED-24](#fixed-24--readme-known-limits-described-already-shipped-behaviour-as-missing) | Low | Documentation / known limits | Fixed (found while verifying FIXED-23) |
+| [FIXED-25](#fixed-25--local-repository-references-used-host-native-separators) | Low | Build / cross-platform paths | Fixed (found while verifying FIXED-23) |
+| [FIXED-26](#fixed-26--the-cost-popover-test-asserts-a-different-currency-label-than-the-ui-was-bug-14) | Low | Chat / cost presentation tests | Fixed (was BUG-14) |
+| [FIXED-27](#fixed-27--github-actions-declared-the-deprecated-node-20-runtime-was-bug-15) | Low | CI / action runtime | Fixed (was BUG-15) |
+| [FIXED-28](#fixed-28--web-validation-emitted-repeated-node-localstorage-warnings-was-bug-16) | Low | Web test runtime | Fixed (was BUG-16) |
+| [FIXED-29](#fixed-29--b3-single-target-patches-rejected-common-unified-diff-forms) | Medium | Build / patch application | Fixed (B3 single-target expansion) |
+| [FIXED-30](#fixed-30--model-api-keys-disappeared-after-restart) | Medium | Models / credential persistence | Fixed |
+| [FIXED-31](#fixed-31--chat-and-build-composers-lacked-a-consistent-finishing-pass) | Medium | Chat / Build composer | Fixed |
+| [FIXED-32](#fixed-32--web-development-dependencies-had-known-security-advisories-was-bug-17) | High | Web development dependencies | Fixed (was BUG-17) |
+| [FIXED-33](#fixed-33--python-tests-emitted-a-starlettehttpx-deprecation-warning-was-bug-18) | Low | Python test dependencies | Fixed (was BUG-18) |
+| [FIXED-34](#fixed-34--one-approval-could-not-govern-an-atomic-multi-file-patch-b3-expansion) | High | Build / multi-file patch application | Fixed (B3 expansion) |
+| [FIXED-35](#fixed-35--settings-and-models-exposed-implementation-detail-and-visual-noise) | Medium | Settings / Models | Fixed |
+| [FIXED-36](#fixed-36--composers-had-no-raiker-owned-english-checking-path) | Medium | Writing quality | Fixed (optional local integration) |
+| [FIXED-37](#fixed-37--connector-operations-and-outbound-bodies-were-invisible-c2) | High | Chat / connector actions | Fixed (C2 inventory and preview) |
+| [FIXED-38](#fixed-38--connector-manifests-can-declare-bounded-operation-scoped-compensation-bug-19) | Medium | Chat / connector compensation | Fixed (was BUG-19) |
+| [FIXED-39](GAP_BUILD_CHAT.md#b4--parallel-tool-calls-are-silently-dropped) | High | Build / parallel tool execution | Fixed (was B4) |
+| [FIXED-40](GAP_BUILD_CHAT.md#c1--first-class-document-output) | High | Chat / document output | Fixed (was C1) |
+| [FIXED-41](GAP_BUILD_CHAT.md#c2--acting-in-the-owners-tools) | High | Chat / connector execution | Fixed (C2 multiple-call expansion) |
+| [FIXED-42](GAP_BUILD_CHAT.md#c3--recall-outside-the-current-chat) | High | Chat / cross-work recall | Fixed (was C3) |
+| [FIXED-43](#fixed-43--chat-creates-first-class-docx-xlsx-pdf-and-markdown-artifacts-c1) | High | Chat / document output | Fixed (C1 format expansion) |
+| [FIXED-44](#fixed-44--sessions-can-grant-a-bounded-command-feedback-channel-b5) | High | Build / command feedback | Fixed except host network containment (B5) |
+| [FIXED-45](#fixed-45--generated-files-have-a-response-linked-preview-surface-c4c5) | Medium | Chat / file inspector and output | Fixed (C4/C5 validation and presentation) |
+| [FIXED-46](#fixed-46--workbench-is-activity-aware-and-action-oriented) | Medium | Workbench | Fixed (activity-aware dashboard redesign) |
+| [FIXED-47](#fixed-47--owner-granted-commands-have-kernel-enforced-network-isolation) | High | Build / command containment | Fixed (was BUG-20) |
+| [FIXED-48](#fixed-48--settings-and-workbench-distinguish-preferences-from-governed-work) | Medium | Settings / Workbench | Fixed (settings and dashboard refinement) |
+| [FIXED-49](#fixed-49--memory-knowledge-map-and-context-usage-expose-user-controls-first) | Medium | Memory / Knowledge Map / context window | Fixed (visual control redesign) |
+| [FIXED-50](#fixed-50--local-model-context-capacity-is-discovered-from-the-active-runtime) | High | Local models / context capacity | Fixed (runtime capacity discovery) |
+| [FIXED-51](#fixed-51--force-simulation-rebuilt-itself-on-every-animation-tick) | High | Knowledge Map / force simulation | Fixed (found during live Playwright verification) |
+| [FIXED-52](#fixed-52--knowledge-map-initially-bypassed-raikers-shared-theme) | Medium | Knowledge Map / theme integration | Fixed (found during visual review) |
+| [FIXED-53](#fixed-53--provider-pricing-is-synchronised-into-a-historical-registry) | Medium | Models / pricing | Fixed (was BUG-21) |
+| [FIXED-54](#fixed-54--chat-and-build-export-a-transcript-and-print-as-a-document) | Medium | Chat / Build export | Fixed (was BUG-22) |
+| [FIXED-55](#fixed-55--rendered-code-blocks-carry-daily-use-interaction-controls) | Low | Chat / Build code ergonomics | Fixed (was BUG-23) |
+| [FIXED-56](#fixed-56--approval-resolution-in-another-tab-continues-chat) | High | Approvals / cross-tab continuation | Fixed (was BUG-24) |
+| [FIXED-57](#fixed-57--the-shipped-model-profile-existed-as-two-divergent-copies) | Low | Models / shipped configuration | Fixed (found while fixing BUG-21) |
+| [FIXED-58](#fixed-58--playwright-could-not-launch-the-pre-installed-browser) | Low | Web test runtime | Fixed (found while verifying BUG-21) |
+| [FIXED-59](#fixed-59--scheduled-work-could-not-resume-after-its-approval-was-granted) | High | Tasks / approval continuation | Fixed (was BUG-25) |
+| [FIXED-60](#fixed-60--image-inspection-had-no-zoom-pan-or-rotation-controls) | Low | File inspector / images | Fixed (was BUG-26) |
+| [FIXED-61](#fixed-61--memory-and-file-provenance-could-not-open-the-exact-source-passage) | Medium | Memory / provenance | Fixed (was BUG-27) |
+| [FIXED-62](#fixed-62--generated-artifacts-had-no-download-surface) | Medium | Chat / artifact download | Fixed (was BUG-28) |
+| [FIXED-63](#fixed-63--raiker-had-five-runtimes-and-needed-one) | High | Runtime | Fixed (single runtime; no mode selection) |
+| [FIXED-64](#fixed-64--the-build-composer-could-not-carry-a-file) | Low | Build / composer attachments | Fixed (was BUG-35) |
+| [FIXED-65](#fixed-65--chat-build-and-the-workbench-composed-work-three-different-ways) | Medium | Composers / Chat, Build, Workbench | Fixed (shared composer) |
+| [FIXED-66](#fixed-66--raiker-did-not-start-like-an-application-on-any-platform) | Medium | Distribution / cross-platform launch | Fixed (`raiker-app`) |
+| [FIXED-67](#fixed-67--an-attached-file-did-not-look-like-the-file-it-was) | Medium | Composers / attachment presentation | Fixed (attached files look like files) |
+| [FIXED-68](#fixed-68--governed-memory-lifecycle-is-complete-was-bug-29) | High | Memory / governed lifecycle | Fixed (was BUG-29) |
+| [FIXED-69](#fixed-69--knowledge-map-source-review-and-persistence-are-available-was-bug-30) | Medium | Knowledge Map / sources and scale | Fixed (was BUG-30) |
+| [FIXED-70](#fixed-70--owner-selected-ssh-and-daytona-execution-are-governed-was-bug-31) | High | Build / remote execution containment | Fixed (was BUG-31) |
+| [FIXED-71](#fixed-71--local-context-capacity-refresh-and-administrator-overrides-ship-was-bug-33) | Medium | Local models / capacity administration | Fixed (was BUG-33) |
+| [FIXED-72](#fixed-72--reloaded-chat-restores-the-parked-approval-was-bug-34) | Medium | Chat / restored approval state | Fixed (was BUG-34) |
+| [FIXED-73](#fixed-73--attached-files-sit-outside-chat-and-build-speech-bubbles) | Low | Chat / Build attachment layout | Fixed |
+| [FIXED-74](#fixed-74--the-standing-command-container-crashed-before-launch-on-windows) | Medium | Build / Windows container sandbox | Fixed (found during verification) |
+| [FIXED-75](#fixed-75--capacity-history-order-was-unstable-for-same-timestamp-changes) | Low | Models / capacity history ordering | Fixed (found in GitHub CI) |
+| [FIXED-76](#fixed-76--the-shipped-model-profile-copies-and-human-review-cadence-stay-in-step-was-bug-36) | Low | Models / shipped price review cadence | Fixed (was BUG-36) |
+| [FIXED-77](#fixed-77--source-coordinates-identify-the-passage-inside-a-turn-was-bug-38) | Medium | Memory / source coordinates | Fixed (was BUG-38) |
+| [FIXED-78](#fixed-78--daytona-budgets-reconcile-cumulative-provider-spend-was-bug-42) | Medium | Cloud execution / billing | Fixed (was BUG-42) |
+| [FIXED-79](#fixed-79--knowledge-map-and-export-dialogs-have-clean-accessibility-semantics-was-bug-43) | Low | Web / accessibility | Fixed (was BUG-43) |
+| [FIXED-80](#fixed-80--schedule-carries-and-presents-attachments-like-chat-and-build) | Low | Schedule / attachments | Fixed (consistency improvement) |
+| [FIXED-81](#fixed-81--submission-waits-for-attachment-uploads-on-every-composer) | Medium | Chat / Build / Workbench / Tasks | Fixed (found during live verification) |
+| [FIXED-82](#fixed-82--live-axe-findings-are-closed-in-export-and-knowledge-map) | Medium | Export / Knowledge Map accessibility | Fixed (found by live axe verification) |
+| [FIXED-83](#fixed-83--chat-export-has-deterministic-keyboard-activation) | Medium | Chat / export keyboard activation | Fixed (found during live verification) |
+| [FIXED-84](#fixed-84--accessibility-test-dependencies-pass-the-licensing-gate) | Low | CI / dependency licensing | Fixed (found during workflow verification) |
+| [FIXED-85](#fixed-85--a-settings-choice-made-while-the-page-was-still-loading-was-silently-discarded) | Medium | Settings / concurrent load | Fixed (found while verifying BUG-37) |
+| [FIXED-86](#fixed-86--the-visual-language-is-finished-and-written-down-was-bug-37) | Low | Design system / visual language | Fixed (was BUG-37) |
+| [FIXED-87](#fixed-87--an-approved-scheduled-run-continues-immediately-was-bug-39) | Low | Scheduler / continuation latency | Fixed (was BUG-39) |
+| [FIXED-88](#fixed-88--raiker-app-installs-registers-controls-and-removes-itself-was-bug-40) | Medium | Distribution / host lifecycle | Fixed (was BUG-40, less packaging — closed by FIXED-92) |
+| [FIXED-89](#fixed-89--e2ecomposerspects-matches-the-app-and-ci-runs-it-was-bug-41) | Low | Web / e2e regression suite | Fixed (was BUG-41) |
+| [FIXED-90](#fixed-90--terminal-approval-authenticates-previews-executes-and-continues-was-bug-32) | Medium | Terminal / approval execution | Fixed (was BUG-32) |
+| [FIXED-91](#fixed-91--a-worker-pays-sqlcipher-key-derivation-once-per-workspace-was-bug-45) | Low | Storage / per-request key derivation | Fixed (was BUG-45) |
+| [FIXED-92](#fixed-92--a-manually-triggered-release-pipeline-and-a-signed-update-channel-was-bug-44) | Medium | Distribution / release pipeline and signed updates | Fixed (was BUG-44, less the wizard and tray — see BUG-48) |
+| [FIXED-93](#fixed-93--a-provider-test-result-appears-only-under-the-provider-that-ran-it-was-bug-47) | Low | Models / provider test feedback | Fixed (was BUG-47) |
+| [FIXED-94](#fixed-94--build-had-no-plan-for-the-work-in-front-of-it-was-b6) | High | Build / turn plan state | Fixed (was B6) |
+| [FIXED-95](#fixed-95--the-model-could-not-delegate-a-wide-search-was-b7) | High | Build / model-spawned subagents | Fixed (was B7) |
+| [FIXED-96](#fixed-96--a-connected-mcp-server-did-not-say-whether-the-agent-could-use-it-b8-review) | Medium | Extensions / MCP agent reachability | Fixed (B8 review; found the surface was silent) |
+| [FIXED-97](#fixed-97--an-event-the-runtime-emitted-but-never-declared-killed-the-turn) | High | Runtime / undeclared event types | Fixed (found during B6 live testing; B4's drop evidence killed the turn) |
+| [FIXED-98](#fixed-98--tools-were-advertised-to-the-model-that-policy-always-denied) | High | Policy / advertised tools with no verdict | Fixed (found while implementing B6/B7) |
+| [FIXED-99](#fixed-99--a-policy-refusal-in-a-fresh-batch-dropped-the-calls-behind-it-was-bug-52) | Medium | Runtime / batched policy refusal | Fixed (was BUG-52) |
+| [FIXED-100](#fixed-100--the-sqlcipher-connection-cache-never-let-a-workspace-go-was-bug-50) | Medium | Storage / connection cache holds every workspace open | Fixed (was BUG-50) |
+| [FIXED-101](#fixed-101--the-agent-could-not-read-a-page-it-was-told-to-read-was-b12c7) | High | Chat / Build — governed web access | Fixed (was B12/C7) |
+| [FIXED-102](#fixed-102--a-running-turn-could-not-be-stopped-or-corrected-was-b17c13) | High | Chat / Build — stop and steer a running turn | Fixed (was B17/C13) |
+| [FIXED-103](#fixed-103--readmes-known-limits-described-behaviour-that-has-since-shipped-was-bug-58) | Low | Documentation / README known limits are stale | Fixed (was BUG-58) |
+| [FIXED-104](#fixed-104--the-context-bundles-fixed-capability-flags-talked-a-model-out-of-tools-it-can-use-was-bug-57) | Medium | Context / stale capability flags mislead the model | Fixed (was BUG-57) |
+| [FIXED-105](#fixed-105--the-user-guides-known-limits-were-stale-in-every-line-was-bug-61) | Medium | Documentation / the user guide's "Known limits" are entirely stale | Fixed (was BUG-61) |
+| [FIXED-106](#fixed-106--the-agent-could-propose-a-task-it-could-never-create-was-bug-62) | Medium | Tasks / an approved task is really created | Fixed (was BUG-62) |
+| [FIXED-107](#fixed-107--an-answer-drawn-from-the-owners-own-material-named-no-source) | High | Chat / Build — source citations and the passage used | Fixed (was C6 and the last of C4) |
+| [FIXED-108](#fixed-108--a-deleted-conversation-left-its-plan-its-controls-and-its-sources-behind) | Medium | Storage / session-keyed rows outliving the conversation | Fixed (found while implementing FIXED-107) |
+| [FIXED-109](#fixed-109--the-agent-could-describe-a-change-it-could-neither-commit-nor-propose) | High | Build / Chat — the governed git write path | Fixed (was B11) |
+| [FIXED-110](#fixed-110--the-git-tools-could-not-reach-a-repository-connected-as-a-sub-folder) | Low | Build / git tools and the selected repository | Fixed (was BUG-66) |
+| [FIXED-111](#fixed-111--a-committed-branch-could-not-be-pushed) | Medium | Build / Chat — the governed push | Fixed (was BUG-67) |
+| [FIXED-112](#fixed-112--a-proposal-the-runtime-had-already-refused-was-raised-as-a-decision) | Medium | Runtime / an unperformable proposal raised as a decision | Fixed (found while verifying FIXED-111) |
+| [FIXED-113](#fixed-113--every-turn-started-cold-the-repository-had-no-index) | High | Build / Chat — the repository code map | Fixed (was B9) |
+| [FIXED-114](#fixed-114--build-showed-repository-state-as-it-stood-before-a-visit-to-permissions) | Low | Build / stale repository state after a visit elsewhere | Fixed (found while verifying FIXED-113) |
+| [FIXED-115](#fixed-115--a-shipped-skill-check-failed-after-compileall-which-ci-itself-runs-was-bug-56) | Low | Tests / a shipped-skill check breaks after `compileall` | Fixed (was BUG-56) |
+| [FIXED-116](#fixed-116--a-fresh-workspace-silently-defaulted-to-llamacpp-instead-of-ollama) | High | Models / first-run default | Fixed (Ollama `gemma4:31b-cloud` is the visible and runtime default) |
+| [FIXED-117](#fixed-117--container-tools-could-not-complete-a-cold-real-docker-run) | High | Container tools / cold start and stdin bridge | Fixed (found during ADD-01 live Docker verification) |
+| [FIXED-118](#fixed-118--the-execution-environment-badge-linked-to-a-route-that-did-not-exist) | Medium | Web / execution-environment deep link | Fixed (found during ADD-01 Playwright verification) |
+| [FIXED-119](#fixed-119--offline-gateway-tests-changed-meaning-when-local-ollama-was-running) | Low | Tests / live Ollama leaked into offline scenarios | Fixed (found during ADD-01 baseline verification) |
+| [FIXED-120](#fixed-120--machine-identity-chips-overwhelmed-the-activity-actor-column) | Low | Activity / machine identity density | Fixed (found during ADD-03 screenshot review) |
+| [FIXED-121](#fixed-121--a-passing-export-test-emitted-a-delayed-jsdom-navigation-error) | Low | Web tests / export download navigation noise | Fixed (found during ADD-03 full verification) |
+| [FIXED-122](#fixed-122--windows-host-status-checks-could-interrupt-the-process-they-inspected) | High | Windows host status / destructive PID probe | Fixed (found during ADD-03 full verification) |
+| [FIXED-123](#fixed-123--plugin-execution-generated-an-unsupported-fallback-turn-id) | Medium | Plugin execution / invalid fallback turn id | Fixed (found during ADD-03 full verification) |
+| [FIXED-124](#fixed-124--project-exports-reversed-events-created-in-the-same-second) | Medium | Project export / unstable same-second event order | Fixed (found during ADD-03 full verification) |
+| [FIXED-125](#fixed-125--auto-and-skip-execution-replaced-the-machine-actor-with-the-owner) | High | Auto/skip runtime / human principal replaced the signed machine actor | Fixed (found during ADD-03 independent review) |
+| [FIXED-126](#fixed-126--non-terminal-exits-leaked-active-machine-principals) | High | Machine identity / abnormal and delegated paths leaked active principals | Fixed (found during ADD-03 independent review) |
+| [FIXED-127](#fixed-127--activity-hid-the-event-actor-behind-a-contextual-turn-identity) | Medium | Activity / contextual turn identity hid the literal event actor | Fixed (found during ADD-03 independent review) |
+| [FIXED-128](#fixed-128--resume-rotation-could-rewrite-approval-identity-metadata) | High | Approvals / resume rotation rewrote proposal identity timestamps | Fixed (found during ADD-03 independent review) |
+| [FIXED-129](#fixed-129--authority-matrix-ignored-failed-readiness-facts) | Low | Permissions / authority matrix ignored readiness failures | Fixed (found during ADD-03 independent review) |
+| [FIXED-130](#fixed-130--approval-identity-metadata-overlapped-at-desktop-width) | Low | Approvals / identity metadata overlapped at desktop width | Fixed (found during ADD-03 screenshot review) |
+| [FIXED-131](#fixed-131--concurrent-first-use-store-bootstrap-deadlocked-in-fts-repair) | High | SQLite bootstrap / concurrent first-use FTS rebuild deadlocked | Fixed (found in ADD-03 GitHub CI) |
+| [FIXED-132](#fixed-132--linux-mypy-rejected-guarded-windows-process-apis) | Medium | Windows process probe / Linux MyPy rejected guarded ctypes APIs | Fixed (found in ADD-03 GitHub CI) |
+| [FIXED-133](#fixed-133--a-new-users-first-message-failed-with-a-raw-reason-code) | High | First run / universal exact-model readiness and setup (BUG-69) | Fixed (2026-08-09 live round) |
+| [FIXED-134](#fixed-134--redaction-corrupted-path-derived-local-model-ids) | High | Local library / redaction corrupted path-derived deployment IDs | Fixed (found in BUG-69 live download/deploy) |
+| [FIXED-135](#fixed-135--model-activity-did-not-refresh-background-state) | Medium | Model Activity / background jobs never refreshed after mount | Fixed (found in BUG-69 screenshot review) |
+| [FIXED-136](#fixed-136--managed-llamacpp-could-outlive-graceful-host-shutdown) | High | Managed llama.cpp / graceful host shutdown could leave the child alive | Fixed (found in BUG-69 shutdown verification) |
+| [FIXED-137](#fixed-137--redaction-destroyed-an-approved-model-library-root) | High | API redaction / an unprefixed `path` field was destroyed | Fixed (found in GitHub CI after BUG-69) |
+| [FIXED-138](#fixed-138--billing-exhaustion-was-reported-as-an-unreachable-provider) | High | Model readiness / an empty account balance was reported as an unreachable provider | Fixed (found in the BUG-69 parity review) |
+| [FIXED-139](#fixed-139--the-readiness-gate-ignored-the-fallback-chain-the-runtime-uses) | High | Model readiness / the gate ignored the fallback chain the runtime actually tries | Fixed (found in the BUG-69 parity review) |
+| [FIXED-140](#fixed-140--models-claimed-providers-were-set-up-and-test-proved-nothing) | High | Models UI / the page counted saved credentials as "set up" and Test proved nothing | Fixed (found in the BUG-69 parity review) |
+| [FIXED-141](#fixed-141--three-models-tabs-were-unreachable-by-deep-link) | Medium | Models navigation / three tabs were unreachable by deep link and silently opened Providers | Fixed (found while splitting the Models page) |
+| [FIXED-142](#fixed-142--enabling-web-fetch-made-every-turn-that-used-it-fail) | High | Runtime / a tool call that blocked the event loop killed its own turn | Fixed (was BUG-72) |
+| [FIXED-143](#fixed-143--the-live-evidence-suite-could-not-reach-a-provider-card-at-all) | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
+| [FIXED-144](#fixed-144--the-first-run-model-sheet-rendered-the-settings-page-underneath-it) | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
+| [FIXED-145](#fixed-145--the-first-run-screen-was-titled-workbench) | Low | Web / the first-run screen was titled "Workbench" | Fixed (found in the 2026-08-10 visual sweep) |
+| [FIXED-146](#fixed-146--the-knowledge-maps-count-pill-contradicted-its-own-empty-state) | Low | Knowledge Map / the count pill contradicted the empty state | Fixed (found in the 2026-08-10 visual sweep) |
+| [FIXED-147](#fixed-147--the-knowledge-map-ignored-a-system-dark-preference) | Medium | Knowledge Map / the graph ignored a system dark preference | Fixed (found in the 2026-08-10 visual sweep) |
+| [FIXED-148](#fixed-148--1-models-ready) | Low | Models / "1 models ready" | Fixed (found in the 2026-08-10 visual sweep) |
+| [FIXED-149](#fixed-149--the-bug-47-live-scenario-expected-two-models-tabs-on-screen-at-once-was-bug-85) | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
+| [FIXED-150](#fixed-150--sqlcipher-ran-out-of-locked-memory-and-locked-the-owner-out-was-bug-86) | **Critical** | Storage / SQLCipher ran out of locked memory and locked the owner out | Fixed (was BUG-86) |
+| [FIXED-151](#fixed-151--the-audit-log-showed-nothing-though-governed-events-were-recorded-was-bug-87) | Medium | Observability / the audit log showed nothing though governed events were recorded | Fixed (was BUG-87) |
+| [FIXED-152](#fixed-152--the-knowledge-maps-source-picker-browsed-the-whole-raiker-installation) | High | Knowledge Map / the source picker browsed the whole Raiker installation | Fixed (reported 2026-08-10) |
+| [FIXED-153](#fixed-153--the-audit-logs-turn-identity-column-rendered-â) | Low | Observability / the audit log's turn-identity column rendered mojibake | Fixed (found while verifying FIXED-151) |
+| [FIXED-154](#fixed-154--the-context-meter-read-nan-input--nan-output) | Medium | Chat / Build — context meter read `NaN input · NaN output` | Fixed (was BUG-68) |
+| [FIXED-155](#fixed-155--builds-mode-chips-rewrote-global-decision-modes-with-no-step-up) | Medium | Build / mode chips rewrote global decision modes with no step-up | Fixed (was BUG-70) |
+| [FIXED-156](#fixed-156--memory-could-never-be-written-from-chat-or-build) | Medium | Memory / a gated capability no turn could ever reach | Fixed (was BUG-71) |
+| [FIXED-157](#fixed-157--a-conversation-could-end-saying-the-approved-action-was-not-executed) | Medium | Chat / a resumed turn could deny an execution that happened | Fixed (was BUG-73) |
+| [FIXED-158](#fixed-158--the-advisor-model-was-never-readiness-checked) | Medium | Model readiness / the advisor model was never readiness-checked or surfaced | Fixed (was BUG-82) |
+| [FIXED-159](#fixed-159--a-composer-permission-control-shipped-and-was-rendered-by-nothing) | Low | Web / a composer permission control shipped unused | Fixed (was BUG-63, closed with FIXED-155) |
+| [FIXED-160](#fixed-160--a-throttled-read-reported-only-unavailable-429) | Low | Models / a throttled read reported only `Unavailable (429)` | Fixed (found while verifying FIXED-158 live) |
+| [FIXED-161](#fixed-161--the-production-web-bundle-no-longer-exceeds-the-chunk-warning) | Low | Web build / the main production JavaScript chunk exceeded the 500 kB warning threshold | Fixed (was BUG-74) |
+| [FIXED-162](#fixed-162--retry-cancellation-and-partial-cleanup-do-what-they-say) | Medium | Model activity / retry, cancellation and partial-file cleanup were record-only for some job types | Fixed (was BUG-75) |
+| [FIXED-163](#fixed-163--a-failing-tool-or-provider-is-contained-not-retried-to-exhaustion) | Medium | Runtime / a failing tool or provider was retried until its budget ran out, every turn | Fixed (was BUG-76) |
+| [FIXED-164](#fixed-164--anomaly-detection-and-containment-cover-every-capability) | High | Security monitoring / anomaly detection and containment covered MCP connections only | Fixed (was BUG-77) |
+| [FIXED-165](#fixed-165--a-delegated-subagent-result-is-bound-to-the-spawn-that-produced-it) | Medium | Subagents / a delegated result carried no identity binding to the spawn that produced it | Fixed (was BUG-78) |
+| [FIXED-166](#fixed-166--a-plugin-signature-states-what-it-actually-proved) | Medium | Plugins / a manifest signature was a presence marker by default and the owner was never told | Fixed (was BUG-79) |
+| [FIXED-167](#fixed-167--the-genai-security-mapping-matches-shipped-code) | Low | Documentation / the GenAI mapping called the verifier a stub | Fixed (was BUG-80) |
+| [FIXED-168](#fixed-168--untrusted-context-is-scanned-and-a-suspicious-source-is-named) | Low | Context / no prompt-injection scanning hook existed, though the security mapping requires one | Fixed (was BUG-81) |
+| [FIXED-169](#fixed-169--readiness-has-an-owner-set-window-and-quiet-revalidation) | Low | Model readiness / one fixed five-minute TTL and no background revalidation | Fixed (was BUG-83) |
+| [FIXED-170](#fixed-170--the-bug-69-live-acceptance-spec-runs-with-one-provider-key) | Low | Live tests / the BUG-69 acceptance spec could not run with a single provider key | Fixed (was BUG-84) |
+| [FIXED-171](#fixed-171--windows-sqlcipher-memory-locking-is-crash-contained-and-explicit) | Medium | Storage / Windows locked memory | Fixed (was BUG-46) |
+| [FIXED-172](#fixed-172--first-run-is-guided-and-the-desktop-host-has-a-native-tray) | Medium | Distribution / setup wizard and native tray | Fixed (was BUG-48) |
+| [FIXED-173](#fixed-173--policy-configuration-no-longer-advertises-a-dead-deny-set) | Low | Policy / dead `denied_actions` configuration | Fixed (was BUG-51) |
+| [FIXED-174](#fixed-174--every-governed-withheld-call-is-disclosed-by-the-runtime) | Low | Runtime / governed refusal destination and disclosure | Fixed (was BUG-59 and BUG-60) |
+| [FIXED-175](#fixed-175--approving-task-creation-does-not-schedule-execution) | Low | Tasks / creation and execution intent | Fixed (was BUG-64) |
+| [FIXED-176](#fixed-176--exported-transcripts-carry-a-portable-citation-ledger) | Low | Export / portable citation ledgers | Fixed (was BUG-65) |
+| [FIXED-177](#fixed-177--ordinary-loopback-reads-no-longer-spend-the-public-dos-budget) | Low | Web / loopback and public-bind rate limits | Fixed (was BUG-88) |
+| [FIXED-178](#fixed-178--a-connected-provider-credential-can-be-removed-in-the-app) | Low | Models / remove a provider credential in-app | Fixed (found during live verification) |
+| [FIXED-179](#fixed-179--release-artifact-actions-are-pinned-immutably) | Low | CI / immutable release artifact actions | Fixed (was BUG-49) |
+| [FIXED-180](#fixed-180--linux-ci-no-longer-stalls-with-every-test-store-memory-locked) | Medium | CI / Linux SQLCipher test throughput | Fixed (found during hosted verification) |
+| [FIXED-181](#fixed-181--multi-call-answer-passes-are-separated-in-chat-was-bug-53) | Low | Chat / multi-call answer separation | Fixed (was BUG-53) |
+| [FIXED-182](#fixed-182--the-live-end-to-end-model-stub-is-reproducible-was-bug-54) | Medium | Web e2e / checked-in deterministic model stub | Fixed (was BUG-54) |
+| [FIXED-183](#fixed-183--chat-has-one-live-transcript-implementation-was-bug-55) | Low | Chat / disabled transcript implementation | Fixed (was BUG-55) |
+| [FIXED-184](#fixed-184--context-compacts-automatically-at-90-former-known-limit) | High | Runtime / automatic context compaction | Fixed (former Known Limit) |
+| [FIXED-185](#fixed-185--connected-providers-have-a-truthful-rolling-usage-view-former-known-limit) | Medium | Models / connected-provider rolling usage | Fixed (former Known Limit) |
+| [FIXED-186](#fixed-186--concurrent-event-writers-preserve-jsonl-and-its-hash-chain) | High | Audit / concurrent event writers could tear JSONL and its hash chain | Fixed (found during final verification) |
+| [FIXED-187](#fixed-187--a-turn-could-not-read-a-past-conversation) | **Critical** | Recall / a turn could not read a past conversation | Fixed (was MEM-01) |
+| [FIXED-188](#fixed-188--ambient-recall-offered-the-eight-most-recent-chats-whatever-the-turn-was-about) | High | Context assembly / ambient recall offered the eight most recent chats | Fixed (was MEM-02) |
+| [FIXED-189](#fixed-189--a-recalled-exchange-was-truncated-before-the-model-could-read-it) | Medium | Recall / a search result was truncated mid-sentence for the model | Fixed (found during the live round) |
+| [FIXED-190](#fixed-190--the-code-map-found-declarations-and-nothing-that-used-them) | Medium | Build / the code map had no reference search | Fixed (was a README known limit) |
+| [FIXED-191](#fixed-191--an-edit-failed-because-the-model-mis-transcribed-whitespace) | Medium | Build / matching failed on whitespace the model mis-transcribed | Fixed (was a README known limit) |
+| [FIXED-192](#fixed-192--the-tray-drew-its-own-icon-and-the-appimage-shipped-an-empty-one) | Medium | Desktop / the tray drew its own icon and the AppImage shipped an empty one | Fixed |
+| [FIXED-193](#fixed-193--eight-views-re-declared-the-same-control-styling-four-different-ways) | Low | Visual consistency / eight views re-declared the same control styling | Fixed |
 | [FIXED-195](#fixed-195--a-governed-command-had-no-operating-system-boundary) | High | Shell / sandbox | Fixed (was part of BUG-194) |
 | [FIXED-198](#fixed-198--registering-one-tool-meant-twelve-edits-across-seven-files) | Medium | Codebase structure | Fixed (was OPT-01) |
 | [FIXED-199](#fixed-199--the-rust-and-python-command-codecs-could-not-authenticate-each-other) | High | Command protocol | Fixed |
@@ -241,17 +252,49 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-237](#fixed-237--eidetic-capture-was-implemented-and-never-called) | High | Eidetic / Stage C (MEM-04) | Fixed |
 | [FIXED-238](#fixed-238--a-background-run-could-not-survive-the-restart-of-the-runtime-that-started-it) | Medium | Shell / recovery (BUG-194) | Fixed |
 | [FIXED-239](#fixed-239--the-command-container-was-rebuilt-around-every-command-so-nothing-could-persist) | Medium | Shell / sandbox (BUG-194) | Fixed |
-| FIXED-143 | High | Live tests / the whole live evidence suite could not reach a provider card | Fixed (found while verifying FIXED-142) |
-| FIXED-144 | Low | Web / the first-run model sheet rendered Settings underneath it | Fixed (found while verifying FIXED-142) |
-| FIXED-149 | Low | Live tests / the BUG-47 scenario expected two Models tabs on screen at once | Fixed (was BUG-85) |
-| FIXED-145 | Low | Web / the first-run screen was titled "Workbench" | Fixed (found in the 2026-08-10 visual sweep) |
-| FIXED-146 | Low | Knowledge Map / the count pill contradicted the empty state | Fixed (found in the 2026-08-10 visual sweep) |
-| FIXED-147 | Medium | Knowledge Map / the graph ignored a system dark preference | Fixed (found in the 2026-08-10 visual sweep) |
-| FIXED-148 | Low | Models / "1 models ready" | Fixed (found in the 2026-08-10 visual sweep) |
-| FIXED-150 | **Critical** | Storage / SQLCipher ran out of locked memory and locked the owner out | Fixed (was BUG-86) |
-| FIXED-151 | Medium | Observability / the audit log showed nothing though governed events were recorded | Fixed (was BUG-87) |
-| FIXED-152 | High | Knowledge Map / the source picker browsed the whole Raiker installation | Fixed (reported 2026-08-10) |
-| FIXED-153 | Low | Observability / the audit log's turn-identity column rendered mojibake | Fixed (found while verifying FIXED-151) |
+| [FIXED-240](#fixed-240--deep-windows-paths-silently-made-approved-writes-irreversible) | High | checkpoints / Windows paths (BUG-216) | Fixed 2026-08-21 |
+| [FIXED-241](#fixed-241--the-memory-entity-graph-had-no-evidence-producing-extractor) | Medium | memory graph (MEM-06) | Fixed 2026-08-21 |
+| [FIXED-242](#fixed-242--runtime-settings-crashed-while-rendering-measured-runner-trust) | High | Runtime UI/API | Fixed (found during live Playwright verification on 2026-08-21) |
+| [FIXED-243](#fixed-243--a-denied-windows-tree-kill-left-cancelled-runs-running-forever) | High | Shell / background execution (BUG-194) | Fixed (found during the complete Windows gate run on 2026-08-21) |
+| [FIXED-244](#fixed-244--the-sqlcipher-posture-test-bypassed-its-own-crash-probe) | Medium | Windows test reliability | Fixed (found during the complete gate run on 2026-08-21) |
+| [FIXED-245](#fixed-245--the-local-runtime-card-contradicted-its-measured-capabilities) | Medium | Runtime UI / capability truthfulness (BUG-194) | Fixed (found during focused live Playwright verification on 2026-08-21) |
+| [FIXED-246](#fixed-246--read-only-quarantine-disposal-was-only-proven-on-windows) | High | credential delta quarantine / CI portability (BUG-194) | Fixed (found by the exact-SHA GitHub Python workflow on 2026-08-21) |
+| [FIXED-247](#fixed-247--voice-controls-were-labels-rather-than-governed-input) | High | Chat / Build / prompt provenance (GAP-CHAT C16) | Fixed 2026-08-21 |
+| [FIXED-248](#fixed-248--build-defaulted-to-a-mode-that-overrode-the-owners-own-permissions) | Medium | Build composer / decision modes | Fixed 2026-08-21 |
+| [FIXED-249](#fixed-249--dictation-kept-listening-from-a-page-the-owner-had-left) | High | Chat / Build voice (GAP-CHAT C16) | Fixed 2026-08-21 |
+| [FIXED-250](#fixed-250--the-composers-carried-each-others-controls-and-said-the-same-thing-four-times) | Low | Chat / Build composer | Fixed 2026-08-21 |
+| [FIXED-251](#fixed-251--build-had-no-operating-protocol-and-no-record-of-which-one-ran) | Medium | Runtime orchestration / Build | Fixed 2026-08-21 |
+| [FIXED-252](#fixed-252--one-typo-in-a-hooks-file-made-every-prompt-fail) | High | hooks / runtime startup | Fixed 2026-08-22 |
+| [FIXED-253](#fixed-253--hooks-enforced-things-nothing-could-see) | Medium | hooks / Extensions | Fixed 2026-08-22 |
+| [FIXED-254](#fixed-254--refusing-a-projects-hooks-meant-editing-the-projects-file) | Low | hooks | Fixed 2026-08-22 (BUG-222) |
+| [FIXED-255](#fixed-255--seven-lifecycle-events-were-specified-and-never-emitted) | Medium | hooks / lifecycle | Fixed 2026-08-22 (BUG-223) |
+| [FIXED-256](#fixed-256--a-plugin-was-recorded-and-then-provided-nothing) | Medium | plugins / extensibility | Fixed 2026-08-22 (BUG-221, first contribution kind) |
+| [FIXED-257](#fixed-257--the-selected-tab-could-be-off-the-screen-it-was-selected-on) | Low | navigation / responsive | Fixed 2026-08-22 |
+| [FIXED-258](#fixed-258--twenty-web-tests-failed-on-a-current-node-and-passed-on-cis) | Low | web tests / environment | Fixed 2026-08-22 (BUG-224) |
+| [FIXED-259](#fixed-259--a-plugin-can-contribute-a-skill-and-it-arrives-switched-off) | Medium → Low | plugins / skills / extensibility | Fixed 2026-08-22 (BUG-221 step 2) |
+| [FIXED-260](#fixed-260--a-plugin-can-offer-an-mcp-server-and-an-offer-is-not-a-server) | Medium → Low | plugins / MCP / extensibility | Fixed 2026-08-22 (BUG-221 step 3) |
+| [FIXED-261](#fixed-261--what-a-channel-message-is-in-a-turn-is-now-decided) | Medium | channels / threat model | Fixed 2026-08-22 (BUG-225 step 1) |
+| [FIXED-262](#fixed-262--there-is-an-unattended-posture-now-decline-instead-of-asking) | Low | approval modes | Fixed 2026-08-22 (BUG-219) |
+| [FIXED-263](#fixed-263--the-approval-posture-menu-opened-into-the-fold) | Low | composer / web UI | Fixed 2026-08-22 |
+| [FIXED-264](#fixed-264--a-live-specs-sign-in-depended-on-how-much-history-the-instance-had) | Low | live test harness | Fixed 2026-08-22 |
+| [FIXED-265](#fixed-265--channels-have-an-owner-surface-and-the-tab-stops-denying-the-transport) | Medium | channels / extensibility | Fixed 2026-08-22 (BUG-225 steps 2 and 3) |
+| [FIXED-266](#fixed-266--a-boolean-was-redacted-into-the-opposite-of-the-truth) | Medium | API redaction | Fixed 2026-08-22 |
+| [FIXED-267](#fixed-267--an-allowlisted-channel-sender-is-no-longer-unbounded) | Medium | channels / abuse resistance | Fixed 2026-08-22 (BUG-225) |
+| [FIXED-268](#fixed-268--a-signed-http-callback-was-posting-an-unsigned-body) | Medium | channels / outbound integrity | Fixed 2026-08-22 |
+| [FIXED-269](#fixed-269--two-overlapping-reconciles-could-delete-each-others-plugin-skills) | Low | plugins / skills | Fixed 2026-08-22 |
+| [FIXED-270](#fixed-270--checkpoint-rewind-was-built-registered-tested-and-unreachable) | High | checkpoints / recovery | Fixed (was BUG-230) |
+| [FIXED-271](#fixed-271--the-audit-log-could-not-be-taken-out-of-the-product) | High | observability / evidence | Fixed (was BUG-231) |
+| [FIXED-272](#fixed-272--two-egress-implementations-existed-and-the-weaker-one-was-registered) | High | egress / governance | Fixed (was BUG-232) |
+| [FIXED-273](#fixed-273--an-approval-promised-a-rewind-it-could-not-give-for-a-file-over-8-mib) | Medium | checkpoints / approvals | Fixed (was BUG-233) |
+| [FIXED-274](#fixed-274--the-mcp-client-was-five-protocol-revisions-behind) | Medium | MCP / interoperability | Fixed (was BUG-234) |
+| [FIXED-275](#fixed-275--a-relayed-write-was-captured-under-a-session-no-checkpoint-belongs-to) | High | checkpoints / approvals | Fixed (was BUG-235; raised and closed 2026-08-23 while verifying FIXED-270 live) |
+| [FIXED-276](#fixed-276--an-audit-exports-manifest-hash-was-redacted-into-unusability) | Medium | API redaction / observability | Fixed (was BUG-236; raised and closed 2026-08-23 while verifying FIXED-271 live) |
+| [FIXED-277](#fixed-277--the-terminal-client-died-on-its-own-output-under-a-legacy-code-page) | Low | CLI / Windows | Fixed (was BUG-237; raised and closed 2026-08-23 while exercising the terminal half of FIXED-270) |
+| [FIXED-278](#fixed-278--every-restart-asked-the-owner-to-set-up-a-model-they-had-already-set-up) | High | models / readiness | Fixed (was BUG-238; raised and closed 2026-08-23) |
+| [FIXED-279](#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted) | Low → Medium once measured | governance architecture | Fixed (was GEP-01; raised 2026-08-23, closed 2026-08-24) |
+| [FIXED-280](#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have) | Medium | governance architecture | Fixed (was GEP-04; raised 2026-08-23, closed 2026-08-24) |
+| [FIXED-281](#fixed-281--a-skill-written-in-raiker-was-not-guaranteed-to-work-anywhere-else) | Medium | skills / interoperability | Fixed (was ADD-21; raised 2026-08-23, closed 2026-08-24) |
+| [FIXED-282](#fixed-282--auto-promised-a-review-it-did-not-perform) | Medium | decision modes / Build / Chat | Fixed (was BUG-218; raised 2026-08-21, closed 2026-08-24) |
 
 ---
 
@@ -5120,7 +5163,7 @@ order. The project export regression and the complete affected test set pass.
 
 ---
 
-## FIXED-125 â€” Auto and skip execution replaced the machine actor with the owner
+## FIXED-125 — Auto and skip execution replaced the machine actor with the owner
 
 **Status: fixed in this change; found during ADD-03 independent review.**
 
@@ -5138,7 +5181,7 @@ a real file executor.
 
 ---
 
-## FIXED-126 â€” Non-terminal exits leaked active machine principals
+## FIXED-126 — Non-terminal exits leaked active machine principals
 
 **Status: fixed in this change; found during ADD-03 independent review.**
 
@@ -5155,7 +5198,7 @@ Exception, stream-close, CLI, plugin, subagent, and resume regressions cover it.
 
 ---
 
-## FIXED-127 â€” Activity hid the event actor behind a contextual turn identity
+## FIXED-127 — Activity hid the event actor behind a contextual turn identity
 
 **Status: fixed in this change; found during ADD-03 independent review.**
 
@@ -5170,7 +5213,7 @@ and copyable.
 
 ---
 
-## FIXED-128 â€” Resume rotation could rewrite approval identity metadata
+## FIXED-128 — Resume rotation could rewrite approval identity metadata
 
 **Status: fixed in this change; found during ADD-03 independent review.**
 
@@ -5188,7 +5231,7 @@ regression.
 
 ---
 
-## FIXED-129 â€” Authority matrix ignored failed readiness facts
+## FIXED-129 — Authority matrix ignored failed readiness facts
 
 **Status: fixed in this change; found during ADD-03 independent review.**
 
@@ -5201,7 +5244,7 @@ regression.
 
 ---
 
-## FIXED-130 â€” Approval identity metadata overlapped at desktop width
+## FIXED-130 — Approval identity metadata overlapped at desktop width
 
 **Status: fixed in this change; found during ADD-03 screenshot review.**
 
@@ -5217,7 +5260,7 @@ were visually reviewed after the change.
 
 ---
 
-## FIXED-131 â€” Concurrent first-use store bootstrap deadlocked in FTS repair
+## FIXED-131 — Concurrent first-use store bootstrap deadlocked in FTS repair
 
 **Status: fixed in this change; found in ADD-03 GitHub CI.**
 
@@ -5236,7 +5279,7 @@ the hosted failure.
 
 ---
 
-## FIXED-132 â€” Linux MyPy rejected guarded Windows process APIs
+## FIXED-132 — Linux MyPy rejected guarded Windows process APIs
 
 **Status: fixed in this change; found in ADD-03 GitHub CI.**
 
@@ -6396,9 +6439,9 @@ not follow:
 
 | What moved | Landed as |
 |---|---|
-| FIXED-141 split Models into tabs and made **Local** the default | `#/models` renders no `article.provider-card` at all |
-| FIXED-133 added the first-run "Choose how to run models" sheet | modal over the workbench on every *load* of a new instance, so skipping it during sign-in does not survive the first navigation |
-| FIXED-133 added the readiness gate | **Send** stays disabled until the *exact* model has a check, so a spec that connected, pinned and typed sat on a disabled button |
+| [FIXED-141](#fixed-141--three-models-tabs-were-unreachable-by-deep-link) split Models into tabs and made **Local** the default | `#/models` renders no `article.provider-card` at all |
+| [FIXED-133](#fixed-133--a-new-users-first-message-failed-with-a-raw-reason-code) added the first-run "Choose how to run models" sheet | modal over the workbench on every *load* of a new instance, so skipping it during sign-in does not survive the first navigation |
+| [FIXED-133](#fixed-133--a-new-users-first-message-failed-with-a-raw-reason-code) added the readiness gate | **Send** stays disabled until the *exact* model has a check, so a spec that connected, pinned and typed sat on a disabled button |
 
 None of these is a defect on its own; each is a shipped improvement. The defect
 is that the live suite is the evidence behind every FIXED entry in this

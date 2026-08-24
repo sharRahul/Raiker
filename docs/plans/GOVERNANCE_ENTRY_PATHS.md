@@ -183,7 +183,7 @@ and the Capabilities page read —
 | `plugin_sandboxed_runtime_cap` | The container-isolated plugin runtime has no owner surface |
 | `plugin_sandbox_image_pull_cap` | Nothing runs a sandboxed plugin, so nothing pulls its image |
 | `plugin_revocation_cap` | Revocation is performed by the plugin registry directly; no governed action is constructed for it |
-| `channel_approval_relay` | An inbound channel message never becomes work, so no approval is ever relayed to a channel ([BUG-225](TO_BE_FIXED.md)) |
+| `channel_approval_relay` | An inbound channel message never becomes work, so no approval is ever relayed to a channel ([BUG-225](TO_BE_FIXED.md#bug-225--a-channel-can-be-described-and-never-reached)) |
 | `reminder_runtime` | No owner surface and no model tool. Nothing creates, lists or delivers a reminder |
 | `calendar_runtime` | No owner surface and no model tool. Nothing syncs and nothing creates an event |
 | `email_runtime` | No owner surface and no model tool. Nothing drafts, and nothing has ever sent |
@@ -387,7 +387,7 @@ seam.
 ### GEP-01 — Eight modules re-implement the gate check
 
 **Severity: Low. Area: governance architecture.
-Status: Closed 2026-08-24 — [FIXED-279](FIXED_ITEMS.md).**
+Status: Closed 2026-08-24 — [FIXED-279](FIXED_ITEMS.md#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted).**
 
 **Observed.** Eight modules carried their own `_ENABLED_GATE_STATES` and read the
 gate state directly from the store. Four of them are egress or subprocess paths.
@@ -461,7 +461,7 @@ everywhere else.
 ### GEP-04 — Fifteen capabilities have no traced governed-action path
 
 **Severity: Unknown when raised; Medium once traced. Area: governance
-architecture. Status: Closed 2026-08-24 — [FIXED-280](FIXED_ITEMS.md).**
+architecture. Status: Closed 2026-08-24 — [FIXED-280](FIXED_ITEMS.md#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have).**
 
 **The trace is in §3.6 and §3.5. What it found is that neither of the two
 readings below was right, and the thing they both missed is the finding.**

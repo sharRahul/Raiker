@@ -1,13 +1,22 @@
 from __future__ import annotations
 
 import hashlib
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
+from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import User
-from raiker.knowledge.files import ManagedFileError, ManagedFileScope, ManagedFileService
+from raiker.control.dashboard import DashboardService
+from raiker.knowledge.files import (
+    ManagedFileError,
+    ManagedFileRecord,
+    ManagedFileScope,
+    ManagedFileService,
+)
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_owner"
@@ -81,6 +90,27 @@ def test_project_file_uses_the_projects_managed_root(
     assert (tmp_path / ".raiker/projects/alpha/notes/plan.txt").read_bytes() == b"alpha"
 
 
+def test_dashboard_created_project_imports_under_the_managed_projects_root(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
+    dashboard = DashboardService(workspace)
+    created = dashboard.create_project("Alpha", OWNER)
+
+    assert created.ok, created.reason_code
+    record = ManagedFileService(workspace, dashboard.store).import_file(
+        ManagedFileScope("project", str(created.data["project_id"])),
+        "notes/plan.txt",
+        b"alpha",
+        "text/plain",
+        OWNER,
+    )
+
+    assert record.project_id == created.data["project_id"]
+    assert (workspace / ".raiker/projects/alpha/notes/plan.txt").read_bytes() == b"alpha"
+    assert not (workspace / "projects/alpha/notes/plan.txt").exists()
+
+
 def test_project_import_requires_an_owner_with_access_to_the_project(
     tmp_path: Path, owner_store: SQLiteStore
 ) -> None:
@@ -98,6 +128,81 @@ def test_project_import_requires_an_owner_with_access_to_the_project(
         )
 
 
+def test_memory_import_requires_an_existing_owner(tmp_path: Path, owner_store: SQLiteStore) -> None:
+    with pytest.raises(ManagedFileError, match="managed_file_scope_not_found"):
+        ManagedFileService(tmp_path, owner_store).import_file(
+            ManagedFileScope("memory"), "notes/private.txt", b"private", "text/plain", "unknown"
+        )
+
+
+def test_rejects_a_runtime_root_symlink_that_leaves_the_workspace(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    outside = tmp_path / "outside"
+    workspace.mkdir()
+    outside.mkdir()
+    try:
+        (workspace / ".raiker").symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):  # pragma: no cover - platform dependent
+        pytest.skip("symlinks unavailable on this platform")
+    store = SQLiteStore(workspace)
+    now = utc_now()
+    store.insert_user(User("user_owner", "Owner", None, True, now, now))
+    store.insert_principal(OWNER, "human", "Owner", delegated_by_user_id="user_owner")
+
+    with pytest.raises(ManagedFileError, match="managed_file_path_outside_scope"):
+        ManagedFileService(workspace, store).import_file(
+            ManagedFileScope("memory"), "notes/private.txt", b"private", "text/plain", OWNER
+        )
+    assert not (outside / "memory-files/notes/private.txt").exists()
+
+
+def test_rejects_a_projects_root_symlink_that_leaves_the_workspace(
+    tmp_path: Path, owner_store: SQLiteStore
+) -> None:
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    projects_root = tmp_path / ".raiker/projects"
+    try:
+        projects_root.symlink_to(outside, target_is_directory=True)
+    except (OSError, NotImplementedError):  # pragma: no cover - platform dependent
+        pytest.skip("symlinks unavailable on this platform")
+    owner_store.create_project(
+        "project_alpha", "Alpha", ".raiker/projects/alpha", owner_user_id="user_owner"
+    )
+
+    with pytest.raises(ManagedFileError, match="managed_file_path_outside_scope"):
+        ManagedFileService(tmp_path, owner_store).import_file(
+            ManagedFileScope("project", "project_alpha"), "notes/private.txt", b"private", "text/plain", OWNER
+        )
+    assert not (outside / "alpha/notes/private.txt").exists()
+
+
+def test_concurrent_imports_leave_one_active_record_with_matching_bytes(
+    tmp_path: Path, owner_store: SQLiteStore
+) -> None:
+    service = ManagedFileService(tmp_path, owner_store)
+    start = Barrier(3)
+    payloads = (b"first" * 400_000, b"second" * 400_000)
+
+    def import_one(payload: bytes) -> ManagedFileRecord | ManagedFileError:
+        start.wait()
+        try:
+            return service.import_file(ManagedFileScope("memory"), "same.bin", payload, "application/octet-stream", OWNER)
+        except ManagedFileError as exc:
+            return exc
+
+    with ThreadPoolExecutor(max_workers=2) as workers:
+        futures = [workers.submit(import_one, payload) for payload in payloads]
+        start.wait()
+    results = [future.result() for future in futures]
+
+    records = owner_store.list_managed_files(OWNER)
+    assert len(records) == 1
+    stored = (tmp_path / ".raiker/memory-files/same.bin").read_bytes()
+    assert hashlib.sha256(stored).hexdigest() == records[0]["content_hash"]
+    assert sum(not isinstance(result, ManagedFileError) for result in results) == 1
+
+
 def test_catalogue_lifecycle_is_owner_scoped(tmp_path: Path, owner_store: SQLiteStore) -> None:
     service = ManagedFileService(tmp_path, owner_store)
     imported = service.import_file(
@@ -111,3 +216,18 @@ def test_catalogue_lifecycle_is_owner_scoped(tmp_path: Path, owner_store: SQLite
     assert owner_store.retire_managed_file(imported.file_id, OWNER) is True
     assert owner_store.list_managed_files(OWNER) == []
     assert owner_store.get_managed_file(imported.file_id, OWNER)["retired_at"] is not None
+
+
+def test_reimport_after_retirement_replaces_the_retired_original(
+    tmp_path: Path, owner_store: SQLiteStore
+) -> None:
+    service = ManagedFileService(tmp_path, owner_store)
+    first = service.import_file(ManagedFileScope("memory"), "notes.txt", b"first", "text/plain", OWNER)
+    assert owner_store.retire_managed_file(first.file_id, OWNER) is True
+
+    second = service.import_file(ManagedFileScope("memory"), "notes.txt", b"second", "text/plain", OWNER)
+
+    assert second.file_id != first.file_id
+    assert second.content_hash == hashlib.sha256(b"second").hexdigest()
+    assert owner_store.get_managed_file(first.file_id, OWNER)["content_hash"] == hashlib.sha256(b"first").hexdigest()
+    assert (tmp_path / ".raiker/memory-files/notes.txt").read_bytes() == b"second"

@@ -135,7 +135,12 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
     }, theme);
     await signIn(page);
     await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
-    await expect(page.getByRole("button", { name: theme === "light" ? "Theme: light. Switch to dark." : "Theme: dark. Switch to system." })).toBeVisible();
+    // The theme is applied from the stored override, not from a shell control:
+    // the toggle moved to Settings -> Personalisation, and the top bar carries
+    // no project selector either. Both absences are asserted here because they
+    // are the shell contract, not an incidental layout detail.
+    await expect(page.getByRole("button", { name: /^Theme: / })).toHaveCount(0);
+    await expect(page.getByLabel("Active project")).toHaveCount(0);
 
     const overflowing: string[] = [];
     const iconless: string[] = [];

@@ -64,6 +64,7 @@
   {#each tabs as tab (tab.id)}
     <button
       type="button"
+      class="tab-control"
       role="tab"
       data-tab={tab.id}
       id={`tab-${tab.id}`}

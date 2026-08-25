@@ -51,7 +51,7 @@
 </script>
 
 {#if notice !== null}
-  <div class="composer-menu" role="status">
+  <div class="composer-menu menu-surface" role="status">
     <p class="menu-notice">
       <Icon name="info" size={13} />
       <span>
@@ -61,14 +61,14 @@
     </p>
   </div>
 {:else if items.length > 0}
-  <div class="composer-menu">
+  <div class="composer-menu menu-surface">
     {#if heading}<p class="menu-heading">{heading}</p>{/if}
     <ul role="listbox" aria-label={heading || "Suggestions"}>
       {#each items as item, index (item.id)}
         <li>
           <button
             type="button"
-            class="menu-row"
+            class="menu-row menu-item"
             class:active={index === active}
             role="option"
             aria-selected={index === active}

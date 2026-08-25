@@ -29,6 +29,7 @@
   } = $props();
 
   let rootEl: HTMLDivElement | undefined = $state();
+  let triggerEl: HTMLButtonElement | undefined = $state();
   const spec = $derived(buildMode(mode));
   const icon = (id: BuildMode) =>
     id === "plan" ? "tasks" : id === "edit" ? "file-edit" : "play";
@@ -39,7 +40,10 @@
   }
 
   function closeOnEscape(event: KeyboardEvent) {
-    if (event.key === "Escape") open = false;
+    if (event.key === "Escape" && open) {
+      open = false;
+      queueMicrotask(() => triggerEl?.focus());
+    }
   }
 
   function onWindowClick(event: MouseEvent) {
@@ -51,8 +55,9 @@
 
 <div class="build-mode" bind:this={rootEl}>
   <button
+    bind:this={triggerEl}
     type="button"
-    class="mode-trigger"
+    class="mode-trigger control"
     class:auto-mode={mode === "auto"}
     aria-label={`How much Raiker may do this turn: ${spec.label}`}
     aria-haspopup="menu"
@@ -68,12 +73,12 @@
   </button>
 
   {#if open}
-    <div class="mode-menu" role="menu" aria-label="Mode" tabindex="-1" onkeydown={closeOnEscape}>
+    <div class="mode-menu menu-surface" role="menu" aria-label="Mode" tabindex="-1" onkeydown={closeOnEscape}>
       <p class="mode-menu-title">Mode</p>
       {#each BUILD_MODES as option, index (option.id)}
         <button
           type="button"
-          class="mode-choice"
+          class="mode-choice menu-item"
           role="menuitemradio"
           aria-checked={mode === option.id}
           {disabled}

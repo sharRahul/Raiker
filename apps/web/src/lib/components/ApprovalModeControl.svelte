@@ -11,6 +11,7 @@
   let error = $state<string | null>(null);
   let selectionVersion = 0;
   let rootEl: HTMLDivElement | undefined = $state();
+  let triggerEl: HTMLButtonElement | undefined = $state();
 
   onMount(async () => {
     const initialSelectionVersion = selectionVersion;
@@ -51,7 +52,10 @@
   }
 
   function closeOnEscape(event: KeyboardEvent) {
-    if (event.key === "Escape") open = false;
+    if (event.key === "Escape" && open) {
+      open = false;
+      queueMicrotask(() => triggerEl?.focus());
+    }
   }
 
   function onWindowClick(event: MouseEvent) {
@@ -63,8 +67,9 @@
 
 <div class="approval-mode-control" bind:this={rootEl}>
   <button
+    bind:this={triggerEl}
     type="button"
-    class="approval-trigger"
+    class="approval-trigger control"
     class:skip-mode={mode === "skip"}
     aria-label={`Approval mode: ${descriptor(mode).label}`}
     aria-haspopup="menu"
@@ -78,11 +83,11 @@
   </button>
 
   {#if open}
-    <div class="approval-menu" role="menu" aria-label="Approval mode" tabindex="-1" onkeydown={closeOnEscape}>
+    <div class="approval-menu menu-surface" role="menu" aria-label="Approval mode" tabindex="-1" onkeydown={closeOnEscape}>
       {#each APPROVAL_MODES as option (option.mode)}
         <button
           type="button"
-          class="approval-choice"
+          class="approval-choice menu-item"
           role="menuitemradio"
           aria-checked={mode === option.mode}
           disabled={busy}

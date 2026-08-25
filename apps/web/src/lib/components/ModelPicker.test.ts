@@ -53,6 +53,23 @@ const profiles: ModelProfile[] = [
 ];
 
 describe("ModelPicker", () => {
+  it("dismisses with Escape and restores focus to the model trigger", async () => {
+    render(ModelPicker, {
+      profiles,
+      selectedProfile: profiles[0],
+      value: profiles[0].profile_id,
+    });
+    const trigger = screen.getByRole("button", { name: /model for this turn/i });
+    await fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: /model/i });
+    screen.getByRole("menuitemradio", { name: /Sonnet 4.5/i }).focus();
+
+    await fireEvent.keyDown(menu, { key: "Escape" });
+
+    expect(screen.queryByRole("menu", { name: /model/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("groups models under a logo-and-name provider heading", async () => {
     render(ModelPicker, {
       profiles,

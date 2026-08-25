@@ -54,6 +54,7 @@
     effort?: string;
   } = $props();
   let rootEl: HTMLDivElement | undefined = $state();
+  let triggerEl: HTMLButtonElement | undefined = $state();
   let effortOpen = $state(false);
   // The last named effort, kept so switching Thinking off and on again returns
   // the owner to the level they picked instead of silently to the first one.
@@ -137,6 +138,7 @@
     if (event.key === "Escape") {
       open = false;
       effortOpen = false;
+      queueMicrotask(() => triggerEl?.focus());
     }
   }
 
@@ -152,8 +154,9 @@
 
 <div class="model-picker" bind:this={rootEl}>
   <button
+    bind:this={triggerEl}
     type="button"
-    class="model-trigger"
+    class="model-trigger control"
     aria-label={`Model for this turn: ${label}`}
     aria-haspopup="menu"
     aria-expanded={open}
@@ -170,7 +173,7 @@
 
   {#if open}
     <div
-      class="model-menu"
+      class="model-menu menu-surface"
       role="menu"
       aria-label="Models"
       tabindex="-1"
@@ -194,7 +197,7 @@
           {#each readyChoices(group.profiles) as profile (`${profile.profile_id}\u0000${profile.model}`)}
             <button
               type="button"
-              class="model-choice"
+              class="model-choice menu-item"
               role="menuitemradio"
               aria-checked={active?.profile_id === profile.profile_id &&
                 active?.model === profile.model}

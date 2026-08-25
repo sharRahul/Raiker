@@ -666,6 +666,44 @@ code,
 
 /* ── Shared component classes ── */
 
+/* Desktop interaction contracts. Components can add layout-specific rules,
+   while these classes keep control height, menu containment, hover, and focus
+   behavior consistent across the shell. */
+.control {
+  min-height: var(--control-min-h);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.2;
+}
+.menu-surface {
+  max-width: min(24rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100vh - 2rem));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-2);
+}
+.menu-item {
+  min-height: var(--control-min-h);
+  font-size: var(--text-sm);
+}
+.menu-item:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--text-1);
+}
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  min-width: var(--control-min-h);
+  min-height: var(--control-min-h);
+  padding: 0;
+}
+.tab-control {
+  min-height: var(--control-min-h);
+  font-size: var(--text-sm);
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

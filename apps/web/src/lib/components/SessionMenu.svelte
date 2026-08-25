@@ -14,6 +14,13 @@
   let renaming = $state(false);
   let moving = $state(false);
   let name = $state("");
+  let triggerEl: HTMLButtonElement | undefined = $state();
+
+  function closeOnEscape(event: KeyboardEvent) {
+    if (event.key !== "Escape" || !open) return;
+    open = false;
+    queueMicrotask(() => triggerEl?.focus());
+  }
 
   async function copyLocalLink() {
     if (!navigator.clipboard || !isLoopbackHost(window.location.hostname)) return;
@@ -23,30 +30,31 @@
 
 <div class="wrap">
   <button
+    bind:this={triggerEl}
     type="button"
-    class="trigger"
+    class="trigger icon-button"
     aria-label={`Session actions for ${title}`}
     aria-expanded={open}
     onclick={() => (open = !open)}
   >•••</button>
   {#if open}
-    <div class="menu" role="menu" aria-label={`Actions for ${title}`}>
-      <button type="button" role="menuitem" onclick={copyLocalLink}>Copy local link</button>
-      <button type="button" role="menuitem" onclick={() => { name = title; renaming = true; }}>Rename</button>
+    <div class="menu menu-surface" role="menu" aria-label={`Actions for ${title}`} tabindex="-1" onkeydown={closeOnEscape}>
+      <button class="menu-item" type="button" role="menuitem" onclick={copyLocalLink}>Copy local link</button>
+      <button class="menu-item" type="button" role="menuitem" onclick={() => { name = title; renaming = true; }}>Rename</button>
       {#if renaming}
         <label>Session title <input bind:value={name} /></label>
-        <button type="button" role="menuitem" onclick={() => { onRename(name); renaming = false; }}>Save name</button>
+        <button class="menu-item" type="button" role="menuitem" onclick={() => { onRename(name); renaming = false; }}>Save name</button>
       {/if}
-      <button type="button" role="menuitem" onclick={() => (moving = !moving)}>Move to project</button>
+      <button class="menu-item" type="button" role="menuitem" onclick={() => (moving = !moving)}>Move to project</button>
       {#if moving}
-        <button type="button" role="menuitem" onclick={() => onMove("")}>No project</button>
+        <button class="menu-item" type="button" role="menuitem" onclick={() => onMove("")}>No project</button>
         {#each projects as project (project.project_id)}
-          <button type="button" role="menuitem" onclick={() => onMove(project.project_id)}>{project.name}</button>
+          <button class="menu-item" type="button" role="menuitem" onclick={() => onMove(project.project_id)}>{project.name}</button>
         {/each}
       {/if}
-      <button type="button" role="menuitem" onclick={onPin}>{pinned ? "Unpin" : "Pin"}</button>
-      <button type="button" role="menuitem" onclick={onArchive}>{archived ? "Unarchive" : "Archive"}</button>
-      <button type="button" role="menuitem" class="danger" onclick={onDelete}>Delete</button>
+      <button class="menu-item" type="button" role="menuitem" onclick={onPin}>{pinned ? "Unpin" : "Pin"}</button>
+      <button class="menu-item" type="button" role="menuitem" onclick={onArchive}>{archived ? "Unarchive" : "Archive"}</button>
+      <button type="button" role="menuitem" class="menu-item danger" onclick={onDelete}>Delete</button>
     </div>
   {/if}
 </div>

@@ -15,6 +15,22 @@ afterEach(() => {
 });
 
 describe("SessionMenu", () => {
+  it("dismisses with Escape and restores focus to the actions trigger", async () => {
+    render(SessionMenu, {
+      sessionId: "ses_1", title: "Brief", projects: [],
+      onRename: vi.fn(), onMove: vi.fn(), onPin: vi.fn(), onArchive: vi.fn(), onDelete: vi.fn(),
+    });
+    const trigger = screen.getByRole("button", { name: /session actions/i });
+    await fireEvent.click(trigger);
+    const menu = screen.getByRole("menu", { name: /actions for brief/i });
+    screen.getByRole("menuitem", { name: /copy local link/i }).focus();
+
+    await fireEvent.keyDown(menu, { key: "Escape" });
+
+    expect(screen.queryByRole("menu", { name: /actions for brief/i })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
+
   it("keeps sharing local and forwards the six session actions", async () => {
     const writeText = vi.fn(async () => undefined);
     Object.assign(navigator, { clipboard: { writeText } });

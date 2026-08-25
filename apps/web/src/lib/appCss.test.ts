@@ -82,6 +82,15 @@ describe("shared design primitives", () => {
     }
   });
 
+  it("defines fixed-size desktop contracts for controls, menus, icons, and tabs", () => {
+    for (const selector of [".control {", ".menu-surface {", ".menu-item {", ".icon-button {", ".tab-control {"]) {
+      expect(stylesheet).toContain(selector);
+    }
+    const contracts = stylesheet.slice(stylesheet.indexOf(".control {"), stylesheet.indexOf(".card-interactive {"));
+    expect(contracts).toContain("min-height: var(--control-min-h)");
+    expect(contracts).not.toMatch(/font-size:\s*clamp\([^)]*vw/);
+  });
+
   it("drops the interactive card lift under reduced motion", () => {
     expect(stylesheet).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*\{\s*\.card-interactive:hover\s*\{\s*transform: none;/s,

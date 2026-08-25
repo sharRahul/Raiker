@@ -46,6 +46,19 @@ describe("ApprovalModeControl", () => {
     expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
+  it("returns focus to its trigger when Escape is pressed inside the menu", async () => {
+    stubModeApi("manual");
+    render(ApprovalModeControl);
+    const menu = await openMenu();
+    const choice = screen.getByRole("menuitemradio", { name: /automatically approve/i });
+    choice.focus();
+
+    await fireEvent.keyDown(menu, { key: "Escape" });
+
+    expect(screen.queryByRole("menu", { name: /approval mode/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /approval mode/i })).toHaveFocus();
+  });
+
   it("keeps a local selection when the initial persisted-mode load resolves late", async () => {
     const load = deferred<{ approval_mode: "manual" | "auto" | "skip" | "dont_ask" }>();
     vi.spyOn(api, "composerApprovalMode").mockReturnValue(load.promise);

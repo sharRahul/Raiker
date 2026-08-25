@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import hashlib
+import multiprocessing
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Barrier
+from typing import Any
 
 import pytest
 
@@ -20,6 +22,21 @@ from raiker.knowledge.files import (
 from raiker.storage.sqlite import SQLiteStore
 
 OWNER = "principal_owner"
+
+
+def _import_from_separate_process(
+    workspace: str, payload: bytes, start: Any, results: Any
+) -> None:
+    store = SQLiteStore(workspace)
+    try:
+        start.wait()
+        record = ManagedFileService(workspace, store).import_file(
+            ManagedFileScope("memory"), "shared.bin", payload, "application/octet-stream", OWNER
+        )
+    except Exception as exc:
+        results.put(("error", type(exc).__name__, str(exc)))
+    else:
+        results.put(("ok", record.content_hash, ""))
 
 
 @pytest.fixture()
@@ -201,6 +218,59 @@ def test_concurrent_imports_leave_one_active_record_with_matching_bytes(
     stored = (tmp_path / ".raiker/memory-files/same.bin").read_bytes()
     assert hashlib.sha256(stored).hexdigest() == records[0]["content_hash"]
     assert sum(not isinstance(result, ManagedFileError) for result in results) == 1
+
+
+def test_multiprocess_imports_leave_one_active_record_with_matching_bytes(
+    tmp_path: Path, owner_store: SQLiteStore
+) -> None:
+    context = multiprocessing.get_context("spawn")
+    start = context.Barrier(3)
+    results = context.Queue()
+    payloads = (b"first" * 400_000, b"second" * 400_000)
+    workers = [
+        context.Process(
+            target=_import_from_separate_process,
+            args=(str(tmp_path), payload, start, results),
+        )
+        for payload in payloads
+    ]
+    for worker in workers:
+        worker.start()
+    start.wait()
+    outcomes = [results.get(timeout=20) for _ in workers]
+    for worker in workers:
+        worker.join(timeout=20)
+        assert worker.exitcode == 0
+
+    records = owner_store.list_managed_files(OWNER)
+    assert len(records) == 1
+    stored = (tmp_path / ".raiker/memory-files/shared.bin").read_bytes()
+    assert hashlib.sha256(stored).hexdigest() == records[0]["content_hash"]
+    assert sum(outcome[0] == "ok" for outcome in outcomes) == 1
+    assert all(outcome[0] == "ok" or outcome[1] == "ManagedFileError" for outcome in outcomes)
+
+
+def test_failed_catalogue_insert_leaves_a_recoverable_destination(
+    tmp_path: Path, owner_store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    service = ManagedFileService(tmp_path, owner_store)
+    original_insert = owner_store.insert_managed_file
+
+    def reject_insert(**_kwargs: object) -> None:
+        raise RuntimeError("simulated_catalogue_failure")
+
+    monkeypatch.setattr(owner_store, "insert_managed_file", reject_insert)
+    with pytest.raises(RuntimeError, match="simulated_catalogue_failure"):
+        service.import_file(ManagedFileScope("memory"), "retry.bin", b"first", "application/octet-stream", OWNER)
+    assert not (tmp_path / ".raiker/memory-files/retry.bin").exists()
+
+    monkeypatch.setattr(owner_store, "insert_managed_file", original_insert)
+    retried = service.import_file(
+        ManagedFileScope("memory"), "retry.bin", b"second", "application/octet-stream", OWNER
+    )
+
+    assert owner_store.list_managed_files(OWNER) == [owner_store.get_managed_file(retried.file_id, OWNER)]
+    assert (tmp_path / ".raiker/memory-files/retry.bin").read_bytes() == b"second"
 
 
 def test_catalogue_lifecycle_is_owner_scoped(tmp_path: Path, owner_store: SQLiteStore) -> None:

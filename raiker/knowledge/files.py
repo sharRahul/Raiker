@@ -5,9 +5,6 @@ from __future__ import annotations
 import hashlib
 import os
 import secrets
-import threading
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 from typing import TYPE_CHECKING, Literal
@@ -20,30 +17,6 @@ if TYPE_CHECKING:
 
 
 ManagedFileScopeKind = Literal["memory", "project"]
-
-
-_IMPORT_LOCKS_GUARD = threading.Lock()
-_IMPORT_LOCKS: dict[tuple[str, str, str, str, str], tuple[threading.Lock, int]] = {}
-
-
-@contextmanager
-def _import_lock(key: tuple[str, str, str, str, str]) -> Iterator[None]:
-    """Serialize same-identity imports so bytes and catalogue stay paired."""
-
-    with _IMPORT_LOCKS_GUARD:
-        lock, users = _IMPORT_LOCKS.get(key, (threading.Lock(), 0))
-        _IMPORT_LOCKS[key] = (lock, users + 1)
-    lock.acquire()
-    try:
-        yield
-    finally:
-        lock.release()
-        with _IMPORT_LOCKS_GUARD:
-            current, users = _IMPORT_LOCKS[key]
-            if users == 1:
-                del _IMPORT_LOCKS[key]
-            else:
-                _IMPORT_LOCKS[key] = (current, users - 1)
 
 
 class ManagedFileError(ValueError):
@@ -117,66 +90,44 @@ class ManagedFileService:
         relative = self._relative_path(relative_path)
         root = self._scope_root(scope, owner_principal_id)
         destination = self._contained_destination(root, relative)
-        key = (
-            str(self.workspace_root),
-            owner_principal_id,
-            scope.kind,
-            scope.project_id or "",
-            relative,
-        )
-        with _import_lock(key):
-            scoped_records = self.store.list_managed_files(
-                owner_principal_id,
-                scope_kind=scope.kind,
-                project_id=scope.project_id,
-                include_retired=True,
-            )
-            matching_records = [
-                row for row in scoped_records if str(row["relative_path"]) == relative
-            ]
-            if any(row["retired_at"] is None for row in matching_records):
-                raise ManagedFileError("managed_file_already_exists")
-            if destination.exists() or destination.is_symlink():
-                if not matching_records:
-                    raise ManagedFileError("managed_file_already_exists")
-                destination.unlink()
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination = self._contained_destination(root, relative)
+        temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(8)}.tmp")
+        try:
+            with temporary.open("xb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
 
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            destination = self._contained_destination(root, relative)
-            temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(8)}.tmp")
-            try:
-                with temporary.open("xb") as handle:
-                    handle.write(data)
-                    handle.flush()
-                    os.fsync(handle.fileno())
+            def publish() -> None:
+                if destination.exists() or destination.is_symlink():
+                    destination.unlink()
                 temporary.replace(destination)
-            except OSError as exc:
-                raise ManagedFileError("managed_file_write_failed") from exc
-            finally:
-                if temporary.exists():
-                    temporary.unlink(missing_ok=True)
 
             now = utc_now()
             file_id = f"mfile_{secrets.token_hex(16)}"
-            try:
-                self.store.insert_managed_file(
-                    file_id=file_id,
-                    owner_principal_id=owner_principal_id,
-                    scope_kind=scope.kind,
-                    project_id=scope.project_id,
-                    relative_path=relative,
-                    media_type=media_type,
-                    size_bytes=len(data),
-                    content_hash=hashlib.sha256(data).hexdigest(),
-                    index_state="queued",
-                    index_error=None,
-                    created_at=now,
-                    updated_at=now,
-                )
-            except Exception:
-                # Leaving an unreferenced file is safer than deleting a path
-                # another importer may have won after an external process race.
-                raise
+            published = self.store.publish_managed_file_atomic(
+                file_id=file_id,
+                owner_principal_id=owner_principal_id,
+                scope_kind=scope.kind,
+                project_id=scope.project_id,
+                relative_path=relative,
+                media_type=media_type,
+                size_bytes=len(data),
+                content_hash=hashlib.sha256(data).hexdigest(),
+                index_state="queued",
+                index_error=None,
+                created_at=now,
+                updated_at=now,
+                publish=publish,
+            )
+            if not published:
+                raise ManagedFileError("managed_file_already_exists")
+        except OSError as exc:
+            raise ManagedFileError("managed_file_write_failed") from exc
+        finally:
+            if temporary.exists():
+                temporary.unlink(missing_ok=True)
         record = self.store.get_managed_file(file_id, owner_principal_id)
         if record is None:  # pragma: no cover - the insert is synchronous
             raise RuntimeError("managed_file_insert_missing")

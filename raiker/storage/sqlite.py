@@ -9,7 +9,7 @@ import os
 import re
 import threading
 from collections import OrderedDict
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal, InvalidOperation
@@ -2733,31 +2733,143 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         index_error: str | None,
         created_at: str,
         updated_at: str,
+        _connection: sqlite3.Connection | None = None,
     ) -> None:
-        with self.connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO managed_files (
-                    file_id, owner_principal_id, scope_kind, project_id, relative_path,
-                    media_type, size_bytes, content_hash, index_state, index_error,
-                    created_at, updated_at, retired_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
-                """,
-                (
-                    file_id,
-                    owner_principal_id,
-                    scope_kind,
-                    project_id,
-                    relative_path,
-                    media_type,
-                    size_bytes,
-                    content_hash,
-                    index_state,
-                    index_error,
-                    created_at,
-                    updated_at,
-                ),
+        if _connection is not None:
+            self._insert_managed_file(
+                _connection,
+                file_id=file_id,
+                owner_principal_id=owner_principal_id,
+                scope_kind=scope_kind,
+                project_id=project_id,
+                relative_path=relative_path,
+                media_type=media_type,
+                size_bytes=size_bytes,
+                content_hash=content_hash,
+                index_state=index_state,
+                index_error=index_error,
+                created_at=created_at,
+                updated_at=updated_at,
             )
+            return
+        with self.connect() as connection:
+            self._insert_managed_file(
+                connection,
+                file_id=file_id,
+                owner_principal_id=owner_principal_id,
+                scope_kind=scope_kind,
+                project_id=project_id,
+                relative_path=relative_path,
+                media_type=media_type,
+                size_bytes=size_bytes,
+                content_hash=content_hash,
+                index_state=index_state,
+                index_error=index_error,
+                created_at=created_at,
+                updated_at=updated_at,
+            )
+
+    @staticmethod
+    def _insert_managed_file(
+        connection: sqlite3.Connection,
+        *,
+        file_id: str,
+        owner_principal_id: str,
+        scope_kind: str,
+        project_id: str | None,
+        relative_path: str,
+        media_type: str,
+        size_bytes: int,
+        content_hash: str,
+        index_state: str,
+        index_error: str | None,
+        created_at: str,
+        updated_at: str,
+    ) -> None:
+        connection.execute(
+            """
+            INSERT INTO managed_files (
+                file_id, owner_principal_id, scope_kind, project_id, relative_path,
+                media_type, size_bytes, content_hash, index_state, index_error,
+                created_at, updated_at, retired_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+            """,
+            (
+                file_id,
+                owner_principal_id,
+                scope_kind,
+                project_id,
+                relative_path,
+                media_type,
+                size_bytes,
+                content_hash,
+                index_state,
+                index_error,
+                created_at,
+                updated_at,
+            ),
+        )
+
+    def publish_managed_file_atomic(
+        self,
+        *,
+        file_id: str,
+        owner_principal_id: str,
+        scope_kind: str,
+        project_id: str | None,
+        relative_path: str,
+        media_type: str,
+        size_bytes: int,
+        content_hash: str,
+        index_state: str,
+        index_error: str | None,
+        created_at: str,
+        updated_at: str,
+        publish: Callable[[], None],
+    ) -> bool:
+        """Publish a file and its active identity under one cross-process lock.
+
+        SQLite's ``BEGIN IMMEDIATE`` serializes writers across processes. The
+        caller's final same-directory replacement happens before commit, so a
+        committed active row always names the bytes it published; a failure
+        rolls back the reservation and leaves only its unique temporary file.
+        """
+
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                active = connection.execute(
+                    """
+                    SELECT 1 FROM managed_files
+                    WHERE owner_principal_id = ? AND scope_kind = ?
+                      AND project_id IS ? AND relative_path = ? AND retired_at IS NULL
+                    """,
+                    (owner_principal_id, scope_kind, project_id, relative_path),
+                ).fetchone()
+                if active is not None:
+                    connection.rollback()
+                    return False
+                self.insert_managed_file(
+                    file_id=file_id,
+                    owner_principal_id=owner_principal_id,
+                    scope_kind=scope_kind,
+                    project_id=project_id,
+                    relative_path=relative_path,
+                    media_type=media_type,
+                    size_bytes=size_bytes,
+                    content_hash=content_hash,
+                    index_state=index_state,
+                    index_error=index_error,
+                    created_at=created_at,
+                    updated_at=updated_at,
+                    _connection=connection,
+                )
+                publish()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return True
 
     def list_managed_files(
         self,

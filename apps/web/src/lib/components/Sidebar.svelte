@@ -87,7 +87,7 @@
 </nav>
 
 <style>
-  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y:auto; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position:relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
+  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
   .sidebar.desktop-hidden { width:0; padding-inline:0; border-right-width:0; overflow:hidden; transform:translateX(-100%); }
   .drawer-scrim,.drawer-close { display:none; }
   .brand { display:flex; align-items:center; gap:.6rem; padding:.25rem .5rem var(--space-3); text-decoration:none; }

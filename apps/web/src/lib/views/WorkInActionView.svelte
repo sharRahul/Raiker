@@ -7,7 +7,7 @@
 
   // `continuing` is a granted approval being replayed into a parked scheduled
 // run (BUG-25): unfinished, so it belongs on the live board.
-const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_for_approval"]);
+const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_for_approval", "waiting_for_children"]);
   // A run that ended is still the thing the owner most needs to read, because
   // the reason it ended lives nowhere else on this page (BUG-09).
   const FINISHED = new Set(["completed", "failed", "cancelled"]);

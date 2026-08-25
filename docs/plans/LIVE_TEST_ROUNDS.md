@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-25 | Targeted | `r0825-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | A semantic space built against a real embedding call — **and measured, which found the read half missing** — the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at five widths |
 | 2026-08-24 | Targeted | `r0824-` | Anthropic (`claude-haiku-4-5-20251001`) | What each capability switch actually decides, Agent Skills conformance on the Skills tab, and Auto's alignment check against a real turn |
 | 2026-08-23 | Targeted | `r0823-` | Anthropic, OpenAI, OpenRouter | The checkpoint rewind end to end, the audit export, the deleted second egress path, and two defects the rewind exposed |
 | 2026-08-22 | Targeted | `bug-219-`, `bug-221-`, `bug-223-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama | Hooks off switch and lifecycle events, plugin-contributed skills and MCP offers, channel owner surface, the fourth approval mode |
@@ -48,6 +49,133 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-25 — a semantic space built, measured, and found to be half a feature
+
+**Tier: Targeted.** Chromium via Playwright at 1920, 1440, 1024, 768 and 390 CSS
+pixels. **Providers:** Anthropic (`claude-haiku-4-5-20251001`, the turn),
+OpenAI (`text-embedding-3-small`, the index), OpenRouter (417 models listed) and
+Ollama (`gemma4:31b-cloud`, detected locally) — all four keys entered **through
+the interface**, none in the process environment. `RAIKER_MODEL_EGRESS_ALLOWLIST`
+carried the four hosts. **Prefix:** `r0825-`.
+
+**Build:** the FIXED-283 … FIXED-288 change set, `apps/web` rebuilt, a **fresh
+workspace** with the owner account created in-session, so every capability gate
+started at its per-account fail-closed default.
+
+### What it proved
+
+* **A key entered in the interface reaches every path that needs it.** Anthropic
+  answered with 10 models, OpenAI with 124, OpenRouter with 417, and Ollama
+  reported the one model this device has pulled — from the setup wizard, with no
+  environment variable for any of them (`r0825-workbench`).
+* **A real governed turn, end to end.** *"Remember that my backup target is the
+  encrypted NAS in the garage"* against live Haiku 4.5: the model proposed
+  `memory_write`, the turn parked, the transcript showed the tool row *Save
+  memory · global scope · waiting for your decision*, the Approvals queue held
+  it at **high** risk attributed to `Raiker agent · turn_f3e0a…`, and the
+  proposed arguments were shown redacted before the decision
+  (`r0825-chat-turn`).
+* **Semantic recall can now be built, and the owner is told what it costs.**
+  With one approved memory, Memory → Recall backend offered **Build a
+  meaning-based index…** listing seven embedding models — four llama.cpp slots
+  and Ollama as *on this machine*, Gemini and OpenAI by provider — beside a
+  button reading **Embed 1**. Confirming asked: *"Send the text of 1 approved
+  memory to openai to be embedded as text-embedding-3-small? Memories marked
+  secret-like or credential-like are never sent."*
+  (`r0825-memory-index`, `r0825-memory-approved`.)
+* **And the space it built is the space recall then selects.** The run returned
+  `indexed_count: 1`, `embedding_model: openai:text-embedding-3-small`, 1536
+  dimensions; `auto` resolved to it over the fallback, and the build control
+  **disappeared**, because nothing was left to build (`r0825-memory-recall-state`). A second approved memory and a second run returned
+  `indexed_count: 1` — only the new one — and a third refused with
+  `no_memories_to_index`, so keeping the index current costs only what is new.
+  **The card in those two screenshots reads "matches meaning", and that sentence
+  was wrong**; see the first finding below.
+* **Every page holds at every width tested.** All fifteen routes measured zero
+  horizontal overflow at 390, 1024 and 1920. At 768 the shell collapses to a
+  **Menu** control; at 390 to a bottom tab bar (`r0825-tasks-768`,
+  `r0825-tasks-390`, `r0825-workbench-1920`, `r0825-memory-768`).
+* **Every cadence is reachable from the page that plans work.** Tasks → Plan work
+  offers **Task / Once / Routine / Background**, and Routine reveals **Repeat**
+  (Keep going, Hourly, Daily, Weekly) and **First run** (`r0825-tasks-routine`).
+
+### What it found
+
+**The claim the round set out to prove, disproved by measuring it.** With the
+space built and selected, retrieval was run directly against it:
+
+```
+'where should backups go'   -> []
+'encrypted NAS'             -> [('mem_19c1146bc9', 3.0)]
+'when do releases ship'     -> []
+```
+
+The one hit is the lexical leg matching shared words; the vector leg contributed
+nothing. `_embed_query` drops it for a semantic backend unless a caller supplies
+a `query_embedder`, and none does — so the **write** half of semantic recall
+shipped and the **read** half was never connected. Two consequences, both taken
+in this round:
+
+* The Memory card was saying *"Searching … — matches meaning"* for a recall the
+  runtime does not perform. It now distinguishes three states rather than two,
+  and reads *"Stored in … Recall still matches words: a question is not embedded
+  into this space yet."* Every surface that makes the claim reads
+  `query_embedding_available()`, so the sentence tracks the behaviour.
+* The read leg is raised as [BUG-240](TO_BE_FIXED.md) rather than fixed here. The
+  shortest fix is a helper that calls the provider straight from the retrieval
+  path, which is a second route into a governed action — the thing
+  `GOVERNANCE_ENTRY_PATHS.md` exists to prevent. Embedding a query is provider
+  egress, on a read path, once per search.
+
+**This is the round's most useful result**, and it is worth naming why it was
+nearly missed: every artefact a builder checks — the executor, the gate, the
+threat model, the acceptance suite, the artifacts the run returned — said the
+feature worked. Only running a query said otherwise.
+
+**Three latent breakages in one capability that had never been run.**
+`model_provider_runtime` was registered, gated, threat-modelled and
+acceptance-tested, and nothing had ever invoked it. Its acceptance suite injects
+an embedder — correctly, to exercise the governed persistence path — so nothing
+had entered the function that does the real work. All three are in
+[FIXED-283](FIXED_ITEMS.md): a registry loaded with a workspace root instead of a
+config path, an `asyncio.run` inside the API's running event loop, and a provider
+factory that saw only the process environment while the owner's key sat in the
+vault. Each surfaced as `model_provider_error:…` or `provider_api_key_missing:…`
+— reason codes that read like a provider fault for a bug that never left the
+process.
+
+**Three interface defects, all fixed in the round**
+([FIXED-288](FIXED_ITEMS.md)):
+
+* **"Turn on" beside "Turn off" on the same enabled capability.** After enabling
+  *Provider embeddings*, its card offered both, and **Turn on** would have set
+  the gate to the state it was already in (`r0825-cap-enabled`).
+* **A permission list that could not be scanned for what is on.** The decision
+  mode showed on every row whether the capability was on or off, and the on/off
+  state was discoverable only by opening the card.
+* **A successful readiness check titled "Repair model connection."** The dialog
+  said *"Anthropic can reach claude-haiku-4-5-20251001"* and *"Check complete"*
+  under a heading claiming something was broken (`r0825-readiness2`).
+
+**Text removed from four surfaces**, and moved to the guide rather than deleted:
+the Workbench's three standing board explanations, the Tasks composer's
+paragraph, the Memory page's duplicate title and its repeated
+memory-store-is-off sentence. Removing the Tasks paragraph also stopped the chip
+row wrapping onto two lines at 1440 (`r0825-workbench`,
+`r0825-workbench-trimmed`).
+
+### Deliberately not covered
+
+* **Retrieval *quality* on a real corpus.** Two memories are not a corpus, so
+  nothing here measures how well a semantic space ranks. What the round measured
+  instead is whether the vector leg contributes at all — and it does not, which
+  is the finding above.
+* **Gemini and the llama.cpp slots.** Offered and listed; only OpenAI was used to
+  embed, and only Anthropic to run a turn.
+* This was a **targeted** round. The last full sweep remains 2026-08-08.
 
 ---
 

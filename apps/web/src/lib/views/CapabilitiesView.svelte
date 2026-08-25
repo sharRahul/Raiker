@@ -20,6 +20,7 @@
     isDecisionMode,
     isDeferred,
     isInherent,
+    isDisabled,
     realityLabel,
     realityNote,
     requiresStepUpToken,
@@ -380,6 +381,14 @@
               </span>
               <span class="cap-name">
                 <span class="cap-label">{capabilityLabel(gate.capability)}</span>
+                <!-- Whether the capability is on was only discoverable by
+                     opening the card and reading which buttons appeared, while
+                     the decision mode beside it showed on every row on or off.
+                     A permission list that cannot be scanned for what is on is
+                     not a permission list. -->
+                {#if isDisabled(gate)}
+                  <span class="cap-reality">Off</span>
+                {/if}
                 {#if realityLabel(gate)}
                   <span class="cap-reality">{realityLabel(gate)}</span>
                 {/if}

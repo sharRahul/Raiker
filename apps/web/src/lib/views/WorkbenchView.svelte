@@ -40,6 +40,7 @@
   import StatTile from "../components/StatTile.svelte";
   import { relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
+  import GuideLink from "../components/GuideLink.svelte";
   import { isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
 
   let sessions = $state<SessionSummary[] | null>(null);
@@ -69,7 +70,7 @@
    * exactly the overcount BUG-09 was filed about. A queued row with no scheduled
    * time is about to start and does belong here.
    */
-  const IN_FLIGHT = ["running", "continuing", "waiting_for_approval", "paused"];
+  const IN_FLIGHT = ["running", "continuing", "waiting_for_approval", "waiting_for_children", "paused"];
   const armed = (task: TaskView) =>
     task.status === "queued" && (task.scheduled_at ?? null) !== null;
 
@@ -149,6 +150,7 @@
   /** What a row is waiting for, in the owner's language. */
   function detail(task: TaskView): string {
     if (task.status === "waiting_for_approval") return "Blocked on a decision you have not made yet.";
+    if (task.status === "waiting_for_children") return "Its own run finished; delegated work has not.";
     if (task.current_step) return task.current_step;
     if (task.progress_percent !== null) return `${task.progress_percent}% through its objective.`;
     return task.objective.slice(0, 140);
@@ -181,6 +183,7 @@
       </p>
     </div>
     <div class="refresh-state">
+      <GuideLink route="home" />
       <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}</span>
       <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}>
         <Icon name="refresh" size={15} /> Refresh
@@ -221,7 +224,6 @@
             <h3 id="running-h">Running now</h3>
             <a href="#/observe?tab=work">Live board</a>
           </div>
-          <p class="group-note">A governed cycle in flight. Each one can be stopped at its next safe boundary.</p>
           {#if runningNow.length === 0}
             <p class="empty">Nothing is running.</p>
           {:else}
@@ -261,10 +263,6 @@
             <h3 id="agents-h">Standing agents</h3>
             <a href="#/tasks">Manage agents</a>
           </div>
-          <p class="group-note">
-            Work with a repeating cadence. Each cycle is one governed turn — policy, permissions and
-            approvals apply to cycle forty exactly as they did to cycle one.
-          </p>
           {#if agents.length === 0}
             <p class="empty">No agent is standing.</p>
           {:else}
@@ -302,11 +300,6 @@
             <h3 id="scheduled-h">Scheduled runs</h3>
             <a href="#/tasks">Manage schedules</a>
           </div>
-          <p class="group-note">
-            A single future run that has not fired yet. A schedule only fires while Raiker is
-            running on this device — a closed laptop is a missed slot, and an elapsed one is skipped
-            rather than run late.
-          </p>
           {#if scheduled.length === 0}
             <p class="empty">Nothing is scheduled.</p>
           {:else}
@@ -417,7 +410,7 @@
      so this page cannot drift from the spec. */
   .intro h2 { margin: 0.15rem 0; }
   .lead { color: var(--text-2); max-width: 62ch; margin: 0; }
-  .refresh-state { display: flex; align-items: center; gap: var(--space-2); color: var(--text-3); font-size: var(--text-sm); }
+  .refresh-state { display: flex; align-items: center; gap: var(--space-3); color: var(--text-3); font-size: var(--text-sm); flex-wrap: wrap; justify-content: flex-end; }
   /* Starting work is a link to the surface that owns the composer, so the board
      never becomes a second send path. */
   .start-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-3); }
@@ -444,7 +437,6 @@
   .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); }
   .card-head h3 { margin: 0; }
   .card-head a { font-size: var(--text-sm); }
-  .group-note { margin: 0.2rem 0 0; color: var(--text-3); font-size: var(--text-xs); line-height: 1.45; max-width: 74ch; }
   .empty { margin: var(--space-3) 0 0; color: var(--text-3); font-size: var(--text-sm); }
   .notice { margin: 0; color: var(--ok); font-size: var(--text-sm); font-weight: 650; }
   .rows { list-style: none; margin: var(--space-3) 0 0; padding: 0; }

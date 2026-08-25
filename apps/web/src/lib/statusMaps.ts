@@ -18,6 +18,10 @@ export const ACTIVE_TASK_STATES = [
   "continuing",
   "paused",
   "waiting_for_approval",
+  // BUG-220 — a task whose own run finished while work it delegated has not.
+  // Unfinished, and counted as such: reporting it as done is the false
+  // completion this state exists to prevent.
+  "waiting_for_children",
 ];
 
 export function isActiveTask(status: string): boolean {
@@ -35,6 +39,8 @@ export function taskBadge(status: string): BadgeVariant {
       return "active";
     case "waiting_for_approval":
       return "needs-approval";
+    case "waiting_for_children":
+      return "active";
     case "cancelled":
     case "failed":
       return "stopped";
@@ -49,6 +55,8 @@ export function taskStatusLabel(status: string): string {
   switch (status) {
     case "waiting_for_approval":
       return "waiting for approval";
+    case "waiting_for_children":
+      return "waiting on delegated work";
     case "continuing":
       return "continuing after approval";
     case "waiting_for_user_answer":

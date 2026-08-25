@@ -710,6 +710,31 @@ A backlog that lists finished work is the same defect as a document that claims
 unfinished work is done. Rows are renumbered; **new items from the 2026-08-23
 pass are marked ★**.
 
+**Closed 2026-08-25 — four rows, and the whole of the Medium/Low section bar
+one.** Items 10, 11, 12 and 25 are struck through in place with what closed them,
+and item 1's provider leg is done. Recorded here rather than removed, because a
+reader arriving with one of those numbers should not have to guess:
+
+- **#1 (write half) — semantic recall can now be *built*, not only selected**
+  ([FIXED-283](../plans/FIXED_ITEMS.md)). The executor behind it had been
+  registered, gated, threat-modelled, acceptance-tested and **never routed** —
+  and its only unmocked path held three separate breakages that no test could
+  reach. Verifying it live then found the same shape one layer in: the space is
+  built, and nothing embeds the *question* into it, so a paraphrase still does
+  not recall ([BUG-240](../plans/TO_BE_FIXED.md)). **PARITY**, and a reminder
+  that "built" and "reachable" are different claims — twice in one item.
+- **#12 — the retention sweep** ([FIXED-284](../plans/FIXED_ITEMS.md)).
+- **#10 — every cadence reachable, anchored to a chosen first run**
+  ([FIXED-285](../plans/FIXED_ITEMS.md)).
+- **#11 — a parent owns its children's terminal states**
+  ([FIXED-286](../plans/FIXED_ITEMS.md)).
+- **#25 — tool rows survive a reload** ([FIXED-287](../plans/FIXED_ITEMS.md)).
+
+Three interface defects found while exercising those live are
+[FIXED-288](../plans/FIXED_ITEMS.md): an enabled capability offering "Turn on"
+beside "Turn off", a permission list that could not be scanned for what is on,
+and a successful readiness check titled "Repair model connection".
+
 **Closed 2026-08-24 — two governance-architecture items that were not on this
 list**, because both were raised in
 [`plans/GOVERNANCE_ENTRY_PATHS.md`](../plans/GOVERNANCE_ENTRY_PATHS.md) and had not
@@ -758,7 +783,7 @@ had to be true first:
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 1 | Semantic memory retrieval (MEM-10) | Let the owner select a real embedding model — a local download or an explicit provider egress — keeping the labelled hashing fallback as the default | Memory that cannot recall a paraphrase is the largest honest gap in the product | PARITY |
+| 1 | Semantic memory retrieval (MEM-10) | **Write half done 2026-08-25 — [FIXED-283](../plans/FIXED_ITEMS.md).** Memory → Recall backend builds a real semantic space out of the owner's approved memories in one governed action, with the model named and the count stated before anything leaves the machine. **The read half is the next item and is now the blocking one** ([BUG-240](../plans/TO_BE_FIXED.md)): the question is not embedded into the space, so a paraphrase still does not recall. The local leg — a curated GGUF model for an owner who accepts no provider egress — remains after that | Memory that cannot recall a paraphrase is still the largest honest gap. The executor that closed the write half had been registered, gated, threat-modelled and never routed — the third time that shape has been found, and verifying it live found a fourth surface with the same problem one layer in | PARITY |
 | 2 | Channel routing modes and approval relay (BUG-225) | Implement the spec's routing modes behind their own gate, with the accepted authority contract unchanged | An inbound message becoming work is the highest-risk transition in the product; it needs its own gate, not the transport's | PARITY |
 | ~~3~~ | ~~Auto mode has no alignment check (BUG-218)~~ | **Done 2026-08-24 — [FIXED-282](../plans/FIXED_ITEMS.md).** A deterministic check over the turn's own record: an existing file the turn never read, listed or was asked about falls back to the approval queue, with the path named | `auto` is the only mode where an action runs with no human in the loop, and it now performs the review its label implies | **YES — differentiator.** Both reference implementations are model judgements; this one is set membership over the audit trail, with no model in the authority path and an answer that can be recomputed months later |
 | 4 | Owner-authored slash commands | Extend the skill store with a trigger token, stating the authority the command carries | Reference products treat a command as a privileged harness path; Raiker's would grant nothing, which is the differentiator | **YES — improvement** |
@@ -777,9 +802,9 @@ had to be true first:
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
 | 9 | Owner-guided summarisation of a range | Add "summarise from here / up to here" over the existing compaction path | Context control becomes the owner's rather than a threshold's | **YES — improvement** |
-| 10 | Task cadences are four names | Accept a time-of-day and a one-shot run-at | A daily task that runs a day after it was created is not a schedule an owner chose | PARITY |
-| 11 | Nothing owns delegated child tasks (BUG-220) | Give a delegating task ownership of its children's terminal states | A parent that reports done while a child is parked is a false completion | PARITY |
-| 12 | Retention sweep (MEM-07) | Run the sweep the stored `expires_at` already describes | An expiry enforced only at read time is a policy the storage does not keep | PARITY |
+| ~~10~~ | ~~Task cadences are four names~~ | **Done 2026-08-25 — [FIXED-285](../plans/FIXED_ITEMS.md).** The chip row names the shape of the work and a Repeat select names the interval; every cadence the scheduler honours is reachable from the page that plans work, and a routine is anchored to a first run the owner picked. Build's standing-agent panel takes the same optional start time | A daily task that ran a day after it was created was not a schedule anybody chose | PARITY |
+| ~~11~~ | ~~Nothing owns delegated child tasks (BUG-220)~~ | **Done 2026-08-25 — [FIXED-286](../plans/FIXED_ITEMS.md).** A parent with an open child parks as `waiting_for_children` and settles when the last one lands; nothing is inherited downward, so a child still carries its own approvals | A parent that reported done while a child was parked was a false completion. The routing half is item 23 below | PARITY |
+| ~~12~~ | ~~Retention sweep (MEM-07)~~ | **Done 2026-08-25 — [FIXED-284](../plans/FIXED_ITEMS.md).** Memory → Observations says how many records are past their retention class and offers the owner-confirmed cleanup. No daemon was added; the deliberate alternative was built. Both the preview and the delete were unscoped and are now scoped to the acting principal | An expiry enforced only at read time was a policy the storage did not keep | PARITY |
 | ~~13~~ | ~~**Agent Skills standard conformance**~~ | **Done 2026-08-24 — [FIXED-281](../plans/FIXED_ITEMS.md).** Measured on every read and reported on the skill's card; the nested `metadata:` map, `license` and `compatibility` parse; all six built-ins conform; `allowed-tools` is parsed, listed and explicitly not honoured | A skill an owner writes in Raiker now installs in the other forty products, and the one place Raiker diverges is stated against a named standard rather than asserted as taste | **YES — improvement** |
 
 ### Medium priority, medium effort
@@ -807,7 +832,7 @@ had to be true first:
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 25 | Tool rows do not survive a reload | Rehydrate the per-turn tool rows from the durable events, as reasoning already does | A transcript that loses half its record on reload is a weaker record | PARITY |
+| ~~25~~ | ~~Tool rows do not survive a reload~~ | **Done 2026-08-25 — [FIXED-287](../plans/FIXED_ITEMS.md).** Rebuilt from `tool_actions` through the same presentation function the live stream uses, so a reloaded row carries exactly what the live one did and cannot carry more | A transcript that lost half its record on reload was a weaker record | PARITY |
 | 26 | Live-spec sign-in (BUG-229) | Let the live specs sign in against a non-empty workspace | A test harness that only works on an empty workspace tests an empty workspace | NO — little advantage |
 
 ### Low priority, medium effort

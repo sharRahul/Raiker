@@ -639,7 +639,20 @@
       id: nextId++,
       prompt: t.prompt_text ?? "",
       attachments: [],
-      events: [],
+      // Backlog #25 — a reopened turn used to show the answer and nothing about
+      // how it was reached, because the tool rows only ever existed on the
+      // stream it was watched on. The server rebuilds them from the durable
+      // record in the same payload shape a live event carries, so they enter
+      // here as events and `toolActivity` assembles them exactly as it does
+      // live — including merging with a later live event for the same call,
+      // which is what a parked turn resumed in this tab produces.
+      events: (t.tool_rows ?? []).map((payload) => ({
+        kind: "tool" as const,
+        text: "",
+        event_type: "tool_restored",
+        payload,
+        response: null,
+      })),
       response: {
         request_id: "",
         session_id: sessionId,

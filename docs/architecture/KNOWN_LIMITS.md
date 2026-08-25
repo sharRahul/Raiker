@@ -319,11 +319,30 @@ on the shipped build, not estimated.
   owner-selected embedding space, embeds the query in that same space, and
   refuses to mix two — and the Memory page names the space in force and says
   whether a paraphrase can recall anything at all, rather than letting the word
-  "vector" imply semantics that are not there. What remains is a model to
-  select: a default install still holds only the labelled hashing fallback, and
-  the two honest routes to better (a download, or provider egress) are both the
-  owner's decision. Tracked as MEM-10; the durable semantic/vector write path is
-  disabled outright (`raiker/memory/semantic.py`).
+  "vector" imply semantics that are not there.
+  **The write half closed 2026-08-25 (FIXED-283):** what was
+  missing was not the *selection* of a space but any way to *produce* one.
+  Memory → Recall backend now builds one — one governed `model_provider_runtime`
+  action over the owner's approved memories, bounded, owner-scoped, refusing
+  secret-shaped rows, with the model and the count stated before anything leaves
+  the machine. Measured live on 2026-08-25 against `text-embedding-3-small`: the
+  space becomes selectable and `auto` resolves to it over the fallback.
+  **The read half is not connected, and this is the one that decides whether a
+  paraphrase works.** `_embed_query` drops the vector leg for a semantic backend
+  unless a caller supplies a `query_embedder`, and none does — embedding the
+  owner's question is provider egress on a read path, once per search, so it
+  needs the gate rather than a bypass. Measured on the same install: *"where
+  should backups go"* returned nothing while *"encrypted NAS"* matched on shared
+  words. Raised as BUG-240, and
+  `raiker/memory/retrieval.py::query_embedding_available()` is the single fact
+  every surface reads, so the claim tracks the behaviour.
+  **Also still behind:** an install with **no** provider key and no local
+  embedding model has only the labelled hashing fallback — nothing is bundled, by
+  design — and recall over the chosen space is a linear scan whose cost grows
+  with the corpus. Tracked as MEM-10's remainder and backlog #5. The durable
+  semantic/vector *write* path — memory written straight to a vector without an
+  approval — remains disabled outright (`raiker/memory/semantic.py`), which is a
+  separate and deliberate boundary.
 - ~~**Lexical results are ordered by recency, not relevance.**~~ **Fixed
   2026-08-17.** This said the bundled SQLCipher build had no FTS5 and therefore
   no BM25, which was true of `sqlcipher3-wheels` 0.5.2 and 0.5.4 and stopped

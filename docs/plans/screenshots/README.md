@@ -25,6 +25,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `r0825-` | **2026-08-25**, a semantic space built against a real embedding call and then measured, the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at 390/768/1024/1440/1920 | Anthropic, OpenAI, OpenRouter and Ollama, every key entered through the interface |
 | `r0824-` | **2026-08-24**, what each capability switch actually decides, Agent Skills standard conformance on the Skills tab, and Auto's alignment check against a real turn | hosted Anthropic (`claude-haiku-4-5-20251001`) |
 | `r0823-` | **2026-08-23**, the checkpoint rewind end to end, the audit export, and the Permissions surface after `network_execution` was deleted | hosted Anthropic, OpenAI, OpenRouter |
 | `bug-221-`, `bug-223-`, `bug-225-` | **2026-08-22**, plugin contributions (skills, MCP-server offers), turn-end hooks across four providers, and the channel owner surface | hosted Anthropic, OpenAI, OpenRouter, local Ollama |

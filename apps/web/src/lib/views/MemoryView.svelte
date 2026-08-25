@@ -6,6 +6,7 @@
   import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
+  import GuideLink from "../components/GuideLink.svelte";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -55,7 +56,21 @@
       dimensions: 384,
       semantic: false,
       reason_code: "embedding_backend_semantic_not_configured",
+      query_embeddable: false,
     },
+  );
+  // Three states, not two. The card used to have a sentence for "the fallback"
+  // and a sentence for "a semantic space", and the second one claimed a recall
+  // the runtime does not perform yet: the stored vectors are semantic, and the
+  // question is not embedded into them, so matching is still by words. Saying
+  // "matches meaning" there would be the same defect MEM-03 was raised to
+  // remove, one layer further in.
+  const recall = $derived(
+    !retrieval.semantic
+      ? "lexical"
+      : retrieval.query_embeddable
+        ? "semantic"
+        : "stored_only",
   );
 
   async function load() {
@@ -88,6 +103,31 @@
     try { await api.setMemoryEmbeddingBackend(backend); await load(); }
     catch (e) { actionError = e instanceof ApiError ? `Could not change the recall backend (${e.status}).` : "Could not change the recall backend."; }
     finally { busy = false; }
+  }
+  // MEM-10 — the select above can only offer spaces this workspace already
+  // holds vectors in, which on a default install is the lexical fallback and
+  // nothing else. This is how the first semantic space comes to exist: one
+  // governed run that sends each approved memory to the named embedding model.
+  // The count and the destination are both stated before the owner confirms,
+  // because the text really does leave the machine.
+  let indexProvider = $state("");
+  let indexResult = $state<string | null>(null);
+  const indexTarget = $derived(
+    (settings?.embedding_providers ?? []).find((p) => p.space === indexProvider) ?? null,
+  );
+  async function buildEmbeddingIndex() {
+    if (!indexTarget || busy) return;
+    const waiting = settings?.unindexed_memories ?? 0;
+    const where = indexTarget.local_only ? "on this machine" : `to ${indexTarget.provider}`;
+    if (!window.confirm(`Send the text of ${waiting} approved ${waiting === 1 ? "memory" : "memories"} ${where} to be embedded as ${indexTarget.model}? Memories marked secret-like or credential-like are never sent.`)) return;
+    busy = true; actionError = null; indexResult = null;
+    try {
+      const result = await api.buildMemoryEmbeddingIndex(indexTarget.provider, indexTarget.model);
+      indexResult = `Embedded ${result.indexed_count} into ${result.embedding_model}.`;
+      await load();
+    } catch (e) {
+      actionError = e instanceof ApiError ? `Could not build the index (${e.status}).` : "Could not build the index.";
+    } finally { busy = false; }
   }
   async function togglePin(m: MemoryControlView) {
     try { await api.setMemoryPinned(m.memory_id, !m.pinned); await load(); }
@@ -217,6 +257,26 @@
     sourceLoading = false;
   }
 
+  // MEM-07 — the retention classes were stated on every row and nothing ever
+  // acted on them, so `turn_only` and `short_term_7_days` records were kept
+  // forever. There is still no cleanup daemon, which is deliberate; this is the
+  // deliberate alternative that was missing — the owner is shown what is due
+  // and confirms it, and the server refuses anything its own preview did not
+  // list.
+  const dueForExpiry = $derived(observations?.due_for_expiry ?? []);
+  let sweepResult = $state<string | null>(null);
+  async function sweepExpired() {
+    if (busy || !dueForExpiry.length) return;
+    if (!window.confirm(`Remove ${dueForExpiry.length} observation records whose retention has run out? Raiker keeps no copy of the material they describe.`)) return;
+    busy = true; actionError = null; sweepResult = null;
+    try {
+      const result = await api.cleanupExpiredObservations(dueForExpiry);
+      sweepResult = `Removed ${result.deleted_observation_ids.length}.`;
+      await load();
+    } catch (e) {
+      actionError = e instanceof ApiError ? `Could not run the retention cleanup (${e.status}).` : "Could not run the retention cleanup.";
+    } finally { busy = false; }
+  }
   async function deleteObservation(observationId: string) {
     if (!window.confirm("Delete this observation? Raiker keeps no copy of the material it describes, so this removes the record that it was seen.")) return;
     try { await api.deleteObservations([observationId]); await load(); }
@@ -263,7 +323,7 @@
   $effect(() => { void load(); });
 </script>
 
-<header class="page-intro"><div><h2>Memory</h2><p>Review and control the approved information Raiker can reuse.</p></div><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
+<header class="page-intro"><GuideLink route="memory" /><button class="btn btn-ghost btn-sm" type="button" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
 <section class="posture-card posture-{posture.kind}" role="note" aria-label="Memory permission posture">
   <Icon name={posture.kind === "proposes" ? "check" : "info"} size={16} />
@@ -280,29 +340,49 @@
   <section class="control-card">
     <div>
       <h3>Recall backend</h3>
-      <p>
-        Which embedding Raiker compares your question against. Only one is searched at a
-        time — comparing two different embeddings produces a similarity that means nothing.
+      <!-- MEM-11 — the setting governs both the memories Raiker attaches to a
+           turn on its own and the search the assistant runs itself. That was
+           not always true, and the guide is where the distinction is
+           explained; this card states only what is in force. -->
+      <!-- One flex child, not three: the icon and the sentence. With the words
+           as separate children a narrow window broke the model name across two
+           columns and stranded the clause beside it. -->
+      <p class="posture-line" data-semantic={recall === "semantic"}>
+        <Icon name={recall === "semantic" ? "check" : "info"} size={14} />
+        <span>
+          {#if recall === "semantic"}
+            Searching <b>{retrieval.model}</b> — matches meaning.
+          {:else if recall === "stored_only"}
+            Stored in <b>{retrieval.model}</b>. Recall still matches words: a
+            question is not embedded into this space yet.
+          {:else}
+            Searching <b>{retrieval.model}</b> — matches words, not meaning.
+          {/if}
+        </span>
       </p>
-      <!-- MEM-11 — this sentence became true in the same change that made it
-           worth saying. The setting used to govern only the memories Raiker
-           attaches to a turn on its own; the search the assistant ran itself
-           ignored it, so this card described a choice that did not apply to
-           half of what reached the model. -->
-      <p class="control-note">
-        Applies both to the memories Raiker recalls on its own and to the ones the
-        assistant looks up while it works.
-      </p>
-      <p class="posture-line" data-semantic={retrieval.semantic}>
-        <Icon name={retrieval.semantic ? "check" : "info"} size={14} />
-        {#if retrieval.semantic}
-          Searching <b>{retrieval.model}</b> — a learned embedding, so a
-          paraphrase can recall a memory that shares no words with it.
-        {:else}
-          Searching <b>{retrieval.model}</b> — matches words, not meaning, so a
-          paraphrase will not recall a memory that shares no words with it.
-        {/if}
-      </p>
+      <!-- MEM-10 — the select opposite can only offer spaces that already hold
+           vectors, so on a default install it offers the fallback and nothing
+           else. This row is the way out of that: it builds one. -->
+      {#if recall !== "semantic" && settings.unindexed_memories > 0 && (settings.embedding_providers ?? []).length}
+        <div class="index-row">
+          <label class="index-field">
+            <span class="sr-only">Embedding model to build with</span>
+            <select class="select" aria-label="Embedding model" bind:value={indexProvider} disabled={busy}>
+              <option value="">Build a meaning-based index…</option>
+              {#each settings.embedding_providers as provider (provider.space)}
+                <option value={provider.space}>{provider.model} · {provider.local_only ? "on this machine" : provider.provider}</option>
+              {/each}
+            </select>
+          </label>
+          <button
+            class="btn btn-sm"
+            type="button"
+            disabled={busy || !indexTarget || !settings.unindexed_memories}
+            onclick={() => void buildEmbeddingIndex()}
+          >Embed {settings.unindexed_memories}</button>
+        </div>
+        {#if indexResult}<p class="posture-line" data-semantic="true"><Icon name="check" size={14} /><span>{indexResult}</span></p>{/if}
+      {/if}
     </div>
     <label class="backend-field">
       <span class="sr-only">Recall backend</span>
@@ -375,7 +455,11 @@
   </section>
 
   <section class="memory-section"><div class="section-head"><h3>Approved memories</h3><span>{filtered.length}</span></div>
-    {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><p>{posture.headline}</p><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
+    <!-- The posture card at the top of the page already states *why* there are
+         none. Repeating its sentence here put the same line on screen twice;
+         the empty state keeps the action, which is the half that is not
+         already said. -->
+    {#if approved.length === 0}<div class="empty"><Icon name="spark" size={24} /><h4>No approved memories yet</h4><a href={posture.action ? "#/capabilities" : "#/approvals"}>{posture.action ?? "Learn how governed review works"}</a></div>
     {:else if filtered.length === 0}<div class="empty"><h4>No memories match these filters</h4><p>Clear or change the filters to see approved memories.</p></div>
     {:else}<div class="memory-grid">{#each filtered as m (m.memory_id)}<article class="memory-card" class:pinned={m.pinned}>
       <div class="memory-title">{#if editingId === m.memory_id}<textarea rows="3" bind:value={editDraft} aria-label="Memory text"></textarea>{:else}<h4>{m.text}</h4>{/if}{#if m.pinned}<span class="pin-label"><Icon name="check" size={12} /> Pinned</span>{/if}</div>
@@ -399,6 +483,15 @@
       </div>
       <span>{observations ? `${observations.captured} captured · ${observations.skipped} not captured` : "—"}</span>
     </div>
+    {#if dueForExpiry.length}
+      <div class="due-row" role="note">
+        <Icon name="info" size={14} />
+        <span>{dueForExpiry.length} past their retention class.</span>
+        <button class="btn btn-sm" type="button" disabled={busy} onclick={() => void sweepExpired()}>Remove</button>
+      </div>
+    {:else if sweepResult}
+      <div class="due-row" role="status"><Icon name="check" size={14} /><span>{sweepResult}</span></div>
+    {/if}
     {#if observations === null}
       <div class="empty"><Icon name="info" size={24} /><h4>Observation capture is not reporting</h4><p>The runtime could not be asked what it captured. This is not the same as having captured nothing.</p></div>
     {:else}
@@ -463,7 +556,7 @@
 {/if}
 
 <style>
-  .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .page-intro h2,.control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
+  .page-intro,.control-card,.section-head,.memory-title,.card-actions,.advanced summary { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--space-3); } .page-intro { margin-bottom:var(--space-4); } .control-card h3,.section-head h3,.memory-card h4,.empty h4 { margin:0; } .page-intro p,.control-card p { margin:.25rem 0 0; color:var(--text-2); }
   .control-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); }
   .control-card + .control-card { margin-top:var(--space-3); }
   /* MEM-03 — the sentence that says which embedding is in force. It is a
@@ -474,7 +567,11 @@
   .posture-line[data-semantic="true"] :global(svg) { color:var(--ok,var(--text-3)); }
   .backend-field { flex:none; min-width:14rem; }
   /* A secondary clause under the lead, not a second lead. */
-  .control-note { margin-top:var(--space-2) !important; font-size:.82rem; color:var(--text-3) !important; }
+  .due-row { display:flex; align-items:center; gap:var(--space-2); margin-bottom:var(--space-3); font-size:.82rem; color:var(--text-2); }
+  .due-row :global(svg) { flex:none; color:var(--warn,var(--text-3)); }
+  .due-row[role="status"] :global(svg) { color:var(--ok,var(--text-3)); }
+  .index-row { display:flex; gap:var(--space-2); align-items:center; margin-top:var(--space-2); flex-wrap:wrap; }
+  .index-field { flex:1 1 14rem; min-width:0; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able

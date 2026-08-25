@@ -10,12 +10,25 @@ machine turn acted while account resources remain scoped to the human owner.
 **Tasks → Plan work.** Pick one of four work types from the chip row; the form
 adapts to your choice.
 
-| Type | Extra field | Button | Behaviour |
+| Type | Extra fields | Button | Behaviour |
 |---|---|---|---|
 | **Task** | — | Create task | Runs now |
-| **Schedule once** | Start time | Schedule task | Runs once at that time |
-| **Daily routine** | Start time | Create daily routine | Repeats every day from then |
-| **Background agent** | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
+| **Once** | Start time | Schedule task | Runs once at that time |
+| **Routine** | Repeat, First run | Create routine | Repeats on the chosen interval, anchored to the first run |
+| **Background** | — | Start background agent | Runs asynchronously until its work is complete or you stop it |
+
+**Repeat** offers every cadence the scheduler honours: **Keep going** (a cycle
+roughly every 20 minutes), **Hourly**, **Daily** and **Weekly**. A routine is
+anchored to its **First run**, and every later cycle is counted forward from
+that slot rather than from whenever the previous one happened to finish — so a
+daily routine created at 4pm for a 9am first run runs at 9am, not at 4pm. Build's
+side panel offers the same choice for a standing agent; leaving its **First run**
+empty starts the first cycle on the next scheduler tick.
+
+A cycle is one governed turn. Policy, permissions and approvals apply to cycle
+forty exactly as they did to cycle one, and a schedule only fires while Raiker is
+running on this device — a closed laptop is a missed slot, and an elapsed slot is
+skipped rather than run late.
 
 Use the attachment panel to add a workspace path, image, or document. The same
 governed attachment payload used by Chat and Build is stored with the task and
@@ -30,6 +43,14 @@ Common fields:
 - **Parent work** — nest under an existing task. A child of a task is a subtask;
   a child of a routine is a subroutine.
 - **Priority** — Low / Normal / High.
+
+**A parent owns its children's outcomes.** A task that delegated work does not
+report *completed* while a child is still open: when its own run finishes it
+reads **waiting on delegated work**, and it settles when the last child lands —
+completed if every child completed, failed if any failed or was cancelled. The
+ownership runs one way only. A child carries its own approvals, because one
+decision standing in for an unbounded number of later ones is exactly what the
+per-turn permission envelope exists to prevent.
 
 The list splits into **Open work** and **Completed work**, with counters for
 open, scheduled, and finished. Each running item has a **Stop** button; a task
@@ -55,6 +76,17 @@ chat** (starts a conversation inside it), **Details**, **Archive**, **Move**,
 
 To move an existing conversation in, drag a recent chat onto the project, or use
 **Move to project** from the session's `⋯` menu.
+
+## The work board
+
+**Workbench** is the first thing Raiker opens on, and it answers one question:
+what is Raiker doing right now. It has three boards.
+
+- **Running now** — a governed cycle in flight. Each one can be stopped at its
+  next safe boundary.
+- **Standing agents** — work with a repeating cadence, one governed turn per
+  cycle.
+- **Scheduled runs** — a single future run that has not fired yet.
 
 ## Where to watch work run
 

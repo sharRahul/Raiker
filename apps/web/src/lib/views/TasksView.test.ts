@@ -10,7 +10,7 @@ afterEach(() => { vi.unstubAllGlobals(); resetModels(); takeScheduleRequest(); }
 const READY_MODEL = { profile_id: "test-ready", provider: "ollama", model: "test-model", selected: true, configured: true, ready: true, readiness_state: "ready" };
 
 describe("TasksView", () => {
-  it("opens on Schedule once when Chat's /schedule asked for it, and creates nothing", async () => {
+  it("opens on Once when Chat's /schedule asked for it, and creates nothing", async () => {
     const fetchMock = stubFetch({
       "GET /api/tasks": [],
       "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
@@ -20,7 +20,7 @@ describe("TasksView", () => {
 
     // The command arranges the control it names, and stops there.
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: "Schedule once" })).toHaveAttribute(
+      expect(screen.getByRole("button", { name: "Once" })).toHaveAttribute(
         "aria-pressed",
         "true",
       ),
@@ -145,7 +145,7 @@ describe("TasksView", () => {
     ] } });
     render(TasksView);
     await screen.findByText("No work queued");
-    await fireEvent.click(screen.getByRole("button", { name: "Schedule once" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Once" }));
     expect(screen.getByText("Model for each run")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /model for this turn: haiku/i })).toBeInTheDocument();
   });
@@ -205,12 +205,12 @@ describe("TasksView", () => {
     render(TasksView);
 
     await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
-    await fireEvent.click(screen.getByRole("button", { name: "Daily routine" }));
+    await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
     await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Plan release" } });
     await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Prepare the release notes." } });
     await fireEvent.change(screen.getByLabelText("Priority"), { target: { value: "high" } });
-    await fireEvent.input(screen.getByLabelText("Start time"), { target: { value: "2026-07-14T09:30" } });
-    await fireEvent.click(screen.getByRole("button", { name: "Create daily routine" }));
+    await fireEvent.input(screen.getByLabelText("First run"), { target: { value: "2026-07-14T09:30" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create routine" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
       "/api/tasks",
@@ -235,6 +235,52 @@ describe("TasksView", () => {
       "/api/tasks?session_id=sess_linked",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
+  });
+
+  // Backlog #10 — four cadences existed in the runtime and the composer offered
+  // one of them, so an hourly or weekly routine could only be made from Build's
+  // side panel. The chip now names the shape and the select names the interval.
+  it("creates an hourly routine anchored to the first run the owner picked", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/tasks": [],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+      "POST /api/tasks": {
+        task_id: "task_hourly",
+        session_id: "sess_inbox_owner",
+        title: "Watch the build",
+        objective: "Report any failing job.",
+        status: "queued",
+        created_at: "2026-07-14T08:00:00Z",
+        updated_at: "2026-07-14T08:00:00Z",
+        priority: "normal",
+        scheduled_at: "2026-07-14T09:30:00Z",
+        recurrence: "hourly",
+        reminder_at: null,
+        parent_task_id: null,
+      },
+    });
+    render(TasksView);
+
+    await waitFor(() => expect(screen.getByText("No work queued")).toBeInTheDocument());
+    await fireEvent.click(screen.getByRole("button", { name: "Routine" }));
+    await fireEvent.input(screen.getByLabelText("Task title"), { target: { value: "Watch the build" } });
+    await fireEvent.input(screen.getByLabelText("Instructions"), { target: { value: "Report any failing job." } });
+    await fireEvent.input(screen.getByLabelText("First run"), { target: { value: "2026-07-14T09:30" } });
+    await fireEvent.change(screen.getByLabelText("Repeat"), { target: { value: "hourly" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Create routine" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+      "/api/tasks",
+      expect.objectContaining({ method: "POST" }),
+    ));
+    const post = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
+    expect(JSON.parse(String(post?.[1]?.body))).toEqual({
+      title: "Watch the build",
+      description: "Report any failing job.",
+      priority: "normal",
+      scheduled_at: new Date("2026-07-14T09:30").toISOString(),
+      recurrence: "hourly",
+    });
   });
 });
 

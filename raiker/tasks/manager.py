@@ -195,6 +195,22 @@ class TaskManager:
         return task
 
     def complete_task(self, task_id: str, summary: str | None = None) -> TaskRecord | None:
+        """Finish a task - unless it delegated work that has not finished.
+
+        BUG-220 - ``parent_task_id`` recorded the structure and nothing owned
+        it, so a task that split its work into children reported ``completed``
+        the moment its own run ended, while a child sat parked on an approval.
+        That is a false completion: it tells the owner the work is done and
+        removes it from everything that counts unfinished work.
+
+        The parent is parked instead, and :meth:`_settle_parent` moves it when
+        the last child lands. Nothing is inherited in the other direction - a
+        child carries its own approvals, because a parent's decision standing in
+        for its children's is exactly what the per-turn capability envelope
+        exists to prevent.
+        """
+        if self._unfinished_children(task_id):
+            return self._hold_for_children(task_id, summary)
         self.store.complete_task(task_id, summary)
         task = self.get_task(task_id)
         if task is not None:
@@ -209,6 +225,7 @@ class TaskManager:
             self._dispatch_task_hook(
                 "TaskCompleted", task, {"outcome": "completed", "summary_length": len(summary or "")}
             )
+            self._settle_parent(task)
         return task
 
     def fail_task(self, task_id: str, reason: str) -> TaskRecord | None:
@@ -229,6 +246,7 @@ class TaskManager:
             self._dispatch_task_hook(
                 "TaskCompleted", task, {"outcome": "failed", "summary_length": len(stated)}
             )
+            self._settle_parent(task)
         return task
 
     def block_task_on_approval(self, task_id: str, reason: str) -> TaskRecord | None:
@@ -250,6 +268,64 @@ class TaskManager:
             )
             self.writer.append(event)
         return task
+
+    # ── Delegation ownership (BUG-220) ──────────────────────────────────────
+
+    def _unfinished_children(self, task_id: str) -> list[str]:
+        """Delegated tasks that have not reached a terminal state."""
+        return [
+            state
+            for state in self.store.child_task_states(task_id)
+            if state not in self.store.TERMINAL_TASK_STATES
+        ]
+
+    def _hold_for_children(self, task_id: str, summary: str | None) -> TaskRecord | None:
+        self.store.hold_task_for_children(task_id, summary)
+        task = self.get_task(task_id)
+        if task is not None:
+            self.writer.append(
+                make_event(
+                    session_id=task.session_id,
+                    turn_id=task.parent_turn_id,
+                    event_type="task_waiting_for_children",
+                    actor="task_manager",
+                    payload={
+                        "task_id": task_id,
+                        "unfinished_children": len(self._unfinished_children(task_id)),
+                        "summary": summary or "",
+                    },
+                )
+            )
+        return task
+
+    def _settle_parent(self, child: TaskRecord) -> None:
+        """Move a parent that was only waiting on this child.
+
+        Deliberately narrow: it moves a parent that is *parked for its children*
+        and nothing else. A parent still running has its own work to finish and
+        its own outcome to report, and a parent that already reached a terminal
+        state is not reopened by a late child - a terminal state that can be
+        walked back is not one an audit record can rely on.
+        """
+        parent_id = child.parent_task_id
+        if not parent_id:
+            return
+        parent = self.get_task(parent_id)
+        if parent is None or parent.status != "waiting_for_children":
+            return
+        if self._unfinished_children(parent_id):
+            return
+        states = self.store.child_task_states(parent_id)
+        failed = [state for state in states if state in ("failed", "cancelled")]
+        if failed:
+            self.fail_task(
+                parent_id,
+                f"{len(failed)} of {len(states)} delegated tasks did not complete.",
+            )
+        else:
+            self.complete_task(
+                parent_id, f"All {len(states)} delegated tasks completed."
+            )
 
     def mark_task_continuing(self, task_id: str, tool_name: str = "") -> TaskRecord | None:
         """A granted approval is being replayed into this task's parked turn.
@@ -312,4 +388,5 @@ class TaskManager:
             self._dispatch_task_hook(
                 "TaskCompleted", task, {"outcome": "cancelled", "summary_length": len(stated)}
             )
+            self._settle_parent(task)
         return task

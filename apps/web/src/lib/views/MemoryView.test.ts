@@ -429,4 +429,182 @@ describe("MemoryView observations (MEM-04)", () => {
       ),
     );
   });
+  // MEM-10 — the select opposite lists the spaces that already hold vectors, so
+  // on a default install the only honest answer it has is the fallback. These
+  // two pin the way out of that: the page says what could build a real space,
+  // and says how many memories the run would send.
+  it("offers to build a meaning-based index when recall is on the fallback", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": {
+        incognito: false,
+        embedding_backend: "auto",
+        retrieval: {
+          backend_id: "local_hash",
+          kind: "lexical_fallback",
+          model: "raiker-local-hash-v1",
+          dimensions: 384,
+          semantic: false,
+          reason_code: "embedding_backend_semantic_not_configured",
+        },
+        spaces: [],
+        embedding_providers: [
+          {
+            profile_id: "openai-hosted",
+            provider: "openai",
+            model: "text-embedding-3-small",
+            space: "openai:text-embedding-3-small",
+            local_only: false,
+            requires_network: true,
+          },
+        ],
+        unindexed_memories: 4,
+      },
+      "POST /api/memory/embedding-index": {
+        ok: true,
+        embedding_model: "openai:text-embedding-3-small",
+        indexed_count: 4,
+        skipped_count: 0,
+      },
+    });
+    vi.stubGlobal("confirm", () => true);
+    render(MemoryView);
+
+    const select = await screen.findByLabelText(/embedding model/i);
+    await fireEvent.change(select, { target: { value: "openai:text-embedding-3-small" } });
+    await fireEvent.click(screen.getByRole("button", { name: /embed 4/i }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/embedding-index",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ provider: "openai", model: "text-embedding-3-small" }),
+        }),
+      ),
+    );
+  });
+
+  // A semantic *space* and semantic *recall* are two claims. The card said
+  // "matches meaning" for the first, which is a recall the runtime does not
+  // perform yet — the same defect MEM-03 was raised to remove, one layer in.
+  it("says so when the vectors are semantic and the question is not embedded", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": {
+        incognito: false,
+        embedding_backend: "auto",
+        retrieval: {
+          backend_id: "provider",
+          kind: "provider",
+          model: "openai:text-embedding-3-small",
+          dimensions: 1536,
+          semantic: true,
+          reason_code: "",
+          query_embeddable: false,
+        },
+        spaces: [],
+        embedding_providers: [],
+        unindexed_memories: 0,
+      },
+    });
+    render(MemoryView);
+
+    await waitFor(() =>
+      expect(screen.getByText(/recall still matches words/i)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/matches meaning/i)).not.toBeInTheDocument();
+  });
+
+  it("does not offer to build an index when recall is already semantic", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": {
+        incognito: false,
+        embedding_backend: "auto",
+        retrieval: {
+          backend_id: "provider",
+          kind: "provider",
+          model: "openai:text-embedding-3-small",
+          dimensions: 1536,
+          semantic: true,
+          reason_code: "",
+          query_embeddable: true,
+        },
+        spaces: [],
+        embedding_providers: [
+          {
+            profile_id: "openai-hosted",
+            provider: "openai",
+            model: "text-embedding-3-small",
+            space: "openai:text-embedding-3-small",
+            local_only: false,
+            requires_network: true,
+          },
+        ],
+        unindexed_memories: 0,
+      },
+    });
+    render(MemoryView);
+
+    await waitFor(() => expect(screen.getByText(/matches meaning/i)).toBeInTheDocument());
+    expect(screen.queryByLabelText(/embedding model/i)).not.toBeInTheDocument();
+  });
+  // MEM-07 — six retention classes were stored and stated on every row, and
+  // nothing ever swept them. There is still no daemon; this is the confirmed
+  // sweep that was meant to stand in for one and never got a surface.
+  it("says what is due for expiry and runs the confirmed sweep", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/memory/observations": {
+        ok: true,
+        captured: 1,
+        skipped: 0,
+        gists_pending: 0,
+        due_for_expiry: ["obs_due"],
+        observations: [
+          {
+            observation_id: "obs_due",
+            session_id: "sess_1",
+            turn_id: "turn_1",
+            tool_name: "read_file",
+            source_type: "tool_result",
+            summary: "read_file — notes.md",
+            sensitivity: "normal",
+            retention: "short_term_7_days",
+            capture_status: "captured",
+            skip_reason: "",
+            promotable_to_memory: false,
+            content_sha256: "c".repeat(64),
+            content_bytes: 120,
+            artifact_ref: null,
+            source_event_id: "evt_1",
+            created_at: "2026-01-01T00:00:00Z",
+            expires_at: "2026-01-08T00:00:00Z",
+            gist_status: "",
+            gist_summary: "",
+            gist_id: "",
+          },
+        ],
+      },
+      "POST /api/memory/eidetic/cleanup": { ok: true, deleted_observation_ids: ["obs_due"] },
+    });
+    vi.stubGlobal("confirm", () => true);
+    render(MemoryView);
+
+    await waitFor(() =>
+      expect(screen.getByText(/1 past their retention class/i)).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/memory/eidetic/cleanup",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ observation_ids: ["obs_due"] }),
+        }),
+      ),
+    );
+  });
 });

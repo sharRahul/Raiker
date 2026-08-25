@@ -226,19 +226,55 @@ def delete_observations(
     return deleted
 
 
-def expiry_preview(*, store: SQLiteStore, now: str) -> list[str]:
+def expiry_preview(
+    *, store: SQLiteStore, now: str, owner_principal_id: str | None = None
+) -> list[str]:
+    """Which observations the stored retention classes say are already due.
+
+    Owner-scoped on the read for the same reason :func:`list_observations` is:
+    a row written before this scoping existed carries an empty owner and belongs
+    to nobody, so it is not another owner's to see, count, or delete.
+    """
     days = {name: value for name, value in RETENTION_DAYS.items() if value is not None}
     current = datetime.fromisoformat(now.replace("Z", "+00:00"))
+    sql = "SELECT observation_id, retention, created_at FROM eidetic_observations"
+    params: tuple[str, ...] = ()
+    if owner_principal_id is not None:
+        sql += " WHERE owner_principal_id = ?"
+        params = (owner_principal_id,)
     with store.connect() as connection:
-        rows = connection.execute("SELECT observation_id, retention, created_at FROM eidetic_observations").fetchall()
-    return [str(row["observation_id"]) for row in rows if row["retention"] in days and datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00")) + timedelta(days=days[str(row["retention"])]) <= current]
+        rows = connection.execute(sql, params).fetchall()
+    return [
+        str(row["observation_id"])
+        for row in rows
+        if row["retention"] in days
+        and datetime.fromisoformat(str(row["created_at"]).replace("Z", "+00:00"))
+        + timedelta(days=days[str(row["retention"])])
+        <= current
+    ]
 
 
-def cleanup_expired_observations(*, store: SQLiteStore, now: str, confirmed_ids: set[str]) -> list[str]:
-    """Owner invokes this explicit, idempotent cleanup after inspecting a preview."""
-    due = set(expiry_preview(store=store, now=now))
+def cleanup_expired_observations(
+    *,
+    store: SQLiteStore,
+    now: str,
+    confirmed_ids: set[str],
+    owner_principal_id: str | None = None,
+) -> list[str]:
+    """Owner invokes this explicit, idempotent cleanup after inspecting a preview.
+
+    MEM-07 - "no automatic cleanup worker" is a deliberate non-goal, and the
+    deliberate alternative is this: the owner is shown what is due and confirms
+    it. The confirmation is checked against the preview rather than trusted, so
+    a request naming a row that is *not* due removes nothing, and the delete is
+    scoped to the owner the preview was taken for.
+    """
+    due = set(expiry_preview(store=store, now=now, owner_principal_id=owner_principal_id))
     if not confirmed_ids or not confirmed_ids.issubset(due):
         raise PermissionError("eidetic_cleanup_confirmation_required")
     with store.connect() as connection:
-        connection.executemany("DELETE FROM eidetic_observations WHERE observation_id = ?", ((item,) for item in sorted(confirmed_ids)))
+        connection.executemany(
+            "DELETE FROM eidetic_observations WHERE observation_id = ?",
+            ((item,) for item in sorted(confirmed_ids)),
+        )
     return sorted(confirmed_ids)

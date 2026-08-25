@@ -45,6 +45,11 @@ LOCAL_HASH_DIMENSIONS = 384
 #: configured", which on a default install is the lexical fallback.
 DEFAULT_SELECTION = "auto"
 
+#: Ceiling on one governed indexing run (MEM-10). A batch is one approval, so it
+#: has to be a bounded one: the owner is agreeing to this many provider calls,
+#: not to "as many as the workspace happens to hold".
+MAX_MEMORY_INDEX_BATCH = 500
+
 
 @dataclass(frozen=True)
 class EmbeddingBackend:
@@ -191,3 +196,55 @@ def list_embedding_spaces(
     # Semantic spaces first so `auto` picks one without a second pass, then by
     # label for a stable, testable order.
     return sorted(spaces, key=lambda space: (space.kind == "lexical_fallback", space.model_label))
+
+
+def embedding_capable_profiles() -> list[dict[str, Any]]:
+    """The embedding models this install could actually call, named exactly.
+
+    MEM-10 - :func:`list_embedding_spaces` reads the vectors that exist, which
+    is right for *choosing* a space and useless for *getting* one: a default
+    install holds no semantic vectors, so the choice is between the fallback and
+    the fallback. This reads the other direction, from the model profiles, and
+    answers "what could produce a semantic space here".
+
+    A profile is listed only when the embedding model it would use is already a
+    concrete name. A profile whose embedding model is a placeholder picks its
+    model at selection time, so offering it here would be offering a button that
+    cannot say what it is about to call - and naming the model is the whole
+    point, because the model *is* the identity of the vector space.
+
+    Nothing here performs egress or checks a credential. It is a description of
+    what the profiles declare; the call still goes through
+    ``model_provider_runtime``, which re-checks the gate, the egress allowlist
+    and the credential on every use.
+    """
+    from raiker.models.registry import ModelProfileRegistry, RegistryError
+
+    try:
+        registry = ModelProfileRegistry.load()
+    except (RegistryError, OSError, ValueError):  # pragma: no cover - unreadable config
+        return []
+    listed: list[dict[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for profile in registry.profiles:
+        raw = profile.raw
+        if not bool(raw.get("supports_embeddings", False)):
+            continue
+        embedding_model = str(raw.get("embedding_model") or "")
+        if not embedding_model or "<" in embedding_model or ">" in embedding_model:
+            continue
+        key = (profile.provider, embedding_model)
+        if key in seen:
+            continue
+        seen.add(key)
+        listed.append({
+            "profile_id": profile.profile_id,
+            "provider": profile.provider,
+            "model": embedding_model,
+            # The label the vectors will carry, and therefore the space the
+            # owner will be able to select once the run finishes.
+            "space": f"{profile.provider}:{embedding_model}",
+            "local_only": bool(profile.local_only),
+            "requires_network": bool(profile.requires_network),
+        })
+    return sorted(listed, key=lambda item: (not item["local_only"], item["space"]))

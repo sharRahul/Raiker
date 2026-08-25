@@ -352,6 +352,52 @@ keep. Recall reads the transcript; Memory reads what was deliberately
 remembered. You can use either, and Raiker will say which one an answer came
 from.
 
+### Recall backend
+
+Recall compares your question against exactly **one** embedding space at a time.
+Comparing two different embeddings produces a similarity that means nothing, so
+mixing them is refused rather than averaged. The choice applies both to the
+memories Raiker attaches to a turn on its own and to the ones the assistant looks
+up while it works.
+
+**Memory → Recall backend** states which space is in force:
+
+- **`raiker-local-hash-v1` — matches words, not meaning.** The default, computed
+  offline with no model and no network. It finds a memory that shares words with
+  your question and misses a paraphrase of it.
+- **A provider or local model, once you build one.** Your approved memories are
+  stored as learned embeddings in a space named for the model you chose.
+
+A workspace only offers a space it actually holds vectors in, which is why a new
+install can offer nothing but the fallback. **Build a meaning-based index** is how
+the first real space comes to exist: pick an embedding model and Raiker sends the
+text of each approved memory to it, once, as one governed action you approve.
+
+**Matching a *question* against that space is not connected yet.** Building the
+index is the write half; embedding your question so it can be compared against
+those vectors means calling the provider on every search, which is egress on a
+read path and needs its own permission rather than a shortcut. Until it has one,
+the card reads *"Stored in … Recall still matches words: a question is not
+embedded into this space yet"*, and a paraphrase does not recall. Tracked as
+BUG-240.
+
+- Memories marked **secret-like** or **credential-like** are never sent.
+- Re-running it embeds only what has been approved since, so keeping the index
+  current does not cost what building it did.
+- A local model (llama.cpp, Ollama) keeps the text on the machine. A hosted one
+  sends it to that provider — the confirmation says which, and how many memories,
+  before anything leaves.
+
+### Retention
+
+Every observation Raiker records carries a retention class, and the classes with
+a time limit — `turn_only`, `short_term_7_days`, `short_term_30_days` — are swept
+by **you**, not by a background worker. Raiker deliberately runs no cleanup daemon:
+**Memory → Observations** says how many records are past their class and gives you
+one control that removes exactly those and reports what it removed. The other
+three classes (`project_lifetime`, `until_forget`, `legal_hold`) have no automatic
+expiry by design.
+
 ## Known limits
 
 Raiker's documentation does not run ahead of its code. As of 2026-08-21, these

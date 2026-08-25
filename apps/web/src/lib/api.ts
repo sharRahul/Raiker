@@ -1532,6 +1532,17 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ embedding_backend: backend }),
     }),
+  // MEM-10 — build the space rather than only choose between the ones that
+  // happen to exist. The call names the provider and the embedding model and
+  // never the memories: which rows are eligible is resolved server-side from
+  // the acting principal.
+  buildMemoryEmbeddingIndex: (provider: string, model: string) =>
+    postJson<{
+      ok: boolean;
+      embedding_model: string;
+      indexed_count: number;
+      skipped_count: number;
+    }>("/api/memory/embedding-index", { provider, model }),
   // MEM-04 — what the runtime captured while it worked. The counts come back
   // with the list because a page that can only count what it received cannot
   // tell an owner whether an empty list means nothing ran or everything was
@@ -1540,6 +1551,14 @@ export const api = {
   deleteObservations: (ids: string[]) =>
     postJson<{ ok: boolean; deleted_observation_ids: string[] }>(
       "/api/memory/observations/delete",
+      { observation_ids: ids },
+    ),
+  // MEM-07 — the confirmed retention sweep. The server re-derives what is due
+  // and refuses anything the preview did not list, so this is a confirmation
+  // rather than an instruction.
+  cleanupExpiredObservations: (ids: string[]) =>
+    postJson<{ ok: boolean; deleted_observation_ids: string[] }>(
+      "/api/memory/eidetic/cleanup",
       { observation_ids: ids },
     ),
   discardGist: (id: string) =>

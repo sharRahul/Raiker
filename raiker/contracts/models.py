@@ -325,6 +325,11 @@ EVENT_TYPES = {
     # work did not go wrong, it is waiting for the owner's decision, and the
     # payload always states which one and why (BUG-09).
     "task_blocked",
+    # A task's own run finished while work it delegated has not (BUG-220).
+    # Distinct from `task_completed` because it is not one, and distinct from
+    # `task_blocked` because no decision of the owner's moves it: what moves it
+    # is the last child landing. The payload states how many are outstanding.
+    "task_waiting_for_children",
     # A granted approval is being replayed into a parked run, and the same run
     # could not be continued automatically (BUG-25). The pair is what makes an
     # approval's effect readable after the fact: the decision, the attempt to
@@ -945,6 +950,11 @@ TASK_STATUSES = {
     "continuing",
     "waiting_for_approval",
     "waiting_for_user_answer",
+    # BUG-220 - a task whose own run finished while work it delegated has not.
+    # Distinct from `completed` because it is not finished, and distinct from
+    # `waiting_for_approval` because no decision of the owner's moves it: what
+    # moves it is the last child landing.
+    "waiting_for_children",
     "paused",
     "cancelling",
     "cancelled",

@@ -27,7 +27,19 @@
       activeReadiness.state === "model_missing" ||
       activeReadiness.state === "runtime_missing",
   );
-  const title = $derived(isSetup ? "Set up a model to continue" : "Repair model connection");
+  // A check that succeeded is not a repair. The dialog had two titles for three
+  // outcomes, so re-checking a model that turned out to be fine kept a heading
+  // that said something was wrong with it — while the line underneath said the
+  // provider could reach it. Naming the third outcome is what makes the two
+  // halves of the dialog agree.
+  const isReady = $derived(activeReadiness?.state === "ready");
+  const title = $derived(
+    isReady
+      ? "This model is ready"
+      : isSetup
+        ? "Set up a model to continue"
+        : "Repair model connection",
+  );
 
   $effect(() => {
     if (!dialog) return;
@@ -118,11 +130,19 @@
 
       {#if retryStatus}<p class="retry-status" role="status">{retryStatus}</p>{/if}
       <div class="actions">
-        <button class="secondary" type="button" onclick={close}>Close</button>
-        {#if activeReadiness}
-          <button class="secondary" type="button" disabled={checking} onclick={retry}>Check again</button>
+        <!-- Once the model is ready, the thing to do is carry on with what the
+             dialog interrupted. Leaving "Open Models" as the primary action sent
+             the owner to a page with nothing left to fix on it. -->
+        {#if isReady}
+          <button class="secondary" type="button" onclick={openModels}>Open Models</button>
+          <button class="primary" type="button" onclick={close}>Continue</button>
+        {:else}
+          <button class="secondary" type="button" onclick={close}>Close</button>
+          {#if activeReadiness}
+            <button class="secondary" type="button" disabled={checking} onclick={retry}>Check again</button>
+          {/if}
+          <button class="primary" type="button" onclick={openModels}>Open Models</button>
         {/if}
-        <button class="primary" type="button" onclick={openModels}>Open Models</button>
       </div>
     </div>
   </dialog>

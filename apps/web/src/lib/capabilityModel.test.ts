@@ -110,6 +110,22 @@ describe("enableability for Security Settings", () => {
     expect(canEnable(gate({ can_current_principal_change: true, allowed_transitions: ["disabled", "enabled_read_only"] }))).toBe(false);
   });
 
+  // The backend lists every state a capability *may* hold, including the one it
+  // already holds, so an enabled gate named its own enabled state as an enable
+  // target. The row rendered "Turn on" next to "Turn off", and pressing it would
+  // have set the capability to the state it was already in.
+  it("canEnable is false once the gate is already enabled", () => {
+    const enabled = gate({
+      can_current_principal_change: true,
+      state: "enabled_runtime",
+      allowed_transitions: ["disabled", "enabled_policy_gated", "enabled_runtime"],
+    });
+    expect(canEnable(enabled)).toBe(false);
+    expect(canDisable(enabled)).toBe(true);
+    expect(canEnable({ ...enabled, state: "enabled_policy_gated" })).toBe(false);
+    expect(canEnable({ ...enabled, state: "disabled" })).toBe(true);
+  });
+
   it("canDisable requires authority and a currently-enabled gate", () => {
     expect(canDisable(gate({ can_current_principal_change: true, state: "enabled_runtime" }))).toBe(true);
     expect(canDisable(gate({ can_current_principal_change: true, state: "disabled" }))).toBe(false);

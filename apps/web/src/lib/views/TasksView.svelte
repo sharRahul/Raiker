@@ -17,7 +17,8 @@
   import { takeScheduleRequest } from "../scheduleHandoff";
   import type { ApprovalView, PromptAttachment, TaskView } from "../apiTypes";
   import { relativeTime } from "../format";
-  import { ACTIVE_TASK_STATES, taskBadge, taskStatusLabel } from "../statusMaps";
+  import { AGENT_CADENCES, cadenceLabel } from "../agentCadence";
+  import { ACTIVE_TASK_STATES, isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
   import { chatProfiles, refreshModels } from "../models.svelte";
   import { blocksSending, openModelSetup, readinessForSelection } from "../modelReadiness.svelte";
 
@@ -31,7 +32,13 @@
   let objective = $state("");
   let priority = $state("normal");
   let parentTaskId = $state("");
-  let cadence = $state<"now" | "once" | "daily" | "background">("now");
+  let cadence = $state<"now" | "once" | "routine" | "background">("now");
+  // Backlog #10 — the composer offered "Daily" and nothing else, so an owner who
+  // wanted hourly or weekly had to go to Build's side panel for it, and the four
+  // cadences the runtime honours read as one. The chip now names the *shape* of
+  // the work and this names the interval, which is the axis they actually vary
+  // on. `continuous` is the shortest cadence the scheduler offers, not a loop.
+  let routineEvery = $state("daily");
   let titleEl: HTMLInputElement | undefined = $state();
   let scheduledAt = $state("");
   let modelProfile = $state("");
@@ -42,10 +49,15 @@
   // captures its model onto every future run, so it is worth remembering apart
   // from a one-off task.
   const surface = $derived<Surface>(
-    cadence === "once" || cadence === "daily" ? "schedule" : "tasks",
+    cadence === "once" || cadence === "routine" ? "schedule" : "tasks",
   );
+  // Whether this composition wants a start time at all. A routine anchors every
+  // later run to the slot the owner picked, so "daily" without one means "daily
+  // from whenever I happened to press the button" — which is the thing backlog
+  // #10 says is not a schedule anybody chose.
+  const wantsStartTime = $derived(cadence === "once" || cadence === "routine");
   // Re-reads whenever the cadence chips change which surface is being composed,
-  // so switching from Task to Daily routine offers the routine's own model.
+  // so switching from Task to Routine offers the routine's own model.
   $effect(() => {
     const active = surface;
     void surfaceModel(active).then((remembered) => {
@@ -109,11 +121,24 @@
     return result;
   }
 
+  // BUG-220 — how many delegated tasks a parked parent is still waiting on.
+  // Counted from the list the page already has rather than fetched: the parent
+  // and its children are always loaded together, and a second request would
+  // make the card's number and the tree below it able to disagree.
+  function childCount(task: TaskView): number {
+    return (tasks ?? []).filter(
+      (child) => child.parent_task_id === task.task_id && isActiveTask(child.status),
+    ).length;
+  }
+
   function scheduleLabel(task: TaskView) {
     if (!task.scheduled_at) return "Ready when you run it";
     const when = new Date(task.scheduled_at).toLocaleString();
-    if (task.recurrence === "daily") return `Every day, next run ${when}`;
     if (task.recurrence === "background") return task.status === "running" ? "Background agent working" : "Background agent ready to start";
+    // Backlog #10 — a routine used to read as "Scheduled for …" unless it was
+    // daily, so an hourly or weekly one looked like a one-shot and its next slot
+    // looked like its only one.
+    if (task.recurrence) return `${cadenceLabel(task.recurrence)}, next ${when}`;
     return `Scheduled for ${when}`;
   }
 
@@ -145,20 +170,20 @@
   }
 
   async function createTask() {
-    if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || ((cadence === "once" || cadence === "daily") && !scheduledAt)) return;
+    if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt)) return;
     creating = true; notice = null;
     const attachments = wireAttachments(attachStore.take());
     try {
       await api.createTask({
         title: title.trim(), description: objective.trim(), priority,
         ...(parentTaskId ? { parent_task_id: parentTaskId } : {}),
-        ...((cadence === "once" || cadence === "daily") ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
-        ...(cadence === "daily" ? { recurrence: "daily" } : cadence === "background" ? { recurrence: "background" } : {}),
+        ...(wantsStartTime ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
+        ...(cadence === "routine" ? { recurrence: routineEvery } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
-      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; scheduledAt = ""; modelProfile = ""; model = "";
+      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = "";
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
@@ -252,16 +277,16 @@
 <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
   <form class="card composer" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
-    <div class="composer-heading"><div><h3>Plan work</h3><p>A routine is a recurring task; a child task becomes a subtask or subroutine. A background agent runs asynchronously until its work is complete or you stop it.</p></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Schedule once</button><button type="button" class="chip" aria-pressed={cadence === "daily"} onclick={() => cadence = "daily"}>Daily routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background agent</button></div></div>
-    <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "daily" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
+    <div class="composer-heading"><div><h3>Plan work</h3></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Once</button><button type="button" class="chip" aria-pressed={cadence === "routine"} onclick={() => cadence = "routine"}>Routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background</button></div></div>
+    <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "routine" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
     <ComposerChips store={attachStore} disabled={creating} />
     <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
-    <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "once" || cadence === "daily"}<label>Start time<input class="input" aria-label="Start time" type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
+    <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "routine"}<label>Repeat<select class="select" aria-label="Repeat" bind:value={routineEvery}>{#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}<option value={option.id}>{option.label}</option>{/each}</select></label>{/if}{#if wantsStartTime}<label>{cadence === "routine" ? "First run" : "Start time"}<input class="input" aria-label={cadence === "routine" ? "First run" : "Start time"} type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>
     <div class="task-model"><span>{cadence === "now" ? "Task model" : "Model for each run"}</span><ModelPicker {profiles} {selectedProfile} bind:profileId={modelProfile} bind:model onchosen={(profileId, chosen) => void rememberSurfaceModel(surface, profileId, chosen)} /><ExecutionEnvironmentBadge /><ModelCapacityBadge tokens={activeProfile?.context_window_tokens} source={activeProfile?.context_window_source} /></div>
     <ModelReadinessStrip readiness={modelReadiness} draftPreserved={Boolean(title.trim() || objective.trim())} />
-    <button class="btn btn-primary" disabled={creating || attachStore.uploading || modelBlocked || !title.trim() || !objective.trim() || ((cadence === "once" || cadence === "daily") && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "daily" ? "Create daily routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
+    <button class="btn btn-primary" disabled={creating || attachStore.uploading || modelBlocked || !title.trim() || !objective.trim() || (wantsStartTime && !scheduledAt)}>{creating ? "Saving…" : attachStore.uploading ? "Uploading…" : cadence === "background" ? "Start background agent" : cadence === "routine" ? "Create routine" : cadence === "once" ? "Schedule task" : "Create task"}</button>
   </form>
 
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
@@ -306,6 +331,15 @@
                 <Icon name="approvals" size={14} />
                 Waiting on {pending.length === 1 ? "a decision" : `${pending.length} decisions`} before this can continue.
                 <a href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>Review {pending.length === 1 ? "it" : "them"}</a>
+              </p>
+            {:else if task.status === "waiting_for_children"}
+              <!-- BUG-220 — the row this replaces said "completed" while a
+                   child was still parked. The count is the point: it is what
+                   the owner would otherwise have to work out by reading the
+                   tree themselves. -->
+              <p class="blocked" role="status">
+                <Icon name="tasks" size={14} />
+                Its own run finished. Waiting on {childCount(task)} delegated {childCount(task) === 1 ? "task" : "tasks"}.
               </p>
             {:else if task.status === "waiting_for_approval"}
               <!-- BUG-39 — granting the decision starts the continuation on its

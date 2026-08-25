@@ -79,7 +79,7 @@ names.
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
 | [MEM-07](MEMORY_RELIABILITY_PLAN.md#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) … [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. |
-| [BUG-220](#bug-220--nothing-owns-a-set-of-delegated-child-tasks) | Medium | Tasks / delegation | Open — raised 2026-08-21 |
+| [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
@@ -88,6 +88,7 @@ names.
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
+| [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium | Memory / retrieval | Open — raised 2026-08-25 while verifying FIXED-283 live. The write half of semantic recall ships; the read half needs a gated path, not a shortcut |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (11 complete, 7 open; C14 branch-from-here closed as FIXED-227) |
 
@@ -100,8 +101,10 @@ FIXED-233 and FIXED-234, MEM-14 as FIXED-236, and MEM-04 as FIXED-237. Two were
 raised in their place. MEM-10: closing MEM-03 built the *selection* of an
 embedding space, and a default install still has nothing semantic to select.
 MEM-06, the binding constraint on the graph leg MEM-12 made reachable, closed
-2026-08-21 as FIXED-241. MEM-07 through MEM-10 remain open there rather than
-being duplicated here.
+2026-08-21 as FIXED-241. MEM-07 closed 2026-08-25 as FIXED-284, and MEM-10's
+first leg — the one that made a semantic space *producible* rather than only
+selectable — as FIXED-283. MEM-08, MEM-09 and MEM-10's remainder remain open
+there rather than being duplicated here.
 
 ---
 
@@ -324,8 +327,22 @@ a capability uses to predict what happens before they touch it.
 
 ## BUG-220 — Nothing owns a set of delegated child tasks
 
-**Severity: Medium. Area: tasks / delegation. Status: Open — raised 2026-08-21
-while reviewing Cowork Dispatch.**
+**Severity: Medium. Area: tasks / delegation. Status: closed 2026-08-25 as
+[FIXED-286](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open),
+raised 2026-08-21 while reviewing Cowork Dispatch.**
+
+**What closed.** The ownership: a parent no longer reports `completed` over an
+open child. It parks as `waiting_for_children` and settles when the last child
+lands — completed if all completed, failed if any did not — and a child still
+carries its own approvals, which was the first of the three requirements below.
+
+**What is left, and where it lives now.** The other two — a visible,
+re-decidable Chat-or-Build routing decision per child, and one conversation that
+briefs the split — are the *composition* half of Dispatch rather than the
+ownership half, and they are tracked as
+[backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort).
+The original entry is kept below because its governance requirements still bind
+that work.
 
 **Observed.** Raiker has every component of
 [Cowork's Dispatch](https://claude.com/docs/cowork/guide/dispatch): read-only
@@ -671,3 +688,64 @@ rather than implied.
 that offers a `ui://` resource, an SSE stream, or an OAuth authorisation
 requirement is either supported or **named on its card as unsupported** — never
 silently degraded.
+
+---
+
+## BUG-240 — A semantic space can be built, and a question is not embedded into it
+
+**Severity: Medium. Area: memory / retrieval. Status: Open — raised 2026-08-25
+while verifying [FIXED-283](FIXED_ITEMS.md) against a live provider.**
+
+**Observed.** After building a semantic index — a real OpenAI
+`text-embedding-3-small` space, 1536 dimensions, resolved by `auto` over the
+fallback — a paraphrase still recalls nothing:
+
+```
+'where should backups go'   -> []
+'encrypted NAS'             -> [('mem_19c1146bc9', 3.0)]
+'when do releases ship'     -> []
+```
+
+The one hit is the lexical leg matching shared words. The vector leg contributed
+nothing to any of the three.
+
+**Root cause, and it is deliberate as far as it goes.**
+`raiker/memory/retrieval.py::_embed_query` returns `None` when the resolved
+backend is semantic and no `query_embedder` was supplied, because the alternative
+— embedding the question with the hashing fallback and comparing it against
+learned vectors — is a cosine between two unrelated spaces, which is not a weaker
+signal but a meaningless one. That reasoning is right. What is missing is the
+other branch: **no caller supplies an embedder, and there is nothing for one to
+call.**
+
+**Why it was not fixed alongside FIXED-283.** The shortest fix is a helper that
+calls `ModelRouter.aembed` directly from the retrieval path. That is a second
+route into a governed action, which
+[`REFERENCE_PLATFORM_COMPATIBILITY.md` §4.5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#45-a-second-route-into-a-governed-action)
+refuses on purpose and
+[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) exists to make
+checkable. Embedding a query is **provider egress, on a read path, once per
+search** — three properties that each argue for the gate rather than around it.
+Shipping the write half and stating the read half honestly is better than
+shipping a bypass and having to remove it.
+
+**The three questions the fix has to answer**, none of which is obvious:
+
+1. **What does `ask` mean for a search?** Blocking a search on an approval makes
+   recall unusable; running it anyway makes the mode a lie. The likely answer is
+   that `ask` drops the vector leg and says so, so the decision mode changes
+   recall *quality* rather than gating a keystroke — but that is a real design
+   decision, not an implementation detail.
+2. **Once per search, or once per turn?** Context gathering, the model's own
+   `memory_search`, and the Memory page's search box are three callers. Each
+   embedding is an egress and a cost.
+3. **What is recorded?** The query is the owner's own words leaving the machine.
+   It should be an audited action like any other, and the audit record must not
+   itself become a second copy of every question the owner has ever asked.
+
+**Required user-interface outcome.** Memory → Recall backend already states which
+of the three states it is in — lexical, stored-but-not-searchable, or genuinely
+semantic — from
+`raiker/memory/retrieval.py::query_embedding_available()`. When this closes, that
+one function changes and every surface that quotes it changes with it. Nothing
+should need to be remembered.

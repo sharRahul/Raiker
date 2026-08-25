@@ -1345,6 +1345,16 @@ export interface TurnSummary {
    */
   reasoning_chars?: number;
   reasoning?: string | null;
+  /**
+   * Backlog #25 — the turn's tool calls, rebuilt from the durable record.
+   *
+   * Live, these arrive on the stream; a reload had no stream and lost them, so
+   * a reopened transcript showed the answer and nothing about how it was
+   * reached. Each entry is the same payload shape a `kind: "tool"` stream event
+   * carries, rendered server-side by the same presentation function, so the two
+   * sources merge into one row rather than two.
+   */
+  tool_rows?: Array<Record<string, unknown>>;
 }
 
 // GET /api/sessions/{id} — raiker/control/dashboard.py SessionDetailView.to_dict()
@@ -1916,6 +1926,19 @@ export interface EmbeddingSpaceView {
   dimensions: number;
   semantic: boolean;
   reason_code: string;
+  /**
+   * MEM-10 — whether a *question* can be embedded into this space at read time.
+   *
+   * `semantic` and this are two different claims and only the first is true
+   * today: a workspace can build a semantic space and recall selects it, but
+   * embedding the query means calling the provider on every search, which needs
+   * its own gated path rather than a shortcut. Until it has one the vector leg
+   * is dropped and matching is still lexical — so a card that reads `semantic`
+   * as "matches meaning" would say something the retrieval does not do.
+   *
+   * Present only on `retrieval`; a listed space carries no read-path claim.
+   */
+  query_embeddable?: boolean;
 }
 
 export interface MemorySettingsView {
@@ -1925,6 +1948,25 @@ export interface MemorySettingsView {
   embedding_backend: string;
   retrieval: EmbeddingSpaceView;
   spaces: EmbeddingSpaceView[];
+  // MEM-10 — `spaces` is read from the vectors that exist, so a default install
+  // has nothing semantic to offer. These two say what it would take: which
+  // embedding models this install could call, and how many approved memories
+  // are waiting to be embedded into one.
+  embedding_providers: EmbeddingProviderView[];
+  unindexed_memories: number;
+}
+
+// raiker/vector/backends.py embedding_capable_profiles(). A description of what
+// the model profiles declare — nothing here has performed egress or checked a
+// credential; the run still goes through model_provider_runtime.
+export interface EmbeddingProviderView {
+  profile_id: string;
+  provider: string;
+  model: string;
+  // The label the vectors will carry, and so the space that becomes selectable.
+  space: string;
+  local_only: boolean;
+  requires_network: boolean;
 }
 
 // raiker/control/dashboard.py ObservationView.to_dict(). MEM-04 — metadata
@@ -1960,6 +2002,10 @@ export interface ObservationsView {
   captured: number;
   skipped: number;
   gists_pending: number;
+  // MEM-07 — the observation ids whose retention class already says they are
+  // due. Raiker runs no cleanup daemon on purpose; being shown what is due and
+  // confirming it is the deliberate alternative, and it was never built.
+  due_for_expiry: string[];
 }
 
 // raiker/control/dashboard.py BrainView.to_dict(). Nodes and edges are stored

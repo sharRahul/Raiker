@@ -685,6 +685,54 @@ describe("ChatView streaming transcript", () => {
     expect(body.session_id).toBe("sess_hist");
   });
 
+  // Backlog #25 — a reopened transcript showed the answer and nothing about how
+  // it was reached: the tool rows only ever existed on the stream the turn was
+  // watched on. The server now rebuilds them from the durable record, in the
+  // same payload shape a live event carries.
+  it("rebuilds the turn's tool rows when the transcript is reopened", async () => {
+    stubFetch({
+      ...MODELS_ROUTE,
+      "GET /api/sessions/sess_tools": {
+        session: {
+          session_id: "sess_tools",
+          title: "Prior chat",
+          status: "open",
+          created_at: "2026-07-10T00:00:00Z",
+          updated_at: "2026-07-10T00:01:00Z",
+          turn_count: 1,
+        },
+        turns: [
+          {
+            turn_id: "turn_1",
+            session_id: "sess_tools",
+            turn_type: "prompt",
+            status: "completed",
+            prompt_text: "what changed in the readme",
+            created_at: "2026-07-10T00:00:00Z",
+            completed_at: "2026-07-10T00:00:10Z",
+            summary: "Two lines changed.",
+            tool_rows: [
+              {
+                action_id: "act_1",
+                tool_name: "read_file",
+                family: "file",
+                label: "Read file",
+                action: "README.md",
+                status: "success",
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    render(ChatView, { props: { sessionId: "sess_tools" } });
+
+    await waitFor(() => expect(screen.getByText("Two lines changed.")).toBeInTheDocument());
+    expect(screen.getByText("Read file")).toBeInTheDocument();
+    expect(screen.getByText("README.md")).toBeInTheDocument();
+  });
+
   it("shows an honest error when persisted history cannot be loaded", async () => {
     stubFetch(MODELS_ROUTE);
     render(ChatView, { props: { sessionId: "sess_missing" } });

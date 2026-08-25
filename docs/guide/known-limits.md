@@ -18,11 +18,24 @@ differ, that ledger is canonical.
 
 ## Memory and recall
 
-The default “vector” representation is feature hashing over tokens, not a
-semantic embedding model. Both retrieval paths are therefore lexical in
-practice. A paraphrase with few shared words may not recall the relevant
-record. Treat Memory and Knowledge Map as useful indexed records, not guaranteed
-human-like recollection.
+**Recall matches words, not meaning.** The default “vector” representation is
+feature hashing over tokens, so both retrieval paths are lexical in practice and
+a paraphrase with few shared words may not recall the relevant record.
+
+**Memory → Recall backend** always says which of three states you are in, and
+offers **Build a meaning-based index** where an embedding model is available: one
+governed run over your approved memories, with the model named and the count
+stated before anything leaves the machine. That builds the space and stores your
+memories as learned embeddings.
+
+**It does not yet make a paraphrase work.** Comparing a *question* against that
+space means embedding the question too — a provider call on every search — and
+that path needs its own permission rather than a shortcut, so it is not
+connected. The card says so rather than implying otherwise. Tracked as BUG-240.
+
+Two further limits. An install with no provider key and no local embedding model
+has only the lexical fallback — nothing is bundled, by design. And recall over
+the chosen space is a linear scan, so its cost grows with the number of memories.
 
 Conversation context is also bounded by the selected model. Raiker compacts
 older exchanges near a known context limit while preserving the visible

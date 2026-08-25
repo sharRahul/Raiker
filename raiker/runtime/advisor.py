@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -268,18 +267,13 @@ class AdvisorService:
 def _run_coro(coro: Any) -> Any:
     """Run a coroutine from sync code, even inside a running event loop.
 
-    The ToolBroker executes tools synchronously from within the async turn
-    loop, where ``asyncio.run`` would raise — so fall back to a worker thread
-    with its own loop.
+    Kept as this module's name for it; the implementation moved to
+    :mod:`raiker.runtime.async_bridge` when a second executor needed the same
+    answer and reached for this private one.
     """
-    try:
-        asyncio.get_running_loop()
-    except RuntimeError:
-        return asyncio.run(coro)
-    import concurrent.futures
+    from raiker.runtime.async_bridge import run_coro
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-        return pool.submit(asyncio.run, coro).result()
+    return run_coro(coro)
 
 
 def _denied(reason: str, message: str) -> dict[str, Any]:

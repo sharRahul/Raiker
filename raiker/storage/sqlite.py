@@ -4226,6 +4226,57 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (scope_id, backend, utc_now()),
             )
 
+    def list_memories_missing_embedding(
+        self,
+        embedding_model: str | None,
+        *,
+        owner_principal_id: str | None = None,
+        limit: int = 200,
+    ) -> list[dict[str, Any]]:
+        """Active approved memories this owner holds no vector for in *embedding_model*.
+
+        MEM-10 — the selectable spaces above are read from the vectors that
+        exist, so an install that has never embedded anything has nothing
+        semantic to offer. This is the other half of that question: which
+        memories would have to be embedded before a space becomes selectable at
+        all. The eligibility clauses match
+        :meth:`get_active_approved_memory` exactly, so a row listed here is a
+        row the executor will accept rather than refuse one at a time.
+
+        ``embedding_model`` of ``None`` means "every eligible memory", which is
+        what a caller asks for before it knows which space a provider will
+        answer in.
+        """
+        now = utc_now()
+        sql = """
+        SELECT m.memory_id AS memory_id
+        FROM approved_memory m
+        WHERE m.deleted_at IS NULL AND m.archived_at IS NULL AND m.search_enabled = 1
+          AND m.sensitivity NOT IN ('secret_like', 'credential_like')
+          AND (m.expires_at IS NULL OR m.expires_at > ?)
+          AND (m.valid_from IS NULL OR m.valid_from <= ?)
+          AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
+        """
+        params: list[Any] = [now, now, now]
+        if embedding_model is not None:
+            sql += """
+          AND NOT EXISTS (
+            SELECT 1 FROM memory_projections p
+            JOIN vector_records v ON v.vector_id = p.projection_id
+            WHERE p.memory_id = m.memory_id AND p.projection_type = 'vector'
+              AND v.embedding IS NOT NULL AND v.embedding_model = ?
+          )
+            """
+            params.append(embedding_model)
+        if owner_principal_id:
+            sql += " AND m.owner_principal_id = ?"
+            params.append(owner_principal_id)
+        sql += " ORDER BY m.memory_id LIMIT ?"
+        params.append(max(1, int(limit)))
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        return [dict(row) for row in rows]
+
     def list_memory_embedding_spaces(
         self, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:
@@ -5942,6 +5993,39 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             status="waiting_for_approval",
             current_step="Waiting for your approval",
             summary=reason,
+        )
+
+    #: A task in one of these has stopped for good. Everything else is work the
+    #: owner is still owed an outcome for, which is what makes a parent that
+    #: reports "done" over one of them a false completion (BUG-220).
+    TERMINAL_TASK_STATES = ("completed", "failed", "cancelled")
+
+    def child_task_states(self, parent_task_id: str) -> list[str]:
+        """The status of every task delegated by *parent_task_id*.
+
+        One row per child rather than a count, because the parent's own outcome
+        depends on *which* terminal state the children reached: a parent whose
+        child failed did not succeed, and a parent told only "three children,
+        none unfinished" could not tell the difference.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT status FROM tasks WHERE parent_task_id = ?", (parent_task_id,)
+            ).fetchall()
+        return [str(row["status"]) for row in rows]
+
+    def hold_task_for_children(self, task_id: str, summary: str | None) -> None:
+        """A parent whose own run finished while a child is still open.
+
+        No ``completed_at`` is stamped, for the same reason
+        :meth:`block_task_on_approval` stamps none: the delegated work is
+        unfinished, and what moves this row is the last child landing.
+        """
+        self._update_task(
+            task_id,
+            status="waiting_for_children",
+            current_step="Waiting for delegated work",
+            summary=summary,
         )
 
     def list_event_index(

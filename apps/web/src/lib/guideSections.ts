@@ -30,6 +30,11 @@ const SECTIONS: Record<string, GuideTarget> = {
   observe: { slug: "troubleshooting", label: "How to read the record" },
   diagnostics: { slug: "troubleshooting", label: "How diagnostics work" },
   settings: { slug: "permissions-and-runtime-modes", label: "How the runtime works" },
+  // Two surfaces that carried standing explanation on the page itself. The
+  // explanation is the same on every visit and is read once, so it moved to the
+  // guide — which only works if the page can reach it.
+  home: { slug: "tasks-and-projects", label: "How the work board works" },
+  memory: { slug: "working-in-chat", label: "How memory and recall work" },
 };
 
 /** The guide target for a route, or null when the guide does not cover it yet. */

@@ -61,10 +61,10 @@ their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 | [MEM-04](#mem-04--eidetic-capture-is-never-invoked-by-the-runtime) | High | Eidetic / Stage C | Fixed 2026-08-17 |
 | [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | **Fixed 2026-08-21** |
-| [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Open |
+| [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Fixed 2026-08-25 (FIXED-284) |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
-| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium | Retrieval quality | Open — raised 2026-08-17 |
+| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | Open — reduced 2026-08-25 (FIXED-283). An owner can now **build** a semantic space; a linear scan and a keyless default install remain |
 | [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
 | [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-13](#mem-13--the-knowledge-graph-was-drawn-for-a-person-and-unreachable-from-a-turn) | Medium | Agent reach | Fixed 2026-08-17 |
@@ -407,7 +407,15 @@ contribute.
 
 ## MEM-07 — Nothing expires, because no retention sweep is ever started
 
-**Severity: Medium. Area: retention.**
+**Severity: Medium. Area: retention. Status: fixed 2026-08-25 as
+[FIXED-284](FIXED_ITEMS.md#fixed-284--nothing-expired-because-the-sweep-the-retention-classes-describe-was-never-offered).**
+
+**2026-08-25 update.** Memory → Observations now says how many records are past
+their retention class and offers the owner-confirmed cleanup behind it. Building
+it found that the preview and the delete were both *unscoped* — they read and
+removed across every row in the workspace, while the list the owner is shown has
+always been owner-scoped — so both are now scoped to the acting principal. No
+daemon was added; the deliberate alternative was built instead.
 
 **Observed.** Six retention classes are defined and stored, and
 `expiry_preview` / `cleanup_expired_observations` implement the owner-confirmed
@@ -486,8 +494,40 @@ log, which is the same class of defect one layer down.
 
 ## MEM-10 — Semantic recall is selectable, but a default install has nothing to select
 
-**Severity: Medium. Area: retrieval quality. Raised 2026-08-17 while closing
-MEM-03.**
+**Severity: Medium → Low. Area: retrieval quality. Raised 2026-08-17 while
+closing MEM-03. Status: reduced 2026-08-25 by
+[FIXED-283](FIXED_ITEMS.md#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select).**
+
+**2026-08-25 update — the proposed fix was the second-cheapest of the two ways
+in, and the cheapest one was already built.** This entry proposed serving a
+curated GGUF embedding model through the managed local runtime. That is still
+the right answer for an owner who accepts no provider egress. But
+`model_provider_runtime` — a registered, gated, threat-modelled executor that
+calls a provider's embedding endpoint and stores a real semantic vector —
+already existed and **had never been routed**. Building the download would have
+left that unreached and would not have been the shortest path to a workspace
+that recalls a paraphrase.
+
+So the provider leg shipped first: **Memory → Recall backend → Build a
+meaning-based index**, one governed action over the owner's approved memories,
+with the model named and the count stated before anything leaves the machine.
+Verified live on 2026-08-25 against a real OpenAI embedding call.
+
+**What remains of MEM-10:**
+
+* **The question is not embedded into the space that was built**, so a paraphrase
+  still does not recall — measured on the same install that built it. That is
+  [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it),
+  and it is the blocking one.
+* **A default install with no provider key still has only the fallback.** The
+  curated GGUF download below is unchanged as the proposal for that, and is now
+  the whole of this entry's open work rather than half of it.
+* **Vector recall is still a linear scan** — roughly 431 ms at 3 000 memories,
+  paid every turn. That is [backlog #5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort)
+  and is a different problem: an index over a space, not a space to index.
+
+The analysis below is kept as written, because the local-model leg still needs
+it.
 
 **Observed.** Memory → **Recall backend** offers **Automatic** and nothing else
 on a workspace that has never been configured, and states plainly that

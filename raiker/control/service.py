@@ -36,6 +36,7 @@ from raiker.runtime.authority.models import (
 )
 from raiker.runtime.authority.router import GovernedAction, GovernedActionResult, RuntimeAuthority
 from raiker.storage.sqlite import SQLiteStore
+from raiker.vector.backends import MAX_MEMORY_INDEX_BATCH, embedding_capable_profiles
 
 _DANGEROUS_CAPS = frozenset({
     "shell_execution", "process_execution",
@@ -924,6 +925,63 @@ class RuntimeControlService:
             tool_or_service_name="audit_export",
             arguments=arguments,
             risk_level=RiskLevelValue.LOW,
+        )
+        result = self._authority.route_action(action, principal)
+        mapped = self._mcp_action_result(result)
+        if not mapped.ok:
+            return mapped
+        return ControlResult(ok=True, data=dict(result.artifacts or {}))
+
+    def build_memory_embedding_index(
+        self, acting_principal_id: str | None, provider: str, model: str
+    ) -> ControlResult:
+        """MEM-10 - embed the approved memories into a real semantic space.
+
+        Human-only, and it takes the long way round for the same reason
+        :meth:`export_audit_log` does: it builds a governed action and routes it
+        through :class:`RuntimeAuthority`, so the ``model_provider_runtime``
+        gate, the policy review, the approval and the audit event all apply. A
+        route that called the executor directly would produce the same vectors
+        while proving nothing about the path they came down.
+
+        Risk is MEDIUM rather than LOW because the run leaves the machine: the
+        text of every approved memory is sent to the named provider. That is the
+        decision the owner is making, and it should not be filed under the same
+        risk as reading a local index.
+
+        The account is the acting principal's, resolved inside the executor from
+        the principal itself - never from an argument.
+        """
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        provider = (provider or "").strip()
+        model = (model or "").strip()
+        if not provider or not model:
+            return ControlResult(ok=False, reason_code="embedding_model_not_named")
+        offered = {
+            (item["provider"], item["model"]) for item in embedding_capable_profiles()
+        }
+        if (provider, model) not in offered:
+            # Refused rather than attempted: a model this install does not
+            # declare as an embedding model is one whose vector space Raiker
+            # could not name afterwards, and an unnameable space is not
+            # selectable, which is the whole point of building one.
+            return ControlResult(ok=False, reason_code="embedding_model_not_offered")
+        action = GovernedAction(
+            action_id=new_id("act_"),
+            principal_id=principal.principal_id,
+            action_type="model_provider",
+            tool_or_service_name="model_provider",
+            arguments={
+                "operation": "index_memories",
+                "provider": provider,
+                "model": model,
+                "limit": MAX_MEMORY_INDEX_BATCH,
+            },
+            risk_level=RiskLevelValue.MEDIUM,
         )
         result = self._authority.route_action(action, principal)
         mapped = self._mcp_action_result(result)

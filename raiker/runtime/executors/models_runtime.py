@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from raiker.models.endpoint_policy import classify_endpoint, model_egress_allowlist
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, get_url
+from raiker.vector.backends import MAX_MEMORY_INDEX_BATCH
 
 if TYPE_CHECKING:
     from raiker.models.contracts import EmbeddingResponse
@@ -150,8 +151,10 @@ class ModelProviderExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = str(action.arguments.get("operation", "embed")).strip()
-        if operation not in {"embed", "project_memory"}:
+        if operation not in {"embed", "project_memory", "index_memories"}:
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
+        if operation == "index_memories":
+            return self._index_memories(action, principal)
 
         memory_id: str | None = None
         if operation == "project_memory":
@@ -247,18 +250,232 @@ class ModelProviderExecutor:
             },
         )
 
-    def _default_embedder(self, principal_id: str) -> Embedder:
-        def embed(provider: str, model: str, text: str) -> EmbeddingResponse:
-            import asyncio
+    def _index_memories(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        """MEM-10 - build a semantic recall space out of the memories that exist.
 
+        ``project_memory`` embeds one named memory, which is the right shape for
+        a turn and the wrong one for an owner: a workspace with two hundred
+        approved memories and no semantic vectors cannot become searchable two
+        hundred approvals at a time. This is the same work under **one** governed
+        action - one gate read, one policy review, one approval, one audit
+        record - with the eligible set resolved from the principal rather than
+        from an argument, so the batch can never be pointed at another account.
+
+        **The space is named for the model the owner chose**, not for whatever the
+        provider echoes back. That is a deliberate departure from the single-shot
+        ``project_memory`` path above, and it is what makes re-running cheap: the
+        candidate filter and the stored label are then the same string, so a
+        second run embeds only what has been approved since. A provider that
+        answers ``text-embedding-3-small-v2`` to a request for
+        ``text-embedding-3-small`` is describing its own routing, not a space the
+        owner selected — and taking its word for it meant the filter looked for a
+        label nothing was ever stored under, so every run re-embedded the whole
+        corpus. The provider's own answer is kept in the artifacts, where it is
+        evidence rather than an identity.
+        """
+        provider = action.arguments.get("provider")
+        model = action.arguments.get("model")
+        if not isinstance(provider, str) or not provider.strip():
+            return self._fail(action.action_id, "missing_argument:provider")
+        if not isinstance(model, str) or not model.strip():
+            return self._fail(action.action_id, "missing_argument:model")
+        try:
+            limit = int(action.arguments.get("limit", MAX_MEMORY_INDEX_BATCH))
+        except (TypeError, ValueError):
+            return self._fail(action.action_id, "invalid_argument:limit")
+        limit = max(1, min(limit, MAX_MEMORY_INDEX_BATCH))
+        if not model_egress_allowlist():
+            return self._fail(action.action_id, "model_egress_denied:no_allowlist")
+
+        owner = self._store.account_scope(principal.principal_id)
+        pending = [
+            str(row["memory_id"])
+            for row in self._store.list_memories_missing_embedding(
+                f"{provider}:{model}", owner_principal_id=owner, limit=limit
+            )
+        ]
+        if not pending:
+            return self._fail(action.action_id, "no_memories_to_index")
+
+        embedder = self._embedder or self._default_embedder(principal.principal_id)
+        embedding_model = f"{provider}:{model}"
+        provider_models: set[str] = set()
+        indexed: list[str] = []
+        failures: list[dict[str, str]] = []
+        for memory_id in pending:
+            memory = self._store.get_active_approved_memory(memory_id, owner_principal_id=owner)
+            if memory is None:
+                failures.append(
+                    {"memory_id": memory_id, "reason_code": "memory_not_active_or_not_found"}
+                )
+                continue
+            text = str(memory["text"])
+            if not text.strip() or len(text) > _MAX_EMBED_TEXT_LEN:
+                failures.append({"memory_id": memory_id, "reason_code": "text_not_embeddable"})
+                continue
+            try:
+                response = embedder(provider, model, text)
+            except SandboxError as exc:
+                return self._batch_stop(
+                    action.action_id, str(exc), indexed, failures, embedding_model
+                )
+            except Exception as exc:  # noqa: BLE001 - map every failure to a fail-closed code
+                return self._batch_stop(
+                    action.action_id,
+                    self._provider_reason(exc),
+                    indexed,
+                    failures,
+                    embedding_model,
+                )
+            vector = getattr(response, "vector", None)
+            if (
+                not isinstance(vector, list)
+                or not vector
+                or not all(isinstance(value, (int, float)) for value in vector)
+            ):
+                return self._batch_stop(
+                    action.action_id,
+                    "invalid_embedding_response",
+                    indexed,
+                    failures,
+                    embedding_model,
+                )
+            self._store_memory_vector(
+                memory_id=memory_id,
+                text=text,
+                scope=str(memory["scope"]),
+                sensitivity=str(memory["sensitivity"]),
+                embedding_model=embedding_model,
+                response=response,
+                owner=owner,
+            )
+            indexed.append(memory_id)
+            answered = str(getattr(response, "model", "") or "")
+            if answered:
+                provider_models.add(answered)
+        return ExecutionResult(
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
+            summary=(
+                f"Embedded {len(indexed)} approved memories into {embedding_model}; "
+                "memory text and provider credentials were not emitted."
+            ),
+            artifacts={
+                "operation": "index_memories",
+                "embedding_model": embedding_model,
+                # What the provider called itself, kept as evidence. It is not
+                # the space's identity; see the note on the method above.
+                "provider_models": sorted(provider_models),
+                "indexed_count": len(indexed),
+                "skipped_count": len(failures),
+                "skipped": failures,
+                "provider_backed": True,
+                "content_redacted": True,
+            },
+        )
+
+    def _batch_stop(
+        self,
+        action_id: str,
+        reason_code: str,
+        indexed: list[str],
+        failures: list[dict[str, str]],
+        embedding_model: str,
+    ) -> ExecutionResult:
+        """Stop the batch at the first provider refusal, and say what it had done.
+
+        A partial batch is not rolled back: every vector already stored is a real
+        vector in a named space, and deleting it would throw away paid-for work
+        to make the record tidier. The counts travel with the refusal so the
+        owner sees both halves.
+        """
+        return ExecutionResult(
+            ok=False,
+            capability=self.capability,
+            action_id=action_id,
+            reason_code=reason_code,
+            summary="Model provider runtime failed closed part-way through the index.",
+            artifacts={
+                "operation": "index_memories",
+                "embedding_model": embedding_model,
+                "indexed_count": len(indexed),
+                "skipped_count": len(failures),
+                "skipped": failures,
+            },
+        )
+
+    def _store_memory_vector(
+        self,
+        *,
+        memory_id: str,
+        text: str,
+        scope: str,
+        sensitivity: str,
+        embedding_model: str,
+        response: EmbeddingResponse,
+        owner: str | None,
+    ) -> None:
+        from raiker.contracts.ids import new_id, utc_now
+        from raiker.contracts.models import VectorRecord
+        from raiker.vector import VectorIndex
+
+        vector = list(getattr(response, "vector", []) or [])
+        vector_id = new_id("vec_")
+        self._store.insert_vector_record(
+            VectorRecord(
+                vector_id=vector_id,
+                content_hash=VectorIndex.compute_content_hash(text),
+                content_preview=text[:_PREVIEW_LEN],
+                embedding_model=embedding_model,
+                dimensions=len(vector),
+                scope=scope,
+                sensitivity=sensitivity,
+                created_at=utc_now(),
+                embedding=_dump_vector([float(value) for value in vector]),
+                owner_principal_id=owner or "",
+            )
+        )
+        self._store.link_memory_projection(
+            memory_id, "vector", vector_id, embedding_model, owner_principal_id=owner
+        )
+
+    def _default_embedder(self, principal_id: str) -> Embedder:
+        """The real provider call, usable from wherever the executor is invoked.
+
+        ``asyncio.run`` raises inside a running event loop, and every route into
+        this executor from the web API *is* inside one — so the only unmocked
+        path here raised ``RuntimeError`` before it reached a provider and
+        reported it as ``model_provider_error:RuntimeError``, which reads like a
+        provider fault and is not one. :mod:`raiker.runtime.async_bridge`
+        holds the one answer, so it is reused rather than solved twice.
+        """
+        def embed(provider: str, model: str, text: str) -> EmbeddingResponse:
+            from raiker.models.connections import get_model_connection
             from raiker.models.policy_state import provider_runtime_policy_from_gates
             from raiker.models.registry import ModelProfileRegistry
             from raiker.models.router import ModelRouter
+            from raiker.runtime.async_bridge import run_coro
 
-            registry = ModelProfileRegistry.load(self._workspace_root)
+            registry = ModelProfileRegistry.load()
             policy = provider_runtime_policy_from_gates(self._store, principal_id)
-            router = ModelRouter(registry, runtime_policy=policy)
-            return asyncio.run(router.aembed(provider, model, text))
+            router = ModelRouter(
+                registry,
+                runtime_policy=policy,
+                # The owner's key lives in the connector vault, put there by the
+                # Models page. Without this resolver the factory sees only the
+                # process environment, so a key entered in the interface worked
+                # for chat and failed here with `provider_api_key_missing` — the
+                # same credential, reachable from one path and not the other.
+                # Nothing is loosened: the vault is owner-scoped, the factory
+                # still re-checks the egress allowlist and the gate state, and
+                # the key never enters an action argument or an event.
+                connection_resolver=lambda profile_id: get_model_connection(
+                    self._store, principal_id, profile_id
+                ),
+            )
+            response: EmbeddingResponse = run_coro(router.aembed(provider, model, text))
+            return response
 
         return embed
 

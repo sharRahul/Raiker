@@ -250,10 +250,34 @@ class TestMemoryForget:
 
         observation = record_observation(
             store=service.store, source_event_id="evt_1", session_id="sess_1",
-            summary="temporary", content="temporary", retention="turn_only"
+            summary="temporary", content="temporary", retention="turn_only",
+            owner_principal_id=OWNER,
         )
         assert not service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", "principal_missing").ok
         assert service.cleanup_expired_observations({observation.observation_id}, "2100-01-01T00:00:00Z", OWNER).ok
+
+    def test_eidetic_cleanup_will_not_delete_another_owners_row(
+        self, service: DashboardService
+    ) -> None:
+        """MEM-07 - the sweep deletes only what the owner's own preview listed.
+
+        The preview and the delete were both unscoped, so a confirmation naming
+        any workspace row removed it. The Observations list an owner is shown
+        has always been owner-scoped, so the sweep behind it has to be too, or
+        the control acts on rows the page never displayed.
+        """
+        from raiker.memory.eidetic import record_observation
+
+        theirs = record_observation(
+            store=service.store, source_event_id="evt_2", session_id="sess_2",
+            summary="temporary", content="temporary", retention="turn_only",
+            owner_principal_id="principal_someone_else",
+        )
+        result = service.cleanup_expired_observations(
+            {theirs.observation_id}, "2100-01-01T00:00:00Z", OWNER
+        )
+        assert result.ok is False
+        assert result.reason_code == "eidetic_cleanup_confirmation_required"
 
 
 class TestMemoryEditAndSearchParticipation:

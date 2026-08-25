@@ -47,6 +47,7 @@
   let title = $state("");
   let instructions = $state("");
   let cadence = $state("continuous");
+  let firstRunAt = $state("");
   let agentProjectId = $state("");
   let creating = $state(false);
 
@@ -97,11 +98,17 @@
         title: title.trim(),
         description: instructions.trim(),
         recurrence: cadence,
+        ...(firstRunAt && cadence !== "background"
+          ? { scheduled_at: new Date(firstRunAt).toISOString() }
+          : {}),
         ...(agentProjectId ? { project_id: agentProjectId } : projectId ? { project_id: projectId } : {}),
       });
       title = "";
       instructions = "";
-      notice = "Agent scheduled. Its first cycle starts on the next scheduler tick.";
+      notice = firstRunAt && cadence !== "background"
+        ? `Agent scheduled. Its first cycle starts ${new Date(firstRunAt).toLocaleString()}.`
+        : "Agent scheduled. Its first cycle starts on the next scheduler tick.";
+      firstRunAt = "";
       tab = "running";
       await load();
     } catch (error) {
@@ -284,6 +291,16 @@
           </select>
         </label>
         <p class="cadence-detail">{AGENT_CADENCES.find((option) => option.id === cadence)?.detail}</p>
+        <!-- Backlog #10 — a recurring agent anchors every later cycle to its
+             first run, so without this the anchor was whenever the owner
+             happened to press the button. Optional: left empty it still starts
+             now, which is what a "keep going" agent usually wants. -->
+        {#if cadence !== "background"}
+          <label>
+            First run
+            <input class="input" type="datetime-local" bind:value={firstRunAt} aria-label="First run" />
+          </label>
+        {/if}
         {#if projects && projects.projects.length > 0}
           <label>
             Project

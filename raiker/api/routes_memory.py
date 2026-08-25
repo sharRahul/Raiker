@@ -331,6 +331,40 @@ async def set_memory_embedding_backend(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/memory/embedding-index")
+async def build_memory_embedding_index(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Embed the approved memories into a real semantic space (MEM-10, human-only).
+
+    The route names the provider and the embedding model; it never names the
+    memories. Which rows are eligible is resolved inside the executor from the
+    acting principal, so this cannot be pointed at another account's memory, and
+    the run goes through ``model_provider_runtime`` - one gate read, one policy
+    review, one approval, one audit event - rather than around it.
+    """
+    provider = str(body.get("provider", "")).strip()
+    model = str(body.get("model", "")).strip()
+    result = _service(request).build_memory_embedding_index(
+        provider, model, auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT
+            if result.reason_code
+            in {
+                "embedding_model_not_named",
+                "embedding_model_not_offered",
+                "no_memories_to_index",
+            }
+            else status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.delete("/api/memory/{memory_id}")
 async def forget_memory(
     memory_id: str,

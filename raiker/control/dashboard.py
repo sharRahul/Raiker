@@ -327,6 +327,12 @@ class TurnView:
     # a re-opened turn has to be able to state.
     reasoning_chars: int = 0
     reasoning: str | None = None
+    # Backlog #25 - the per-turn tool rows, rebuilt from the durable record.
+    # Live, these arrive on the stream and the client assembles them; a reload
+    # had no stream and so lost half of what the turn said it did. Rebuilt
+    # server-side through the same `raiker.tools.presentation` function the live
+    # path uses, so a reloaded row can never say more than the one it replaces.
+    tool_rows: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -535,6 +541,13 @@ class MemorySettingsView:
     embedding_backend: str = "auto"
     retrieval: dict[str, Any] = field(default_factory=dict)
     spaces: tuple[dict[str, Any], ...] = ()
+    #: MEM-10 - what it would take to have a semantic space at all. `spaces`
+    #: above is read from the vectors that exist, so on a default install it
+    #: holds only the lexical fallback and the page can offer no better choice.
+    #: These two say why: the embedding models this install could call, and how
+    #: many approved memories are waiting to be embedded into one.
+    embedding_providers: tuple[dict[str, Any], ...] = ()
+    unindexed_memories: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -542,6 +555,8 @@ class MemorySettingsView:
             "embedding_backend": self.embedding_backend,
             "retrieval": dict(self.retrieval),
             "spaces": [dict(space) for space in self.spaces],
+            "embedding_providers": [dict(item) for item in self.embedding_providers],
+            "unindexed_memories": self.unindexed_memories,
         }
 
 
@@ -4194,6 +4209,13 @@ class DashboardService:
                     gist_summary=gist[2] if gist else "",
                 )
             )
+        # MEM-07 - the retention class of every row was already stated and
+        # nothing ever acted on it, so `turn_only` and `short_term_7_days`
+        # records were kept forever. The sweep is still owner-confirmed rather
+        # than automatic; what was missing was being *shown* what is due.
+        from raiker.memory.eidetic import expiry_preview
+
+        due = set(expiry_preview(store=self.store, now=utc_now(), owner_principal_id=owner))
         return ControlResult(
             ok=True,
             data={
@@ -4201,6 +4223,7 @@ class DashboardService:
                 "captured": sum(1 for view in views if view.capture_status == "captured"),
                 "skipped": sum(1 for view in views if view.capture_status == "skipped"),
                 "gists_pending": sum(1 for view in views if view.gist_status == "pending_review"),
+                "due_for_expiry": sorted(due),
             },
         )
 
@@ -4255,9 +4278,13 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.eidetic import cleanup_expired_observations
 
+        owner = self.store.account_scope(acting_principal_id) or (acting_principal_id or "")
         try:
             deleted = cleanup_expired_observations(
-                store=self.store, now=now, confirmed_ids=observation_ids
+                store=self.store,
+                now=now,
+                confirmed_ids=observation_ids,
+                owner_principal_id=owner,
             )
         except PermissionError as error:
             return ControlResult(ok=False, reason_code=str(error))
@@ -4318,14 +4345,25 @@ class DashboardService:
         )
 
     def get_memory_settings(self, acting_principal_id: str | None = None) -> MemorySettingsView:
-        from raiker.vector.backends import list_embedding_spaces, resolve_embedding_backend
+        from raiker.memory.retrieval import query_embedding_available
+        from raiker.vector.backends import (
+            MAX_MEMORY_INDEX_BATCH,
+            embedding_capable_profiles,
+            list_embedding_spaces,
+            resolve_embedding_backend,
+        )
 
         owner = self.store.account_scope(acting_principal_id) if acting_principal_id else None
         active = resolve_embedding_backend(self.store, owner_principal_id=owner)
         return MemorySettingsView(
             incognito=self.store.is_memory_incognito(acting_principal_id),
             embedding_backend=self.store.get_memory_embedding_backend(owner),
-            retrieval=active.describe(),
+            # A semantic *space* and semantic *recall* are two claims, and only
+            # the first one is true today: the question is not embedded into the
+            # space, so the vector leg is dropped and matching is still lexical.
+            # The card has to say which it has, or it repeats the exact defect
+            # MEM-03 was raised to remove.
+            retrieval={**active.describe(), "query_embeddable": query_embedding_available()},
             # `auto` is always offered and always resolvable; the rest are the
             # spaces that really hold vectors, so a selection can never name a
             # corpus that would answer with nothing.
@@ -4333,7 +4371,27 @@ class DashboardService:
                 space.describe()
                 for space in list_embedding_spaces(self.store, owner_principal_id=owner)
             ),
+            embedding_providers=tuple(embedding_capable_profiles()),
+            unindexed_memories=len(
+                self.store.list_memories_missing_embedding(
+                    active.model_label if active.semantic else None,
+                    owner_principal_id=owner,
+                    limit=MAX_MEMORY_INDEX_BATCH,
+                )
+            ),
         )
+
+    def build_memory_embedding_index(
+        self, provider: str, model: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """MEM-10 - embed the approved memories into a real semantic space.
+
+        Delegated for the same reason ``create_mcp_server`` is: the capability
+        gate, the policy review and the audit event live on the governed path,
+        and a REST mutation that reached the executor directly would produce the
+        same vectors while proving nothing about how they got there.
+        """
+        return self.control.build_memory_embedding_index(acting_principal_id, provider, model)
 
     def set_memory_embedding_backend(
         self, backend: str, acting_principal_id: str | None
@@ -6286,8 +6344,7 @@ class DashboardService:
             match_turn_id=str(row.get("match_turn_id") or ""),
         )
 
-    @staticmethod
-    def _turn_view(row: dict[str, Any]) -> TurnView:
+    def _turn_view(self, row: dict[str, Any]) -> TurnView:
         return TurnView(
             turn_id=str(row["turn_id"]),
             session_id=str(row["session_id"]),
@@ -6299,7 +6356,49 @@ class DashboardService:
             summary=row.get("summary"),
             reasoning_chars=int(row.get("reasoning_chars") or 0),
             reasoning=row.get("reasoning_text"),
+            tool_rows=self._turn_tool_rows(
+                str(row["session_id"]), str(row.get("turn_id") or "")
+            ),
         )
+
+    #: How a stored action's status reads as a transcript row. `proposed` is a
+    #: call that never settled - the live view shows the same fact as a row that
+    #: never stopped running, and a reload should not invent a different answer.
+    _STORED_ROW_STATES = {
+        "success": "success",
+        "failed": "failed",
+        "denied": "denied",
+        "approval_required": "waiting",
+        "proposed": "running",
+    }
+
+    def _turn_tool_rows(self, session_id: str, turn_id: str) -> tuple[dict[str, Any], ...]:
+        """Backlog #25 - the turn's tool calls, as the transcript showed them.
+
+        Read from ``tool_actions``, whose arguments were already redacted by the
+        broker before they were stored, and rendered through the same
+        :func:`raiker.tools.presentation.tool_row` the live stream uses. Two
+        consequences worth stating: the reloaded row carries exactly the family,
+        label and action phrase the live one did, and it cannot carry more,
+        because it is the same function over an already-redacted record.
+        """
+        from raiker.tools.presentation import tool_row
+
+        rows: list[dict[str, Any]] = []
+        for stored in self.store.list_turn_tool_actions(session_id, turn_id):
+            try:
+                arguments = json.loads(str(stored.get("arguments_json") or "{}"))
+            except (TypeError, ValueError):  # pragma: no cover - unreadable row
+                arguments = {}
+            tool_name = str(stored.get("tool_name") or "")
+            if not tool_name:
+                continue
+            rows.append({
+                "action_id": str(stored.get("action_id") or ""),
+                **tool_row(tool_name, arguments if isinstance(arguments, dict) else {}).to_payload(),
+                "status": self._STORED_ROW_STATES.get(str(stored.get("status") or ""), "running"),
+            })
+        return tuple(rows)
 
     @staticmethod
     def _event_view(row: dict[str, Any]) -> EventView:

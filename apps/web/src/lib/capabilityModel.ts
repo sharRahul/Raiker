@@ -33,9 +33,21 @@ export function enableableTargets(gate: CapabilityGate): string[] {
   return ENABLE_TARGETS.filter((t) => gate.allowed_transitions.includes(t));
 }
 
-/** True when this principal can enable the gate to a real enabled state (authority + a target). */
+/** True when this principal can enable the gate to a real enabled state (authority + a target).
+ *
+ * `isDisabled` is part of the question, not an optimisation. `allowed_transitions`
+ * lists every state a capability *may* hold rather than every state it may move
+ * to next, so an already-enabled gate still names its own enabled state as a
+ * target — which rendered "Turn on" next to "Turn off" and would have set the
+ * capability to the state it was already in.
+ */
 export function canEnable(gate: CapabilityGate): boolean {
-  return gate.can_current_principal_change && !isDeferred(gate) && enableableTargets(gate).length > 0;
+  return (
+    gate.can_current_principal_change
+    && isDisabled(gate)
+    && !isDeferred(gate)
+    && enableableTargets(gate).length > 0
+  );
 }
 
 /** True when an authorised principal can turn the (currently enabled) gate off. */

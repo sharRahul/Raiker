@@ -295,6 +295,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-280](#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have) | Medium | governance architecture | Fixed (was GEP-04; raised 2026-08-23, closed 2026-08-24) |
 | [FIXED-281](#fixed-281--a-skill-written-in-raiker-was-not-guaranteed-to-work-anywhere-else) | Medium | skills / interoperability | Fixed (was ADD-21; raised 2026-08-23, closed 2026-08-24) |
 | [FIXED-282](#fixed-282--auto-promised-a-review-it-did-not-perform) | Medium | decision modes / Build / Chat | Fixed (was BUG-218; raised 2026-08-21, closed 2026-08-24) |
+| [FIXED-283](#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select) | Medium | memory / retrieval quality | Fixed (was MEM-10 first leg; raised 2026-08-17, closed 2026-08-25) |
+| [FIXED-284](#fixed-284--nothing-expired-because-the-sweep-the-retention-classes-describe-was-never-offered) | Medium | memory / retention | Fixed (was MEM-07; raised 2026-08-11, closed 2026-08-25) |
+| [FIXED-285](#fixed-285--four-cadences-existed-and-the-composer-offered-one-of-them) | Low | tasks / scheduling | Fixed (was backlog #10; closed 2026-08-25) |
+| [FIXED-286](#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | tasks / delegation | Fixed (was BUG-220; raised 2026-08-21, closed 2026-08-25) |
+| [FIXED-287](#fixed-287--a-reopened-transcript-showed-the-answer-and-nothing-about-how-it-was-reached) | Low | Chat / transcript record | Fixed (was backlog #25; closed 2026-08-25) |
+| [FIXED-288](#fixed-288--three-interface-defects-found-while-exercising-the-four-above) | Low → Medium | Permissions / Models | Fixed (raised and closed 2026-08-25 during the live round) |
 
 ---
 
@@ -11939,3 +11945,334 @@ that a target resolving outside the workspace is never waved through as a
 the broker: Auto withholds and the evidence reaches the approval, Auto still
 executes work the turn established, and Skip is unaffected;
 `apps/web/src/lib/approvalMode.test.ts`, `apps/web/src/lib/buildModes.test.ts`.
+
+---
+
+## FIXED-283 — Semantic recall was selectable, and nothing could ever produce a space to select
+
+**Severity: Medium. Area: memory / retrieval quality. Was MEM-10 (first leg),
+raised 2026-08-17, closed 2026-08-25.**
+
+**Observed.** Memory → **Recall backend** let the owner choose which embedding
+space recall searches, and on every install the list held exactly one entry: the
+lexical fallback. The card was honest about it — *"Searching
+`raiker-local-hash-v1` — matches words, not meaning"* — and the honesty was the
+whole problem. `list_embedding_spaces` reads the spaces a workspace **holds
+vectors in**, which is right for choosing one and useless for getting one.
+Nothing in the product could produce the first semantic vector.
+
+**Reproduce (before).** Approve a memory. Open Memory → Recall backend. The only
+selectable space is the hashing fallback, and a paraphrase of the memory does not
+recall it.
+
+**Root cause — a capability built, registered, gated, tested, and never run.**
+`ModelProviderExecutor` (`raiker/runtime/executors/models_runtime.py`) already
+called a provider's embedding endpoint and persisted a real semantic vector. It
+was in `REAL_EXECUTOR_CAPABILITIES`, had a threat model, an activation
+requirement, a phase gate and its own acceptance suite. **No route, no page and
+no tool ever invoked it.** This is the third time this shape has been found —
+after checkpoint rewind (FIXED-270) and audit export (FIXED-271) — and it is the
+worst-behaved of the three, because the surface that depended on it read as
+correct rather than as missing.
+
+The acceptance suite injected an embedder, which is the right way to test the
+governed persistence path and the reason nothing noticed that the **unmocked**
+path could not run at all. Routing it surfaced three separate breakages in the
+one function the tests never entered:
+
+1. `ModelProfileRegistry.load(self._workspace_root)` — the registry takes a
+   *config file* path, not a workspace root. Every other call site in the
+   codebase calls it with no argument. Handing it a directory raised
+   `PermissionError` on Windows (`IsADirectoryError` on POSIX) before a provider
+   was ever contacted, and the executor reported it as
+   `model_provider_error:PermissionError`, which reads like a provider fault.
+2. `asyncio.run(...)` inside a running event loop. Every route into this
+   executor from the web API is already on a loop, where `asyncio.run` raises and
+   the coroutine is never awaited. Same symptom, different name:
+   `model_provider_error:RuntimeError`.
+3. The provider factory saw only the process environment, so a key the owner had
+   entered on the **Models** page — which works for chat — failed here with
+   `provider_api_key_missing:OPENAI_API_KEY`. The same credential, reachable from
+   one path and not the other.
+
+**Fixed.**
+
+* **A batch, not two hundred approvals.** `operation: index_memories` embeds the
+  owner's approved, non-sensitive, not-yet-embedded memories under **one**
+  governed action — one gate read, one policy review, one approval, one audit
+  record — bounded by `MAX_MEMORY_INDEX_BATCH` (500). The eligible set is
+  resolved inside the executor from the acting principal, never from an argument,
+  so the batch cannot be pointed at another account. It inherits
+  `project_memory`'s sensitivity boundary exactly: a memory marked `secret_like`
+  or `credential_like` is never sent.
+* **The space is named for the model the owner chose**, not for whatever the
+  provider echoes back — a deliberate departure from the single-shot
+  `project_memory` path beside it. The candidate filter and the stored label are
+  then the same string, so re-running embeds only what has been approved since.
+  Taking the provider's word for it (the first version did) meant a provider
+  answering `text-embedding-3-small-v2` to a request for `text-embedding-3-small`
+  left the filter looking for a label nothing had been stored under, and every
+  run re-embedded the whole corpus — for as long as the owner kept the index
+  current. The provider's own answer is kept in the artifacts as evidence rather
+  than as an identity.
+* **A provider refusal stops the batch and says what it had done.** Vectors
+  already stored are kept: each is a real vector in a named space, and discarding
+  paid-for work to tidy the record helps nobody. The counts travel with the
+  refusal.
+* **The three breakages.** `ModelProfileRegistry.load()` takes its own default;
+  `raiker/runtime/async_bridge.py` holds the one answer for running a coroutine
+  from synchronous code (the advisor's private `_run_coro` now delegates to it
+  rather than being imported across modules); and the router is built with the
+  same `connection_resolver` the gateway uses, so the vault key the owner entered
+  is the key that is used. Nothing is loosened — the vault is owner-scoped and
+  the factory still re-checks the egress allowlist, the gate state and the
+  credential on every use.
+
+**User-interface outcome.** Memory → Recall backend states what is in force in
+one line, and — while a question cannot yet be matched against a semantic space
+and memories are waiting — offers **Build a meaning-based index…**: a list of the
+embedding models this install can actually name, and a button that says how many
+memories it would send. The confirmation names the count, the destination and the
+model before anything leaves the machine, and says that secret-shaped memories
+are never sent.
+
+**And then the card says what it has, which is not yet what it sounds like.**
+Verifying this live found that building the space is only the *write* half.
+`retrieve_hybrid_memory` drops the vector leg for a semantic backend unless a
+caller supplies a `query_embedder`, and **no caller does** — so after a
+successful run, *"where should backups go"* still returned nothing while
+*"encrypted NAS"* matched on shared words. The first version of this card read
+*"Searching `openai:text-embedding-3-small` — matches meaning"*, which is a
+recall the runtime does not perform. It now reads *"Stored in
+`openai:text-embedding-3-small`. Recall still matches words: a question is not
+embedded into this space yet."* The claim and the behaviour agree, and
+`raiker/memory/retrieval.py::query_embedding_available()` is the one fact every
+surface reads, so the sentence changes when the behaviour does rather than when
+somebody remembers to change it.
+
+**Live evidence (2026-08-25).** A fresh workspace, the owner's OpenAI and
+Anthropic keys entered through the interface. First run: `indexed_count: 1`,
+`embedding_model: openai:text-embedding-3-small`, 1536 dimensions, and the
+Recall backend card resolved to that space. A second approved memory, then a
+second run: `indexed_count: 1` — only the new one — and a third run refused with
+`no_memories_to_index`. Retrieval measured directly afterwards is what found the
+read-leg gap. Screenshots `r0825-memory-index`, `r0825-memory-recall-state`.
+
+**What is *not* closed, and one of these is new.**
+
+* **The read leg — a question is not embedded into the space.** Raised as
+  [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it)
+  rather than fixed here, because the shortest fix is a second route into a
+  governed action and this codebase refuses those on purpose: embedding a query
+  is provider egress, on a read path, once per search, and it needs the gate and
+  the decision mode.
+* **A keyless install still has only the fallback**, and **vector recall is still
+  a linear scan** — MEM-10's remainder and backlog #5, both unchanged.
+
+So what closed is precisely this: a semantic space can be **produced**, is named
+for the model the owner chose, is selected by recall, and costs only what is new
+on each re-run. What it cannot yet do is answer a paraphrase, and the product now
+says so in the one place an owner would otherwise assume otherwise.
+
+**Evidence.** `tests/test_memory_semantic_index.py` (11 cases: the space becomes
+selectable, a second run does not re-embed, a provider echoing a variant name
+does not rename the space, an empty corpus fails closed, a credential-shaped
+memory never reaches the provider, a provider refusal keeps what it stored, the
+batch is bounded, the settings report what is waiting, and an unoffered or
+unnamed model is refused before any call); `tests/test_async_bridge.py`;
+`apps/web/src/lib/views/MemoryView.test.ts` — including *"says so when the
+vectors are semantic and the question is not embedded"*, which pins the card
+against the overclaim it briefly made.
+
+---
+
+## FIXED-284 — Nothing expired, because the sweep the retention classes describe was never offered
+
+**Severity: Medium. Area: memory / retention. Was MEM-07, raised 2026-08-11,
+closed 2026-08-25.**
+
+**Observed.** Six retention classes are defined, stored, and stated on every
+observation card. `expiry_preview` and `cleanup_expired_observations` implement
+an owner-confirmed sweep correctly. Nothing scheduled or **offered** it, so
+`turn_only` and `short_term_7_days` records were retained indefinitely on every
+workspace.
+
+**Root cause.** "No automatic cleanup worker" is a deliberate non-goal and
+remains one. But the deliberate alternative — the owner being *shown* what is due
+and asked — was never built, so a considered boundary read as an omission.
+
+**Two things found while building the surface.** `expiry_preview` and
+`cleanup_expired_observations` were both **unscoped**: they scanned and deleted
+across every row in the workspace. The Observations list an owner sees has always
+been owner-scoped, so the control behind it would have acted on rows the page
+never displayed. Both now take `owner_principal_id`, and the confirmation is
+still checked against the preview rather than trusted, so naming a row that is
+not due removes nothing.
+
+**Fixed.** `list_observations` reports `due_for_expiry` alongside the counters it
+already returned, computed from the same preview the cleanup checks against — so
+what the page offers to remove and what the server will remove cannot disagree.
+
+**User-interface outcome.** Memory → Observations says *"N past their retention
+class"* with one **Remove** control beside it. Confirming states that Raiker
+keeps no copy of the material the records describe, and the result reports
+exactly how many were removed. No daemon, no automatic delete, and the three
+classes with no automatic expiry (`project_lifetime`, `until_forget`,
+`legal_hold`) are untouched by design. The reasoning moved to
+[the guide](../guide/working-in-chat.md#retention) rather than onto the page.
+
+**Evidence.** `tests/test_memory_controls.py` (the sweep is human-only,
+preview-bound, and will not delete another owner's row);
+`tests/test_eidetic_observations.py`; `apps/web/src/lib/views/MemoryView.test.ts`.
+
+---
+
+## FIXED-285 — Four cadences existed and the composer offered one of them
+
+**Severity: Low. Area: tasks / scheduling. Was backlog #10, closed 2026-08-25.**
+
+**Observed.** The scheduler honours four recurring cadences — `continuous`,
+`hourly`, `daily`, `weekly` — and anchors every later cycle to the slot the owner
+picked (`next_run_after` steps forward from the original time, not from "now").
+Tasks → Plan work offered **Daily routine** and nothing else, so hourly and
+weekly were reachable only from Build's side panel, and Build's side panel had no
+start time at all: `create_task` defaults `scheduled_at` to *now*, so a daily
+agent created at 4pm ran at 4pm forever. A daily task that runs a day after it
+happened to be created is not a schedule anybody chose.
+
+**Fixed.** The chip row now names the *shape* of the work — **Task**, **Once**,
+**Routine**, **Background** — and a **Repeat** select names the interval, which
+is the axis they actually vary on. **First run** is required for a routine and
+for a one-shot, and Build's standing-agent panel gained the same optional field:
+left empty it still starts on the next scheduler tick, which is what a "keep
+going" agent usually wants.
+
+**User-interface outcome.** Four chips instead of four chips, one more control,
+and every cadence the runtime honours reachable from the page that plans work. A
+running routine reads *"Runs hourly, next 14 July 09:30"* rather than
+*"Scheduled for 14 July 09:30"*, which had made an hourly routine look like a
+one-shot and its next slot look like its only one. The composer's standing
+paragraph of explanation moved to
+[the guide](../guide/tasks-and-projects.md#tasks); removing it also stopped the
+chip row wrapping onto two lines.
+
+**Evidence.** `apps/web/src/lib/views/TasksView.test.ts` (an hourly routine
+anchored to the owner's first run reaches the API as `recurrence: "hourly"` with
+that `scheduled_at`).
+
+---
+
+## FIXED-286 — A task reported done while the work it delegated was still open
+
+**Severity: Medium. Area: tasks / delegation. Was BUG-220, raised 2026-08-21,
+closed 2026-08-25.**
+
+**Observed.** `parent_task_id` recorded the structure of delegated work and
+nothing owned it. A task that split its work into children reported `completed`
+the moment its **own** run ended — while a child sat parked on an approval. That
+is a false completion in the strict sense: it tells the owner the work is
+finished, stamps a `completed_at`, and removes the row from every surface that
+counts unfinished work.
+
+**Fixed.** `TaskManager.complete_task` parks a parent with an unfinished child as
+`waiting_for_children` — a new status, distinct from `completed` because it is
+not one, and distinct from `waiting_for_approval` because no decision of the
+owner's moves it. What moves it is the last child landing: the parent then
+completes if every child completed, and fails if any failed or was cancelled,
+naming the count. No `completed_at` is stamped while it waits, for the same
+reason a run parked on an approval stamps none.
+
+Two boundaries are deliberate. **A parent that already reached a terminal state
+is not reopened by a late child** — a terminal state that can be walked back is
+not one an audit record can rely on. And **nothing is inherited downward**: a
+child carries its own approvals, because one decision standing in for an
+unbounded number of later ones is exactly what the per-turn permission envelope
+exists to prevent. That was the first of the three governance requirements the
+defect entry set, and it is a property of the design rather than a promise about
+it.
+
+**User-interface outcome.** The task card reads *"Its own run finished. Waiting
+on N delegated tasks."* — the count being the part the owner would otherwise have
+to work out by reading the tree. `waiting_for_children` counts as active
+everywhere active work is counted, including the global **STOP** sweep, and reads
+as *"waiting on delegated work"* wherever a status is named.
+
+**What is *not* closed.** BUG-220's other two requirements — a visible,
+re-decidable Chat-or-Build routing decision per child, and one conversation that
+briefs the split — remain open, and are backlog #23.
+
+**Evidence.** `tests/test_task_delegation_ownership.py` (8 cases: the parent does
+not report done over an open child, the last child settles it, a failed or
+cancelled child fails it, a childless task is unaffected, a finished parent is
+not reopened, the hold is its own audit event, and a three-level tree settles
+from the leaf up).
+
+---
+
+## FIXED-287 — A reopened transcript showed the answer and nothing about how it was reached
+
+**Severity: Low. Area: Chat / transcript record. Was backlog #25, closed
+2026-08-25.**
+
+**Observed.** A turn's tool rows — what it read, what it ran, what was refused —
+existed only on the stream the turn was watched on. Reload the conversation and
+they were gone, leaving the answer and the reasoning with no record of the work
+underneath them. Reasoning already survived a reload (FIXED/BUG-215); this half
+did not.
+
+**Root cause.** The rows are assembled client-side from `kind: "tool"` stream
+events. A restored turn has no stream. The record was never lost — `tool_actions`
+held every call with its arguments already redacted by the broker — it was simply
+never read back.
+
+**Fixed.** `TurnView` carries `tool_rows`, built from `list_turn_tool_actions`
+and rendered through **the same** `raiker.tools.presentation.tool_row` the live
+path uses. Two consequences worth stating: the reloaded row carries exactly the
+family, label and action phrase the live one did, and it **cannot carry more**,
+because it is the same function over an already-redacted record. The client feeds
+them in as events, so `toolActivity` assembles and merges them exactly as it does
+live — including merging with a later live event for the same call, which is what
+a parked turn resumed in this tab produces.
+
+**User-interface outcome.** Reopening a conversation shows the tool rows the turn
+showed while it ran, in call order, in their settled state. A call that never
+settled reads as running, which is what the live view says about the same fact
+rather than a different answer invented for the reload.
+
+**Evidence.** `tests/test_turn_tool_rows_survive_reload.py` (9 cases: the rows
+come back with their action phrase, in proposal order, scoped to their own turn,
+with every stored status mapped to the state the transcript uses);
+`apps/web/src/lib/views/ChatView.test.ts`.
+
+---
+
+## FIXED-288 — Three interface defects found while exercising the four above
+
+**Severity: Low → Medium. Area: Permissions / Models. Raised and closed
+2026-08-25 during the live round.**
+
+**"Turn on" beside "Turn off" on the same enabled capability.**
+`allowed_transitions` lists every state a capability *may hold*, not every state
+it may move to next, so an enabled gate still named its own enabled state as an
+enable target. Both buttons rendered, and pressing **Turn on** would have set the
+capability to the state it was already in. `canEnable` now requires the gate to
+be currently disabled, which is what the word means.
+
+**A permission list that could not be scanned for what is on.** The collapsed row
+showed the decision mode (Ask / Allow / Auto / Deny) whether the capability was
+on or off, and the on/off state was discoverable only by opening the card and
+reading which buttons appeared. The row now carries an **Off** marker — text, not
+colour alone, in the same style GEP-04 established for a switch that does not
+govern its own capability.
+
+**A successful readiness check titled "Repair model connection".** The dialog had
+two titles for three outcomes, so re-checking a model that turned out to be fine
+kept a heading saying something was wrong with it while the line underneath said
+the provider could reach it. A ready model now reads **"This model is ready"**,
+and its primary action is **Continue** rather than **Open Models** — which had
+sent the owner to a page with nothing left to fix on it.
+
+**Evidence.** `apps/web/src/lib/capabilityModel.test.ts` (`canEnable` is false
+once the gate is enabled, while `canDisable` stays true);
+`apps/web/src/lib/views/CapabilitiesView.test.ts`;
+`apps/web/src/lib/components/ModelSetupDialog.test.ts`.

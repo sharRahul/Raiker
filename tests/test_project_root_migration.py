@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+import raiker.control.dashboard as dashboard
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService, migrate_project_roots
 from raiker.control.knowledge_scope import build_roots
@@ -59,7 +60,11 @@ def test_failed_row_reservation_leaves_the_legacy_root_coherent(
     old.mkdir(parents=True)
     (old / "notes.txt").write_text("alpha", encoding="utf-8")
     store.create_project("proj_a", "Alpha", "projects/alpha")
-    monkeypatch.setattr(store, "publish_project_root_atomic", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        store,
+        "publish_project_root_atomic",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(RuntimeError("database_locked")),
+    )
 
     report = migrate_project_roots(tmp_path, store)
 
@@ -125,6 +130,36 @@ def test_destination_claim_race_never_overwrites_or_strands_the_legacy_root(
     resumed = migrate_project_roots(tmp_path, store)
     assert resumed.migrated == ("proj_a",)
     assert (destination / "notes.txt").read_text(encoding="utf-8") == "legacy"
+
+
+def test_incomplete_owned_publication_resumes_without_replacing_files(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A crash after claiming the final root must leave an owned, resumable reservation."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_copy = dashboard._copy_project_tree_resuming
+
+    def fail_after_copy(source: Path, destination: Path) -> None:
+        original_copy(source, destination)
+        raise OSError("injected_after_final_copy")
+
+    monkeypatch.setattr(dashboard, "_copy_project_tree_resuming", fail_after_copy)
+
+    failed = migrate_project_roots(tmp_path, store)
+
+    assert failed.conflicts == ("proj_a",)
+    assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
+    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+
+    monkeypatch.undo()
+    resumed = migrate_project_roots(tmp_path, store)
+    assert resumed.migrated == ("proj_a",)
+    assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "legacy"
 
 
 def test_migration_is_idempotent_after_a_successful_move(tmp_path: Path, store: SQLiteStore) -> None:
@@ -241,6 +276,37 @@ def test_legacy_container_symlink_cannot_migrate_runtime_data(tmp_path: Path) ->
     assert report.conflicts == ("proj_memory",)
     assert (memory / "keep.txt").read_text(encoding="utf-8") == "keep"
     assert store.load_project("proj_memory")["root_subpath"] == "projects/memory"
+
+
+def test_source_container_swap_before_publication_cannot_copy_runtime_data(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The source container must be revalidated after the database lock is acquired."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    runtime_source = tmp_path / ".raiker" / "alpha"
+    runtime_source.mkdir(parents=True)
+    (runtime_source / "secret.txt").write_text("secret", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_publish = store.publish_project_root_atomic
+
+    def swap_then_publish(*args: object, **kwargs: object) -> bool:
+        old.parent.rename(tmp_path / "projects-before-swap")
+        try:
+            (tmp_path / "projects").symlink_to(tmp_path / ".raiker", target_is_directory=True)
+        except (OSError, NotImplementedError):  # pragma: no cover - host dependent
+            pytest.skip("symlinks unavailable")
+        return original_publish(*args, **kwargs)
+
+    monkeypatch.setattr(store, "publish_project_root_atomic", swap_then_publish)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.conflicts == ("proj_a",)
+    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert not (tmp_path / ".raiker" / "projects" / "alpha").exists()
+    assert (runtime_source / "secret.txt").read_text(encoding="utf-8") == "secret"
 
 
 def test_container_symlinks_are_not_knowledge_map_roots(tmp_path: Path) -> None:

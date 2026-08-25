@@ -646,6 +646,107 @@ def _copy_project_tree_exclusive(source: Path, destination: Path) -> None:
             raise OSError("project_root_special_file_not_migrated")
 
 
+_PROJECT_ROOT_RESERVATION = ".raiker-project-root-reservation.json"
+_PROJECT_ROOT_STAGE_TREE = "tree"
+_PROJECT_ROOT_STAGE_COMPLETE = ".complete"
+
+
+def _copy_project_tree_resuming(source: Path, destination: Path) -> None:
+    """Complete a reserved publication without replacing any existing entry."""
+    for child in source.iterdir():
+        target = destination / child.name
+        if child.is_symlink():
+            raise OSError("project_root_symlink_not_migrated")
+        if child.is_dir():
+            if target.is_symlink() or (target.exists() and not target.is_dir()):
+                raise FileExistsError(target)
+            if not target.exists():
+                target.mkdir()
+            _copy_project_tree_resuming(child, target)
+        elif child.is_file():
+            if target.exists() or target.is_symlink():
+                if not target.is_file() or not _same_file(child, target):
+                    raise FileExistsError(target)
+                continue
+            with child.open("rb") as reader, target.open("xb") as writer:
+                shutil.copyfileobj(reader, writer)
+            shutil.copystat(child, target, follow_symlinks=False)
+        else:
+            raise OSError("project_root_special_file_not_migrated")
+
+
+def _same_file(left: Path, right: Path) -> bool:
+    if left.stat().st_size != right.stat().st_size:
+        return False
+    with left.open("rb") as first, right.open("rb") as second:
+        while first_chunk := first.read(64 * 1024):
+            if first_chunk != second.read(len(first_chunk)):
+                return False
+        return not second.read(1)
+
+
+def _write_reservation(path: Path, reservation: dict[str, str]) -> None:
+    with path.open("x", encoding="utf-8") as handle:
+        handle.write(json.dumps(reservation, sort_keys=True))
+        handle.flush()
+        os.fsync(handle.fileno())
+
+
+def _read_reservation(path: Path) -> dict[str, str] | None:
+    if path.is_symlink() or not path.is_file():
+        return None
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) and all(isinstance(value, str) for value in data.values()) else None
+
+
+def _stage_project_tree(source: Path, destination: Path) -> tuple[Path, Path]:
+    stage = destination.parent / f".{destination.name}.raiker-migration-{uuid4().hex}"
+    stage.mkdir()
+    tree = stage / _PROJECT_ROOT_STAGE_TREE
+    tree.mkdir()
+    if source.exists():
+        _copy_project_tree_exclusive(source, tree)
+    complete = stage / _PROJECT_ROOT_STAGE_COMPLETE
+    complete.touch(exist_ok=False)
+    return stage, tree
+
+
+def _reservation_tree(
+    destination: Path, reservation: dict[str, str], project_id: str, raw_root: str
+) -> tuple[Path, Path] | None:
+    if reservation.get("project_id") != project_id or reservation.get("raw_root") != raw_root:
+        return None
+    stage_name = reservation.get("stage_name", "")
+    if not stage_name.startswith(f".{destination.name}.raiker-migration-") or "/" in stage_name or "\\" in stage_name:
+        return None
+    stage = destination.parent / stage_name
+    tree = stage / _PROJECT_ROOT_STAGE_TREE
+    if stage.is_symlink() or tree.is_symlink() or not stage.is_dir() or not tree.is_dir():
+        return None
+    if not (stage / _PROJECT_ROOT_STAGE_COMPLETE).is_file():
+        return None
+    return stage, tree
+
+
+def _recover_empty_reservation(
+    destination: Path, project_id: str, raw_root: str
+) -> tuple[dict[str, str], Path, Path] | None:
+    if any(destination.iterdir()):
+        return None
+    candidates: list[tuple[dict[str, str], Path, Path]] = []
+    for sidecar in destination.parent.glob(f".{destination.name}.raiker-migration-*.json"):
+        reservation = _read_reservation(sidecar)
+        if reservation is None:
+            continue
+        staged = _reservation_tree(destination, reservation, project_id, raw_root)
+        if staged is not None:
+            candidates.append((reservation, *staged))
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def migrate_project_roots(
     workspace_root: Path, store: SQLiteStore
 ) -> ProjectRootMigrationReport:
@@ -696,10 +797,20 @@ def migrate_project_roots(
         if source.is_symlink() or destination.is_symlink():
             conflicts.append(project_id)
             continue
-        if destination.exists() and (source.exists() or not destination.is_dir()):
-            conflicts.append(project_id)
-            continue
-        if destination.exists() and not was_moved_with_parent:
+        owned_reservation = None
+        if destination.exists() and destination.is_dir() and not destination.is_symlink():
+            reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
+            owned_reservation = (
+                _reservation_tree(destination, reservation, project_id, raw_root)
+                if reservation is not None
+                else _recover_empty_reservation(destination, project_id, raw_root)
+            )
+        if destination.exists() and (
+            destination.is_symlink()
+            or not destination.is_dir()
+            or (source.exists() and owned_reservation is None)
+            or (not source.exists() and owned_reservation is None and not was_moved_with_parent)
+        ):
             conflicts.append(project_id)
             continue
         if source.exists() and not source.is_dir():
@@ -711,18 +822,54 @@ def migrate_project_roots(
             destination_subpath: str = destination_subpath,
             source: Path = source,
             was_moved_with_parent: bool = was_moved_with_parent,
+            project_id: str = project_id,
+            raw_root: str = raw_root,
         ) -> None:
+            source_revalidated = _contained_project_root(workspace, raw_root)
+            if (
+                source_revalidated is None
+                or source_revalidated[0] != _LEGACY_PROJECT_ROOT
+                or source_revalidated[2] != source
+                or source.is_symlink()
+            ):
+                raise OSError("project_root_source_invalid")
             destination.parent.mkdir(parents=True, exist_ok=True)
             revalidated = _contained_project_root(workspace, destination_subpath)
             if revalidated is None or revalidated[2] != destination:
                 raise OSError("project_root_destination_invalid")
             if destination.exists():
-                if not was_moved_with_parent or source.exists() or not destination.is_dir():
+                if destination.is_symlink() or not destination.is_dir():
                     raise FileExistsError(destination)
-                return
+                reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
+                staged = (
+                    _reservation_tree(destination, reservation, project_id, raw_root)
+                    if reservation is not None
+                    else None
+                )
+                if staged is None and reservation is None:
+                    recovered = _recover_empty_reservation(destination, project_id, raw_root)
+                    if recovered is not None:
+                        reservation, _stage, tree = recovered
+                        _write_reservation(destination / _PROJECT_ROOT_RESERVATION, reservation)
+                        staged = _stage, tree
+                if staged is not None:
+                    _copy_project_tree_resuming(staged[1], destination)
+                    return
+                if was_moved_with_parent and not source.exists():
+                    return
+                raise FileExistsError(destination)
+
+            stage, tree = _stage_project_tree(source, destination)
+            reservation = {
+                "project_id": project_id,
+                "raw_root": raw_root,
+                "stage_name": stage.name,
+            }
+            sidecar = destination.parent / f".{destination.name}.raiker-migration-{uuid4().hex}.json"
+            _write_reservation(sidecar, reservation)
             destination.mkdir()
-            if source.exists():
-                _copy_project_tree_exclusive(source, destination)
+            _write_reservation(destination / _PROJECT_ROOT_RESERVATION, reservation)
+            _copy_project_tree_resuming(tree, destination)
 
         try:
             updated = store.publish_project_root_atomic(
@@ -731,7 +878,7 @@ def migrate_project_roots(
                 destination_subpath,
                 publish,
             )
-        except OSError:
+        except Exception:  # noqa: BLE001 - migration failures preserve the legacy row for retry
             conflicts.append(project_id)
             continue
         if updated:

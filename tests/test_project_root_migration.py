@@ -35,6 +35,140 @@ def test_existing_project_root_moves_without_overwrite(tmp_path: Path, store: SQ
     assert store.load_project("proj_a")["root_subpath"] == ".raiker/projects/alpha"
 
 
+def test_migration_preserves_a_user_file_named_like_legacy_reservation(
+    tmp_path: Path, store: SQLiteStore
+) -> None:
+    """Migration metadata must not occupy a project file name."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    reservation_named_file = old / ".raiker-project-root-reservation.json"
+    reservation_named_file.write_bytes(b"user project content\x00must survive")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert (
+        tmp_path / ".raiker" / "projects" / "alpha" / ".raiker-project-root-reservation.json"
+    ).read_bytes() == b"user project content\x00must survive"
+
+
+def test_post_commit_replacement_source_is_not_deleted(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A new directory at the old path after commit belongs to manual cleanup."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_publish = store.publish_project_root_atomic
+
+    def publish_then_replace(*args: object, **kwargs: object) -> bool:
+        updated = original_publish(*args, **kwargs)
+        if updated:
+            old.rename(old.with_name("alpha-original"))
+            old.mkdir()
+            (old / "replacement.txt").write_text("do not delete", encoding="utf-8")
+        return updated
+
+    monkeypatch.setattr(store, "publish_project_root_atomic", publish_then_replace)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert (old / "replacement.txt").read_text(encoding="utf-8") == "do not delete"
+    assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "legacy"
+
+
+def test_post_commit_changed_source_file_is_not_deleted(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An in-place source edit after commit belongs to manual cleanup too."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    notes = old / "notes.txt"
+    notes.write_text("legacy", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_publish = store.publish_project_root_atomic
+
+    def publish_then_change(*args: object, **kwargs: object) -> bool:
+        updated = original_publish(*args, **kwargs)
+        if updated:
+            notes.write_text("changed after commit", encoding="utf-8")
+        return updated
+
+    monkeypatch.setattr(store, "publish_project_root_atomic", publish_then_change)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert notes.read_text(encoding="utf-8") == "changed after commit"
+    assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "legacy"
+
+
+def test_post_commit_identical_nested_file_replacement_is_not_deleted(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Replacing a nested file must not be hidden by identical content."""
+    old = tmp_path / "projects" / "alpha"
+    nested = old / "nested"
+    nested.mkdir(parents=True)
+    notes = nested / "notes.txt"
+    notes.write_text("same bytes", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_publish = store.publish_project_root_atomic
+
+    def publish_then_replace_nested_file(*args: object, **kwargs: object) -> bool:
+        updated = original_publish(*args, **kwargs)
+        if updated:
+            notes.unlink()
+            notes.write_text("same bytes", encoding="utf-8")
+        return updated
+
+    monkeypatch.setattr(store, "publish_project_root_atomic", publish_then_replace_nested_file)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert notes.read_text(encoding="utf-8") == "same bytes"
+    assert (tmp_path / ".raiker" / "projects" / "alpha" / "nested" / "notes.txt").read_text(
+        encoding="utf-8"
+    ) == "same bytes"
+
+
+def test_replacement_after_cleanup_check_is_not_deleted(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Cleanup must not delete a source swapped immediately after verification."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_is_unchanged = dashboard._source_is_unchanged
+    replaced = False
+
+    def replace_after_check(path: Path, identity: str) -> bool:
+        nonlocal replaced
+        unchanged = original_is_unchanged(path, identity)
+        if unchanged and path == old and not replaced:
+            replaced = True
+            old.rename(old.with_name("alpha-original"))
+            old.mkdir()
+            (old / "replacement.txt").write_text("do not delete", encoding="utf-8")
+        return unchanged
+
+    monkeypatch.setattr(dashboard, "_source_is_unchanged", replace_after_check)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert (old / "replacement.txt").read_text(encoding="utf-8") == "do not delete"
+
+
 def test_dashboard_startup_migrates_existing_legacy_project_roots(
     tmp_path: Path, store: SQLiteStore
 ) -> None:

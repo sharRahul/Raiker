@@ -9,6 +9,7 @@ import json
 import os
 import re
 import shutil
+import stat
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -649,7 +650,7 @@ def _copy_project_tree_exclusive(source: Path, destination: Path) -> None:
             raise OSError("project_root_special_file_not_migrated")
 
 
-_PROJECT_ROOT_RESERVATION = ".raiker-project-root-reservation.json"
+_PROJECT_ROOT_MIGRATION_DIR = "project-migrations"
 _PROJECT_ROOT_STAGE_TREE = "tree"
 _PROJECT_ROOT_STAGE_COMPLETE = ".complete"
 
@@ -705,8 +706,151 @@ def _read_reservation(path: Path) -> dict[str, str] | None:
     return data if isinstance(data, dict) and all(isinstance(value, str) for value in data.values()) else None
 
 
-def _stage_project_tree(source: Path, destination: Path) -> tuple[Path, Path]:
-    stage = destination.parent / f".{destination.name}.raiker-migration-{uuid4().hex}"
+def _project_migration_area(workspace: Path) -> Path:
+    """Return Raiker-owned staging storage, never a project file namespace."""
+    runtime = workspace / ".raiker"
+    area = runtime / _PROJECT_ROOT_MIGRATION_DIR
+    for directory in (runtime, area):
+        if _is_reparse_point(directory) or (directory.exists() and not directory.is_dir()):
+            raise OSError("project_migration_storage_invalid")
+    area.mkdir(parents=True, exist_ok=True)
+    if _is_reparse_point(area) or not area.is_dir():
+        raise OSError("project_migration_storage_invalid")
+    return area
+
+
+def _is_reparse_point(path: Path) -> bool:
+    try:
+        info = path.lstat()
+    except FileNotFoundError:
+        return False
+    return path.is_symlink() or bool(
+        getattr(info, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    )
+
+
+def _source_identity(source: Path) -> str | None:
+    """Return a stable content identity for a regular project tree."""
+    try:
+        before = source.stat(follow_symlinks=False)
+    except OSError:
+        return None
+    if source.is_symlink() or not source.is_dir():
+        return None
+    digest = hashlib.sha256()
+
+    def include_metadata(kind: bytes, relative: Path, info: os.stat_result) -> None:
+        digest.update(kind + b"\0" + relative.as_posix().encode() + b"\0")
+        digest.update(
+            f"{info.st_dev}:{info.st_ino}:{info.st_size}:{info.st_mtime_ns}:{info.st_ctime_ns}\0".encode()
+        )
+
+    include_metadata(b"directory", Path("."), before)
+
+    def include(directory: Path, relative: Path) -> bool:
+        try:
+            children = sorted(directory.iterdir(), key=lambda child: child.name)
+        except OSError:
+            return False
+        for child in children:
+            child_relative = relative / child.name
+            if child.is_symlink():
+                return False
+            if child.is_dir():
+                try:
+                    child_before = child.stat(follow_symlinks=False)
+                except OSError:
+                    return False
+                include_metadata(b"directory", child_relative, child_before)
+                if not include(child, child_relative):
+                    return False
+                try:
+                    child_after = child.stat(follow_symlinks=False)
+                except OSError:
+                    return False
+                if (
+                    child_before.st_dev,
+                    child_before.st_ino,
+                    child_before.st_size,
+                    child_before.st_mtime_ns,
+                    child_before.st_ctime_ns,
+                ) != (
+                    child_after.st_dev,
+                    child_after.st_ino,
+                    child_after.st_size,
+                    child_after.st_mtime_ns,
+                    child_after.st_ctime_ns,
+                ):
+                    return False
+                continue
+            if not child.is_file():
+                return False
+            try:
+                child_before = child.stat(follow_symlinks=False)
+                include_metadata(b"file", child_relative, child_before)
+                with child.open("rb") as reader:
+                    while chunk := reader.read(64 * 1024):
+                        digest.update(chunk)
+                child_after = child.stat(follow_symlinks=False)
+            except OSError:
+                return False
+            if (
+                child_before.st_dev,
+                child_before.st_ino,
+                child_before.st_size,
+                child_before.st_mtime_ns,
+                child_before.st_ctime_ns,
+            ) != (
+                child_after.st_dev,
+                child_after.st_ino,
+                child_after.st_size,
+                child_after.st_mtime_ns,
+                child_after.st_ctime_ns,
+            ):
+                return False
+        return True
+
+    if not include(source, Path(".")):
+        return None
+    try:
+        after = source.stat(follow_symlinks=False)
+    except OSError:
+        return None
+    if (before.st_dev, before.st_ino, before.st_mtime_ns, before.st_ctime_ns) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_mtime_ns,
+        after.st_ctime_ns,
+    ):
+        return None
+    return digest.hexdigest()
+
+
+def _source_is_unchanged(source: Path, identity: str) -> bool:
+    return _source_identity(source) == identity
+
+
+def _cleanup_migrated_source(source: Path, identity: str) -> None:
+    """Delete only the source tree that was verified, never its path replacement."""
+    if not _source_is_unchanged(source, identity):
+        return
+    quarantine = source.with_name(f".{source.name}.raiker-migration-cleanup-{uuid4().hex}")
+    try:
+        source.rename(quarantine)
+    except OSError:
+        return
+    if not _source_is_unchanged(quarantine, identity):
+        if not source.exists():
+            with contextlib.suppress(OSError):
+                quarantine.rename(source)
+        return
+    with contextlib.suppress(OSError):
+        shutil.rmtree(quarantine)
+
+
+def _stage_project_tree(source: Path, migration_area: Path) -> tuple[Path, Path]:
+    stage = migration_area / uuid4().hex
     stage.mkdir()
     tree = stage / _PROJECT_ROOT_STAGE_TREE
     tree.mkdir()
@@ -734,7 +878,7 @@ def _new_reservation(
 
 
 def _reservation_tree(
-    workspace: Path, destination: Path, reservation: dict[str, str], project_id: str, raw_root: str
+    workspace: Path, migration_area: Path, reservation: dict[str, str], project_id: str, raw_root: str
 ) -> tuple[Path, Path] | None:
     if reservation.get("project_id") != project_id or reservation.get("raw_root") != raw_root:
         return None
@@ -756,9 +900,9 @@ def _reservation_tree(
     if not hmac.compare_digest(authentication, expected):
         return None
     stage_name = reservation.get("stage_name", "")
-    if not stage_name.startswith(f".{destination.name}.raiker-migration-") or "/" in stage_name or "\\" in stage_name:
+    if len(stage_name) != 32 or any(char not in "0123456789abcdef" for char in stage_name):
         return None
-    stage = destination.parent / stage_name
+    stage = migration_area / stage_name
     tree = stage / _PROJECT_ROOT_STAGE_TREE
     if stage.is_symlink() or tree.is_symlink() or not stage.is_dir() or not tree.is_dir():
         return None
@@ -767,17 +911,15 @@ def _reservation_tree(
     return stage, tree
 
 
-def _recover_empty_reservation(
-    workspace: Path, destination: Path, project_id: str, raw_root: str
+def _find_reservation(
+    workspace: Path, migration_area: Path, project_id: str, raw_root: str
 ) -> tuple[dict[str, str], Path, Path] | None:
-    if any(destination.iterdir()):
-        return None
     candidates: list[tuple[dict[str, str], Path, Path]] = []
-    for sidecar in destination.parent.glob(f".{destination.name}.raiker-migration-*.json"):
+    for sidecar in migration_area.glob("*.json"):
         reservation = _read_reservation(sidecar)
         if reservation is None:
             continue
-        staged = _reservation_tree(workspace, destination, reservation, project_id, raw_root)
+        staged = _reservation_tree(workspace, migration_area, reservation, project_id, raw_root)
         if staged is not None:
             candidates.append((reservation, *staged))
     return candidates[0] if len(candidates) == 1 else None
@@ -833,14 +975,14 @@ def migrate_project_roots(
         if source.is_symlink() or destination.is_symlink():
             conflicts.append(project_id)
             continue
+        try:
+            migration_area = _project_migration_area(workspace)
+        except OSError:
+            conflicts.append(project_id)
+            continue
         owned_reservation = None
         if destination.exists() and destination.is_dir() and not destination.is_symlink():
-            reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
-            owned_reservation = (
-                _reservation_tree(workspace, destination, reservation, project_id, raw_root)
-                if reservation is not None
-                else _recover_empty_reservation(workspace, destination, project_id, raw_root)
-            )
+            owned_reservation = _find_reservation(workspace, migration_area, project_id, raw_root)
         if destination.exists() and (
             destination.is_symlink()
             or not destination.is_dir()
@@ -852,11 +994,16 @@ def migrate_project_roots(
         if source.exists() and not source.is_dir():
             conflicts.append(project_id)
             continue
+        source_identity = _source_identity(source) if source.exists() else None
+        if source.exists() and source_identity is None:
+            conflicts.append(project_id)
+            continue
 
         def publish(
             destination: Path = destination,
             destination_subpath: str = destination_subpath,
             source: Path = source,
+            migration_area: Path = migration_area,
             was_moved_with_parent: bool = was_moved_with_parent,
             project_id: str = project_id,
             raw_root: str = raw_root,
@@ -873,36 +1020,23 @@ def migrate_project_roots(
             revalidated = _contained_project_root(workspace, destination_subpath)
             if revalidated is None or revalidated[2] != destination:
                 raise OSError("project_root_destination_invalid")
+            if _project_migration_area(workspace) != migration_area:
+                raise OSError("project_migration_storage_invalid")
             if destination.exists():
                 if destination.is_symlink() or not destination.is_dir():
                     raise FileExistsError(destination)
-                reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
-                staged = (
-                    _reservation_tree(workspace, destination, reservation, project_id, raw_root)
-                    if reservation is not None
-                    else None
-                )
-                if staged is None and reservation is None:
-                    recovered = _recover_empty_reservation(
-                        workspace, destination, project_id, raw_root
-                    )
-                    if recovered is not None:
-                        reservation, _stage, tree = recovered
-                        _write_reservation(destination / _PROJECT_ROOT_RESERVATION, reservation)
-                        staged = _stage, tree
+                staged = _find_reservation(workspace, migration_area, project_id, raw_root)
                 if staged is not None:
-                    _copy_project_tree_resuming(source if source.exists() else staged[1], destination)
+                    _copy_project_tree_resuming(source if source.exists() else staged[2], destination)
                     return
                 if was_moved_with_parent and not source.exists():
                     return
                 raise FileExistsError(destination)
 
-            stage, tree = _stage_project_tree(source, destination)
+            stage, tree = _stage_project_tree(source, migration_area)
             reservation = _new_reservation(workspace, project_id, raw_root, stage.name)
-            sidecar = destination.parent / f".{destination.name}.raiker-migration-{uuid4().hex}.json"
-            _write_reservation(sidecar, reservation)
+            _write_reservation(migration_area / f"{reservation['reservation_id']}.json", reservation)
             destination.mkdir()
-            _write_reservation(destination / _PROJECT_ROOT_RESERVATION, reservation)
             _copy_project_tree_resuming(tree, destination)
 
         try:
@@ -918,9 +1052,8 @@ def migrate_project_roots(
         if updated:
             migrated.append(project_id)
             managed_roots.append(relative)
-            if source.exists():
-                with contextlib.suppress(OSError):
-                    shutil.rmtree(source)
+            if source_identity is not None:
+                _cleanup_migrated_source(source, source_identity)
         else:
             conflicts.append(project_id)
     return ProjectRootMigrationReport(tuple(migrated), tuple(conflicts), tuple(unchanged))

@@ -99,6 +99,16 @@
   --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-shell: 240ms;
 
+  /* Desktop canvases share one vocabulary. A view chooses the kind of work it
+     contains; it does not invent a width from the monitor it happens to be on. */
+  --page-reading: 72rem;
+  --page-workspace: 90rem;
+  --page-operational: 112rem;
+  --prose-measure: 68ch;
+  --grid-columns: 12;
+  --grid-gap: var(--space-4);
+  --content-gutter: clamp(1.25rem, 2vw, 2.5rem);
+
   /* ── Type scale ──
      A modular scale at 1.22, anchored on the 15px body. The old headings sat at
      1.45 / 1.08 / 0.95rem — barely separated, so heading level was carried by
@@ -486,14 +496,18 @@ h4 {
 h1.display,
 h2.display {
   font-family: var(--font-serif);
-  /* The scale step is the ceiling, not a fixed size: at 375px a 1.82rem serif
-     greeting wraps to three lines and pushes the page it is introducing off
-     screen. Clamping here rather than in each view is what stops every page
-     that wants display type from inventing its own responsive rule. */
-  font-size: clamp(1.45rem, 3.2vw, var(--text-display));
+  font-size: var(--text-display);
   font-weight: 500;
   letter-spacing: var(--tracking-tight);
   line-height: 1.2;
+}
+
+@media (max-width: 420px) {
+  .display,
+  h1.display,
+  h2.display {
+    font-size: var(--text-2xl);
+  }
 }
 
 /* Named steps, so a view reaches for the scale rather than inventing 0.83rem. */

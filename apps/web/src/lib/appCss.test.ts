@@ -61,6 +61,14 @@ describe("global mobile accessibility styles", () => {
 // lists, and hover treatments. These guards keep them token-only: a primitive
 // that hard-codes a colour would break theme parity without any view changing.
 describe("shared design primitives", () => {
+  it("defines the shared desktop canvas and twelve-column grid tokens", () => {
+    expect(stylesheet).toContain("--page-reading: 72rem");
+    expect(stylesheet).toContain("--page-workspace: 90rem");
+    expect(stylesheet).toContain("--page-operational: 112rem");
+    expect(stylesheet).toContain("--grid-columns: 12");
+    expect(stylesheet).toContain("--grid-gap: var(--space-4)");
+  });
+
   it("defines the primitives views are expected to reuse", () => {
     for (const selector of [
       ".card-interactive",

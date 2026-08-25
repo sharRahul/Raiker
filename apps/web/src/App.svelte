@@ -54,9 +54,16 @@
   let navigationTrigger = $state<HTMLElement | null>(null);
   let appMain = $state<HTMLElement>();
   const pageLayout = $derived(
-    current === "new-chat" || current === "search-chat" || current === "guide"
-      ? "reading" as const
-      : "workspace" as const,
+    current === "new-chat" || current === "build"
+      ? "work-surface" as const
+      : current === "search-chat" || current === "guide"
+        ? "reading" as const
+        : current === "models" || current === "extensions" || current === "observe" ||
+            current === "home" || current === "tasks" || current === "projects" ||
+            current === "memory" || current === "brain" || current === "approvals" ||
+            current === "capabilities"
+          ? "operational" as const
+          : "workspace" as const,
   );
 
   function toggleNavigation(trigger: HTMLElement) {
@@ -353,7 +360,7 @@
        reports its offset as root overflow, which some browsers answer with a
        stray page scrollbar. */
     position: relative;
-    padding: var(--space-5) var(--space-6);
+    padding: var(--space-5) var(--content-gutter);
     background: var(--bg);
     /* The room a page has between the topbar and the bottom of the viewport.
        Views that pin a footer — a chat composer — size themselves from this

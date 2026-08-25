@@ -4,6 +4,8 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import SettingsView from "./SettingsView.svelte";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,6 +46,38 @@ function stubApi(options: { failPut?: boolean } = {}) {
 }
 
 describe("supported-preferences settings", () => {
+  it("separates Personal and System sections into labelled groups", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice" } });
+    const personal = screen.getByRole("group", { name: "Personal settings" });
+    const system = screen.getByRole("group", { name: "System settings" });
+    expect(within(personal).getByRole("button", { name: "Account" })).toBeVisible();
+    for (const label of ["Web access", "Git credential", "Runtime configuration"]) {
+      expect(within(system).getByRole("button", { name: label })).toBeVisible();
+      expect(within(personal).queryByRole("button", { name: label })).toBeNull();
+    }
+  });
+
+  it.each([
+    ["general", "General"], ["notification", "Notifications"],
+    ["personalisation", "Personalisation"], ["security", "Security & sign-in"],
+    ["privacy", "Privacy"], ["account", "Account"], ["web-access", "Web access"],
+    ["git-credential", "Git credential"], ["runtime", "Runtime configuration"],
+  ])("renders the %s deep link with its named heading", async (tab, heading) => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice", tab } });
+    expect(await screen.findByRole("heading", { name: heading })).toBeInTheDocument();
+  });
+
+  it("uses fixed settings spacing rather than viewport-scaled padding", () => {
+    for (const file of ["General", "Personalisation", "Privacy", "Account", "Runtime"]) {
+      const source = readFileSync(resolve(process.cwd(), `src/lib/views/settings/${file}.svelte`), "utf8");
+      expect(source).not.toMatch(/clamp\([^)]*vw/);
+    }
+    const shell = readFileSync(resolve(process.cwd(), "src/lib/views/SettingsView.svelte"), "utf8");
+    expect(shell).not.toMatch(/margin:\s*var\(--space-5\) 0 0 16rem/);
+  });
+
   it("opens the runtime section from a supported deep link", async () => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab: "runtime" } });

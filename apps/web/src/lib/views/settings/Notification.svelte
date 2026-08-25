@@ -15,7 +15,7 @@
   }
 </script>
 
-<h2>Notification</h2>
+<h2>Notifications</h2>
 
 <section class="card">
   <h3>Alerts</h3>

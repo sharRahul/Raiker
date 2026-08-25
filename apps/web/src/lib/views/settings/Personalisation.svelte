@@ -94,7 +94,7 @@
   .section-heading { margin-bottom:var(--space-4); }
   .section-heading h2,.card-heading h3 { margin:0; }
   .section-heading p,.card-heading p { color:var(--text-2); margin:.3rem 0 0; }
-  .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:clamp(1.25rem, 3vw, 2rem); margin-bottom:var(--space-4); }
+  .settings-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--r-lg); padding:var(--card-pad-y) var(--card-pad-x); margin-bottom:var(--space-4); }
   .row {
     display: flex;
     gap: var(--space-2);

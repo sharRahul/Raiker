@@ -141,18 +141,21 @@
 
 <div class="settings-layout">
   <nav class="section-rail" aria-label="Settings sections">
-    <p class="rail-group">Personal</p>
-    {#each SECTIONS as section (section.id)}
-      {#if section.group === "System" && section.id === "runtime"}<p class="rail-group system-group">System</p>{/if}
-      <button
-        type="button"
-        class="rail-item"
-        class:active={active === section.id}
-        aria-current={active === section.id ? "page" : undefined}
-        onclick={() => selectSection(section.id)}
-      >
-        <Icon name={section.icon} size={17} /><span>{section.label}</span>{#if dirtySections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
-      </button>
+    {#each ["Personal", "System"] as group}
+      <div class="rail-section" role="group" aria-label={`${group} settings`}>
+        <p class="rail-group">{group}</p>
+        {#each SECTIONS.filter((section) => section.group === group) as section (section.id)}
+          <button
+            type="button"
+            class="rail-item"
+            class:active={active === section.id}
+            aria-current={active === section.id ? "page" : undefined}
+            onclick={() => selectSection(section.id)}
+          >
+            <Icon name={section.icon} size="md" /><span>{section.label}</span>{#if dirtySections.includes(section.id)}<span class="dirty-dot" aria-label="Unsaved changes"></span>{/if}
+          </button>
+        {/each}
+      </div>
     {/each}
   </nav>
 
@@ -176,19 +179,18 @@
     {:else}
       <Runtime {principal} {settings} {save} />
     {/if}
+    {#if dirty}
+      <div class="save-bar" role="region" aria-label="Unsaved settings changes">
+        <strong>You have unsaved changes</strong>
+        <div><button class="btn btn-ghost" type="button" onclick={discard}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push}>Save changes</button></div>
+      </div>
+    {/if}
   </div>
 </div>
 
-{#if dirty}
-  <div class="save-bar" role="region" aria-label="Unsaved settings changes">
-    <strong>You have unsaved changes</strong>
-    <div><button class="btn btn-ghost" type="button" onclick={discard}>Discard changes</button><button class="btn btn-primary" type="button" onclick={push}>Save changes</button></div>
-  </div>
-{/if}
-
 <style>
   .settings-header { margin-bottom: var(--space-5); }
-  .settings-header h2 { margin: 0 0 .25rem; font-size: clamp(1.35rem, 3vw, 1.8rem); }
+  .settings-header h2 { margin: 0 0 .25rem; font-size: var(--text-display); }
   .settings-header p { margin: 0; color: var(--text-2); }
   .save-status {
     min-height: 0;
@@ -199,9 +201,10 @@
   }
   .settings-layout {
     display: grid;
-    grid-template-columns: 14rem minmax(0, 58rem);
+    grid-template-columns: minmax(12rem, 14rem) minmax(0, 1fr);
     gap: var(--space-6);
     align-items: start;
+    max-width: 78rem;
   }
   .section-rail {
     display: flex;
@@ -210,6 +213,8 @@
     position: sticky;
     top: var(--space-4);
   }
+  .rail-section { display: grid; gap: 2px; }
+  .rail-section + .rail-section { margin-top: var(--space-4); }
   .rail-item {
     text-align: left;
     display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: .55rem;
@@ -233,9 +238,8 @@
     min-width: 0;
   }
   .rail-group { margin: var(--space-2) var(--space-3); color: var(--text-3); font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: .09em; }
-  .system-group { margin-top: var(--space-5); }
   .dirty-dot { width: .45rem; height: .45rem; border-radius: 50%; background: var(--warning); }
-  .save-bar { position: sticky; bottom: var(--space-3); z-index: 5; max-width: 58rem; margin: var(--space-5) 0 0 16rem; padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-2); }
+  .save-bar { position: sticky; bottom: var(--space-3); z-index: 5; width: 100%; margin-top: var(--space-5); padding: var(--space-3) var(--space-4); display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); border: 1px solid var(--accent-border); border-radius: var(--r-lg); background: var(--surface); box-shadow: var(--shadow-2); }
   .save-bar div { display: flex; gap: var(--space-2); }
   @media (max-width: 40rem) {
     .settings-layout {
@@ -246,7 +250,6 @@
       flex-wrap: wrap;
       position: static;
     }
-    .rail-group { width: 100%; }
-    .save-bar { margin-left: 0; }
+    .rail-section { width: 100%; }
   }
 </style>

@@ -64,7 +64,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
-    padding: clamp(1.25rem, 3vw, 2rem);
+    padding: var(--card-pad-y) var(--card-pad-x);
     margin-bottom: var(--space-4);
   }
   .toggle {

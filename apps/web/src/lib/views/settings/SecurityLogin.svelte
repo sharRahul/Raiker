@@ -297,7 +297,7 @@
 
 <section class="card" aria-labelledby="security-h">
   <GuideLink route="settings" />
-  <h2 id="security-h">Security &amp; Login</h2>
+  <h2 id="security-h">Security &amp; sign-in</h2>
 
   {#if notice}
     <p class="notice {notice.kind === 'ok' ? 'notice-ok' : 'notice-danger'}" role="status">

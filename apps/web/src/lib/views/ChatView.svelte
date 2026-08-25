@@ -1468,6 +1468,7 @@
       <EmptyState
         icon="chat"
         title={`What would you like to work on, ${userName}?`}
+        compactTitle="What can I help with?"
         body="Start with a question, a task, or a file."
         serif={true}
       />
@@ -1886,7 +1887,7 @@
             aria-label={streaming ? "Running" : "Send"}
           >
             <Icon name="send" size={15} />
-            {streaming ? "Running…" : "Send"}
+            <span class="send-label">{streaming ? "Running…" : "Send"}</span>
           </button>
         </div>
       </div>
@@ -2030,6 +2031,8 @@
     .composer-upper {
       flex-direction: column;
     }
+    .thread :global(.empty-body) { display: none; }
+    .thread :global(.empty) { padding-block: var(--space-5); }
   }
   /* On narrow screens the model picker wraps under the textarea even when the
      page layout hasn't hit the split-view breakpoint yet. */
@@ -2475,6 +2478,48 @@
   }
   .context-trigger:hover { border-color: var(--accent-border); color: var(--accent); }
   .context-trigger:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+  /* Kept after the base composer rules so compact declarations win without
+     changing a single desktop selector. */
+  @media (max-width: 63.9rem) {
+    .composer { flex-shrink: 0; padding-top: var(--space-2); }
+    .composer-card {
+      gap: .3rem;
+      padding: .55rem .6rem;
+      border-radius: 1rem;
+      box-shadow: none;
+    }
+    .prompt-input { min-height: 2.25rem; resize: none; }
+    .composer-bar { flex-wrap: nowrap; gap: .25rem; padding-top: .4rem; }
+    .bar-left, .bar-right { flex-wrap: nowrap; gap: .2rem; }
+    .bar-right { margin-left: auto; width: auto; justify-content: flex-end; }
+    .composer-scope, .context-control, .shortcut-hint { display: none; }
+    .send {
+      width: 2.75rem;
+      height: 2.75rem;
+      min-width: 2.75rem;
+      margin-left: 0;
+      padding: 0;
+      border-radius: 50%;
+    }
+    .send-label { display: none; }
+    :global(.composer-card .model-trigger) {
+      min-width: 2.75rem;
+      width: 2.75rem;
+      height: 2.75rem;
+      padding: 0;
+      justify-content: center;
+    }
+    :global(.composer-card .model-trigger > span),
+    :global(.composer-card .model-trigger > svg:last-child),
+    :global(.composer-card .approval-trigger > span),
+    :global(.composer-card .approval-trigger > svg:last-child) { display: none; }
+    :global(.composer-card .approval-trigger) {
+      width: 2.75rem;
+      height: 2.75rem;
+      padding: 0;
+      justify-content: center;
+    }
+  }
   @media (max-width: 720px) {
     .message-group {
       max-width: 88%;
@@ -2485,12 +2530,9 @@
      send button stranded from its group. */
   @media (max-width: 34rem) {
     .bar-right {
-      margin-left: 0;
-      width: 100%;
-      justify-content: flex-start;
-    }
-    .send {
       margin-left: auto;
+      width: auto;
+      justify-content: flex-end;
     }
   }
 </style>

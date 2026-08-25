@@ -41,5 +41,12 @@
   .copy strong { color: var(--text-1); }
   .draft { color: var(--text-3); }
   button { border: 1px solid var(--accent-border); border-radius: var(--r-pill); padding: .3rem .62rem; background: var(--surface); color: var(--text-1); font: inherit; font-size: .72rem; font-weight: 750; cursor: pointer; }
-  @media (max-width: 639px) { .readiness-strip { grid-template-columns: auto 1fr; } button { grid-column: 2; justify-self: start; } }
+  @media (max-width: 63.9rem) {
+    /* Revalidation does not block sending, so compact composers omit this
+       informational line. A real failure keeps the full actionable strip. */
+    .rechecking { display: none; }
+    .readiness-strip { grid-template-columns: auto minmax(0, 1fr) auto; gap: .45rem; padding: .45rem .5rem; }
+    .copy > span { display: none; }
+    button { grid-column: auto; justify-self: end; white-space: nowrap; }
+  }
 </style>

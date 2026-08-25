@@ -44,4 +44,22 @@ describe("stacked conversation layout", () => {
     expect(block).toMatch(/\.rail-slot\.drawer \{[\s\S]*?position: fixed;/);
     expect(block).toMatch(/\.rail-slot\.drawer \{[\s\S]*?inset: 0 0 0 auto;/);
   });
+
+  it("uses the same compact composer grammar in Chat and Build", () => {
+    for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
+      const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
+      expect(source).toMatch(/\.composer-card \{[\s\S]*?padding: \.55rem \.6rem;/);
+      expect(source).toMatch(/\.composer-bar \{ flex-wrap: nowrap;/);
+      expect(source).toMatch(/\.send \{[\s\S]*?width: 2\.75rem;/);
+      expect(source).toMatch(/\.send-label \{ display: none; \}/);
+      expect(source).toMatch(/\.shortcut-hint/);
+    }
+  });
+
+  it("removes Build-only secondary chrome from the default compact surface", () => {
+    const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", "BuildView.svelte"), "utf8");
+    expect(source).toMatch(/:global\(\.command-pane:not\(\.expanded\)\) \{ display: none; \}/);
+    expect(source).toMatch(/\.standing-wide \{ display: none; \}/);
+    expect(source).toContain("Auto follows your Permissions.");
+  });
 });

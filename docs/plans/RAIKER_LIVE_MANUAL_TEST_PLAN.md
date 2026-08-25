@@ -235,7 +235,9 @@ twenty-nine tabs.
 
 ### 4.3 Responsive [S]
 
-Resize to **375 px**, **390 px**, **768 px**, **1024 px**, **1440 px**,
+Resize to **360 × 800** and **412 × 915** Android phone profiles,
+**375 × 667** and **393 × 852** iPhone profiles, **768 × 1024** iPad mini,
+**800 × 1280** Android tablet, **1024 px**, **1440 px**,
 **1920 × 1080**, **3840 × 2160 (4K)**, and **7680 × 4320 (8K)**. Repeat in
 light and dark themes. At each size:
 
@@ -258,6 +260,14 @@ light and dark themes. At each size:
 - **MUST**: the selected tab is on the screen it was selected on — no tab strip
   scrolls its own selection out of view.
 - **MUST**: no composer floats mid-page; both stay anchored to the bottom.
+- **MUST**: below 1024 px, Chat and Build use the same compact composer grammar:
+  a short prompt area and one non-wrapping icon row with 44-pixel touch targets.
+  Build may add its mode control, but collapsed terminal, environment, project,
+  context, and shortcut prose do not occupy the default compact surface.
+- **MUST**: a real blocking model failure stays actionable but compact: one
+  summary plus **Set up model**. Non-blocking revalidation prose is absent.
+- **MUST**: Knowledge Map is not offered in compact navigation; Memory remains
+  present. At 1024 px and above Knowledge Map remains a normal desktop route.
 - **MUST**: the page body never scrolls horizontally.
 - **MUST**: the canvas, cards, code, logs, and messages retain generous padding
   and readable line length in every rail combination; no wide-margin focus state

@@ -20,12 +20,14 @@
   let {
     icon = "spark",
     title,
+    compactTitle = null,
     body = null,
     serif = true,
     action = undefined,
   }: {
     icon?: IconName;
     title: string;
+    compactTitle?: string | null;
     body?: string | null;
     serif?: boolean;
     action?: Snippet;
@@ -34,7 +36,10 @@
 
 <div class="empty motion-enter">
   <span class="empty-icon" aria-hidden="true"><Icon name={icon} size="xl" /></span>
-  <p class="empty-title" class:serif>{title}</p>
+  <p class="empty-title" class:serif>
+    <span class:wide-title={compactTitle !== null}>{title}</span>
+    {#if compactTitle !== null}<span class="compact-title">{compactTitle}</span>{/if}
+  </p>
   {#if body}
     <p class="empty-body">{body}</p>
   {/if}
@@ -77,6 +82,11 @@
     font-weight: 500;
     font-size: var(--text-xl);
     letter-spacing: var(--tracking-tight);
+  }
+  .compact-title { display: none; }
+  @media (max-width: 63.9rem) {
+    .wide-title { display: none; }
+    .compact-title { display: inline; }
   }
   .empty-body {
     font-size: var(--text-sm);

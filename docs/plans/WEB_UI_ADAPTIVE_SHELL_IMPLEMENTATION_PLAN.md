@@ -6,6 +6,13 @@
 and verified as one release candidate. The procedural checklist below is kept
 as the reproducible build record; completion evidence is summarized at the end.
 
+**Compact conversation refinement — 2026-08-25.** Chat and Build now use the
+same minimalist composer grammar below 1024 CSS pixels. Secondary project,
+context, environment, shortcut, and collapsed-terminal chrome is removed from
+the default compact surface; required failure recovery and Build mode posture
+remain available. Knowledge Map is intentionally omitted from compact
+navigation because its graph canvas is not a credible phone/tablet surface.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the approved low-saturation palette, desktop reflow/focus
@@ -30,6 +37,11 @@ Testing Library, Playwright, FastAPI guide assets, Markdown.
   its width.
 - Support and visually verify `390 × 844`, `1920 × 1080`, `3840 × 2160`, and
   `7680 × 4320`; keep assertion coverage at 768/834, 1024, and 1440 widths.
+- Treat compact support as an operating-system-neutral CSS-pixel contract. Test
+  `375 × 667` and `393 × 852` iPhones, `360 × 800` and `412 × 915` Android
+  phones, `768 × 1024` iPad mini, and `800 × 1280` Android tablet viewports.
+  Compact composers and every visible descendant must remain within each
+  viewport with touch actions at least 44 CSS pixels in both dimensions.
 - Preserve every supplied light/dark palette value. Because dark `#64748B` on
   `#12161F` is below 4.5:1, expose it as `--palette-secondary` for non-text or
   independently conforming large-text use and use `#94A3B8` for normal muted
@@ -565,10 +577,20 @@ an empty completion commit.
 | Area | Result |
 |---|---|
 | Independent gate | Design and implementation plan both approved after two revision cycles; implementation began only after approval. |
-| Web unit/type/lint | ESLint and Svelte check clean; 111 Vitest files passed with 974 tests passing and one intentional skip. |
-| Browser verification | Seven mocked Playwright scenarios passed; the real-host live sweep passed all eight size/theme matrices with zero overflow, icon, selected-tab, console, theme, or centering failures. |
+| Web unit/type/lint | ESLint and Svelte check clean; 111 Vitest files passed with 977 tests passing and one intentional skip after the compact refinement. |
+| Browser verification | Eight mocked Playwright scenarios passed; the real-host full catalogue sweep passed all eight size/theme matrices, followed by a focused mobile light/dark Chat/Build sweep with descendant containment checks. |
 | Screenshot catalogue | 208 viewport-only PNGs: 26 route/tab states × mobile/1080p/4K/8K × light/dark. PNG dimensions are asserted from IHDR. |
 | Python | Full pytest suite passed with CI's SQLCipher memory-security override; the two SQLCipher posture files also passed separately with the override removed. Ruff, mypy, and compileall passed. |
 | Native | `cargo fmt --check`, Clippy with warnings denied, and all Rust tests passed. |
 | Documentation/governance | Repository documentation consistency, phase/status, relative-link, and licensing checks passed. The memory guide is in the in-product reading order and its same-change maintenance contract is in the architecture plan. |
 | Visual review | Mobile Workbench, Memory, Build, and Settings plus 1080p Workbench and 8K Guide were inspected at rendered/original resolution. A narrow Memory posture-card defect was fixed and all eight Memory variants were re-captured. |
+
+## Compact conversation refinement evidence
+
+| Requirement | Implemented contract | Evidence |
+|---|---|---|
+| Less mobile text | Compact empty states use one short question; non-blocking revalidation, shortcut prose, project/context selectors, environment label, and collapsed terminal are absent from the default composer. A blocking model failure keeps only its summary and recovery action. | `EmptyState.svelte`, `ModelReadinessStrip.svelte`, compact CSS in Chat/Build, live light/dark captures. |
+| Chat/Build consistency | Both use a border-only composer, two-line prompt field, one non-wrapping icon row, circular 44-pixel Send action, compact model and approval controls, and the same header actions. Build adds only its repository and per-turn mode controls. | `ConversationLayout.test.ts` and `composer.spec.ts`. |
+| Brain mobile boundary | Knowledge Map remains a desktop route but is not rendered as a compact navigation option. Memory remains available. | `Sidebar.test.ts` and the six-device Playwright matrix. |
+| iOS/Android/tablet fit | Six representative CSS-pixel viewports assert no horizontal overflow, composer/control containment, and 44-pixel Send targets for both surfaces. | `composer.spec.ts`; real-host `390 × 844` light/dark captures additionally assert the lowest visible composer descendant stays on-screen. |
+| Desktop non-regression | Every new visual rule is scoped to `max-width: 63.9rem`; no 1080p, 4K, or 8K screenshot was regenerated or changed. | Git diff contains only the four mobile Chat/Build PNGs. |

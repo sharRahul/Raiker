@@ -1195,7 +1195,7 @@
           aria-controls="build-rail"
         >
           <Icon name="panel" size={15} />
-          {railOpen ? "Hide background work" : "Background work"}
+          <span class="rail-label">{railOpen ? "Hide background work" : "Background work"}</span>
         </button>
       </div>
     </header>
@@ -1224,6 +1224,7 @@
         <EmptyState
           icon="code"
           title="What should we build?"
+          compactTitle="What should we build?"
           body={activeRepo === null
             ? "Connect a repository to give Raiker something to work in, or just describe what you want and start from nothing."
             : `Working in ${activeRepo.label}. Describe the change, and pick how much Raiker may do on its own.`}
@@ -1497,8 +1498,8 @@
              nothing it has not read. -->
         {#if standingNote !== null}
           <p class="line-notice" role="status">
-            {standingNote}
-            <a href="#/capabilities">Change in Permissions →</a>
+            <span class="standing-wide">{standingNote} <a href="#/capabilities">Change in Permissions →</a></span>
+            <span class="standing-compact">Auto follows your Permissions.</span>
           </p>
         {/if}
 
@@ -1594,7 +1595,7 @@
               disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
             >
               <Icon name={streaming ? "clock" : "send"} size={15} />
-              {streaming ? "Working…" : "Send"}
+              <span class="send-label">{streaming ? "Working…" : "Send"}</span>
             </button>
           </div>
         </div>
@@ -2048,6 +2049,7 @@
     color: var(--text-3);
     line-height: 1.5;
   }
+  .standing-compact { display: none; }
   .error {
     margin: 0;
     font-size: 0.78rem;
@@ -2175,6 +2177,45 @@
     .composer-upper {
       flex-direction: column;
     }
+    .build-header { align-items: center; gap: var(--space-2); }
+    .repo-button { max-width: 100%; min-height: 2.75rem; padding-inline: .6rem; }
+    .header-actions { width: 100%; flex-wrap: nowrap; justify-content: flex-end; }
+    .rail-label { display: none; }
+    .thread :global(.empty-body) { display: none; }
+    .thread :global(.empty) { padding-block: var(--space-5); }
+    :global(.command-pane:not(.expanded)) { display: none; }
+    .composer { flex-shrink: 0; }
+    .composer-card {
+      gap: .3rem;
+      padding: .55rem .6rem;
+      border-radius: 1rem;
+      box-shadow: none;
+    }
+    .composer-card textarea { min-height: 2.25rem; resize: none; }
+    .composer-bar { flex-wrap: nowrap; gap: .25rem; padding-top: .4rem; }
+    .bar-left, .bar-right { flex-wrap: nowrap; gap: .2rem; }
+    .bar-right { margin-left: auto; }
+    .project-picker, .context-wrap, .shortcut-hint, :global(.composer-card .environment-badge) { display: none; }
+    .standing-wide { display: none; }
+    .standing-compact { display: inline; }
+    .send {
+      width: 2.75rem;
+      height: 2.75rem;
+      min-width: 2.75rem;
+      padding: 0;
+      border-radius: 50%;
+    }
+    .send-label { display: none; }
+    :global(.composer-card .model-trigger),
+    :global(.composer-card .approval-trigger),
+    :global(.composer-card .mode-trigger) { width: 2.75rem; height: 2.75rem; padding: 0; justify-content: center; }
+    :global(.composer-card .model-trigger) { min-width: 2.75rem; }
+    :global(.composer-card .model-trigger > span),
+    :global(.composer-card .model-trigger > svg:last-child),
+    :global(.composer-card .approval-trigger > span),
+    :global(.composer-card .approval-trigger > svg:last-child),
+    :global(.composer-card .mode-trigger > span),
+    :global(.composer-card .mode-trigger > svg:last-child) { display: none; }
   }
   @media (max-width: 30rem) {
     .composer-upper {

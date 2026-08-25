@@ -172,6 +172,7 @@
       <p class="group-label">{group.label}</p>
       <ul>
         {#each group.items as item (item.id)}
+          {#if !(compact && item.id === "brain")}
           <li>
             <a
               href={`#/${item.id}`}
@@ -186,6 +187,7 @@
               <span>{item.label}</span>
             </a>
           </li>
+          {/if}
         {/each}
       </ul>
       {#if group.label === "Work" && recent.length > 0}

@@ -26,6 +26,13 @@ describe("Sidebar navigation", () => {
     expect(active).toHaveAttribute("aria-current", "page");
   });
 
+  it("does not offer the Knowledge Map in compact navigation", () => {
+    render(Sidebar, { current: "new-chat", compact: true, drawerOpen: true });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    expect(within(nav).queryByRole("link", { name: "Knowledge Map" })).not.toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "Memory" })).toBeInTheDocument();
+  });
+
   it("shows the runtime scope and project license in the footer", () => {
     render(Sidebar, { current: "new-chat" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });

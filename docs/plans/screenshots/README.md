@@ -35,6 +35,15 @@ overflow, and reads the PNG header to prove its dimensions equal the viewport.
 Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
 automated layout assertions rather than additional committed screenshot classes.
 
+The mobile Chat and Build files were refreshed again on 2026-08-25 after the
+compact-conversation refinement. Only these four current-state files changed:
+`mobile-{light,dark}-{chat,build}.png`. The refinement is additionally exercised
+at iPhone `375 × 667`/`393 × 852`, Android phone `360 × 800`/`412 × 915`, iPad
+mini `768 × 1024`, and Android tablet `800 × 1280` in the mocked Playwright
+matrix. Those device profiles are assertions rather than new committed capture
+classes, so the catalogue remains exactly 208 PNGs and the desktop evidence is
+unchanged.
+
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.
 

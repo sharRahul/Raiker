@@ -204,6 +204,68 @@ test("both composers stay anchored to the bottom on a tablet, not floating mid-p
   }
 });
 
+test("minimal composers fit representative iPhone, Android, and tablet viewports", async ({ page }) => {
+  test.setTimeout(90_000);
+  const compactViewports = [
+    ["iPhone SE", 375, 667],
+    ["iPhone 15", 393, 852],
+    ["compact Android", 360, 800],
+    ["Pixel", 412, 915],
+    ["iPad mini", 768, 1024],
+    ["Android tablet", 800, 1280],
+  ] as const;
+
+  for (const [device, width, height] of compactViewports) {
+    await page.setViewportSize({ width, height });
+
+    for (const [route, label] of [["new-chat", "Prompt"], ["build", "Describe the change"]] as const) {
+      await page.goto(`http://raiker.test/#/${route}`);
+      await expect(page.getByLabel(label, { exact: true }), `${device} ${route} input`).toBeVisible();
+      const activeComposer = page.locator("form.composer:visible");
+      await expect(activeComposer.locator(".shortcut-hint"), `${device} ${route} shortcut prose`).toBeHidden();
+
+      const geometry = await page.evaluate(() => {
+        const composer = [...document.querySelectorAll("form.composer")]
+          .find((form) => (form as HTMLElement).offsetParent !== null)!;
+        const send = composer.querySelector("button[type=submit]")!.getBoundingClientRect();
+        const box = composer.getBoundingClientRect();
+        const descendantBottom = Math.max(...[...composer.querySelectorAll("*")]
+          .filter((node) => (node as HTMLElement).offsetParent !== null)
+          .map((node) => node.getBoundingClientRect().bottom));
+        return {
+          rootOverflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+          composerLeft: box.left,
+          composerRight: box.right,
+          composerBottom: box.bottom,
+          descendantBottom,
+          sendWidth: send.width,
+          sendHeight: send.height,
+        };
+      });
+      expect(geometry.rootOverflow, `${device} ${route} overflow`).toBeLessThanOrEqual(1);
+      expect(geometry.composerLeft, `${device} ${route} left edge`).toBeGreaterThanOrEqual(0);
+      expect(geometry.composerRight, `${device} ${route} right edge`).toBeLessThanOrEqual(width + 1);
+      expect(geometry.composerBottom, `${device} ${route} bottom edge`).toBeLessThanOrEqual(height + 1);
+      expect(geometry.descendantBottom, `${device} ${route} control bottom edge`).toBeLessThanOrEqual(height + 1);
+      expect(geometry.sendWidth, `${device} ${route} send width`).toBeGreaterThanOrEqual(44);
+      expect(geometry.sendHeight, `${device} ${route} send height`).toBeGreaterThanOrEqual(44);
+
+      if (route === "build") {
+        await expect(page.getByRole("button", { name: "Governed terminal" })).toBeHidden();
+        await expect(page.getByText("Auto follows your Permissions.")).toBeVisible();
+      }
+    }
+
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("http://raiker.test/#/new-chat");
+  await page.getByRole("button", { name: "Open navigation" }).click();
+  const navigation = page.getByRole("navigation", { name: "All navigation" });
+  await expect(navigation).toBeVisible();
+  await expect(navigation.getByRole("link", { name: "Knowledge Map" })).toHaveCount(0);
+});
+
 test("Chat and Build composers stay polished and usable", async ({ page }) => {
   const chat = page.getByLabel("Prompt", { exact: true });
   await expect(chat).toHaveAttribute("placeholder", "How can I help you today?");

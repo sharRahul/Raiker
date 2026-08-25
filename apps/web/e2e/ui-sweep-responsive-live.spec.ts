@@ -64,8 +64,13 @@ const CAPTURES = [
   ["4k", { width: 3840, height: 2160 }],
   ["8k", { width: 7680, height: 4320 }],
 ] as const;
-const ACTIVE_ROUTES = process.env.RAIKER_SWEEP_ROUTE
-  ? ROUTES.filter(([name]) => name === process.env.RAIKER_SWEEP_ROUTE)
+const selectedCaptures = new Set(process.env.RAIKER_SWEEP_CAPTURE?.split(",").map((name) => name.trim()).filter(Boolean));
+const ACTIVE_CAPTURES = selectedCaptures.size > 0
+  ? CAPTURES.filter(([name]) => selectedCaptures.has(name))
+  : CAPTURES;
+const selectedRoutes = new Set(process.env.RAIKER_SWEEP_ROUTE?.split(",").map((name) => name.trim()).filter(Boolean));
+const ACTIVE_ROUTES = selectedRoutes.size > 0
+  ? ROUTES.filter(([name]) => selectedRoutes.has(name))
   : ROUTES;
 const THEMES = ["light", "dark"] as const;
 
@@ -120,7 +125,7 @@ async function settle(page: import("@playwright/test").Page) {
 
 test.describe.configure({ mode: "serial" });
 
-for (const [label, viewport] of CAPTURES) {
+for (const [label, viewport] of ACTIVE_CAPTURES) {
   for (const theme of THEMES) {
   test(`every page fits at ${label} in ${theme}`, async ({ page }) => {
     test.setTimeout(900_000);
@@ -181,6 +186,18 @@ for (const [label, viewport] of CAPTURES) {
         });
         expect(bounds.width).toBeLessThanOrEqual(bounds.max + 1);
         expect(bounds.centeringError).toBeLessThanOrEqual(1);
+      }
+
+      if (label === "mobile" && (name === "chat" || name === "build")) {
+        const composerBottom = await page.locator("form.composer:visible").evaluate(
+          (node) => Math.max(
+            node.getBoundingClientRect().bottom,
+            ...[...node.querySelectorAll("*")]
+              .filter((child) => (child as HTMLElement).offsetParent !== null)
+              .map((child) => child.getBoundingClientRect().bottom),
+          ),
+        );
+        expect(composerBottom, `${name} composer bottom edge`).toBeLessThanOrEqual(viewport.height + 1);
       }
 
       const image = await page.screenshot({ path: `${SHOTS}/${label}-${theme}-${name}.png` });

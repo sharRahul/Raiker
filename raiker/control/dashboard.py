@@ -631,6 +631,7 @@ class ProjectRootMigrationReport:
     migrated: tuple[str, ...] = ()
     conflicts: tuple[str, ...] = ()
     unchanged: tuple[str, ...] = ()
+    retained_residues: tuple[str, ...] = ()
 
 
 def _copy_project_tree_exclusive(source: Path, destination: Path) -> None:
@@ -687,6 +688,29 @@ def _same_file(left: Path, right: Path) -> bool:
             if first_chunk != second.read(len(first_chunk)):
                 return False
         return not second.read(1)
+
+
+def _same_project_tree(left: Path, right: Path) -> bool:
+    """Return true only when two regular project trees have identical content."""
+    try:
+        left_children = sorted(left.iterdir(), key=lambda child: child.name)
+        right_children = sorted(right.iterdir(), key=lambda child: child.name)
+    except OSError:
+        return False
+    if [child.name for child in left_children] != [child.name for child in right_children]:
+        return False
+    for left_child, right_child in zip(left_children, right_children, strict=True):
+        if left_child.is_symlink() or right_child.is_symlink():
+            return False
+        if left_child.is_dir():
+            if not right_child.is_dir() or not _same_project_tree(left_child, right_child):
+                return False
+        elif left_child.is_file():
+            if not right_child.is_file() or not _same_file(left_child, right_child):
+                return False
+        else:
+            return False
+    return True
 
 
 def _write_reservation(path: Path, reservation: dict[str, str]) -> None:
@@ -831,22 +855,28 @@ def _source_is_unchanged(source: Path, identity: str) -> bool:
     return _source_identity(source) == identity
 
 
-def _cleanup_migrated_source(source: Path, identity: str) -> None:
-    """Delete only the source tree that was verified, never its path replacement."""
+def _retain_migrated_source(
+    workspace: Path, source: Path, identity: str, migration_area: Path
+) -> Path | None:
+    """Retain a verified legacy tree as recoverable, inactive migration residue."""
     if not _source_is_unchanged(source, identity):
-        return
-    quarantine = source.with_name(f".{source.name}.raiker-migration-cleanup-{uuid4().hex}")
+        return None
     try:
-        source.rename(quarantine)
+        if _project_migration_area(workspace) != migration_area:
+            return None
     except OSError:
-        return
-    if not _source_is_unchanged(quarantine, identity):
+        return None
+    residue = migration_area / f"residue-{uuid4().hex}"
+    try:
+        source.rename(residue)
+    except OSError:
+        return None
+    if not _source_is_unchanged(residue, identity):
         if not source.exists():
             with contextlib.suppress(OSError):
-                quarantine.rename(source)
-        return
-    with contextlib.suppress(OSError):
-        shutil.rmtree(quarantine)
+                residue.rename(source)
+        return None
+    return residue
 
 
 def _stage_project_tree(source: Path, migration_area: Path) -> tuple[Path, Path]:
@@ -868,7 +898,9 @@ def _new_reservation(
         "project_id": project_id,
         "raw_root": raw_root,
         "stage_name": stage_name,
-        "reservation_id": uuid4().hex,
+        "reservation_id": hmac.new(
+            ensure_app_key(workspace), f"{project_id}\0{raw_root}".encode(), hashlib.sha256
+        ).hexdigest(),
     }
     payload = json.dumps(reservation, separators=(",", ":"), sort_keys=True).encode()
     reservation["authentication"] = hmac.new(
@@ -922,7 +954,9 @@ def _find_reservation(
         staged = _reservation_tree(workspace, migration_area, reservation, project_id, raw_root)
         if staged is not None:
             candidates.append((reservation, *staged))
-    return candidates[0] if len(candidates) == 1 else None
+    if len(candidates) > 1:
+        raise OSError("project_migration_reservation_ambiguous")
+    return candidates[0] if candidates else None
 
 
 def migrate_project_roots(
@@ -937,6 +971,7 @@ def migrate_project_roots(
     migrated: list[str] = []
     conflicts: list[str] = []
     unchanged: list[str] = []
+    retained_residues: list[str] = []
     projects = store.list_projects()
     managed_roots: list[tuple[str, ...]] = [
         parsed[1]
@@ -980,13 +1015,22 @@ def migrate_project_roots(
         except OSError:
             conflicts.append(project_id)
             continue
-        owned_reservation = None
-        if destination.exists() and destination.is_dir() and not destination.is_symlink():
+        try:
             owned_reservation = _find_reservation(workspace, migration_area, project_id, raw_root)
+        except OSError:
+            conflicts.append(project_id)
+            continue
+        nested_duplicate = (
+            was_moved_with_parent
+            and source.exists()
+            and destination.exists()
+            and destination.is_dir()
+            and _same_project_tree(source, destination)
+        )
         if destination.exists() and (
             destination.is_symlink()
             or not destination.is_dir()
-            or (source.exists() and owned_reservation is None)
+            or (source.exists() and owned_reservation is None and not nested_duplicate)
             or (not source.exists() and owned_reservation is None and not was_moved_with_parent)
         ):
             conflicts.append(project_id)
@@ -1029,10 +1073,17 @@ def migrate_project_roots(
                 if staged is not None:
                     _copy_project_tree_resuming(source if source.exists() else staged[2], destination)
                     return
+                if was_moved_with_parent and source.exists() and _same_project_tree(source, destination):
+                    return
                 if was_moved_with_parent and not source.exists():
                     return
                 raise FileExistsError(destination)
 
+            pending = _find_reservation(workspace, migration_area, project_id, raw_root)
+            if pending is not None:
+                destination.mkdir()
+                _copy_project_tree_resuming(source if source.exists() else pending[2], destination)
+                return
             stage, tree = _stage_project_tree(source, migration_area)
             reservation = _new_reservation(workspace, project_id, raw_root, stage.name)
             _write_reservation(migration_area / f"{reservation['reservation_id']}.json", reservation)
@@ -1052,11 +1103,15 @@ def migrate_project_roots(
         if updated:
             migrated.append(project_id)
             managed_roots.append(relative)
-            if source_identity is not None:
-                _cleanup_migrated_source(source, source_identity)
+            if source_identity is not None and not was_moved_with_parent:
+                residue = _retain_migrated_source(workspace, source, source_identity, migration_area)
+                if residue is not None:
+                    retained_residues.append(str(residue.relative_to(workspace)).replace("\\", "/"))
         else:
             conflicts.append(project_id)
-    return ProjectRootMigrationReport(tuple(migrated), tuple(conflicts), tuple(unchanged))
+    return ProjectRootMigrationReport(
+        tuple(migrated), tuple(conflicts), tuple(unchanged), tuple(retained_residues)
+    )
 
 @dataclass(frozen=True)
 class ProjectsListView:

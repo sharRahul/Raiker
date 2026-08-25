@@ -33,6 +33,10 @@ def test_existing_project_root_moves_without_overwrite(tmp_path: Path, store: SQ
         encoding="utf-8"
     ) == "alpha"
     assert store.load_project("proj_a")["root_subpath"] == ".raiker/projects/alpha"
+    assert len(report.retained_residues) == 1
+    residue = tmp_path / report.retained_residues[0]
+    assert residue.parent == tmp_path / ".raiker" / "project-migrations"
+    assert (residue / "notes.txt").read_text(encoding="utf-8") == "alpha"
 
 
 def test_migration_preserves_a_user_file_named_like_legacy_reservation(
@@ -167,6 +171,83 @@ def test_replacement_after_cleanup_check_is_not_deleted(
 
     assert report.migrated == ("proj_a",)
     assert (old / "replacement.txt").read_text(encoding="utf-8") == "do not delete"
+
+
+def test_parent_commit_with_retained_legacy_tree_migrates_nested_child(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A child duplicated by its committed parent must not remain conflicted."""
+    child = tmp_path / "projects" / "alpha" / "child"
+    child.mkdir(parents=True)
+    (child / "notes.txt").write_text("child", encoding="utf-8")
+    store.create_project("proj_parent", "Alpha", "projects/alpha")
+    store.create_project("proj_child", "Child", "projects/alpha/child", parent_id="proj_parent")
+    monkeypatch.setattr(dashboard, "_retain_migrated_source", lambda *_args: None)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert set(report.migrated) == {"proj_parent", "proj_child"}
+    assert report.conflicts == ()
+    assert store.load_project("proj_child")["root_subpath"] == ".raiker/projects/alpha/child"
+    assert (child / "notes.txt").read_text(encoding="utf-8") == "child"
+
+
+def test_retry_before_destination_claim_reuses_the_pending_reservation(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An interrupted pre-claim attempt must not create ambiguous reservations."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    destination = tmp_path / ".raiker" / "projects" / "alpha"
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_mkdir = Path.mkdir
+
+    def fail_claim(path: Path, *args: object, **kwargs: object) -> None:
+        if path == destination:
+            raise OSError("injected_before_destination_claim")
+        original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", fail_claim)
+    failed = migrate_project_roots(tmp_path, store)
+
+    assert failed.conflicts == ("proj_a",)
+    area = tmp_path / ".raiker" / "project-migrations"
+    assert len(list(area.glob("*.json"))) == 1
+
+    monkeypatch.undo()
+    resumed = migrate_project_roots(tmp_path, store)
+
+    assert resumed.migrated == ("proj_a",)
+    assert len(list(area.glob("*.json"))) == 1
+    assert (destination / "notes.txt").read_text(encoding="utf-8") == "legacy"
+
+
+def test_post_commit_invalid_migration_area_keeps_legacy_source(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retention must revalidate its owned area after the database commit."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_area = dashboard._project_migration_area
+    calls = 0
+
+    def swapped_area(workspace: Path) -> Path:
+        nonlocal calls
+        calls += 1
+        if calls == 3:
+            return tmp_path / "not-raiker-owned"
+        return original_area(workspace)
+
+    monkeypatch.setattr(dashboard, "_project_migration_area", swapped_area)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ("proj_a",)
+    assert report.retained_residues == ()
+    assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
 
 
 def test_dashboard_startup_migrates_existing_legacy_project_roots(

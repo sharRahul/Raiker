@@ -763,6 +763,156 @@ passage read — the one case here that would be a disclosure rather than a wron
 answer — and the unresolved-citation case in
 `tests/test_knowledge_map_graph.py`.
 
+---
+
+## Post-Stage J expansion backlog
+
+**Status: future improvements, not current reliability defects.** These items
+begin only after Stage J's pilot, benchmark, and independent assessment. Their
+architecture contract is
+[`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`](../architecture/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md#future-improvements--post-stage-j-expansion),
+and the capability-level roadmap entry is
+[`ADD-25`](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion).
+
+The order is deliberate: transactional publication must exist before Raiker
+creates more derived representations, and prompt budgets must be enforceable
+before the graph becomes wider.
+
+| ID | Area | Dependency | Completion proof |
+|---|---|---|---|
+| FME-01 | Snapshot isolation and atomic rollback | Stage I jobs/integrity | old-or-new generation under every injected failure; never mixed |
+| FME-02 | Context ranking and canonical serialization | Stage F evaluation, `RetrievalBudget` | hard budget compliance, deterministic bytes, measured quality curve |
+| FME-03 | Hot/warm/cold temporal tiering | FME-01 and FME-02 | idempotent movement and complete lifecycle/correction fan-out |
+| FME-04 | Polyglot boundary and polymorphic resolution | FME-01 and code-map adapters | versioned cross-language fixture corpus with ambiguity reporting |
+
+### FME-01 — Snapshot isolation and an atomic rollback state machine
+
+**Problem to prevent.** A scan that reads files while they are changing can
+produce a graph whose nodes describe different repository revisions. A failure
+after some projection writes can make that mixed state eligible unless
+publication is a separate atomic decision.
+
+**Contract.** Every scan records one virtual snapshot: VCS revision plus dirty
+file checksums/manifests where applicable. It writes into a staged generation
+while retrieval remains pinned to the last committed generation. Only after
+node/edge/vector/FTS counts, source revisions, and checksums validate does one
+transaction publish the generation pointer.
+
+The persisted state machine is:
+
+```text
+planned -> snapshot_acquired -> indexing -> validating -> committing -> committed
+                                      |             |
+                                      v             v
+                                rolling_back -> rolled_back
+                                      |
+                                      v
+                                    failed
+```
+
+Cancellation, lease loss, parser failure, validation mismatch, disk exhaustion,
+and process death enter rollback. Rollback is idempotent, deletes only the exact
+staged generation, releases the bounded scan lease, and never touches the last
+committed generation. Startup recovery completes rollback before admitting a
+new scan.
+
+**Owner-visible outcome.** Maintenance names the snapshot, current state,
+previous committed generation, failure cause, rollback result, and whether any
+retry is safe. “Failed” cannot mean “some new results may be live.”
+
+**Acceptance:** edit files concurrently and terminate the process at every
+transition; readers observe the old complete generation or the new complete
+generation. Duplicate delivery and repeated rollback leave no eligible orphan
+projection or abandoned lease.
+
+### FME-02 — Retrieval ranking, truncation, and serialization consistency
+
+**Problem to prevent.** A high-degree graph or long evidence passage can consume
+the prompt window even when every candidate is individually relevant. Different
+callers must not serialize the same graph differently or omit the provenance
+that makes it safe to use.
+
+**Contract.** `RetrievalBudget` sets hard node, edge, storage-byte, and token
+ceilings. Policy and scope filtering precede ranking. Eligible candidates then
+receive an observable deterministic score from query relevance, graph distance,
+recency, access frequency, evidence confidence, and correction authority.
+Lowest-ranked leaf candidates are removed first; no frequency or recency volume
+may outrank an authoritative active correction by itself.
+
+One versioned serializer emits stable IDs, typed edges, tier, temporal validity,
+trust labels, confidence, citations, and explicit untrusted-data delimiters in a
+deterministic order. It reserves budget for provenance and emits requested,
+eligible, included, and omitted counts with the reason for every omission class.
+
+**Owner-visible outcome.** The context meter says which budget applied, how many
+nodes/edges/tokens were included, what was truncated, and whether truncation may
+make the answer incomplete. The model never receives graph assertions without
+their source/trust metadata.
+
+**Acceptance:** byte-identical output for the same graph and serializer version;
+no budget overrun on adversarial high-degree graphs; round-trip parsing; no
+instruction-role ambiguity; and persisted Recall@k/MRR/nDCG/token curves for
+each supported budget profile.
+
+### FME-03 — Hot, warm, and cold temporal memory tiers
+
+**Problem to prevent.** Keeping every observation and granular relationship at
+full fidelity forever makes storage and retrieval grow without expressing which
+information has become stable architectural knowledge. Naive decay would solve
+that by destroying evidence.
+
+**Contract.** The hot epimemory tier holds granular observations, events, and
+edges for 0–90 days. Eligible evidence may condense into warm semantic
+generalisations such as `module_depends_on`. Owner-approved ADRs, architectural
+intent, and high-level relationships form cold core history. “Cold” means
+durable, not undeletable: correction, archive, forget, purge, retention, legal
+hold, and backup disposition apply to every tier.
+
+Before movement, the job previews source count, target facts, confidence,
+estimated storage/token change, expiry effect, and held records. A warm or cold
+record cites every source used and carries valid time. Changing or forgetting a
+source invalidates or recomputes derived representations in the same staged
+generation; source evidence is not removed before publication commits.
+
+**Owner-visible outcome.** Memory filters by tier, explains why a record moved,
+opens the evidence it condensed, shows its next retention action, and previews
+the impact of correction or forget across derived tiers.
+
+**Acceptance:** deterministic UTC handling at the 90-day boundary; idempotent
+reruns; legal-hold preservation; complete correction/archive/forget/purge fan-
+out; restore after archive; and retrieval results that identify their tier and
+original evidence.
+
+### FME-04 — Polyglot linker rules and polymorphic resolution
+
+**Problem to prevent.** A per-language AST stops at foreign-function, generated-
+binding, RPC, and dynamic-interface boundaries. Treating a matching name as a
+resolved call silently invents topology; ignoring it makes the code memory
+incomplete exactly where systems are composed.
+
+**Contract.** Versioned linker rules first cover Python ↔ Rust through PyO3 and
+TypeScript ↔ HTTP/RPC services. Each boundary record names producer, consumer or
+endpoint, language pair, mechanism, repository snapshot, evidence spans,
+resolver version, confidence, and one of `resolved`, `ambiguous`, or
+`unresolved`.
+
+Polymorphic resolution may use runtime traces to propose interface-to-
+implementation edges missed by static analysis. Observed edges remain labelled
+`runtime_observed`, retain reproducible trace evidence, and never auto-promote
+to cold history. A changed file, manifest, schema, or service contract
+invalidates only affected boundaries and re-runs them against one FME-01
+snapshot.
+
+**Owner-visible outcome.** Knowledge Map and code-map retrieval distinguish
+static, configured, generated, and runtime-observed edges; show ambiguity rather
+than selecting a convenient target; and open the exact evidence and resolver
+version behind each cross-language relationship.
+
+**Acceptance:** fixtures for PyO3 exports/imports, generated bindings,
+TypeScript clients, renamed endpoints, overloads, ambiguous dynamic interfaces,
+and a runtime-only implementation. Report precision, unresolved rate, ambiguous
+rate, invalidation scope, and zero stale edges after a snapshot change.
+
 
 Recorded so the entries above are read against the right baseline. Confirmed by
 reading the code and its tests on **2026-08-11**:

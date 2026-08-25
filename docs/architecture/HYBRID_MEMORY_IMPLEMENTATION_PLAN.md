@@ -396,6 +396,134 @@ dashboards and runbooks are exercised by people other than the implementer.
 published evidence supports that claim. “Best” remains a comparative claim and
 must be tied to a disclosed benchmark, population, and date.
 
+## Future improvements — post-Stage J expansion
+
+The following work starts only after Stage J evidence exists. It extends the
+same archive-first, evidence-bound model; it does not create a second memory
+authority, weaken lifecycle filtering, or turn inferred relationships into
+facts. Delivery is split into four independently measurable tracks so temporal
+tiering, language reach, prompt efficiency, and write safety cannot hide one
+another's regressions.
+
+### K1 — multi-tier memory decay and temporal tiering
+
+Memory moves between representations, not between trust levels. Every promoted
+record retains its stable source IDs, correction chain, scope, sensitivity,
+retention class, legal-hold state, and lifecycle audit history.
+
+| Tier | Purpose | Default horizon | Representation and movement rule |
+|---|---|---:|---|
+| Hot — Epimemory | Granular recent edges, observations, and tool/event logs | 0–90 days | High-fidelity metadata and source references. Eligible records condense only through an idempotent, owner-observable job; expiry and legal hold still win. |
+| Warm — Semantic Memory | Architectural generalisations such as `module_depends_on` | After hot-tier condensation | Evidence-bound summaries and typed edges. A warm fact must cite every hot source used, carry confidence and valid time, and be invalidated or recomputed when a source is corrected, forgotten, or purged. |
+| Cold — Core History / ADRs | Permanent architectural intent and high-level relationships | Indefinite or `until_forget` | Approved ADRs, decisions, and durable relationships. Cold means stable and high-value, never exempt from owner correction, forget, purge, or backup-disposition reporting. |
+
+The tiering job produces a preview containing source count, proposed warm/cold
+records, estimated token/storage change, expiry impact, and records protected
+by hold. Promotion is atomic: source evidence remains readable until the new
+representation and every projection mapping commit. Demotion or expiry never
+silently deletes an approved durable record.
+
+**Acceptance:** a 90-day boundary is deterministic in UTC; repeated tiering is
+idempotent; correction/archive/forget/purge fan out through every derived tier;
+legal hold prevents movement that would discard required evidence; retrieval
+can explain which tier supplied a result and open its original sources.
+
+### K2 — polyglot cross-language boundaries
+
+The code-memory graph gains explicit boundary records instead of pretending
+that per-language ASTs form a complete call graph.
+
+1. Add versioned linker rules for supported boundary mechanisms, beginning
+   with Python ↔ Rust through PyO3 and TypeScript ↔ HTTP/RPC services. A rule
+   records the producer symbol, consumer symbol or endpoint, language pair,
+   mechanism, repository revision, evidence locations, and resolver version.
+2. Represent unresolved and ambiguous targets as first-class states. A name or
+   route match is a candidate, not a call edge, until its evidence and
+   confidence meet the configured threshold.
+3. Add polymorphic resolution for dynamic interfaces missed by static parsing.
+   Runtime traces may propose interface-to-implementation edges, but proposals
+   remain distinct from statically proven edges and require reproducible trace
+   evidence. No runtime observation auto-promotes into cold history.
+4. Re-resolve only the affected boundary when a file, manifest, schema, or
+   service contract changes; invalidate edges whose evidence revision no
+   longer matches the workspace snapshot.
+
+**Acceptance:** fixtures cover PyO3 exports/imports, generated bindings,
+TypeScript service clients, renamed endpoints, ambiguous interfaces, and a
+dynamic implementation observable only at runtime. Every returned edge names
+its language pair, resolver, confidence, evidence, snapshot, and whether it is
+static, configured, or observed.
+
+### K3 — context optimisation and token-window controls
+
+`RetrievalBudget` becomes a hard contract shared by every retrieval leg and
+context serializer. Candidate collection may be broad; prompt material may not
+exceed the caller's node, edge, byte, or token allowance.
+
+1. Rank permitted candidates using a documented deterministic score composed
+   of recency, access/use frequency, graph distance, evidence confidence, and
+   query relevance. Policy filtering happens before scoring; tier is an
+   explanatory feature, not an authorization shortcut.
+2. Truncate over-budget graphs by removing the lowest-ranked leaf candidates
+   first while retaining provenance for every included assertion. Reserve a
+   fixed portion of the budget for source labels, corrections, and uncertainty
+   so content cannot crowd out its trust metadata.
+3. Standardize graph-to-prompt serialization with a versioned schema,
+   deterministic ordering, explicit delimiters, stable IDs, trust labels,
+   temporal validity, and an omission summary. The same graph and serializer
+   version must produce byte-identical context.
+4. Report requested, eligible, included, and omitted counts plus estimated and
+   actual tokens. Retrieval must say when budget truncation could make an
+   answer incomplete.
+
+**Acceptance:** adversarial high-degree graphs stay within budget; ordering is
+stable across runs; the most recent or frequent node cannot displace a closer
+authoritative correction solely through volume; serialization round-trips and
+contains no instruction-role ambiguity; evaluation records quality loss at
+each configured budget.
+
+### K4 — transaction safety and snapshot isolation
+
+An index build or workspace scan operates against a declared immutable view of
+the repository and memory authority. A mixed-revision graph must never become
+visible to retrieval.
+
+1. Acquire a bounded workspace scan lease and record a virtual snapshot ID
+   (VCS revision plus dirty-file manifests/checksums where available). Use
+   platform file locking only as a coordination mechanism; do not hold a broad
+   repository lock for the duration of parsing.
+2. Write nodes, edges, vectors, and FTS mappings into a staged generation. All
+   readers continue using the last committed generation until one atomic
+   pointer swap publishes the complete replacement.
+3. Drive scans through an explicit state machine:
+   `planned -> snapshot_acquired -> indexing -> validating -> committing ->`
+   `committed`, with `rolling_back -> rolled_back` and `failed` terminal paths.
+   Transitions and retry identity are persisted and audited.
+4. On cancellation, parser failure, validation mismatch, process loss, or disk
+   exhaustion, discard staged rows and artifacts, release the lease, and leave
+   the previous generation unchanged. Startup recovery resumes rollback rather
+   than guessing that a partial generation is valid.
+
+**Acceptance:** concurrent edits, duplicate jobs, forced termination at every
+state transition, validation failure, and out-of-space injection expose either
+the old complete generation or the new complete generation—never a mixture.
+Rollback is idempotent, leaves no eligible orphan projections, and reports the
+snapshot and last safe state to the owner.
+
+### Post-Stage J sequencing and governance
+
+| Order | Track | Dependency | Release evidence |
+|---:|---|---|---|
+| 1 | K4 transaction safety | Stage I maintenance jobs and integrity scanner | failure-injection matrix and generation-consistency report |
+| 2 | K3 context controls | Stage F evaluation and existing `RetrievalBudget` | budget/quality curves and deterministic serialization fixtures |
+| 3 | K1 temporal tiering | K4 atomic generations and K3 budget accounting | tier-transition, lifecycle-fan-out, and storage/token reports |
+| 4 | K2 polyglot boundaries | K4 snapshots; language-specific code-map adapters | cross-language fixture corpus and precision/ambiguity report |
+
+K4 comes first because tier movement and cross-language resolution both create
+multi-table projections. K3 follows so the larger graph has a bounded consumer.
+No track is complete from schema presence alone: its owner-visible controls,
+audit evidence, lifecycle fan-out, rollback path, and benchmark must all pass.
+
 ## Live-validation runbook and pending external actions
 
 The items below require a real deployment, people, or infrastructure outside

@@ -97,6 +97,8 @@ that would put Raiker ahead of the field.
 | [ADD-22](#add-22--a-structured-question-to-the-owner-mid-turn) | Tier 1 | Runtime / structured mid-turn question | Proposal |
 | [ADD-23](#add-23--governed-browser-control-as-a-narrow-tool-set) | Tier 3 | Browser / governed control | Proposal — owner decision |
 | [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
+| [ADD-25](#add-25--post-stage-j-memory-expansion) | Tier 4 | Memory / temporal, polyglot, context and transactions | Proposal — after Stage J |
+| [ADD-26](#add-26--a-premium-responsive-workspace-shell) | Tier 2 | Web UI / theme and adaptive navigation | Proposal |
 
 **2026-08-21 review against the reference platforms.** Evidence-bound graph
 review and visible checkpoint failure are proven meaningful differentiators and
@@ -931,6 +933,130 @@ two accessibility contracts for one capability. BUG-228 should close as
 
 **Beyond the reference platforms? YES — improvement**, and only if Raiker keeps
 the per-app permission the specification makes optional.
+
+---
+
+## ADD-25 — Post-Stage-J memory expansion
+
+**Status: proposed. Tier 4 (differentiation). Effort: very high — begins only
+after Stage J evidence.**
+
+**What exists today.** Raiker has an authoritative SQLite lifecycle, active-only
+lexical projections, source-versioned vector/graph mappings, correction and
+supersession, bounded `RetrievalBudget`, evidence-bound graph edges, and
+owner-started maintenance jobs. The complete contract and current Stage F–J
+status live in
+[`HYBRID_MEMORY_IMPLEMENTATION_PLAN.md`](../architecture/HYBRID_MEMORY_IMPLEMENTATION_PLAN.md).
+
+**What is missing.** The current model treats retained memories as one durable
+class, resolves code relationships primarily within a language, bounds the
+assembled result without a canonical graph serialization, and rebuilds
+projections without a published snapshot-generation isolation contract. Those
+limits become material only after the production evidence and corpus scale in
+Stage J exist.
+
+**The work.** Four separately accepted tracks:
+
+1. **Temporal tiering:** a 0–90-day hot epimemory tier, a condensed warm
+   semantic tier, and cold core history/ADRs. Movement preserves stable source
+   IDs, temporal validity, correction lineage, scope, sensitivity, holds, and
+   lifecycle fan-out; a tier is a representation, never a new authority.
+2. **Polyglot boundaries:** versioned linker rules for Python ↔ Rust/PyO3 and
+   TypeScript ↔ service calls, plus evidence-labelled polymorphic resolution
+   for runtime interface matches that static ASTs cannot prove. Ambiguity stays
+   visible and inferred edges never masquerade as static ones.
+3. **Context optimisation:** deterministic ranking by relevance, recency,
+   frequency, distance, and confidence; hard node/edge/byte/token ceilings;
+   provenance-reserved budget; and one versioned, byte-stable graph-to-prompt
+   serialization with an omission summary.
+4. **Transaction safety:** scans bind to an immutable workspace snapshot,
+   write a staged generation, validate it, and publish it through one atomic
+   pointer swap. A persisted rollback state machine removes partial work after
+   cancellation, crash, mismatch, or disk failure.
+
+**Ordering.** Transaction safety first, context controls second, temporal
+tiering third, and polyglot linking fourth. The first makes the other projection
+changes safe; the second prevents the larger graph from exhausting a turn's
+window. Schema-only delivery does not count.
+
+**Governed outcome.** An owner can see which tier, snapshot, resolver, and
+serializer supplied a recalled claim; open its evidence; understand what the
+budget omitted; and recover from a failed scan without exposing mixed or
+partial index state.
+
+**Evidence required.** Forced termination at every scan-state transition,
+idempotent rollback, lifecycle fan-out across tiers, adversarial high-degree
+budget tests, byte-stable serialization, and a cross-language fixture corpus
+that reports precision and ambiguity rather than only successful examples.
+
+**Beyond the reference platforms? YES — improvement.** The differentiator is
+not a bigger graph; it is a graph whose ageing, language boundaries, prompt
+cost, evidence, and transactional publication are all inspectable together.
+
+---
+
+## ADD-26 — A premium responsive workspace shell
+
+**Status: proposed. Tier 2 (experience). Effort: medium.**
+
+**What exists today.** Raiker has fifteen routes, a shared sidebar/top bar,
+mobile drawer navigation, theme tokens, independent application surfaces, and
+responsive checks at 375, 768, 1024, and 1440 pixels. The live test plan already
+requires no horizontal overflow and route-complete navigation.
+
+**What should change.** The shell becomes a quiet three-layer workspace: a
+low-saturation left navigation panel, a single control header, and a central
+canvas with generous reading margins. Status is communicated through text,
+icons, and luminance as well as hue; motion is restrained; and the desktop and
+mobile sidebars deliberately use different spatial models.
+
+**Canonical semantic palette.** Components consume named tokens rather than
+embedding these values locally.
+
+| Token | Premium dark | Premium light |
+|---|---|---|
+| app background | `#0B0D10` | `#F8FAFC` |
+| surface/card | `#12161F` | `#FFFFFF` |
+| muted border | `#1F242F` | `#E2E8F0` |
+| primary text | `#E2E8F0` | `#0F172A` |
+| secondary text | `#64748B` | `#475569` |
+| pass background | `#142E24` | `#E6F4EA` |
+| pass text | `#A7F3D0` | `#137333` |
+| deny background | `#3E1F11` | `#FCE8E6` |
+| deny text | `#FFEDD5` | `#C5221F` |
+
+**Desktop contract.** At the desktop breakpoint, each left or right sidebar
+occupies a fixed, predictable column (the primary rail defaults to 256 px) and
+reflows the central canvas. Collapsing a rail slides it fully out and recentres
+the canvas into a wide-margin focus state. Rails remain flat in document flow,
+separated by the muted one-pixel border, and scroll independently of the main
+workspace. A hidden rail's reveal control is discoverable by keyboard and focus,
+but visually recedes until pointer proximity or focus reveals it. Hover states
+shift only to a nearby surface tone; they do not glow or flash.
+
+**Mobile and small-screen contract.** The header is the stable anchor and owns a
+balanced menu trigger. Sidebars become isolated sliding drawers above the
+content, never reducing the canvas width or rewrapping its text. Opening a drawer
+adds a quiet scrim, traps focus, closes on Escape/back/scrim, restores focus to
+the trigger, and prevents background scroll. The workspace retains comfortable
+padding without sacrificing the readable width.
+
+**Motion and accessibility.** Drawer and reflow transitions use one tokenized
+`cubic-bezier` curve and no flashing, bounce, or heavy shadow. Reduced-motion
+preference removes travel while preserving state changes. Allowed and blocked
+states always include a label/icon, meet contrast requirements in both themes,
+and remain distinguishable in grayscale and common colour-vision simulations.
+
+**Governed outcome.** Long code, logs, and messages remain readable while the
+owner can choose navigation visibility without layout surprise. Desktop gains
+shared real estate and a total-focus state; small screens gain an overlay that
+never crushes the work; every route uses the same semantic colour vocabulary.
+
+**Evidence required.** Screenshot and interaction coverage at 375, 390, 768,
+1024, 1440, and 1920 pixels in light and dark themes; left/right rail state
+combinations; independent scrolling; focus trap/restoration; reduced motion;
+keyboard-only reveal; no horizontal overflow; token-value assertions; contrast
+checks; and zero console errors.
 
 ---
 

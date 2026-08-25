@@ -89,6 +89,8 @@ MEM-10's binding leg closed on 2026-08-25.
 | A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open |
 | Retention sweep | [FIXED-284](FIXED_ITEMS.md#fixed-284--nothing-expired-because-the-sweep-the-retention-classes-describe-was-never-offered) | **Closed 2026-08-25** — what is due is shown and the owner confirms it. No daemon, by design |
 | Owner-guided summarisation of a range | [backlog #9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
+| Post-Stage-J temporal tiers and bounded graph context | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-02/FME-03](MEMORY_RELIABILITY_PLAN.md#post-stage-j-expansion-backlog) | Future — begins only after Stage J evidence and atomic snapshot publication |
+| Premium responsive workspace shell | [ADD-26](TO_BE_ADDED.md#add-26--a-premium-responsive-workspace-shell) | Proposed — semantic palette, desktop reflow, and mobile overlay contract |
 | A structured question to the owner mid-turn | [backlog #17](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md#add-22--a-structured-question-to-the-owner-mid-turn) | Proposed — the model cannot ask *which did you mean* |
 | Tool rows do not survive a reload | [FIXED-287](FIXED_ITEMS.md#fixed-287--a-reopened-transcript-showed-the-answer-and-nothing-about-how-it-was-reached) | **Closed 2026-08-25** — rebuilt from `tool_actions` through the presentation function the live stream uses |
 | GAP-CHAT remainder | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | 7 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
@@ -142,6 +144,7 @@ into children routed to Chat or Build, under the same ownership.
 | Filtered domain egress unproven | [backlog #6](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
 | Remote supervisor install lifecycle | [backlog #22](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
 | No resolved call graph; textual find-references | [B10](GAP_BUILD_CHAT.md#b10--no-language-intelligence) | Open by design, stated |
+| Polyglot linker rules and polymorphic resolution | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-04](MEMORY_RELIABILITY_PLAN.md#fme-04--polyglot-linker-rules-and-polymorphic-resolution) | Future — evidence-labelled Python/Rust and TypeScript/service boundaries after snapshot isolation |
 | LSP surface | [BUG-227](TO_BE_FIXED.md#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Open — **decide whether Raiker wants one at all** |
 | Worktrees for parallel work | [backlog #27](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
 | GAP-BUILD remainder | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | 7 items (5 open, 2 partial) |

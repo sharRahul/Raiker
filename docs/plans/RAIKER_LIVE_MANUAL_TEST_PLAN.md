@@ -235,14 +235,35 @@ twenty-nine tabs.
 
 ### 4.3 Responsive [S]
 
-Resize to **375 px**, **768 px**, **1024 px** and **1440 px**. At each width:
+Resize to **375 px**, **390 px**, **768 px**, **1024 px**, **1440 px**, and
+**1920 px**. Repeat in light and dark themes. At each width:
 
-- **[S]** Below 640 px: a bottom bar plus drawer. To 1023 px: a menu trigger plus
-  drawer. At 1024 px and above: the full sidebar.
+- **[S]** Below 1024 px, each sidebar is a sliding overlay/drawer above the
+  workspace. It **MUST NOT** narrow the central canvas, rewrap its text, or move
+  the composer. A quiet scrim darkens the background without hiding it.
+- **[S]** At 1024 px and above, left and right sidebars occupy fixed columns and
+  reflow the central canvas. The primary left rail defaults to 256 px. Toggling
+  either rail changes the available workspace width; hiding both recentres and
+  expands the canvas into the total-focus state.
+- The control header remains the top anchor. On small screens it owns the menu
+  trigger; on desktop it keeps breadcrumbs and rail controls aligned without
+  becoming a second navigation region.
+- Desktop sidebars and the main workspace **MUST** scroll independently. Mobile
+  drawers trap focus, prevent background scrolling, close on Escape/back/scrim,
+  and restore focus to the trigger.
+- The hidden desktop reveal control may visually recede until top-left pointer
+  proximity, but **MUST** remain discoverable by keyboard focus and have an
+  accessible name.
 - **MUST**: the selected tab is on the screen it was selected on — no tab strip
   scrolls its own selection out of view.
 - **MUST**: no composer floats mid-page; both stay anchored to the bottom.
 - **MUST**: the page body never scrolls horizontally.
+- **MUST**: the canvas, cards, code, logs, and messages retain generous padding
+  and readable line length in every rail combination; no wide-margin focus state
+  makes prose span the full 1920-pixel viewport.
+- Toggle reduced motion. Rail and drawer state still changes, but translational
+  travel is removed. With motion enabled, every rail uses the same tokenized
+  `cubic-bezier` curve and no bounce, flash, or heavy shadow.
 
 ---
 
@@ -776,8 +797,33 @@ runtime*, Build to *Working in Build*.
 ## 17. Global chrome
 
 - **[S]** Sidebar: primary navigation, **More navigation**, **Recent chats**,
-  open and close on mobile.
+  desktop reflow and independent scrolling, mobile overlay/open/close, and focus
+  restoration.
 - **[S]** Top bar: **Active project**, **Notification panel**, **Host control**.
+- **[S]** The shell has three visually stable layers: low-saturation navigation,
+  one control header, and the central workspace canvas. Navigation recedes; it
+  never competes with code, logs, messages, or the current task.
+- **[S]** Inspect computed styles in both themes. Shared semantic tokens **MUST**
+  resolve exactly as follows; components may consume the tokens but **MUST NOT**
+  substitute route-local status colours:
+
+  | Token | Dark | Light |
+  |---|---|---|
+  | app background | `#0B0D10` | `#F8FAFC` |
+  | surface/card | `#12161F` | `#FFFFFF` |
+  | muted border | `#1F242F` | `#E2E8F0` |
+  | primary text | `#E2E8F0` | `#0F172A` |
+  | secondary text | `#64748B` | `#475569` |
+  | pass background / text | `#142E24` / `#A7F3D0` | `#E6F4EA` / `#137333` |
+  | deny background / text | `#3E1F11` / `#FFEDD5` | `#FCE8E6` / `#C5221F` |
+
+- **MUST**: pass/allowed and deny/blocked states use text and an icon in
+  addition to colour, meet contrast requirements, and remain distinguishable in
+  grayscale and common colour-vision simulations. Hover feedback is a subtle
+  surface/luminance shift—never a neon glow or aggressive status fill.
+- **MUST**: separation comes from the base/surface contrast and a one-pixel
+  muted border. Sidebars stay flat in the layout; no heavy drop shadow is used
+  to manufacture depth.
 - **Host control**: state, what a quit would interrupt, Pause, Restart, Quit, and
   **Install and updates**. **MUST**: opening it makes **no outbound request**.
 - **Keyboard shortcuts** sheet opens and closes.

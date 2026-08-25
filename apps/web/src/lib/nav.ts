@@ -1,34 +1,35 @@
 import type { IconName } from "./icons";
 
 export interface NavItem { id: string; label: string; icon: IconName; hint: string; }
-export interface NavGroup { label: string; items: NavItem[]; }
+export type NavGroupId = "core" | "knowledge" | "manage" | "observe" | "support";
+export interface NavGroup { id: NavGroupId; label: string; collapsible: boolean; items: NavItem[]; }
 
 // Stable workbench navigation: work objects stay together, governance lives in
 // one place, and read-first operational evidence is one destination rather than
 // three competing pages.
 export const NAV_GROUPS: NavGroup[] = [
-  { label: "Home", items: [{ id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" }] },
-  { label: "Work", items: [
+  { id: "core", label: "Core", collapsible: false, items: [
+    { id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
-    { id: "search-chat", label: "Search Chat", icon: "search", hint: "Search your chat history" },
+    { id: "search-chat", label: "Search chats", icon: "search", hint: "Browse or search your chat history" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
   ] },
-  { label: "Knowledge", items: [
+  { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
     { id: "brain", label: "Knowledge Map", icon: "spark", hint: "Governed workspace relationships and sources" },
   ] },
-  { label: "Control", items: [
+  { id: "manage", label: "Manage", collapsible: true, items: [
     { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, skills, hooks and plugins" },
   ] },
-  { label: "Observe", items: [
+  { id: "observe", label: "Observe", collapsible: true, items: [
     { id: "observe", label: "Observability", icon: "diagnostics", hint: "Readiness, audit log, checkpoints, live work, and notifications" },
   ] },
-  { label: "Utilities", items: [
+  { id: "support", label: "Support", collapsible: true, items: [
     { id: "guide", label: "Guide", icon: "info", hint: "How Raiker works, in the product" },
     { id: "settings", label: "Settings", icon: "settings", hint: "Runtime, security posture, appearance" },
   ] },

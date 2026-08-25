@@ -1,6 +1,6 @@
 // The full route list lives in the adaptive drawer so every governed route
 // stays available when phone and tablet controls take over.
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/svelte";
+import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar.svelte";
 import { NAV_ITEMS } from "../nav";
@@ -8,6 +8,7 @@ import { stubFetch } from "../test-helpers";
 
 afterEach(() => {
   vi.unstubAllGlobals();
+  localStorage.clear();
 });
 
 describe("Sidebar navigation", () => {
@@ -24,6 +25,27 @@ describe("Sidebar navigation", () => {
     render(Sidebar, { current: "observe" });
     const active = within(screen.getByRole("navigation", { name: "All navigation" })).getByRole("link", { name: "Observability" });
     expect(active).toHaveAttribute("aria-current", "page");
+  });
+
+  it("keeps Core visible and exposes the other sections as disclosures", () => {
+    render(Sidebar, { current: "models" });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    expect(within(nav).getByRole("link", { name: "Search chats" })).toBeVisible();
+    expect(within(nav).getByRole("button", { name: "Manage" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(nav).getByRole("button", { name: "Knowledge" })).toHaveAttribute("aria-expanded", "true");
+    expect(within(nav).getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("toggles and persists an inactive navigation group", async () => {
+    render(Sidebar, { current: "new-chat" });
+    const knowledge = screen.getByRole("button", { name: "Knowledge" });
+    expect(knowledge).toHaveAttribute("aria-expanded", "true");
+    await fireEvent.click(knowledge);
+    expect(knowledge).toHaveAttribute("aria-expanded", "false");
+    expect(localStorage.getItem("raiker.navigation.groups")).not.toContain("knowledge");
+    await fireEvent.click(knowledge);
+    expect(knowledge).toHaveAttribute("aria-expanded", "true");
+    expect(localStorage.getItem("raiker.navigation.groups")).toContain("knowledge");
   });
 
   it("does not offer the Knowledge Map in compact navigation", () => {
@@ -69,32 +91,13 @@ describe("Sidebar navigation", () => {
     expect(drawer).not.toHaveAttribute("aria-hidden");
   });
 
-  // BUG-10 — a task run stores a server-owned session (the Inbox). It belongs
-  // in Sessions and in Tasks, not in a list of conversations the owner had.
-  it("asks for conversations only when listing recent chats", async () => {
-    const fetchMock = stubFetch({
-      "GET /api/sessions": [
-        {
-          session_id: "sess_typed",
-          title: "Release checklist",
-          status: "open",
-          created_at: "2026-07-27T00:00:00Z",
-          updated_at: "2026-07-27T00:00:00Z",
-          turn_count: 2,
-          pinned: false,
-          tags: [],
-          project_id: null,
-          archived: false,
-          archived_at: null,
-          origin: "chat",
-        },
-      ],
-      "GET /api/projects": { projects: [], active_project_id: null },
-    });
+  it("does not load or render recent chats in navigation", async () => {
+    const fetchMock = stubFetch({});
     render(Sidebar, { current: "new-chat" });
-
-    await waitFor(() => expect(screen.getByText("Release checklist")).toBeInTheDocument());
+    await Promise.resolve();
+    expect(screen.queryByLabelText("Recent chats")).toBeNull();
     const requested = fetchMock.mock.calls.map(([url]) => String(url));
-    expect(requested.some((url) => url.startsWith("/api/sessions") && url.includes("origin=chat"))).toBe(true);
+    expect(requested.some((url) => url.startsWith("/api/sessions"))).toBe(false);
+    expect(requested.some((url) => url.startsWith("/api/projects"))).toBe(false);
   });
 });

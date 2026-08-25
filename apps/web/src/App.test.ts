@@ -54,7 +54,7 @@ describe("App shell", () => {
     for (const label of [
       "Workbench",
       "Chat",
-      "Search Chat",
+      "Search chats",
       "Approvals",
       "Tasks",
       "Permissions",

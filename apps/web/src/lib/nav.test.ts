@@ -19,14 +19,20 @@ describe("nav model", () => {
     expect(routeFromHash("#/nonsense")).toBe("home");
   });
 
-  it("uses the five stable workbench destinations plus utilities", () => {
-    expect(NAV_GROUPS.map((g) => g.label)).toEqual(["Home", "Work", "Knowledge", "Control", "Observe", "Utilities"]);
+  it("uses one direct Core section plus four discoverable groups", () => {
+    expect(NAV_GROUPS.map((g) => [g.id, g.label, g.collapsible])).toEqual([
+      ["core", "Core", false],
+      ["knowledge", "Knowledge", true],
+      ["manage", "Manage", true],
+      ["observe", "Observe", true],
+      ["support", "Support", true],
+    ]);
   });
 
   it("keeps Knowledge to what Raiker has stored", () => {
     // Checkpoints moved to Observe: rewind data is an operational record, not
     // knowledge the agent recalls.
-    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual(["memory", "brain"]);
+    expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual(["memory", "brain"]);
   });
 
   it("labels the capability gates as Permissions", () => {
@@ -37,7 +43,8 @@ describe("nav model", () => {
   });
 
   it("keeps work objects together", () => {
-    expect(NAV_GROUPS[1].items.map((i) => i.id)).toEqual([
+    expect(NAV_GROUPS[0].items.map((i) => i.id)).toEqual([
+      "home",
       "new-chat",
       "build",
       "search-chat",
@@ -46,8 +53,12 @@ describe("nav model", () => {
     ]);
   });
 
+  it("uses sentence case for the direct conversation browser", () => {
+    expect(navItem("search-chat").label).toBe("Search chats");
+  });
+
   it("consolidates the operational record into one Observe destination", () => {
-    expect(NAV_GROUPS[4].items.map((i) => i.id)).toEqual(["observe"]);
+    expect(NAV_GROUPS[3].items.map((i) => i.id)).toEqual(["observe"]);
     expect(HUB_TABS.observe).toEqual([
       "overview",
       "sessions",
@@ -60,7 +71,7 @@ describe("nav model", () => {
   });
 
   it("consolidates connectors and MCP into one Extensions destination", () => {
-    expect(NAV_GROUPS[3].items.map((i) => i.id)).toEqual([
+    expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual([
       "approvals",
       "capabilities",
       "models",

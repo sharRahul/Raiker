@@ -612,6 +612,13 @@ class PromptRequest:
     # Defaults to "chat" so an external REST client that has never heard of the
     # field gets the conservative surface rather than the coding one.
     surface: Literal["chat", "build"] = "chat"
+    # The project this turn may retrieve inside. Required by "build" and
+    # rejected for "chat", because the two surfaces have genuinely different
+    # boundaries and a request that leaves it to the server to guess is a
+    # request whose boundary nobody stated. It is sent explicitly on every turn
+    # rather than read from the account's active-project preference, so what the
+    # owner selected in Build is what the backend enforces.
+    project_id: str | None = None
     session_id: str | None = None
     planning_mode: str | None = None
     approval_mode: str | None = None

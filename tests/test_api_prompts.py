@@ -88,7 +88,12 @@ def test_prompt_input_provenance_defaults_to_typed_and_preserves_dictation(
 
     assert typed.prompt.metadata["input_mode"] == "typed"
     assert dictated.prompt.metadata["input_mode"] == "dictated"
-    assert set(dictated.prompt.metadata) == {"entry_command", "input_mode", "surface"}
+    assert set(dictated.prompt.metadata) == {
+        "entry_command",
+        "input_mode",
+        "surface",
+        "project_id",
+    }
 
 
 def test_prompt_surface_defaults_to_chat_and_is_validated(workspace: Path) -> None:

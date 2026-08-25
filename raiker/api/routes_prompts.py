@@ -173,6 +173,9 @@ def _build_envelope(
                 "entry_command": client.type,
                 "input_mode": normalize_input_mode(body.input_mode),
                 "surface": normalize_prompt_surface(body.surface),
+                # Carried on the turn, not looked up later: the boundary a turn
+                # ran under has to be part of what the turn recorded.
+                "project_id": (body.project_id or "").strip() or None,
             },
         ),
         options=options,
@@ -314,6 +317,57 @@ def _invalid_response(exc: Exception) -> AgentResponse:
     )
 
 
+def _resolve_turn_project(
+    body: PromptRequest, workspace: str | Path, principal: Principal
+) -> str | None:
+    """The project this turn may retrieve inside, or a 422 explaining why not.
+
+    Authenticate first, then resolve: an id naming another account's project is
+    reported exactly like an id naming nothing, so the response cannot be used
+    to discover which projects exist.
+    """
+    requested = (body.project_id or "").strip()
+    surface = (body.surface or "chat").strip()
+    if surface != "build":
+        if requested:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "chat_has_no_project_scope"},
+            )
+        return None
+    if not requested:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": "build_requires_project"},
+        )
+    store = SQLiteStore(workspace)
+    if store.load_project(requested, user_id=principal.delegated_by_user_id) is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": "build_project_not_found"},
+        )
+    return requested
+
+
+def _bind_session_project(
+    workspace: str | Path, session_id: str, project_id: str | None, principal: Principal
+) -> None:
+    """Record Build's selected project on the session it is working in.
+
+    Retrieval reads the boundary from the turn, so this is bookkeeping for the
+    conversation list rather than an authorization step -- but a Build session
+    that shows no project while running inside one would be lying about where
+    its work lives.
+    """
+    if not project_id:
+        return
+    store = SQLiteStore(workspace)
+    session = store.load_session(session_id)
+    if session is None or str(session.get("project_id") or "") == project_id:
+        return
+    store.set_session_project(session_id, project_id, user_id=principal.delegated_by_user_id)
+
+
 @router.post("/api/prompts")
 async def submit_prompt(
     body: PromptRequest,
@@ -325,10 +379,12 @@ async def submit_prompt(
         existing = SQLiteStore(_ws(request)).load_session(body.session_id)
         if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
+    turn_project_id = _resolve_turn_project(body, _ws(request), principal)
     try:
         envelope = _build_envelope(body, session.principal_id, _ws(request))
     except ContractValidationError as exc:
         return _invalid_response(exc).to_dict()
+    _bind_session_project(_ws(request), envelope.session_id, turn_project_id, principal)
     try:
         await _require_model_ready(
             request, session.principal_id, body.model_profile, body.model
@@ -376,6 +432,7 @@ async def stream_prompt(
         existing = SQLiteStore(_ws(request)).load_session(body.session_id)
         if existing is not None and existing.get("user_id") != principal.delegated_by_user_id:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unknown session")
+    turn_project_id = _resolve_turn_project(body, _ws(request), principal)
     try:
         envelope = _build_envelope(body, session.principal_id, _ws(request))
     except ContractValidationError as exc:
@@ -385,6 +442,8 @@ async def stream_prompt(
             yield _sse(StreamEvent(kind=FINAL, response=final))
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
+
+    _bind_session_project(_ws(request), envelope.session_id, turn_project_id, principal)
 
     try:
         await _require_model_ready(

@@ -1969,6 +1969,12 @@ class RuntimeOrchestrator:
             prompt_text=envelope.prompt.text,
             attachments=envelope.prompt.attachments,
             owner_principal_id=envelope.user.id,
+            # The turn states its own retrieval boundary. Reading it from the
+            # envelope rather than from stored session state is what makes Build's
+            # boundary enforced by the backend instead of by whichever UI
+            # happened to submit the turn.
+            surface=str(envelope.prompt.metadata.get("surface") or "chat"),
+            project_id=(str(envelope.prompt.metadata.get("project_id") or "") or None),
         )
         self._event(envelope, "context_gathered", bundle.event_payload())
 

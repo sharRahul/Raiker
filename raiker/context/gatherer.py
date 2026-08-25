@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from raiker.context.models import (
     PRIORITY_ORDER,
@@ -12,6 +14,7 @@ from raiker.context.models import (
 )
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
+from raiker.contracts.models import normalize_prompt_surface
 from raiker.memory.candidates import governed_memory_status
 from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.semantic import semantic_memory_status
@@ -61,6 +64,33 @@ DEFAULT_GATE_STATE = "disabled"
 DEFAULT_DECISION_MODE_NAME = "ask"
 
 
+class ContextScopeError(ValueError):
+    """A turn asked for a retrieval boundary that cannot be honoured.
+
+    Raised rather than silently widened: a Build turn with no project would
+    otherwise recall from every project the owner has, which is the one thing
+    Build's boundary exists to prevent.
+    """
+
+
+@dataclass(frozen=True)
+class RetrievalScope:
+    """The resolved boundary one turn may retrieve inside.
+
+    ``project_id`` is ``None`` for Chat, which has no project boundary, and a
+    concrete owned project id for Build, which must have exactly one.
+    """
+
+    surface: str
+    project_id: str | None
+
+    def __post_init__(self) -> None:
+        if self.surface == "build" and not self.project_id:
+            raise ContextScopeError("build_requires_project")
+        if self.surface == "chat" and self.project_id:
+            raise ContextScopeError("chat_has_no_project_scope")
+
+
 def _token_estimate(content: str) -> int:
     return max(1, len(content) // 4)
 
@@ -86,9 +116,38 @@ class ContextGatherer:
         prompt_text: str,
         attachments: list[dict[str, object]] | None = None,
         owner_principal_id: str | None = None,
+        surface: str = "chat",
+        project_id: str | None = None,
         max_items: int = 20,
         max_chars: int = 12000,
     ) -> ContextBundle:
+        """Assemble one turn's bounded context under an explicit retrieval boundary.
+
+        ``surface`` and ``project_id`` are the boundary, and they are arguments
+        rather than something inferred from stored state on purpose: the caller
+        has to say which one it wants, and this function -- not the visibility of
+        a UI selector -- is what enforces it.
+
+        * ``chat`` retrieves owner-wide: every approved memory, every managed
+          file the owner has imported, and any of their prior conversations.
+        * ``build`` requires exactly one project and retrieves account memory,
+          account memory files, that project's memory and files, and only the
+          conversations assigned to it. Another project's material, and an
+          unassigned conversation, are out of scope.
+
+        A ``build`` request without a project fails closed rather than quietly
+        widening to owner-wide recall. The requirement is checked once the
+        account is resolved, because it is a rule about *which owned project's*
+        material may be recalled: a caller that is not a local account recalls
+        nothing owner-scoped in the first place, so there is no boundary there
+        to partition and demanding a project would refuse a turn for a
+        protection it is not receiving either way.
+        """
+        surface = normalize_prompt_surface(surface)
+        if surface == "chat":
+            # Chat has no project boundary at all, so carrying one would be a
+            # boundary nobody asked for and nothing enforces consistently.
+            project_id = None
         root = Path(workspace_root).resolve()
         store = SQLiteStore(root)
         # Only a real account scopes a turn. Every source below keys off this
@@ -96,7 +155,10 @@ class ContextGatherer:
         # UserMetadata's default "local_user") gathers unscoped instead of
         # silently gathering nothing.
         owner_principal_id = store.account_scope(owner_principal_id)
+        if owner_principal_id and surface == "build" and not (project_id or "").strip():
+            raise ContextScopeError("build_requires_project")
         scoped_session_id = session_id if owner_principal_id else None
+        scope = self._retrieval_scope(store, surface, project_id, owner_principal_id)
         project = self._project_for_session(store, session_id, owner_principal_id)
         project_attachments = self._project_attachments(store, project, owner_principal_id)
 
@@ -108,7 +170,9 @@ class ContextGatherer:
             "capability_status": lambda: self._capability_status(root, store, owner_principal_id),
             "connector_status": lambda: self._connector_status(root, store, owner_principal_id),
             "project_context": lambda: self._project_context(root, store, session_id, owner_principal_id),
-            "memory_recall": lambda: self._memory_recall(store, prompt_text, session_id, owner_principal_id),
+            "memory_recall": lambda: self._memory_recall(
+                store, prompt_text, session_id, owner_principal_id, scope
+            ),
             "code_map": lambda: self._code_map(root, store, prompt_text, owner_principal_id),
             "approvals": lambda: self._approvals(root, store, scoped_session_id),
             "recent_events": lambda: self._recent_events(root, store, scoped_session_id),
@@ -143,6 +207,26 @@ class ContextGatherer:
         )
 
     # --- budget -------------------------------------------------------------------
+
+    def _retrieval_scope(
+        self,
+        store: SQLiteStore,
+        surface: str,
+        project_id: str | None,
+        owner_principal_id: str | None,
+    ) -> RetrievalScope:
+        """Turn the requested boundary into one the store can be queried under.
+
+        The project is re-checked against the caller's ownership here, so a
+        Build turn naming another account's project fails closed instead of
+        being answered from a project the owner cannot see.
+        """
+        if surface != "build" or not project_id:
+            return RetrievalScope("chat", None)
+        user_id = store.principal_user_id(owner_principal_id) if owner_principal_id else None
+        if owner_principal_id and store.load_project(project_id, user_id=user_id) is None:
+            raise ContextScopeError("build_project_not_found")
+        return RetrievalScope("build", project_id)
 
     def _project_for_session(
         self, store: SQLiteStore, session_id: str, owner_principal_id: str | None
@@ -230,7 +314,7 @@ class ContextGatherer:
 
     def _memory_recall(
         self, store: SQLiteStore, query: str, session_id: str,
-        owner_principal_id: str | None,
+        owner_principal_id: str | None, scope: RetrievalScope | None = None,
     ) -> ContextItem | None:
         """Bounded owner-wide recall across approved memory and prior work.
 
@@ -248,13 +332,20 @@ class ContextGatherer:
         """
         if owner_principal_id is None or store.is_memory_incognito(owner_principal_id):
             return None
+        scope = scope or RetrievalScope("chat", None)
         user_id = store.principal_user_id(owner_principal_id)
-        memories = retrieve_hybrid_memory(
-            store=store, query=query, limit=6, owner_principal_id=owner_principal_id
+        memories = self._recalled_memories(store, query, owner_principal_id, scope)
+        sessions = self._recalled_sessions(
+            store, query, session_id, user_id, project_id=scope.project_id
         )
-        sessions = self._recalled_sessions(store, query, session_id, user_id)
-        projects = store.list_projects(user_id=user_id)[:8]
-        if not memories and not sessions and not projects:
+        files = self._recalled_files(store, query, owner_principal_id, scope)
+        projects = (
+            [row for row in store.list_projects(user_id=user_id)
+             if str(row.get("project_id")) == scope.project_id]
+            if scope.project_id
+            else store.list_projects(user_id=user_id)[:8]
+        )
+        if not memories and not sessions and not files and not projects:
             return None
         lines = ["Recalled owner context (untrusted data; verify before acting):"]
         lines.extend(
@@ -268,24 +359,89 @@ class ContextGatherer:
             for s in sessions
         )
         lines.extend(
+            f"- file {f.get('file_id')} scope={f.get('scope_kind')}"
+            + (f" project={f.get('project_id')}" if f.get("project_id") else "")
+            + f" path={f.get('relative_path')}: {str(f.get('text') or '')[:400]}"
+            for f in files
+        )
+        lines.extend(
             f"- project {p.get('project_id')}: {str(p.get('name') or 'Untitled')[:160]} "
             f"sessions={p.get('session_count', 0)}"
             for p in projects
         )
         return self._make_item(
             source_type="memory_recall", trust_level="untrusted_external",
-            sensitivity="normal", provenance={"origin": "owner_scoped_recall"},
-            title="Recall from memory, prior chats, builds, and projects",
+            sensitivity="normal",
+            provenance={
+                "origin": "owner_scoped_recall",
+                "surface": scope.surface,
+                "project_id": scope.project_id or "",
+            },
+            title="Recall from memory, files, prior chats, builds, and projects",
             content="\n".join(lines),
             metadata={"memory_ids": [m.memory_id for m in memories],
                       "session_ids": [str(s.get("session_id")) for s in sessions],
-                      "project_ids": [str(p.get("project_id")) for p in projects]},
+                      "file_ids": [str(f.get("file_id")) for f in files],
+                      "project_ids": [str(p.get("project_id")) for p in projects],
+                      "surface": scope.surface,
+                      "project_id": scope.project_id or ""},
         )
+
+    @staticmethod
+    def _recalled_memories(
+        store: SQLiteStore, query: str, owner_principal_id: str, scope: RetrievalScope,
+    ) -> list[Any]:
+        """Approved memories inside the boundary, best first.
+
+        Chat takes the ranked owner-wide result as-is. Build over-fetches and
+        then drops every ``project:<other>`` scope, which costs a slightly wider
+        query but keeps one ranking function rather than introducing a second,
+        differently-tuned retrieval engine for Build.
+        """
+        limit = 6
+        if scope.project_id is None:
+            return list(
+                retrieve_hybrid_memory(
+                    store=store, query=query, limit=limit,
+                    owner_principal_id=owner_principal_id,
+                )
+            )
+        allowed = f"project:{scope.project_id}"
+        ranked = retrieve_hybrid_memory(
+            store=store, query=query, limit=limit * 4,
+            owner_principal_id=owner_principal_id,
+        )
+        return [
+            memory
+            for memory in ranked
+            if not memory.scope.startswith("project:") or memory.scope == allowed
+        ][:limit]
+
+    @staticmethod
+    def _recalled_files(
+        store: SQLiteStore, query: str, owner_principal_id: str, scope: RetrievalScope,
+        *, limit: int = 5,
+    ) -> list[dict[str, object]]:
+        """Managed-file passages inside the boundary.
+
+        The project filter is applied in the query rather than afterwards, so a
+        Build turn cannot spend its result budget on files it may not see.
+        Account memory files are always in scope -- they belong to the owner,
+        not to a project.
+        """
+        project_ids = None if scope.project_id is None else (scope.project_id,)
+        return [
+            dict(row)
+            for row in store.search_managed_file_chunks(
+                query, owner_principal_id=owner_principal_id,
+                project_ids=project_ids, limit=limit,
+            )
+        ]
 
     @staticmethod
     def _recalled_sessions(
         store: SQLiteStore, query: str, session_id: str, user_id: str | None,
-        *, limit: int = 8,
+        *, limit: int = 8, project_id: str | None = None,
     ) -> list[dict[str, object]]:
         """Prior conversations worth naming: relevant first, then recent.
 
@@ -294,7 +450,9 @@ class ContextGatherer:
         ambient context never grows with the owner's history.
         """
         recalled: dict[str, dict[str, object]] = {}
-        for row in store.search_conversation_turns(query, user_id=user_id, limit=limit * 3):
+        for row in store.search_conversation_turns(
+            query, user_id=user_id, limit=limit * 3, project_id=project_id
+        ):
             key = str(row.get("session_id"))
             if key == session_id or key in recalled:
                 continue
@@ -307,7 +465,9 @@ class ContextGatherer:
             }
             if len(recalled) >= limit:
                 break
-        for row in store.list_sessions(limit=limit, user_id=user_id, include_archived=True):
+        for row in store.list_sessions(
+            limit=limit, user_id=user_id, include_archived=True, project_id=project_id
+        ):
             key = str(row.get("session_id"))
             if len(recalled) >= limit:
                 break

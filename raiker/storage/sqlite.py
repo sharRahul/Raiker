@@ -5086,6 +5086,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         user_id: str | None = None,
         limit: int = 10,
         session_id: str | None = None,
+        project_id: str | None = None,
         after: str | None = None,
         before: str | None = None,
     ) -> list[dict[str, Any]]:
@@ -5146,6 +5147,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if session_id is not None:
             conditions.append("turns.session_id = ?")
             params.append(session_id)
+        if project_id is not None:
+            # Build's boundary: only conversations assigned to the selected
+            # project. An unassigned conversation is *not* in scope -- a NULL
+            # project_id means "belongs to no project", not "belongs to all".
+            conditions.append("sessions.project_id = ?")
+            params.append(project_id)
         if after:
             conditions.append("turns.created_at >= ?")
             params.append(after)

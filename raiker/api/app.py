@@ -27,6 +27,7 @@ from raiker.api.routes_egress import router as egress_router
 from raiker.api.routes_guide import router as guide_router
 from raiker.api.routes_host import router as host_router
 from raiker.api.routes_instances import router as instances_router
+from raiker.api.routes_knowledge_files import router as knowledge_files_router
 from raiker.api.routes_language import router as language_router
 from raiker.api.routes_memory import router as memory_router
 from raiker.api.routes_models import router as models_router
@@ -396,6 +397,7 @@ def create_app(
     app.include_router(host_router)
     app.include_router(updates_router)
     app.include_router(dashboard_router)
+    app.include_router(knowledge_files_router)
     app.include_router(memory_router)
     app.include_router(models_router)
     app.include_router(setup_router)

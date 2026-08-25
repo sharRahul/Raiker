@@ -17,6 +17,7 @@
    */
   import { onMount, tick } from "svelte";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
+  import { readBuildProject, rememberBuildProject } from "../buildProject";
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
@@ -373,25 +374,7 @@
   //
   // The choice is remembered locally so returning to Build resumes where the
   // owner left off, and it cannot change mid-turn.
-  const BUILD_PROJECT_KEY = "raiker.build.project";
-  let projectId = $state(readRememberedProject());
-
-  function readRememberedProject(): string {
-    try {
-      return window.localStorage.getItem(BUILD_PROJECT_KEY) ?? "";
-    } catch {
-      return "";
-    }
-  }
-
-  function rememberProject(value: string) {
-    try {
-      if (value === "") window.localStorage.removeItem(BUILD_PROJECT_KEY);
-      else window.localStorage.setItem(BUILD_PROJECT_KEY, value);
-    } catch {
-      // A blocked storage is a lost preference, never a blocked turn.
-    }
-  }
+  let projectId = $state(readBuildProject());
 
   // A remembered id that no longer names an owned project must not silently
   // stand as a boundary. Resolving it against the loaded list is what turns a
@@ -1036,7 +1019,7 @@
   async function onProjectPicked(value: string) {
     if (streaming) return;
     projectId = value;
-    rememberProject(value);
+    rememberBuildProject(value);
     projectNotice = null;
     const target = value === "" ? null : value;
     if (sessionId === null) {
@@ -1680,7 +1663,7 @@
       bind:this={railElement}
     >
       <BuildSidePanel
-        projectId={projectId || projects?.active_project_id || null}
+        projectId={projectId || null}
         {projects}
         onclose={() => closeRail(true)}
       />
@@ -2139,7 +2122,9 @@
     font-size: var(--text-xs);
     color: var(--text-3);
   }
-  .project-required { color: var(--danger); }
+  /* Deliberately not `--danger`: nothing has failed, the owner simply has not
+     chosen yet. Red here competes with real problems on the same screen. */
+  .project-required { color: var(--text-2); font-weight: 600; }
   .project-boundary strong { color: var(--text-1); }
 
   /* Same setting pill as the Chat composer, so the two conversation surfaces

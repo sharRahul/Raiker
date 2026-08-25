@@ -1905,7 +1905,7 @@
   {#if backgroundWorkOpen}
     <div id="chat-background-work" class="rail-slot">
       <BuildSidePanel
-        projectId={projectId || projects?.active_project_id || null}
+        projectId={projectId || null}
         {projects}
         onclose={() => (backgroundWorkOpen = false)}
       />

@@ -302,6 +302,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-287](#fixed-287--a-reopened-transcript-showed-the-answer-and-nothing-about-how-it-was-reached) | Low | Chat / transcript record | Fixed (was backlog #25; closed 2026-08-25) |
 | [FIXED-288](#fixed-288--three-interface-defects-found-while-exercising-the-four-above) | Low → Medium | Permissions / Models | Fixed (raised and closed 2026-08-25 during the live round) |
 | [FIXED-289](#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named) | Medium | Memory / Projects / Chat / Build retrieval | Fixed (closed 2026-08-25) |
+| [FIXED-290](#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to) | Medium | Projects / Build / Chat / Workbench | Fixed (raised and closed 2026-08-25 by the screenshot refresh) |
 
 ---
 
@@ -12384,3 +12385,78 @@ gatherer and the prompt API fail closed);
 `apps/web/src/lib/views/BuildView.test.ts` (the project requirement, the
 streaming lock, and the boundary carried on the turn),
 `apps/web/src/lib/components/Topbar.test.ts` (neither control is in the shell).
+
+---
+
+## FIXED-290 — Four controls that outlived the selector they belonged to
+
+**Severity: Medium. Area: Projects / Build / Chat / Workbench. Raised and closed
+2026-08-25 while refreshing the screenshot catalogue for
+[FIXED-289](#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named).**
+
+**Observed.** FIXED-289 removed the global project selector from the top bar and
+made each turn state its own retrieval boundary. It did not remove everything
+that had been wired to the account-level *active project* the selector wrote,
+and the leftovers were invisible to the test suite because each one still
+rendered, still had an accessible name, and still called a live endpoint.
+
+The desktop capture is what found them. Reading the Projects and Workbench
+screenshots at 1080p showed two controls describing a workspace state that no
+longer exists.
+
+**The four.**
+
+1. **Projects offered "Set active" / "Deactivate".** It wrote
+   `active_project_id` through `PUT /api/projects/selection`. Nothing reads that
+   value for retrieval any more — Chat is owner-wide, Build carries its own
+   selection on the turn, and the shell stopped passing a project filter to
+   Tasks, Sessions and Observe. Pressing it changed a stored preference and
+   nothing else, which is precisely the invisible surface FIXED-289 existed to
+   remove.
+2. **Build's side rail fell back to the account preference.**
+   `projectId={projectId || projects?.active_project_id || null}`. The composer
+   had been corrected to use only Build's own selection; the rail had not. Two
+   halves of the same screen could therefore name different projects, and the
+   one the *turn* used was the one not shown.
+3. **Chat's side rail had the same fallback** — worse there, because Chat has no
+   project boundary at all. The rail could scope itself to a project the turn was
+   guaranteed not to be scoped by.
+4. **Workbench named an "active project."** Its "Open a project" tile read the
+   same dead preference, so a fresh owner saw *No project selected* as though a
+   selection were something the board was waiting for.
+
+**Fixed.** The concept is gone rather than repaired, because the honest version
+of "which project" is now per-surface. Projects offers **Start in Build**, which
+selects the project for Build and opens it there — the explicit action the design
+called for, replacing an implicit account-wide one. `newChatInProject` opens Chat
+without narrowing it, since narrowing Chat is exactly what its boundary forbids.
+Both rails take the surface's own selection or nothing. Workbench counts the
+owner's projects instead of naming one as active.
+
+Build's selection is now the only shared piece, and it lives in one place —
+`apps/web/src/lib/buildProject.ts` — so Projects can hand Build a project without
+two views agreeing on a storage key by coincidence.
+
+**Two presentation defects were fixed in the same pass, both found the same way.**
+Build's *"Select a project to start"* line was styled `--danger`, so an untouched
+Build page opened with red text next to a genuine amber warning; nothing has
+failed when the owner has simply not chosen yet, and it is now ordinary
+secondary text. Memory's document library had no card enclosure, so its empty
+state sat directly on top of the memory filter row and read as a caption for the
+filters; it now matches the cards above it.
+
+**User-interface outcome.** No control claims to set a workspace-wide project,
+because none does. Build shows one project in both its composer and its rail, and
+it is the one the turn runs in. Chat shows none, which is what its boundary
+means. Workbench says how many projects exist rather than implying one is
+selected.
+
+**Evidence.** `apps/web/src/lib/views/ProjectsView.test.ts` (Start in Build
+writes the Build selection, navigates, and makes **no** call to
+`/api/projects/selection`; neither "Set active" nor "Deactivate" is present);
+`apps/web/src/lib/views/WorkbenchView.test.ts` (the tile links to `#/projects`
+and states a count rather than a project name);
+`apps/web/src/lib/views/BuildView.test.ts`. Catalogue:
+[`screenshots/pages/`](screenshots/pages) — all 208 images recaptured after the
+fix, so the committed evidence shows the corrected build rather than the one that
+exposed the defects.

@@ -107,8 +107,15 @@ describe("WorkbenchView", () => {
     );
     expect(within(start).getByRole("link", { name: /start a build/i })).toHaveAttribute("href", "#/build");
     expect(within(start).getByRole("link", { name: /plan a task or agent/i })).toHaveAttribute("href", "#/tasks");
-    // The active project is named on the board rather than picked on it.
-    expect(within(start).getByText("Quarterly note")).toBeInTheDocument();
+    // The board counts the owner's projects rather than naming an "active" one.
+    // No route is scoped by an account-level selection any more, so naming one
+    // here would claim a boundary nothing enforces.
+    expect(within(start).getByRole("link", { name: /open a project/i })).toHaveAttribute(
+      "href",
+      "#/projects",
+    );
+    expect(within(start).getByText(/^\d+ projects?$|^None yet$/)).toBeInTheDocument();
+    expect(within(start).queryByText("Quarterly note")).not.toBeInTheDocument();
   });
 
   it("separates a run in flight from a standing agent from a scheduled run", async () => {

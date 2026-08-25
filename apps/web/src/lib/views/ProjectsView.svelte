@@ -7,6 +7,7 @@
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
+  import { startInBuild } from "../buildProject";
   import FileLibrary from "../components/FileLibrary.svelte";
   import { api, ApiError } from "../api";
   import type {
@@ -29,8 +30,6 @@
   let creating = $state(false);
   let createError = $state<string | null>(null);
 
-  let selecting = $state(false);
-  let selectError = $state<string | null>(null);
 
   let detail = $state<ProjectDetail | null>(null);
   let detailError = $state<string | null>(null);
@@ -83,18 +82,12 @@
     }
   }
 
-  // "New chat in this project": activate the project (new sessions are stamped
-  // with the active project), notify the shell so the topbar switcher follows,
-  // then open the composer. The project is an organizing scope — selecting it
-  // grants nothing; it only bounds the context the new chat receives.
-  async function newChatInProject(projectId: string) {
-    try {
-      await api.selectProject(projectId);
-      onchanged?.();
-      window.location.hash = "#/new-chat";
-    } catch (e) {
-      selectError = e instanceof ApiError ? `Could not start a new chat (${e.status}).` : "Could not start a new chat.";
-    }
+  // "New chat in this project" opens Chat, and deliberately does not narrow it.
+  // Chat's retrieval is owner-wide by design, so starting a conversation from a
+  // project must not quietly scope it. The composer's own picker files the
+  // resulting conversation, which is filing rather than a boundary.
+  function newChatInProject() {
+    window.location.hash = "#/new-chat";
   }
 
   async function saveContext() {
@@ -146,23 +139,6 @@
           : "Could not create";
     } finally {
       creating = false;
-    }
-  }
-
-  async function select(projectId: string | null) {
-    selecting = true;
-    selectError = null;
-    try {
-      await api.selectProject(projectId);
-      await load();
-      onchanged?.();
-    } catch (e) {
-      selectError =
-        e instanceof ApiError
-          ? `Could not select (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
-          : "Could not select";
-    } finally {
-      selecting = false;
     }
   }
 
@@ -342,26 +318,14 @@
             · created {relativeTime(p.created_at)}
           </p>
           <div class="project-actions">
-            {#if p.selected}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => void select(null)}
-                disabled={selecting}
-              >
-                Deactivate
-              </button>
-            {:else}
-              <button
-                type="button"
-                class="btn btn-sm"
-                onclick={() => void select(p.project_id)}
-                disabled={selecting}
-              >
-                Set active
-              </button>
-            {/if}
-            <button type="button" class="btn btn-primary btn-sm" onclick={() => void newChatInProject(p.project_id)}>
+            <button
+              type="button"
+              class="btn btn-sm"
+              onclick={() => startInBuild(p.project_id)}
+            >
+              Start in Build
+            </button>
+            <button type="button" class="btn btn-primary btn-sm" onclick={() => newChatInProject()}>
               New chat
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void open(p.project_id)}>
@@ -414,10 +378,6 @@
         </div>
         {#if moveError}<p class="error" role="alert">{moveError}</p>{/if}
       </div>
-    {/if}
-
-    {#if selectError}
-      <p class="error" role="alert">{selectError}</p>
     {/if}
     {#if deleteError}<p class="error" role="alert">{deleteError}</p>{/if}
 

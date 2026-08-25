@@ -35,36 +35,36 @@ overflow, and reads the PNG header to prove its dimensions equal the viewport.
 Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
 automated layout assertions rather than additional committed screenshot classes.
 
-The 156 desktop files were refreshed on 2026-08-25 for the workspace command
-centre shell. They record the binary hide/show navigation model, direct Core
-routes, collapsible Knowledge/Manage/Observe/Support groups, recent-first Search
-chats, fixed desktop type and controls, and the bounded reading/workspace/
-operational/work-surface canvases. The 52 mobile files were deliberately
-preserved byte-for-byte; their combined SHA-256 catalogue checksum remains
-`AC5407C2516910DAC6856EAAB7011F4276CD42FF2D7DE46D2EC55A699A713F2A`.
+**All 208 files were recaptured on 2026-08-25**, against a real host serving the
+current build. This replaced the earlier refresh, which had regenerated only the
+156 desktop files and preserved the 52 mobile ones byte-for-byte. That
+preservation guarantee no longer holds and is not claimed anywhere: mobile was
+regenerated in the same run, from the same build, so every image in `pages/`
+now comes from one instance at one moment rather than from two rounds months
+apart. The combined SHA-256 catalogue checksum over all 208 files —
+name-then-content, in sorted filename order — is
+`7681C01627F539EC54BC3377DC563D47910103CAFA73C15928AB0F7ABACB11FB`.
+
+They record the binary hide/show navigation model, direct Core routes,
+collapsible Knowledge/Manage/Observe/Support groups, recent-first Search chats,
+fixed desktop type and controls, the bounded reading/workspace/operational/
+work-surface canvases, and — new in this round — the managed document libraries
+on Memory and Projects, Build's required project selector, and a top bar
+carrying neither a project selector nor a theme toggle.
+
+**The capture is what caught the defects it was run to document.** Four of them,
+all consequences of removing the global project selector, none visible from the
+tests: a **Set active** button on Projects that wrote a preference no route reads
+any more, an account-level fallback that let Build's side rail name a different
+project than the turn ran in, the same fallback in Chat which has no project
+boundary at all, and a Workbench tile naming an "active project" that steered
+nothing. They were fixed and the whole catalogue recaptured before these images
+were kept — see
+[FIXED-290](../FIXED_ITEMS.md#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to).
 
 The same run also exercises all seven Models tabs and all nine Settings sections
 as rendered audit states. Those extra deep links are assertions rather than new
 committed capture names, so the catalogue remains exactly 208 PNGs.
-
-**The desktop catalogue is one change behind, and here is exactly which change.**
-[FIXED-289](../FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named)
-landed after this refresh and altered four of the captured surfaces. The 156
-desktop files were **not** regenerated for it, because the sweep needs a
-credentialled live host, and a catalogue nobody re-ran is not evidence. What the
-current images no longer show:
-
-| Surface | The images show | The build now shows |
-|---|---|---|
-| Top bar (every route) | Global project selector and theme toggle | Neither; both moved to where they are explained |
-| Memory | Approved records only | A document library above them |
-| Projects (detail) | Instructions, sessions, tasks | A project file library between context and sessions |
-| Build | Optional "Project or folder" picker | A required project selector, with the boundary named above the composer |
-
-Everything else in the catalogue — navigation model, layout planes, type and
-control scale, both themes, all four display classes — is unchanged and still
-current. The next live sweep replaces the 156 desktop files and clears this note;
-until then, read these four surfaces from the code, not from the pictures.
 
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.

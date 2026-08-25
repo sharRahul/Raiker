@@ -101,28 +101,29 @@ describe("ProjectsView", () => {
     await waitFor(() => expect(onchanged).toHaveBeenCalled());
   });
 
-  it("sets a project active via PUT /api/projects/selection", async () => {
+  it("offers Start in Build instead of an account-wide activation", async () => {
+    // "Set active" wrote a preference no route reads any more. What the owner
+    // wanted from it — work in this one — is now explicit and local to Build.
     const mock = stubFetch({
       "GET /api/projects": {
         projects: [project({ project_id: "proj_1", name: "Alpha" })],
         active_project_id: null,
       },
       "GET /api/projects/tree": [],
-      "PUT /api/projects/selection": { ok: true, active_project_id: "proj_1" },
     });
     render(ProjectsView);
-    await waitFor(() => expect(screen.getByText("Set active")).toBeInTheDocument());
-    await fireEvent.click(screen.getByText("Set active"));
 
-    await waitFor(() => {
-      const put = mock.mock.calls.find(
-        (c) =>
-          (c[1]?.method ?? "GET").toUpperCase() === "PUT" &&
-          String(c[0]).includes("/api/projects/selection"),
-      );
-      expect(put).toBeTruthy();
-      expect(JSON.parse(put![1]!.body as string)).toEqual({ project_id: "proj_1" });
-    });
+    await waitFor(() => expect(screen.getByText("Start in Build")).toBeInTheDocument());
+    expect(screen.queryByText("Set active")).not.toBeInTheDocument();
+    expect(screen.queryByText("Deactivate")).not.toBeInTheDocument();
+
+    await fireEvent.click(screen.getByText("Start in Build"));
+
+    expect(window.localStorage.getItem("raiker.build.project")).toBe("proj_1");
+    expect(window.location.hash).toBe("#/build");
+    expect(
+      mock.mock.calls.some(([url]) => String(url).includes("/api/projects/selection")),
+    ).toBe(false);
   });
 
   it("exports a loaded project's redacted JSONL via POST", async () => {

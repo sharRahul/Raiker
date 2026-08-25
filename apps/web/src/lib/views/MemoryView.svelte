@@ -599,6 +599,17 @@
   .switch { min-width:76px; min-height:44px; display:flex; align-items:center; gap:.45rem; border:1px solid var(--border-strong); border-radius:var(--r-pill); padding:.25rem .55rem .25rem .3rem; background:var(--sunken); color:var(--text-2); cursor:pointer; } .switch span { width:1.65rem; height:1.65rem; border-radius:50%; background:var(--text-3); } .switch.on { background:var(--accent-soft); color:var(--accent); border-color:var(--accent-border); } .switch.on span { background:var(--accent); }
   .summary { display:grid; grid-template-columns:repeat(4,1fr); gap:1px; margin:var(--space-4) 0; overflow:hidden; border:1px solid var(--border); border-radius:var(--r-lg); background:var(--border); } .summary div { display:grid; gap:.15rem; padding:var(--space-3); background:var(--surface); } .summary strong { font-size:1.2rem; } .summary span { color:var(--text-3); font-size:.75rem; }
   .filters { display:flex; flex-wrap:wrap; gap:var(--space-2); align-items:center; margin-bottom:var(--space-5); } .search { min-height:var(--control-min-h); border:1px solid var(--border-strong); border-radius:var(--r-sm); background:var(--surface); color:var(--text-1); } .search { display:flex; align-items:center; gap:.45rem; padding:0 .7rem; flex:1; min-width:15rem; } .search input { width:100%; border:0; outline:0; background:transparent; color:inherit; } .pinned-filter { display:flex; align-items:center; gap:.35rem; color:var(--text-2); font-size:.82rem; }
+  /* The library is a card like the posture controls above it, not a bare run of
+     text. Without the enclosure its empty state ("No files yet.") sat directly
+     on top of the memory filter row and read as a caption for the filters. */
+  .library-section {
+    margin-top: var(--space-5);
+    padding: var(--card-pad-y) var(--card-pad-x);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    box-shadow: var(--shadow-1);
+  }
   .memory-section { margin-top:var(--space-5); } .section-head { align-items:center; margin-bottom:var(--space-3); } .section-head span { color:var(--text-3); } .memory-grid { display:grid; gap:var(--space-3); }
   .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warning-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
   .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }

@@ -83,9 +83,9 @@
   // different facts and the board answers both.
   const agents = $derived(active.filter(repeats));
   const scheduled = $derived(active.filter((task) => !repeats(task) && armed(task)));
-  const activeProject = $derived(
-    projects?.projects.find((project) => project.project_id === projects?.active_project_id) ?? null,
-  );
+  // Deliberately not "the active project": no route is scoped by one any more.
+  // What the board can honestly say is how many projects exist.
+  const projectCount = $derived(projects?.projects.length ?? 0);
   const named = $derived((sessions ?? []).filter((s) => (s.title ?? "").trim() !== ""));
   const hasActivity = $derived(
     named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0,
@@ -202,7 +202,7 @@
       <Icon name="tasks" size={18} /><span><strong>Plan a task or agent</strong><small>Run once, on a cadence, or in the background</small></span>
     </a>
     <a class="start-card" href="#/projects">
-      <Icon name="projects" size={18} /><span><strong>Open a project</strong><small>{activeProject?.name ?? "No project selected"}</small></span>
+      <Icon name="projects" size={18} /><span><strong>Open a project</strong><small>{projectCount === 0 ? "None yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}</small></span>
     </a>
   </nav>
 

@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
 
+from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService, migrate_project_roots
 from raiker.control.knowledge_scope import build_roots
 from raiker.storage.sqlite import SQLiteStore
@@ -49,15 +51,15 @@ def test_dashboard_startup_migrates_existing_legacy_project_roots(
     ) == "alpha"
 
 
-def test_failed_row_update_rolls_back_the_folder_move(
+def test_failed_row_reservation_leaves_the_legacy_root_coherent(
     tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A guarded update race must not leave a row pointing at a vanished source."""
+    """A guarded database race must not publish or move a stale project root."""
     old = tmp_path / "projects" / "alpha"
     old.mkdir(parents=True)
     (old / "notes.txt").write_text("alpha", encoding="utf-8")
     store.create_project("proj_a", "Alpha", "projects/alpha")
-    monkeypatch.setattr(store, "update_project_root", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(store, "publish_project_root_atomic", lambda *_args, **_kwargs: False)
 
     report = migrate_project_roots(tmp_path, store)
 
@@ -85,6 +87,44 @@ def test_existing_destination_conflict_preserves_legacy_project(tmp_path: Path, 
     assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
     assert (destination / "notes.txt").read_text(encoding="utf-8") == "managed"
     assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+
+
+def test_destination_claim_race_never_overwrites_or_strands_the_legacy_root(
+    tmp_path: Path, store: SQLiteStore, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A POSIX-style rename replacement must not destroy a concurrent destination."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    destination = tmp_path / ".raiker" / "projects" / "alpha"
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+    original_mkdir = Path.mkdir
+    claimed = False
+
+    def claim_destination(path: Path, *args: object, **kwargs: object) -> None:
+        nonlocal claimed
+        if path == destination and not claimed:
+            claimed = True
+            original_mkdir(path, *args, **kwargs)
+            (path / "racer.txt").write_text("do not replace", encoding="utf-8")
+            raise FileExistsError(path)
+        original_mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "mkdir", claim_destination)
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ()
+    assert report.conflicts == ("proj_a",)
+    assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
+    assert (destination / "racer.txt").read_text(encoding="utf-8") == "do not replace"
+    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+
+    monkeypatch.undo()
+    shutil.rmtree(destination)
+    resumed = migrate_project_roots(tmp_path, store)
+    assert resumed.migrated == ("proj_a",)
+    assert (destination / "notes.txt").read_text(encoding="utf-8") == "legacy"
 
 
 def test_migration_is_idempotent_after_a_successful_move(tmp_path: Path, store: SQLiteStore) -> None:
@@ -156,3 +196,76 @@ def test_knowledge_roots_offer_only_the_stored_managed_project_path(
     assert "project-proj_bad" not in root_ids
     assert "project-proj_container" not in root_ids
     assert "project-proj_legacy_container" not in root_ids
+
+
+def test_managed_container_symlink_cannot_delete_runtime_data(tmp_path: Path) -> None:
+    """Resolving `.raiker/projects` through `.raiker` must not make memory deletable."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    bootstrap_owner("owner", "Owner", workspace_root=workspace)
+    store = SQLiteStore(workspace)
+    memory = workspace / ".raiker" / "memory"
+    memory.mkdir(parents=True)
+    (memory / "keep.txt").write_text("keep", encoding="utf-8")
+    container = workspace / ".raiker" / "projects"
+    try:
+        container.symlink_to(workspace / ".raiker", target_is_directory=True)
+    except (OSError, NotImplementedError):  # pragma: no cover - host dependent
+        pytest.skip("symlinks unavailable")
+    store.create_project(
+        "proj_memory", "Memory", ".raiker/projects/memory", owner_user_id="owner"
+    )
+
+    result = DashboardService(workspace).delete_project("proj_memory", "principal_owner", confirm=True)
+
+    assert result.reason_code == "project_root_escapes_workspace"
+    assert (memory / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert store.load_project("proj_memory", "owner") is not None
+
+
+def test_legacy_container_symlink_cannot_migrate_runtime_data(tmp_path: Path) -> None:
+    """Resolving legacy `projects` through `.raiker` must not move memory."""
+    store = SQLiteStore(tmp_path)
+    memory = tmp_path / ".raiker" / "memory"
+    memory.mkdir(parents=True)
+    (memory / "keep.txt").write_text("keep", encoding="utf-8")
+    container = tmp_path / "projects"
+    try:
+        container.symlink_to(tmp_path / ".raiker", target_is_directory=True)
+    except (OSError, NotImplementedError):  # pragma: no cover - host dependent
+        pytest.skip("symlinks unavailable")
+    store.create_project("proj_memory", "Memory", "projects/memory")
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.conflicts == ("proj_memory",)
+    assert (memory / "keep.txt").read_text(encoding="utf-8") == "keep"
+    assert store.load_project("proj_memory")["root_subpath"] == "projects/memory"
+
+
+def test_container_symlinks_are_not_knowledge_map_roots(tmp_path: Path) -> None:
+    """A container symlink must not turn Raiker memory into project knowledge."""
+    runtime = tmp_path / ".raiker"
+    memory = runtime / "memory"
+    memory.mkdir(parents=True)
+    (memory / "secret.txt").write_text("secret", encoding="utf-8")
+    managed = runtime / "projects"
+    legacy = tmp_path / "projects"
+    try:
+        managed.symlink_to(runtime, target_is_directory=True)
+        legacy.symlink_to(runtime, target_is_directory=True)
+    except (OSError, NotImplementedError):  # pragma: no cover - host dependent
+        pytest.skip("symlinks unavailable")
+
+    roots = build_roots(
+        tmp_path,
+        [
+            {"project_id": "managed", "name": "Managed", "root_subpath": ".raiker/projects/memory"},
+            {"project_id": "legacy", "name": "Legacy", "root_subpath": "projects/memory"},
+        ],
+        [],
+    )
+
+    root_ids = {root.root_id for root in roots}
+    assert "project-managed" not in root_ids
+    assert "project-legacy" not in root_ids

@@ -34,6 +34,18 @@ from raiker.control.knowledge_scope import (
     resolve,
     scope_path,
 )
+from raiker.control.project_paths import (
+    LEGACY_PROJECT_ROOT as _LEGACY_PROJECT_ROOT,
+)
+from raiker.control.project_paths import (
+    MANAGED_PROJECT_ROOT as _MANAGED_PROJECT_ROOT,
+)
+from raiker.control.project_paths import (
+    contained_project_root as _contained_project_root,
+)
+from raiker.control.project_paths import (
+    project_root_parts as _project_root_parts,
+)
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
@@ -617,41 +629,21 @@ class ProjectRootMigrationReport:
     unchanged: tuple[str, ...] = ()
 
 
-_LEGACY_PROJECT_ROOT = "projects"
-_MANAGED_PROJECT_ROOT = ".raiker/projects"
-
-
-def _project_root_parts(root_subpath: str) -> tuple[str, tuple[str, ...]] | None:
-    """Return a canonical legacy/managed project path, rejecting traversal."""
-    parts = tuple(part for part in root_subpath.replace("\\", "/").split("/") if part)
-    if not parts or any(part in {".", ".."} for part in parts):
-        return None
-    if parts[0] == _LEGACY_PROJECT_ROOT and len(parts) > 1:
-        return _LEGACY_PROJECT_ROOT, parts[1:]
-    if parts[:2] == (".raiker", "projects") and len(parts) > 2:
-        return _MANAGED_PROJECT_ROOT, parts[2:]
-    return None
-
-
-def _contained_project_root(
-    workspace_root: Path, root_subpath: str
-) -> tuple[str, tuple[str, ...], Path] | None:
-    """Resolve a permitted project root while rejecting root and symlink escapes."""
-    parsed = _project_root_parts(root_subpath)
-    if parsed is None:
-        return None
-    kind, relative = parsed
-    workspace = workspace_root.resolve()
-    parent = workspace.joinpath(*kind.split("/"))
-    candidate = parent.joinpath(*relative)
-    resolved_parent = parent.resolve()
-    resolved_candidate = candidate.resolve()
-    try:
-        resolved_parent.relative_to(workspace)
-        resolved_candidate.relative_to(resolved_parent)
-    except ValueError:
-        return None
-    return kind, relative, candidate
+def _copy_project_tree_exclusive(source: Path, destination: Path) -> None:
+    """Copy a tree into an exclusively reserved directory without replacement."""
+    for child in source.iterdir():
+        target = destination / child.name
+        if child.is_symlink():
+            raise OSError("project_root_symlink_not_migrated")
+        if child.is_dir():
+            target.mkdir()
+            _copy_project_tree_exclusive(child, target)
+        elif child.is_file():
+            with child.open("rb") as reader, target.open("xb") as writer:
+                shutil.copyfileobj(reader, writer)
+            shutil.copystat(child, target, follow_symlinks=False)
+        else:
+            raise OSError("project_root_special_file_not_migrated")
 
 
 def migrate_project_roots(
@@ -704,55 +696,51 @@ def migrate_project_roots(
         if source.is_symlink() or destination.is_symlink():
             conflicts.append(project_id)
             continue
-        if destination.exists() and (
-            source.exists() or not destination.is_dir() or not was_moved_with_parent
-        ):
+        if destination.exists() and (source.exists() or not destination.is_dir()):
             conflicts.append(project_id)
             continue
-        moved_source = False
-        created_destination = False
-        try:
+        if destination.exists() and not was_moved_with_parent:
+            conflicts.append(project_id)
+            continue
+        if source.exists() and not source.is_dir():
+            conflicts.append(project_id)
+            continue
+
+        def publish(
+            destination: Path = destination,
+            destination_subpath: str = destination_subpath,
+            source: Path = source,
+            was_moved_with_parent: bool = was_moved_with_parent,
+        ) -> None:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            # Re-resolve after creating parents: a symlink introduced while the
-            # parent was missing is still an escape, not a project root.
             revalidated = _contained_project_root(workspace, destination_subpath)
             if revalidated is None or revalidated[2] != destination:
-                conflicts.append(project_id)
-                continue
+                raise OSError("project_root_destination_invalid")
+            if destination.exists():
+                if not was_moved_with_parent or source.exists() or not destination.is_dir():
+                    raise FileExistsError(destination)
+                return
+            destination.mkdir()
             if source.exists():
-                if not source.is_dir():
-                    conflicts.append(project_id)
-                    continue
-                source.rename(destination)
-                moved_source = True
-            elif not destination.exists():
-                destination.mkdir()
-                created_destination = True
+                _copy_project_tree_exclusive(source, destination)
+
+        try:
+            updated = store.publish_project_root_atomic(
+                project_id,
+                raw_root,
+                destination_subpath,
+                publish,
+            )
         except OSError:
             conflicts.append(project_id)
             continue
-        try:
-            updated = store.update_project_root(
-                project_id,
-                destination_subpath,
-                expected_root_subpath=raw_root,
-            )
-        except Exception:
-            updated = False
         if updated:
             migrated.append(project_id)
             managed_roots.append(relative)
+            if source.exists():
+                with contextlib.suppress(OSError):
+                    shutil.rmtree(source)
         else:
-            # A guarded update can lose to a concurrent row change. Undo only
-            # work this invocation performed, so the legacy row remains a
-            # truthful pointer and a later startup can retry safely.
-            try:
-                if moved_source:
-                    destination.rename(source)
-                elif created_destination:
-                    destination.rmdir()
-            except OSError:
-                pass
             conflicts.append(project_id)
     return ProjectRootMigrationReport(tuple(migrated), tuple(conflicts), tuple(unchanged))
 

@@ -2737,6 +2737,36 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             updated = connection.execute(query, params)
         return updated.rowcount == 1
 
+    def publish_project_root_atomic(
+        self,
+        project_id: str,
+        expected_root_subpath: str,
+        root_subpath: str,
+        publish: Callable[[], None],
+    ) -> bool:
+        """Publish a claimed project directory and its row under one DB lock."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    "SELECT root_subpath FROM projects WHERE project_id = ?", (project_id,)
+                ).fetchone()
+                if row is None or str(row["root_subpath"]) != expected_root_subpath:
+                    connection.rollback()
+                    return False
+                publish()
+                updated = connection.execute(
+                    "UPDATE projects SET root_subpath = ? WHERE project_id = ? AND root_subpath = ?",
+                    (root_subpath, project_id, expected_root_subpath),
+                )
+                if updated.rowcount != 1:
+                    raise RuntimeError("project_root_update_lost")
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return True
+
     # ── Managed knowledge files ──────────────────────────────────────────────
 
     def insert_managed_file(

@@ -37,6 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raiker.control.project_paths import contained_project_root
 from raiker.storage.internal_paths import internal_io_path
 
 # Never walked, wherever they appear: version-control internals, dependency
@@ -128,7 +129,6 @@ def build_roots(
     workspace = workspace_root.resolve()
     runtime_path = (workspace / RUNTIME_DIR_NAME).resolve()
     runtime_dir = internal_io_path(runtime_path)
-    managed_projects = (runtime_path / "projects").resolve()
     roots: list[ScopeRoot] = []
     for project in projects:
         subpath = str(project.get("root_subpath") or "").strip()
@@ -136,27 +136,10 @@ def build_roots(
         project_id = str(project.get("project_id") or "")
         if not project_id or not subpath:
             continue
-        parts = tuple(part for part in subpath.replace("\\", "/").split("/") if part)
-        if (
-            any(part in {".", ".."} for part in parts)
-            or not (
-                (parts[:1] == ("projects",) and len(parts) > 1)
-                or (parts[:2] == (".raiker", "projects") and len(parts) > 2)
-            )
-        ):
+        project_root = contained_project_root(workspace, subpath)
+        if project_root is None:
             continue
-        path = workspace.joinpath(*parts).resolve()
-        try:
-            path.relative_to(workspace)
-        except ValueError:
-            continue
-        # Project rows may name legacy workspace folders or a leaf below the
-        # managed projects directory. They may never turn the rest of
-        # `.raiker` (database, keys, checkpoints, and so on) into a root.
-        if path == runtime_path or (
-            runtime_path in path.parents and managed_projects not in path.parents
-        ):
-            continue
+        path = project_root[2].resolve()
         roots.append(
             ScopeRoot(
                 root_id=f"{PROJECT_ROOT_PREFIX}{project_id}",

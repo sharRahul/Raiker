@@ -116,10 +116,10 @@ class TestBoundary:
         store.insert_principal(
             OWNER, "human", "A", delegated_by_user_id="user_a"
         )
-        (tmp_path / "mine").mkdir()
-        (tmp_path / "theirs").mkdir()
-        store.create_project("proj_mine", "Mine", "mine", owner_user_id="user_a")
-        store.create_project("proj_theirs", "Theirs", "theirs", owner_user_id="user_b")
+        (tmp_path / "projects" / "mine").mkdir(parents=True)
+        (tmp_path / "projects" / "theirs").mkdir(parents=True)
+        store.create_project("proj_mine", "Mine", "projects/mine", owner_user_id="user_a")
+        store.create_project("proj_theirs", "Theirs", "projects/theirs", owner_user_id="user_b")
 
         labels = {
             root["label"]

@@ -125,13 +125,37 @@ def build_roots(
     created yet is a real project, and hiding it would read as Raiker having
     lost it. Browsing one that does not exist fails by name.
     """
-    runtime_dir = internal_io_path(workspace_root / RUNTIME_DIR_NAME)
+    workspace = workspace_root.resolve()
+    runtime_path = (workspace / RUNTIME_DIR_NAME).resolve()
+    runtime_dir = internal_io_path(runtime_path)
+    managed_projects = (runtime_path / "projects").resolve()
     roots: list[ScopeRoot] = []
     for project in projects:
-        subpath = str(project.get("root_subpath") or "").strip().strip("/")
+        subpath = str(project.get("root_subpath") or "").strip()
         name = str(project.get("name") or "Project")
         project_id = str(project.get("project_id") or "")
-        if not project_id:
+        if not project_id or not subpath:
+            continue
+        parts = tuple(part for part in subpath.replace("\\", "/").split("/") if part)
+        if (
+            any(part in {".", ".."} for part in parts)
+            or not (
+                (parts[:1] == ("projects",) and len(parts) > 1)
+                or (parts[:2] == (".raiker", "projects") and len(parts) > 2)
+            )
+        ):
+            continue
+        path = workspace.joinpath(*parts).resolve()
+        try:
+            path.relative_to(workspace)
+        except ValueError:
+            continue
+        # Project rows may name legacy workspace folders or a leaf below the
+        # managed projects directory. They may never turn the rest of
+        # `.raiker` (database, keys, checkpoints, and so on) into a root.
+        if path == runtime_path or (
+            runtime_path in path.parents and managed_projects not in path.parents
+        ):
             continue
         roots.append(
             ScopeRoot(
@@ -139,7 +163,7 @@ def build_roots(
                 label=f"Project files · {name}",
                 detail="The files this project keeps in your Raiker workspace.",
                 kind="raiker",
-                path=(workspace_root / subpath).resolve() if subpath else workspace_root,
+                path=path,
                 browsable=True,
             )
         )

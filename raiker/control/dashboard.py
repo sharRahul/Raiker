@@ -609,6 +609,154 @@ class ProjectView:
 
 
 @dataclass(frozen=True)
+class ProjectRootMigrationReport:
+    """The safe, repeatable outcome of moving legacy project folders."""
+
+    migrated: tuple[str, ...] = ()
+    conflicts: tuple[str, ...] = ()
+    unchanged: tuple[str, ...] = ()
+
+
+_LEGACY_PROJECT_ROOT = "projects"
+_MANAGED_PROJECT_ROOT = ".raiker/projects"
+
+
+def _project_root_parts(root_subpath: str) -> tuple[str, tuple[str, ...]] | None:
+    """Return a canonical legacy/managed project path, rejecting traversal."""
+    parts = tuple(part for part in root_subpath.replace("\\", "/").split("/") if part)
+    if not parts or any(part in {".", ".."} for part in parts):
+        return None
+    if parts[0] == _LEGACY_PROJECT_ROOT and len(parts) > 1:
+        return _LEGACY_PROJECT_ROOT, parts[1:]
+    if parts[:2] == (".raiker", "projects") and len(parts) > 2:
+        return _MANAGED_PROJECT_ROOT, parts[2:]
+    return None
+
+
+def _contained_project_root(
+    workspace_root: Path, root_subpath: str
+) -> tuple[str, tuple[str, ...], Path] | None:
+    """Resolve a permitted project root while rejecting root and symlink escapes."""
+    parsed = _project_root_parts(root_subpath)
+    if parsed is None:
+        return None
+    kind, relative = parsed
+    workspace = workspace_root.resolve()
+    parent = workspace.joinpath(*kind.split("/"))
+    candidate = parent.joinpath(*relative)
+    resolved_parent = parent.resolve()
+    resolved_candidate = candidate.resolve()
+    try:
+        resolved_parent.relative_to(workspace)
+        resolved_candidate.relative_to(resolved_parent)
+    except ValueError:
+        return None
+    return kind, relative, candidate
+
+
+def migrate_project_roots(
+    workspace_root: Path, store: SQLiteStore
+) -> ProjectRootMigrationReport:
+    """Move legacy ``projects/<slug>`` folders below `.raiker/projects` safely.
+
+    A row changes only after its source and destination have passed containment
+    validation. Existing destination folders are never merged or replaced.
+    """
+    workspace = Path(workspace_root).resolve()
+    migrated: list[str] = []
+    conflicts: list[str] = []
+    unchanged: list[str] = []
+    projects = store.list_projects()
+    managed_roots: list[tuple[str, ...]] = [
+        parsed[1]
+        for project in projects
+        if (parsed := _project_root_parts(str(project.get("root_subpath") or "")))
+        and parsed[0] == _MANAGED_PROJECT_ROOT
+    ]
+
+    def migration_order(project: dict[str, Any]) -> tuple[int, int]:
+        parsed = _project_root_parts(str(project.get("root_subpath") or ""))
+        if parsed is not None and parsed[0] == _LEGACY_PROJECT_ROOT:
+            return 0, len(parsed[1])
+        return 1, 0
+
+    for project in sorted(projects, key=migration_order):
+        project_id = str(project["project_id"])
+        raw_root = str(project.get("root_subpath") or "")
+        source_info = _contained_project_root(workspace, raw_root)
+        if source_info is None:
+            conflicts.append(project_id)
+            continue
+        kind, relative, source = source_info
+        if kind == _MANAGED_PROJECT_ROOT:
+            unchanged.append(project_id)
+            continue
+        destination_subpath = "/".join((_MANAGED_PROJECT_ROOT, *relative))
+        destination_info = _contained_project_root(workspace, destination_subpath)
+        if destination_info is None:  # defensive: it is constructed above
+            conflicts.append(project_id)
+            continue
+        destination = destination_info[2]
+        was_moved_with_parent = any(
+            len(relative) > len(parent) and relative[: len(parent)] == parent
+            for parent in managed_roots
+        )
+        if source.is_symlink() or destination.is_symlink():
+            conflicts.append(project_id)
+            continue
+        if destination.exists() and (
+            source.exists() or not destination.is_dir() or not was_moved_with_parent
+        ):
+            conflicts.append(project_id)
+            continue
+        moved_source = False
+        created_destination = False
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            # Re-resolve after creating parents: a symlink introduced while the
+            # parent was missing is still an escape, not a project root.
+            revalidated = _contained_project_root(workspace, destination_subpath)
+            if revalidated is None or revalidated[2] != destination:
+                conflicts.append(project_id)
+                continue
+            if source.exists():
+                if not source.is_dir():
+                    conflicts.append(project_id)
+                    continue
+                source.rename(destination)
+                moved_source = True
+            elif not destination.exists():
+                destination.mkdir()
+                created_destination = True
+        except OSError:
+            conflicts.append(project_id)
+            continue
+        try:
+            updated = store.update_project_root(
+                project_id,
+                destination_subpath,
+                expected_root_subpath=raw_root,
+            )
+        except Exception:
+            updated = False
+        if updated:
+            migrated.append(project_id)
+            managed_roots.append(relative)
+        else:
+            # A guarded update can lose to a concurrent row change. Undo only
+            # work this invocation performed, so the legacy row remains a
+            # truthful pointer and a later startup can retry safely.
+            try:
+                if moved_source:
+                    destination.rename(source)
+                elif created_destination:
+                    destination.rmdir()
+            except OSError:
+                pass
+            conflicts.append(project_id)
+    return ProjectRootMigrationReport(tuple(migrated), tuple(conflicts), tuple(unchanged))
+
+@dataclass(frozen=True)
 class ProjectsListView:
     projects: tuple[ProjectView, ...]
     active_project_id: str | None
@@ -1185,6 +1333,9 @@ class DashboardService:
     def __init__(self, workspace_root: str | Path = ".") -> None:
         self.workspace_root = Path(workspace_root)
         self.store = SQLiteStore(self.workspace_root)
+        self.project_root_migration_report = migrate_project_roots(
+            self.workspace_root, self.store
+        )
         self.control = RuntimeControlService(self.workspace_root)
 
     def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
@@ -4554,8 +4705,8 @@ class DashboardService:
         """Create a named project folder (human gate-manager only).
 
         The root subpath is derived server-side from the name (slug under
-        ``projects/``) and verified to stay inside the workspace — a name can
-        never place a project root outside it (fail closed). When
+        ``.raiker/projects/``) and verified to stay inside the workspace — a
+        name can never place a project root outside it (fail closed). When
         ``parent_id`` is supplied the project is created as a nested child of
         that parent folder.
         """
@@ -4574,12 +4725,16 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="duplicate_project_name")
         if parent_id is not None and self.store.load_project(parent_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_parent:{parent_id}")
-        root_subpath = f"projects/{slug}"
-        workspace = self.workspace_root.resolve()
-        resolved = (workspace / root_subpath).resolve()
-        if workspace != resolved and workspace not in resolved.parents:
+        root_subpath = f"{_MANAGED_PROJECT_ROOT}/{slug}"
+        contained_root = _contained_project_root(self.workspace_root, root_subpath)
+        if contained_root is None:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        if any(p.get("root_subpath") == root_subpath for p in self.store.list_projects(principal.delegated_by_user_id)):
+        resolved = contained_root[2]
+        if any(
+            (parsed := _project_root_parts(str(project.get("root_subpath") or "")))
+            and parsed[1] == (slug,)
+            for project in self.store.list_projects()
+        ):
             return ControlResult(ok=False, reason_code="duplicate_project_root")
         project_id = new_id("proj_")
         resolved.mkdir(parents=True, exist_ok=True)
@@ -4621,9 +4776,12 @@ class DashboardService:
         project = self.store.load_project(project_id, principal.delegated_by_user_id)
         if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        root = (self.workspace_root.resolve() / str(project["root_subpath"])).resolve()
-        if self.workspace_root.resolve() not in root.parents:
+        contained_root = _contained_project_root(
+            self.workspace_root, str(project.get("root_subpath") or "")
+        )
+        if contained_root is None:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
+        root = contained_root[2]
         if not self.store.delete_project_with_orphanage(project_id):
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         try:

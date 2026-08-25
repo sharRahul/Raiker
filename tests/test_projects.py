@@ -55,8 +55,8 @@ class TestCreateProject:
     def test_create_lists_and_makes_a_contained_root(self, service: DashboardService, workspace: Path) -> None:
         result = service.create_project("Tejas Mk1A", OWNER)
         assert result.ok, result.reason_code
-        assert result.data["root_subpath"] == "projects/tejas-mk1a"
-        assert (workspace / "projects" / "tejas-mk1a").is_dir()
+        assert result.data["root_subpath"] == ".raiker/projects/tejas-mk1a"
+        assert (workspace / ".raiker" / "projects" / "tejas-mk1a").is_dir()
 
         listing = service.list_projects()
         assert len(listing.projects) == 1
@@ -130,7 +130,7 @@ class TestSelectProject:
         assert service.store.load_session("sess_alpha") is None
         assert service.store.load_project(project_id) is None
         assert service.store.get_active_project() is None
-        assert not (workspace / "projects" / "alpha").exists()
+        assert not (workspace / ".raiker" / "projects" / "alpha").exists()
 
 
 class TestSessionAssociation:
@@ -381,7 +381,7 @@ class TestProjectsApi:
         created = client.post("/api/projects", json={"name": "Tejas Mk1A"}, headers=headers)
         assert created.status_code == 200, created.text
         pid = created.json()["project_id"]
-        assert (workspace / "projects" / "tejas-mk1a").is_dir()
+        assert (workspace / ".raiker" / "projects" / "tejas-mk1a").is_dir()
 
         listing = client.get("/api/projects", headers=headers).json()
         assert [p["project_id"] for p in listing["projects"]] == [pid]
@@ -440,7 +440,7 @@ class TestProjectsApi:
         )
 
         assert response.status_code == 200, response.text
-        assert not (workspace / "projects" / "alpha").exists()
+        assert not (workspace / ".raiker" / "projects" / "alpha").exists()
 
     def test_project_deletion_requires_an_explicit_confirmation(
         self, client: TestClient

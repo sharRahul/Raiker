@@ -2716,6 +2716,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
+    def update_project_root(
+        self,
+        project_id: str,
+        root_subpath: str,
+        *,
+        expected_root_subpath: str | None = None,
+    ) -> bool:
+        """Change one project's root without changing its identity or ownership.
+
+        ``expected_root_subpath`` lets a filesystem migration refuse to replace
+        a concurrent change to the project row.
+        """
+        query = "UPDATE projects SET root_subpath = ? WHERE project_id = ?"
+        params: list[Any] = [root_subpath, project_id]
+        if expected_root_subpath is not None:
+            query += " AND root_subpath = ?"
+            params.append(expected_root_subpath)
+        with self.connect() as connection:
+            updated = connection.execute(query, params)
+        return updated.rowcount == 1
+
     # ── Managed knowledge files ──────────────────────────────────────────────
 
     def insert_managed_file(

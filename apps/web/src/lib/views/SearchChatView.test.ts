@@ -42,10 +42,25 @@ describe("SearchChatView", () => {
     );
   });
 
-  it("invites a search while the query is empty", async () => {
-    stubFetch({});
+  it("browses every chat recent-first while the query is empty", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/sessions": [
+        { ...MATCH, session_id: "sess_older", title: "Older chat", updated_at: "2026-07-15T01:00:00Z" },
+        { ...MATCH, session_id: "sess_newest", title: "Newest chat", updated_at: "2026-07-16T01:00:00Z" },
+      ],
+    });
     render(SearchChatView);
-    expect(await screen.findByText("Search your chats")).toBeInTheDocument();
+    expect(await screen.findByText("Newest chat")).toBeInTheDocument();
+    const links = screen.getAllByRole("link", { name: /open conversation/i });
+    expect(links[0]).toHaveAttribute("href", "#/new-chat?session=sess_newest");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("origin=chat"))).toBe(true);
+  });
+
+  it("keeps untitled and empty chats browseable", async () => {
+    stubFetch({ "GET /api/sessions": [{ ...MATCH, title: null, turn_count: 0 }] });
+    render(SearchChatView);
+    expect(await screen.findByText("Untitled chat")).toBeInTheDocument();
+    expect(screen.getByText(/0 turns/)).toBeInTheDocument();
   });
 
   it("links each match back into the conversation", async () => {

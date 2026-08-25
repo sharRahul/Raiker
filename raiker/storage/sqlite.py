@@ -1161,6 +1161,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection.execute("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)")
+            # A project's root is now one of two things. `root_kind` says which,
+            # and `root_grant_id` names the owner's grant when the root is a
+            # folder they already had. Defaulting to 'managed' makes this a
+            # no-op for every project that exists today.
+            for _root_column in (
+                "ALTER TABLE projects ADD COLUMN root_kind TEXT NOT NULL DEFAULT 'managed'",
+                "ALTER TABLE projects ADD COLUMN root_grant_id TEXT",
+                # Bytes Raiker discovered rather than wrote need a cheap change
+                # signal, or every reconcile re-hashes the whole tree.
+                "ALTER TABLE managed_files ADD COLUMN source_mtime_ns INTEGER",
+            ):
+                with contextlib.suppress(sqlite3.OperationalError):
+                    connection.execute(_root_column)
+            # Two projects over one folder would put a single file inside two
+            # mutually exclusive "only this project" boundaries, so the database
+            # refuses it rather than trusting every caller to check.
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_projects_attached_root "
+                    "ON projects(root_grant_id) WHERE root_grant_id IS NOT NULL"
+                )
             self._apply_migration(LOCK_SCREEN_MIGRATION_ID, LOCK_SCREEN_SQL, connection)
             self._backfill_legacy_account_data_owner(connection)
             self._apply_migration(
@@ -1178,6 +1199,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 BRAIN_SOURCE_GRANTS_MIGRATION_ID, BRAIN_SOURCE_GRANTS_SQL, connection
             )
+            # The grant stops implying read-only and starts saying what it
+            # allows, so one record can serve the Knowledge Map's read-only
+            # folders and a project's writable root. Applied here rather than in
+            # the projects block above, because that runs before this table
+            # exists.
+            with contextlib.suppress(sqlite3.OperationalError):
+                connection.execute(
+                    "ALTER TABLE brain_source_grants "
+                    "ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0"
+                )
             self._apply_migration(
                 BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection
             )
@@ -1877,7 +1908,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def list_brain_source_grants(self, owner_principal_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT root_id, path, label, created_at FROM brain_source_grants "
+                "SELECT root_id, path, label, created_at, write_enabled FROM brain_source_grants "
                 "WHERE owner_principal_id = ? ORDER BY created_at, path",
                 (owner_principal_id,),
             ).fetchall()
@@ -1887,11 +1918,35 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         self, owner_principal_id: str, root_id: str, path: str, label: str
     ) -> None:
         with self.connect() as connection:
+            # `INSERT OR REPLACE` would delete the existing row and write a
+            # fresh one, resetting `write_enabled` to its default. Re-granting a
+            # folder the owner already trusted must not quietly withdraw the
+            # write decision they made about it, so the conflict updates the
+            # describable fields and leaves that one alone.
             connection.execute(
-                "INSERT OR REPLACE INTO brain_source_grants "
-                "(owner_principal_id, root_id, path, label, created_at) VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO brain_source_grants "
+                "(owner_principal_id, root_id, path, label, created_at) VALUES (?, ?, ?, ?, ?) "
+                "ON CONFLICT(owner_principal_id, root_id) DO UPDATE SET path = excluded.path, "
+                "label = excluded.label",
                 (owner_principal_id, root_id, path, label, utc_now()),
             )
+
+    def set_grant_write_enabled(
+        self, owner_principal_id: str, root_id: str, enabled: bool
+    ) -> bool:
+        """Record whether Raiker may write into one granted folder.
+
+        A separate decision from the grant itself: reading a folder and editing
+        it are not the same permission, and the Knowledge Map's grants stay
+        read-only however a project uses them.
+        """
+        with self.connect() as connection:
+            updated = connection.execute(
+                "UPDATE brain_source_grants SET write_enabled = ? "
+                "WHERE owner_principal_id = ? AND root_id = ?",
+                (1 if enabled else 0, owner_principal_id, root_id),
+            )
+        return updated.rowcount == 1
 
     def remove_brain_source_grant(self, owner_principal_id: str, root_id: str) -> None:
         with self.connect() as connection:
@@ -2724,6 +2779,56 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (project_id, user_id) if user_id else (project_id,),
             ).fetchone()
         return dict(row) if row else None
+
+    def attach_project_root(
+        self, project_id: str, root_grant_id: str, *, user_id: str | None = None
+    ) -> bool:
+        """Point a project at a folder the owner granted.
+
+        `root_subpath` is cleared rather than kept: an attached project has no
+        workspace-relative root, and leaving a stale one behind would give the
+        resolver two answers to choose between.
+        """
+        if self.load_project(project_id, user_id) is None:
+            return False
+        with self.connect() as connection:
+            updated = connection.execute(
+                "UPDATE projects SET root_kind = 'attached', root_grant_id = ?, root_subpath = '' "
+                "WHERE project_id = ?",
+                (root_grant_id, project_id),
+            )
+        return updated.rowcount == 1
+
+    def detach_project_root(self, project_id: str, *, user_id: str | None = None) -> bool:
+        """Release the grant a project was attached to, leaving it rootless.
+
+        Deliberately keeps `root_kind = 'attached'`. Turning the project back
+        into a managed one would invent a root under `.raiker/projects/` that
+        the owner never asked for and that holds none of their work.
+        """
+        if self.load_project(project_id, user_id) is None:
+            return False
+        with self.connect() as connection:
+            updated = connection.execute(
+                "UPDATE projects SET root_grant_id = NULL WHERE project_id = ?", (project_id,)
+            )
+        return updated.rowcount == 1
+
+    def project_for_grant(
+        self, owner_principal_id: str, root_grant_id: str
+    ) -> dict[str, Any] | None:
+        """The project attached to one grant, if the caller owns it."""
+        user_id = self.principal_user_id(owner_principal_id)
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM projects WHERE root_grant_id = ?", (root_grant_id,)
+            ).fetchone()
+        if row is None:
+            return None
+        owner = row["owner_user_id"]
+        if user_id is not None and owner is not None and owner != user_id:
+            return None
+        return dict(row)
 
     def load_project_by_name(self, name: str) -> dict[str, Any] | None:
         with self.connect() as connection:

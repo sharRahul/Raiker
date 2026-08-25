@@ -88,7 +88,7 @@ names.
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
-| [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium | Memory / retrieval | Open — raised 2026-08-25 while verifying FIXED-283 live. The write half of semantic recall ships; the read half needs a gated path, not a shortcut |
+| [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium | Memory / retrieval | Open — raised 2026-08-25 while verifying FIXED-283 live. The write half of semantic recall ships; the read half needs a gated path, not a shortcut. **Widened 2026-08-25 (FIXED-289)**: managed knowledge files are lexical-only for the same reason |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (11 complete, 7 open; C14 branch-from-here closed as FIXED-227) |
 
@@ -728,6 +728,18 @@ checkable. Embedding a query is **provider egress, on a read path, once per
 search** — three properties that each argue for the gate rather than around it.
 Shipping the write half and stating the read half honestly is better than
 shipping a bypass and having to remove it.
+
+**What this now also decides (2026-08-25,
+[FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named)).**
+The managed knowledge libraries added a second body of retrievable text — the
+extracted chunks of the owner's uploaded files — and it was given a lexical index
+and **no vector projection**, on exactly this reasoning. Embedding file chunks at
+write time is the easy half; without the read half, a stored file vector could
+never be matched at query time. It would be an index nothing reads, and it would
+let Memory and Projects imply a semantic file search that does not exist. So this
+entry no longer scopes only approved memory: closing it gains a paraphrase over
+the owner's documents as well as over their remembered sentences, and until it
+closes, "search my files" means lexical search with exact provenance and says so.
 
 **The three questions the fix has to answer**, none of which is obvious:
 

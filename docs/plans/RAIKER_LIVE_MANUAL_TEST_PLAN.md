@@ -426,7 +426,25 @@ retained reasoning.
    network call.
 3. Remove a repository. The folder and the remote **MUST** be untouched.
 
-### 6.2 The three modes [S]
+### 6.2 The selected project [S]
+
+The selection is the execution and retrieval boundary, not a filing label.
+
+1. **[S]** With no project selected, **Send** **MUST** be disabled and the
+   composer **MUST** say a project is required. Typing a prompt **MUST NOT**
+   enable it.
+2. **[S]** Select a project. **MUST**: the composer names the project it is
+   working in.
+3. **[S]** Start a turn. While it streams, the selector **MUST** be disabled.
+4. Leave Build, return to it. **MUST**: the same project is still selected.
+5. With two projects each holding a file that mentions the same phrase, ask
+   Build about that phrase. **MUST**: only the selected project's file is
+   recalled, and the other project's is not — check the recall provenance.
+6. Assign one conversation to the selected project and leave another
+   unassigned. Ask Build about both. **MUST**: the assigned one can be recalled
+   and the unassigned one cannot.
+
+### 6.3 The three modes [S]
 
 1. **[S]** Build **MUST** open in **Auto** — the mode that sends no override.
 2. **[S]** `Shift+Tab` **MUST** cycle Plan → Edit → Auto without leaving the
@@ -439,7 +457,7 @@ retained reasoning.
 6. **MUST**: none of the three writes to your standing capability modes. Check
    Permissions before and after.
 
-### 6.3 Build a small proof of concept [S]
+### 6.4 Build a small proof of concept [S]
 
 This is the end-to-end coding exercise, and it is the point of the surface.
 
@@ -456,7 +474,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
    Both **MUST** be refused before anything is written.
 6. **MUST**: nothing writes into `.raiker/` or `.git/`, by any path.
 
-### 6.4 Code map
+### 6.5 Code map
 
 1. Turn on **Code map**. Index the repository.
 2. `@` in the composer **MUST** complete paths **from the map**, not the working
@@ -468,7 +486,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
 4. Ask where a symbol is defined, then for its references. A partial scan **MUST**
    report `partial` and name the bound it hit.
 
-### 6.5 Git
+### 6.6 Git
 
 1. Ask for a branch and a commit. Approve each. **MUST**: the commit stages
    exactly the paths you reviewed — never `--all`.
@@ -480,7 +498,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
    - Grant **once**, then **for this session**. Withdraw the session grant and
      confirm the next push asks again.
 
-### 6.6 Execution environment
+### 6.7 Execution environment
 
 1. Open the environment badge (`aria-label="Execution environment"`). Select each
    available profile.
@@ -493,7 +511,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
    **MUST** both be offered, and **MUST** be refused on a profile that rebuilds
    itself around every command.
 
-### 6.7 Background work
+### 6.8 Background work
 
 1. Start a long command with background execution. **Background work**
    (`aria-label="Background work"`) **MUST** list it.
@@ -502,7 +520,7 @@ This is the end-to-end coding exercise, and it is the point of the surface.
 3. Schedule a background agent with a **Cadence**. Each cycle **MUST** be one
    governed turn.
 
-### 6.8 The operating protocol
+### 6.9 The operating protocol
 
 Run the same prompt in Chat and in Build. **MUST**: the Build turn's audit record
 names its surface, and the protocol is a working method only — every gate,
@@ -559,13 +577,21 @@ fresh governed turn, and a missed slot is skipped rather than owed as a backlog.
    them, and a turn outside it does not.
 3. Set **Project memory setting** to each of *inherit*, *enabled*, *disabled*
    and confirm the behaviour changes.
-4. Assign a conversation to the project from the composer, and from the
-   recent-chat row. Both **MUST** work.
-5. Add files to the project. **MUST**: they reach a turn as bounded context and
-   **MUST NOT** grant filesystem access.
-6. Switch the **Active project** in the top bar. The Workbench and Chat **MUST**
-   scope to it.
-7. Delete the project. **MUST**: it says what will happen to its conversations
+4. Assign a conversation to the project from the composer, and from a row in
+   **Search chats**. Both **MUST** work.
+5. **[S]** **Project files** → **Add files**. Add a `.md`, a `.pdf`, a `.docx`,
+   a `.xlsx`, a legacy `.doc`, and something with no reader at all (rename a
+   binary to `.custom`). **MUST**: every one is stored. The first four reach
+   **Ready**; the `.doc` and the `.custom` read **Metadata only** and say why.
+   **MUST NOT**: any of them grant filesystem access.
+6. **Add folder**. Pick a folder two levels deep. **MUST**: the relative
+   hierarchy is preserved in the listed paths, and the files land under
+   `.raiker/projects/<slug>/`.
+7. Add the same relative path twice. **MUST**: the second is reported as a
+   duplicate and the first file's bytes are **not** overwritten.
+8. Delete a file from the library, then ask a turn in that project about its
+   contents. **MUST**: it is no longer recalled.
+9. Delete the project. **MUST**: it says what will happen to its conversations
    before you confirm.
 
 ---
@@ -630,7 +656,22 @@ changed and when.
 expiry, sensitivity and checksum — and a **refused** observation **MUST** be a
 row with its reason, so an empty list is distinguishable from a disabled feature.
 
-### 10.5 Recall
+### 10.5 The document library
+
+1. **[S]** **Document library** → **Add files**. **MUST**: it is visually
+   distinct from the approved atomic memories — an uploaded workbook and a
+   remembered sentence must not read as the same kind of thing.
+2. **MUST**: the file inputs offer **no** type filter. Add something Raiker
+   cannot parse and confirm it is stored as **Metadata only** with the reason.
+3. Delete the stored file from disk under `.raiker/memory-files/`, then press
+   **Retry**. **MUST**: it reports **Failed** rather than silently succeeding.
+   Restore the file and retry again. **MUST**: it returns to **Ready**.
+4. Ask Chat a question answered by one of these files. **MUST**: the passage is
+   recalled with its managed path, and it is labelled untrusted data.
+5. **MUST**: the same file is reachable from Chat regardless of which project
+   the conversation is filed under — this library belongs to the account.
+
+### 10.6 Recall
 
 1. Ask a question whose answer is in an approved memory, using **the same
    words**. It **MUST** be recalled.
@@ -640,7 +681,7 @@ row with its reason, so an empty list is distinguishable from a disabled feature
 3. **MUST**: each hit names the legs that found it, and the reply names the
    embedding space in force.
 
-### 10.6 Export and import
+### 10.7 Export and import
 
 Export memories, then import them into a fresh workspace. **MUST**: the count
 matches and nothing is silently dropped.
@@ -811,10 +852,13 @@ runtime*, Build to *Working in Build*.
 
 ## 17. Global chrome
 
-- **[S]** Sidebar: primary navigation, **More navigation**, **Recent chats**,
-  desktop reflow and independent scrolling, mobile overlay/open/close, and focus
-  restoration.
-- **[S]** Top bar: **Active project**, **Notification panel**, **Host control**.
+- **[S]** Sidebar: **Core** rendered directly, the collapsible **Knowledge**,
+  **Manage**, **Observe** and **Support** groups, desktop hide/show reflow and
+  independent scrolling, mobile overlay/open/close, and focus restoration.
+  **MUST**: the active route's group cannot be left collapsed.
+- **[S]** Top bar: **Notification panel** and **Host control**. **MUST NOT**:
+  a project selector or a theme toggle appears anywhere in the top bar — the
+  first belongs to Build, the second to Settings → Personalisation.
 - **[S]** The shell has three visually stable layers: low-saturation navigation,
   one control header, and the central workspace canvas. Navigation recedes; it
   never competes with code, logs, messages, or the current task.
@@ -943,17 +987,21 @@ tray in a headless environment where no system tray exists. 22.1–22.3, 22.5–
 
 ### 20.4 Items closed since this map was last rebuilt
 
-The map above was built on 2026-08-11 against 189 closed entries. Sixty-nine have
-closed since — FIXED-190 through FIXED-269 — covering deep-path-safe I/O, the
+The map above was built on 2026-08-11 against 189 closed entries. Ninety-three
+have closed since — FIXED-190 through FIXED-289, counted from the entries
+themselves rather than from the range — covering deep-path-safe I/O, the
 memory entity graph, the native sandbox, background execution and the POSIX
 terminal, restart reattachment, persistent environments, governed voice, the
 Build modes and operating protocol, the hooks surface and its lifecycle events,
-plugin contributions, channels, and the fourth approval mode.
+plugin contributions, channels, the fourth approval mode, and — as of
+2026-08-25 — managed knowledge libraries with a per-turn retrieval boundary
+([FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named),
+covered by the new §6.2, §8.5–§8.8 and §10.5).
 
 **Every one of them has a step in §3–§17 of this plan**, because those sections
 were written against the current product rather than grown from the old ones.
 What is *not* yet done is the per-entry attribution: mapping each of the
-sixty-nine to the step that proves it, in the shape of §20.1. That is the next
+ninety-three to the step that proves it, in the shape of §20.1. That is the next
 piece of work on this document, and until it is finished a Full sweep should
 treat §3–§17 as the obligation and this note as the honest caveat.
 

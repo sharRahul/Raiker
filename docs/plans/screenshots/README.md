@@ -47,6 +47,25 @@ The same run also exercises all seven Models tabs and all nine Settings sections
 as rendered audit states. Those extra deep links are assertions rather than new
 committed capture names, so the catalogue remains exactly 208 PNGs.
 
+**The desktop catalogue is one change behind, and here is exactly which change.**
+[FIXED-289](../FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named)
+landed after this refresh and altered four of the captured surfaces. The 156
+desktop files were **not** regenerated for it, because the sweep needs a
+credentialled live host, and a catalogue nobody re-ran is not evidence. What the
+current images no longer show:
+
+| Surface | The images show | The build now shows |
+|---|---|---|
+| Top bar (every route) | Global project selector and theme toggle | Neither; both moved to where they are explained |
+| Memory | Approved records only | A document library above them |
+| Projects (detail) | Instructions, sessions, tasks | A project file library between context and sessions |
+| Build | Optional "Project or folder" picker | A required project selector, with the boundary named above the composer |
+
+Everything else in the catalogue — navigation model, layout planes, type and
+control scale, both themes, all four display classes — is unchanged and still
+current. The next live sweep replaces the 156 desktop files and clears this note;
+until then, read these four surfaces from the code, not from the pictures.
+
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.
 

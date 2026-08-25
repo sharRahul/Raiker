@@ -556,6 +556,19 @@ model-visible behind their own gates, so the model proposes the exact text and
 the owner accepts it rather than Raiker silently remembering — or, with the gate
 off, nothing can be proposed and every surface says so.
 
+**Extended 2026-08-25 by
+[FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named).**
+Two changes to what "owner-scoped" means here. Recall now also reaches the
+owner's **managed knowledge files** — documents kept under `.raiker/memory-files/`
+for the account and under each project's managed root — as bounded passages with
+provenance back to the exact file and revision. And the boundary is now **stated
+by the turn** rather than inherited from an account-level active project: Chat
+stays owner-wide, while Build declares one project and can reach only account
+memory, account files, that project's memory and files, and the conversations
+assigned to it. The backend enforces both — the prompt API refuses a Build turn
+with no project, and the gatherer re-checks ownership and fails closed — so the
+boundary no longer depends on which selector a page happened to show.
+
 ### Tier 1 — working with the owner's material
 
 #### C4 — File inspector

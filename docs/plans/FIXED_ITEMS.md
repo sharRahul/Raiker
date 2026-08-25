@@ -301,6 +301,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-286](#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | tasks / delegation | Fixed (was BUG-220; raised 2026-08-21, closed 2026-08-25) |
 | [FIXED-287](#fixed-287--a-reopened-transcript-showed-the-answer-and-nothing-about-how-it-was-reached) | Low | Chat / transcript record | Fixed (was backlog #25; closed 2026-08-25) |
 | [FIXED-288](#fixed-288--three-interface-defects-found-while-exercising-the-four-above) | Low → Medium | Permissions / Models | Fixed (raised and closed 2026-08-25 during the live round) |
+| [FIXED-289](#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named) | Medium | Memory / Projects / Chat / Build retrieval | Fixed (closed 2026-08-25) |
 
 ---
 
@@ -12276,3 +12277,110 @@ sent the owner to a page with nothing left to fix on it.
 once the gate is enabled, while `canDisable` stays true);
 `apps/web/src/lib/views/CapabilitiesView.test.ts`;
 `apps/web/src/lib/components/ModelSetupDialog.test.ts`.
+
+---
+
+## FIXED-289 — Uploaded files had nowhere to live, and Build inherited a project nothing on screen named
+
+**Severity: Medium. Area: Memory / Projects / Chat / Build retrieval. Closed
+2026-08-25.**
+
+**Observed.** Two defects that turned out to be one shape.
+
+A file could reach Raiker only as a *chat attachment*: bound to the turn that
+carried it, stored in the encrypted database, and unreachable from any later
+conversation. There was no way to hand Raiker a document to keep — no folder of
+reference material for the account, none for a project. Memory held approved
+sentences; Projects held instructions and a root; neither held the owner's files.
+
+Separately, Chat and Build both took their project from an account-level "active
+project" set from a selector in the top bar. That selector was global, so
+choosing a project on one page silently changed what a turn on another page would
+retrieve, and nothing on the receiving page said which project it meant. Build —
+where the choice decides which repository is being worked in — could also start a
+turn with no project at all.
+
+**Root cause.** The attachment path was built for *one turn's* material and was
+correct for that. Nothing owned the other case: a durable, owner-scoped library of
+originals with a catalogue, an index, and a lifecycle. And the retrieval boundary
+was read from stored preference state rather than stated by the turn, so the
+backend could not enforce a rule the UI was the only expression of.
+
+**Fixed.** One managed-file system, and an explicit per-turn boundary.
+
+*Storage.* Originals live under `.raiker/memory-files/` for the account and
+`.raiker/projects/<slug>/` for a project. Every file type is accepted — acceptance
+is not a claim that Raiker can read the file, only that it will keep it. Writes
+are contained (resolved-root checks, traversal and symlink escapes rejected),
+atomic (same-directory temporary file plus `Path.replace`), and serialised across
+processes with the catalogue row they publish, so a committed active row always
+names the bytes it published.
+
+*Reading.* `raiker/knowledge/extractors.py` reuses the attachment path's
+local-only readers — a decode for text, pypdf for PDF, stdlib zip+XML for OOXML.
+A file with no safe local reader (legacy `.doc`/`.xls`, unknown binaries, a
+malformed or encrypted document) stays stored and becomes **metadata-only** with
+the reason stated. Extraction failure never costs the owner the original.
+
+*Projection.* Extracted text is a projection of the stored bytes, never a second
+source of truth: each chunk carries the content hash of the revision it came
+from, so replacing or deleting a file retires the stale revision before anything
+new is published. Retirement is one operation — projections first, then bytes and
+catalogue row — so an interruption can only leave a stored original with no index,
+recoverable by re-indexing, and never an index pointing at bytes that are gone.
+
+*Retrieval.* Every turn now states its own boundary as `surface` plus
+`project_id` rather than inheriting one. **Chat** is owner-wide: approved memory,
+managed files from anywhere the owner owns, and prior conversations. **Build**
+requires exactly one owned project and sees account memory, account memory files,
+that project's memory and files, and only the conversations assigned to it —
+another project's material, and an unassigned chat, are out of scope. The prompt
+API refuses Build without a project and Chat *with* one before a turn starts, and
+the context gatherer re-checks ownership and fails closed rather than widening to
+owner-wide recall.
+
+*The selector.* The top bar loses the global project selector and the theme
+toggle. Build owns the project choice where its consequences are visible: it is
+required before a turn can start, locked while one is streaming, remembered
+across visits, and re-resolved against the owned list so a stale remembered id
+reads as "no project selected" rather than standing as a boundary. Theme moved to
+Settings → Personalisation, where System remains the default.
+
+**Two things deliberately not done, so the record is not read as more than it is.**
+
+File chunks get a **lexical** index and exact provenance, and no vector or graph
+projection. The read half of semantic recall is not connected —
+`retrieval.default_query_embedder()` returns `None` for the reasons
+[BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it)
+records — so a stored file vector could never be matched at query time. It would
+have been an index nothing reads, and a claim of semantic file search Raiker
+cannot honour.
+
+Build's memory leg over-fetches and drops other projects' scopes rather than
+gaining a scope-list parameter through three store methods. That costs a slightly
+wider query and keeps **one** ranking function, rather than introducing a second,
+differently-tuned retrieval engine for Build — which the design explicitly ruled
+out.
+
+**User-interface outcome.** Memory and Projects each show a document library with
+grouped **Add files** / **Add folder** controls, no MIME filter in either input,
+and folder hierarchy preserved through `webkitRelativePath`. Each row states its
+managed relative path, size and type, and its honest index state: **Ready**,
+**Metadata only** with the reason there is no local reader, or **Failed** with a
+retry beside it. A folder import that trips over one member keeps every sibling it
+already stored and names the one that failed. Deleting stays outside the grouped
+control — removing a file is not one of a set of equivalent adds. Build shows
+which project it is working in above the composer, and says so plainly when none
+is selected instead of quietly starting work somewhere.
+
+**Evidence.** `tests/test_managed_knowledge_files.py`,
+`tests/test_project_root_migration.py`, `tests/test_managed_file_indexing.py`,
+`tests/test_managed_file_api.py` (13 cases: containment, all-file acceptance,
+per-file batch results, duplicate reporting, owner isolation, delete, retry),
+`tests/test_context_surface_scoping.py` (12 cases: Chat reaches every owned
+project, Build reaches only its own and excludes unassigned chats, and both the
+gatherer and the prompt API fail closed);
+`apps/web/src/lib/components/FileLibrary.test.ts` (8 cases),
+`apps/web/src/lib/views/BuildView.test.ts` (the project requirement, the
+streaming lock, and the boundary carried on the turn),
+`apps/web/src/lib/components/Topbar.test.ts` (neither control is in the shell).

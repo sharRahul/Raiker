@@ -41,7 +41,7 @@ Honest one-line assessments, each backed by the items below it.
 
 | Pillar | State | The thing in the way |
 |---|---|---|
-| [**P1**](#p1--a-polished-ai-assistant) Assistant | **Strong, and half a step from recalling a paraphrase.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects — and, as of 2026-08-25, a semantic recall space the owner can build in one governed action | The space exists and the *question* is not embedded into it (BUG-240), so matching is still lexical. That is the one thing between P1 and the claim |
+| [**P1**](#p1--a-polished-ai-assistant) Assistant | **Strong, and half a step from recalling a paraphrase.** Streaming, attachments, citations, search, export, branching, voice, incognito, projects, and — as of 2026-08-25 — a semantic recall space the owner can build in one governed action, plus managed libraries that finally give their own documents somewhere to live | The space exists and the *question* is not embedded into it (BUG-240), so matching is still lexical over memories **and** over files. That is the one thing between P1 and the claim |
 | [**P2**](#p2--a-governed-ai-agent) Governed agent | **Ahead of the field, and now delivering what it claims.** Re-governance at execution time, machine identity, measured sandbox boundaries and per-capability threat models are all things no compared platform has — and as of 2026-08-23 *recoverable* and *auditable* are reachable rather than asserted. As of 2026-08-24 the owner's switches are checked to actually be switches, and as of 2026-08-25 a task cannot report done over work it delegated | GEP-01, GEP-04, BUG-218 and BUG-220 are closed. What remains is composition — one brief that splits into routed children (backlog #23) — and the two owner decisions GEP-02 and ADD-14/15 |
 | [**P3**](#p3--a-capable-codingbuild-agent) Coding agent | **Closes the loop, and can now undo.** Real patches, real commits, real pushes, a governed terminal in a measured OS boundary, a code map, code review, and a governed rewind | Execution inside the sandbox is foreground-only: no interactive PTY on Windows, no background run that outlives the turn, no reattachment after a restart (BUG-194) |
 | [**P4**](#p4--an-extensible-governed-agent-platform) Platform | **Governed, and narrower than the reference set.** Hooks, skills, plugins, channels and MCP all extend without an execution surface of their own | The MCP client now negotiates the current revision, but implements a subset of it: no streamable-HTTP session semantics, no remote OAuth, no `server/discover`, no MCP Apps |
@@ -91,6 +91,7 @@ MEM-10's binding leg closed on 2026-08-25.
 | Owner-guided summarisation of a range | [backlog #9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort) | Proposed |
 | Post-Stage-J temporal tiers and bounded graph context | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-02/FME-03](MEMORY_RELIABILITY_PLAN.md#post-stage-j-expansion-backlog) | Future — begins only after Stage J evidence and atomic snapshot publication |
 | Premium responsive workspace shell | [ADD-26](TO_BE_ADDED.md#add-26--a-premium-responsive-workspace-shell) | **Closed 2026-08-25** — semantic palette, desktop reflow, compact overlay drawers, and 208 light/dark captures through 8K |
+| The owner's own documents | [FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named) | **Closed 2026-08-25** — Memory and Projects keep every file type in managed roots, with lexical passages and provenance back to the exact file and revision. Semantic matching over them waits on the same [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) read half |
 | A structured question to the owner mid-turn | [backlog #17](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort), [ADD-22](TO_BE_ADDED.md#add-22--a-structured-question-to-the-owner-mid-turn) | Proposed — the model cannot ask *which did you mean* |
 | Tool rows do not survive a reload | [FIXED-287](FIXED_ITEMS.md#fixed-287--a-reopened-transcript-showed-the-answer-and-nothing-about-how-it-was-reached) | **Closed 2026-08-25** — rebuilt from `tool_actions` through the presentation function the live stream uses |
 | GAP-CHAT remainder | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | 7 items; C2, C3(3), C10 and C12 are **owner policy decisions**, not implementation tasks |
@@ -101,6 +102,12 @@ found that the *read* half was never connected: the question is not embedded int
 the space, so a paraphrase still does not recall. That is now the one thing
 between P1 and "an assistant people keep using", and it is a much smaller item
 than MEM-10 was, with a governance question rather than a build in front of it.
+
+It also became a *wider* item on the same day. [FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named)
+gave the owner a place to keep their documents, and those documents are indexed
+lexically and deliberately not embedded — for exactly the reason above. So
+BUG-240 no longer stands between P1 and a paraphrase over remembered sentences
+alone; it stands between P1 and a paraphrase over the owner's material.
 
 ## P2 — A governed AI agent
 

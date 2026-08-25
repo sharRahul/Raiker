@@ -178,9 +178,16 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
         const bounds = await page.locator('[data-testid="responsive-page"]').evaluate((node) => {
           const pageBox = node.getBoundingClientRect();
           const content = document.querySelector("main#main")!.getBoundingClientRect();
+          const layout = (node as HTMLElement).dataset.layout;
           return {
             width: pageBox.width,
-            max: (node as HTMLElement).dataset.layout === "reading" ? 72 * 16 : 90 * 16,
+            max: layout === "reading"
+              ? 72 * 16
+              : layout === "operational"
+                ? 112 * 16
+                : layout === "work-surface"
+                  ? content.width
+                  : 90 * 16,
             centeringError: Math.abs((pageBox.left - content.left) - (content.right - pageBox.right)),
           };
         });

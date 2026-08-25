@@ -397,3 +397,100 @@ test("new-account Workbench is a board over the work, not a second composer", as
   await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
   await page.screenshot({ path: join(shots, "workbench-dashboard-redesign.png"), fullPage: true });
 });
+
+test("desktop view audit covers every route, Models tab, and Settings section", async ({ page }) => {
+  test.setTimeout(120_000);
+  await page.setViewportSize({ width: 1920, height: 1080 });
+
+  const canonical = [
+    ["workbench", "Workbench", "operational"],
+    ["new-chat", "Chat", "work-surface"],
+    ["build", "Build", "work-surface"],
+    ["search-chat", "Search chats", "reading"],
+    ["tasks", "Tasks", "operational"],
+    ["projects", "Projects", "operational"],
+    ["memory", "Memory", "operational"],
+    ["brain", "Knowledge Map", "operational"],
+    ["approvals", "Approvals", "operational"],
+    ["capabilities", "Permissions", "operational"],
+    ["models?tab=local", "Models", "operational"],
+    ["extensions?tab=connectors", "Extensions", "operational"],
+    ["extensions?tab=mcp", "Extensions", "operational"],
+    ["extensions?tab=skills", "Extensions", "operational"],
+    ["extensions?tab=hooks", "Extensions", "operational"],
+    ["extensions?tab=plugins", "Extensions", "operational"],
+    ["extensions?tab=channels", "Extensions", "operational"],
+    ["observe?tab=overview", "Observability", "operational"],
+    ["observe?tab=sessions", "Observability", "operational"],
+    ["observe?tab=activity", "Observability", "operational"],
+    ["observe?tab=checkpoints", "Observability", "operational"],
+    ["observe?tab=diagnostics", "Observability", "operational"],
+    ["observe?tab=work", "Observability", "operational"],
+    ["observe?tab=notifications", "Observability", "operational"],
+    ["guide", "Guide", "reading"],
+    ["settings?tab=general", "Settings", "workspace"],
+  ] as const;
+  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing", "posture"] as const;
+  const settingsSections = [
+    "notification", "personalisation", "security", "privacy", "account",
+    "web-access", "git-credential", "runtime",
+  ] as const;
+  const settingsLabels: Record<string, string> = {
+    general: "General",
+    notification: "Notifications",
+    personalisation: "Personalisation",
+    security: "Security & sign-in",
+    privacy: "Privacy",
+    account: "Account",
+    "web-access": "Web access",
+    "git-credential": "Git credential",
+    runtime: "Runtime configuration",
+  };
+  const states = [
+    ...canonical,
+    ...modelTabs.map((tab) => [`models?tab=${tab}`, "Models", "operational"] as const),
+    ...settingsSections.map((tab) => [`settings?tab=${tab}`, "Settings", "workspace"] as const),
+  ];
+
+  for (const [route, title, layout] of states) {
+    await page.goto(`http://raiker.test/#/${route}`);
+    const canvas = page.getByTestId("responsive-page");
+    await expect(canvas, route).toHaveAttribute("data-layout", layout);
+    await expect(page.locator("header .page-title"), route).toHaveText(title);
+    await expect(page.locator("header .page-hint"), route).not.toBeEmpty();
+
+    const requestedTab = new URLSearchParams(route.split("?", 2)[1] ?? "").get("tab");
+    if (requestedTab && (route.startsWith("models") || route.startsWith("extensions") || route.startsWith("observe"))) {
+      await expect(page.locator(`[role="tab"][data-tab="${requestedTab}"]`), route).toHaveAttribute("aria-selected", "true");
+    }
+    if (requestedTab && route.startsWith("settings")) {
+      const selectedSection = page.locator('.section-rail [aria-current="page"]');
+      await expect(selectedSection, route).toHaveCount(1);
+      await expect(selectedSection, route).toHaveText(settingsLabels[requestedTab]);
+    }
+
+    const geometry = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLElement>('[data-testid="responsive-page"]')!;
+      const main = document.querySelector<HTMLElement>("main#main")!;
+      const canvasBox = canvas.getBoundingClientRect();
+      const mainBox = main.getBoundingClientRect();
+      const emptyIcons = [...document.querySelectorAll("main#main svg, header svg, nav svg")]
+        .filter((svg) => svg.getBoundingClientRect().width > 0 && svg.children.length === 0).length;
+      const control = document.querySelector<HTMLElement>("main#main button, main#main input, main#main select");
+      const visibleChild = ([...canvas.children] as HTMLElement[])
+        .find((child) => child.getBoundingClientRect().width > 0);
+      return {
+        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        emptyIcons,
+        centeringError: Math.abs((canvasBox.left - mainBox.left) - (mainBox.right - canvasBox.right)),
+        firstChildRatio: visibleChild ? visibleChild.getBoundingClientRect().width / canvasBox.width : 1,
+        controlFont: control ? Number.parseFloat(getComputedStyle(control).fontSize) : 0,
+      };
+    });
+    expect(geometry.overflow, route).toBeLessThanOrEqual(1);
+    expect(geometry.emptyIcons, route).toBe(0);
+    expect(geometry.centeringError, route).toBeLessThanOrEqual(1);
+    if (route === "tasks") expect(geometry.firstChildRatio, route).toBeGreaterThanOrEqual(0.9);
+    if (geometry.controlFont > 0) expect(geometry.controlFont, route).toBeLessThanOrEqual(16);
+  }
+});

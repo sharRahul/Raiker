@@ -7,6 +7,7 @@
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
+  import FileLibrary from "../components/FileLibrary.svelte";
   import { api, ApiError } from "../api";
   import type {
     ProjectDetail,
@@ -450,6 +451,12 @@
         <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
         <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
         {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}
+        <FileLibrary
+          scope="project"
+          projectId={detail.project.project_id}
+          heading="Project files"
+          description="Files kept under this project's managed root. Build can read them only while this project is selected."
+        />
         <h3 class="kicker">Sessions</h3>
         {#if detail.sessions.length === 0}
           <p class="sub">No sessions yet — chats started while this project is active land here.</p>

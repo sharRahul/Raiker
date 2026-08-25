@@ -7,6 +7,7 @@
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
   import GuideLink from "../components/GuideLink.svelte";
+  import FileLibrary from "../components/FileLibrary.svelte";
 
   type MemoryImport = Array<Partial<MemoryControlView> & { text: string }>;
   let memories = $state<MemoryControlView[] | null>(null);
@@ -408,6 +409,18 @@
 {:else}
   <section class="summary" aria-label="Memory summary">
     <div><strong>{approved.length}</strong><span>Approved</span></div><div><strong>{pending.length + relationshipProposals.length}</strong><span>Pending review</span></div><div><strong>{approved.filter((m) => m.pinned).length}</strong><span>Pinned</span></div><div><strong>{expired.length}</strong><span>Withheld or expired</span></div>
+  </section>
+
+  <!-- The document library is deliberately its own section, above the atomic
+       records and outside their filters: an uploaded workbook and an approved
+       remembered sentence are different kinds of thing, and mixing them into
+       one list makes it impossible to tell which one answered a question. -->
+  <section class="memory-section library-section" aria-label="Memory document library">
+    <FileLibrary
+      scope="memory"
+      heading="Document library"
+      description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
+    />
   </section>
 
   <section class="filters" aria-label="Filter memories">

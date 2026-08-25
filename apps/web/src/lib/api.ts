@@ -112,6 +112,11 @@ import type {
   WebBlocklist,
   WebBlocklistProbe,
   GitCredentialStatus,
+  ManagedFile,
+  ManagedFileImportResponse,
+  ManagedFileList,
+  ManagedFileScope,
+  ManagedFileUpload,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 
@@ -1640,6 +1645,37 @@ export const api = {
     anchor.click();
     setTimeout(() => URL.revokeObjectURL(url));
   },
+  // ── Managed knowledge files ───────────────────────────────────────────────
+  // Memory and Projects share one contract, differing only in which managed
+  // root the file lands in. Every file type is accepted; whether its text can
+  // be indexed is reported back per file, never assumed by the client.
+  deleteManagedFile: (fileId: string) =>
+    request<{ ok: boolean } & ManagedFile>(
+      `/api/managed-files/${encodeURIComponent(fileId)}`,
+      { method: "DELETE" },
+    ),
+  retryManagedFile: (fileId: string) =>
+    postJson<{ ok: boolean } & ManagedFile>(
+      `/api/managed-files/${encodeURIComponent(fileId)}/retry`,
+      {},
+    ),
+  managedFiles: (scope: ManagedFileScope, projectId: string | null) =>
+    scope === "memory"
+      ? request<ManagedFileList>("/api/memory/files")
+      : request<ManagedFileList>(
+          `/api/projects/${encodeURIComponent(projectId ?? "")}/managed-files`,
+        ),
+  importManagedFiles: (
+    scope: ManagedFileScope,
+    projectId: string | null,
+    files: ManagedFileUpload[],
+  ) =>
+    scope === "memory"
+      ? postJson<ManagedFileImportResponse>("/api/memory/files", { files })
+      : postJson<ManagedFileImportResponse>(
+          `/api/projects/${encodeURIComponent(projectId ?? "")}/managed-files`,
+          { files },
+        ),
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
   createProject: (name: string) =>

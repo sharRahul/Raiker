@@ -39,6 +39,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
   streamPromptMock.mockReset();
   resetModels();
+  // Build remembers its project across visits, which is the product behaviour —
+  // so a test that selected one must not hand it to the next test.
+  window.localStorage.removeItem("raiker.build.project");
 });
 
 const DEFAULT_READY_PROFILE = {
@@ -175,11 +178,37 @@ function modeTrigger() {
   return screen.getByRole("button", { name: /^How much Raiker may do this turn:/ });
 }
 
+// Build cannot start a turn without a project, so every test that sends one has
+// to choose one first. That is the product rule, not a test detail: the
+// selection is the retrieval and execution boundary the turn runs inside.
+const BUILD_PROJECTS: ProjectsList = {
+  projects: [
+    {
+      project_id: "proj_1",
+      name: "Landing page",
+      root_subpath: ".raiker/projects/landing-page",
+      created_at: "2026-07-01T00:00:00Z",
+      session_count: 0,
+      selected: false,
+    },
+  ],
+  active_project_id: null,
+} as ProjectsList;
+
+/** Render Build with a project already selected, ready to send. */
+async function renderBuildWithProject(props: Record<string, unknown> = {}) {
+  const result = render(BuildView, { props: { projects: BUILD_PROJECTS, ...props } });
+  await fireEvent.change(await screen.findByLabelText("Project for this build"), {
+    target: { value: "proj_1" },
+  });
+  return result;
+}
+
 describe("Build composer modes", () => {
   it("opens in Auto and sends no turn-scoped override for it", async () => {
     stubFetch(baseRoutes());
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     expect(await screen.findByRole("button", {
       name: "How much Raiker may do this turn: Auto",
@@ -199,7 +228,7 @@ describe("Build composer modes", () => {
 
   it("is the Code-minimal composer: no Chat switch, no duplicate capacity chip", async () => {
     stubFetch(baseRoutes());
-    render(BuildView);
+    await renderBuildWithProject();
 
     await screen.findByLabelText("Describe the change");
     expect(screen.queryByRole("group", { name: "Chat or Build" })).not.toBeInTheDocument();
@@ -213,7 +242,7 @@ describe("Build composer modes", () => {
     vi.stubGlobal("SpeechRecognition", FakeRecognition);
     stubFetch({ ...baseRoutes(), "GET /api/settings": { settings: { "general.speech_language": "en" }, status: { username: "Owner" } } });
     streamPromptMock.mockResolvedValue(undefined);
-    render(BuildView);
+    await renderBuildWithProject();
 
     await fireEvent.click(await screen.findByRole("button", { name: "Dictate" }));
     FakeRecognition.instance.final("check the repository");
@@ -228,7 +257,7 @@ describe("Build composer modes", () => {
     vi.stubGlobal("SpeechRecognition", FakeRecognition);
     stubFetch(baseRoutes());
     streamPromptMock.mockResolvedValue(undefined);
-    render(BuildView);
+    await renderBuildWithProject();
     const prompt = await screen.findByLabelText("Describe the change");
     await fireEvent.input(prompt, { target: { value: "keep this" } });
     await fireEvent.click(screen.getByRole("button", { name: "Dictate" }));
@@ -245,7 +274,7 @@ describe("Build composer modes", () => {
   it("offers manual read aloud beside Copy only after a Build answer completes", async () => {
     stubFetch(baseRoutes());
     respondWith("Build answer");
-    render(BuildView);
+    await renderBuildWithProject();
     await fireEvent.input(await screen.findByLabelText("Describe the change"), { target: { value: "Plan it" } });
     await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
 
@@ -256,7 +285,7 @@ describe("Build composer modes", () => {
   it("preserves the change and disables Send when the exact model is unready", async () => {
     const stopped = { ...REASONING_PROFILE, ready: false, readiness_state: "runtime_stopped", readiness_summary: "The local runtime is stopped.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start it, then check again." };
     stubFetch(baseRoutes({ "GET /api/models": { ...MODELS, profiles: [stopped], chat_profiles: [stopped] } }));
-    render(BuildView);
+    await renderBuildWithProject();
     const box = screen.getByLabelText("Describe the change");
     await fireEvent.input(box, { target: { value: "keep this change" } });
     await waitFor(() => expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled());
@@ -270,7 +299,7 @@ describe("Build composer modes", () => {
     // The mode is now this conversation's posture, so nothing standing is
     // written at all.
     const fetchMock = stubFetch(baseRoutes());
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Plan");
     expect(modeTrigger()).toHaveAccessibleName("How much Raiker may do this turn: Plan");
@@ -285,7 +314,7 @@ describe("Build composer modes", () => {
     // Auto was the sharpest case: it set four high-risk permissions to `auto`
     // with no confirmation. It now sends no override at all.
     const fetchMock = stubFetch(baseRoutes());
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Auto");
 
@@ -299,7 +328,7 @@ describe("Build composer modes", () => {
     // With every write still at Ask, "low-risk changes run unprompted" would be
     // the same lie the old chip told — just in the other direction.
     stubFetch(baseRoutes({ "GET /api/capability-gates": gates("ask") }));
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Auto");
 
@@ -309,7 +338,7 @@ describe("Build composer modes", () => {
 
   it("says it could not read the standing permissions rather than assuming them", async () => {
     stubFetch(baseRoutes({ "GET /api/capability-gates": undefined }));
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Auto");
 
@@ -318,7 +347,7 @@ describe("Build composer modes", () => {
 
   it("states that the mode applies to this conversation only", async () => {
     stubFetch(baseRoutes());
-    render(BuildView);
+    await renderBuildWithProject();
 
     await fireEvent.click(
       await screen.findByRole("button", { name: /^How much Raiker may do this turn:/ }),
@@ -332,7 +361,7 @@ describe("Build composer modes", () => {
   it("sends the mode as a turn-scoped posture with the prompt", async () => {
     stubFetch(baseRoutes());
     respondWith("Here is the plan.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Plan");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
@@ -354,7 +383,7 @@ describe("Build composer modes", () => {
   it("sends no posture at all in Auto", async () => {
     stubFetch(baseRoutes());
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Auto");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
@@ -369,7 +398,7 @@ describe("Build composer modes", () => {
   it("sends the turn with the planning option the mode carries", async () => {
     stubFetch(baseRoutes());
     respondWith("Here is the plan.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await pickMode("Plan");
     await fireEvent.input(screen.getByLabelText("Describe the change"), {
@@ -392,7 +421,7 @@ describe("Build model picker", () => {
       },
     }));
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Model for this turn: Reasoning Model" })).toBeInTheDocument(),
@@ -429,7 +458,7 @@ describe("Build model picker", () => {
 
   it("calls an unavailable choice Not selected", async () => {
     stubFetch(baseRoutes({ "GET /api/models": { ...MODELS, profiles: [], chat_profiles: [] } }));
-    render(BuildView);
+    await renderBuildWithProject();
 
     expect(await screen.findByRole("button", { name: "Model for this turn: Not selected" })).toBeInTheDocument();
     // No model means no published effort levels, so the Effort section is absent
@@ -443,7 +472,7 @@ describe("Build repository context", () => {
   it("attaches a local repository's path so the turn is bounded to it", async () => {
     stubFetch(baseRoutes({ "GET /api/code/repos": reposView({ repos: [LOCAL_REPO], selected_repo_id: "repo_local" }) }));
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await screen.findByRole("button", { name: /my-app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Rename the header" } });
@@ -458,7 +487,7 @@ describe("Build repository context", () => {
   it("renders sent attachment cards outside the prompt bubble", async () => {
     stubFetch(baseRoutes());
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await fireEvent.click(screen.getByLabelText("Add attachment"));
     await fireEvent.input(screen.getByLabelText("Attachment path"), {
@@ -479,7 +508,7 @@ describe("Build repository context", () => {
     // precisely so the transcript shows what was actually sent.
     stubFetch(baseRoutes({ "GET /api/code/repos": reposView({ repos: [GITHUB_REPO], selected_repo_id: "repo_gh" }) }));
     respondWith("Done.");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await screen.findByRole("button", { name: /octo\/app/ });
     await fireEvent.input(screen.getByLabelText("Describe the change"), { target: { value: "Summarise the README" } });
@@ -502,7 +531,7 @@ describe("Build repository context", () => {
         }),
       }),
     );
-    render(BuildView);
+    await renderBuildWithProject();
 
     expect(await screen.findByText(/no longer in the workspace/i)).toBeInTheDocument();
   });
@@ -517,7 +546,7 @@ describe("Build repository context", () => {
         }),
       }),
     );
-    render(BuildView);
+    await renderBuildWithProject();
 
     await fireEvent.click(await screen.findByRole("button", { name: /octo\/app/ }));
     const panel = await screen.findByRole("region", { name: "Repositories" });
@@ -526,20 +555,6 @@ describe("Build repository context", () => {
 });
 
 describe("Build project filing", () => {
-  const PROJECTS: ProjectsList = {
-    projects: [
-      {
-        project_id: "proj_1",
-        name: "Landing page",
-        root_subpath: "projects/landing-page",
-        created_at: "2026-07-01T00:00:00Z",
-        session_count: 0,
-        selected: false,
-      },
-    ],
-    active_project_id: null,
-  } as ProjectsList;
-
   it("files the chat as soon as the first turn creates a session", async () => {
     // Choosing a project before the chat exists must not silently do nothing.
     const fetchMock = stubFetch({
@@ -548,9 +563,9 @@ describe("Build project filing", () => {
       "GET /api/approvals": [],
     });
     respondWith("Done.");
-    render(BuildView, { props: { projects: PROJECTS } });
+    render(BuildView, { props: { projects: BUILD_PROJECTS } });
 
-    await fireEvent.change(await screen.findByLabelText("Project for this chat"), {
+    await fireEvent.change(await screen.findByLabelText("Project for this build"), {
       target: { value: "proj_1" },
     });
     expect(await screen.findByText(/filed there as soon as it starts/i)).toBeInTheDocument();
@@ -567,6 +582,58 @@ describe("Build project filing", () => {
   });
 });
 
+describe("Build project requirement", () => {
+  it("requires a project before Build can send", async () => {
+    stubFetch(baseRoutes());
+    render(BuildView, { props: { projects: BUILD_PROJECTS } });
+
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
+    });
+
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+    expect(screen.getByText(/select a project to start/i)).toBeVisible();
+  });
+
+  it("names the boundary once a project is selected", async () => {
+    stubFetch(baseRoutes());
+    await renderBuildWithProject();
+
+    expect(await screen.findByText(/working in/i)).toBeVisible();
+    expect(screen.getByRole("button", { name: /^send$/i })).toBeDisabled();
+  });
+
+  it("sends the selected project as the turn's boundary", async () => {
+    stubFetch(baseRoutes());
+    respondWith("Done.");
+    await renderBuildWithProject();
+
+    await fireEvent.input(screen.getByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() => expect(streamPromptMock).toHaveBeenCalled());
+    expect(streamPromptMock.mock.calls[0][0].surface).toBe("build");
+    expect(streamPromptMock.mock.calls[0][0].project_id).toBe("proj_1");
+  });
+
+  it("locks the selector while a turn is streaming", async () => {
+    stubFetch(baseRoutes());
+    streamPromptMock.mockImplementation(() => new Promise(() => {}));
+    await renderBuildWithProject();
+
+    await fireEvent.input(screen.getByLabelText("Describe the change"), {
+      target: { value: "Add a settings page" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Project for this build")).toBeDisabled(),
+    );
+  });
+});
+
 describe("Build background work rail", () => {
   it("uses a modal right drawer on compact screens", async () => {
     vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
@@ -575,7 +642,7 @@ describe("Build background work rail", () => {
       removeEventListener: vi.fn(),
     }));
     stubFetch(baseRoutes());
-    render(BuildView);
+    await renderBuildWithProject();
     const trigger = await screen.findByRole("button", { name: /background work/i });
     await fireEvent.click(trigger);
     const drawer = await screen.findByRole("dialog", { name: "Background work" });
@@ -608,7 +675,7 @@ describe("Build background work rail", () => {
         ],
       }),
     );
-    render(BuildView);
+    await renderBuildWithProject();
 
     // The rail is collapsed by default; open it to view running work.
     await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
@@ -628,7 +695,7 @@ describe("Build background work rail", () => {
       ...baseRoutes(),
       "POST /api/tasks": { task_id: "task_new" },
     });
-    render(BuildView);
+    await renderBuildWithProject();
 
     // The rail is collapsed by default; open it to reach the agent form.
     await fireEvent.click(await screen.findByRole("button", { name: /background work/i }));
@@ -658,7 +725,7 @@ describe("Build transcript rendering", () => {
   it("renders a markdown answer as real elements", async () => {
     stubFetch(baseRoutes());
     respondWith("## Plan\n\n1. Read the file\n2. Patch it\n\n```ts\nconst x = 1;\n```");
-    render(BuildView);
+    await renderBuildWithProject();
 
     await fireEvent.input(await screen.findByLabelText("Describe the change"), {
       target: { value: "Plan the change" },

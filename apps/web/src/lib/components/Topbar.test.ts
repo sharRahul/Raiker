@@ -1,5 +1,8 @@
 // The topbar is the shell's status strip: route identity, notification
-// access, theme, and the stop switch — reachable on every route.
+// access, host and the stop switch — reachable on every route. It carries no
+// project selector and no theme toggle: a global project silently retargeted
+// every surface, and a theme is a preference, so both moved to where they are
+// explained (Build and Settings respectively).
 import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Topbar from "./Topbar.svelte";
@@ -31,6 +34,19 @@ const NOTIFICATIONS = [
     created_at: "2026-07-17T00:00:00Z",
   },
 ];
+
+describe("Topbar scope", () => {
+  it("keeps project and theme choices out of the top bar", async () => {
+    stubFetch({ "GET /api/notifications": [] });
+    render(Topbar, { title: "Chat", hint: "Ask anything" });
+
+    await screen.findByRole("button", { name: "Notifications" });
+    // The project selector belongs to Build, where the boundary it sets is
+    // visible for the whole session; the theme toggle belongs to Settings.
+    expect(screen.queryByLabelText("Active project")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/theme/i)).not.toBeInTheDocument();
+  });
+});
 
 describe("Topbar notifications", () => {
   it("shows the unread count on the notifications button", async () => {

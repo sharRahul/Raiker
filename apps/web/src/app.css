@@ -159,6 +159,14 @@
   --control-y: 0.42rem;
   --control-x: 0.85rem;
   --control-min-h: 40px;
+
+  /* Named control sizes. Density scales `--control-min-h`; these three are the
+     fixed contract every surface can reach for when a control has to be a
+     specific size regardless of density: compact for dense toolbars, normal for
+     ordinary controls, prominent for touch-critical ones. */
+  --control-compact: 32px;
+  --control-normal: 40px;
+  --control-prominent: 44px;
   --row-y: 0.5rem;
   --row-x: 0.6rem;
   --card-pad-y: var(--space-4);
@@ -702,6 +710,50 @@ code,
 .tab-control {
   min-height: var(--control-min-h);
   font-size: var(--text-sm);
+}
+
+/* Segmented group for *related, non-destructive* actions. Destructive and
+   primary actions stay outside a group, because a segmented control reads as
+   "pick one of these equivalent things" and deleting is not equivalent to
+   adding. Each member keeps its own accessible name; the group only supplies
+   the shared border and radius. */
+.icon-button-group {
+  display: inline-flex;
+  align-items: stretch;
+}
+.icon-button-group > .control {
+  min-height: var(--control-min-h);
+  padding: var(--control-y) var(--control-x);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-2);
+  border-radius: 0;
+  cursor: pointer;
+}
+.icon-button-group > .control + .control {
+  border-left-width: 0;
+}
+.icon-button-group > .control:first-child {
+  border-top-left-radius: var(--r-sm);
+  border-bottom-left-radius: var(--r-sm);
+}
+.icon-button-group > .control:last-child {
+  border-top-right-radius: var(--r-sm);
+  border-bottom-right-radius: var(--r-sm);
+}
+.icon-button-group > .control:hover:not(:disabled) {
+  background: var(--accent-soft);
+  color: var(--text-1);
+}
+.icon-button-group > .control:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.icon-button-group > .control:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  position: relative;
+  z-index: 1;
 }
 
 .card {

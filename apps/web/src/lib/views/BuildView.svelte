@@ -363,11 +363,43 @@
     }
   }
 
-  // ── Project assignment ───────────────────────────────────────────────
-  // A chat can be filed into a project before it exists as a session. The
-  // choice is remembered and applied as soon as the first turn creates one, so
-  // "file this under X" never silently does nothing.
-  let projectId = $state("");
+  // ── Project selection ────────────────────────────────────────────────
+  // Build owns its project, and a project is required before work can start.
+  // That is not a UI preference: the selection *is* the execution boundary —
+  // the files, memories and conversations the turn may retrieve — so a Build
+  // session with no project has no boundary to run inside. It used to fall back
+  // to an account-level "active project" set from the top bar, which meant the
+  // boundary could change from another page without anything here saying so.
+  //
+  // The choice is remembered locally so returning to Build resumes where the
+  // owner left off, and it cannot change mid-turn.
+  const BUILD_PROJECT_KEY = "raiker.build.project";
+  let projectId = $state(readRememberedProject());
+
+  function readRememberedProject(): string {
+    try {
+      return window.localStorage.getItem(BUILD_PROJECT_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  }
+
+  function rememberProject(value: string) {
+    try {
+      if (value === "") window.localStorage.removeItem(BUILD_PROJECT_KEY);
+      else window.localStorage.setItem(BUILD_PROJECT_KEY, value);
+    } catch {
+      // A blocked storage is a lost preference, never a blocked turn.
+    }
+  }
+
+  // A remembered id that no longer names an owned project must not silently
+  // stand as a boundary. Resolving it against the loaded list is what turns a
+  // stale preference back into "no project selected".
+  const selectedProject = $derived(
+    projects?.projects.find((project) => project.project_id === projectId) ?? null,
+  );
+  const projectReady = $derived(projectId !== "" && selectedProject !== null);
   let pendingProjectId: string | null = null;
   let projectNotice = $state<string | null>(null);
 
@@ -786,6 +818,10 @@
           text: sent,
           input_mode: inputMode,
           surface: "build",
+          // The boundary rides the turn. The server re-checks it and refuses a
+          // Build turn without an owned project, so this is what to send, not
+          // merely what to display.
+          project_id: projectId,
           session_id: sessionId ?? undefined,
           model_profile: modelProfile || undefined,
           model: model || undefined,
@@ -998,7 +1034,9 @@
 
   // ── Projects ─────────────────────────────────────────────────────────
   async function onProjectPicked(value: string) {
+    if (streaming) return;
     projectId = value;
+    rememberProject(value);
     projectNotice = null;
     const target = value === "" ? null : value;
     if (sessionId === null) {
@@ -1531,23 +1569,22 @@
               onactivechange={onVoiceActive}
             />
             <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
-            {#if projects && projects.projects.length > 0}
-              <label class="project-picker">
-                <Icon name="folder" size={14} />
-                <span class="sr-only">Project for this chat</span>
-                <select
-                  class="bar-select"
-                  value={projectId}
-                  aria-label="Project for this chat"
-                  onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
-                >
-                  <option value="">Project or folder</option>
-                  {#each projects.projects as project (project.project_id)}
-                    <option value={project.project_id}>{project.name}</option>
-                  {/each}
-                </select>
-              </label>
-            {/if}
+            <label class="project-picker" data-selected={projectReady}>
+              <Icon name="folder" size={14} />
+              <span class="sr-only">Project for this build</span>
+              <select
+                class="bar-select"
+                value={projectId}
+                aria-label="Project for this build"
+                disabled={streaming}
+                onchange={(event) => void onProjectPicked((event.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">Select a project</option>
+                {#each projects?.projects ?? [] as project (project.project_id)}
+                  <option value={project.project_id}>{project.name}</option>
+                {/each}
+              </select>
+            </label>
             <ApprovalModeControl />
             <ExecutionEnvironmentBadge />
           </div>
@@ -1592,13 +1629,24 @@
             <button
               type="submit"
               class="btn btn-primary send"
-              disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
+              disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked || !projectReady}
             >
               <Icon name={streaming ? "clock" : "send"} size={15} />
               <span class="send-label">{streaming ? "Working…" : "Send"}</span>
             </button>
           </div>
         </div>
+        {#if !projectReady}
+          <p class="project-required" role="status">
+            Select a project to start. Build reads and writes inside one project;
+            it cannot run without one.
+          </p>
+        {:else}
+          <p class="project-boundary" role="status">
+            Working in <strong>{selectedProject?.name}</strong>. Build can use this
+            project's files, its memory, and account memory.
+          </p>
+        {/if}
         <p class="shortcut-hint">
           Shift+Tab changes mode · Enter sends · <code>/</code> for commands ·
           <code>@</code> to mention a file ·
@@ -2085,6 +2133,15 @@
     justify-content: flex-end;
     min-width: 0;
   }
+  .project-required,
+  .project-boundary {
+    margin: 0.35rem 0 0;
+    font-size: var(--text-xs);
+    color: var(--text-3);
+  }
+  .project-required { color: var(--danger); }
+  .project-boundary strong { color: var(--text-1); }
+
   /* Same setting pill as the Chat composer, so the two conversation surfaces
      present their per-turn controls identically. */
   .bar-select {

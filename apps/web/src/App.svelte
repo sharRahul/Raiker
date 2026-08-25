@@ -93,7 +93,6 @@
   >("locked");
   let principal = $state("—");
   let projects = $state<ProjectsList | null>(null);
-  const activeProjectId = $derived(projects?.active_project_id ?? null);
   let continuedSessionId = $state<string | null>(
     typeof window === "undefined"
       ? null
@@ -178,8 +177,10 @@
     }
   }
 
-  // Same for projects: the Projects view and the topbar switcher share one
-  // snapshot so the active project reads identically everywhere.
+  // One projects snapshot for the whole shell, so Build's selector and the
+  // Projects page never disagree about what exists. It is a *list*, not an
+  // application-wide selection: a project no longer silently retargets other
+  // routes, which is why the list views below no longer receive one.
   async function refreshProjects() {
     try {
       projects = await api.projects();
@@ -188,14 +189,6 @@
     }
   }
 
-  async function selectProject(projectId: string | null) {
-    try {
-      await api.selectProject(projectId);
-    } catch {
-      // Server refused (e.g. not gate-manager); the refresh below re-reads truth.
-    }
-    await refreshProjects();
-  }
 </script>
 
 <a class="skip-link" href="#main">Skip to content</a>
@@ -217,8 +210,6 @@
       <Topbar
         title={activeItem.label}
         hint={activeItem.hint}
-        {projects}
-        onProjectSelect={selectProject}
         navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
         {compactNavigation}
         onNavigationToggle={toggleNavigation}
@@ -262,20 +253,14 @@
           {:else if current === "tasks"}
             <LazyRoute
               route="tasks"
-              props={{
-                projectId: activeProjectId,
-                sessionId: continuedSessionId,
-              }}
+              props={{ sessionId: continuedSessionId }}
             />
           {:else if current === "brain"}
             <LazyRoute route="brain" />
           {:else if current === "sessions"}
             <LazyRoute
               route="sessions"
-              props={{
-                projectId: activeProjectId,
-                sessionId: continuedSessionId,
-              }}
+              props={{ sessionId: continuedSessionId }}
             />
           {:else if current === "projects"}
             <LazyRoute
@@ -302,7 +287,6 @@
               props={{
                 tab: currentTab ?? "overview",
                 sessionId: continuedSessionId,
-                projectId: activeProjectId,
               }}
             />
             <!-- Settings is the fallback route, so every guard that renders

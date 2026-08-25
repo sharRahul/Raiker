@@ -1631,6 +1631,10 @@ export interface PromptRequestBody {
   // runs under — Build adds the engineering protocol, Chat does not — and grants
   // nothing: gates, capabilities and approvals are identical either way.
   surface?: "chat" | "build";
+  // The project this turn may retrieve inside. Required by Build and rejected
+  // for Chat: the two surfaces have genuinely different boundaries, and the
+  // server refuses a turn that leaves the boundary for it to guess.
+  project_id?: string;
   session_id?: string;
   planning_mode?: string;
   approval_mode?: string;
@@ -2436,4 +2440,58 @@ export interface GitCredentialStatus {
   scopes: string[];
   grant_seconds: Record<string, number>;
   checked_at: string;
+}
+
+// ── Managed knowledge files ─────────────────────────────────────────────────
+// One catalogue entry per stored original. `index_state` is the honest answer
+// to "can Raiker read this?": `ready` means its text is searchable,
+// `metadata_only` means the file is kept but has no safe local reader, and
+// `failed` means extraction broke — the stored bytes are unaffected either way.
+export type ManagedFileScope = "memory" | "project";
+
+export type ManagedFileIndexState =
+  | "queued"
+  | "indexing"
+  | "ready"
+  | "metadata_only"
+  | "failed"
+  | "retired";
+
+export interface ManagedFile {
+  file_id: string;
+  scope_kind: ManagedFileScope;
+  project_id: string | null;
+  relative_path: string;
+  media_type: string;
+  size_bytes: number;
+  content_hash: string;
+  index_state: ManagedFileIndexState;
+  index_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ManagedFileList {
+  ok: boolean;
+  scope_kind: ManagedFileScope;
+  project_id: string | null;
+  files: ManagedFile[];
+}
+
+/** One file's outcome inside a batch. A failure names the file, not the batch. */
+export type ManagedFileImportResult =
+  | ({ ok: true } & ManagedFile)
+  | { ok: false; relative_path: string; reason_code: string };
+
+export interface ManagedFileImportResponse {
+  ok: boolean;
+  scope_kind: ManagedFileScope;
+  project_id: string | null;
+  results: ManagedFileImportResult[];
+}
+
+export interface ManagedFileUpload {
+  relative_path: string;
+  media_type: string;
+  data_base64: string;
 }

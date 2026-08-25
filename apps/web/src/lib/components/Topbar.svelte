@@ -1,20 +1,22 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import type { Notification as RaikerNotification, ProjectsList } from "../apiTypes";
+  import type { Notification as RaikerNotification } from "../apiTypes";
   import { api } from "../api";
   import { relativeTime } from "../format";
   import Icon from "./Icon.svelte";
   import HostControl from "./HostControl.svelte";
   import StopSwitch from "./StopSwitch.svelte";
-  import ThemeToggle from "./ThemeToggle.svelte";
 
-  let { title, hint, connecting = false, projects = null, onProjectSelect = undefined,
+  // The top bar carries the shell's own controls only. The project selector
+  // moved into Build, where the execution boundary it sets is visible for the
+  // whole session; the theme toggle moved into Settings, where a preference
+  // belongs. A global selector that silently retargeted every surface was the
+  // thing worth removing: nothing about a page told you which project it meant.
+  let { title, hint, connecting = false,
     navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {} }: {
     title: string;
     hint: string;
     connecting?: boolean;
-    projects?: ProjectsList | null;
-    onProjectSelect?: (projectId: string | null) => void;
     navigationOpen?: boolean;
     compactNavigation?: boolean;
     onNavigationToggle?: (trigger: HTMLElement) => void;
@@ -87,12 +89,7 @@
   </div>
   <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
   <div class="status" role="status" aria-live="polite">
-    {#if connecting}<span class="pill">Connecting…</span>
-    {:else if projects !== null && projects.projects.length > 0}
-      <select class="project-select" aria-label="Active project" value={projects.active_project_id ?? ""} onchange={(e) => onProjectSelect?.((e.currentTarget as HTMLSelectElement).value || null)}>
-        <option value="">No project</option>{#each projects.projects as p (p.project_id)}<option value={p.project_id}>{p.name}</option>{/each}
-      </select>
-    {/if}
+    {#if connecting}<span class="pill">Connecting…</span>{/if}
   </div>
   <div class="controls">
     <div class="bell-wrap">
@@ -141,13 +138,12 @@
       {/if}
     </div>
     <HostControl />
-    <ThemeToggle />
     <StopSwitch />
   </div>
 </header>
 
 <style>
-  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:1rem;margin:0;line-height:1.2}.page-hint{font-size:.72rem;color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill,.project-select{font-size:.74rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:1rem;margin:0;line-height:1.2}.page-hint{font-size:.72rem;color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill{font-size:.74rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   .bell-wrap{position:relative}
   .bell{position:relative;padding:.35rem .5rem}
   .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:.62rem;font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:#fff;padding:0 .2rem}

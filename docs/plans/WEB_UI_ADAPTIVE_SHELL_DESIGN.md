@@ -74,14 +74,20 @@ the old black/gold hues.
 | surface/card | `#12161F` | `#FFFFFF` |
 | muted border | `#1F242F` | `#E2E8F0` |
 | primary text | `#E2E8F0` | `#0F172A` |
-| secondary text | `#64748B` | `#475569` |
+| supplied secondary palette value | `#64748B` | `#475569` |
+| normal-size muted text | `#94A3B8` | `#475569` |
 | allowed background | `#142E24` | `#E6F4EA` |
 | allowed text | `#A7F3D0` | `#137333` |
 | blocked background | `#3E1F11` | `#FCE8E6` |
 | blocked text | `#FFEDD5` | `#C5221F` |
 
 `--bg`, `--surface`, `--border`, `--text-1`, `--text-2`, `--ok-soft`,
-`--ok`, `--danger-soft`, and `--danger` map exactly to the table. Raised and
+`--ok`, `--danger-soft`, and `--danger` map to the accessible semantic roles.
+The supplied dark secondary value remains available as
+`--palette-secondary: #64748B`, but is limited to decorative/inactive marks and
+large text that independently meets AA. It is not used for normal-size text:
+its contrast on `#12161F` is below 4.5:1. Normal muted dark text therefore uses
+`--text-2: #94A3B8`; light mode uses the supplied `#475569`. Raised and
 sunken surfaces use nearby slate values or `color-mix()` derived from the base
 roles. Interactive accent remains a restrained steel/slate blue in light mode
 and a soft desaturated blue in dark mode; it is not reused as a status color.
@@ -149,13 +155,21 @@ closed                                drawer open
   wrapping of the workspace beneath it.
 - The scrim uses the theme overlay token. The drawer uses the surface and muted
   border, with only a restrained transient shadow.
-- The drawer closes on navigation, close button, Escape, browser back where the
-  drawer owns the current transient state, or scrim activation.
+- The drawer closes on navigation, close button, Escape, or scrim activation.
 - While open, focus stays within the drawer, background scrolling is locked,
-  and closing restores focus to the header trigger.
+  and Escape, scrim, or close-button dismissal restores focus to the header
+  trigger. Navigation-triggered close does not restore trigger focus;
+  `App.svelte` moves focus to `main` after the new route renders, and that route
+  focus action wins.
 - Build's right rail becomes a right-side overlay drawer under the same
   breakpoint instead of stacking below the transcript. It follows the same
   scrim, focus, Escape, scroll-lock, and restoration contract.
+- Only one compact drawer may be active. Opening Build background work closes
+  navigation first (and vice versa), completes its cleanup, then activates the
+  requested drawer. This prevents two scrims, two focus traps, or ambiguous
+  Escape handling.
+- While either drawer is active, the explicit application background regions
+  are `inert` and `aria-hidden`; cleanup restores their previous attributes.
 
 ## Component boundaries
 
@@ -191,9 +205,13 @@ closed                                drawer open
 
 ### `ResponsivePage.svelte`
 
-- Preserves the 90-rem maximum for data-dense views.
-- Adds a bounded reading-plane rule that avoids full-width prose when the left
-  rail is closed at 1440 pixels, 1080p, 4K, or 8K.
+- Adds `layout: "reading" | "workspace"` (default `workspace`). Reading pages
+  have a 72-rem maximum; data-dense workspace pages retain 90 rem.
+- `App.svelte` maps Chat/New Chat, Search Chat, and Guide to `reading`; Build,
+  Workbench, Tasks, Projects, Memory, Brain, Approvals, Capabilities, Models,
+  Extensions, Observe, and Settings use `workspace`.
+- Centering is measured within `.content`, the actual independently scrolling
+  content box. Only the collapsed desktop focus state is also viewport-centred.
 
 ## Motion and interaction
 
@@ -207,8 +225,11 @@ closed                                drawer open
 ## Accessibility
 
 - All rail toggles have names, `aria-controls`, and accurate `aria-expanded`.
-- Closed overlay drawers are `inert` and `aria-hidden`.
-- Open drawers trap Tab/Shift+Tab and restore focus on close.
+- Closed overlay drawers are `inert` and `aria-hidden`. While one is open, its
+  explicitly supplied application-background siblings are also `inert` and
+  `aria-hidden`, then restored on cleanup.
+- Open drawers trap Tab/Shift+Tab. Escape, scrim, and explicit close restore
+  trigger focus; navigation cleanup does not, so route focus lands on `main`.
 - Allowed/blocked states continue to include icon/text labels; hue is never the
   only signal.
 - Exact palette mappings receive automated assertions and contrast checks in
@@ -221,8 +242,8 @@ closed                                drawer open
 historical `working/` and `not-working/` folders are evidence archives and are
 not overwritten.
 
-The page sweep visits its existing 26 route/tab states and commits eight captures
-per state:
+The page sweep visits its existing 26 route/tab states and commits eight
+viewport-only captures per state (not full-page documents):
 
 - `mobile-light-<page>.png` at 390 × 844;
 - `mobile-dark-<page>.png` at 390 × 844;
@@ -235,10 +256,13 @@ per state:
 
 Tablet and the exact 1024-pixel breakpoint remain assertion-only coverage for
 overflow, selected tabs, layout state, and rail behavior. The screenshot sweep
-sets theme explicitly, waits for content to settle, parks the pointer away from
-hover targets, and fails on console errors. High-resolution captures also assert
-that the bounded page does not exceed its declared maximum and remains centered
-within one pixel.
+sets the theme in local storage before application mount, reloads into that
+theme, and asserts both `html[data-theme]` and the theme control's accessible
+state. It waits for content to settle, parks the pointer away from hover targets,
+and fails on console errors. Each PNG's IHDR width/height must exactly equal its
+declared viewport. High-resolution captures also assert that the bounded page
+does not exceed its declared maximum and remains centered within one pixel of
+the `.content` inner box (and of the viewport in collapsed focus state).
 
 ## Documentation changes
 

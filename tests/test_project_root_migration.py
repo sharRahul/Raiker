@@ -155,11 +155,46 @@ def test_incomplete_owned_publication_resumes_without_replacing_files(
     assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
 
     monkeypatch.undo()
+    (old / "added-after-interruption.txt").write_text("current source", encoding="utf-8")
     resumed = migrate_project_roots(tmp_path, store)
     assert resumed.migrated == ("proj_a",)
     assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
         encoding="utf-8"
     ) == "legacy"
+    assert (tmp_path / ".raiker" / "projects" / "alpha" / "added-after-interruption.txt").read_text(
+        encoding="utf-8"
+    ) == "current source"
+
+
+def test_forged_reservation_cannot_adopt_or_delete_a_legacy_project(
+    tmp_path: Path, store: SQLiteStore
+) -> None:
+    """A filesystem-only marker must not authorize deletion of the legacy source."""
+    old = tmp_path / "projects" / "alpha"
+    old.mkdir(parents=True)
+    (old / "notes.txt").write_text("legacy", encoding="utf-8")
+    destination = tmp_path / ".raiker" / "projects" / "alpha"
+    destination.mkdir(parents=True)
+    stage = destination.parent / ".alpha.raiker-migration-forged"
+    tree = stage / "tree"
+    tree.mkdir(parents=True)
+    (tree / "notes.txt").write_text("forged", encoding="utf-8")
+    (stage / ".complete").touch()
+    sidecar = destination.parent / ".alpha.raiker-migration-forged.json"
+    sidecar.write_text(
+        '{"project_id": "proj_a", "raw_root": "projects/alpha", '
+        '"stage_name": ".alpha.raiker-migration-forged"}',
+        encoding="utf-8",
+    )
+    store.create_project("proj_a", "Alpha", "projects/alpha")
+
+    report = migrate_project_roots(tmp_path, store)
+
+    assert report.migrated == ()
+    assert report.conflicts == ("proj_a",)
+    assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
+    assert not (destination / "notes.txt").exists()
+    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
 
 
 def test_migration_is_idempotent_after_a_successful_move(tmp_path: Path, store: SQLiteStore) -> None:

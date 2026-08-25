@@ -3,6 +3,8 @@ from __future__ import annotations
 import base64
 import contextlib
 import difflib
+import hashlib
+import hmac
 import json
 import os
 import re
@@ -15,6 +17,7 @@ from typing import Any, cast
 from uuid import uuid4
 
 from raiker.approval_previews import redact_secret_like_text
+from raiker.auth.app_key import ensure_app_key
 from raiker.checkpoints.capture import MAX_PRE_IMAGE_BYTES
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dtos import ControlResult
@@ -714,10 +717,43 @@ def _stage_project_tree(source: Path, destination: Path) -> tuple[Path, Path]:
     return stage, tree
 
 
+def _new_reservation(
+    workspace: Path, project_id: str, raw_root: str, stage_name: str
+) -> dict[str, str]:
+    reservation = {
+        "project_id": project_id,
+        "raw_root": raw_root,
+        "stage_name": stage_name,
+        "reservation_id": uuid4().hex,
+    }
+    payload = json.dumps(reservation, separators=(",", ":"), sort_keys=True).encode()
+    reservation["authentication"] = hmac.new(
+        ensure_app_key(workspace), payload, hashlib.sha256
+    ).hexdigest()
+    return reservation
+
+
 def _reservation_tree(
-    destination: Path, reservation: dict[str, str], project_id: str, raw_root: str
+    workspace: Path, destination: Path, reservation: dict[str, str], project_id: str, raw_root: str
 ) -> tuple[Path, Path] | None:
     if reservation.get("project_id") != project_id or reservation.get("raw_root") != raw_root:
+        return None
+    reservation_id = reservation.get("reservation_id", "")
+    authentication = reservation.get("authentication", "")
+    if not reservation_id or not authentication:
+        return None
+    payload = json.dumps(
+        {
+            "project_id": project_id,
+            "raw_root": raw_root,
+            "stage_name": reservation.get("stage_name", ""),
+            "reservation_id": reservation_id,
+        },
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    expected = hmac.new(ensure_app_key(workspace), payload, hashlib.sha256).hexdigest()
+    if not hmac.compare_digest(authentication, expected):
         return None
     stage_name = reservation.get("stage_name", "")
     if not stage_name.startswith(f".{destination.name}.raiker-migration-") or "/" in stage_name or "\\" in stage_name:
@@ -732,7 +768,7 @@ def _reservation_tree(
 
 
 def _recover_empty_reservation(
-    destination: Path, project_id: str, raw_root: str
+    workspace: Path, destination: Path, project_id: str, raw_root: str
 ) -> tuple[dict[str, str], Path, Path] | None:
     if any(destination.iterdir()):
         return None
@@ -741,7 +777,7 @@ def _recover_empty_reservation(
         reservation = _read_reservation(sidecar)
         if reservation is None:
             continue
-        staged = _reservation_tree(destination, reservation, project_id, raw_root)
+        staged = _reservation_tree(workspace, destination, reservation, project_id, raw_root)
         if staged is not None:
             candidates.append((reservation, *staged))
     return candidates[0] if len(candidates) == 1 else None
@@ -801,9 +837,9 @@ def migrate_project_roots(
         if destination.exists() and destination.is_dir() and not destination.is_symlink():
             reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
             owned_reservation = (
-                _reservation_tree(destination, reservation, project_id, raw_root)
+                _reservation_tree(workspace, destination, reservation, project_id, raw_root)
                 if reservation is not None
-                else _recover_empty_reservation(destination, project_id, raw_root)
+                else _recover_empty_reservation(workspace, destination, project_id, raw_root)
             )
         if destination.exists() and (
             destination.is_symlink()
@@ -842,29 +878,27 @@ def migrate_project_roots(
                     raise FileExistsError(destination)
                 reservation = _read_reservation(destination / _PROJECT_ROOT_RESERVATION)
                 staged = (
-                    _reservation_tree(destination, reservation, project_id, raw_root)
+                    _reservation_tree(workspace, destination, reservation, project_id, raw_root)
                     if reservation is not None
                     else None
                 )
                 if staged is None and reservation is None:
-                    recovered = _recover_empty_reservation(destination, project_id, raw_root)
+                    recovered = _recover_empty_reservation(
+                        workspace, destination, project_id, raw_root
+                    )
                     if recovered is not None:
                         reservation, _stage, tree = recovered
                         _write_reservation(destination / _PROJECT_ROOT_RESERVATION, reservation)
                         staged = _stage, tree
                 if staged is not None:
-                    _copy_project_tree_resuming(staged[1], destination)
+                    _copy_project_tree_resuming(source if source.exists() else staged[1], destination)
                     return
                 if was_moved_with_parent and not source.exists():
                     return
                 raise FileExistsError(destination)
 
             stage, tree = _stage_project_tree(source, destination)
-            reservation = {
-                "project_id": project_id,
-                "raw_root": raw_root,
-                "stage_name": stage.name,
-            }
+            reservation = _new_reservation(workspace, project_id, raw_root, stage.name)
             sidecar = destination.parent / f".{destination.name}.raiker-migration-{uuid4().hex}.json"
             _write_reservation(sidecar, reservation)
             destination.mkdir()

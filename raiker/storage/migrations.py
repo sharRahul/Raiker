@@ -1182,6 +1182,46 @@ CREATE INDEX IF NOT EXISTS idx_managed_files_owner_scope
 ON managed_files(owner_principal_id, scope_kind, project_id, created_at);
 """
 
+MANAGED_FILE_CHUNKS_MIGRATION_ID = "RAIKER-1021-managed-file-chunks"
+
+# Extracted managed-file text is a *projection* of the stored original, never a
+# second source of truth: every row carries the `content_hash` of the revision it
+# was extracted from, so replacing a file retires the stale revision rather than
+# leaving two answers to the same question. The bytes on disk remain the record.
+MANAGED_FILE_CHUNKS_SQL = """
+CREATE TABLE IF NOT EXISTS managed_file_chunks (
+  chunk_id TEXT PRIMARY KEY,
+  file_id TEXT NOT NULL REFERENCES managed_files(file_id),
+  owner_principal_id TEXT NOT NULL,
+  scope_kind TEXT NOT NULL CHECK (scope_kind IN ('memory', 'project')),
+  project_id TEXT,
+  chunk_index INTEGER NOT NULL CHECK (chunk_index >= 0),
+  content_hash TEXT NOT NULL,
+  text TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  UNIQUE (file_id, content_hash, chunk_index)
+);
+
+CREATE INDEX IF NOT EXISTS idx_managed_file_chunks_scope
+ON managed_file_chunks(owner_principal_id, scope_kind, project_id);
+"""
+
+# One rebuildable lexical index over managed-file chunks. `chunk_id` carries a
+# hit back to the governed row, which is where ownership and scope are still
+# decided — the index itself authorises nothing.
+MANAGED_FILE_CHUNK_FTS_MIGRATION_ID = "RAIKER-1022-managed-file-chunk-fts"
+
+MANAGED_FILE_CHUNK_FTS_SQL_TEMPLATE = """
+CREATE VIRTUAL TABLE IF NOT EXISTS managed_file_chunk_fts USING {engine}(
+  chunk_id UNINDEXED, file_id UNINDEXED, text
+);
+"""
+
+
+def managed_file_chunk_fts_sql(engine: str) -> str:
+    return MANAGED_FILE_CHUNK_FTS_SQL_TEMPLATE.format(engine=require_text_search_engine(engine))
+
+
 ATTACHMENT_STORE_MIGRATION_ID = "RAIKER-1006-attachment-store"
 
 ATTACHMENT_STORE_SQL = """

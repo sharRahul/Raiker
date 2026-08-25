@@ -71,6 +71,10 @@ class ManagedFileRecord:
             retired_at=str(row["retired_at"]) if row["retired_at"] is not None else None,
         )
 
+    def scope(self) -> ManagedFileScope:
+        """The logical scope this file belongs to, rebuilt from its own row."""
+        return ManagedFileScope(self.scope_kind, self.project_id)
+
 
 class ManagedFileService:
     """Write imported bytes only below the owner's declared managed scope."""
@@ -88,10 +92,10 @@ class ManagedFileService:
         owner_principal_id: str,
     ) -> ManagedFileRecord:
         relative = self._relative_path(relative_path)
-        root = self._scope_root(scope, owner_principal_id)
-        destination = self._contained_destination(root, relative)
+        root = self.scope_root(scope, owner_principal_id)
+        destination = self.contained_destination(root, relative)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        destination = self._contained_destination(root, relative)
+        destination = self.contained_destination(root, relative)
         temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(8)}.tmp")
         try:
             with temporary.open("xb") as handle:
@@ -133,7 +137,7 @@ class ManagedFileService:
             raise RuntimeError("managed_file_insert_missing")
         return ManagedFileRecord.from_row(record)
 
-    def _scope_root(self, scope: ManagedFileScope, owner_principal_id: str) -> Path:
+    def scope_root(self, scope: ManagedFileScope, owner_principal_id: str) -> Path:
         runtime_root = internal_io_path(self.workspace_root / ".raiker")
         self._require_within(runtime_root.resolve(), internal_io_path(self.workspace_root).resolve())
         if self.store.get_principal(owner_principal_id) is None:
@@ -155,6 +159,32 @@ class ManagedFileService:
         self._require_within(root.resolve(), runtime_root.resolve())
         root.mkdir(parents=True, exist_ok=True)
         return root
+
+    def delete_file(self, file_id: str, owner_principal_id: str) -> ManagedFileRecord:
+        """Remove one file's bytes and retire its catalogue row.
+
+        The path is re-derived from the scope, never taken from the stored
+        string, so a tampered row cannot direct a delete outside the managed
+        root. A missing file on disk is not an error -- the catalogue row is
+        still retired, which is what retrieval reads.
+        """
+        row = self.store.get_managed_file(file_id, owner_principal_id)
+        if row is None:
+            raise ManagedFileError("managed_file_not_found")
+        record = ManagedFileRecord.from_row(row)
+        if record.retired_at is not None:
+            raise ManagedFileError("managed_file_retired")
+        root = self.scope_root(record.scope(), owner_principal_id)
+        destination = self.contained_destination(root, record.relative_path)
+        try:
+            destination.unlink(missing_ok=True)
+        except OSError as exc:
+            raise ManagedFileError("managed_file_delete_failed") from exc
+        self.store.retire_managed_file(file_id, owner_principal_id)
+        reloaded = self.store.get_managed_file(file_id, owner_principal_id)
+        if reloaded is None:  # pragma: no cover - the row was read moments ago
+            raise ManagedFileError("managed_file_not_found")
+        return ManagedFileRecord.from_row(reloaded)
 
     def _managed_project_root(self, root_subpath: str, projects_root: Path) -> Path:
         """Resolve legacy `projects/<slug>` rows into Task 2's destination."""
@@ -189,7 +219,7 @@ class ManagedFileService:
             raise ManagedFileError("managed_file_path_outside_scope")
         return "/".join(parts)
 
-    def _contained_destination(self, root: Path, relative: str) -> Path:
+    def contained_destination(self, root: Path, relative: str) -> Path:
         destination = internal_io_path(root / Path(relative))
         self._require_within(destination.resolve(), root.resolve())
         return destination

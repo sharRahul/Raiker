@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import re
+import secrets
 import threading
 from collections import OrderedDict
 from collections.abc import Callable, Sequence
@@ -130,6 +131,9 @@ from raiker.storage.migrations import (
     MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
     MACHINE_IDENTITIES_MIGRATION_ID,
     MACHINE_IDENTITIES_SQL,
+    MANAGED_FILE_CHUNK_FTS_MIGRATION_ID,
+    MANAGED_FILE_CHUNKS_MIGRATION_ID,
+    MANAGED_FILE_CHUNKS_SQL,
     MANAGED_FILES_MIGRATION_ID,
     MANAGED_FILES_SQL,
     MCP_CONTAINMENT_MIGRATION_ID,
@@ -353,6 +357,7 @@ from raiker.storage.migrations import (
     WEB_BLOCKLIST_MIGRATION_ID,
     WEB_BLOCKLIST_SQL,
     conversation_fts_sql,
+    managed_file_chunk_fts_sql,
     memory_fts_sql,
     memory_sqlcipher_fts_sql,
 )
@@ -1130,6 +1135,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
             self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
             self._apply_migration(MANAGED_FILES_MIGRATION_ID, MANAGED_FILES_SQL, connection)
+            self._apply_migration(
+                MANAGED_FILE_CHUNKS_MIGRATION_ID, MANAGED_FILE_CHUNKS_SQL, connection
+            )
+            self._apply_migration(
+                MANAGED_FILE_CHUNK_FTS_MIGRATION_ID,
+                managed_file_chunk_fts_sql(self.text_search_engine(connection)),
+                connection,
+            )
             self._apply_migration(PROJECT_CONTEXT_MIGRATION_ID, PROJECT_CONTEXT_SQL, connection)
             self._apply_migration(
                 CONNECTOR_ECOSYSTEM_MIGRATION_ID, CONNECTOR_ECOSYSTEM_SQL, connection
@@ -1641,6 +1654,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         for table, rebuild in (
             ("approved_memory_fts", self._rebuild_memory_fts),
             ("conversation_fts", self._rebuild_conversation_fts),
+            ("managed_file_chunk_fts", self._rebuild_managed_file_chunk_fts),
         ):
             if self._index_engine(connection, table) != TEXT_SEARCH_FTS4:
                 continue
@@ -1652,11 +1666,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # differ only in that the latter also seeds the index from
             # `approved_memory`, which `rebuild` does properly a line later —
             # with the archival, expiry and supersession filters this one omits.
-            connection.executescript(
-                memory_sqlcipher_fts_sql(TEXT_SEARCH_FTS5)
-                if table == "approved_memory_fts"
-                else conversation_fts_sql(TEXT_SEARCH_FTS5)
-            )
+            if table == "approved_memory_fts":
+                script = memory_sqlcipher_fts_sql(TEXT_SEARCH_FTS5)
+            elif table == "conversation_fts":
+                script = conversation_fts_sql(TEXT_SEARCH_FTS5)
+            else:
+                script = managed_file_chunk_fts_sql(TEXT_SEARCH_FTS5)
+            connection.executescript(script)
             rebuild(connection)
             converted = True
         if converted or connection.execute(
@@ -2985,6 +3001,195 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (now, now, file_id, owner_principal_id),
             )
         return retired.rowcount == 1
+
+    # -- Managed file text projections ----------------------------------------
+
+    @staticmethod
+    def _rebuild_managed_file_chunk_fts(connection: sqlite3.Connection) -> None:
+        """Recompute the lexical index from the rows that own the text."""
+        connection.execute("DELETE FROM managed_file_chunk_fts")
+        connection.execute(
+            """
+            INSERT INTO managed_file_chunk_fts (chunk_id, file_id, text)
+            SELECT chunk_id, file_id, text FROM managed_file_chunks
+            """
+        )
+
+    def replace_managed_file_chunks(
+        self,
+        *,
+        file_id: str,
+        owner_principal_id: str,
+        scope_kind: str,
+        project_id: str | None,
+        content_hash: str,
+        chunks: Sequence[str],
+    ) -> int:
+        """Publish one revision's chunks, retiring every earlier revision first.
+
+        Retirement and publication share a transaction so a reader never sees two
+        revisions of one file at once, and never sees none of a file whose bytes
+        are still stored.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._delete_managed_file_chunks(connection, file_id)
+                for index, text in enumerate(chunks):
+                    chunk_id = f"mchunk_{secrets.token_hex(12)}"
+                    connection.execute(
+                        """
+                        INSERT INTO managed_file_chunks (
+                            chunk_id, file_id, owner_principal_id, scope_kind, project_id,
+                            chunk_index, content_hash, text, created_at
+                        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            chunk_id,
+                            file_id,
+                            owner_principal_id,
+                            scope_kind,
+                            project_id,
+                            index,
+                            content_hash,
+                            text,
+                            now,
+                        ),
+                    )
+                    connection.execute(
+                        "INSERT INTO managed_file_chunk_fts (chunk_id, file_id, text) "
+                        "VALUES (?, ?, ?)",
+                        (chunk_id, file_id, text),
+                    )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return len(chunks)
+
+    @staticmethod
+    def _delete_managed_file_chunks(connection: sqlite3.Connection, file_id: str) -> int:
+        deleted = connection.execute(
+            "DELETE FROM managed_file_chunks WHERE file_id = ?", (file_id,)
+        ).rowcount
+        with contextlib.suppress(sqlite3.OperationalError):
+            connection.execute(
+                "DELETE FROM managed_file_chunk_fts WHERE file_id = ?", (file_id,)
+            )
+        return int(deleted or 0)
+
+    def list_managed_file_chunks(
+        self, file_id: str, owner_principal_id: str
+    ) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT managed_file_chunks.*, managed_file_chunks.file_id AS source_file_id
+                FROM managed_file_chunks
+                WHERE file_id = ? AND owner_principal_id = ?
+                ORDER BY chunk_index
+                """,
+                (file_id, owner_principal_id),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def retire_managed_file_chunks(self, file_id: str, owner_principal_id: str) -> int:
+        """Drop every projection of *file_id*. Ownership is checked, not assumed."""
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                owned = connection.execute(
+                    "SELECT 1 FROM managed_files WHERE file_id = ? AND owner_principal_id = ?",
+                    (file_id, owner_principal_id),
+                ).fetchone()
+                if owned is None:
+                    connection.rollback()
+                    return 0
+                removed = self._delete_managed_file_chunks(connection, file_id)
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return removed
+
+    def search_managed_file_chunks(
+        self,
+        query: str,
+        *,
+        owner_principal_id: str,
+        project_ids: Sequence[str] | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Chunks matching *query* for one owner, with file provenance attached.
+
+        ``project_ids`` is the Build boundary: when it is given, only account
+        memory files and files belonging to those projects can match. ``None`` is
+        Chat's owner-wide boundary. Either way the owner filter is applied first
+        and is never optional.
+        """
+        if limit < 1 or not owner_principal_id:
+            return []
+        terms = self._match_terms(query)
+        conditions = [
+            "managed_file_chunks.owner_principal_id = ?",
+            "managed_files.retired_at IS NULL",
+        ]
+        params: list[Any] = [owner_principal_id]
+        ordering = "managed_file_chunks.created_at DESC, managed_file_chunks.chunk_index ASC"
+        if terms:
+            source = (
+                "managed_file_chunk_fts "
+                "JOIN managed_file_chunks "
+                "ON managed_file_chunks.chunk_id = managed_file_chunk_fts.chunk_id "
+                "JOIN managed_files ON managed_files.file_id = managed_file_chunks.file_id"
+            )
+            selected = f"{self._snippet_expression('managed_file_chunk_fts', 2)} AS snippet"
+            conditions.append("managed_file_chunk_fts MATCH ?")
+            params.append(" ".join(terms))
+            if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
+                ordering = "bm25(managed_file_chunk_fts, 0.0, 0.0, 1.0) ASC, " + ordering
+        else:
+            # Terms below the tokenizer's floor still have to be findable, so a
+            # bounded substring scan stands in -- with no score, hence no reorder.
+            source = (
+                "managed_file_chunks "
+                "JOIN managed_files ON managed_files.file_id = managed_file_chunks.file_id"
+            )
+            selected = "SUBSTR(managed_file_chunks.text, 1, 220) AS snippet"
+            conditions.append("managed_file_chunks.text LIKE ?")
+            params.append(f"%{query.strip()}%")
+        if project_ids is not None:
+            placeholders = ",".join("?" for _ in project_ids)
+            if placeholders:
+                conditions.append(
+                    "(managed_file_chunks.scope_kind = 'memory' "
+                    f"OR managed_file_chunks.project_id IN ({placeholders}))"
+                )
+                params.extend(project_ids)
+            else:
+                conditions.append("managed_file_chunks.scope_kind = 'memory'")
+        params.append(limit)
+        sql = (
+            "SELECT managed_file_chunks.chunk_id AS chunk_id, "
+            "managed_file_chunks.file_id AS file_id, "
+            "managed_file_chunks.chunk_index AS chunk_index, "
+            "managed_file_chunks.text AS text, "
+            "managed_file_chunks.scope_kind AS scope_kind, "
+            "managed_file_chunks.project_id AS project_id, "
+            "managed_file_chunks.content_hash AS content_hash, "
+            "managed_files.relative_path AS relative_path, "
+            "managed_files.media_type AS media_type, "
+            f"{selected} FROM {source} "
+            f"WHERE {' AND '.join(conditions)} "
+            f"ORDER BY {ordering} LIMIT ?"
+        )
+        with self.connect() as connection:
+            try:
+                rows = connection.execute(sql, params).fetchall()
+            except sqlite3.OperationalError:
+                return []
+        return [dict(row) for row in rows]
 
     def load_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
         if user_id is not None and self.load_project(project_id, user_id=user_id) is None:

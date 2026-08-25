@@ -8,12 +8,16 @@
   import StopSwitch from "./StopSwitch.svelte";
   import ThemeToggle from "./ThemeToggle.svelte";
 
-  let { title, hint, connecting = false, projects = null, onProjectSelect = undefined }: {
+  let { title, hint, connecting = false, projects = null, onProjectSelect = undefined,
+    navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {} }: {
     title: string;
     hint: string;
     connecting?: boolean;
     projects?: ProjectsList | null;
     onProjectSelect?: (projectId: string | null) => void;
+    navigationOpen?: boolean;
+    compactNavigation?: boolean;
+    onNavigationToggle?: (trigger: HTMLElement) => void;
   } = $props();
 
   // Owner-scoped notifications, reachable from every route. Reads are
@@ -71,6 +75,16 @@
 </script>
 
 <header class="topbar">
+  <div class="navigation-reveal-zone" data-navigation-open={navigationOpen}>
+    <button
+      type="button"
+      class="btn btn-ghost navigation-toggle"
+      aria-label={compactNavigation ? (navigationOpen ? "Close navigation" : "Open navigation") : (navigationOpen ? "Hide navigation" : "Show navigation")}
+      aria-controls="all-navigation"
+      aria-expanded={navigationOpen}
+      onclick={(event) => onNavigationToggle(event.currentTarget)}
+    ><Icon name="panel" size={18} /></button>
+  </div>
   <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
   <div class="status" role="status" aria-live="polite">
     {#if connecting}<span class="pill">Connecting…</span>
@@ -133,7 +147,7 @@
 </header>
 
 <style>
-  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-4);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.page-id{min-width:0}.page-title{font-size:1rem;margin:0;line-height:1.2}.page-hint{font-size:.72rem;color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill,.project-select{font-size:.74rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
+  .topbar{height:var(--topbar-h);display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-5);border-bottom:1px solid var(--border);background:var(--surface);flex-shrink:0}.navigation-reveal-zone{width:48px;height:48px;margin-left:-.75rem;display:grid;place-items:center}.navigation-toggle{transition:opacity var(--motion-shell) var(--ease-shell),background var(--motion-fast) var(--ease)}.navigation-reveal-zone[data-navigation-open="false"] .navigation-toggle{opacity:.28}.navigation-reveal-zone:hover .navigation-toggle,.navigation-toggle:focus-visible{opacity:1!important}.page-id{min-width:0}.page-title{font-size:1rem;margin:0;line-height:1.2}.page-hint{font-size:.72rem;color:var(--text-3);margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.status{display:flex;align-items:center;gap:.45rem;margin-left:auto}.pill,.project-select{font-size:.74rem;font-weight:600;padding:.18rem .6rem;border-radius:var(--r-pill);border:1px solid var(--neutral-border);background:var(--neutral-soft);color:var(--text-2)}.controls{display:flex;align-items:center;gap:.5rem}
   .bell-wrap{position:relative}
   .bell{position:relative;padding:.35rem .5rem}
   .unread-count{position:absolute;top:-2px;right:-2px;min-width:1rem;height:1rem;display:grid;place-items:center;font-size:.62rem;font-weight:700;border-radius:var(--r-pill);background:var(--danger);color:#fff;padding:0 .2rem}
@@ -148,5 +162,5 @@
   .panel li span{color:var(--text-2)}
   .panel li time{color:var(--text-3);font-size:.72rem}
   @media(max-width:900px){.page-hint{display:none}}@media(max-width:720px){.topbar{gap:var(--space-2);padding:0 var(--space-3)}.page-title{font-size:.9rem}.status{display:none}}
-  @media (min-width:640px) and (max-width:1023px){.topbar{padding-left:calc(var(--space-3) + 5rem)}}
+  @media(max-width:720px){.navigation-reveal-zone{margin-left:-.5rem}}
 </style>

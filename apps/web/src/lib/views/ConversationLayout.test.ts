@@ -1,10 +1,10 @@
-// The stacked (below split-view) layout of the two conversation surfaces.
+// The compact (below split-view) layout of the two conversation surfaces.
 //
 // Chat and Build pin their composer to the bottom of the room the shell gives
 // them by sizing from `--content-h`. Below the split-view breakpoint they switch
-// to `height: auto`, so the transcript — and, in Build, the rail stacked under
-// the composer — can take the space they need instead of being trapped in a
-// short inner scroller.
+// Chat grows normally. Build now keeps the transcript in the shell's available
+// room while its background-work panel floats as a right drawer, so opening the
+// panel cannot change message wrapping.
 //
 // That switch used to drop the floor along with the ceiling. On a tall tablet an
 // empty or short conversation then collapsed to its own content and left the
@@ -38,11 +38,10 @@ describe("stacked conversation layout", () => {
     expect(block).not.toMatch(/\.chat \{[\s\S]*?min-height: 0;/);
   });
 
-  it("lets Build grow while still filling the room the shell gives it", () => {
+  it("keeps Build bounded while background work floats as a drawer", () => {
     const block = stackedBlock("BuildView.svelte");
-    // Build's grid still releases its own height so the rail can stack under the
-    // composer; the floor lives on the column that holds the composer.
-    expect(block).toMatch(/\.build,[\s\S]*?height: auto;/);
-    expect(block).toMatch(/\.main \{\s*min-height: var\(--content-h\);/);
+    expect(block).toMatch(/\.build,[\s\S]*?height: var\(--content-h\);/);
+    expect(block).toMatch(/\.rail-slot\.drawer \{[\s\S]*?position: fixed;/);
+    expect(block).toMatch(/\.rail-slot\.drawer \{[\s\S]*?inset: 0 0 0 auto;/);
   });
 });

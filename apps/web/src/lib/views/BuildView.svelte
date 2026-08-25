@@ -105,6 +105,7 @@
     speechLanguagePreference,
     type SpeechLanguage,
   } from "../voice";
+  import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
   let {
     projects = null,
@@ -301,6 +302,43 @@
 
   // ── Side rail ────────────────────────────────────────────────────────
   let railOpen = $state(false);
+  let compactRail = $state(false);
+  let railElement = $state<HTMLElement>();
+  let buildMainElement = $state<HTMLElement>();
+  let railTrigger = $state<HTMLElement | null>(null);
+  let deactivateRail: DeactivateModalDrawer | null = null;
+
+  function closeRail(restoreFocus = true) {
+    deactivateRail?.(restoreFocus);
+    deactivateRail = null;
+    railOpen = false;
+  }
+
+  function toggleRail(event: MouseEvent) {
+    railTrigger = event.currentTarget as HTMLElement;
+    if (railOpen) closeRail(true);
+    else railOpen = true;
+  }
+
+  $effect(() => {
+    if (!visible && railOpen) closeRail(false);
+  });
+
+  $effect(() => {
+    if (!compactRail || !railOpen || railElement === undefined) return;
+    const shellBackground = Array.from(document.querySelectorAll<HTMLElement>(".topbar, .sidebar"));
+    deactivateRail = activateModalDrawer({
+      id: "build-background",
+      container: railElement,
+      returnFocusTo: railTrigger,
+      backgroundElements: buildMainElement === undefined ? shellBackground : [buildMainElement, ...shellBackground],
+      onDismiss: () => closeRail(true),
+    });
+    return () => {
+      deactivateRail?.(false);
+      deactivateRail = null;
+    };
+  });
 
   // ── The agent's plan (B6) ────────────────────────────────────────────
   // A long change had no visible spine: the transcript looked identical on
@@ -373,6 +411,12 @@
   );
 
   onMount(() => {
+    const railQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 1023px)")
+      : null;
+    const updateRailMode = () => { compactRail = railQuery?.matches ?? false; };
+    updateRailMode();
+    railQuery?.addEventListener("change", updateRailMode);
     void loadRepos();
     void refreshModels();
     // Build keeps its own model. Coding work and conversation rarely want the
@@ -400,6 +444,8 @@
     };
     window.addEventListener("raiker:build-compose", onCompose);
     return () => {
+      railQuery?.removeEventListener("change", updateRailMode);
+      deactivateRail?.(false);
       window.removeEventListener("raiker:build-compose", onCompose);
       audioSessionCoordinator.stopAll("route");
     };
@@ -1087,8 +1133,8 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<div class="build" class:with-rail={railOpen}>
-  <div class="main">
+<div class="build" class:with-rail={railOpen && !compactRail}>
+  <div class="main" bind:this={buildMainElement}>
     <header class="build-header">
       <div class="repo-slot">
         <button
@@ -1144,7 +1190,7 @@
         <button
           type="button"
           class="btn btn-ghost btn-sm rail-toggle"
-          onclick={() => (railOpen = !railOpen)}
+          onclick={toggleRail}
           aria-expanded={railOpen}
           aria-controls="build-rail"
         >
@@ -1572,11 +1618,22 @@
   {/if}
 
   {#if railOpen}
-    <div id="build-rail" class="rail-slot">
+    {#if compactRail}
+      <button type="button" class="rail-scrim" aria-label="Close background work" onclick={() => closeRail(true)}></button>
+    {/if}
+    <div
+      id="build-rail"
+      class="rail-slot"
+      class:drawer={compactRail}
+      role={compactRail ? "dialog" : undefined}
+      aria-modal={compactRail ? "true" : undefined}
+      aria-label={compactRail ? "Background work" : undefined}
+      bind:this={railElement}
+    >
       <BuildSidePanel
         projectId={projectId || projects?.active_project_id || null}
         {projects}
-        onclose={() => (railOpen = false)}
+        onclose={() => closeRail(true)}
       />
     </div>
   {/if}
@@ -1622,6 +1679,13 @@
   .rail-slot > :global(*) {
     flex: 1;
     min-height: 0;
+  }
+  .rail-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    border: 0;
+    background: var(--overlay);
   }
 
   .build-header {
@@ -2088,33 +2152,25 @@
     text-decoration: underline;
   }
 
-  /* Below the split-view breakpoint the rail stacks under the composer. Pinning
-     the workspace to the viewport there would trap the transcript in a short
-     inner scroller with the rail hidden below it, so the page scrolls normally
-     instead and each section takes the room it needs. */
+  /* Compact screens preserve the transcript width and float background work as
+     an isolated right-side drawer. */
   @media (max-width: 63.9rem) {
     .build,
     .build.with-rail {
       grid-template-columns: minmax(0, 1fr);
-      height: auto;
-      min-height: 0;
+      height: var(--content-h);
+      min-height: 32rem;
     }
-    /* Stacked, the column still starts as tall as the room the shell gives it.
-       `height: auto` is what lets the transcript and the rail below it take
-       the space they need; without a floor to go with it, an empty or short
-       conversation collapsed to its content and left the composer floating in
-       the middle of a tall tablet screen with half the page blank under it.
-       A minimum, rather than a fixed height, keeps both: the composer sits at
-       the bottom when there is little to show, and the page still scrolls
-       normally once there is more. */
-    .main {
-      min-height: var(--content-h);
-    }
-    .thread {
-      overflow-y: visible;
-    }
-    .rail-slot {
-      max-height: 32rem;
+    .rail-slot.drawer {
+      position: fixed;
+      inset: 0 0 0 auto;
+      z-index: 100;
+      width: min(21rem, 90vw);
+      padding: var(--space-3);
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--shadow-2);
+      transition: transform var(--motion-shell) var(--ease-shell);
     }
     .composer-upper {
       flex-direction: column;

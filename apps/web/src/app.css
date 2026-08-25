@@ -94,8 +94,10 @@
   --space-5: 1.5rem;
   --space-6: 2rem;
 
-  --sidebar-w: 232px;
+  --sidebar-w: 256px;
   --topbar-h: 56px;
+  --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
+  --motion-shell: 240ms;
 
   /* ── Type scale ──
      A modular scale at 1.22, anchored on the 15px body. The old headings sat at
@@ -180,25 +182,26 @@
 :root[data-theme="light"] {
   color-scheme: light;
 
-  --bg: #f4f4f5;
-  --surface: #ffffff;
-  --sunken: #ececed;
-  --raised: #ffffff;
-  --border: #dcdcdd;
-  --border-strong: #9c9c9c;
+  --bg: #F8FAFC;
+  --surface: #FFFFFF;
+  --sunken: #F1F5F9;
+  --raised: #FFFFFF;
+  --border: #E2E8F0;
+  --border-strong: #CBD5E1;
 
-  --text-1: #1b1c1e;
-  --text-2: #575859;
+  --text-1: #0F172A;
+  --palette-secondary: #475569;
+  --text-2: #475569;
   /* Small secondary labels must remain AA-readable on both white and the
      composer's slightly sunken surface. */
-  --text-3: #68696a;
-  --text-inverse: #ffffff;
+  --text-3: #475569;
+  --text-inverse: #FFFFFF;
 
   /* Steel blue — the one accent; primary action and active state */
-  --accent: #236f9a;
-  --accent-strong: #1d5d81;
-  --accent-soft: #e7f1f7;
-  --accent-border: #a9cde1;
+  --accent: #365F7D;
+  --accent-strong: #294A63;
+  --accent-soft: #E8F0F5;
+  --accent-border: #B7CAD7;
 
   /* Gold — the brand mark, and the pending/ask state it also carries */
   --brand: #ecd06f;
@@ -207,9 +210,9 @@
   --brand-border: #ecd06f;
 
   /* Green — success / enabled / allow */
-  --ok: #1c7049;
-  --ok-soft: #e3f1e9;
-  --ok-border: #aed3bf;
+  --ok: #137333;
+  --ok-soft: #E6F4EA;
+  --ok-border: #B7D8C0;
 
   /* Gold — warning / ask / pending */
   --warn: #866412;
@@ -217,10 +220,10 @@
   --warn-border: #ecd06f;
 
   /* Red — danger / deny / critical risk */
-  --danger: #b4292f;
-  --danger-strong: #942127;
-  --danger-soft: #f8e3e4;
-  --danger-border: #e6b6b8;
+  --danger: #C5221F;
+  --danger-strong: #9F1C1A;
+  --danger-soft: #FCE8E6;
+  --danger-border: #E8B9B5;
 
   /* Blue — info / read-only / authenticated trust; the accent's quieter half */
   --info: #2779a7;
@@ -248,8 +251,8 @@
   --shadow-0: 0 1px 1px rgba(27, 28, 30, 0.04);
   --shadow-1: 0 1px 1px rgba(27, 28, 30, 0.04), 0 2px 6px -1px rgba(27, 28, 30, 0.07);
   --shadow-2: 0 2px 4px -1px rgba(27, 28, 30, 0.06), 0 12px 28px -6px rgba(27, 28, 30, 0.16);
-  --overlay: rgba(27, 28, 30, 0.42);
-  --focus-ring: #2779a7;
+  --overlay: rgba(15, 23, 42, 0.48);
+  --focus-ring: #365F7D;
 }
 
 /* ── Dark theme tokens ("deck") ──
@@ -259,40 +262,41 @@
 :root[data-theme="dark"] {
   color-scheme: dark;
 
-  --bg: #000000;
-  --surface: #0b0b0c;
-  --sunken: #050506;
-  --raised: #17171a;
-  --border: #2a2a2c;
-  --border-strong: #454547;
+  --bg: #0B0D10;
+  --surface: #12161F;
+  --sunken: #0F131A;
+  --raised: #171C26;
+  --border: #1F242F;
+  --border-strong: #303847;
 
-  --text-1: #ffffff;
-  --text-2: #b6b6b8;
-  --text-3: #9c9c9c;
-  --text-inverse: #000000;
+  --text-1: #E2E8F0;
+  --palette-secondary: #64748B;
+  --text-2: #94A3B8;
+  --text-3: #94A3B8;
+  --text-inverse: #0B0D10;
 
-  --accent: #ecd06f;
-  --accent-strong: #f4e2a4;
-  --accent-soft: rgba(236, 208, 111, 0.14);
-  --accent-border: rgba(236, 208, 111, 0.42);
+  --accent: #91B4CD;
+  --accent-strong: #B8D0E0;
+  --accent-soft: rgba(145, 180, 205, 0.13);
+  --accent-border: rgba(145, 180, 205, 0.38);
 
   --brand: #ecd06f;
   --brand-strong: #f4e2a4;
   --brand-soft: rgba(236, 208, 111, 0.14);
   --brand-border: rgba(236, 208, 111, 0.42);
 
-  --ok: #6fcf97;
-  --ok-soft: rgba(111, 207, 151, 0.13);
-  --ok-border: rgba(111, 207, 151, 0.36);
+  --ok: #A7F3D0;
+  --ok-soft: #142E24;
+  --ok-border: #28513F;
 
   --warn: #ecd06f;
   --warn-soft: rgba(236, 208, 111, 0.13);
   --warn-border: rgba(236, 208, 111, 0.36);
 
-  --danger: #f0797c;
-  --danger-strong: #f59a9c;
-  --danger-soft: rgba(240, 121, 124, 0.14);
-  --danger-border: rgba(240, 121, 124, 0.4);
+  --danger: #FFEDD5;
+  --danger-strong: #FFF7ED;
+  --danger-soft: #3E1F11;
+  --danger-border: #704127;
 
   --info: #7ab6d8;
   --info-soft: rgba(122, 182, 216, 0.13);
@@ -311,8 +315,8 @@
   --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
   --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
   --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
-  --overlay: rgba(0, 0, 0, 0.68);
-  --focus-ring: #ecd06f;
+  --overlay: rgba(3, 5, 8, 0.72);
+  --focus-ring: #91B4CD;
 }
 
 /* System preference drives the default when the user hasn't chosen. */
@@ -320,40 +324,41 @@
   :root:not([data-theme]) {
     color-scheme: dark;
 
-    --bg: #000000;
-    --surface: #0b0b0c;
-    --sunken: #050506;
-    --raised: #17171a;
-    --border: #2a2a2c;
-    --border-strong: #454547;
+    --bg: #0B0D10;
+    --surface: #12161F;
+    --sunken: #0F131A;
+    --raised: #171C26;
+    --border: #1F242F;
+    --border-strong: #303847;
 
-    --text-1: #ffffff;
-    --text-2: #b6b6b8;
-    --text-3: #9c9c9c;
-    --text-inverse: #000000;
+    --text-1: #E2E8F0;
+    --palette-secondary: #64748B;
+    --text-2: #94A3B8;
+    --text-3: #94A3B8;
+    --text-inverse: #0B0D10;
 
-    --accent: #ecd06f;
-    --accent-strong: #f4e2a4;
-    --accent-soft: rgba(236, 208, 111, 0.14);
-    --accent-border: rgba(236, 208, 111, 0.42);
+    --accent: #91B4CD;
+    --accent-strong: #B8D0E0;
+    --accent-soft: rgba(145, 180, 205, 0.13);
+    --accent-border: rgba(145, 180, 205, 0.38);
 
     --brand: #ecd06f;
     --brand-strong: #f4e2a4;
     --brand-soft: rgba(236, 208, 111, 0.14);
     --brand-border: rgba(236, 208, 111, 0.42);
 
-    --ok: #6fcf97;
-    --ok-soft: rgba(111, 207, 151, 0.13);
-    --ok-border: rgba(111, 207, 151, 0.36);
+    --ok: #A7F3D0;
+    --ok-soft: #142E24;
+    --ok-border: #28513F;
 
     --warn: #ecd06f;
     --warn-soft: rgba(236, 208, 111, 0.13);
     --warn-border: rgba(236, 208, 111, 0.36);
 
-    --danger: #f0797c;
-    --danger-strong: #f59a9c;
-    --danger-soft: rgba(240, 121, 124, 0.14);
-    --danger-border: rgba(240, 121, 124, 0.4);
+    --danger: #FFEDD5;
+    --danger-strong: #FFF7ED;
+    --danger-soft: #3E1F11;
+    --danger-border: #704127;
 
     --info: #7ab6d8;
     --info-soft: rgba(122, 182, 216, 0.13);
@@ -372,8 +377,8 @@
     --shadow-0: 0 1px 1px rgba(0, 0, 0, 0.5);
     --shadow-1: 0 1px 1px rgba(0, 0, 0, 0.55), 0 2px 6px -1px rgba(0, 0, 0, 0.65);
     --shadow-2: 0 2px 4px -1px rgba(0, 0, 0, 0.6), 0 14px 32px -6px rgba(0, 0, 0, 0.8);
-    --overlay: rgba(0, 0, 0, 0.68);
-    --focus-ring: #ecd06f;
+    --overlay: rgba(3, 5, 8, 0.72);
+    --focus-ring: #91B4CD;
   }
 }
 

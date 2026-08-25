@@ -39,6 +39,52 @@ There is no Raiker cloud account.
 For Windows instructions, project-local workspaces, explicit server control,
 and uninstall help, see [Getting started](docs/guide/getting-started.md).
 
+### Linux
+
+On Debian or Ubuntu, install the OS-provided Python tooling and Git first. Use
+a NodeSource package, `nvm`, or another trusted source when the distribution's
+`nodejs` is older than 20.
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip git
+git clone https://github.com/sharRahul/Raiker.git
+cd Raiker
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[dev]"
+npm --prefix apps/web ci
+npm --prefix apps/web run build
+raiker-app
+```
+
+Raiker binds to loopback and stores instance data under the normal Linux user
+data directory unless `--workspace PATH` is supplied. `raiker-app service
+install` registers a user-level `systemd` service; it does not require or create
+a system service.
+
+### macOS
+
+Install the command-line prerequisites with Homebrew (or equivalent), then use
+the Homebrew Python explicitly when creating the environment:
+
+```bash
+brew install python@3.11 node@20 git
+git clone https://github.com/sharRahul/Raiker.git
+cd Raiker
+$(brew --prefix python@3.11)/bin/python3.11 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e ".[dev]"
+export PATH="$(brew --prefix node@20)/bin:$PATH"
+npm --prefix apps/web ci
+npm --prefix apps/web run build
+raiker-app
+```
+
+`raiker-app service install` creates a user LaunchAgent. Current source installs
+are supported; locally generated Linux `.deb`/AppImage and macOS `.pkg`
+artifacts are unsigned unless a published release explicitly says otherwise.
+
 ## Documentation
 
 - **[User guide](docs/guide/README.md)** — install, configure, and use Raiker.

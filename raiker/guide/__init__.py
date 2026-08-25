@@ -32,6 +32,7 @@ _READING_ORDER = (
     "getting-started",
     "connecting-a-model",
     "working-in-chat",
+    "memory",
     "working-in-build",
     "permissions-and-runtime-modes",
     "tasks-and-projects",

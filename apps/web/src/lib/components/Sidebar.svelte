@@ -1,13 +1,29 @@
 <script lang="ts">
-  import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
-  import { NAV_GROUPS, navItem } from "../nav";
+  import { NAV_GROUPS } from "../nav";
   import { api } from "../api";
   import type { ProjectView, SessionSummary } from "../apiTypes";
   import { relativeTime } from "../format";
+  import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
-  let { current }: { current: string } = $props();
+  let {
+    current,
+    desktopOpen = true,
+    drawerOpen = false,
+    compact = false,
+    returnFocusTo = null,
+    backgroundElement = undefined,
+    onDrawerClose = () => {},
+  }: {
+    current: string;
+    desktopOpen?: boolean;
+    drawerOpen?: boolean;
+    compact?: boolean;
+    returnFocusTo?: HTMLElement | null;
+    backgroundElement?: HTMLElement;
+    onDrawerClose?: () => void;
+  } = $props();
   let recent = $state<SessionSummary[]>([]);
   let projects = $state<ProjectView[]>([]);
 
@@ -18,50 +34,27 @@
   let moveOpen = $state(false);
   let busy = $state(false);
   let actionError = $state<string | null>(null);
-  // Narrow-screen primary navigation: the workbench, the work itself, the
-  // decisions blocking it, and the operational record — plus More for the rest.
-  // The master stop stays in the context bar and is never behind this drawer.
-  const phoneNavItems = ["home", "new-chat", "approvals", "observe"].map(navItem);
-  let navigationOpen = $state(false);
-  let returnFocusTo: HTMLButtonElement | null = null;
-  let compactNavigation = $state(false);
-  let closeButton: HTMLButtonElement | undefined = $state();
-
-  function openNavigation(event: MouseEvent) {
-    returnFocusTo = event.currentTarget as HTMLButtonElement;
-    navigationOpen = true;
-    queueMicrotask(() => closeButton?.focus());
-  }
+  let navigationElement = $state<HTMLElement>();
+  let deactivate: DeactivateModalDrawer | null = null;
 
   function closeNavigation(restoreFocus = true) {
-    navigationOpen = false;
-    if (restoreFocus) returnFocusTo?.focus();
-    returnFocusTo = null;
+    deactivate?.(restoreFocus);
+    deactivate = null;
+    onDrawerClose();
   }
 
-  onMount(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const query = window.matchMedia("(max-width: 1023px)");
-    const updateCompactNavigation = () => {
-      compactNavigation = query.matches;
-      if (!query.matches) closeNavigation(false);
-    };
-    updateCompactNavigation();
-    query.addEventListener("change", updateCompactNavigation);
-    return () => query.removeEventListener("change", updateCompactNavigation);
-  });
-
   $effect(() => {
-    if (!navigationOpen) return;
-    const closeForEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closeNavigation();
-    };
-    const closeForResize = () => closeNavigation(false);
-    window.addEventListener("keydown", closeForEscape);
-    window.addEventListener("resize", closeForResize);
+    if (!compact || !drawerOpen || navigationElement === undefined) return;
+    deactivate = activateModalDrawer({
+      id: "navigation",
+      container: navigationElement,
+      returnFocusTo,
+      backgroundElements: backgroundElement === undefined ? [] : [backgroundElement],
+      onDismiss: () => closeNavigation(true),
+    });
     return () => {
-      window.removeEventListener("keydown", closeForEscape);
-      window.removeEventListener("resize", closeForResize);
+      deactivate?.(false);
+      deactivate = null;
     };
   });
 
@@ -151,23 +144,21 @@
   }
 </script>
 
-<button type="button" class="tablet-toggle btn btn-ghost" aria-expanded={navigationOpen} aria-controls="all-navigation" onclick={openNavigation}>
-  Menu
-</button>
-
-{#if navigationOpen}
+{#if compact && drawerOpen}
   <button type="button" class="drawer-scrim" aria-label="Close navigation" onclick={() => closeNavigation()}></button>
 {/if}
 
 <nav
   id="all-navigation"
   class="sidebar"
-  class:open={navigationOpen}
+  class:open={drawerOpen}
+  class:desktop-hidden={!compact && !desktopOpen}
   aria-label="All navigation"
-  aria-hidden={compactNavigation && !navigationOpen ? "true" : undefined}
-  inert={compactNavigation && !navigationOpen}
+  aria-hidden={(compact && !drawerOpen) || (!compact && !desktopOpen) ? "true" : undefined}
+  inert={(compact && !drawerOpen) || (!compact && !desktopOpen)}
+  bind:this={navigationElement}
 >
-  <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()} bind:this={closeButton}>Close</button>
+  <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
   <a class="brand" href="#/home">
     <Logo size={30} />
     <span class="brand-text">
@@ -189,7 +180,7 @@
               aria-current={current === item.id ? "page" : undefined}
               aria-label={item.label}
               title={item.hint}
-              onclick={() => closeNavigation(false)}
+              onclick={() => { if (compact) closeNavigation(false); }}
             >
               <Icon name={item.icon} size="lg" filled={current === item.id} />
               <span>{item.label}</span>
@@ -256,25 +247,6 @@
   </p>
 </nav>
 
-<nav class="phone-nav" aria-label="Primary">
-  {#each phoneNavItems as item (item.id)}
-    <a
-      class="phone-link"
-      class:active={current === item.id}
-      href={`#/${item.id}`}
-      aria-current={current === item.id ? "page" : undefined}
-      aria-label={item.label}
-    >
-      <Icon name={item.icon} size="lg" filled={current === item.id} />
-      <span>{item.label}</span>
-    </a>
-  {/each}
-  <button type="button" class="phone-more" aria-label="More navigation" aria-expanded={navigationOpen} aria-controls="all-navigation" onclick={openNavigation}>
-    <Icon name="chevron-right" size={18} />
-    <span>More</span>
-  </button>
-</nav>
-
 <style>
   .sidebar {
     width: var(--sidebar-w);
@@ -293,7 +265,9 @@
     overflow-y: auto;
     position: relative;
   }
-  .tablet-toggle, .phone-nav, .drawer-scrim, .drawer-close { display: none; }
+  .drawer-scrim, .drawer-close { display: none; }
+  .sidebar.desktop-hidden { width: 0; padding-inline: 0; border-right-width: 0; overflow: hidden; transform: translateX(-100%); }
+  .sidebar { transition: width var(--motion-shell) var(--ease-shell), padding var(--motion-shell) var(--ease-shell), transform var(--motion-shell) var(--ease-shell); }
   .brand {
     display: flex;
     align-items: center;
@@ -452,25 +426,12 @@
     appearance: none;
   }
   @media (max-width: 1023px) {
-    .tablet-toggle { display: inline-flex; position: fixed; top: 0.5rem; left: var(--space-3); z-index: 70; }
     .drawer-scrim { display: block; position: fixed; inset: 0; z-index: 90; border: 0; background: var(--overlay); cursor: default; }
-    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 100; width: min(19rem, 84vw); transform: translateX(-105%); transition: transform 160ms var(--ease); box-shadow: var(--shadow-2); }
+    .sidebar, .sidebar.desktop-hidden { position: fixed; inset: 0 auto 0 0; z-index: 100; width: min(19rem, 84vw); padding: var(--space-4) var(--space-3); border-right-width: 1px; transform: translateX(-105%); transition: transform var(--motion-shell) var(--ease-shell); box-shadow: var(--shadow-2); }
     .sidebar.open { transform: translateX(0); }
     .drawer-close { display: inline-flex; align-self: flex-end; }
   }
-  @media (max-width: 639px) {
-    .tablet-toggle { display: none; }
-    .phone-nav { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); position: fixed; inset: auto 0 0; z-index: 70; min-height: 4rem; padding-bottom: env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: var(--shadow-1); }
-    .phone-link, .phone-more { display: grid; place-items: center; gap: 0.1rem; min-width: 0; padding: 0.4rem 0.2rem; color: var(--text-3); background: transparent; border: 0; font: inherit; font-size: 0.64rem; font-weight: 650; text-decoration: none; }
-    .phone-link.active, .phone-more[aria-expanded="true"] { color: var(--accent); }
-    /* Guarded on a real pointer. On a touch device `:hover` sticks after a tap,
-       so the last item touched keeps a highlight that reads as "you are here" —
-       directly contradicting the accent colour on the item that actually is. */
-    @media (hover: hover) {
-      .phone-link:hover, .phone-more:hover { background: var(--sunken); color: var(--text-1); text-decoration: none; }
-    }
-  }
   @media (min-width: 1024px) {
-    .phone-nav, .tablet-toggle, .drawer-scrim, .drawer-close { display: none; }
+    .drawer-scrim, .drawer-close { display: none; }
   }
 </style>

@@ -6,6 +6,7 @@ import { BOOTSTRAP_ROUTES, stubFetch } from "./lib/test-helpers";
 afterEach(() => {
   vi.unstubAllGlobals();
   window.location.hash = "";
+  localStorage.removeItem("raiker.navigation.desktop");
 });
 
 // Drive the lock screen: fill credentials and submit so the app shell mounts.
@@ -17,6 +18,19 @@ async function signIn() {
 }
 
 describe("App shell", () => {
+  it("reflows and persists the desktop navigation preference", async () => {
+    stubFetch(BOOTSTRAP_ROUTES);
+    render(App);
+    await signIn();
+    const toggle = await screen.findByRole("button", { name: "Hide navigation" });
+    await fireEvent.click(toggle);
+    expect(screen.getByRole("button", { name: "Show navigation" })).toHaveAttribute("aria-expanded", "false");
+    expect(document.querySelector(".app-shell")).toHaveAttribute("data-navigation-open", "false");
+    const hiddenNavigation = document.getElementById("all-navigation") as HTMLElement;
+    expect(hiddenNavigation).toHaveAttribute("aria-hidden", "true");
+    expect(hiddenNavigation.inert).toBe(true);
+    expect(localStorage.getItem("raiker.navigation.desktop")).toBe("false");
+  });
   it("routes a first owner into resumable model setup", async () => {
     stubFetch({
       ...BOOTSTRAP_ROUTES,

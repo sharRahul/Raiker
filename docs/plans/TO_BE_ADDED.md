@@ -98,7 +98,7 @@ that would put Raiker ahead of the field.
 | [ADD-23](#add-23--governed-browser-control-as-a-narrow-tool-set) | Tier 3 | Browser / governed control | Proposal — owner decision |
 | [ADD-24](#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Tier 3 | MCP / server-contributed UI | Proposal — after BUG-234; supersedes plugin panels |
 | [ADD-25](#add-25--post-stage-j-memory-expansion) | Tier 4 | Memory / temporal, polyglot, context and transactions | Proposal — after Stage J |
-| [ADD-26](#add-26--a-premium-responsive-workspace-shell) | Tier 2 | Web UI / theme and adaptive navigation | Proposal |
+| [ADD-26](#add-26--a-premium-responsive-workspace-shell) | Tier 2 | Web UI / theme and adaptive navigation | Implemented 2026-08-25 |
 
 **2026-08-21 review against the reference platforms.** Evidence-bound graph
 review and visible checkpoint failure are proven meaningful differentiators and
@@ -997,7 +997,12 @@ cost, evidence, and transactional publication are all inspectable together.
 
 ## ADD-26 — A premium responsive workspace shell
 
-**Status: proposed. Tier 2 (experience). Effort: medium.**
+**Status: implemented 2026-08-25. Tier 2 (experience).** The shared shell,
+accessible modal-drawer controller, low-saturation semantic tokens, bounded
+reading/workspace canvases, and the complete high-resolution evidence matrix
+ship together. The approved design and task-level implementation record are
+[`WEB_UI_ADAPTIVE_SHELL_DESIGN.md`](WEB_UI_ADAPTIVE_SHELL_DESIGN.md) and
+[`WEB_UI_ADAPTIVE_SHELL_IMPLEMENTATION_PLAN.md`](WEB_UI_ADAPTIVE_SHELL_IMPLEMENTATION_PLAN.md).
 
 **What exists today.** Raiker has fifteen routes, a shared sidebar/top bar,
 mobile drawer navigation, theme tokens, independent application surfaces, and
@@ -1019,7 +1024,8 @@ embedding these values locally.
 | surface/card | `#12161F` | `#FFFFFF` |
 | muted border | `#1F242F` | `#E2E8F0` |
 | primary text | `#E2E8F0` | `#0F172A` |
-| secondary text | `#64748B` | `#475569` |
+| supplied secondary palette value | `#64748B` | `#475569` |
+| normal muted text | `#94A3B8` | `#475569` |
 | pass background | `#142E24` | `#E6F4EA` |
 | pass text | `#A7F3D0` | `#137333` |
 | deny background | `#3E1F11` | `#FCE8E6` |
@@ -1052,11 +1058,17 @@ owner can choose navigation visibility without layout surprise. Desktop gains
 shared real estate and a total-focus state; small screens gain an overlay that
 never crushes the work; every route uses the same semantic colour vocabulary.
 
-**Evidence required.** Screenshot and interaction coverage at 375, 390, 768,
-1024, 1440, and 1920 pixels in light and dark themes; left/right rail state
+The supplied dark `#64748B` is retained for non-text/decorative use; normal
+muted text uses `#94A3B8` because the supplied value does not reach 4.5:1 on
+the dark surface.
+
+**Evidence.** Screenshot and interaction coverage includes 390 × 844,
+1920 × 1080, 3840 × 2160, and 7680 × 4320 in light and dark themes, with
+assertion-only breakpoint coverage at 768/834, 1024, and 1440; left/right rail state
 combinations; independent scrolling; focus trap/restoration; reduced motion;
 keyboard-only reveal; no horizontal overflow; token-value assertions; contrast
-checks; and zero console errors.
+checks; and zero console errors. The current 208-image catalogue is documented
+under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2026-08-25).
 
 ---
 

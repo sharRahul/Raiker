@@ -28,6 +28,16 @@ remains authoritative and filters every recalled source record.
 5. Retrieval is scope- and policy-filtered before ranking. Fast retrieval must
    never bypass user visibility, archive state, incognito, or sensitivity rules.
 
+### User-guide synchronization contract
+
+[`docs/guide/memory.md`](../guide/memory.md) is the owner-facing description of
+this subsystem and ships inside the product guide. Any change to capture,
+observation metadata, candidate approval, automatic or tool-driven retrieval,
+ranking, correction, retention, temporal tiering, archive, restore, forget,
+purge, projection behavior, scope, sensitivity, Incognito, or privacy must
+update that guide in the same change. A memory implementation change is
+incomplete when the guide still describes the prior behavior.
+
 ## Architecture
 
 ```text

@@ -21,6 +21,89 @@ python -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+The following platform sections spell out the same source install with the
+correct shell and package manager. Raiker does not currently publish a signed
+download, Homebrew formula, or Linux repository.
+
+### Linux
+
+For Debian or Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install python3 python3-venv python3-pip git
+```
+
+For Fedora, install the equivalent prerequisites:
+
+```bash
+sudo dnf install python3 python3-pip git
+```
+
+Confirm that `python3 --version` is 3.11 or newer and `node --version` is 20 or
+newer. Stable distributions may ship an older Node.js; use NodeSource, `nvm`,
+or another trusted versioned source rather than continuing with an unsupported
+runtime. Then install and build Raiker:
+
+```bash
+git clone https://github.com/sharRahul/Raiker.git
+cd Raiker
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+npm --prefix apps/web ci
+npm --prefix apps/web run build
+raiker-app --print-paths
+raiker-app
+```
+
+The dashboard opens from a loopback host. Without `--workspace`, Linux instance
+data uses `$XDG_DATA_HOME/raiker` or the platform user-data default. To start the
+same instance at sign-in:
+
+```bash
+raiker-app service install
+raiker-app service status
+```
+
+This installs a `systemd --user` registration, not a privileged system service.
+Keep the checkout and `.venv` at the registered paths, or uninstall and
+reinstall the service after moving them.
+
+### macOS
+
+With Homebrew:
+
+```bash
+brew install python@3.11 node@20 git
+git clone https://github.com/sharRahul/Raiker.git
+cd Raiker
+$(brew --prefix python@3.11)/bin/python3.11 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+export PATH="$(brew --prefix node@20)/bin:$PATH"
+npm --prefix apps/web ci
+npm --prefix apps/web run build
+raiker-app --print-paths
+raiker-app
+```
+
+The default instance data is under `~/Library/Application Support/Raiker`.
+Automatic sign-in startup uses a user LaunchAgent:
+
+```bash
+raiker-app service install
+raiker-app service status
+```
+
+Source checkout execution does not require opening an installer. The release
+tool can generate a `.pkg`, but local artifacts are unsigned. macOS Gatekeeper
+may refuse an unsigned package or app bundle; do not bypass that warning for an
+artifact you did not build or verify yourself. No notarized Raiker release is
+claimed until the release channel says so.
+
 ### Windows PowerShell
 
 The editable package-install step above installs `raiker-app` into the virtual
@@ -159,8 +242,10 @@ The top bar carries the notification bell, the theme toggle
 every task that is queued, running, paused, or waiting for your approval, at the
 next safe boundary. It is governed and audited — not a force-kill.
 
-The layout adapts live: a bottom bar plus drawer below 640 px, a menu trigger
-plus drawer from 640–1023 px, and the full sidebar at 1024 px and wider.
+The layout adapts live: below 1024 px the header menu opens navigation as an
+overlay without changing the workspace width. At 1024 px and wider, the
+256-pixel sidebar shares screen space and reflows the canvas; collapsing it
+expands the bounded focus view. Sidebar and workspace scrolling stay independent.
 
 Continue with [Connecting a model](connecting-a-model.md). For a tour of every
 destination and its evidence views, see

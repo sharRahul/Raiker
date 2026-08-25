@@ -235,8 +235,9 @@ twenty-nine tabs.
 
 ### 4.3 Responsive [S]
 
-Resize to **375 px**, **390 px**, **768 px**, **1024 px**, **1440 px**, and
-**1920 px**. Repeat in light and dark themes. At each width:
+Resize to **375 px**, **390 px**, **768 px**, **1024 px**, **1440 px**,
+**1920 × 1080**, **3840 × 2160 (4K)**, and **7680 × 4320 (8K)**. Repeat in
+light and dark themes. At each size:
 
 - **[S]** Below 1024 px, each sidebar is a sliding overlay/drawer above the
   workspace. It **MUST NOT** narrow the central canvas, rewrap its text, or move
@@ -260,7 +261,11 @@ Resize to **375 px**, **390 px**, **768 px**, **1024 px**, **1440 px**, and
 - **MUST**: the page body never scrolls horizontally.
 - **MUST**: the canvas, cards, code, logs, and messages retain generous padding
   and readable line length in every rail combination; no wide-margin focus state
-  makes prose span the full 1920-pixel viewport.
+  makes prose span the full 1080p, 4K, or 8K viewport. Controls and type retain
+  their CSS-pixel size; additional resolution becomes breathing room.
+- **MUST**: committed page evidence is viewport-only and its PNG header exactly
+  matches the declared viewport. The complete current matrix is 26 route/tab
+  states × four capture sizes × two themes = 208 files.
 - Toggle reduced motion. Rail and drawer state still changes, but translational
   travel is removed. With motion enabled, every rail uses the same tokenized
   `cubic-bezier` curve and no bounce, flash, or heavy shadow.

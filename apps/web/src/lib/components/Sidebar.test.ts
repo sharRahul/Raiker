@@ -33,18 +33,12 @@ describe("Sidebar navigation", () => {
     expect(within(nav).getByText("Apache License, Version 2.0")).toBeInTheDocument();
   });
 
-  it("opens More navigation and closes it with Escape", async () => {
-    render(Sidebar, { current: "new-chat" });
-    const more = screen.getByRole("button", { name: "More navigation" });
-    expect(more).toHaveAttribute("aria-expanded", "false");
-
-    await fireEvent.click(more);
-    expect(more).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("navigation", { name: "All navigation" })).toBeInTheDocument();
-
-    await fireEvent.keyDown(window, { key: "Escape" });
-    expect(more).toHaveAttribute("aria-expanded", "false");
-    expect(more).toHaveFocus();
+  it("closes controlled compact navigation with Escape", async () => {
+    const onDrawerClose = vi.fn();
+    render(Sidebar, { current: "new-chat", compact: true, drawerOpen: true, onDrawerClose });
+    await Promise.resolve();
+    await fireEvent.keyDown(document, { key: "Escape" });
+    expect(onDrawerClose).toHaveBeenCalledOnce();
   });
 
   it("removes the closed compact drawer from keyboard navigation", async () => {
@@ -56,14 +50,14 @@ describe("Sidebar navigation", () => {
         removeEventListener: vi.fn(),
       }),
     );
-    render(Sidebar, { current: "new-chat" });
+    const { rerender } = render(Sidebar, { current: "new-chat", compact: true, drawerOpen: false });
 
     const drawer = document.getElementById("all-navigation");
     expect(drawer).not.toBeNull();
     expect((drawer as HTMLElement).inert).toBe(true);
     expect(drawer).toHaveAttribute("aria-hidden", "true");
 
-    await fireEvent.click(screen.getByRole("button", { name: "More navigation" }));
+    await rerender({ current: "new-chat", compact: true, drawerOpen: true });
     expect((drawer as HTMLElement).inert).toBe(false);
     expect(drawer).not.toHaveAttribute("aria-hidden");
   });

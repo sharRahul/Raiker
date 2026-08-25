@@ -21,11 +21,11 @@ describe("accessibility landmarks", () => {
     render(App);
     await signIn();
     await waitFor(() => {
-      expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+      expect(screen.getByRole("navigation", { name: /all navigation/i })).toBeInTheDocument();
     });
     const skip = screen.getByText(/skip to content/i);
     expect(skip).toHaveAttribute("href", "#main");
-    expect(screen.getByRole("navigation", { name: /primary/i })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: /all navigation/i })).toBeInTheDocument();
     expect(screen.getByRole("main")).toBeInTheDocument();
     expect(screen.getByRole("banner")).toBeInTheDocument();
   });

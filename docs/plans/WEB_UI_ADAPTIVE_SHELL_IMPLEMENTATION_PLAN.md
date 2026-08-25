@@ -1,5 +1,11 @@
 # Adaptive Workspace Shell Implementation Plan
 
+## Status
+
+**Complete — 2026-08-25.** The independently approved design was implemented
+and verified as one release candidate. The procedural checklist below is kept
+as the reproducible build record; completion evidence is summarized at the end.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Deliver the approved low-saturation palette, desktop reflow/focus
@@ -553,3 +559,16 @@ Run `git status --short`, `git diff --check`, and `git log -8 --oneline`. If a
 demonstrated failure required a fix, return to the task that owns that file,
 repeat its focused test and commit step, then rerun Steps 1–4 here. Do not create
 an empty completion commit.
+
+## Completion evidence
+
+| Area | Result |
+|---|---|
+| Independent gate | Design and implementation plan both approved after two revision cycles; implementation began only after approval. |
+| Web unit/type/lint | ESLint and Svelte check clean; 111 Vitest files passed with 974 tests passing and one intentional skip. |
+| Browser verification | Seven mocked Playwright scenarios passed; the real-host live sweep passed all eight size/theme matrices with zero overflow, icon, selected-tab, console, theme, or centering failures. |
+| Screenshot catalogue | 208 viewport-only PNGs: 26 route/tab states × mobile/1080p/4K/8K × light/dark. PNG dimensions are asserted from IHDR. |
+| Python | Full pytest suite passed with CI's SQLCipher memory-security override; the two SQLCipher posture files also passed separately with the override removed. Ruff, mypy, and compileall passed. |
+| Native | `cargo fmt --check`, Clippy with warnings denied, and all Rust tests passed. |
+| Documentation/governance | Repository documentation consistency, phase/status, relative-link, and licensing checks passed. The memory guide is in the in-product reading order and its same-change maintenance contract is in the architecture plan. |
+| Visual review | Mobile Workbench, Memory, Build, and Settings plus 1080p Workbench and 8K Guide were inspected at rendered/original resolution. A narrow Memory posture-card defect was fixed and all eight Memory variants were re-captured. |

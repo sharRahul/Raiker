@@ -2,8 +2,8 @@
 
 ## Status
 
-Approved product direction, awaiting independent design and implementation-plan
-review before code changes begin. This document turns
+Implemented after independent approval of both this design and its detailed
+implementation plan. This document turns
 [`ADD-26`](TO_BE_ADDED.md#add-26--a-premium-responsive-workspace-shell) and the
 responsive acceptance contract in
 [`RAIKER_LIVE_MANUAL_TEST_PLAN.md`](RAIKER_LIVE_MANUAL_TEST_PLAN.md#43-responsive-s)

@@ -48,6 +48,30 @@
   // long-running, and stepping over to Approvals must not throw it away.
   let buildVisited = $state(false);
   const activeItem = $derived(navItem(current));
+  let compactNavigation = $state(false);
+  let desktopNavigationOpen = $state(true);
+  let navigationDrawerOpen = $state(false);
+  let navigationTrigger = $state<HTMLElement | null>(null);
+  let appMain = $state<HTMLElement>();
+  const pageLayout = $derived(
+    current === "new-chat" || current === "search-chat" || current === "guide"
+      ? "reading" as const
+      : "workspace" as const,
+  );
+
+  function toggleNavigation(trigger: HTMLElement) {
+    navigationTrigger = trigger;
+    if (compactNavigation) {
+      navigationDrawerOpen = !navigationDrawerOpen;
+      return;
+    }
+    desktopNavigationOpen = !desktopNavigationOpen;
+    localStorage.setItem("raiker.navigation.desktop", String(desktopNavigationOpen));
+  }
+
+  function closeNavigationDrawer() {
+    navigationDrawerOpen = false;
+  }
 
   $effect(() => {
     if (current === "new-chat") chatVisited = true;
@@ -70,7 +94,18 @@
   );
 
   onMount(() => {
+    desktopNavigationOpen = localStorage.getItem("raiker.navigation.desktop") !== "false";
+    const navigationQuery = typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 1023px)")
+      : null;
+    const updateNavigationMode = () => {
+      compactNavigation = navigationQuery?.matches ?? false;
+      if (!compactNavigation) navigationDrawerOpen = false;
+    };
+    updateNavigationMode();
+    navigationQuery?.addEventListener("change", updateNavigationMode);
     const handler = () => {
+      navigationDrawerOpen = false;
       current = routeFromHash(window.location.hash);
       currentTab = tabFromHash(window.location.hash);
       currentSection = sectionFromHash(window.location.hash);
@@ -89,6 +124,7 @@
     prefetchRoutes();
     return () => {
       window.removeEventListener("hashchange", handler);
+      navigationQuery?.removeEventListener("change", updateNavigationMode);
       stopRevalidation();
     };
   });
@@ -160,19 +196,30 @@
 {#if authState !== "ready"}
   <LoginView {onAuthenticated} runtimeState={authState} />
 {:else}
-  <div class="app-shell">
-    <Sidebar {current} />
-    <div class="app-main">
+  <div class="app-shell" data-navigation-open={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}>
+    <Sidebar
+      {current}
+      desktopOpen={desktopNavigationOpen}
+      drawerOpen={navigationDrawerOpen}
+      compact={compactNavigation}
+      returnFocusTo={navigationTrigger}
+      backgroundElement={appMain}
+      onDrawerClose={closeNavigationDrawer}
+    />
+    <div class="app-main" bind:this={appMain}>
       <Topbar
         title={activeItem.label}
         hint={activeItem.hint}
         {projects}
         onProjectSelect={selectProject}
+        navigationOpen={compactNavigation ? navigationDrawerOpen : desktopNavigationOpen}
+        {compactNavigation}
+        onNavigationToggle={toggleNavigation}
       />
       <main id="main" class="content" tabindex="-1">
         <!-- The topbar already shows the route title + hint; the page itself
            opens with its own lead so nothing is said twice. -->
-        <ResponsivePage>
+        <ResponsivePage layout={pageLayout}>
           {#if current === "model-setup"}
             <LazyRoute route="model-setup" />
           {:else if chatVisited}
@@ -285,6 +332,7 @@
     height: 100vh;
     height: 100dvh;
     overflow: hidden;
+    background: var(--bg);
   }
   .app-main {
     flex: 1;
@@ -319,13 +367,8 @@
   }
   @media (max-width: 639px) {
     .content {
-      padding: var(--space-4) var(--space-3)
-        calc(var(--space-5) + 4rem + env(safe-area-inset-bottom));
-      /* Same room, minus the phone bottom navigation the padding reserves. */
-      --content-h: calc(
-        100dvh - var(--topbar-h) - var(--space-4) - var(--space-5) - 4rem -
-          env(safe-area-inset-bottom)
-      );
+      padding: var(--space-4) var(--space-3) calc(var(--space-5) + env(safe-area-inset-bottom));
+      --content-h: calc(100dvh - var(--topbar-h) - var(--space-4) - var(--space-5));
     }
   }
 </style>

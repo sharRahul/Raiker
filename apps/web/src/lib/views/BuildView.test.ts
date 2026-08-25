@@ -568,6 +568,24 @@ describe("Build project filing", () => {
 });
 
 describe("Build background work rail", () => {
+  it("uses a modal right drawer on compact screens", async () => {
+    vi.stubGlobal("matchMedia", vi.fn().mockReturnValue({
+      matches: true,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }));
+    stubFetch(baseRoutes());
+    render(BuildView);
+    const trigger = await screen.findByRole("button", { name: /background work/i });
+    await fireEvent.click(trigger);
+    const drawer = await screen.findByRole("dialog", { name: "Background work" });
+    expect(drawer).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "Close background work" })).toBeInTheDocument();
+    await fireEvent.keyDown(document, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Background work" })).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
   it("shows running background work and hides on the toggle", async () => {
     stubFetch(
       baseRoutes({

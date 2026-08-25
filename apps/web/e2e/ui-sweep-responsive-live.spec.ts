@@ -18,12 +18,10 @@
  * Signed in as the owner rather than creating a fresh account, because the
  * pages worth checking are the populated ones.
  *
- * **On the captures.** This writes every page at every width into
- * `docs/plans/screenshots/pages/`. What is *committed* is a deliberate subset —
- * every page at `mobile`, where layout actually breaks, plus all three widths of
- * the six Extensions tabs, which is the surface most rounds change. Running this
- * spec regenerates the complete set locally; the assertions above are the part
- * that has to hold, and they do not depend on which files are kept.
+ * **On the captures.** This writes the complete current-state catalogue into
+ * `docs/plans/screenshots/pages/`: 26 route/tab states crossed with light/dark
+ * and mobile, 1080p, 4K, and 8K. Captures are viewport-only and their PNG
+ * dimensions are asserted before they are accepted.
  */
 import { expect, test } from "@playwright/test";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
@@ -60,11 +58,16 @@ const ROUTES = [
   ["settings", "settings"],
 ] as const;
 
-const WIDTHS = [
+const CAPTURES = [
   ["mobile", { width: 390, height: 844 }],
-  ["tablet", { width: 834, height: 1112 }],
-  ["desktop", { width: 1440, height: 1000 }],
+  ["1080p", { width: 1920, height: 1080 }],
+  ["4k", { width: 3840, height: 2160 }],
+  ["8k", { width: 7680, height: 4320 }],
 ] as const;
+const ACTIVE_ROUTES = process.env.RAIKER_SWEEP_ROUTE
+  ? ROUTES.filter(([name]) => name === process.env.RAIKER_SWEEP_ROUTE)
+  : ROUTES;
+const THEMES = ["light", "dark"] as const;
 
 async function signIn(page: import("@playwright/test").Page) {
   await page.goto(`${BASE}/#/workbench`);
@@ -117,17 +120,25 @@ async function settle(page: import("@playwright/test").Page) {
 
 test.describe.configure({ mode: "serial" });
 
-for (const [label, viewport] of WIDTHS) {
-  test(`every page fits, keeps its icons and its selected tab at ${label}`, async ({ page }) => {
-    test.setTimeout(600_000);
+for (const [label, viewport] of CAPTURES) {
+  for (const theme of THEMES) {
+  test(`every page fits at ${label} in ${theme}`, async ({ page }) => {
+    test.setTimeout(900_000);
     await page.setViewportSize(viewport);
+    await page.addInitScript((selectedTheme) => {
+      localStorage.setItem("raiker.theme", selectedTheme);
+    }, theme);
     await signIn(page);
+    await expect(page.locator("html")).toHaveAttribute("data-theme", theme);
+    await expect(page.getByRole("button", { name: theme === "light" ? "Theme: light. Switch to dark." : "Theme: dark. Switch to system." })).toBeVisible();
 
     const overflowing: string[] = [];
     const iconless: string[] = [];
     const offscreenTab: string[] = [];
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
 
-    for (const [name, route] of ROUTES) {
+    for (const [name, route] of ACTIVE_ROUTES) {
       await page.goto(`${BASE}/#/${route}`);
       await settle(page);
 
@@ -155,14 +166,32 @@ for (const [label, viewport] of WIDTHS) {
           const box = node.getBoundingClientRect();
           return box.left >= -1 && box.right <= window.innerWidth + 1;
         });
-        if (!inView) offscreenTab.push(name);
+      if (!inView) offscreenTab.push(name);
       }
 
-      await page.screenshot({ path: `${SHOTS}/${label}-${name}.png`, fullPage: true });
+      if (label !== "mobile") {
+        const bounds = await page.locator('[data-testid="responsive-page"]').evaluate((node) => {
+          const pageBox = node.getBoundingClientRect();
+          const content = document.querySelector("main#main")!.getBoundingClientRect();
+          return {
+            width: pageBox.width,
+            max: (node as HTMLElement).dataset.layout === "reading" ? 72 * 16 : 90 * 16,
+            centeringError: Math.abs((pageBox.left - content.left) - (content.right - pageBox.right)),
+          };
+        });
+        expect(bounds.width).toBeLessThanOrEqual(bounds.max + 1);
+        expect(bounds.centeringError).toBeLessThanOrEqual(1);
+      }
+
+      const image = await page.screenshot({ path: `${SHOTS}/${label}-${theme}-${name}.png` });
+      expect(image.readUInt32BE(16), `${name} PNG width`).toBe(viewport.width);
+      expect(image.readUInt32BE(20), `${name} PNG height`).toBe(viewport.height);
     }
 
     expect(overflowing, `pages overflowing horizontally at ${label}`).toEqual([]);
     expect(iconless, `pages rendering an icon with no glyph at ${label}`).toEqual([]);
     expect(offscreenTab, `pages whose selected tab is off screen at ${label}`).toEqual([]);
+    expect(consoleErrors, `console errors at ${label}/${theme}`).toEqual([]);
   });
+  }
 }

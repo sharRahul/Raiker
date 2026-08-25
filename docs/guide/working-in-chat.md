@@ -312,6 +312,10 @@ approval for that task.
 
 ## Conversation memory
 
+For the full owner-facing lifecycle—proposal approval, source provenance,
+scope, Incognito, retention, correction, archive, forget, and purge—see
+[How Raiker memory works](memory.md).
+
 Raiker replays the prior completed turns of the conversation to the model, so a
 follow-up question works: tell it a codeword and ask for it two turns later and
 it has it.

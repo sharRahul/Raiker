@@ -23,6 +23,18 @@ def test_sections_are_offered_in_reading_order() -> None:
     assert slugs[:3] == ["getting-started", "connecting-a-model", "working-in-chat"]
     # The guide's own contents page would be a list inside the product's list.
     assert "readme" not in slugs
+    assert slugs.index("memory") == slugs.index("working-in-chat") + 1
+
+
+def test_memory_guide_covers_the_owner_lifecycle() -> None:
+    found = read_section("memory")
+    assert found is not None
+    _, markdown = found
+    for term in [
+        "approval", "provenance", "archive", "forget", "purge", "Incognito",
+        "retention", "correction", "semantic", "fallback",
+    ]:
+        assert term.lower() in markdown.lower()
 
 
 def test_each_section_names_itself_from_its_own_heading() -> None:

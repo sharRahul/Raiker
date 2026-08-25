@@ -4,6 +4,45 @@ import { describe, expect, it } from "vitest";
 
 const stylesheet = readFileSync(resolve(process.cwd(), "src", "app.css"), "utf8");
 
+function themeTokens(selector: string): Record<string, string> {
+  const start = stylesheet.indexOf(selector);
+  expect(start).toBeGreaterThanOrEqual(0);
+  const open = stylesheet.indexOf("{", start);
+  const close = stylesheet.indexOf("}", open);
+  return Object.fromEntries(
+    Array.from(stylesheet.slice(open + 1, close).matchAll(/(--[\w-]+):\s*([^;]+);/g))
+      .map((match) => [match[1], match[2].trim()]),
+  );
+}
+
+function contrast(foreground: string, background: string): number {
+  const luminance = (hex: string) => {
+    const channels = [1, 3, 5].map((index) => Number.parseInt(hex.slice(index, index + 2), 16) / 255)
+      .map((value) => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+  };
+  const [light, dark] = [luminance(foreground), luminance(background)].sort((a, b) => b - a);
+  return (light + 0.05) / (dark + 0.05);
+}
+
+describe("subtle semantic palette", () => {
+  it("pins the supplied roles and the accessible dark muted-text alias", () => {
+    const light = themeTokens(":root[data-theme=\"light\"]");
+    const dark = themeTokens(":root[data-theme=\"dark\"]");
+    expect(light).toMatchObject({ "--bg": "#F8FAFC", "--surface": "#FFFFFF", "--border": "#E2E8F0", "--text-1": "#0F172A", "--text-2": "#475569", "--ok": "#137333", "--ok-soft": "#E6F4EA", "--danger": "#C5221F", "--danger-soft": "#FCE8E6" });
+    expect(dark).toMatchObject({ "--bg": "#0B0D10", "--surface": "#12161F", "--border": "#1F242F", "--text-1": "#E2E8F0", "--palette-secondary": "#64748B", "--text-2": "#94A3B8", "--ok": "#A7F3D0", "--ok-soft": "#142E24", "--danger": "#FFEDD5", "--danger-soft": "#3E1F11" });
+  });
+
+  it("keeps normal muted and semantic state text at AA contrast", () => {
+    for (const tokens of [themeTokens(":root[data-theme=\"light\"]"), themeTokens(":root[data-theme=\"dark\"]")]) {
+      for (const [foreground, background] of [["--text-2", "--surface"], ["--ok", "--ok-soft"], ["--danger", "--danger-soft"]] as const) {
+        expect(contrast(tokens[foreground], tokens[background])).toBeGreaterThanOrEqual(4.5);
+      }
+    }
+    expect(contrast("#64748B", "#12161F")).toBeLessThan(4.5);
+  });
+});
+
 describe("global mobile accessibility styles", () => {
   it("keeps shared mobile shell controls at the 44px touch-target floor", () => {
     expect(stylesheet).toMatch(

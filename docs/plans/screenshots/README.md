@@ -10,7 +10,33 @@ evidence those write-ups point at.
 |---|---|
 | [`working/`](working) | Verified behaviour — every surface that did what it claims. Round-stamped: a file here is evidence of what was true on the day its prefix names, and is **not** re-captured later, because a defect that no longer reproduces cannot be photographed again |
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
-| [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full on each round by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
+| [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
+
+## Current adaptive-shell catalogue — 2026-08-25
+
+The mutable `pages/` catalogue contains 208 viewport-only PNG files:
+
+```text
+26 route/tab states × 4 display classes × 2 themes = 208
+```
+
+| Prefix | Viewport | Purpose |
+|---|---:|---|
+| `mobile-{light,dark}-` | 390 × 844 | Compact header and overlay navigation without squeezed content |
+| `1080p-{light,dark}-` | 1920 × 1080 | Standard full-HD desktop reflow and focus canvas |
+| `4k-{light,dark}-` | 3840 × 2160 | Bounded high-resolution workspace canvas |
+| `8k-{light,dark}-` | 7680 × 4320 | Maximum declared display class without scaled controls or unbounded prose |
+
+Each filename ends with the stable route/tab name, for example
+`4k-dark-observe-diagnostics.png`. The live sweep sets the chosen theme before
+application mount, checks the theme control state, waits for the page to settle,
+parks the pointer away from hover targets, rejects console errors and horizontal
+overflow, and reads the PNG header to prove its dimensions equal the viewport.
+Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
+automated layout assertions rather than additional committed screenshot classes.
+
+Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
+round-specific evidence and must never be deleted during a catalogue refresh.
 
 **Part of `working/` was pruned, and the write-ups still name what it held.**
 Forty-seven captures from the 2026-07-26 → 2026-08-10 rounds were removed from

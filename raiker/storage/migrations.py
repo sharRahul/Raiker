@@ -1150,6 +1150,38 @@ CREATE TABLE IF NOT EXISTS active_project (
 );
 """
 
+
+MANAGED_FILES_MIGRATION_ID = "RAIKER-1020-managed-knowledge-files"
+
+MANAGED_FILES_SQL = """
+CREATE TABLE IF NOT EXISTS managed_files (
+  file_id TEXT PRIMARY KEY,
+  owner_principal_id TEXT NOT NULL,
+  scope_kind TEXT NOT NULL CHECK (scope_kind IN ('memory', 'project')),
+  project_id TEXT REFERENCES projects(project_id),
+  relative_path TEXT NOT NULL,
+  media_type TEXT NOT NULL,
+  size_bytes INTEGER NOT NULL CHECK (size_bytes >= 0),
+  content_hash TEXT NOT NULL,
+  index_state TEXT NOT NULL,
+  index_error TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  retired_at TEXT,
+  CHECK (
+    (scope_kind = 'memory' AND project_id IS NULL)
+    OR (scope_kind = 'project' AND project_id IS NOT NULL)
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_managed_files_active_identity
+ON managed_files(owner_principal_id, scope_kind, COALESCE(project_id, ''), relative_path)
+WHERE retired_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_managed_files_owner_scope
+ON managed_files(owner_principal_id, scope_kind, project_id, created_at);
+"""
+
 ATTACHMENT_STORE_MIGRATION_ID = "RAIKER-1006-attachment-store"
 
 ATTACHMENT_STORE_SQL = """

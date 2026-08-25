@@ -130,6 +130,8 @@ from raiker.storage.migrations import (
     MACHINE_ACTION_IDENTITY_SNAPSHOT_SQL,
     MACHINE_IDENTITIES_MIGRATION_ID,
     MACHINE_IDENTITIES_SQL,
+    MANAGED_FILES_MIGRATION_ID,
+    MANAGED_FILES_SQL,
     MCP_CONTAINMENT_MIGRATION_ID,
     MCP_CONTAINMENT_SQL,
     MCP_MONITORING_MIGRATION_ID,
@@ -1127,6 +1129,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(MODEL_ADVISOR_MIGRATION_ID, MODEL_ADVISOR_SQL, connection)
             self._apply_migration(ATTACHMENT_STORE_MIGRATION_ID, ATTACHMENT_STORE_SQL, connection)
             self._apply_migration(PROJECTS_MIGRATION_ID, PROJECTS_SQL, connection)
+            self._apply_migration(MANAGED_FILES_MIGRATION_ID, MANAGED_FILES_SQL, connection)
             self._apply_migration(PROJECT_CONTEXT_MIGRATION_ID, PROJECT_CONTEXT_SQL, connection)
             self._apply_migration(
                 CONNECTOR_ECOSYSTEM_MIGRATION_ID, CONNECTOR_ECOSYSTEM_SQL, connection
@@ -2712,6 +2715,113 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM projects WHERE name = ?", (name,)
             ).fetchone()
         return dict(row) if row else None
+
+    # ── Managed knowledge files ──────────────────────────────────────────────
+
+    def insert_managed_file(
+        self,
+        *,
+        file_id: str,
+        owner_principal_id: str,
+        scope_kind: str,
+        project_id: str | None,
+        relative_path: str,
+        media_type: str,
+        size_bytes: int,
+        content_hash: str,
+        index_state: str,
+        index_error: str | None,
+        created_at: str,
+        updated_at: str,
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO managed_files (
+                    file_id, owner_principal_id, scope_kind, project_id, relative_path,
+                    media_type, size_bytes, content_hash, index_state, index_error,
+                    created_at, updated_at, retired_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)
+                """,
+                (
+                    file_id,
+                    owner_principal_id,
+                    scope_kind,
+                    project_id,
+                    relative_path,
+                    media_type,
+                    size_bytes,
+                    content_hash,
+                    index_state,
+                    index_error,
+                    created_at,
+                    updated_at,
+                ),
+            )
+
+    def list_managed_files(
+        self,
+        owner_principal_id: str,
+        *,
+        scope_kind: str | None = None,
+        project_id: str | None = None,
+        include_retired: bool = False,
+    ) -> list[dict[str, Any]]:
+        query = "SELECT * FROM managed_files WHERE owner_principal_id = ?"
+        parameters: list[Any] = [owner_principal_id]
+        if scope_kind is not None:
+            query += " AND scope_kind = ?"
+            parameters.append(scope_kind)
+        if project_id is not None:
+            query += " AND project_id = ?"
+            parameters.append(project_id)
+        if not include_retired:
+            query += " AND retired_at IS NULL"
+        query += " ORDER BY created_at, file_id"
+        with self.connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return [dict(row) for row in rows]
+
+    def get_managed_file(
+        self, file_id: str, owner_principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM managed_files WHERE file_id = ? AND owner_principal_id = ?",
+                (file_id, owner_principal_id),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def set_managed_file_index_state(
+        self,
+        file_id: str,
+        owner_principal_id: str,
+        index_state: str,
+        index_error: str | None = None,
+    ) -> bool:
+        with self.connect() as connection:
+            updated = connection.execute(
+                """
+                UPDATE managed_files
+                SET index_state = ?, index_error = ?, updated_at = ?
+                WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
+                """,
+                (index_state, index_error, utc_now(), file_id, owner_principal_id),
+            )
+        return updated.rowcount == 1
+
+    def retire_managed_file(self, file_id: str, owner_principal_id: str) -> bool:
+        now = utc_now()
+        with self.connect() as connection:
+            retired = connection.execute(
+                """
+                UPDATE managed_files
+                SET index_state = 'retired', index_error = NULL, updated_at = ?, retired_at = ?
+                WHERE file_id = ? AND owner_principal_id = ? AND retired_at IS NULL
+                """,
+                (now, now, file_id, owner_principal_id),
+            )
+        return retired.rowcount == 1
 
     def load_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
         if user_id is not None and self.load_project(project_id, user_id=user_id) is None:

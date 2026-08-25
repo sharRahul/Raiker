@@ -1,0 +1,190 @@
+"""Contained storage for original, untrusted managed knowledge files."""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import secrets
+from dataclasses import dataclass
+from pathlib import Path, PureWindowsPath
+from typing import TYPE_CHECKING, Literal
+
+from raiker.contracts.ids import utc_now
+from raiker.storage.internal_paths import internal_io_path
+
+if TYPE_CHECKING:
+    from raiker.storage.sqlite import SQLiteStore
+
+
+ManagedFileScopeKind = Literal["memory", "project"]
+
+
+class ManagedFileError(ValueError):
+    """A stable managed-file boundary failure."""
+
+
+@dataclass(frozen=True)
+class ManagedFileScope:
+    kind: ManagedFileScopeKind
+    project_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in {"memory", "project"}:
+            raise ManagedFileError("managed_file_scope_invalid")
+        if self.kind == "memory" and self.project_id is not None:
+            raise ManagedFileError("managed_file_scope_invalid")
+        if self.kind == "project" and not self.project_id:
+            raise ManagedFileError("managed_file_scope_invalid")
+
+
+@dataclass(frozen=True)
+class ManagedFileRecord:
+    file_id: str
+    owner_principal_id: str
+    scope_kind: ManagedFileScopeKind
+    project_id: str | None
+    relative_path: str
+    media_type: str
+    size_bytes: int
+    content_hash: str
+    index_state: str
+    index_error: str | None
+    created_at: str
+    updated_at: str
+    retired_at: str | None
+
+    @classmethod
+    def from_row(cls, row: dict[str, object]) -> ManagedFileRecord:
+        return cls(
+            file_id=str(row["file_id"]),
+            owner_principal_id=str(row["owner_principal_id"]),
+            scope_kind=str(row["scope_kind"]),  # type: ignore[arg-type]
+            project_id=str(row["project_id"]) if row["project_id"] is not None else None,
+            relative_path=str(row["relative_path"]),
+            media_type=str(row["media_type"]),
+            size_bytes=int(str(row["size_bytes"])),
+            content_hash=str(row["content_hash"]),
+            index_state=str(row["index_state"]),
+            index_error=str(row["index_error"]) if row["index_error"] is not None else None,
+            created_at=str(row["created_at"]),
+            updated_at=str(row["updated_at"]),
+            retired_at=str(row["retired_at"]) if row["retired_at"] is not None else None,
+        )
+
+
+class ManagedFileService:
+    """Write imported bytes only below the owner's declared managed scope."""
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+        self.workspace_root = Path(workspace_root).resolve()
+        self.store = store
+
+    def import_file(
+        self,
+        scope: ManagedFileScope,
+        relative_path: str,
+        data: bytes,
+        media_type: str,
+        owner_principal_id: str,
+    ) -> ManagedFileRecord:
+        relative = self._relative_path(relative_path)
+        root = self._scope_root(scope, owner_principal_id)
+        destination = self._contained_destination(root, relative)
+
+        if any(
+            str(row["relative_path"]) == relative
+            for row in self.store.list_managed_files(
+                owner_principal_id, scope_kind=scope.kind, project_id=scope.project_id
+            )
+        ):
+            raise ManagedFileError("managed_file_already_exists")
+        if destination.exists() or destination.is_symlink():
+            raise ManagedFileError("managed_file_already_exists")
+
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination = self._contained_destination(root, relative)
+        temporary = destination.with_name(f".{destination.name}.{secrets.token_hex(8)}.tmp")
+        try:
+            with temporary.open("xb") as handle:
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+            temporary.replace(destination)
+        except OSError as exc:
+            raise ManagedFileError("managed_file_write_failed") from exc
+        finally:
+            if temporary.exists():
+                temporary.unlink(missing_ok=True)
+
+        now = utc_now()
+        file_id = f"mfile_{secrets.token_hex(16)}"
+        try:
+            self.store.insert_managed_file(
+                file_id=file_id,
+                owner_principal_id=owner_principal_id,
+                scope_kind=scope.kind,
+                project_id=scope.project_id,
+                relative_path=relative,
+                media_type=media_type,
+                size_bytes=len(data),
+                content_hash=hashlib.sha256(data).hexdigest(),
+                index_state="queued",
+                index_error=None,
+                created_at=now,
+                updated_at=now,
+            )
+        except Exception:
+            destination.unlink(missing_ok=True)
+            raise
+        record = self.store.get_managed_file(file_id, owner_principal_id)
+        if record is None:  # pragma: no cover - the insert is synchronous
+            raise RuntimeError("managed_file_insert_missing")
+        return ManagedFileRecord.from_row(record)
+
+    def _scope_root(self, scope: ManagedFileScope, owner_principal_id: str) -> Path:
+        runtime_root = internal_io_path(self.workspace_root / ".raiker")
+        if scope.kind == "memory":
+            root = internal_io_path(runtime_root / "memory-files")
+        else:
+            owner_user_id = self.store.principal_user_id(owner_principal_id)
+            if owner_user_id is None:
+                raise ManagedFileError("managed_file_scope_not_found")
+            project = self.store.load_project(scope.project_id or "", user_id=owner_user_id)
+            if project is None:
+                raise ManagedFileError("managed_file_scope_not_found")
+            root = internal_io_path(self.workspace_root / str(project["root_subpath"]))
+            projects_root = internal_io_path(runtime_root / "projects")
+            self._require_within(root.resolve(), projects_root.resolve())
+
+        root.mkdir(parents=True, exist_ok=True)
+        self._require_within(root.resolve(), runtime_root.resolve())
+        return root
+
+    @staticmethod
+    def _relative_path(relative_path: str) -> str:
+        raw = str(relative_path)
+        windows = PureWindowsPath(raw)
+        if (
+            not raw
+            or raw.startswith(("/", "\\"))
+            or windows.is_absolute()
+            or windows.drive
+        ):
+            raise ManagedFileError("managed_file_path_outside_scope")
+        normalized = raw.replace("\\", "/")
+        parts = normalized.split("/")
+        if any(part in {"", ".", ".."} for part in parts):
+            raise ManagedFileError("managed_file_path_outside_scope")
+        return "/".join(parts)
+
+    def _contained_destination(self, root: Path, relative: str) -> Path:
+        destination = internal_io_path(root / Path(relative))
+        self._require_within(destination.resolve(), root.resolve())
+        return destination
+
+    @staticmethod
+    def _require_within(candidate: Path, root: Path) -> None:
+        try:
+            candidate.relative_to(root)
+        except ValueError as exc:
+            raise ManagedFileError("managed_file_path_outside_scope") from exc

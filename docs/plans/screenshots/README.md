@@ -35,14 +35,17 @@ overflow, and reads the PNG header to prove its dimensions equal the viewport.
 Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
 automated layout assertions rather than additional committed screenshot classes.
 
-The mobile Chat and Build files were refreshed again on 2026-08-25 after the
-compact-conversation refinement. Only these four current-state files changed:
-`mobile-{light,dark}-{chat,build}.png`. The refinement is additionally exercised
-at iPhone `375 × 667`/`393 × 852`, Android phone `360 × 800`/`412 × 915`, iPad
-mini `768 × 1024`, and Android tablet `800 × 1280` in the mocked Playwright
-matrix. Those device profiles are assertions rather than new committed capture
-classes, so the catalogue remains exactly 208 PNGs and the desktop evidence is
-unchanged.
+The 156 desktop files were refreshed on 2026-08-25 for the workspace command
+centre shell. They record the binary hide/show navigation model, direct Core
+routes, collapsible Knowledge/Manage/Observe/Support groups, recent-first Search
+chats, fixed desktop type and controls, and the bounded reading/workspace/
+operational/work-surface canvases. The 52 mobile files were deliberately
+preserved byte-for-byte; their combined SHA-256 catalogue checksum remains
+`AC5407C2516910DAC6856EAAB7011F4276CD42FF2D7DE46D2EC55A699A713F2A`.
+
+The same run also exercises all seven Models tabs and all nine Settings sections
+as rendered audit states. Those extra deep links are assertions rather than new
+committed capture names, so the catalogue remains exactly 208 PNGs.
 
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.

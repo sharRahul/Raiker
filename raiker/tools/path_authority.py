@@ -64,6 +64,10 @@ class PathAuthority:
     def workspace_root(self) -> Path:
         return self._roots[0].path
 
+    @property
+    def roots(self) -> tuple[AuthorityRoot, ...]:
+        return self._roots
+
     def resolve_read(self, requested: str | Path) -> ResolvedPath:
         return self._resolve(requested, for_write=False)
 
@@ -91,12 +95,14 @@ class PathAuthority:
                 raise FilesystemSafetyError("protected_workspace_path")
             if not matched.writable:
                 raise FilesystemSafetyError("root_not_writable")
-        # Protected directories are protected in *every* root. Attaching a
-        # repository protects its `.git` for precisely the reason the
-        # workspace's own is protected: those are the files that record and
-        # constrain the agent, not ordinary content it may edit.
-        if relative_parts and relative_parts[0] in PROTECTED_WORKSPACE_DIRS:
-            raise FilesystemSafetyError("protected_workspace_path")
+            # Protected directories are protected in *every* root, and only
+            # against writes. Attaching a repository protects its `.git` for
+            # precisely the reason the workspace's own is protected: those are
+            # the files that record and constrain the agent. Reads stay
+            # untouched, exactly as they were for the workspace alone -- the
+            # agent may still read anything it can reach.
+            if relative_parts[0] in PROTECTED_WORKSPACE_DIRS:
+                raise FilesystemSafetyError("protected_workspace_path")
         relative = "/".join(relative_parts)
         display = (
             relative
@@ -121,3 +127,38 @@ class PathAuthority:
             if matched is None or len(root.path.parts) > len(matched.path.parts):
                 matched = root
         return matched
+
+
+def encode_root_path(resolved: ResolvedPath) -> str:
+    """The stored form of a resolved path, for records that outlive the turn.
+
+    A workspace file keeps the bare relative path it has always had, so every
+    checkpoint written before roots existed stays readable and no data
+    migration is needed. Anything else is qualified by the root that named it,
+    because "src/a.md" is not an address once there is more than one root.
+    """
+    if resolved.root_id == WORKSPACE_ROOT_ID:
+        return resolved.relative
+    return f"{resolved.root_id}:{resolved.relative}"
+
+
+def decode_root_path(authority: PathAuthority, stored: str) -> Path | None:
+    """Turn a stored key back into a file, or decline.
+
+    Declines rather than guesses when the root is unknown — a checkpoint
+    written while a folder was attached and read back after it was revoked
+    must not resolve to some other path that happens to exist.
+    """
+    root_id, separator, relative = stored.partition(":")
+    if not separator:
+        try:
+            return authority.resolve_read(stored).path
+        except FilesystemSafetyError:
+            return None
+    root = next((item for item in authority.roots if item.root_id == root_id), None)
+    if root is None:
+        return None
+    try:
+        return authority.resolve_read(root.path / relative).path
+    except FilesystemSafetyError:
+        return None

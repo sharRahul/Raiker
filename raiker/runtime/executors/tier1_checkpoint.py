@@ -11,7 +11,7 @@ file before overwriting it, so a restore is itself reversible.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from raiker.checkpoints.service import (
     RESTORE_OP_CONTENT,
@@ -19,7 +19,7 @@ from raiker.checkpoints.service import (
     CheckpointService,
 )
 from raiker.runtime.executors.base import ExecutionResult
-from raiker.tools.filesystem import FilesystemSafetyError, resolve_workspace_path
+from raiker.tools.path_authority import PathAuthority, decode_root_path
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -30,9 +30,12 @@ if TYPE_CHECKING:
 class CheckpointRestoreExecutor:
     capability = "checkpoint_restore_execution"
 
-    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+    def __init__(
+        self, workspace_root: str | Path, store: SQLiteStore, authority: Any = None
+    ) -> None:
         self._workspace_root = Path(workspace_root).resolve()
         self._store = store
+        self._authority = authority
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         checkpoint_id = str(action.arguments.get("checkpoint_id", ""))
@@ -66,11 +69,15 @@ class CheckpointRestoreExecutor:
                 skipped += 1
                 continue
 
-            # Defense in depth: the manifest is workspace-scoped, but re-verify the
-            # path resolves inside the workspace before touching the filesystem.
-            try:
-                resolved = resolve_workspace_path(self._workspace_root, path)
-            except FilesystemSafetyError:
+            # Defense in depth: re-verify the stored key resolves inside a root
+            # this scope may reach before touching the filesystem. A key naming
+            # a root that is gone -- a folder attached when the checkpoint was
+            # written and revoked since -- decodes to nothing and is skipped
+            # rather than guessed at.
+            resolved = decode_root_path(
+                self._authority or PathAuthority(self._workspace_root), path
+            )
+            if resolved is None:
                 skipped += 1
                 continue
 

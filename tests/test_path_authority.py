@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from raiker.control.path_authority import (
+from raiker.tools.filesystem import FilesystemSafetyError
+from raiker.tools.path_authority import (
     WORKSPACE_ROOT_ID,
     AuthorityRoot,
     PathAuthority,
 )
-from raiker.tools.filesystem import FilesystemSafetyError
 
 
 def _workspace(tmp_path: Path) -> Path:

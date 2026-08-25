@@ -26,23 +26,20 @@ class FilesystemSafetyError(ValueError):
 PROTECTED_WORKSPACE_DIRS: frozenset[str] = frozenset({".raiker", ".git"})
 
 
-def resolve_workspace_path(workspace_root: str | Path, requested_path: str | Path) -> Path:
-    root = Path(workspace_root).resolve()
-    candidate = Path(requested_path)
-    resolved = (
-        candidate.resolve(strict=False)
-        if candidate.is_absolute()
-        else (root / candidate).resolve(strict=False)
-    )
-    try:
-        resolved.relative_to(root)
-    except ValueError as exc:
-        raise FilesystemSafetyError("outside_workspace") from exc
-    return resolved
+def resolve_workspace_path(
+    workspace_root: str | Path, requested_path: str | Path, *, authority: Any = None
+) -> Path:
+    """Resolve *requested_path* for **reading**, refusing anything out of scope.
+
+    ``authority`` carries the roots this scope may reach. Omitted -- which is
+    every caller that has not been given a project's roots -- it is built
+    workspace-only, so the answer is exactly what it was before roots existed.
+    """
+    return _authority_for(workspace_root, authority).resolve_read(requested_path).path
 
 
 def resolve_writable_workspace_path(
-    workspace_root: str | Path, requested_path: str | Path
+    workspace_root: str | Path, requested_path: str | Path, *, authority: Any = None
 ) -> Path:
     """Resolve *requested_path* for **writing**, refusing protected directories.
 
@@ -50,14 +47,20 @@ def resolve_writable_workspace_path(
     :func:`resolve_workspace_path`, so confinement and the protected-directory
     refusal can never drift apart.
     """
-    root = Path(workspace_root).resolve()
-    resolved = resolve_workspace_path(root, requested_path)
-    if resolved == root:
-        raise FilesystemSafetyError("protected_workspace_path")
-    parts = resolved.relative_to(root).parts
-    if parts and parts[0] in PROTECTED_WORKSPACE_DIRS:
-        raise FilesystemSafetyError("protected_workspace_path")
-    return resolved
+    return _authority_for(workspace_root, authority).resolve_write(requested_path).path
+
+
+def _authority_for(workspace_root: str | Path, authority: Any) -> Any:
+    """The caller's authority, or a workspace-only one built on the spot.
+
+    Imported lazily because ``path_authority`` reads this module's protected
+    directory set, and importing it at module scope would be circular.
+    """
+    if authority is not None:
+        return authority
+    from raiker.tools.path_authority import PathAuthority
+
+    return PathAuthority(workspace_root)
 
 
 def _is_binary_bytes(data: bytes) -> bool:

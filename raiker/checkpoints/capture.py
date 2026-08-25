@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 from raiker.contracts.ids import new_id, utc_now
@@ -39,7 +40,6 @@ from raiker.storage.sqlite import SQLiteStore
 from raiker.tools.filesystem import (
     FilesystemSafetyError,
     patch_target_paths,
-    resolve_workspace_path,
 )
 
 # 8 MiB: comfortably covers source/config/text mutations while bounding the
@@ -72,8 +72,17 @@ class PreImage:
 
 
 class CheckpointCaptureService:
-    def __init__(self, store: SQLiteStore, *, max_bytes: int = MAX_PRE_IMAGE_BYTES) -> None:
+    def __init__(
+        self,
+        store: SQLiteStore,
+        *,
+        max_bytes: int = MAX_PRE_IMAGE_BYTES,
+        authority: Any = None,
+    ) -> None:
         self.store = store
+        # Without an authority this is workspace-only, which is what every
+        # existing caller gets and what keeps their stored keys bare.
+        self.authority = authority
         self.workspace_root = store.paths.workspace_root
         self.objects_dir = store.paths.checkpoints_dir / "objects"
         self.max_bytes = max_bytes
@@ -112,11 +121,19 @@ class CheckpointCaptureService:
         """
         if not raw_path:
             return None
+        from raiker.tools.path_authority import PathAuthority, encode_root_path
+
+        authority = self.authority or PathAuthority(self.workspace_root)
         try:
-            resolved = resolve_workspace_path(self.workspace_root, raw_path)
+            resolved_path = authority.resolve_read(raw_path)
         except FilesystemSafetyError:
             return None
-        rel = str(resolved.relative_to(self.workspace_root))
+        resolved = resolved_path.path
+        # A workspace file keeps the bare relative key it has always had, so
+        # checkpoints written before roots existed stay restorable. Anything
+        # else is qualified by its root, because a relative path is not an
+        # address once there is more than one.
+        rel = encode_root_path(resolved_path)
         io_resolved = internal_io_path(resolved)
 
         if not (io_resolved.exists() and io_resolved.is_file()):

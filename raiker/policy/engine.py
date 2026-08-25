@@ -12,15 +12,26 @@ from raiker.tools.mcp_tools import is_mcp_tool
 
 
 class PolicyEngine:
-    def __init__(self, config: StaticPolicyConfig, store: Any = None) -> None:
+    def __init__(
+        self, config: StaticPolicyConfig, store: Any = None, authority: Any = None
+    ) -> None:
         self.config = config
         self.store = store
+        # The same authority the executor will use. Policy decides before
+        # execution and the executor decides again at the write; if the two
+        # disagree about an attached root, a turn is refused after being allowed
+        # or allowed after being refused.
+        self.authority = authority
 
     def _is_inside_workspace(self, path: Path) -> bool:
+        from raiker.tools.filesystem import FilesystemSafetyError
+        from raiker.tools.path_authority import PathAuthority
+
+        authority = self.authority or PathAuthority(self.config.workspace_root)
         try:
-            path.resolve(strict=False).relative_to(self.config.workspace_root)
+            authority.resolve_read(path)
             return True
-        except ValueError:
+        except FilesystemSafetyError:
             return False
 
     def _path_arguments_inside_workspace(self, action: ToolAction) -> tuple[bool, list[str]]:

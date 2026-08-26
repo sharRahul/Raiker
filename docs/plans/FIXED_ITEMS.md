@@ -303,6 +303,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-288](#fixed-288--three-interface-defects-found-while-exercising-the-four-above) | Low → Medium | Permissions / Models | Fixed (raised and closed 2026-08-25 during the live round) |
 | [FIXED-289](#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named) | Medium | Memory / Projects / Chat / Build retrieval | Fixed (closed 2026-08-25) |
 | [FIXED-290](#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to) | Medium | Projects / Build / Chat / Workbench | Fixed (raised and closed 2026-08-25 by the screenshot refresh) |
+| [FIXED-291](#fixed-291--a-project-could-only-ever-be-a-folder-raiker-made) | Medium | Projects / path containment / knowledge indexing / Build retrieval | Fixed (closed 2026-08-26) |
 
 ---
 
@@ -12460,3 +12461,128 @@ and states a count rather than a project name);
 [`screenshots/pages/`](screenshots/pages) — all 208 images recaptured after the
 fix, so the committed evidence shows the corrected build rather than the one that
 exposed the defects.
+
+---
+
+## FIXED-291 — A project could only ever be a folder Raiker made
+
+**Severity: Medium. Area: Projects / path containment / knowledge indexing /
+Build retrieval. Closed 2026-08-26.**
+
+**Observed.** A project's root was always a subpath under `.raiker/projects/`,
+created by Raiker and populated only by importing copies into it. Anyone whose
+work already lived in a folder — a repository, a design directory, a notes tree —
+had two options, both wrong: copy it in and maintain two divergent versions, or
+keep the project empty and lose every benefit of having one. The folder they
+actually worked in could not be the project.
+
+The containment rule underneath was the reason, and it was spelled out
+separately in three places: "is this path inside the workspace?" in
+`resolve_workspace_path`, in the policy engine's pre-execution check, and in
+checkpoint capture. Widening the boundary meant widening it three times and
+hoping the three agreed.
+
+The Project page compounded it. It showed the same files twice — as the managed
+document library and as an eager walk of the project folder — described
+differently, so the owner had to decide which to believe.
+
+**Root cause.** "Contained" and "inside the workspace" had become the same
+sentence. Nothing in the design required a project's root to be workspace-relative;
+it was simply the only root that existed when the check was written.
+
+**Fixed.** A `PathAuthority` answers one question — *is this path inside exactly
+one root this scope may touch, and may that root be written?* Constructed with no
+extra roots it is workspace-only and answers exactly as the bare check it
+replaces, which is what let all three call sites adopt it with the existing suite
+passing unchanged.
+
+A grant becomes the single record of "a folder the owner allowed" and gains a
+write flag, so one record serves both the Knowledge Map's read-only folders and a
+project's writable root. A project points at one grant. Because the resolver
+reads the grant rather than a stored path, revoking a folder takes the root away
+with no cascade code anywhere: the next resolution simply finds nothing.
+
+Indexing reuses the managed-file catalogue unchanged. `reconcile_attached_root`
+decides per file whether the database is behind, using size *and* mtime, and a
+`watchfiles` worker in the host lifespan makes that pass prompt rather than
+replacing it. One explorer now browses both root kinds, and *Attach existing
+folder…* sits beside *Create project*.
+
+**Four things the work surfaced that the plan had wrong.**
+
+1. **Retiring a managed file deletes its bytes**, because Raiker wrote them.
+   Under an attached root those bytes are the owner's, so reindexing an edited
+   file would have deleted the file that was edited. `ManagedFileService.owns_bytes`
+   now gates the unlink, and a test asserts the file survives its own reindex.
+2. **Restore resolved the *stored* key as a path.** Letting that key name its
+   root would have made restoring an attached file silently skip rather than
+   fail, so restore decodes the key and declines when the root is gone instead of
+   guessing at a path that happens to exist.
+3. **Applying the protected-directory refusal to reads** broke a documented rule
+   the existing suite defends: reads are untouched, the agent may still read
+   anything it can reach. The refusal is write-only, in every root.
+4. **The turn's authority had to reach the broker, not the orchestrator.** The
+   plan expected the executor registry to be built per turn in the orchestrator;
+   it is built per action in the broker, which is what actually runs a turn's
+   tools. The authority now lives on the broker for the length of a turn, exactly
+   as `stream_sink` already does, and policy is given the same object — two
+   authorities could refuse a turn after allowing it.
+5. **A project with any indexed file could not be deleted at all.** This one was
+   pre-existing and applies to managed projects equally; it was found by the
+   by-hand run and by nothing else, because every unit test that deleted a
+   project deleted an empty one. `managed_files.project_id` references
+   `projects` with no `ON DELETE`, so the delete failed on a foreign key and the
+   owner was left with a project they could not remove.
+   `delete_project_with_orphanage` now clears the project's catalogue rows and
+   their projections first. It removes no bytes: whether Raiker owns them is the
+   caller's question, and for an attached root the answer is no.
+
+**Deliberately not done.**
+
+- **`.gitignore` is not parsed.** The ignore list is fixed and stated
+  (`.git`, `.raiker`, `node_modules`, `.venv`, `venv`, `__pycache__`, `dist`,
+  `build`, `target`, `.mypy_cache`, `.pytest_cache`). Honouring a file the owner
+  may not have written would make what Raiker can recall depend on it, and
+  half-parsing gitignore semantics is worse than not parsing them.
+- **One root per project, one project per root**, enforced by a partial unique
+  index rather than by every caller remembering to check. Two projects over one
+  folder would place a single file inside two mutually exclusive "only this
+  project" boundaries.
+- **No synchronisation between a managed root and an attached one.** A project
+  has one root; attaching does not merge or migrate the other.
+- **`glob` and `grep` stay workspace-only.** They enumerate a tree rather than
+  resolve a named path; one pattern meaning two trees is a different feature.
+- **A reconcile pass is capped at 5,000 files** and reports `truncated`. A
+  truncated pass retires nothing, because "not seen" no longer means "not there".
+
+**User-interface outcome.** A project can be a folder the owner already has. It
+is read where it lives, never copied, and deleting the project deletes no file —
+which the delete confirmation says in those words rather than the managed
+project's warning. One file tree serves both kinds of root, reads one directory
+at a time, and shows an index state only where one exists. When the watcher
+cannot keep an indexed folder current it says so, rather than presenting a stale
+index as live.
+
+**Proved by hand.** A real folder outside the workspace, attached, indexed,
+edited from an editor with Raiker not looking, and then its project deleted:
+recall followed the edit (new text found, superseded text gone), the edited file
+survived its own reindex, and every file was still on disk afterwards, byte for
+byte. This is the run that found defect 5 above.
+
+**Evidence.** `tests/test_path_authority.py` and
+`tests/test_path_authority_guards.py` (workspace-only behaviour is unchanged;
+protected directories are refused for writes in every root);
+`tests/test_project_root_attachment_schema.py`; `tests/test_project_attachment.py`
+(a folder inside the workspace is refused, one folder serves one project,
+revoking detaches, deleting an attached project removes no file);
+`tests/test_turn_path_authority.py` (a Build turn writes into its attached
+project and names the file without raising; a read-only attachment still
+refuses); `tests/test_attached_root_indexing.py` (incremental reconcile, retiring
+does not delete the owner's file, Build reaches its own attached project and not
+another); `tests/test_attached_root_watcher.py` (an edit made outside Raiker
+reaches the catalogue; failure is recorded, not swallowed);
+`tests/test_project_root_api.py`;
+`apps/web/src/lib/components/ProjectExplorer.test.ts` (lazy expansion, index
+state only where it exists, a missing root says so);
+`apps/web/src/lib/views/ProjectsView.test.ts` (exactly one file list; the attach
+entry point; the root-aware delete confirmation).

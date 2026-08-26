@@ -594,6 +594,45 @@ fresh governed turn, and a missed slot is skipped rather than owed as a backlog.
 9. Delete the project. **MUST**: it says what will happen to its conversations
    before you confirm.
 
+### 8.1 Attaching a folder you already have
+
+The one section of this plan that cannot be carried by unit tests, because it is
+about a real folder on your real disk. Use a folder with work in it that you
+would notice losing — a checkout, a notes tree — and take a copy first.
+
+1. **[S]** **Attach existing folder…** beside **Create project**. **MUST**: it
+   states that the folder is read where it lives and is not copied.
+2. Give it a name and the folder's full path. **MUST**: the project opens with
+   that folder as its root, and the card reads **attached folder**.
+3. Attach a folder that is *inside* the workspace. **MUST**: refused, naming
+   `attach_path_inside_workspace`. One file cannot have two names.
+4. Attach the same folder to a second project. **MUST**: refused.
+5. **[S]** **Project files** **MUST** show one tree, not two lists. Expand a
+   directory. **MUST**: only that directory is read — nothing walked the whole
+   tree on open.
+6. **Index this folder**. **MUST**: it reports how many files were indexed and
+   skipped, and files that were indexed gain a state; files with no reader gain
+   none rather than a blank badge.
+7. Ask a turn in that project about something only that folder's files say.
+   **MUST**: it is recalled. Ask the same in a *different* project. **MUST NOT**
+   be recalled.
+8. **Edit a file in that folder from your own editor**, outside Raiker. Wait a
+   few seconds, then ask the turn again. **MUST**: the new text is recalled and
+   the old is not.
+9. Delete a file in that folder from your own file manager, then ask about it.
+   **MUST**: it is no longer recalled.
+10. Ask a turn to write a file into the attached folder. **MUST**: it goes
+    through the ordinary approval, and the result names the file rather than
+    failing on the way out.
+11. Attach a folder with **writable** unticked, then ask a turn to write into it.
+    **MUST**: refused with `root_not_writable`.
+12. Ask a turn to write into that folder's `.git`. **MUST**: refused.
+13. Revoke the folder in **Knowledge Map** → return to the project. **MUST**: it
+    says the folder is no longer available, not that the project is empty.
+14. **MUST**: delete the project and confirm **every file is still on disk**.
+    The confirmation **MUST** have said the folder would not be deleted, and it
+    **MUST NOT** have been.
+
 ---
 
 ## 9. Knowledge Map

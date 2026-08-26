@@ -69,6 +69,28 @@ committed capture names, so the catalogue remains exactly 208 PNGs.
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.
 
+### Outstanding: the Projects captures predate FIXED-291
+
+**`{mobile,1080p,4k,8k}-{light,dark}-projects.png` — 8 of the 208 — show the
+Projects page as it was before
+[FIXED-291](../FIXED_ITEMS.md#fixed-291--a-project-could-only-ever-be-a-folder-raiker-made).**
+They do not show *Attach existing folder…* beside *Create project*, the card
+body as the control that opens a project, or the single file explorer that
+replaced the two lists. Nothing else in the catalogue is affected: FIXED-291
+changed no other route.
+
+They are **not** recaptured here, because the sweep signs in as the owner
+against a real credentialled host on `127.0.0.1:8765` and that is the owner's
+own instance to run:
+
+```bash
+npm --prefix apps/web run test:e2e:live
+```
+
+Until that runs, treat these eight as historical rather than current — which is
+the one thing this folder otherwise promises they never are. The checksum above
+still describes the committed 208 and will change when they are replaced.
+
 **Part of `working/` was pruned, and the write-ups still name what it held.**
 Forty-seven captures from the 2026-07-26 → 2026-08-10 rounds were removed from
 the repository to keep its size down. [Fixed items](../FIXED_ITEMS.md) still

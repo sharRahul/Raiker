@@ -13,7 +13,7 @@ is the wrong half to get wrong.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -58,6 +58,18 @@ def _bad_request(reason_code: str) -> HTTPException:
         status_code=status.HTTP_400_BAD_REQUEST,
         detail={"ok": False, "reason_code": reason_code},
     )
+
+
+def _names_its_own_root(supplied: str) -> bool:
+    """True when a path sent to a *relative* parameter names a root of its own.
+
+    The question has to be asked of what the caller sent, before the separators
+    are trimmed: stripping the leading slash off `/etc/passwd` leaves something
+    that looks relative and would then be resolved under the project's root.
+    `PureWindowsPath` is what carries the drive and UNC spellings, and it does so
+    on every platform, so the answer does not depend on where Raiker is running.
+    """
+    return supplied.startswith("/") or bool(PureWindowsPath(supplied).drive)
 
 
 def _owned_project(
@@ -110,8 +122,9 @@ async def browse_project(
             "root_label": _label(root),
             "root_missing": True,
         }
-    relative = (path or "").strip().replace("\\", "/").strip("/")
-    if Path(relative).is_absolute() or ".." in Path(relative).parts:
+    supplied = (path or "").strip().replace("\\", "/")
+    relative = supplied.strip("/")
+    if _names_its_own_root(supplied) or ".." in PurePosixPath(relative).parts:
         # Refused before it reaches the authority, because an absolute path in a
         # *relative* parameter is a caller naming a root this project was never
         # given, not a traversal the authority should be asked to adjudicate.

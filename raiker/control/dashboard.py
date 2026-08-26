@@ -774,7 +774,24 @@ def _is_reparse_point(path: Path) -> bool:
     )
 
 
-def _source_identity(source: Path) -> str | None:
+@dataclass(frozen=True)
+class _SourceIdentity:
+    """One reading of a project tree, in the two forms the migration needs.
+
+    ``strict`` answers "is this tree still exactly what it was?". ``moved``
+    answers the same question about a tree that has just been renamed, and
+    differs in exactly one field: a rename bumps the renamed directory's own
+    ``st_ctime_ns`` while leaving its inode, size, mtime and every child
+    untouched, so the strict form can never hold after a move. Everything that
+    would betray a swapped-in tree — the device and inode, the mtime, and every
+    child's metadata and bytes — is in both.
+    """
+
+    strict: str
+    moved: str
+
+
+def _source_identity(source: Path) -> _SourceIdentity | None:
     """Return a stable content identity for a regular project tree."""
     try:
         before = source.stat(follow_symlinks=False)
@@ -783,14 +800,24 @@ def _source_identity(source: Path) -> str | None:
     if source.is_symlink() or not source.is_dir():
         return None
     digest = hashlib.sha256()
+    moved_digest = hashlib.sha256()
+
+    def metadata(info: os.stat_result, *, ctime: bool = True) -> bytes:
+        fields = f"{info.st_dev}:{info.st_ino}:{info.st_size}:{info.st_mtime_ns}"
+        if ctime:
+            fields += f":{info.st_ctime_ns}"
+        return f"{fields}\0".encode()
 
     def include_metadata(kind: bytes, relative: Path, info: os.stat_result) -> None:
-        digest.update(kind + b"\0" + relative.as_posix().encode() + b"\0")
-        digest.update(
-            f"{info.st_dev}:{info.st_ino}:{info.st_size}:{info.st_mtime_ns}:{info.st_ctime_ns}\0".encode()
-        )
+        entry = kind + b"\0" + relative.as_posix().encode() + b"\0" + metadata(info)
+        digest.update(entry)
+        moved_digest.update(entry)
 
-    include_metadata(b"directory", Path("."), before)
+    # The root is the one entry the two readings disagree about, because it is
+    # the one inode a rename of this tree touches.
+    root_header = b"directory\0.\0"
+    digest.update(root_header + metadata(before))
+    moved_digest.update(root_header + metadata(before, ctime=False))
 
     def include(directory: Path, relative: Path) -> bool:
         try:
@@ -836,6 +863,7 @@ def _source_identity(source: Path) -> str | None:
                 with child.open("rb") as reader:
                     while chunk := reader.read(64 * 1024):
                         digest.update(chunk)
+                        moved_digest.update(chunk)
                 child_after = child.stat(follow_symlinks=False)
             except OSError:
                 return False
@@ -868,15 +896,16 @@ def _source_identity(source: Path) -> str | None:
         after.st_ctime_ns,
     ):
         return None
-    return digest.hexdigest()
+    return _SourceIdentity(digest.hexdigest(), moved_digest.hexdigest())
 
 
-def _source_is_unchanged(source: Path, identity: str) -> bool:
-    return _source_identity(source) == identity
+def _source_is_unchanged(source: Path, identity: _SourceIdentity) -> bool:
+    current = _source_identity(source)
+    return current is not None and current.strict == identity.strict
 
 
 def _retain_migrated_source(
-    workspace: Path, source: Path, identity: str, migration_area: Path
+    workspace: Path, source: Path, identity: _SourceIdentity, migration_area: Path
 ) -> Path | None:
     """Retain a verified legacy tree as recoverable, inactive migration residue."""
     if not _source_is_unchanged(source, identity):
@@ -891,7 +920,12 @@ def _retain_migrated_source(
         source.rename(residue)
     except OSError:
         return None
-    if not _source_is_unchanged(residue, identity):
+    # The rename is the one change the strict form cannot survive, so the residue
+    # is checked against the reading that tolerates exactly that — and against
+    # `identity`, taken before the migration published, so a tree swapped in
+    # after the check above is still caught here and put back where it was.
+    moved = _source_identity(residue)
+    if moved is None or moved.moved != identity.moved:
         if not source.exists():
             with contextlib.suppress(OSError):
                 residue.rename(source)

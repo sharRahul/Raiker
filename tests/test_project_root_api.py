@@ -147,6 +147,20 @@ class TestBrowse:
 
         assert response.status_code == 400
 
+    def test_browse_refuses_a_windows_absolute_path_on_any_host(
+        self, client: TestClient, headers: dict[str, str], attached_project: str
+    ) -> None:
+        # The contract does not change with the host Raiker runs on, so a drive
+        # letter is refused on Linux too, where `Path` would call it relative.
+        response = client.get(
+            f"/api/projects/{attached_project}/browse",
+            params={"path": "C:\\Windows\\System32"},
+            headers=headers,
+        )
+
+        assert response.status_code == 400
+        assert response.json()["detail"]["reason_code"] == "outside_workspace"
+
     def test_browse_hides_the_ignored_directories(
         self, client: TestClient, headers: dict[str, str], attached_project: str
     ) -> None:

@@ -48,6 +48,13 @@ def owner_store(tmp_path: Path) -> SQLiteStore:
     return store
 
 
+def _managed_file(store: SQLiteStore, file_id: str, principal_id: str) -> dict[str, Any]:
+    """The catalogue row, failing by name rather than indexing a `None`."""
+    row = store.get_managed_file(file_id, principal_id)
+    assert row is not None, file_id
+    return row
+
+
 def test_memory_accepts_unknown_binary_type(tmp_path: Path, owner_store: SQLiteStore) -> None:
     record = ManagedFileService(tmp_path, owner_store).import_file(
         ManagedFileScope("memory"),
@@ -279,13 +286,13 @@ def test_catalogue_lifecycle_is_owner_scoped(tmp_path: Path, owner_store: SQLite
         ManagedFileScope("memory"), "notes.txt", b"first", "text/plain", OWNER
     )
 
-    assert owner_store.get_managed_file(imported.file_id, OWNER)["index_state"] == "queued"
+    assert _managed_file(owner_store, imported.file_id, OWNER)["index_state"] == "queued"
     assert owner_store.get_managed_file(imported.file_id, "principal_other") is None
     assert owner_store.set_managed_file_index_state(imported.file_id, OWNER, "ready") is True
-    assert owner_store.get_managed_file(imported.file_id, OWNER)["index_state"] == "ready"
+    assert _managed_file(owner_store, imported.file_id, OWNER)["index_state"] == "ready"
     assert owner_store.retire_managed_file(imported.file_id, OWNER) is True
     assert owner_store.list_managed_files(OWNER) == []
-    assert owner_store.get_managed_file(imported.file_id, OWNER)["retired_at"] is not None
+    assert _managed_file(owner_store, imported.file_id, OWNER)["retired_at"] is not None
 
 
 def test_reimport_after_retirement_replaces_the_retired_original(
@@ -299,5 +306,5 @@ def test_reimport_after_retirement_replaces_the_retired_original(
 
     assert second.file_id != first.file_id
     assert second.content_hash == hashlib.sha256(b"second").hexdigest()
-    assert owner_store.get_managed_file(first.file_id, OWNER)["content_hash"] == hashlib.sha256(b"first").hexdigest()
+    assert _managed_file(owner_store, first.file_id, OWNER)["content_hash"] == hashlib.sha256(b"first").hexdigest()
     assert (tmp_path / ".raiker/memory-files/notes.txt").read_bytes() == b"second"

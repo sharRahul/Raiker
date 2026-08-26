@@ -50,6 +50,7 @@ from raiker.control.project_paths import (
 from raiker.control.project_paths import (
     project_root_parts as _project_root_parts,
 )
+from raiker.control.project_roots import resolve_project_root
 from raiker.control.service import RuntimeControlService
 from raiker.events.export import generate_export
 from raiker.events.writer import EventLogWriter
@@ -5058,7 +5059,13 @@ class DashboardService:
         )
         return ControlResult(ok=True, data={"export_path": manifest.export_path})
 
-    def create_project(self, name: str, acting_principal_id: str | None, parent_id: str | None = None) -> ControlResult:
+    def create_project(
+        self,
+        name: str,
+        acting_principal_id: str | None,
+        parent_id: str | None = None,
+        attach_path: str | None = None,
+    ) -> ControlResult:
         """Create a named project folder (human gate-manager only).
 
         The root subpath is derived server-side from the name (slug under
@@ -5066,6 +5073,11 @@ class DashboardService:
         name can never place a project root outside it (fail closed). When
         ``parent_id`` is supplied the project is created as a nested child of
         that parent folder.
+
+        ``attach_path`` makes the new project's root a folder the owner already
+        has, by the same route as attaching one afterwards. A refusal takes the
+        half-made project with it, so a rejected path leaves nothing behind for
+        the owner to clean up.
         """
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -5082,11 +5094,6 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="duplicate_project_name")
         if parent_id is not None and self.store.load_project(parent_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_parent:{parent_id}")
-        root_subpath = f"{_MANAGED_PROJECT_ROOT}/{slug}"
-        contained_root = _contained_project_root(self.workspace_root, root_subpath)
-        if contained_root is None:
-            return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        resolved = contained_root[2]
         if any(
             (parsed := _project_root_parts(str(project.get("root_subpath") or "")))
             and parsed[1] == (slug,)
@@ -5094,12 +5101,126 @@ class DashboardService:
         ):
             return ControlResult(ok=False, reason_code="duplicate_project_root")
         project_id = new_id("proj_")
+        if attach_path is not None:
+            # No managed folder is made: the owner's folder is the root, and
+            # creating a second one under `.raiker/projects/` would leave an
+            # empty directory that nothing ever uses.
+            self.store.create_project(
+                project_id, cleaned, "", parent_id=parent_id,
+                owner_user_id=principal.delegated_by_user_id,
+            )
+            attached = self.attach_project_folder(
+                project_id, attach_path, acting_principal_id
+            )
+            if not attached.ok:
+                self.store.delete_project_with_orphanage(project_id)
+                return attached
+            return ControlResult(
+                ok=True,
+                data={
+                    "project_id": project_id,
+                    "name": cleaned,
+                    "root_subpath": "",
+                    "parent_id": parent_id,
+                    "root_kind": "attached",
+                    "root_id": attached.data.get("root_id"),
+                },
+            )
+        root_subpath = f"{_MANAGED_PROJECT_ROOT}/{slug}"
+        contained_root = _contained_project_root(self.workspace_root, root_subpath)
+        if contained_root is None:
+            return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
+        resolved = contained_root[2]
         resolved.mkdir(parents=True, exist_ok=True)
         self.store.create_project(project_id, cleaned, root_subpath, parent_id=parent_id, owner_user_id=principal.delegated_by_user_id)
         return ControlResult(
             ok=True,
             data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath, "parent_id": parent_id},
         )
+
+    def attach_project_folder(
+        self,
+        project_id: str,
+        raw_path: str,
+        acting_principal_id: str | None,
+        writable: bool = True,
+    ) -> ControlResult:
+        """Make a folder the owner already has this project's root.
+
+        Human-only, like every other project mutation. Validation goes through
+        the existing grant path so an attached folder is recorded exactly as a
+        Knowledge Map folder is — one record of "a folder the owner allowed" —
+        and then adds the one refusal a grant alone does not make.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        candidate = (raw_path or "").strip()
+        if not candidate:
+            return ControlResult(ok=False, reason_code="invalid_brain_source_path")
+        expanded = Path(candidate).expanduser()
+        if expanded.is_absolute():
+            try:
+                probe = expanded.resolve(strict=True)
+            except OSError:
+                probe = None
+            if probe is not None and self._inside_workspace(probe):
+                # Refused *before* granting: a folder already reachable inside
+                # the workspace would gain a second name and a second boundary
+                # from being attached, and the grant record would outlive the
+                # refusal.
+                return ControlResult(ok=False, reason_code="attach_path_inside_workspace")
+        try:
+            granted = self.grant_brain_source_folder(
+                candidate, owner_principal_id=str(acting_principal_id)
+            )
+        except ValueError as exc:
+            return ControlResult(ok=False, reason_code=str(exc))
+        root_id = str(granted["root_id"])
+        if self._inside_workspace(Path(str(granted["path"])).resolve()):
+            return ControlResult(ok=False, reason_code="attach_path_inside_workspace")
+        existing = self.store.project_for_grant(str(acting_principal_id), root_id)
+        if existing is not None and str(existing["project_id"]) != project_id:
+            return ControlResult(ok=False, reason_code="attach_root_already_used")
+        self.store.set_grant_write_enabled(str(acting_principal_id), root_id, writable)
+        if not self.store.attach_project_root(
+            project_id, root_id, user_id=principal.delegated_by_user_id
+        ):
+            return ControlResult(ok=False, reason_code="attach_failed")
+        return ControlResult(ok=True, data={"project_id": project_id, "root_id": root_id})
+
+    def detach_project_folder(
+        self, project_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
+        """Release the folder a project was attached to.
+
+        The grant stays. Detaching a project is not revoking the owner's
+        folder, and conflating the two would silently close a Knowledge Map
+        source the owner granted for its own sake.
+        """
+        principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
+        if principal is None:
+            return ControlResult(ok=False, reason_code="principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
+            return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
+        if not self.store.detach_project_root(
+            project_id, user_id=principal.delegated_by_user_id
+        ):
+            return ControlResult(ok=False, reason_code="detach_failed")
+        return ControlResult(ok=True, data={"project_id": project_id})
+
+    def _inside_workspace(self, resolved: Path) -> bool:
+        try:
+            resolved.relative_to(self.workspace_root.resolve())
+        except ValueError:
+            return False
+        return True
 
     def select_project(self, project_id: str | None, acting_principal_id: str | None) -> ControlResult:
         """Set (or clear, with null/empty) the active project (human gate-manager only).
@@ -5133,21 +5254,26 @@ class DashboardService:
         project = self.store.load_project(project_id, principal.delegated_by_user_id)
         if project is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        contained_root = _contained_project_root(
-            self.workspace_root, str(project.get("root_subpath") or "")
+        # Branch on the resolver, never on the path string: an attached root is
+        # the owner's own folder, and deleting the project must not touch a
+        # single byte of it.
+        root = resolve_project_root(
+            project,
+            self.store.list_brain_source_grants(str(acting_principal_id)),
+            self.workspace_root,
         )
-        if contained_root is None:
+        if root.kind == "managed" and root.missing:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
-        root = contained_root[2]
         if not self.store.delete_project_with_orphanage(project_id):
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        try:
-            shutil.rmtree(root)
-        except FileNotFoundError:
-            pass
-        except OSError:
-            return ControlResult(ok=False, reason_code="project_folder_delete_failed")
-        return ControlResult(ok=True, data={"project_id": project_id})
+        if root.kind == "managed" and root.path is not None:
+            try:
+                shutil.rmtree(root.path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                return ControlResult(ok=False, reason_code="project_folder_delete_failed")
+        return ControlResult(ok=True, data={"project_id": project_id, "root_kind": root.kind})
 
     def save_project_context(
         self,

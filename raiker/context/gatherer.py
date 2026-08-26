@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from raiker.context.models import (
     PRIORITY_ORDER,
@@ -20,6 +20,9 @@ from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.semantic import semantic_memory_status
 from raiker.memory.store import list_memory
 from raiker.storage.sqlite import SQLiteStore
+
+if TYPE_CHECKING:
+    from raiker.memory.query_embedding import GovernedQueryEmbedder
 
 # Capability gates the bundle reports, keyed by the capability the owner actually
 # switches and valued by the model-exposed tools that capability governs.
@@ -161,6 +164,11 @@ class ContextGatherer:
         scope = self._retrieval_scope(store, surface, project_id, owner_principal_id)
         project = self._project_for_session(store, session_id, owner_principal_id)
         project_attachments = self._project_attachments(store, project, owner_principal_id)
+        from raiker.memory.query_embedding import GovernedQueryEmbedder
+
+        query_embedder = GovernedQueryEmbedder(
+            store, owner_principal_id, session_id=session_id, turn_id=turn_id
+        )
 
         builders: dict[str, Callable[[], ContextItem | None]] = {
             "current_prompt": lambda: self._current_prompt(root, prompt_text),
@@ -171,7 +179,7 @@ class ContextGatherer:
             "connector_status": lambda: self._connector_status(root, store, owner_principal_id),
             "project_context": lambda: self._project_context(root, store, session_id, owner_principal_id),
             "memory_recall": lambda: self._memory_recall(
-                store, prompt_text, session_id, owner_principal_id, scope
+                store, prompt_text, session_id, owner_principal_id, scope, query_embedder
             ),
             "code_map": lambda: self._code_map(root, store, prompt_text, owner_principal_id),
             "approvals": lambda: self._approvals(root, store, scoped_session_id),
@@ -315,6 +323,7 @@ class ContextGatherer:
     def _memory_recall(
         self, store: SQLiteStore, query: str, session_id: str,
         owner_principal_id: str | None, scope: RetrievalScope | None = None,
+        query_embedder: GovernedQueryEmbedder | None = None,
     ) -> ContextItem | None:
         """Bounded owner-wide recall across approved memory and prior work.
 
@@ -334,7 +343,9 @@ class ContextGatherer:
             return None
         scope = scope or RetrievalScope("chat", None)
         user_id = store.principal_user_id(owner_principal_id)
-        memories = self._recalled_memories(store, query, owner_principal_id, scope)
+        memories = self._recalled_memories(
+            store, query, owner_principal_id, scope, query_embedder
+        )
         sessions = self._recalled_sessions(
             store, query, session_id, user_id, project_id=scope.project_id
         )
@@ -390,6 +401,7 @@ class ContextGatherer:
     @staticmethod
     def _recalled_memories(
         store: SQLiteStore, query: str, owner_principal_id: str, scope: RetrievalScope,
+        query_embedder: GovernedQueryEmbedder | None = None,
     ) -> list[Any]:
         """Approved memories inside the boundary, best first.
 
@@ -404,12 +416,14 @@ class ContextGatherer:
                 retrieve_hybrid_memory(
                     store=store, query=query, limit=limit,
                     owner_principal_id=owner_principal_id,
+                    query_embedder=query_embedder,
                 )
             )
         allowed = f"project:{scope.project_id}"
         ranked = retrieve_hybrid_memory(
             store=store, query=query, limit=limit * 4,
             owner_principal_id=owner_principal_id,
+            query_embedder=query_embedder,
         )
         return [
             memory

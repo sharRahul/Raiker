@@ -534,10 +534,15 @@ export const api = {
       "/api/model-library/rescan",
       {},
     ),
-  deployLocalModel: (modelId: string) =>
+  deployLocalModel: (modelId: string, profileId?: string) =>
     postJson<ModelOperation>(
       `/api/model-library/${encodeURIComponent(modelId)}/deploy`,
-      {},
+      profileId ? { profile_id: profileId } : {},
+    ),
+  deployMlxModel: (modelId: string, profileId?: string) =>
+    postJson<ModelOperation>(
+      `/api/model-library/${encodeURIComponent(modelId)}/deploy-mlx`,
+      profileId ? { profile_id: profileId } : {},
     ),
   modelOperations: () =>
     request<{ items: ModelOperation[] }>("/api/model-operations"),

@@ -29,6 +29,7 @@
   import DownloadsPanel from "./models/DownloadsPanel.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
+  import LocalFrameworkRow from "./models/LocalFrameworkRow.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload. `tab`
@@ -681,6 +682,14 @@
       (profile) => sectionFor(profile) === section,
     );
   }
+  function frameworkProfiles(provider: "llama.cpp" | "mlx") {
+    return profilesFor("Local").filter((profile) => profile.provider === provider);
+  }
+  function ordinaryLocalProfiles() {
+    return profilesFor("Local").filter(
+      (profile) => profile.provider !== "llama.cpp" && profile.provider !== "mlx",
+    );
+  }
   function providerHelp(profile: ModelProfile): string {
     if (profile.provider === "ollama")
       return "Run Ollama locally, then choose one of its installed models.";
@@ -688,6 +697,8 @@
       return "Start the LM Studio local server, then choose the loaded model.";
     if (profile.provider === "llama.cpp")
       return "Start llama-server and expose the model name configured by the server.";
+    if (profile.provider === "mlx")
+      return "Run an MLX model locally with mlx-lm on Apple silicon.";
     if (profile.provider === "openai-compatible")
       return "Use this for a vLLM, home-lab, or other OpenAI-compatible endpoint you control.";
     if (profile.provider === "anthropic")
@@ -963,7 +974,7 @@
 
               {#if section === "Local"}
                 <div class="local-list">
-                  {#each sectionProfiles as p (p.profile_id)}
+                  {#each ordinaryLocalProfiles() as p (p.profile_id)}
                     <div
                       class="local-row"
                       class:selected={p.selected}
@@ -1123,6 +1134,38 @@
                       {/if}
                     </div>
                   {/each}
+                  {#if frameworkProfiles("llama.cpp").length > 0}
+                    <LocalFrameworkRow
+                      provider="llama.cpp"
+                      title="llama.cpp GGUF"
+                      format="gguf"
+                      profiles={frameworkProfiles("llama.cpp")}
+                      description="Choose up to four different detected GGUF models to serve in separate local slots."
+                      onchanged={() => void load()}
+                      ontest={(profile) => void testConnection(profile)}
+                      ondetails={(profile) => (detailsFor = profile)}
+                      onselect={(profile) => void select(profile.profile_id)}
+                      testing={testing[frameworkProfiles("llama.cpp")[0].profile_id] === true}
+                      {selecting}
+                      testResult={testResults[frameworkProfiles("llama.cpp")[0].profile_id] ?? null}
+                    />
+                  {/if}
+                  {#if frameworkProfiles("mlx").length > 0}
+                    <LocalFrameworkRow
+                      provider="mlx"
+                      title="MLX"
+                      format="mlx"
+                      profiles={frameworkProfiles("mlx")}
+                      description="Choose up to four detected MLX models optimized for Apple silicon."
+                      onchanged={() => void load()}
+                      ontest={(profile) => void testConnection(profile)}
+                      ondetails={(profile) => (detailsFor = profile)}
+                      onselect={(profile) => void select(profile.profile_id)}
+                      testing={testing[frameworkProfiles("mlx")[0].profile_id] === true}
+                      {selecting}
+                      testResult={testResults[frameworkProfiles("mlx")[0].profile_id] ?? null}
+                    />
+                  {/if}
                 </div>
               {:else}
                 <div class="provider-grid">

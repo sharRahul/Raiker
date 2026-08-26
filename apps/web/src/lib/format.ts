@@ -82,6 +82,7 @@ export function humanize(name: string | null | undefined): string {
 // providers render verbatim rather than guessing.
 const PROVIDER_NAMES: Record<string, string> = {
   "llama.cpp": "llama.cpp",
+  mlx: "MLX",
   ollama: "Ollama",
   "ollama-cloud": "Ollama Cloud",
   "lm-studio": "LM Studio",

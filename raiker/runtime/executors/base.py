@@ -22,6 +22,10 @@ class ExecutionResult:
     reason_code: str | None = None
     summary: str = ""
     artifacts: dict[str, Any] = field(default_factory=dict)
+    # Data needed by the in-process caller but forbidden from durable audit
+    # payloads. RuntimeAuthority deliberately returns this field to the caller
+    # without adding it to action_executed/action_failed events.
+    transient: dict[str, Any] = field(default_factory=dict)
 
 
 def not_implemented(capability: str, action_id: str) -> ExecutionResult:

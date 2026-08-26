@@ -64,7 +64,7 @@ their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Fixed 2026-08-25 (FIXED-284) |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
-| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | Open — reduced 2026-08-25 (FIXED-283). An owner can now **build** a semantic space; a linear scan and a keyless default install remain |
+| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | Open — provider path complete 2026-08-26 (FIXED-283, FIXED-292). A linear scan and a keyless default install remain |
 | [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
 | [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-13](#mem-13--the-knowledge-graph-was-drawn-for-a-person-and-unreachable-from-a-turn) | Medium | Agent reach | Fixed 2026-08-17 |
@@ -515,10 +515,11 @@ Verified live on 2026-08-25 against a real OpenAI embedding call.
 
 **What remains of MEM-10:**
 
-* **The question is not embedded into the space that was built**, so a paraphrase
-  still does not recall — measured on the same install that built it. That is
-  [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it),
-  and it is the blocking one.
+* **The provider read half closed 2026-08-26.** Ambient recall and
+  `memory_search` now embed the question once in the selected provider space
+  through `model_provider_runtime` ([FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)).
+  Ask/deny/off drop the vector leg without parking a read; Allow and low-risk
+  Auto execute. Query text and vectors are not persisted in audit events.
 * **A default install with no provider key still has only the fallback.** The
   curated GGUF download below is unchanged as the proposal for that, and is now
   the whole of this entry's open work rather than half of it.

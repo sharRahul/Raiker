@@ -16,6 +16,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
     HuggingFaceCredentialRequest,
     HuggingFaceSelectionRequest,
+    LocalModelDeployRequest,
     ModelConversionRequestBody,
     ModelLibraryRootRequest,
     ModelOperationRequestBody,
@@ -34,6 +35,7 @@ from raiker.models.local_operations import (
     ModelOperationService,
 )
 from raiker.models.local_runtime import LOCAL_SLOTS, ManagedLlamaRuntime, slot_for_profile
+from raiker.models.mlx_runtime import MLX_SLOTS, ManagedMlxRuntime
 from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
 from raiker.models.runtime_installers import RuntimeInstallerRegistry
 from raiker.models.setup import ModelSetupState
@@ -316,8 +318,20 @@ def _dispatch_operation(
         background.add_task(_run_model_conversion, workspace, owner, operation_id, body)
         return
     if operation.kind == "deploy":
-        background.add_task(
-            _run_local_deployment,
+        framework = str(payload.get("framework", "llama.cpp"))
+        if framework == "mlx":
+            background.add_task(
+                _run_mlx_deployment,
+                workspace,
+                owner,
+                operation_id,
+                Path(str(payload.get("model_path", ""))),
+                tuple(Path(path) for path in _library_service(request).roots(owner)),
+                request.app.state.managed_mlx_runtime,  # type: ignore[attr-defined]
+                payload.get("profile_id"),
+            )
+            return
+        arguments = (
             workspace,
             owner,
             operation_id,
@@ -325,6 +339,10 @@ def _dispatch_operation(
             tuple(Path(path) for path in _library_service(request).roots(owner)),
             request.app.state.managed_llama_runtime,  # type: ignore[attr-defined]
         )
+        if payload.get("profile_id"):
+            background.add_task(_run_local_deployment, *arguments, payload["profile_id"])
+        else:
+            background.add_task(_run_local_deployment, *arguments)
         return
     if operation.kind == "download":
         background.add_task(
@@ -549,6 +567,7 @@ def _run_local_deployment(
     model_path: Path,
     approved_roots: tuple[Path, ...],
     runtime: ManagedLlamaRuntime,
+    profile_id: str | None = None,
 ) -> None:
     operations = ModelOperationService(SQLiteStore(workspace))
     started_slot: str | None = None
@@ -567,6 +586,7 @@ def _run_local_deployment(
             model_path,
             executable=Path(executable),
             approved_roots=approved_roots,
+            profile_id=profile_id,
         )
         started_slot = started.slot
         slot = slot_for_profile(started.slot) or LOCAL_SLOTS[0]
@@ -615,6 +635,7 @@ def deploy_local_model(
     model_id: str,
     background: BackgroundTasks,
     request: Request,
+    body: LocalModelDeployRequest | None = None,
     auth_data: tuple[ApiSession, Principal] = Depends(_auth),
 ) -> dict[str, Any]:
     session, principal = auth_data
@@ -629,6 +650,11 @@ def deploy_local_model(
     )
     if model is None or not model.complete:
         raise HTTPException(status_code=409, detail={"reason_code": "local_model_not_deployable"})
+    if model.format != "gguf":
+        raise HTTPException(status_code=409, detail={"reason_code": "local_model_wrong_format"})
+    profile_id = body.profile_id if body is not None else None
+    if profile_id is not None and profile_id not in {slot.profile_id for slot in LOCAL_SLOTS}:
+        raise HTTPException(status_code=422, detail={"reason_code": "unknown_local_runtime_slot"})
     operation = (
         _operation_service(request)
         .start(
@@ -636,19 +662,142 @@ def deploy_local_model(
             ModelOperationRequest(
                 kind="deploy", target=model.model_id, confirmed=True, destination=model.primary_path
             ),
-            payload={"model_id": model.model_id, "model_path": model.primary_path},
+            payload={
+                "model_id": model.model_id,
+                "model_path": model.primary_path,
+                "framework": "llama.cpp",
+                "profile_id": profile_id,
+            },
         )
         .to_dict()
     )
     roots = tuple(Path(path) for path in _library_service(request).roots(session.principal_id))
-    background.add_task(
-        _run_local_deployment,
+    arguments = (
         Path(request.app.state.workspace_root),
         session.principal_id,
         operation["operation_id"],
         Path(model.primary_path),
         roots,
         request.app.state.managed_llama_runtime,
+    )
+    if profile_id is not None:
+        background.add_task(_run_local_deployment, *arguments, profile_id)
+    else:
+        background.add_task(_run_local_deployment, *arguments)
+    return operation
+
+
+def _run_mlx_deployment(
+    workspace: Path,
+    owner: str,
+    operation_id: str,
+    model_path: Path,
+    approved_roots: tuple[Path, ...],
+    runtime: ManagedMlxRuntime,
+    profile_id: str | None = None,
+) -> None:
+    operations = ModelOperationService(SQLiteStore(workspace))
+    started_slot: str | None = None
+    try:
+        operations.running(owner, operation_id, phase="starting_mlx")
+        if operations.cancel_requested(owner, operation_id):
+            operations.cancelled(owner, operation_id)
+            return
+        if sys.platform != "darwin":
+            raise RuntimeError("mlx_requires_apple_silicon")
+        executable = shutil.which("mlx_lm.server") or shutil.which("mlx_lm")
+        if executable is None:
+            raise RuntimeError("mlx_lm_server_missing")
+        started = runtime.start(
+            model_path,
+            executable=Path(executable),
+            profile_id=profile_id,
+            approved_roots=approved_roots,
+        )
+        started_slot = started.slot
+        slot = next(item for item in MLX_SLOTS if item.profile_id == started.slot)
+        origin = f"http://127.0.0.1:{slot.port}"
+        served_model: str | None = None
+        deadline = time.monotonic() + 60
+        with httpx.Client(timeout=2.0, trust_env=False) as client:
+            while time.monotonic() < deadline:
+                try:
+                    response = client.get(f"{origin}/v1/models")
+                    ids = [str(item.get("id")) for item in response.json().get("data", [])]
+                    if response.is_success and ids:
+                        served_model = ids[0]
+                        break
+                except (httpx.HTTPError, ValueError):
+                    pass
+                if operations.cancel_requested(owner, operation_id):
+                    raise RuntimeError("local_model_deploy_cancelled")
+                time.sleep(0.2)
+            else:
+                raise RuntimeError("mlx_server_not_ready")
+        store = SQLiteStore(workspace)
+        store.save_configured_model(owner, slot.profile_id, served_model or str(model_path))
+        store.invalidate_model_readiness(
+            owner, slot.profile_id, reason_code="local_runtime_deployed"
+        )
+        operations.complete(owner, operation_id)
+    except Exception as exc:  # noqa: BLE001
+        if started_slot is not None:
+            runtime.stop(started_slot)
+        if str(exc) == "local_model_deploy_cancelled":
+            operations.cancelled(owner, operation_id)
+        else:
+            operations.fail(owner, operation_id, code="local_mlx_deploy_failed")
+
+
+@router.post("/api/model-library/{model_id:path}/deploy-mlx")
+def deploy_mlx_model(
+    model_id: str,
+    background: BackgroundTasks,
+    request: Request,
+    body: LocalModelDeployRequest | None = None,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, principal = auth_data
+    _require_human(principal)
+    model = next(
+        (
+            item
+            for item in _library_service(request).list_models(session.principal_id)
+            if item.model_id == model_id
+        ),
+        None,
+    )
+    if model is None or not model.complete or model.format != "mlx":
+        raise HTTPException(status_code=409, detail={"reason_code": "local_mlx_not_deployable"})
+    profile_id = body.profile_id if body is not None else None
+    if profile_id is not None and profile_id not in {slot.profile_id for slot in MLX_SLOTS}:
+        raise HTTPException(status_code=422, detail={"reason_code": "unknown_mlx_runtime_slot"})
+    operation = (
+        _operation_service(request)
+        .start(
+            session.principal_id,
+            ModelOperationRequest(
+                kind="deploy", target=model.model_id, confirmed=True, destination=model.primary_path
+            ),
+            payload={
+                "model_id": model.model_id,
+                "model_path": model.primary_path,
+                "framework": "mlx",
+                "profile_id": profile_id,
+            },
+        )
+        .to_dict()
+    )
+    roots = tuple(Path(path) for path in _library_service(request).roots(session.principal_id))
+    background.add_task(
+        _run_mlx_deployment,
+        Path(request.app.state.workspace_root),
+        session.principal_id,
+        operation["operation_id"],
+        Path(model.primary_path),
+        roots,
+        request.app.state.managed_mlx_runtime,
+        profile_id,
     )
     return operation
 

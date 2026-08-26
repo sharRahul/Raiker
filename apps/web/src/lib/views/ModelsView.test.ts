@@ -61,6 +61,40 @@ function models(partial: Partial<ModelsData>): ModelsData {
 }
 
 describe("ModelsView state grammar", () => {
+  it("consolidates four llama.cpp slots and adds one four-slot MLX row below it", async () => {
+    const localProfiles = [1, 2, 3, 4].flatMap((slot) => [
+      profile({
+        profile_id: `raiker-local-llama-cpp${slot === 1 ? "" : `-${slot}`}`,
+        provider: "llama.cpp",
+      }),
+      profile({
+        profile_id: `raiker-local-mlx${slot === 1 ? "" : `-${slot}`}`,
+        provider: "mlx",
+        model: "<model>",
+      }),
+    ]);
+    stubFetch({
+      "GET /api/models": models({ profiles: localProfiles }),
+      "GET /api/model-library": {
+        roots: [],
+        models: [
+          { model_id: "gguf-1", name: "Gemma GGUF", primary_path: "/models/gemma.gguf", complete: true, format: "gguf" },
+          { model_id: "mlx-1", name: "Gemma MLX", primary_path: "/models/gemma-mlx", complete: true, format: "mlx" },
+        ],
+      },
+    });
+
+    render(ModelsView, { tab: "local" });
+
+    const gguf = await screen.findByRole("group", { name: "llama.cpp GGUF" });
+    const mlx = screen.getByRole("group", { name: "MLX" });
+    expect(within(gguf).getAllByRole("combobox")).toHaveLength(4);
+    expect(within(mlx).getAllByRole("combobox")).toHaveLength(4);
+    expect(gguf.compareDocumentPosition(mlx) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelectorAll('.framework-row[data-provider="llama.cpp"]')).toHaveLength(1);
+    expect(document.querySelectorAll('.framework-row[data-provider="mlx"]')).toHaveLength(1);
+  });
+
   it("sets the global default from every configured provider/model pair", async () => {
     const anthropic = profile({
       profile_id: "anthropic",
@@ -462,11 +496,8 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView);
-    await waitFor(() =>
-      expect(screen.getAllByText("Select").length).toBeGreaterThan(0),
-    );
-
-    await fireEvent.click(screen.getAllByText("Select")[0]);
+    const llamaRow = await screen.findByRole("group", { name: "llama.cpp GGUF" });
+    await fireEvent.click(within(llamaRow).getByText("Select"));
 
     await waitFor(() => {
       const put = mock.mock.calls.find(

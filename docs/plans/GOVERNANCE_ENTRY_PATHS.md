@@ -22,7 +22,7 @@ recorded below with what the trace found.
 
 ## 1. The finding that motivated this document
 
-**The documentation says one chokepoint. The code has two, plus ten callers that
+**The documentation says one chokepoint. The code has two, plus eleven callers that
 read one of the checks themselves** — eight when this was written, each with its
 own copy of the lookup; they now share one (GEP-01).
 
@@ -41,7 +41,7 @@ hole — it is an undocumented, defensible design that nobody wrote down:
   `RuntimeAuthority.route_action`.
 - An **acting capability** is governed at **`RuntimeAuthority.route_action`**,
   which applies eight checks the policy engine does not.
-- **Eight modules** re-implement the capability-gate check locally rather than
+- **Eleven modules** read the capability-gate check locally rather than
   routing through the authority, so they get the gate and the decision mode and
   none of the other six checks.
 
@@ -89,7 +89,7 @@ Everything that *acts* crosses this. In order:
 | 9 | Decision-mode resolution | `resolve_decision_mode` |
 | 10 | Executor dispatch and audit events | `executor_registry.get(...).execute(...)` |
 
-**Exactly six call sites enter B**, in five modules, and that is the number to
+**Exactly seven call sites enter B**, in six modules, and that is the number to
 watch:
 
 | Caller | Line | Why |
@@ -99,8 +99,9 @@ watch:
 | `raiker/runtime/executors/tier1_approval.py` | `:287` | The relay re-routing the **target** capability, so it re-passes 1–10 at execution time |
 | `raiker/control/service.py` | `:492`, `:838` | Governed control-plane mutations (capability gates, runtime state) |
 | `raiker/runtime/authority/router.py` | `:1579` | Internal delegation |
+| `raiker/memory/query_embedding.py` | `GovernedQueryEmbedder._embed` | MEM-10 query egress after its admission precheck; only Allow/low-risk Auto reach B |
 
-A seventh call site appearing here is an architectural change and should be
+An eighth call site appearing here is an architectural change and should be
 reviewed as one.
 
 ---
@@ -249,6 +250,7 @@ propose a restore, so an agent can never rewind the workspace on its own say-so.
 | `connector_gmail_runtime`, `connector_gcal_runtime`, `connector_slack_runtime` | `raiker/runtime/connectors.py` |
 | `vector_embedding_runtime` | `raiker/runtime/retrieval.py` |
 | `hosted_model_runtime`, `private_network_model_runtime`, `model_provider_runtime` | `raiker/models/policy_state.py` |
+| `model_provider_runtime` query embedding | `raiker/memory/query_embedding.py` — reads admission so Ask can fall back without parking a passive read, then routes Allow/Auto through chokepoint B |
 
 **Reached by the control plane**, which enters chokepoint B like everything else:
 
@@ -284,7 +286,7 @@ does.
 
 ---
 
-## 4. The eight modules that check the gate themselves
+## 4. The eleven modules that check the gate themselves
 
 These read the capability gate directly rather than calling
 `RuntimeAuthority.check_capability_gate` through `route_action`. **Since
@@ -305,13 +307,14 @@ which is GEP-01 closed.
 | `raiker/models/policy_state.py` | provider gate state | Local read |
 | `raiker/tools/subagent_tools.py` | `subagents` | Local delegation (GEP-04) |
 | `raiker/context/gatherer.py` | every gate it reports | **Describes rather than enforces** |
+| `raiker/memory/query_embedding.py` | `model_provider_runtime` | **Egress admission precheck, followed by chokepoint B** |
 
 **This is defensible and it is not free.** The design intent is stated in
 `raiker/policy/engine.py:132–138`: a projected MCP tool is *read-shaped at the
 policy layer* because what actually governs it is enforced inside the tool. The
 same argument covers the others.
 
-**Two drifts were live in the eight copies, and neither was visible from any one
+**Two drifts were live in the original eight copies, and neither was visible from any one
 of them.** Both are closed by the shared helper:
 
 * **Scope.** `RuntimeAuthority` resolves the control scope with

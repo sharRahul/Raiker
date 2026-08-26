@@ -225,6 +225,9 @@ class GovernedActionResult:
     error: str | None = None
     approval_id: str | None = None
     artifacts: dict[str, Any] = field(default_factory=dict)
+    # Executor output for the immediate in-process consumer only. Unlike
+    # artifacts, this is never copied into the event log.
+    transient: dict[str, Any] = field(default_factory=dict)
 
 
 class RuntimeAuthority:
@@ -1546,6 +1549,7 @@ class RuntimeAuthority:
                 message="executed" if result.ok else f"execution_failed:{result.reason_code}",
                 error=None if result.ok else result.reason_code,
                 artifacts=execution_artifacts,
+                transient=dict(result.transient),
             )
 
         return GovernedActionResult(

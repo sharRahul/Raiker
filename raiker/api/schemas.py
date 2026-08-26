@@ -6,6 +6,10 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 
+class LocalModelDeployRequest(BaseModel):
+    profile_id: str | None = None
+
+
 @dataclass
 class ActivateRuntimeModeRequest:
     mode_name: str

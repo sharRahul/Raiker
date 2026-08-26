@@ -304,6 +304,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-289](#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named) | Medium | Memory / Projects / Chat / Build retrieval | Fixed (closed 2026-08-25) |
 | [FIXED-290](#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to) | Medium | Projects / Build / Chat / Workbench | Fixed (raised and closed 2026-08-25 by the screenshot refresh) |
 | [FIXED-291](#fixed-291--a-project-could-only-ever-be-a-folder-raiker-made) | Medium | Projects / path containment / knowledge indexing / Build retrieval | Fixed (closed 2026-08-26) |
+| [FIXED-292](#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium | Memory / governed model egress | Fixed (closed 2026-08-26) |
 
 ---
 
@@ -12586,3 +12587,36 @@ reaches the catalogue; failure is recorded, not swallowed);
 state only where it exists, a missing root says so);
 `apps/web/src/lib/views/ProjectsView.test.ts` (exactly one file list; the attach
 entry point; the root-aware delete confirmation).
+
+---
+
+## FIXED-292 — Semantic memory built a space the question never entered
+
+**Severity: Medium. Area: Memory / governed model egress. Closed 2026-08-26.**
+
+**Observed.** Building an OpenAI semantic memory space succeeded and the Memory
+page selected it, but a synonym-only query returned no hit. Stored memories had
+provider vectors; no production retrieval caller supplied a vector for the
+question, so the vector leg correctly dropped rather than comparing unrelated
+embedding spaces.
+
+**Fixed.** `model_provider_runtime` now supports an ephemeral `embed_query`
+operation. It goes through `RuntimeAuthority` with the existing gate, policy,
+provider allowlist and credential resolution. Allow and low-risk Auto execute;
+Ask, Deny and a disabled gate fall back to lexical/graph retrieval without
+parking a passive read. A per-turn embedder caches by selected space and query,
+so ambient context gathering pays for at most one provider call; the
+model-facing `memory_search` uses the same path once per invocation.
+
+The executor returns the vector through an explicitly transient result field.
+Only model identity, dimensions and a content hash enter `action_executed`; the
+question and vector are neither audited nor stored as memory. The work also
+exposed and fixed an owner-scope mismatch in FIXED-283's batch vectors: they now
+carry the same owner id as the memory projection, making the space genuinely
+readable by owner-scoped recall.
+
+**Evidence.** `tests/test_memory_semantic_index.py` (synonym-only vector hit,
+one call across repeated retrieval in a turn, Ask creates no approval, query and
+vector absent from audit, query vector not persisted); existing semantic-index
+and provider-runtime suites cover batching, egress refusal and fail-closed
+provider behavior.

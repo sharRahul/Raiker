@@ -8,6 +8,11 @@
   let busy = $state(false);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
+  const ggufModels = $derived(
+    (library?.models ?? []).filter(
+      (model) => model.format === "gguf" || (!model.format && model.primary_path.toLowerCase().endsWith(".gguf")),
+    ),
+  );
 
   const bytes = (value: number) => {
     if (value < 1024 ** 2) return `${Math.max(1, Math.round(value / 1024))} KB`;
@@ -146,18 +151,18 @@
         <p class="eyebrow">Inventory</p>
         <h3 id="local-models-title">Detected GGUF models</h3>
       </div>
-      <span>{library?.models.length ?? 0}</span>
+      <span>{ggufModels.length}</span>
     </div>
     {#if error}<p class="error" role="alert">{error}</p>{/if}
     {#if notice}<p class="notice" role="status">{notice}</p>{/if}
     {#if library === null}<p class="empty-copy">Loading your model library…</p>
-    {:else if library.models.length === 0}<div class="empty-models">
+    {:else if ggufModels.length === 0}<div class="empty-models">
         <strong>No GGUF models indexed</strong><span
           >Add a folder above, or download one from Discover.</span
         >
       </div>
     {:else}<div class="model-grid">
-        {#each library.models as model (model.model_id)}<article
+        {#each ggufModels as model (model.model_id)}<article
             class="model-card"
             class:incomplete={!model.complete}
           >

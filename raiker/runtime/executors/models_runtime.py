@@ -151,18 +151,19 @@ class ModelProviderExecutor:
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = str(action.arguments.get("operation", "embed")).strip()
-        if operation not in {"embed", "project_memory", "index_memories"}:
+        if operation not in {"embed", "embed_query", "project_memory", "index_memories"}:
             return self._fail(action.action_id, f"unknown_operation:{operation or 'missing'}")
         if operation == "index_memories":
             return self._index_memories(action, principal)
 
         memory_id: str | None = None
+        owner = self._owner_scope(principal)
         if operation == "project_memory":
             memory_id = action.arguments.get("memory_id")
             if not isinstance(memory_id, str) or not memory_id:
                 return self._fail(action.action_id, "missing_argument:memory_id")
             memory = self._store.get_active_approved_memory(
-                memory_id, owner_principal_id=self._store.account_scope(principal.principal_id)
+                memory_id, owner_principal_id=owner
             )
             if memory is None:
                 return self._fail(action.action_id, "memory_not_active_or_not_found")
@@ -216,6 +217,27 @@ class ModelProviderExecutor:
         provider_model = str(getattr(response, "model", "") or model)
         embedding_model = f"{provider}:{provider_model}"
         content_hash = VectorIndex.compute_content_hash(text)
+        if operation == "embed_query":
+            # MEM-10 read half. A search vector is useful only for this search:
+            # persisting it would turn every question into a memory record, and
+            # putting it in artifacts would copy a high-dimensional derivative
+            # of owner text into the durable audit log. Return it only through
+            # RuntimeAuthority's explicitly non-audited transient channel.
+            return ExecutionResult(
+                ok=True,
+                capability=self.capability,
+                action_id=action.action_id,
+                summary="Semantic query embedding computed; query/vector not persisted.",
+                artifacts={
+                    "operation": "embed_query",
+                    "embedding_model": embedding_model,
+                    "dimensions": len(vector),
+                    "content_hash": content_hash,
+                    "provider_backed": True,
+                    "content_redacted": True,
+                },
+                transient={"embedding": [float(value) for value in vector]},
+            )
         vector_id = new_id("vec_")
         self._store.insert_vector_record(VectorRecord(
             vector_id=vector_id,
@@ -227,12 +249,12 @@ class ModelProviderExecutor:
             sensitivity=sensitivity,
             created_at=utc_now(),
             embedding=_dump_vector(vector),
-            owner_principal_id=self._store.account_scope(principal.principal_id) or "",
+            owner_principal_id=owner or "",
         ))
         if memory_id is not None:
             self._store.link_memory_projection(
                 memory_id, "vector", vector_id, embedding_model,
-                owner_principal_id=self._store.account_scope(principal.principal_id),
+                owner_principal_id=owner,
             )
         return ExecutionResult(
             ok=True,
@@ -287,7 +309,7 @@ class ModelProviderExecutor:
         if not model_egress_allowlist():
             return self._fail(action.action_id, "model_egress_denied:no_allowlist")
 
-        owner = self._store.account_scope(principal.principal_id)
+        owner = self._owner_scope(principal)
         pending = [
             str(row["memory_id"])
             for row in self._store.list_memories_missing_embedding(
@@ -478,6 +500,18 @@ class ModelProviderExecutor:
             return response
 
         return embed
+
+    def _owner_scope(self, principal: Principal) -> str | None:
+        """The durable owner id used by both memory rows and their vectors."""
+        resolved = self._store.account_scope(principal.principal_id)
+        if resolved is not None:
+            return resolved
+        # A bootstrapped local owner is a human principal but predates a full
+        # account-credential row. Memory writes scope to that principal id; the
+        # projection must use the same id or owner-scoped recall cannot join it.
+        if str(principal.principal_type) == "human":
+            return principal.principal_id
+        return None
 
     @staticmethod
     def _provider_reason(exc: Exception) -> str:

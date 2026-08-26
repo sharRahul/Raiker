@@ -63,28 +63,8 @@ QueryEmbedder = Callable[[EmbeddingBackend, str], list[float] | None]
 
 
 def default_query_embedder() -> QueryEmbedder | None:
-    """The embedder used when a caller supplies none — currently there is not one.
-
-    This is the **read** half of semantic recall, and it is not connected. A
-    workspace can now *build* a semantic space (FIXED-283) and recall selects it,
-    but embedding the owner's **question** into that space means calling the
-    provider on every search. That is egress, on a read path, once per query, and
-    Raiker refuses to add a second route into a governed action — so it needs the
-    gate and the decision mode, not a shortcut. Until it has them this returns
-    ``None`` and the vector leg is dropped, which is why a paraphrase still does
-    not recall.
-
-    Stating it as a function rather than as a comment is deliberate: every
-    surface that says what recall can do reads this, so the day the read leg
-    lands, the sentence the owner sees changes with it rather than being
-    remembered.
-    """
+    """No context-free embedder exists; production callers supply governance context."""
     return None
-
-
-def query_embedding_available() -> bool:
-    """Whether a question can be embedded into a semantic space at read time."""
-    return default_query_embedder() is not None
 
 
 def _embed_query(

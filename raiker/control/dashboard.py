@@ -4907,7 +4907,7 @@ class DashboardService:
         )
 
     def get_memory_settings(self, acting_principal_id: str | None = None) -> MemorySettingsView:
-        from raiker.memory.retrieval import query_embedding_available
+        from raiker.memory.query_embedding import query_embedding_available
         from raiker.vector.backends import (
             MAX_MEMORY_INDEX_BATCH,
             embedding_capable_profiles,
@@ -4925,7 +4925,10 @@ class DashboardService:
             # space, so the vector leg is dropped and matching is still lexical.
             # The card has to say which it has, or it repeats the exact defect
             # MEM-03 was raised to remove.
-            retrieval={**active.describe(), "query_embeddable": query_embedding_available()},
+            retrieval={
+                **active.describe(),
+                "query_embeddable": query_embedding_available(self.store, owner, active),
+            },
             # `auto` is always offered and always resolvable; the rest are the
             # spaces that really hold vectors, so a selection can never name a
             # corpus that would answer with nothing.

@@ -313,6 +313,7 @@ def create_app(
             from raiker.storage.sqlite import invalidate_workspace_connections
 
             app.state.managed_llama_runtime.stop()
+            app.state.managed_mlx_runtime.stop()
 
             command_service = getattr(app.state, "command_service", None)
             if command_service is not None:
@@ -347,8 +348,10 @@ def create_app(
     app.state.scheduler_wakeup = SchedulerWakeup()
     app.state.loopback_only = loopback_only
     from raiker.models.local_runtime import ManagedLlamaRuntime
+    from raiker.models.mlx_runtime import ManagedMlxRuntime
 
     app.state.managed_llama_runtime = ManagedLlamaRuntime()
+    app.state.managed_mlx_runtime = ManagedMlxRuntime()
     app.state.instance_ui_dir = Path(ui_dir) if ui_dir is not None else None
     # Boot key material: ensure the internal app key exists (encrypts MFA seeds)
     # and load the connector vault key-file into the environment when the env var

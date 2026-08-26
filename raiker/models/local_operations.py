@@ -22,6 +22,7 @@ _PAYLOAD_KEYS = frozenset(
     {
         "repo_id", "revision", "variant", "destination", "model", "source",
         "output", "quantization", "model_path", "model_id",
+        "framework", "profile_id",
     }
 )
 

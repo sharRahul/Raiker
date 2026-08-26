@@ -84,7 +84,7 @@ MEM-10's binding leg closed on 2026-08-25.
 | Item | Where | State |
 |---|---|---|
 | Semantic memory — the write half | [FIXED-283](FIXED_ITEMS.md#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select) | **Closed 2026-08-25** — one governed action builds a real space out of the owner's approved memories. A keyless install still has only the fallback ([MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) remainder) |
-| Semantic memory — the read half | [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Open — raised 2026-08-25. The question is not embedded into the space, so a paraphrase still does not recall. Needs a gated path, not a shortcut |
+| Semantic memory — the read half | [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | **Closed 2026-08-26** — ambient recall and `memory_search` embed once per turn through the governed provider action; Ask falls back without parking the turn |
 | Vector recall is linear | [MEM-10 remainder](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open — ~431 ms at 3 000 memories, paid every turn |
 | A natural-language question drops the lexical leg | [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Open |
 | Retention sweep | [FIXED-284](FIXED_ITEMS.md#fixed-284--nothing-expired-because-the-sweep-the-retention-classes-describe-was-never-offered) | **Closed 2026-08-25** — what is due is shown and the owner confirms it. No daemon, by design |
@@ -214,7 +214,7 @@ unblocks*.
 | 4 | **Remove the second egress path** ([#3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
 | 5 | **Oversize checkpoint honesty** ([#4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
 | 6 | **MCP protocol revision** ([#9](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort)) | P4 | One change, three rows |
-| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select)) | P1 | **Done 2026-08-25** ([FIXED-283](FIXED_ITEMS.md)), and it turned out to be the same shape as items 2 and 3 rather than the expensive build it was priced as: the executor existed and had never been routed |
+| 7 | **Semantic memory** ([MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select)) | P1 | **Provider path done 2026-08-26** ([FIXED-283](FIXED_ITEMS.md), [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)): both halves reused the governed executor rather than adding a shortcut. The keyless curated-GGUF leg remains |
 | 8 | **Shared admission helper** ([FIXED-279](FIXED_ITEMS.md#fixed-279--eight-copies-of-one-governance-check-and-two-of-them-had-already-drifted)) | P2 + P4 | **Done 2026-08-24**, and moved up rather than waiting: GEP-04 added two call sites that needed it, so designing it once meant designing it now |
 
 **Every item in the top group is closed.** Item 7 — semantic memory — closed on

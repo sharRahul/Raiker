@@ -531,6 +531,8 @@ export interface LocalModel {
   complete: boolean;
   size_bytes: number;
   indexed_at: string;
+  /** Runtime format detected from the approved local model folder. */
+  format?: "gguf" | "mlx";
 }
 
 export interface ModelLibraryView {

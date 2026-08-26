@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+from raiker.memory.query_embedding import GovernedQueryEmbedder
 from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.store import get_memory, list_memory
 from raiker.storage.sqlite import SQLiteStore
@@ -74,6 +75,7 @@ def memory_search(
     if not query.strip():
         return {"status": "failed", "error": {"type": "empty_query", "message": "Search query cannot be empty."}}
     store = SQLiteStore(workspace_root)
+    query_embedder = GovernedQueryEmbedder(store, owner_principal_id)
     results = retrieve_hybrid_memory(
         store=store,
         query=query,
@@ -81,6 +83,7 @@ def memory_search(
         entity_id=entity_id,
         limit=max_results,
         owner_principal_id=owner_principal_id,
+        query_embedder=query_embedder,
     )
     backend = resolve_embedding_backend(store, owner_principal_id=owner_principal_id)
     # Reported from what the graph leg actually anchored on, not from whether an

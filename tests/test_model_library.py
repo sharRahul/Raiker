@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import struct
 from pathlib import Path
@@ -54,3 +55,25 @@ def test_root_must_be_absolute_existing_directory(tmp_path: Path) -> None:
             assert str(exc) == "invalid_model_library_root"
         else:
             raise AssertionError("invalid root was accepted")
+
+
+def test_scan_detects_complete_mlx_directory_without_loading_model_code(tmp_path: Path) -> None:
+    root = tmp_path / "models"
+    model = root / "Qwen-MLX-4bit"
+    model.mkdir(parents=True)
+    (model / "config.json").write_text(
+        json.dumps({"model_type": "qwen2", "quantization": {"bits": 4}}),
+        encoding="utf-8",
+    )
+    (model / "model.safetensors").write_bytes(b"weights")
+    service = ModelLibraryService(SQLiteStore(tmp_path / "db"))
+    service.add_root("owner", root)
+
+    models = service.rescan("owner")
+
+    assert len(models) == 1
+    assert models[0].format == "mlx"
+    assert models[0].name == "Qwen-MLX-4bit"
+    assert models[0].architecture == "qwen2"
+    assert models[0].quantization == "4-bit"
+    assert models[0].to_dict()["format"] == "mlx"

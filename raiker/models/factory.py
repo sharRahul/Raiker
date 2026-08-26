@@ -93,6 +93,7 @@ class ModelProviderFactory:
             "llama-cpp",
             "llama.cpp",
             "llama-cpp-server",
+            "mlx",
             "ollama",
             "ollama-cloud",
             "lm-studio",

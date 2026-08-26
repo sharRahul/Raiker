@@ -22,6 +22,7 @@ ENTRY_PATHS_DOC = Path("docs/plans/GOVERNANCE_ENTRY_PATHS.md")
 ROUTE_ACTION_CALLERS = {
     "raiker/approvals/execution.py",
     "raiker/control/service.py",
+    "raiker/memory/query_embedding.py",
     "raiker/runtime/authority/router.py",
     "raiker/runtime/executors/tier1_approval.py",
     "raiker/tools/broker.py",
@@ -63,6 +64,9 @@ LOCAL_GATE_CHECK_MODULES = {
     # an empty gate table differently from the path it was describing, and told
     # the model `web_fetch: disabled` on an install where web_fetch worked.
     "raiker/context/gatherer.py",
+    # MEM-10 reads admission first so Ask can degrade a passive read without
+    # parking it, then routes allowed/auto execution through chokepoint B.
+    "raiker/memory/query_embedding.py",
 }
 
 #: Capabilities with a real executor that no product path constructs. Each is

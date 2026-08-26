@@ -55,6 +55,9 @@ dependencies = [
     # is an async iterator, so the watcher joins the host's existing lifespan
     # workers directly instead of needing a thread bridged back into the loop.
     "watchfiles>=0.21",
+    # Apple's local MLX runtime. The marker keeps non-Apple installations clean;
+    # the UI still explains that MLX serving is available only on Apple silicon.
+    "mlx-lm>=0.31.3; platform_system == 'Darwin'",
 ]
 
 [project.optional-dependencies]

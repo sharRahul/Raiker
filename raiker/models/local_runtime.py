@@ -87,7 +87,9 @@ class ManagedLlamaRuntime:
         process = self._processes.get(slot_id)
         return process is not None and process.poll() is None
 
-    def _assign_slot(self, model_path: str, requested_port: int | None) -> LocalSlot:
+    def _assign_slot(
+        self, model_path: str, requested_port: int | None, profile_id: str | None = None
+    ) -> LocalSlot:
         """Pick the slot this model should occupy.
 
         Re-deploying a model that is already serving reuses its slot rather than
@@ -101,6 +103,11 @@ class ManagedLlamaRuntime:
                 slot.profile_id
             ):
                 return slot
+        if profile_id is not None:
+            named_profile = _SLOTS_BY_PROFILE.get(profile_id)
+            if named_profile is None:
+                raise ValueError("unknown_local_runtime_slot")
+            return named_profile
         if requested_port is not None:
             named = next((slot for slot in LOCAL_SLOTS if slot.port == requested_port), None)
             if named is not None:
@@ -122,6 +129,7 @@ class ManagedLlamaRuntime:
         *,
         executable: Path,
         port: int | None = None,
+        profile_id: str | None = None,
         approved_roots: tuple[Path, ...] | None = None,
     ) -> LocalRuntimeStatus:
         model = model_path.resolve()
@@ -136,7 +144,7 @@ class ManagedLlamaRuntime:
             raise ValueError("model_outside_approved_library")
         if port is not None and not 1024 <= port <= 65535:
             raise ValueError("invalid_runtime_port")
-        slot = self._assign_slot(str(model), port)
+        slot = self._assign_slot(str(model), port, profile_id)
         bound_port = port if port is not None else slot.port
         if self._alive(slot.profile_id):
             self.stop(slot.profile_id)

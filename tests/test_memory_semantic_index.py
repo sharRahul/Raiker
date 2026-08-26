@@ -23,6 +23,8 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.memory.query_embedding import GovernedQueryEmbedder
+from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.store import MemoryGovernance, write_memory
 from raiker.models.contracts import EmbeddingResponse
 from raiker.runtime.authority import GovernedAction, RuntimeAuthority
@@ -189,6 +191,107 @@ def test_a_second_run_does_not_re_embed_what_the_first_one_did(
         "The backup target is the encrypted NAS.",
         "Deploys happen on Thursdays.",
     ]
+
+
+def test_query_is_embedded_once_and_a_paraphrase_reaches_the_vector_leg(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-240: the selected semantic space now embeds both sides of recall."""
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    _memory(ws, store, "The backup target is the encrypted NAS.")
+
+    calls: list[str] = []
+
+    def semantic(provider: str, model: str, text: str) -> EmbeddingResponse:
+        calls.append(text)
+        vector = [1.0, 0.0, 0.0] if "backup" in text or "disaster" in text else [0.0, 1.0, 0.0]
+        return EmbeddingResponse(vector=vector, model=_MODEL, usage=None)
+
+    authority, principal = _authority(ws, semantic)
+    assert authority.route_action(_index_action(principal.principal_id), principal).decision == "allow"
+    mode = RuntimeControlService(ws).set_capability_decision_mode(
+        _CAP, "always_allow", principal.principal_id, "semantic recall test"
+    )
+    assert mode.ok, mode.reason_code
+    embedder = GovernedQueryEmbedder(
+        store,
+        principal.principal_id,
+        session_id="sess_semantic_read",
+        turn_id="turn_semantic_read",
+        authority=authority,
+    )
+
+    first = retrieve_hybrid_memory(
+        store=store,
+        query="Where is the disaster destination?",
+        owner_principal_id=principal.principal_id,
+        query_embedder=embedder,
+    )
+    second = retrieve_hybrid_memory(
+        store=store,
+        query="Where is the disaster destination?",
+        owner_principal_id=principal.principal_id,
+        query_embedder=embedder,
+    )
+
+    assert first and first[0].text == "The backup target is the encrypted NAS."
+    assert first[0].sources == ("vector",)
+    assert second[0].memory_id == first[0].memory_id
+    assert calls.count("Where is the disaster destination?") == 1
+    # Search questions are ephemeral, not new vector records.
+    assert len(store.list_vector_records()) == 1
+
+
+def test_ask_mode_drops_semantic_leg_without_parking_an_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    calls: list[str] = []
+    authority, principal = _authority(ws, _counting_embedder(calls))
+    backend = type(resolve_embedding_backend(store))(
+        backend_id="provider", kind="provider", model_label=_SPACE, dimensions=3
+    )
+
+    vector = GovernedQueryEmbedder(store, principal.principal_id, authority=authority)(
+        backend, "private search question"
+    )
+
+    assert vector is None
+    assert calls == []
+    assert store.count_pending_approvals() == 0
+
+
+def test_query_embedding_audit_excludes_query_and_vector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    authority, principal = _authority(ws, _counting_embedder([]))
+    assert RuntimeControlService(ws).set_capability_decision_mode(
+        _CAP, "always_allow", principal.principal_id, "semantic recall test"
+    ).ok
+    backend = type(resolve_embedding_backend(store))(
+        backend_id="provider", kind="provider", model_label=_SPACE, dimensions=3
+    )
+    query = "the uniquely private semantic question"
+
+    result = GovernedQueryEmbedder(
+        store, principal.principal_id, session_id="sess_query_audit", authority=authority
+    )(backend, query)
+
+    assert result == [0.1, 0.2, 0.3]
+    event_text = (store.paths.events_dir / "sess_query_audit.jsonl").read_text(encoding="utf-8")
+    assert query not in event_text
+    assert "[0.1, 0.2, 0.3]" not in event_text
+    assert '"operation":"embed_query"' in event_text.replace(" ", "")
 
 
 def test_the_space_is_named_for_the_model_the_owner_chose(

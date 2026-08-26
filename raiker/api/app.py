@@ -289,6 +289,15 @@ def create_app(
 
         worker = asyncio.create_task(tick())
         nudged = asyncio.create_task(continuations())
+        # A folder attached to a project is edited by whatever the owner uses,
+        # and none of it tells Raiker anything. This worker is why an edit
+        # reaches recall in seconds; the reconcile pass behind it is why recall
+        # is still correct when watching fails.
+        from raiker.knowledge.watcher import AttachedRootWatcher
+
+        watcher = AttachedRootWatcher(app.state.workspace_root)
+        app.state.attached_root_watcher = watcher
+        watching = asyncio.create_task(watcher.run(stop))
         try:
             yield
         finally:
@@ -296,7 +305,8 @@ def create_app(
             wakeup.request()
             worker.cancel()
             nudged.cancel()
-            for task in (worker, nudged):
+            watching.cancel()
+            for task in (worker, nudged, watching):
                 with suppress(asyncio.CancelledError):
                     await task
             from raiker.storage.sqlite import invalidate_workspace_connections

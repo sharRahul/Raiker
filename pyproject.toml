@@ -50,6 +50,11 @@ dependencies = [
     "Pillow>=10.4",
     # Official client for revision-pinned, filtered, dry-run-capable model downloads.
     "huggingface_hub>=1.25,<2",
+    # Filesystem change notifications for indexed attached project roots.
+    # `watchfiles` and not `watchdog` because it is async-native: its `awatch`
+    # is an async iterator, so the watcher joins the host's existing lifespan
+    # workers directly instead of needing a thread bridged back into the loop.
+    "watchfiles>=0.21",
 ]
 
 [project.optional-dependencies]

@@ -3104,6 +3104,32 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 raise
         return True
 
+    def list_indexed_attached_roots(self) -> list[dict[str, Any]]:
+        """Every attached project root that has something in the catalogue.
+
+        The join is what makes "indexed" mean indexed: a project attached but
+        never scanned has no rows, and watching its folder would read the
+        owner's disk continuously to keep an index that does not exist current.
+        Returns the owner principal alongside, because every downstream call —
+        grants, reconcile, retirement — is owner-scoped.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT DISTINCT p.project_id AS project_id,
+                       g.owner_principal_id AS owner_principal_id,
+                       g.path AS path
+                FROM projects p
+                JOIN brain_source_grants g ON g.root_id = p.root_grant_id
+                JOIN managed_files m
+                  ON m.project_id = p.project_id
+                 AND m.owner_principal_id = g.owner_principal_id
+                 AND m.retired_at IS NULL
+                WHERE p.root_kind = 'attached' AND p.root_grant_id IS NOT NULL
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
     def set_managed_file_source_mtime(
         self, file_id: str, owner_principal_id: str, mtime_ns: int
     ) -> bool:

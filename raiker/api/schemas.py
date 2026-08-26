@@ -473,10 +473,15 @@ class CreateProjectRequest(BaseModel):
     # server-side from the name and contained inside the workspace — the client
     # never supplies a path. extra="forbid" rejects unknown fields.
     # parent_id (optional) creates a nested project under the given parent.
+    # attach_path is the one path a client may send, and only because the owner
+    # is naming a folder they already have: the server validates it, records it
+    # as a grant, and refuses one already inside the workspace.
     model_config = ConfigDict(extra="forbid")
 
     name: str
     parent_id: str | None = None
+    attach_path: str | None = None
+    attach_writable: bool = True
 
 
 class SelectProjectRequest(BaseModel):

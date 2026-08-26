@@ -1366,10 +1366,22 @@ async def create_project(
     workspace; a project grants no authority.
     """
     session, _principal = auth_data
-    result = _service(request).create_project(body.name, session.principal_id, parent_id=body.parent_id)
+    result = _service(request).create_project(
+        body.name,
+        session.principal_id,
+        parent_id=body.parent_id,
+        attach_path=body.attach_path,
+        attach_writable=body.attach_writable,
+    )
     if not result.ok:
+        # An attachment the owner asked for and the server refused is a bad
+        # request about that folder, not a claim they may not create projects.
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
+            status_code=(
+                status.HTTP_400_BAD_REQUEST
+                if body.attach_path is not None
+                else status.HTTP_403_FORBIDDEN
+            ),
             detail={"ok": False, "reason_code": result.reason_code},
         )
     return {"ok": True, **result.data}

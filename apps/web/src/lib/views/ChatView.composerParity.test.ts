@@ -55,6 +55,8 @@ const projects = {
       path: "Composer project",
       is_archived: false,
       archived_at: null,
+      root_kind: "managed" as const,
+      root_label: "composer",
     },
   ],
 };

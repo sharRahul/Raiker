@@ -117,6 +117,9 @@ import type {
   ManagedFileList,
   ManagedFileScope,
   ManagedFileUpload,
+  ProjectBrowseView,
+  ProjectRootIndexResult,
+  ProjectRootStatus,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 
@@ -1678,13 +1681,49 @@ export const api = {
         ),
   // Create a named project for the authenticated local human.
   // The root subpath is derived and contained server-side — no path is sent.
-  createProject: (name: string) =>
+  // `attachPath` is the exception and the only path the client ever sends: the
+  // owner is naming a folder they already have, which the server validates and
+  // records as a grant before it becomes a root.
+  createProject: (name: string, attachPath: string | null = null, attachWritable = true) =>
     postJson<{
       ok: boolean;
       project_id: string;
       name: string;
       root_subpath: string;
-    }>("/api/projects", { name }),
+    }>(
+      "/api/projects",
+      attachPath === null
+        ? { name }
+        : { name, attach_path: attachPath, attach_writable: attachWritable },
+    ),
+  // ── Project roots ──────────────────────────────────────────────────────
+  // One directory at a time, never the whole tree: a folder the owner attached
+  // can be arbitrarily large, and walking it eagerly would stall the page on a
+  // repository the owner only wanted to glance at.
+  browseProject: (projectId: string, path = "") =>
+    request<ProjectBrowseView>(
+      `/api/projects/${encodeURIComponent(projectId)}/browse` +
+        (path === "" ? "" : `?path=${encodeURIComponent(path)}`),
+    ),
+  projectRootStatus: (projectId: string) =>
+    request<ProjectRootStatus>(
+      `/api/projects/${encodeURIComponent(projectId)}/root/status`,
+    ),
+  indexProjectRoot: (projectId: string) =>
+    postJson<ProjectRootIndexResult>(
+      `/api/projects/${encodeURIComponent(projectId)}/root/index`,
+      {},
+    ),
+  attachProjectFolder: (projectId: string, path: string, writable: boolean) =>
+    postJson<{ ok: boolean; project_id: string; root_id: string }>(
+      `/api/projects/${encodeURIComponent(projectId)}/root/attach`,
+      { path, writable },
+    ),
+  detachProjectFolder: (projectId: string) =>
+    request<{ ok: boolean; project_id: string }>(
+      `/api/projects/${encodeURIComponent(projectId)}/root`,
+      { method: "DELETE" },
+    ),
   // Set (or clear, with null) the active project; new sessions are stamped with it.
   selectProject: (project_id: string | null) =>
     request<{ ok: boolean; active_project_id: string | null }>(

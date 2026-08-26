@@ -620,6 +620,11 @@ class ProjectView:
     path: str = "/"
     is_archived: bool = False
     archived_at: str | None = None
+    # Which kind of root this project has, and what to call it. Carried on the
+    # list rather than fetched per card, because the delete confirmation has to
+    # say whether a folder survives *before* the owner opens anything.
+    root_kind: str = "managed"
+    root_label: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -633,6 +638,20 @@ class ProjectRootMigrationReport:
     conflicts: tuple[str, ...] = ()
     unchanged: tuple[str, ...] = ()
     retained_residues: tuple[str, ...] = ()
+
+
+def _default_root_label(row: dict[str, Any]) -> str:
+    """A short name for the project's root, without resolving the grant.
+
+    The grant's path arrives on the row from `list_projects`, so naming an
+    attached folder costs no extra query. A managed project falls back to its
+    subpath's last segment, which is its slug.
+    """
+    granted = str(row.get("root_grant_path") or "")
+    if granted:
+        return Path(granted).name or granted
+    subpath = str(row.get("root_subpath") or "")
+    return subpath.rsplit("/", 1)[-1] if subpath else ""
 
 
 def _copy_project_tree_exclusive(source: Path, destination: Path) -> None:
@@ -5065,6 +5084,7 @@ class DashboardService:
         acting_principal_id: str | None,
         parent_id: str | None = None,
         attach_path: str | None = None,
+        attach_writable: bool = True,
     ) -> ControlResult:
         """Create a named project folder (human gate-manager only).
 
@@ -5110,7 +5130,7 @@ class DashboardService:
                 owner_user_id=principal.delegated_by_user_id,
             )
             attached = self.attach_project_folder(
-                project_id, attach_path, acting_principal_id
+                project_id, attach_path, acting_principal_id, writable=attach_writable
             )
             if not attached.ok:
                 self.store.delete_project_with_orphanage(project_id)
@@ -5378,6 +5398,8 @@ class DashboardService:
             path=str(row.get("path", "/")),
             is_archived=bool(row.get("is_archived", 0)),
             archived_at=row.get("archived_at"),
+            root_kind=str(row.get("root_kind") or "managed"),
+            root_label=str(row.get("root_label") or "") or _default_root_label(row),
         )
 
     def list_tasks(

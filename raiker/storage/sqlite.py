@@ -3452,9 +3452,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT projects.*, COUNT(sessions.session_id) AS session_count
+                SELECT projects.*, COUNT(sessions.session_id) AS session_count,
+                       grants.path AS root_grant_path
                 FROM projects
                 LEFT JOIN sessions ON sessions.project_id = projects.project_id
+                -- An attached project's folder lives on its grant, so the list
+                -- can name it without one extra query per row.
+                LEFT JOIN brain_source_grants AS grants
+                       ON grants.root_id = projects.root_grant_id
                 """ + (" WHERE projects.owner_user_id = ? " if user_id else "") + """
                 GROUP BY projects.project_id
                 ORDER BY projects.created_at DESC

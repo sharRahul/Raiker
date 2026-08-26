@@ -959,6 +959,11 @@ export interface ProjectView {
   path: string;
   is_archived: boolean;
   archived_at: string | null;
+  /** Which kind of root, and what to call it. On the list rather than fetched
+   *  per card, because the delete confirmation must say whether a folder
+   *  survives before the owner opens anything. */
+  root_kind: "managed" | "attached";
+  root_label: string;
 }
 
 export interface ProjectsList {
@@ -2494,4 +2499,59 @@ export interface ManagedFileUpload {
   relative_path: string;
   media_type: string;
   data_base64: string;
+}
+
+// ── Project roots ─────────────────────────────────────────────────────────
+// A project's root is one of two things: the managed subpath under the
+// workspace it has always had, or a folder the owner already has and granted.
+// One explorer browses both, so both answer this same shape — what differs is
+// only what the answer says.
+export type ProjectRootKind = "managed" | "attached";
+
+export interface ProjectBrowseEntry {
+  name: string;
+  relative_path: string;
+  is_directory: boolean;
+  size_bytes: number;
+  media_type: string;
+  /** Absent when the file has no catalogue row: a file Raiker cannot read has
+   *  no index state, and inventing one would suggest a failure. */
+  index_state: ManagedFileIndexState | null;
+}
+
+export interface ProjectBrowseView {
+  path: string;
+  parent: string | null;
+  entries: ProjectBrowseEntry[];
+  truncated: boolean;
+  root_kind: ProjectRootKind;
+  root_label: string;
+  /** The grant was revoked, the project detached, or the folder moved. The
+   *  explorer must say so; an empty tree would read as "no files". */
+  root_missing: boolean;
+}
+
+export interface ProjectRootStatus {
+  ok: boolean;
+  project_id: string;
+  root_kind: ProjectRootKind;
+  root_label: string;
+  root_path: string | null;
+  root_missing: boolean;
+  writable: boolean;
+  watching: boolean;
+  watch_reason: string;
+  last_scanned_at: string;
+  indexed_files: number;
+}
+
+export interface ProjectRootIndexResult {
+  ok: boolean;
+  project_id: string;
+  indexed: number;
+  updated: number;
+  retired: number;
+  skipped: number;
+  truncated: boolean;
+  scanned_at: string;
 }

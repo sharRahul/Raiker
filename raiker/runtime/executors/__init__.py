@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from raiker.runtime.executors.base import ExecutionResult, Executor, not_implemented
 from raiker.runtime.executors.registry import ExecutorRegistry
@@ -238,8 +238,15 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
 def build_default_executor_registry(
     workspace_root: str | Path,
     store: SQLiteStore,
+    *,
+    authority: Any = None,
 ) -> ExecutorRegistry:
     """Build a registry containing only genuinely-implemented executors.
+
+    ``authority`` carries the roots the turn's project may touch, and reaches
+    the executors that resolve a filesystem path. Omitted, each builds a
+    workspace-only authority, so a registry without one confines exactly as it
+    did before attached roots existed.
 
     The set registered here is exactly ``REAL_EXECUTOR_CAPABILITIES``. Anything
     not registered fails activation with ``activation_blocked:no_executor`` and,
@@ -253,8 +260,8 @@ def build_default_executor_registry(
 
     registry = ExecutorRegistry()
     registry.register("approval_execution_relay", ApprovalExecutionRelay(ws, store))
-    registry.register("file_write_execution", FileWriteExecutor(ws))
-    registry.register("patch_apply_execution", PatchApplyExecutor(ws))
+    registry.register("file_write_execution", FileWriteExecutor(ws, authority=authority))
+    registry.register("patch_apply_execution", PatchApplyExecutor(ws, authority=authority))
     registry.register("git_write_execution", GitWriteExecutor(ws, store))
     registry.register("git_push_execution", GitPushExecutor(ws, store))
     registry.register("checkpoint_restore_execution", CheckpointRestoreExecutor(ws, store))

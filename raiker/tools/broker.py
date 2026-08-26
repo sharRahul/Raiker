@@ -182,6 +182,13 @@ class ToolBroker:
         # None — a non-streamed turn, the terminal client, a direct caller — the
         # broker behaves exactly as it did before.
         self.stream_sink: list[StreamEvent] | None = None
+        # The roots this turn's project may touch. Set by the runtime for the
+        # length of a turn, exactly like `stream_sink` above, because it is a
+        # property of the turn and not of the broker: the same broker serves a
+        # managed project and an attached one. None -- a turn with no project,
+        # the terminal client, a direct caller -- means workspace-only, which is
+        # what confinement was before attached roots existed.
+        self.path_authority: Any = None
         # BUG-218 — actions Auto's alignment check withheld this turn, so the
         # approval raised in their place can say why. Keyed by action id.
         self._alignment_withheld: dict[str, AlignmentVerdict] = {}
@@ -192,9 +199,11 @@ class ToolBroker:
             writer=writer,
         )
         self.executors: dict[str, Callable[[dict[str, Any]], dict[str, Any]]] = {
-            "read_file": lambda args: read_file(self.workspace_root, str(args.get("path", "."))),
+            "read_file": lambda args: read_file(
+                self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
+            ),
             "list_directory": lambda args: list_directory(
-                self.workspace_root, str(args.get("path", "."))
+                self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
             ),
             "glob": lambda args: glob(
                 self.workspace_root,
@@ -208,7 +217,9 @@ class ToolBroker:
                 include=str(args.get("include", "*")),
                 max_results=int(args.get("max_results", 100)),
             ),
-            "stat_path": lambda args: stat_path(self.workspace_root, str(args.get("path", "."))),
+            "stat_path": lambda args: stat_path(
+                self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
+            ),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
                 str(args.get("before_path", ".")),
@@ -222,16 +233,19 @@ class ToolBroker:
                 self.git_root(), "log", ["--oneline", "-n", str(args.get("limit", 10))]
             ),
             "write_file": lambda args: proposed_write_snapshot(
-                self.workspace_root, str(args.get("path", ".")), str(args.get("text", ""))
+                self.workspace_root, str(args.get("path", ".")), str(args.get("text", "")),
+                authority=self.path_authority,
             ),
             "edit_file": lambda args: proposed_edit_snapshot(
                 self.workspace_root,
                 str(args.get("path", ".")),
                 str(args.get("old_text", "")),
                 str(args.get("new_text", "")),
+                authority=self.path_authority,
             ),
             "apply_patch": lambda args: proposed_patch_snapshot(
-                self.workspace_root, str(args["path"]) if args.get("path") else None, str(args.get("patch", ""))
+                self.workspace_root, str(args["path"]) if args.get("path") else None,
+                str(args.get("patch", "")), authority=self.path_authority,
             ),
             "knowledge_graph": lambda args: knowledge_graph(
                 self.workspace_root,
@@ -1466,7 +1480,9 @@ class ToolBroker:
         authority = RuntimeAuthority(
             self.store,
             self.writer or EventLogWriter(self.store),
-            executor_registry=build_default_executor_registry(self.workspace_root, self.store),
+            executor_registry=build_default_executor_registry(
+                self.workspace_root, self.store, authority=self.path_authority
+            ),
         )
         governed = GovernedAction(
             action_id=action.action_id,

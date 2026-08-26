@@ -1076,6 +1076,47 @@ class RuntimeOrchestrator:
             drained.append(self._sink.pop(0))
         return drained
 
+    def _open_turn(self, stream: bool, envelope: PromptEnvelope) -> None:
+        """Set up the two things the broker borrows for the length of a turn."""
+        self._open_sink(stream)
+        self._open_authority(envelope)
+
+    def _close_turn(self) -> None:
+        self._close_sink()
+        self.tool_broker.path_authority = None
+        engine = getattr(self.tool_broker, "policy_engine", None)
+        if engine is not None:
+            engine.authority = None
+
+    def _open_authority(self, envelope: PromptEnvelope) -> None:
+        """Hand the broker the roots this turn's project may touch.
+
+        Built from the same project the retrieval boundary above resolves, so
+        the boundary that governs *reading* and the boundary that governs
+        *writing* come from one resolution rather than two that could disagree.
+        Policy is given the same object, because policy decides before
+        execution and the executor decides again at the write: if the two
+        disagreed about an attached root, a turn would be refused after being
+        allowed, or allowed after being refused.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        project_id = str(envelope.prompt.metadata.get("project_id") or "").strip()
+        authority = None
+        if store is not None and project_id:
+            with contextlib.suppress(Exception):
+                from raiker.control.project_roots import authority_for_project
+
+                owner = self._source_owner(envelope)
+                authority = authority_for_project(
+                    store.load_project(project_id),
+                    store.list_brain_source_grants(owner),
+                    self.workspace_root,
+                )
+        self.tool_broker.path_authority = authority
+        engine = getattr(self.tool_broker, "policy_engine", None)
+        if engine is not None:
+            engine.authority = authority
+
     def _open_sink(self, stream: bool) -> None:
         """Start collecting this turn's out-of-band events, if anyone is watching.
 
@@ -1914,14 +1955,14 @@ class RuntimeOrchestrator:
         stream: bool,
         identity: TrustedTurnIdentity | None = None,
     ) -> AsyncIterator[StreamEvent]:
-        self._open_sink(stream)
+        self._open_turn(stream, envelope)
         try:
             async for event in self._aturn_events_inner(
                 envelope, stream=stream, identity=identity
             ):
                 yield event
         finally:
-            self._close_sink()
+            self._close_turn()
 
     async def _aturn_events_inner(
         self,
@@ -2105,7 +2146,7 @@ class RuntimeOrchestrator:
         it would keep saying *waiting for your decision* after the decision had
         been made.
         """
-        self._open_sink(stream)
+        self._open_turn(stream, envelope)
         try:
             machine = RuntimeStateMachine()
             self._state(machine, envelope, "NORMALISED")
@@ -2135,7 +2176,7 @@ class RuntimeOrchestrator:
             ):
                 yield event
         finally:
-            self._close_sink()
+            self._close_turn()
 
     async def _aexecute_tool(
         self,

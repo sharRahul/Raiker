@@ -68,9 +68,10 @@ def _is_binary_bytes(data: bytes) -> bool:
 
 
 def read_file(
-    workspace_root: str | Path, path: str | Path, *, max_bytes: int = 200_000
+    workspace_root: str | Path, path: str | Path, *, max_bytes: int = 200_000,
+    authority: Any = None,
 ) -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+    resolved = resolve_workspace_path(workspace_root, path, authority=authority)
     if not resolved.exists():
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
     if not resolved.is_file():
@@ -84,14 +85,16 @@ def read_file(
         return {"status": "failed", "error": {"type": "binary_file", "path": str(path)}}
     return {
         "status": "success",
-        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "text": text,
         "truncated": len(data) > max_bytes,
     }
 
 
-def list_directory(workspace_root: str | Path, path: str | Path = ".") -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+def list_directory(
+    workspace_root: str | Path, path: str | Path = ".", *, authority: Any = None
+) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path, authority=authority)
     if not resolved.exists():
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
     if not resolved.is_dir():
@@ -100,6 +103,10 @@ def list_directory(workspace_root: str | Path, path: str | Path = ".") -> dict[s
     return {"status": "success", "path": str(path), "entries": entries}
 
 
+# `glob_paths` and `grep_files` enumerate a tree rather than resolve a named
+# path, so they stay workspace-only. Walking an attached root is the reconcile
+# pass's and the explorer's job, both of which already know which root they are
+# in; teaching a glob to span roots would make one pattern mean two trees.
 def glob_paths(
     workspace_root: str | Path, pattern: str, *, max_results: int = 100
 ) -> dict[str, Any]:
@@ -165,13 +172,15 @@ def grep_files(
     return {"status": "success", "matches": results, "truncated": False}
 
 
-def stat_path(workspace_root: str | Path, path: str | Path) -> dict[str, Any]:
-    resolved = resolve_workspace_path(workspace_root, path)
+def stat_path(
+    workspace_root: str | Path, path: str | Path, *, authority: Any = None
+) -> dict[str, Any]:
+    resolved = resolve_workspace_path(workspace_root, path, authority=authority)
     if not resolved.exists():
         return {"status": "failed", "error": {"type": "not_found", "path": str(path)}}
     return {
         "status": "success",
-        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "is_file": resolved.is_file(),
         "is_dir": resolved.is_dir(),
         "size_bytes": resolved.stat().st_size,
@@ -184,11 +193,12 @@ def diff_files(
     after_path: str | Path,
     *,
     max_lines: int = 200,
+    authority: Any = None,
 ) -> dict[str, Any]:
     import difflib
 
-    before = read_file(workspace_root, before_path)
-    after = read_file(workspace_root, after_path)
+    before = read_file(workspace_root, before_path, authority=authority)
+    after = read_file(workspace_root, after_path, authority=authority)
     if before["status"] != "success":
         return {"status": "failed", "error": before.get("error")}
     if after["status"] != "success":
@@ -206,12 +216,12 @@ def diff_files(
 
 
 def proposed_write_snapshot(
-    workspace_root: str | Path, path: str | Path, new_text: str
+    workspace_root: str | Path, path: str | Path, new_text: str, *, authority: Any = None
 ) -> dict[str, Any]:
     # Refused here as well as at execution time, so a proposal the runtime could
     # never carry out is rejected while the model can still react to it, rather
     # than sitting in the Approvals inbox looking actionable.
-    resolved = resolve_writable_workspace_path(workspace_root, path)
+    resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
     before = (
         resolved.read_text(encoding="utf-8")
         if resolved.exists() and resolved.is_file() and is_text_file(resolved)
@@ -219,20 +229,22 @@ def proposed_write_snapshot(
     )
     return {
         "status": "proposal",
-        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "before_snapshot": before,
         "proposed_text": new_text,
         "requires_approval": True,
     }
 
 
-def write_file_content(workspace_root: str | Path, path: str | Path, text: str) -> dict[str, Any]:
-    resolved = resolve_writable_workspace_path(workspace_root, path)
+def write_file_content(
+    workspace_root: str | Path, path: str | Path, text: str, *, authority: Any = None
+) -> dict[str, Any]:
+    resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
     resolved.parent.mkdir(parents=True, exist_ok=True)
     resolved.write_text(text, encoding="utf-8")
     return {
         "status": "success",
-        "path": str(resolved.relative_to(Path(workspace_root).resolve())),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "size_bytes": resolved.stat().st_size,
     }
 
@@ -249,9 +261,9 @@ def _failure(error_type: str, **details: Any) -> dict[str, Any]:
 
 
 def _existing_text_target(
-    workspace_root: str | Path, path: str | Path
+    workspace_root: str | Path, path: str | Path, *, authority: Any = None
 ) -> tuple[Path, str] | dict[str, Any]:
-    resolved = resolve_writable_workspace_path(workspace_root, path)
+    resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
     if not resolved.exists() or not resolved.is_file():
         return _failure("not_found")
     if not is_text_file(resolved):
@@ -264,8 +276,17 @@ def _existing_text_target(
         return _failure("read_failed", message=str(exc))
 
 
-def _relative_path(workspace_root: str | Path, resolved: Path) -> str:
-    return str(resolved.relative_to(Path(workspace_root).resolve()))
+def _relative_path(workspace_root: str | Path, resolved: Path, *, authority: Any = None) -> str:
+    """What to call a resolved path in a result, a proposal or a patch header.
+
+    ``relative_to`` is only correct while every resolved path is inside the
+    workspace. Once a project can be an attached folder that is no longer true,
+    and the bare call raises ``ValueError`` — turning a *successful* write into
+    a crash on the way out. The authority already knows what each root's files
+    are called, so ask it, and keep the bare relative path for workspace files
+    so no stored patch header or checkpoint key changes meaning.
+    """
+    return _authority_for(workspace_root, authority).resolve_read(resolved).display
 
 
 def _same_line(left: str, right: str) -> bool:
@@ -339,9 +360,10 @@ def _unique_match(text: str, old_text: str) -> tuple[int, int] | dict[str, Any]:
 
 
 def _replace_candidate(
-    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, authority: Any = None,
 ) -> tuple[Path, str, str] | dict[str, Any]:
-    target = _existing_text_target(workspace_root, path)
+    target = _existing_text_target(workspace_root, path, authority=authority)
     if isinstance(target, dict):
         return target
     resolved, before = target
@@ -485,9 +507,11 @@ def _matching_starts(lines: list[str], needle: list[str]) -> list[int]:
     ]
 
 
-def _patch_candidate(workspace_root: str | Path, path: str | Path, patch: str) -> _PatchCandidate | dict[str, Any]:
-    resolved = resolve_writable_workspace_path(workspace_root, path)
-    expected_path = _relative_path(workspace_root, resolved).replace("\\", "/")
+def _patch_candidate(
+    workspace_root: str | Path, path: str | Path, patch: str, *, authority: Any = None
+) -> _PatchCandidate | dict[str, Any]:
+    resolved = resolve_writable_workspace_path(workspace_root, path, authority=authority)
+    expected_path = _relative_path(workspace_root, resolved, authority=authority).replace("\\", "/")
     parsed = _parse_unified_patch(patch, expected_path)
     if isinstance(parsed, dict):
         return parsed
@@ -556,12 +580,14 @@ def patch_target_paths(patch: str) -> list[str]:
 
 
 def _patch_candidates(
-    workspace_root: str | Path, path: str | Path | None, patch: str
+    workspace_root: str | Path, path: str | Path | None, patch: str, *, authority: Any = None
 ) -> list[_PatchCandidate] | dict[str, Any]:
     expected: str | None = None
     if path:
         expected = _relative_path(
-            workspace_root, resolve_writable_workspace_path(workspace_root, path)
+            workspace_root,
+            resolve_writable_workspace_path(workspace_root, path, authority=authority),
+            authority=authority,
         ).replace("\\", "/")
     sections = _split_unified_patch(patch)
     if isinstance(sections, dict):
@@ -575,7 +601,7 @@ def _patch_candidates(
         target = new_path if old_path == "/dev/null" else old_path
         if index == 0 and expected is not None and target != expected:
             return _failure("patch_path_mismatch", old_path=old_path, new_path=new_path)
-        candidate = _patch_candidate(workspace_root, target, section)
+        candidate = _patch_candidate(workspace_root, target, section, authority=authority)
         if isinstance(candidate, dict):
             candidate.setdefault("error", {})["path"] = target
             return candidate
@@ -587,7 +613,9 @@ def _patch_candidates(
 
 
 def _proposal_from_candidate(
-    workspace_root: str | Path, candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any]
+    workspace_root: str | Path,
+    candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any],
+    *, authority: Any = None,
 ) -> dict[str, Any]:
     if isinstance(candidate, dict):
         return candidate
@@ -599,7 +627,7 @@ def _proposal_from_candidate(
         operation = "update"
     return {
         "status": "proposal",
-        "path": _relative_path(workspace_root, resolved),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "before_snapshot": before,
         "proposed_text": proposed_text,
         "operation": operation,
@@ -608,22 +636,25 @@ def _proposal_from_candidate(
 
 
 def proposed_edit_snapshot(
-    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, authority: Any = None,
 ) -> dict[str, Any]:
     return _proposal_from_candidate(
-        workspace_root, _replace_candidate(workspace_root, path, old_text, new_text)
+        workspace_root,
+        _replace_candidate(workspace_root, path, old_text, new_text, authority=authority),
+        authority=authority,
     )
 
 
 def proposed_patch_snapshot(
-    workspace_root: str | Path, path: str | Path | None, patch: str
+    workspace_root: str | Path, path: str | Path | None, patch: str, *, authority: Any = None
 ) -> dict[str, Any]:
-    candidates = _patch_candidates(workspace_root, path, patch)
+    candidates = _patch_candidates(workspace_root, path, patch, authority=authority)
     if isinstance(candidates, dict):
         return candidates
     changes = [
         {
-            "path": _relative_path(workspace_root, item.path),
+            "path": _relative_path(workspace_root, item.path, authority=authority),
             "before_snapshot": item.before,
             "proposed_text": item.proposed_text,
             "operation": item.operation,
@@ -641,7 +672,9 @@ def proposed_patch_snapshot(
 
 
 def _write_candidate(
-    workspace_root: str | Path, candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any]
+    workspace_root: str | Path,
+    candidate: tuple[Path, str, str] | _PatchCandidate | dict[str, Any],
+    *, authority: Any = None,
 ) -> dict[str, Any]:
     if isinstance(candidate, dict):
         return candidate
@@ -659,37 +692,41 @@ def _write_candidate(
         size_bytes = resolved.stat().st_size
     return {
         "status": "success",
-        "path": _relative_path(workspace_root, resolved),
+        "path": _relative_path(workspace_root, resolved, authority=authority),
         "size_bytes": size_bytes,
         "operation": operation,
     }
 
 
 def replace_text_content(
-    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, authority: Any = None,
 ) -> dict[str, Any]:
     return _write_candidate(
-        workspace_root, _replace_candidate(workspace_root, path, old_text, new_text)
+        workspace_root,
+        _replace_candidate(workspace_root, path, old_text, new_text, authority=authority),
+        authority=authority,
     )
 
 
 def edit_file_content(
-    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str
+    workspace_root: str | Path, path: str | Path, old_text: str, new_text: str,
+    *, authority: Any = None,
 ) -> dict[str, Any]:
-    return replace_text_content(workspace_root, path, old_text, new_text)
+    return replace_text_content(workspace_root, path, old_text, new_text, authority=authority)
 
 
 def apply_patch_content(
-    workspace_root: str | Path, path: str | Path | None, patch: str
+    workspace_root: str | Path, path: str | Path | None, patch: str, *, authority: Any = None
 ) -> dict[str, Any]:
     """Apply every file section as one transaction, rolling back on any write failure."""
-    candidates = _patch_candidates(workspace_root, path, patch)
+    candidates = _patch_candidates(workspace_root, path, patch, authority=authority)
     if isinstance(candidates, dict):
         return candidates
     completed: list[_PatchCandidate] = []
     try:
         for candidate in candidates:
-            result = _write_candidate(workspace_root, candidate)
+            result = _write_candidate(workspace_root, candidate, authority=authority)
             if result["status"] != "success":
                 raise OSError(str(result.get("error", {})))
             completed.append(candidate)

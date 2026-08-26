@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.storage.internal_paths import internal_io_path
@@ -10,6 +10,7 @@ from raiker.tools.filesystem import (
     replace_text_content,
     resolve_writable_workspace_path,
 )
+from raiker.tools.path_authority import PathAuthority
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.models import Principal
@@ -19,8 +20,12 @@ if TYPE_CHECKING:
 class FileWriteExecutor:
     capability = "file_write_execution"
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, *, authority: Any = None) -> None:
         self._workspace_root = Path(workspace_root).resolve()
+        # The roots this turn's project may write to. Omitted -- which is every
+        # caller outside a project turn -- the resolver builds a workspace-only
+        # authority, so confinement is exactly what it was.
+        self._authority = authority
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         path_value = action.arguments.get("path")
@@ -38,6 +43,7 @@ class FileWriteExecutor:
                     path,
                     str(action.arguments.get("old_text", "")),
                     str(action.arguments.get("new_text", "")),
+                    authority=self._authority,
                 )
                 if result["status"] != "success":
                     error = result["error"]
@@ -53,11 +59,19 @@ class FileWriteExecutor:
                     artifacts={"path": result["path"], "size_bytes": result["size_bytes"]},
                 )
             text = str(action.arguments.get("text", ""))
-            resolved = resolve_writable_workspace_path(self._workspace_root, path)
+            resolved = resolve_writable_workspace_path(
+                self._workspace_root, path, authority=self._authority
+            )
             io_resolved = internal_io_path(resolved)
             io_resolved.parent.mkdir(parents=True, exist_ok=True)
             io_resolved.write_text(text, encoding="utf-8")
-            rel = str(resolved.relative_to(self._workspace_root))
+            # `relative_to(self._workspace_root)` raises for a path in an
+            # attached root, which would turn a successful write into a crash
+            # while it reported itself. Ask the authority what the file is
+            # called instead; for a workspace file that is the same string.
+            rel = (
+                self._authority or PathAuthority(self._workspace_root)
+            ).resolve_read(resolved).display
             return ExecutionResult(
                 ok=True, capability=self.capability, action_id=action.action_id,
                 summary=f"Wrote {io_resolved.stat().st_size} bytes to {rel}.",
@@ -74,15 +88,17 @@ class FileWriteExecutor:
 class PatchApplyExecutor:
     capability = "patch_apply_execution"
 
-    def __init__(self, workspace_root: str | Path) -> None:
+    def __init__(self, workspace_root: str | Path, *, authority: Any = None) -> None:
         self._workspace_root = Path(workspace_root).resolve()
+        self._authority = authority
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         path_value = action.arguments.get("path")
         path = str(path_value) if path_value else None
         try:
             result = apply_patch_content(
-                self._workspace_root, path, str(action.arguments.get("patch", ""))
+                self._workspace_root, path, str(action.arguments.get("patch", "")),
+                authority=self._authority,
             )
             if result["status"] != "success":
                 error = result["error"]

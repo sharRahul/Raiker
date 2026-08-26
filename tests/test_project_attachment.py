@@ -201,6 +201,36 @@ class TestDeletion:
         assert (external / "keep.txt").read_text(encoding="utf-8") == "keep"
         assert external.is_dir()
 
+    def test_deleting_an_indexed_attached_project_succeeds_and_keeps_the_files(
+        self, workspace: Path, tmp_path: Path, service: DashboardService
+    ) -> None:
+        # A project with catalogue rows is the ordinary case once a folder has
+        # been indexed, and `managed_files.project_id` references `projects`.
+        # Deleting the project has to clear the catalogue first or the whole
+        # delete fails on a foreign key -- which is a project the owner cannot
+        # remove at all.
+        from raiker.knowledge.reconcile import reconcile_attached_root
+
+        external = tmp_path / "repo"
+        external.mkdir()
+        (external / "keep.md").write_text("the alpha runbook", encoding="utf-8")
+        created = service.create_project("Alpha", OWNER)
+        service.attach_project_folder(created.data["project_id"], str(external), OWNER)
+        project_id = created.data["project_id"]
+        report = reconcile_attached_root(
+            workspace, service.store, service.store.load_project(project_id), OWNER
+        )
+        assert report.indexed == 1
+
+        result = service.delete_project(project_id, OWNER, confirm=True)
+
+        assert result.ok, result.reason_code
+        assert (external / "keep.md").read_text(encoding="utf-8") == "the alpha runbook"
+        assert service.store.list_managed_files(OWNER, scope_kind="project", project_id=project_id) == []
+        assert (
+            service.store.search_managed_file_chunks("runbook", owner_principal_id=OWNER) == []
+        )
+
     def test_deleting_a_managed_project_still_removes_its_root(
         self, workspace: Path, service: DashboardService
     ) -> None:

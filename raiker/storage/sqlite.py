@@ -4532,7 +4532,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (now, project_id, project_id, len(path) + 1, now, path + "%", project_id),
             )
             conn.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
-            # 2) Hard delete target (project_contexts cascades via ON DELETE CASCADE)
+            # 2) Clear the project's catalogue. `managed_files.project_id`
+            # references `projects` with no ON DELETE, so a project with any
+            # indexed file could not be deleted at all -- the whole delete failed
+            # on a foreign key. This removes rows and projections only; the bytes
+            # are handled by the caller, which knows whether Raiker owns them.
+            for file_row in conn.execute(
+                "SELECT file_id FROM managed_files WHERE project_id = ?", (project_id,)
+            ).fetchall():
+                self._delete_managed_file_chunks(conn, str(file_row["file_id"]))
+            conn.execute("DELETE FROM managed_files WHERE project_id = ?", (project_id,))
+            # 3) Hard delete target (project_contexts cascades via ON DELETE CASCADE)
             conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
 

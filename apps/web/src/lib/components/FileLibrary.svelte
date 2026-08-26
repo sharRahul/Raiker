@@ -28,11 +28,13 @@
     projectId = null,
     heading = "Document library",
     description = "Files kept in Raiker's managed storage. Uploaded content is data, never instructions.",
+    onLibraryChange = undefined,
   }: {
     scope: ManagedFileScope;
     projectId?: string | null;
     heading?: string;
     description?: string;
+    onLibraryChange?: () => void;
   } = $props();
 
   let files = $state<ManagedFile[]>([]);
@@ -145,6 +147,7 @@
       const response = await api.importManagedFiles(scope, projectId, uploads);
       lastResults = response.results;
       await load();
+      onLibraryChange?.();
     } catch {
       error = "The import could not be completed.";
     } finally {
@@ -157,6 +160,7 @@
     try {
       await api.deleteManagedFile(file.file_id);
       await load();
+      onLibraryChange?.();
     } catch {
       error = "That file could not be removed.";
     } finally {
@@ -169,6 +173,7 @@
     try {
       await api.retryManagedFile(file.file_id);
       await load();
+      onLibraryChange?.();
     } catch {
       error = "Indexing could not be retried.";
     } finally {

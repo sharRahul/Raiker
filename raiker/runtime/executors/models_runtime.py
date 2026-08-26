@@ -46,34 +46,53 @@ class _ModelRuntimeExecutorBase:
 
     def _fail(self, action: GovernedAction, reason: str, summary: str) -> ExecutionResult:
         return ExecutionResult(
-            ok=False, capability=self.capability, action_id=action.action_id,
-            reason_code=reason, summary=summary,
+            ok=False,
+            capability=self.capability,
+            action_id=action.action_id,
+            reason_code=reason,
+            summary=summary,
         )
 
     def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
         operation = str(action.arguments.get("operation", "")).strip()
         if operation != "connectivity_check":
-            return self._fail(action, f"unknown_operation:{operation or 'missing'}",
-                              "Model runtime denied: only 'connectivity_check' is supported.")
+            return self._fail(
+                action,
+                f"unknown_operation:{operation or 'missing'}",
+                "Model runtime denied: only 'connectivity_check' is supported.",
+            )
         endpoint = str(action.arguments.get("endpoint", "")).strip()
         if not endpoint:
-            return self._fail(action, "missing_argument:endpoint",
-                              "Model runtime denied: endpoint required.")
+            return self._fail(
+                action, "missing_argument:endpoint", "Model runtime denied: endpoint required."
+            )
         kind = classify_endpoint(endpoint)
         if kind != self.expected_kind:
-            return self._fail(action, f"endpoint_kind_not_allowed:{kind}",
-                              f"Model runtime denied: endpoint is not {self.expected_kind}.")
+            return self._fail(
+                action,
+                f"endpoint_kind_not_allowed:{kind}",
+                f"Model runtime denied: endpoint is not {self.expected_kind}.",
+            )
         if self.require_https and urlparse(endpoint).scheme != "https":
-            return self._fail(action, "hosted_https_required",
-                              "Model runtime denied: hosted endpoints require HTTPS.")
+            return self._fail(
+                action,
+                "hosted_https_required",
+                "Model runtime denied: hosted endpoints require HTTPS.",
+            )
         allowlist = model_egress_allowlist()
         if not allowlist:
-            return self._fail(action, "model_egress_denied:no_allowlist",
-                              "Model runtime blocked: owner egress allowlist is empty (fail closed).")
+            return self._fail(
+                action,
+                "model_egress_denied:no_allowlist",
+                "Model runtime blocked: owner egress allowlist is empty (fail closed).",
+            )
         host = urlparse(endpoint).netloc
         if not any(fnmatch.fnmatch(host, pattern) for pattern in allowlist):
-            return self._fail(action, f"model_egress_denied:{host}",
-                              "Model runtime blocked: endpoint host is not on the owner egress allowlist.")
+            return self._fail(
+                action,
+                f"model_egress_denied:{host}",
+                "Model runtime blocked: endpoint host is not on the owner egress allowlist.",
+            )
         models_path = str(action.arguments.get("models_path", "/v1/models"))
         url = endpoint.rstrip("/") + "/" + models_path.lstrip("/")
         try:
@@ -81,7 +100,9 @@ class _ModelRuntimeExecutorBase:
         except SandboxError as exc:
             return self._fail(action, str(exc), "Model runtime probe failed (egress/transport).")
         return ExecutionResult(
-            ok=True, capability=self.capability, action_id=action.action_id,
+            ok=True,
+            capability=self.capability,
+            action_id=action.action_id,
             summary="Model endpoint reachable (metadata-only probe).",
             # Metadata only — never the endpoint URL, host, response body, or credentials.
             artifacts={
@@ -162,9 +183,7 @@ class ModelProviderExecutor:
             memory_id = action.arguments.get("memory_id")
             if not isinstance(memory_id, str) or not memory_id:
                 return self._fail(action.action_id, "missing_argument:memory_id")
-            memory = self._store.get_active_approved_memory(
-                memory_id, owner_principal_id=owner
-            )
+            memory = self._store.get_active_approved_memory(memory_id, owner_principal_id=owner)
             if memory is None:
                 return self._fail(action.action_id, "memory_not_active_or_not_found")
             if str(memory["sensitivity"]) in {"secret_like", "credential_like"}:
@@ -189,11 +208,15 @@ class ModelProviderExecutor:
             return self._fail(action.action_id, "missing_argument:provider")
         if not isinstance(model, str) or not model.strip():
             return self._fail(action.action_id, "missing_argument:model")
+        local_only = self._local_only_profile(provider, model)
         if not isinstance(scope, str) or not isinstance(sensitivity, str):
             return self._fail(action.action_id, "invalid_argument:scope_or_sensitivity")
 
-        # Owner egress allowlist must be configured (empty = fail closed).
-        if not model_egress_allowlist():
+        # A loopback-only profile performs no off-machine egress. Hosted and
+        # private-network profiles still fail closed without an allowlist; a
+        # local llama.cpp/Ollama embedding must not require a fictional remote
+        # host merely to pass this executor's outer check.
+        if not local_only and not model_egress_allowlist():
             return self._fail(action.action_id, "model_egress_denied:no_allowlist")
 
         embedder = self._embedder or self._default_embedder(principal.principal_id)
@@ -205,8 +228,10 @@ class ModelProviderExecutor:
             return self._fail(action.action_id, self._provider_reason(exc))
 
         vector = getattr(response, "vector", None)
-        if not isinstance(vector, list) or not vector or not all(
-            isinstance(v, (int, float)) for v in vector
+        if (
+            not isinstance(vector, list)
+            or not vector
+            or not all(isinstance(v, (int, float)) for v in vector)
         ):
             return self._fail(action.action_id, "invalid_embedding_response")
 
@@ -233,27 +258,33 @@ class ModelProviderExecutor:
                     "embedding_model": embedding_model,
                     "dimensions": len(vector),
                     "content_hash": content_hash,
-                    "provider_backed": True,
+                    "provider_backed": not local_only,
+                    "local_only": local_only,
                     "content_redacted": True,
                 },
                 transient={"embedding": [float(value) for value in vector]},
             )
         vector_id = new_id("vec_")
-        self._store.insert_vector_record(VectorRecord(
-            vector_id=vector_id,
-            content_hash=content_hash,
-            content_preview=text[:_PREVIEW_LEN],
-            embedding_model=embedding_model,
-            dimensions=len(vector),
-            scope=scope,
-            sensitivity=sensitivity,
-            created_at=utc_now(),
-            embedding=_dump_vector(vector),
-            owner_principal_id=owner or "",
-        ))
+        self._store.insert_vector_record(
+            VectorRecord(
+                vector_id=vector_id,
+                content_hash=content_hash,
+                content_preview=text[:_PREVIEW_LEN],
+                embedding_model=embedding_model,
+                dimensions=len(vector),
+                scope=scope,
+                sensitivity=sensitivity,
+                created_at=utc_now(),
+                embedding=_dump_vector(vector),
+                owner_principal_id=owner or "",
+            )
+        )
         if memory_id is not None:
             self._store.link_memory_projection(
-                memory_id, "vector", vector_id, embedding_model,
+                memory_id,
+                "vector",
+                vector_id,
+                embedding_model,
                 owner_principal_id=owner,
             )
         return ExecutionResult(
@@ -266,7 +297,8 @@ class ModelProviderExecutor:
                 "embedding_model": embedding_model,
                 "dimensions": len(vector),
                 "content_hash": content_hash,
-                "provider_backed": True,
+                "provider_backed": not local_only,
+                "local_only": local_only,
                 "content_redacted": True,
                 **({"memory_id": memory_id} if memory_id is not None else {}),
             },
@@ -301,28 +333,41 @@ class ModelProviderExecutor:
             return self._fail(action.action_id, "missing_argument:provider")
         if not isinstance(model, str) or not model.strip():
             return self._fail(action.action_id, "missing_argument:model")
+        local_only = self._local_only_profile(provider, model)
         try:
             limit = int(action.arguments.get("limit", MAX_MEMORY_INDEX_BATCH))
         except (TypeError, ValueError):
             return self._fail(action.action_id, "invalid_argument:limit")
         limit = max(1, min(limit, MAX_MEMORY_INDEX_BATCH))
-        if not model_egress_allowlist():
+        if not local_only and not model_egress_allowlist():
             return self._fail(action.action_id, "model_egress_denied:no_allowlist")
 
         owner = self._owner_scope(principal)
+        if owner is None:
+            return self._fail(action.action_id, "owner_scope_not_resolved")
+        embedding_model = f"{provider}:{model}"
         pending = [
             str(row["memory_id"])
             for row in self._store.list_memories_missing_embedding(
-                f"{provider}:{model}", owner_principal_id=owner, limit=limit
+                embedding_model, owner_principal_id=owner, limit=limit
             )
         ]
-        if not pending:
+        pending_chunks = (
+            self._store.list_managed_file_chunks_missing_embedding(
+                embedding_model,
+                owner_principal_id=owner,
+                limit=max(0, limit - len(pending)),
+            )
+            if owner and len(pending) < limit
+            else []
+        )
+        if not pending and not pending_chunks:
             return self._fail(action.action_id, "no_memories_to_index")
 
         embedder = self._embedder or self._default_embedder(principal.principal_id)
-        embedding_model = f"{provider}:{model}"
         provider_models: set[str] = set()
         indexed: list[str] = []
+        indexed_chunks: list[str] = []
         failures: list[dict[str, str]] = []
         for memory_id in pending:
             memory = self._store.get_active_approved_memory(memory_id, owner_principal_id=owner)
@@ -375,13 +420,74 @@ class ModelProviderExecutor:
             answered = str(getattr(response, "model", "") or "")
             if answered:
                 provider_models.add(answered)
+        from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+
+        for chunk in pending_chunks:
+            chunk_id = str(chunk["chunk_id"])
+            text = str(chunk["text"])
+            sensitivity = classify_memory_sensitivity(text)
+            if sensitivity in {
+                MemorySensitivity.SECRET_LIKE,
+                MemorySensitivity.CREDENTIAL_LIKE,
+            }:
+                failures.append(
+                    {"chunk_id": chunk_id, "reason_code": "chunk_sensitivity_not_projectable"}
+                )
+                continue
+            if not text.strip() or len(text) > _MAX_EMBED_TEXT_LEN:
+                failures.append({"chunk_id": chunk_id, "reason_code": "text_not_embeddable"})
+                continue
+            try:
+                response = embedder(provider, model, text)
+            except SandboxError as exc:
+                return self._batch_stop(
+                    action.action_id,
+                    str(exc),
+                    [*indexed, *indexed_chunks],
+                    failures,
+                    embedding_model,
+                )
+            except Exception as exc:  # noqa: BLE001
+                return self._batch_stop(
+                    action.action_id,
+                    self._provider_reason(exc),
+                    [*indexed, *indexed_chunks],
+                    failures,
+                    embedding_model,
+                )
+            vector = getattr(response, "vector", None)
+            if (
+                not isinstance(vector, list)
+                or not vector
+                or not all(isinstance(value, (int, float)) for value in vector)
+            ):
+                return self._batch_stop(
+                    action.action_id,
+                    "invalid_embedding_response",
+                    [*indexed, *indexed_chunks],
+                    failures,
+                    embedding_model,
+                )
+            if not self._store_file_chunk_vector(
+                chunk=chunk,
+                embedding_model=embedding_model,
+                response=response,
+                owner=owner,
+            ):
+                failures.append({"chunk_id": chunk_id, "reason_code": "chunk_revision_changed"})
+                continue
+            indexed_chunks.append(chunk_id)
+            answered = str(getattr(response, "model", "") or "")
+            if answered:
+                provider_models.add(answered)
         return ExecutionResult(
             ok=True,
             capability=self.capability,
             action_id=action.action_id,
             summary=(
-                f"Embedded {len(indexed)} approved memories into {embedding_model}; "
-                "memory text and provider credentials were not emitted."
+                f"Embedded {len(indexed)} approved memories and {len(indexed_chunks)} "
+                f"managed-file chunks into {embedding_model}; source text and provider "
+                "credentials were not emitted."
             ),
             artifacts={
                 "operation": "index_memories",
@@ -390,9 +496,11 @@ class ModelProviderExecutor:
                 # the space's identity; see the note on the method above.
                 "provider_models": sorted(provider_models),
                 "indexed_count": len(indexed),
+                "indexed_file_chunk_count": len(indexed_chunks),
                 "skipped_count": len(failures),
                 "skipped": failures,
-                "provider_backed": True,
+                "provider_backed": not local_only,
+                "local_only": local_only,
                 "content_redacted": True,
             },
         )
@@ -462,6 +570,51 @@ class ModelProviderExecutor:
             memory_id, "vector", vector_id, embedding_model, owner_principal_id=owner
         )
 
+    def _store_file_chunk_vector(
+        self,
+        *,
+        chunk: dict[str, object],
+        embedding_model: str,
+        response: EmbeddingResponse,
+        owner: str,
+    ) -> bool:
+        from raiker.contracts.ids import new_id, utc_now
+        from raiker.contracts.models import VectorRecord
+        from raiker.vector import VectorIndex
+
+        text = str(chunk["text"])
+        vector = [float(value) for value in list(getattr(response, "vector", []) or [])]
+        vector_id = new_id("vec_")
+        scope = (
+            "knowledge:memory"
+            if str(chunk["scope_kind"]) == "memory"
+            else f"knowledge:project:{chunk.get('project_id') or ''}"
+        )
+        self._store.insert_vector_record(
+            VectorRecord(
+                vector_id=vector_id,
+                content_hash=VectorIndex.compute_content_hash(text),
+                content_preview=text[:_PREVIEW_LEN],
+                embedding_model=embedding_model,
+                dimensions=len(vector),
+                scope=scope,
+                sensitivity="normal",
+                created_at=utc_now(),
+                embedding=_dump_vector(vector),
+                owner_principal_id=owner,
+            )
+        )
+        linked = self._store.link_managed_file_chunk_vector(
+            str(chunk["chunk_id"]),
+            vector_id,
+            embedding_model,
+            str(chunk["content_hash"]),
+            owner_principal_id=owner,
+        )
+        if not linked:
+            self._store.delete_vector_record(vector_id, owner_principal_id=owner)
+        return linked
+
     def _default_embedder(self, principal_id: str) -> Embedder:
         """The real provider call, usable from wherever the executor is invoked.
 
@@ -472,6 +625,7 @@ class ModelProviderExecutor:
         provider fault and is not one. :mod:`raiker.runtime.async_bridge`
         holds the one answer, so it is reused rather than solved twice.
         """
+
         def embed(provider: str, model: str, text: str) -> EmbeddingResponse:
             from raiker.models.connections import get_model_connection
             from raiker.models.policy_state import provider_runtime_policy_from_gates
@@ -500,6 +654,22 @@ class ModelProviderExecutor:
             return response
 
         return embed
+
+    @staticmethod
+    def _local_only_profile(provider: str, model: str) -> bool:
+        """Resolve locality from the shipped profile, never from its label.
+
+        An injected test embedder still follows the same profile contract. An
+        unknown pair returns ``False`` so it can never acquire the local
+        allowlist exemption by choosing a local-looking name.
+        """
+        from raiker.models.registry import ModelProfileRegistry, RegistryError
+
+        try:
+            profile = ModelProfileRegistry.load().resolve(provider, model)
+        except (RegistryError, OSError, ValueError):
+            return False
+        return bool(profile.local_only) and not bool(profile.requires_network)
 
     def _owner_scope(self, principal: Principal) -> str | None:
         """The durable owner id used by both memory rows and their vectors."""
@@ -586,7 +756,9 @@ class AdvisorModelRuntimeExecutor:
             return self._fail(action.action_id, "missing_argument:question")
 
         service = AdvisorService(
-            self._workspace_root, self._store, consult_fn=self._consult_fn,
+            self._workspace_root,
+            self._store,
+            consult_fn=self._consult_fn,
             principal_id=principal.principal_id if principal is not None else None,
         )
         outcome = service.consult(question, enforce_modes=False)

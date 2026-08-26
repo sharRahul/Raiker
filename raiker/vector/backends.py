@@ -24,6 +24,7 @@ a choice the owner already made; the call itself still goes through
 ``model_provider_runtime``, which re-checks the egress allowlist, the provider
 gate state and credential presence on every use.
 """
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -85,7 +86,9 @@ class EmbeddingBackend:
         than a silent downgrade to a different space.
         """
         if self.kind != "lexical_fallback":
-            raise EmbeddingBackendUnavailable(f"embedding_backend_requires_executor:{self.backend_id}")
+            raise EmbeddingBackendUnavailable(
+                f"embedding_backend_requires_executor:{self.backend_id}"
+            )
         return embed_text(text, self.dimensions)
 
     def describe(self) -> dict[str, Any]:
@@ -189,7 +192,13 @@ def list_embedding_spaces(
         dimensions = int(row["dimensions"])
         if model_label == LOCAL_EMBEDDING_MODEL:
             spaces.append(LEXICAL_FALLBACK_BACKEND)
-        elif model_label.startswith("local/") or model_label.startswith("llama.cpp/"):
+        elif (
+            model_label.startswith("local/")
+            or model_label.startswith("local:")
+            or model_label.startswith("llama.cpp/")
+            or model_label.startswith("llama.cpp:")
+            or model_label.startswith("ollama:")
+        ):
             spaces.append(_local_model_backend(model_label, dimensions))
         else:
             spaces.append(_provider_backend(model_label, dimensions))
@@ -237,14 +246,16 @@ def embedding_capable_profiles() -> list[dict[str, Any]]:
         if key in seen:
             continue
         seen.add(key)
-        listed.append({
-            "profile_id": profile.profile_id,
-            "provider": profile.provider,
-            "model": embedding_model,
-            # The label the vectors will carry, and therefore the space the
-            # owner will be able to select once the run finishes.
-            "space": f"{profile.provider}:{embedding_model}",
-            "local_only": bool(profile.local_only),
-            "requires_network": bool(profile.requires_network),
-        })
+        listed.append(
+            {
+                "profile_id": profile.profile_id,
+                "provider": profile.provider,
+                "model": embedding_model,
+                # The label the vectors will carry, and therefore the space the
+                # owner will be able to select once the run finishes.
+                "space": f"{profile.provider}:{embedding_model}",
+                "local_only": bool(profile.local_only),
+                "requires_network": bool(profile.requires_network),
+            }
+        )
     return sorted(listed, key=lambda item: (not item["local_only"], item["space"]))

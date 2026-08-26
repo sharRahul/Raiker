@@ -19,10 +19,13 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.context.gatherer import ContextGatherer, RetrievalScope
 from raiker.contracts.ids import new_id, utc_now
 from raiker.control.dashboard import DashboardService
 from raiker.control.service import RuntimeControlService
 from raiker.events.writer import EventLogWriter
+from raiker.knowledge.files import ManagedFileScope, ManagedFileService
+from raiker.knowledge.indexing import ManagedFileIndexer
 from raiker.memory.query_embedding import GovernedQueryEmbedder
 from raiker.memory.retrieval import retrieve_hybrid_memory
 from raiker.memory.store import MemoryGovernance, write_memory
@@ -45,6 +48,9 @@ _ALLOWLIST_ENV = "RAIKER_MODEL_EGRESS_ALLOWLIST"
 _PROVIDER = "openai"
 _MODEL = "text-embedding-3-small"
 _SPACE = f"{_PROVIDER}:{_MODEL}"
+_LOCAL_PROVIDER = "llama.cpp"
+_LOCAL_MODEL = "local-gguf"
+_LOCAL_SPACE = f"{_LOCAL_PROVIDER}:{_LOCAL_MODEL}"
 
 
 def _ws(tmp_path: Path) -> Path:
@@ -163,6 +169,34 @@ def test_index_memories_creates_a_selectable_semantic_space(
     assert backend.model_label == _SPACE
 
 
+def test_local_index_needs_no_remote_egress_allowlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A loopback embedding is governed, but it is not remote egress."""
+    monkeypatch.delenv(_ALLOWLIST_ENV, raising=False)
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    _memory(ws, store, "The backup target is the encrypted NAS.")
+    calls: list[str] = []
+    authority, principal = _authority(ws, _counting_embedder(calls))
+    action = _index_action(
+        principal.principal_id,
+        provider=_LOCAL_PROVIDER,
+        model=_LOCAL_MODEL,
+    )
+
+    result = authority.route_action(action, principal)
+
+    assert result.decision == "allow", result.error
+    assert result.artifacts["embedding_model"] == _LOCAL_SPACE
+    assert result.artifacts["local_only"] is True
+    assert result.artifacts["provider_backed"] is False
+    backend = resolve_embedding_backend(store, owner_principal_id="principal_owner")
+    assert backend.kind == "local_model"
+    assert backend.model_label == _LOCAL_SPACE
+
+
 def test_a_second_run_does_not_re_embed_what_the_first_one_did(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -180,7 +214,9 @@ def test_a_second_run_does_not_re_embed_what_the_first_one_did(
 
     calls: list[str] = []
     authority, principal = _authority(ws, _counting_embedder(calls))
-    assert authority.route_action(_index_action(principal.principal_id), principal).decision == "allow"
+    assert (
+        authority.route_action(_index_action(principal.principal_id), principal).decision == "allow"
+    )
     assert len(calls) == 1
 
     _memory(ws, store, "Deploys happen on Thursdays.")
@@ -211,7 +247,9 @@ def test_query_is_embedded_once_and_a_paraphrase_reaches_the_vector_leg(
         return EmbeddingResponse(vector=vector, model=_MODEL, usage=None)
 
     authority, principal = _authority(ws, semantic)
-    assert authority.route_action(_index_action(principal.principal_id), principal).decision == "allow"
+    assert (
+        authority.route_action(_index_action(principal.principal_id), principal).decision == "allow"
+    )
     mode = RuntimeControlService(ws).set_capability_decision_mode(
         _CAP, "always_allow", principal.principal_id, "semantic recall test"
     )
@@ -245,6 +283,80 @@ def test_query_is_embedded_once_and_a_paraphrase_reaches_the_vector_leg(
     assert len(store.list_vector_records()) == 1
 
 
+def test_managed_file_passage_is_semantic_and_revision_safe(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """BUG-240: the same governed query reaches owned document projections."""
+    monkeypatch.setenv(_ALLOWLIST_ENV, "api.openai.com")
+    ws = _ws(tmp_path)
+    _enable(ws)
+    store = SQLiteStore(ws)
+    files = ManagedFileService(ws, store)
+    indexer = ManagedFileIndexer(ws, store)
+    record = files.import_file(
+        ManagedFileScope("memory"),
+        "runbooks/recovery.md",
+        b"The encrypted NAS is the disaster recovery destination.",
+        "text/markdown",
+        "principal_owner",
+    )
+    indexer.index(record.file_id, "principal_owner")
+    calls: list[str] = []
+
+    def semantic(provider: str, model: str, text: str) -> EmbeddingResponse:
+        calls.append(text)
+        vector = [1.0, 0.0, 0.0] if "NAS" in text or "backups" in text else [0.0, 1.0, 0.0]
+        return EmbeddingResponse(vector=vector, model=_MODEL, usage=None)
+
+    authority, principal = _authority(ws, semantic)
+    built = authority.route_action(_index_action(principal.principal_id), principal)
+    assert built.decision == "allow", built.error
+    assert built.artifacts["indexed_count"] == 0
+    assert built.artifacts["indexed_file_chunk_count"] == 1
+    assert (
+        RuntimeControlService(ws)
+        .set_capability_decision_mode(
+            _CAP, "always_allow", principal.principal_id, "semantic file recall test"
+        )
+        .ok
+    )
+    embedder = GovernedQueryEmbedder(store, principal.principal_id, authority=authority)
+    backend = resolve_embedding_backend(store, owner_principal_id=principal.principal_id)
+    assert backend.model_label == _SPACE
+    query_vector = embedder(backend, "Where should backups be stored?")
+    assert query_vector == [1.0, 0.0, 0.0]
+    assert store.search_managed_file_chunk_vectors(
+        query_vector,
+        backend.model_label,
+        owner_principal_id=principal.principal_id,
+    )
+
+    hits = ContextGatherer._recalled_files(
+        store,
+        "Where should backups be stored?",
+        principal.principal_id,
+        RetrievalScope("chat", None),
+        query_embedder=embedder,
+    )
+
+    assert hits and hits[0]["file_id"] == record.file_id
+    assert hits[0]["sources"] == ["vector"]
+    assert calls.count("Where should backups be stored?") == 1
+    vector_count = len(store.list_vector_records(owner_principal_id=principal.principal_id))
+    assert vector_count == 1
+
+    indexer.retire(record.file_id, principal.principal_id)
+    assert (
+        store.search_managed_file_chunk_vectors(
+            [1.0, 0.0, 0.0],
+            _SPACE,
+            owner_principal_id=principal.principal_id,
+        )
+        == []
+    )
+    assert store.list_vector_records(owner_principal_id=principal.principal_id) == []
+
+
 def test_ask_mode_drops_semantic_leg_without_parking_an_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -275,9 +387,13 @@ def test_query_embedding_audit_excludes_query_and_vector(
     _enable(ws)
     store = SQLiteStore(ws)
     authority, principal = _authority(ws, _counting_embedder([]))
-    assert RuntimeControlService(ws).set_capability_decision_mode(
-        _CAP, "always_allow", principal.principal_id, "semantic recall test"
-    ).ok
+    assert (
+        RuntimeControlService(ws)
+        .set_capability_decision_mode(
+            _CAP, "always_allow", principal.principal_id, "semantic recall test"
+        )
+        .ok
+    )
     backend = type(resolve_embedding_backend(store))(
         backend_id="provider", kind="provider", model_label=_SPACE, dimensions=3
     )
@@ -329,9 +445,9 @@ def test_the_space_is_named_for_the_model_the_owner_chose(
     assert second.error == "no_memories_to_index"
     assert len(calls) == 2
     # And the space the owner can then select is the one they asked for.
-    assert resolve_embedding_backend(
-        store, owner_principal_id="principal_owner"
-    ).model_label == _SPACE
+    assert (
+        resolve_embedding_backend(store, owner_principal_id="principal_owner").model_label == _SPACE
+    )
 
 
 def test_nothing_to_index_fails_closed_rather_than_reporting_success(
@@ -433,6 +549,13 @@ def test_settings_report_what_is_waiting_and_what_could_embed_it(tmp_path: Path)
     assert (_PROVIDER, _MODEL) in {
         (item["provider"], item["model"]) for item in settings.embedding_providers
     }
+    offered = next(
+        item
+        for item in settings.embedding_providers
+        if (item["provider"], item["model"]) == (_PROVIDER, _MODEL)
+    )
+    assert offered["unindexed_memories"] == 1
+    assert offered["pending_count"] == 1
 
 
 def test_an_unoffered_model_is_refused_before_any_provider_call(tmp_path: Path) -> None:

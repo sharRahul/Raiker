@@ -132,6 +132,8 @@ from raiker.storage.migrations import (
     MACHINE_IDENTITIES_MIGRATION_ID,
     MACHINE_IDENTITIES_SQL,
     MANAGED_FILE_CHUNK_FTS_MIGRATION_ID,
+    MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID,
+    MANAGED_FILE_CHUNK_VECTORS_SQL,
     MANAGED_FILE_CHUNKS_MIGRATION_ID,
     MANAGED_FILE_CHUNKS_SQL,
     MANAGED_FILES_MIGRATION_ID,
@@ -570,7 +572,10 @@ def resolve_memory_security(
             probe_root = Path(workspace_root or Path.cwd())
             _MEMORY_SECURITY_PROBE = probe_memory_security(probe_root)
             if _MEMORY_SECURITY_PROBE.supported:
-                resolved = (True, "requested_on" if _MEMORY_SECURITY_MODE == "on" else "auto_probe_supported")
+                resolved = (
+                    True,
+                    "requested_on" if _MEMORY_SECURITY_MODE == "on" else "auto_probe_supported",
+                )
             elif _MEMORY_SECURITY_MODE == "on":
                 resolved = (
                     False,
@@ -604,9 +609,7 @@ def memory_security_posture(workspace_root: str | Path | None = None) -> dict[st
         # `off` resolved after that is an intent the build will not honour. The
         # divergence costs performance, never protection — but reporting only the
         # intent would let health say `off` while every connection was `on`.
-        "memory_security_in_force": (
-            "on" if enabled or _MEMORY_SECURITY_EVER_ENABLED else "off"
-        ),
+        "memory_security_in_force": ("on" if enabled or _MEMORY_SECURITY_EVER_ENABLED else "off"),
         # Deliberately not "reason": the store's own reason travels beside this
         # one on the health view, and two keys of the same name would let the
         # posture overwrite the failure — the kind of quiet contradiction this
@@ -1108,7 +1111,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             with contextlib.suppress(sqlite3.OperationalError):
                 connection.execute("ALTER TABLE events_index ADD COLUMN prev_event_sha256 TEXT")
             with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute("ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)")
+                connection.execute(
+                    "ALTER TABLE sessions ADD COLUMN user_id TEXT REFERENCES users(user_id)"
+                )
             self._apply_migration(
                 CAPABILITY_DECISION_MODE_MIGRATION_ID, CAPABILITY_DECISION_MODE_SQL, connection
             )
@@ -1158,9 +1163,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # an organizing label only (like projects) — it grants nothing and
             # changes no gate, policy, or authority. Default 0 (unpinned).
             with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute("ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0")
+                connection.execute(
+                    "ALTER TABLE sessions ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0"
+                )
             with contextlib.suppress(sqlite3.OperationalError):
-                connection.execute("ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)")
+                connection.execute(
+                    "ALTER TABLE projects ADD COLUMN owner_user_id TEXT REFERENCES users(user_id)"
+                )
             # A project's root is now one of two things. `root_kind` says which,
             # and `root_grant_id` names the owner's grant when the root is a
             # folder they already had. Defaulting to 'managed' makes this a
@@ -1209,9 +1218,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     "ALTER TABLE brain_source_grants "
                     "ADD COLUMN write_enabled INTEGER NOT NULL DEFAULT 0"
                 )
-            self._apply_migration(
-                BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection
-            )
+            self._apply_migration(BRAIN_PREFERENCES_MIGRATION_ID, BRAIN_PREFERENCES_SQL, connection)
             self._apply_migration(
                 EXECUTION_ENVIRONMENT_CONTROL_MIGRATION_ID,
                 EXECUTION_ENVIRONMENT_CONTROL_SQL,
@@ -1223,18 +1230,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._backfill_legacy_brain_sources(connection)
             self._backfill_legacy_account_bootstrap_roles(connection)
             self._migrate_legacy_controls_to_original_owner(connection)
-            self._apply_migration(
-                MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection
-            )
-            self._apply_migration(
-                SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection
-            )
-            self._apply_migration(
-                SESSION_ARCHIVE_MIGRATION_ID, SESSION_ARCHIVE_SQL, connection
-            )
-            self._apply_migration(
-                PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection
-            )
+            self._apply_migration(MEMORY_CONTROLS_MIGRATION_ID, MEMORY_CONTROLS_SQL, connection)
+            self._apply_migration(SESSION_TAGS_MIGRATION_ID, SESSION_TAGS_SQL, connection)
+            self._apply_migration(SESSION_ARCHIVE_MIGRATION_ID, SESSION_ARCHIVE_SQL, connection)
+            self._apply_migration(PROJECTS_NESTING_MIGRATION_ID, PROJECTS_NESTING_SQL, connection)
             self._apply_migration(
                 PROJECT_MEMORY_INHERITANCE_MIGRATION_ID,
                 PROJECT_MEMORY_INHERITANCE_SQL,
@@ -1242,11 +1241,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._backfill_self_inclusive_project_paths(connection)
             self._apply_migration(MEMORY_ARCHIVE_MIGRATION_ID, MEMORY_ARCHIVE_SQL, connection)
-            self._apply_migration(EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection)
+            self._apply_migration(
+                EIDETIC_OBSERVATIONS_MIGRATION_ID, EIDETIC_OBSERVATIONS_SQL, connection
+            )
             self._apply_migration(EIDETIC_CAPTURE_MIGRATION_ID, EIDETIC_CAPTURE_SQL, connection)
             self._apply_migration(MEMORY_PURGE_MIGRATION_ID, MEMORY_PURGE_SQL, connection)
             self._apply_migration(GIST_MEMORY_MIGRATION_ID, GIST_MEMORY_SQL, connection)
-            self._apply_migration(MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection)
+            self._apply_migration(
+                MEMORY_PROJECTIONS_MIGRATION_ID, MEMORY_PROJECTIONS_SQL, connection
+            )
             engine = self.text_search_engine(connection)
             self._apply_migration(MEMORY_FTS_MIGRATION_ID, memory_fts_sql(engine), connection)
             self._apply_migration(
@@ -1277,7 +1280,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
             connection.executemany(
                 "UPDATE approved_memory SET content_checksum = ? WHERE memory_id = ?",
-                ((hashlib.sha256(str(row["text"]).encode()).hexdigest(), row["memory_id"]) for row in rows),
+                (
+                    (hashlib.sha256(str(row["text"]).encode()).hexdigest(), row["memory_id"])
+                    for row in rows
+                ),
             )
             self._apply_migration(
                 MEMORY_ENTITY_GRAPH_MIGRATION_ID, MEMORY_ENTITY_GRAPH_SQL, connection
@@ -1305,9 +1311,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MCP_REMOTE_ENDPOINT_MIGRATION_ID, MCP_REMOTE_ENDPOINT_SQL, connection
             )
             self._apply_migration(MCP_MONITORING_MIGRATION_ID, MCP_MONITORING_SQL, connection)
-            self._apply_migration(
-                MCP_CONTAINMENT_MIGRATION_ID, MCP_CONTAINMENT_SQL, connection
-            )
+            self._apply_migration(MCP_CONTAINMENT_MIGRATION_ID, MCP_CONTAINMENT_SQL, connection)
             self._apply_migration(
                 CREDENTIAL_SECURITY_MIGRATION_ID, CREDENTIAL_SECURITY_SQL, connection
             )
@@ -1316,17 +1320,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CHECKPOINT_CAPTURE_MANIFEST_SQL,
                 connection,
             )
-            self._apply_migration(
-                STANDING_GRANTS_MIGRATION_ID, STANDING_GRANTS_SQL, connection
-            )
+            self._apply_migration(STANDING_GRANTS_MIGRATION_ID, STANDING_GRANTS_SQL, connection)
             self._apply_migration(
                 CRITICAL_APPROVAL_LIFECYCLE_MIGRATION_ID,
                 CRITICAL_APPROVAL_LIFECYCLE_SQL,
                 connection,
             )
-            self._apply_migration(
-                SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection
-            )
+            self._apply_migration(SUBAGENT_BUDGETS_MIGRATION_ID, SUBAGENT_BUDGETS_SQL, connection)
             self._apply_migration(CODE_REPOS_MIGRATION_ID, CODE_REPOS_SQL, connection)
             self._apply_migration(CODE_MAP_MIGRATION_ID, CODE_MAP_SQL, connection)
             self._apply_migration(
@@ -1350,9 +1350,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CONVERSATION_COMPACTIONS_SQL,
                 connection,
             )
-            self._apply_migration(
-                SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection
-            )
+            self._apply_migration(SUSPENDED_TURNS_MIGRATION_ID, SUSPENDED_TURNS_SQL, connection)
             self._apply_migration(
                 SUSPENDED_TURN_QUEUE_MIGRATION_ID, SUSPENDED_TURN_QUEUE_SQL, connection
             )
@@ -1370,9 +1368,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             self._apply_migration(SESSION_ORIGIN_MIGRATION_ID, SESSION_ORIGIN_SQL, connection)
-            self._apply_migration(
-                CONFIGURED_MODELS_MIGRATION_ID, CONFIGURED_MODELS_SQL, connection
-            )
+            self._apply_migration(CONFIGURED_MODELS_MIGRATION_ID, CONFIGURED_MODELS_SQL, connection)
             self._apply_migration(
                 TASK_MODEL_CHOICES_MIGRATION_ID, TASK_MODEL_CHOICES_SQL, connection
             )
@@ -1384,9 +1380,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 CLOUD_EXECUTION_COST_LEDGER_SQL,
                 connection,
             )
-            self._apply_migration(
-                TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection
-            )
+            self._apply_migration(TASK_ATTACHMENTS_MIGRATION_ID, TASK_ATTACHMENTS_SQL, connection)
             self._apply_migration(SKILLS_MIGRATION_ID, SKILLS_SQL, connection)
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
@@ -1455,9 +1449,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 COMMAND_AUTHORITY_EVIDENCE_SQL,
                 connection,
             )
-            self._apply_migration(
-                COMMAND_EGRESS_MIGRATION_ID, COMMAND_EGRESS_SQL, connection
-            )
+            self._apply_migration(COMMAND_EGRESS_MIGRATION_ID, COMMAND_EGRESS_SQL, connection)
             self._apply_migration(
                 CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
                 CHECKPOINT_CAPTURE_HEALTH_SQL,
@@ -1479,8 +1471,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 connection,
             )
             self._apply_migration(
-                TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection
+                MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID,
+                MANAGED_FILE_CHUNK_VECTORS_SQL,
+                connection,
             )
+            self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
             self._apply_migration(
                 MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
                 MEMORY_EMBEDDING_BACKEND_SQL,
@@ -1515,7 +1510,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def _migrate_plaintext_database(self) -> None:
         """Convert a legacy stdlib-SQLite file before SQLCipher opens it."""
-        if not self.db_path.exists() or not self.db_path.read_bytes()[:16].startswith(b"SQLite format 3"):
+        if not self.db_path.exists() or not self.db_path.read_bytes()[:16].startswith(
+            b"SQLite format 3"
+        ):
             return
         import sqlite3 as plaintext_sqlite
 
@@ -1578,7 +1575,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             if match is not None:
                 columns = {
                     str(row["name"])
-                    for row in connection.execute(f'PRAGMA table_info("{match["table"]}")').fetchall()
+                    for row in connection.execute(
+                        f'PRAGMA table_info("{match["table"]}")'
+                    ).fetchall()
                 }
                 if match["column"] in columns:
                     continue
@@ -1624,9 +1623,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return cls._text_search_engine
         engine = TEXT_SEARCH_FTS4
         try:
-            connection.execute(
-                "CREATE VIRTUAL TABLE temp.raiker_fts5_probe USING fts5(probe)"
-            )
+            connection.execute("CREATE VIRTUAL TABLE temp.raiker_fts5_probe USING fts5(probe)")
         except sqlite3.Error:
             pass
         else:
@@ -1706,24 +1703,29 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.executescript(script)
             rebuild(connection)
             converted = True
-        if converted or connection.execute(
-            "SELECT 1 FROM migrations WHERE migration_id = ?", (TEXT_SEARCH_FTS5_MIGRATION_ID,)
-        ).fetchone() is None:
+        if (
+            converted
+            or connection.execute(
+                "SELECT 1 FROM migrations WHERE migration_id = ?", (TEXT_SEARCH_FTS5_MIGRATION_ID,)
+            ).fetchone()
+            is None
+        ):
             connection.execute(
                 "INSERT OR IGNORE INTO migrations (migration_id, applied_at) VALUES (?, ?)",
                 (TEXT_SEARCH_FTS5_MIGRATION_ID, utc_now()),
             )
 
-    def _backfill_legacy_account_bootstrap_roles(
-        self, connection: sqlite3.Connection
-    ) -> None:
+    def _backfill_legacy_account_bootstrap_roles(self, connection: sqlite3.Connection) -> None:
         connection.commit()
         connection.execute("BEGIN IMMEDIATE")
         try:
-            if connection.execute(
-                "SELECT 1 FROM migrations WHERE migration_id = ?",
-                (LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,),
-            ).fetchone() is not None:
+            if (
+                connection.execute(
+                    "SELECT 1 FROM migrations WHERE migration_id = ?",
+                    (LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,),
+                ).fetchone()
+                is not None
+            ):
                 connection.commit()
                 return
 
@@ -1738,11 +1740,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             required_role_ids = ("rl_admin", "rl_approver", "rl_rgm")
             for principal in principals:
                 role_ids = json.loads(principal["role_ids"] or "[]")
-                missing_role_ids = [role_id for role_id in required_role_ids if role_id not in role_ids]
+                missing_role_ids = [
+                    role_id for role_id in required_role_ids if role_id not in role_ids
+                ]
                 if missing_role_ids:
                     connection.execute(
                         "UPDATE principals SET role_ids = ? WHERE principal_id = ?",
-                        (json.dumps([*role_ids, *missing_role_ids], sort_keys=True), principal["principal_id"]),
+                        (
+                            json.dumps([*role_ids, *missing_role_ids], sort_keys=True),
+                            principal["principal_id"],
+                        ),
                     )
                 for role_id in required_role_ids:
                     assignments = connection.execute(
@@ -1795,11 +1802,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         principal = connection.execute(
             "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?", (principal_id,)
         ).fetchone()
-        user_id = str(principal["delegated_by_user_id"] or principal_id.removeprefix("principal_")) if principal else ""
-        if not user_id or connection.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone() is None:
+        user_id = (
+            str(principal["delegated_by_user_id"] or principal_id.removeprefix("principal_"))
+            if principal
+            else ""
+        )
+        if (
+            not user_id
+            or connection.execute("SELECT 1 FROM users WHERE user_id = ?", (user_id,)).fetchone()
+            is None
+        ):
             return
         connection.execute("UPDATE sessions SET user_id = ? WHERE user_id IS NULL", (user_id,))
-        connection.execute("UPDATE projects SET owner_user_id = ? WHERE owner_user_id IS NULL", (user_id,))
+        connection.execute(
+            "UPDATE projects SET owner_user_id = ? WHERE owner_user_id IS NULL", (user_id,)
+        )
         legacy_active = connection.execute(
             "SELECT project_id FROM active_project WHERE scope_id IN ('local_single_user', 'project_scope:legacy') "
             "ORDER BY updated_at DESC LIMIT 1"
@@ -1858,14 +1875,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         """
         # The backfills call this during bootstrap, before the migration that
         # creates the guard has run, so its absence is expected here.
-        guard_exists = connection.execute(
-            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'instance_account_guard'"
-        ).fetchone() is not None
-        row = connection.execute(
-            "SELECT g.principal_id FROM instance_account_guard g "
-            "JOIN principals p ON p.principal_id = g.principal_id "
-            "WHERE g.singleton = 1 AND p.is_active = 1"
-        ).fetchone() if guard_exists else None
+        guard_exists = (
+            connection.execute(
+                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'instance_account_guard'"
+            ).fetchone()
+            is not None
+        )
+        row = (
+            connection.execute(
+                "SELECT g.principal_id FROM instance_account_guard g "
+                "JOIN principals p ON p.principal_id = g.principal_id "
+                "WHERE g.singleton = 1 AND p.is_active = 1"
+            ).fetchone()
+            if guard_exists
+            else None
+        )
         if row is None:
             row = connection.execute(
                 "SELECT principal_id FROM principals WHERE role_ids LIKE '%rl_owner%' "
@@ -1931,9 +1955,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (owner_principal_id, root_id, path, label, utc_now()),
             )
 
-    def set_grant_write_enabled(
-        self, owner_principal_id: str, root_id: str, enabled: bool
-    ) -> bool:
+    def set_grant_write_enabled(self, owner_principal_id: str, root_id: str, enabled: bool) -> bool:
         """Record whether Raiker may write into one granted folder.
 
         A separate decision from the grant itself: reading a folder and editing
@@ -1977,9 +1999,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return {}
         return value if isinstance(value, dict) else {}
 
-    def save_brain_preferences(
-        self, owner_principal_id: str, settings: dict[str, Any]
-    ) -> str:
+    def save_brain_preferences(self, owner_principal_id: str, settings: dict[str, Any]) -> str:
         updated_at = utc_now()
         with self.connect() as connection:
             connection.execute(
@@ -2105,9 +2125,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # rows say where to look, and looking still goes through `read_file`, the
     # workspace containment check, and the policy engine.
 
-    def load_code_map_index(
-        self, owner_principal_id: str, repo_path: str
-    ) -> dict[str, Any] | None:
+    def load_code_map_index(self, owner_principal_id: str, repo_path: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT * FROM code_map_indexes WHERE owner_principal_id = ? AND repo_path = ?",
@@ -2162,9 +2180,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                      languages=excluded.languages, schema_version=excluded.schema_version,
                      updated_at=excluded.updated_at""",
                 (
-                    owner_principal_id, repo_path, repo_id, label, status, reason_code,
-                    file_count, symbol_count, edge_count, skipped, limits_hit, languages,
-                    schema_version, built_at, now,
+                    owner_principal_id,
+                    repo_path,
+                    repo_id,
+                    label,
+                    status,
+                    reason_code,
+                    file_count,
+                    symbol_count,
+                    edge_count,
+                    skipped,
+                    limits_hit,
+                    languages,
+                    schema_version,
+                    built_at,
+                    now,
                 ),
             )
 
@@ -2185,7 +2215,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         """
         with self.connect() as connection:
             self._delete_code_map_rows(connection, owner_principal_id, repo_path)
-            self._insert_code_map_rows(connection, owner_principal_id, repo_path, files, symbols, edges)
+            self._insert_code_map_rows(
+                connection, owner_principal_id, repo_path, files, symbols, edges
+            )
 
     def refresh_code_map_paths(
         self,
@@ -2218,7 +2250,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     "DELETE FROM code_map_edges WHERE owner_principal_id = ? AND repo_path = ? AND from_path = ?",
                     (owner_principal_id, repo_path, path),
                 )
-            self._insert_code_map_rows(connection, owner_principal_id, repo_path, files, symbols, edges)
+            self._insert_code_map_rows(
+                connection, owner_principal_id, repo_path, files, symbols, edges
+            )
 
     def delete_code_map(self, owner_principal_id: str, repo_path: str) -> None:
         with self.connect() as connection:
@@ -2431,9 +2465,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if delegated:
             return str(delegated)
         inferred = principal_id.removeprefix("principal_")
-        exists = connection.execute(
-            "SELECT 1 FROM users WHERE user_id = ?", (inferred,)
-        ).fetchone()
+        exists = connection.execute("SELECT 1 FROM users WHERE user_id = ?", (inferred,)).fetchone()
         return inferred if exists is not None else None
 
     def principal_user_id(self, principal_id: str) -> str | None:
@@ -2513,11 +2545,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return cursor.rowcount == 1
 
     def create_initial_account_atomic(
-        self, *, user: User, principal_id: str, role_ids: tuple[str, ...], max_runtime_mode: str,
-        username: str | None = None, password_hash: str | None = None, hash_algo: str | None = None,
+        self,
+        *,
+        user: User,
+        principal_id: str,
+        role_ids: tuple[str, ...],
+        max_runtime_mode: str,
+        username: str | None = None,
+        password_hash: str | None = None,
+        hash_algo: str | None = None,
         fail_after: str | None = None,
     ) -> bool:
         """Create the sole account and all identity state in one transaction."""
+
         def checkpoint(phase: str) -> None:
             if fail_after == phase:
                 raise RuntimeError(f"injected_failure:{phase}")
@@ -2535,24 +2575,54 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 checkpoint("guard")
                 connection.execute(
                     "INSERT INTO users (user_id, display_name, email, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (user.user_id, user.display_name, user.email, int(user.is_active), user.created_at, user.updated_at),
+                    (
+                        user.user_id,
+                        user.display_name,
+                        user.email,
+                        int(user.is_active),
+                        user.created_at,
+                        user.updated_at,
+                    ),
                 )
                 checkpoint("user")
                 connection.execute(
                     """INSERT INTO principals (principal_id, principal_type, display_name, delegated_by_user_id,
                     role_ids, domain_scopes, max_runtime_mode, created_at, is_active)
                     VALUES (?, 'human', ?, ?, ?, '[]', ?, ?, 1)""",
-                    (principal_id, user.display_name, user.user_id, json.dumps(list(role_ids)), max_runtime_mode, user.created_at),
+                    (
+                        principal_id,
+                        user.display_name,
+                        user.user_id,
+                        json.dumps(list(role_ids)),
+                        max_runtime_mode,
+                        user.created_at,
+                    ),
                 )
                 checkpoint("principal")
                 connection.executemany(
                     "INSERT INTO user_role_assignments (assignment_id, user_id, role_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
-                    [(new_id("ura_"), user.user_id, role_id, user.created_at, "lock_screen_registration") for role_id in role_ids],
+                    [
+                        (
+                            new_id("ura_"),
+                            user.user_id,
+                            role_id,
+                            user.created_at,
+                            "lock_screen_registration",
+                        )
+                        for role_id in role_ids
+                    ],
                 )
                 if username is not None and password_hash is not None and hash_algo is not None:
                     connection.execute(
                         "INSERT INTO account_credentials (principal_id, username, password_hash, hash_algo, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                        (principal_id, username, password_hash, hash_algo, user.created_at, user.updated_at),
+                        (
+                            principal_id,
+                            username,
+                            password_hash,
+                            hash_algo,
+                            user.created_at,
+                            user.updated_at,
+                        ),
                     )
                 checkpoint("credential")
                 self._backfill_legacy_account_data_owner(connection)
@@ -2567,8 +2637,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 raise
 
     def recover_owner_atomic(
-        self, *, user: User, principal_id: str, role_ids: tuple[str, ...],
-        old_principal_ids: list[str], credential_owner_id: str | None, max_runtime_mode: str,
+        self,
+        *,
+        user: User,
+        principal_id: str,
+        role_ids: tuple[str, ...],
+        old_principal_ids: list[str],
+        credential_owner_id: str | None,
+        max_runtime_mode: str,
         fail_after: str | None = None,
     ) -> None:
         """Transfer the sole credential and guard to a replacement owner atomically.
@@ -2578,6 +2654,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         no owner at all. The principal, guard, and data transfer still run; only
         the credential move is skipped.
         """
+
         def checkpoint(phase: str) -> None:
             if fail_after == phase:
                 raise RuntimeError(f"injected_failure:{phase}")
@@ -2587,35 +2664,70 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             try:
                 if (
                     credential_owner_id is not None
-                    and connection.execute("SELECT 1 FROM account_credentials WHERE principal_id = ?", (credential_owner_id,)).fetchone() is None
+                    and connection.execute(
+                        "SELECT 1 FROM account_credentials WHERE principal_id = ?",
+                        (credential_owner_id,),
+                    ).fetchone()
+                    is None
                 ):
                     raise ValueError("credential_owner_not_found")
                 connection.execute(
                     "INSERT INTO users (user_id, display_name, email, is_active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)",
-                    (user.user_id, user.display_name, user.email, int(user.is_active), user.created_at, user.updated_at),
+                    (
+                        user.user_id,
+                        user.display_name,
+                        user.email,
+                        int(user.is_active),
+                        user.created_at,
+                        user.updated_at,
+                    ),
                 )
                 checkpoint("user")
                 connection.execute(
                     """INSERT INTO principals (principal_id, principal_type, display_name, delegated_by_user_id,
                     role_ids, domain_scopes, max_runtime_mode, created_at, is_active)
                     VALUES (?, 'human', ?, ?, ?, '[]', ?, ?, 1)""",
-                    (principal_id, user.display_name, user.user_id, json.dumps(list(role_ids)), max_runtime_mode, user.created_at),
+                    (
+                        principal_id,
+                        user.display_name,
+                        user.user_id,
+                        json.dumps(list(role_ids)),
+                        max_runtime_mode,
+                        user.created_at,
+                    ),
                 )
                 connection.executemany(
                     "INSERT INTO user_role_assignments (assignment_id, user_id, role_id, granted_at, granted_by) VALUES (?, ?, ?, ?, ?)",
-                    [(new_id("ura_"), user.user_id, role_id, user.created_at, "owner_recovery") for role_id in role_ids],
+                    [
+                        (new_id("ura_"), user.user_id, role_id, user.created_at, "owner_recovery")
+                        for role_id in role_ids
+                    ],
                 )
                 checkpoint("principal")
-                old_users = connection.execute(
-                    f"SELECT delegated_by_user_id FROM principals WHERE principal_id IN ({','.join('?' for _ in old_principal_ids)})",
-                    old_principal_ids,
-                ).fetchall() if old_principal_ids else []
+                old_users = (
+                    connection.execute(
+                        f"SELECT delegated_by_user_id FROM principals WHERE principal_id IN ({','.join('?' for _ in old_principal_ids)})",
+                        old_principal_ids,
+                    ).fetchall()
+                    if old_principal_ids
+                    else []
+                )
                 self._transfer_owner_scoped_data(
-                    connection, old_principal_ids, [str(row["delegated_by_user_id"]) for row in old_users if row["delegated_by_user_id"]],
-                    principal_id, user.user_id,
+                    connection,
+                    old_principal_ids,
+                    [
+                        str(row["delegated_by_user_id"])
+                        for row in old_users
+                        if row["delegated_by_user_id"]
+                    ],
+                    principal_id,
+                    user.user_id,
                 )
                 if credential_owner_id is not None:
-                    connection.execute("UPDATE account_credentials SET principal_id = ? WHERE principal_id = ?", (principal_id, credential_owner_id))
+                    connection.execute(
+                        "UPDATE account_credentials SET principal_id = ? WHERE principal_id = ?",
+                        (principal_id, credential_owner_id),
+                    )
                 # The guard names this instance's sole account either way, and
                 # is what the original-owner pointer resolves through.
                 connection.execute(
@@ -2626,8 +2738,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 checkpoint("credential")
                 if old_principal_ids:
                     marks = ",".join("?" for _ in old_principal_ids)
-                    connection.execute(f"UPDATE principals SET is_active = 0 WHERE principal_id IN ({marks})", old_principal_ids)
-                    connection.execute(f"UPDATE api_sessions SET revoked = 1 WHERE principal_id IN ({marks})", old_principal_ids)
+                    connection.execute(
+                        f"UPDATE principals SET is_active = 0 WHERE principal_id IN ({marks})",
+                        old_principal_ids,
+                    )
+                    connection.execute(
+                        f"UPDATE api_sessions SET revoked = 1 WHERE principal_id IN ({marks})",
+                        old_principal_ids,
+                    )
                 self.initialize_principal_controls(principal_id, connection=connection)
                 checkpoint("finalize")
                 connection.commit()
@@ -2637,17 +2755,32 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     @staticmethod
     def _transfer_owner_scoped_data(
-        connection: sqlite3.Connection, old_principal_ids: list[str], old_user_ids: list[str],
-        principal_id: str, user_id: str,
+        connection: sqlite3.Connection,
+        old_principal_ids: list[str],
+        old_user_ids: list[str],
+        principal_id: str,
+        user_id: str,
     ) -> None:
         """Move owner-scoped rows without rewriting immutable audit/event history."""
-        excluded = {"account_credentials", "api_sessions", "instance_account_guard", "migrations", "principals", "users"}
-        tables = connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall()
+        excluded = {
+            "account_credentials",
+            "api_sessions",
+            "instance_account_guard",
+            "migrations",
+            "principals",
+            "users",
+        }
+        tables = connection.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table'"
+        ).fetchall()
         for row in tables:
             table = str(row["name"])
             if table.startswith("sqlite_") or table in excluded:
                 continue
-            columns = {str(column["name"]) for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()}
+            columns = {
+                str(column["name"])
+                for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()
+            }
             for column in ("owner_principal_id", "principal_id"):
                 if column in columns and old_principal_ids:
                     marks = ",".join("?" for _ in old_principal_ids)
@@ -2666,7 +2799,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def rollback_initial_registration(self, principal_id: str, user_id: str) -> None:
         with self.connect() as connection:
             connection.execute("DELETE FROM user_role_assignments WHERE user_id = ?", (user_id,))
-            connection.execute("DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,))
+            connection.execute(
+                "DELETE FROM account_credentials WHERE principal_id = ?", (principal_id,)
+            )
             connection.execute("DELETE FROM principals WHERE principal_id = ?", (principal_id,))
             connection.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
             connection.execute(
@@ -2676,10 +2811,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def _backfill_self_inclusive_project_paths(self, connection: sqlite3.Connection) -> None:
         """Derive paths from the authoritative adjacency list once per database."""
-        if connection.execute(
-            "SELECT 1 FROM migrations WHERE migration_id = ?",
-            (PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,),
-        ).fetchone() is not None:
+        if (
+            connection.execute(
+                "SELECT 1 FROM migrations WHERE migration_id = ?",
+                (PROJECT_SELF_INCLUSIVE_PATH_MIGRATION_ID,),
+            ).fetchone()
+            is not None
+        ):
             return
         rows = connection.execute("SELECT project_id, parent_id FROM projects").fetchall()
         parents = {str(row[0]): str(row[1]) if row[1] is not None else None for row in rows}
@@ -2756,13 +2894,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     ACTIVE_PROJECT_SCOPE = "project_scope:"
 
-    def create_project(self, project_id: str, name: str, root_subpath: str, parent_id: str | None = None, owner_user_id: str | None = None) -> None:
+    def create_project(
+        self,
+        project_id: str,
+        name: str,
+        root_subpath: str,
+        parent_id: str | None = None,
+        owner_user_id: str | None = None,
+    ) -> None:
         if owner_user_id is None:
             original = self.original_account_principal_id()
             owner_user_id = self.principal_user_id(original) if original else None
         with self.connect() as connection:
             if parent_id:
-                parent = connection.execute("SELECT path FROM projects WHERE project_id = ?", (parent_id,)).fetchone()
+                parent = connection.execute(
+                    "SELECT path FROM projects WHERE project_id = ?", (parent_id,)
+                ).fetchone()
                 parent_path = parent["path"] if parent else "/"
                 path = f"{parent_path}{project_id}/"
             else:
@@ -2775,7 +2922,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def load_project(self, project_id: str, user_id: str | None = None) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT * FROM projects WHERE project_id = ?" + (" AND owner_user_id = ?" if user_id else ""),
+                "SELECT * FROM projects WHERE project_id = ?"
+                + (" AND owner_user_id = ?" if user_id else ""),
                 (project_id, user_id) if user_id else (project_id,),
             ).fetchone()
         return dict(row) if row else None
@@ -2832,9 +2980,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_project_by_name(self, name: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM projects WHERE name = ?", (name,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM projects WHERE name = ?", (name,)).fetchone()
         return dict(row) if row else None
 
     def update_project_root(
@@ -3164,9 +3310,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, parameters).fetchall()
         return [dict(row) for row in rows]
 
-    def get_managed_file(
-        self, file_id: str, owner_principal_id: str
-    ) -> dict[str, Any] | None:
+    def get_managed_file(self, file_id: str, owner_principal_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT * FROM managed_files WHERE file_id = ? AND owner_principal_id = ?",
@@ -3273,13 +3417,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     @staticmethod
     def _delete_managed_file_chunks(connection: sqlite3.Connection, file_id: str) -> int:
+        vector_rows = connection.execute(
+            """SELECT v.vector_id FROM managed_file_chunk_vectors v
+               JOIN managed_file_chunks c ON c.chunk_id = v.chunk_id
+               WHERE c.file_id = ?""",
+            (file_id,),
+        ).fetchall()
+        vector_ids = [str(row["vector_id"]) for row in vector_rows]
+        connection.execute(
+            """DELETE FROM managed_file_chunk_vectors WHERE chunk_id IN
+               (SELECT chunk_id FROM managed_file_chunks WHERE file_id = ?)""",
+            (file_id,),
+        )
+        if vector_ids:
+            placeholders = ",".join("?" for _ in vector_ids)
+            connection.execute(
+                f"DELETE FROM vector_records WHERE vector_id IN ({placeholders})", vector_ids
+            )
         deleted = connection.execute(
             "DELETE FROM managed_file_chunks WHERE file_id = ?", (file_id,)
         ).rowcount
         with contextlib.suppress(sqlite3.OperationalError):
-            connection.execute(
-                "DELETE FROM managed_file_chunk_fts WHERE file_id = ?", (file_id,)
-            )
+            connection.execute("DELETE FROM managed_file_chunk_fts WHERE file_id = ?", (file_id,))
         return int(deleted or 0)
 
     def list_managed_file_chunks(
@@ -3296,6 +3455,135 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (file_id, owner_principal_id),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def list_managed_file_chunks_missing_embedding(
+        self,
+        embedding_model: str,
+        *,
+        owner_principal_id: str,
+        limit: int = 500,
+    ) -> list[dict[str, Any]]:
+        if limit < 1 or not owner_principal_id:
+            return []
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT c.* FROM managed_file_chunks c
+                JOIN managed_files f ON f.file_id = c.file_id
+                WHERE c.owner_principal_id = ? AND f.retired_at IS NULL
+                  AND NOT EXISTS (
+                    SELECT 1 FROM managed_file_chunk_vectors v
+                    WHERE v.chunk_id = c.chunk_id AND v.embedding_model = ?
+                  )
+                ORDER BY c.created_at, c.file_id, c.chunk_index
+                LIMIT ?
+                """,
+                (owner_principal_id, embedding_model, min(limit * 4, 2000)),
+            ).fetchall()
+        from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
+
+        blocked = {MemorySensitivity.SECRET_LIKE, MemorySensitivity.CREDENTIAL_LIKE}
+        return [
+            dict(row)
+            for row in rows
+            if classify_memory_sensitivity(str(row["text"])) not in blocked
+        ][:limit]
+
+    def link_managed_file_chunk_vector(
+        self,
+        chunk_id: str,
+        vector_id: str,
+        embedding_model: str,
+        content_hash: str,
+        *,
+        owner_principal_id: str,
+    ) -> bool:
+        """Link a vector only while the exact owned chunk revision exists."""
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT 1 FROM managed_file_chunks
+                   WHERE chunk_id = ? AND owner_principal_id = ? AND content_hash = ?""",
+                (chunk_id, owner_principal_id, content_hash),
+            ).fetchone()
+            if row is None:
+                return False
+            previous = connection.execute(
+                """SELECT vector_id FROM managed_file_chunk_vectors
+                   WHERE chunk_id = ? AND embedding_model = ?""",
+                (chunk_id, embedding_model),
+            ).fetchone()
+            connection.execute(
+                """INSERT OR REPLACE INTO managed_file_chunk_vectors
+                   (chunk_id, vector_id, embedding_model, content_hash)
+                   VALUES (?, ?, ?, ?)""",
+                (chunk_id, vector_id, embedding_model, content_hash),
+            )
+            if previous is not None and str(previous["vector_id"]) != vector_id:
+                connection.execute(
+                    "DELETE FROM vector_records WHERE vector_id = ?",
+                    (str(previous["vector_id"]),),
+                )
+        return True
+
+    def search_managed_file_chunk_vectors(
+        self,
+        query_vector: Sequence[float],
+        embedding_model: str,
+        *,
+        owner_principal_id: str,
+        project_ids: Sequence[str] | None = None,
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Cosine-ranked owned chunks in one named embedding space."""
+        if not query_vector or limit < 1 or not owner_principal_id:
+            return []
+        conditions = [
+            "c.owner_principal_id = ?",
+            "f.retired_at IS NULL",
+            "m.embedding_model = ?",
+        ]
+        params: list[Any] = [owner_principal_id, embedding_model]
+        if project_ids is not None:
+            placeholders = ",".join("?" for _ in project_ids)
+            if placeholders:
+                conditions.append(f"(c.scope_kind = 'memory' OR c.project_id IN ({placeholders}))")
+                params.extend(project_ids)
+            else:
+                conditions.append("c.scope_kind = 'memory'")
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT c.*, f.relative_path, f.media_type, r.embedding
+                   FROM managed_file_chunk_vectors m
+                   JOIN managed_file_chunks c ON c.chunk_id = m.chunk_id
+                   JOIN managed_files f ON f.file_id = c.file_id
+                   JOIN vector_records r ON r.vector_id = m.vector_id
+                   WHERE """
+                + " AND ".join(conditions),
+                params,
+            ).fetchall()
+        from raiker.vector import VectorIndex
+
+        ranked: list[tuple[float, dict[str, Any]]] = []
+        for raw in rows:
+            row = dict(raw)
+            try:
+                vector = json.loads(str(row.pop("embedding")))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if not isinstance(vector, list) or len(vector) != len(query_vector):
+                continue
+            if not all(isinstance(value, (int, float)) for value in vector):
+                continue
+            score = VectorIndex._cosine_similarity(  # noqa: SLF001
+                [float(value) for value in query_vector],
+                [float(value) for value in vector],
+            )
+            row["score"] = round(score, 6)
+            row["snippet"] = str(row.get("text", ""))[:220]
+            row["sources"] = ["vector"]
+            ranked.append((score, row))
+        ranked.sort(key=lambda item: item[0], reverse=True)
+        return [row for _, row in ranked[:limit]]
 
     def retire_managed_file_chunks(self, file_id: str, owner_principal_id: str) -> int:
         """Drop every projection of *file_id*. Ownership is checked, not assumed."""
@@ -3394,16 +3682,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 return []
         return [dict(row) for row in rows]
 
-    def load_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
+    def load_project_context(
+        self, project_id: str, *, user_id: str | None = None
+    ) -> dict[str, Any]:
         if user_id is not None and self.load_project(project_id, user_id=user_id) is None:
-            return {"instructions": "", "attachment_ids": [], "memory_enabled": False, "memory_mode": "inherit"}
+            return {
+                "instructions": "",
+                "attachment_ids": [],
+                "memory_enabled": False,
+                "memory_mode": "inherit",
+            }
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT instructions, attachment_ids_json, memory_enabled, memory_mode FROM project_contexts WHERE project_id = ?",
                 (project_id,),
             ).fetchone()
         if row is None:
-            return {"instructions": "", "attachment_ids": [], "memory_enabled": False, "memory_mode": "inherit"}
+            return {
+                "instructions": "",
+                "attachment_ids": [],
+                "memory_enabled": False,
+                "memory_mode": "inherit",
+            }
         try:
             attachment_ids = json.loads(str(row["attachment_ids_json"]))
         except (TypeError, ValueError):
@@ -3429,7 +3729,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if mode not in {"inherit", "enabled", "disabled"}:
             raise ValueError("invalid_memory_mode")
         if owner_principal_id is not None and any(
-            self.load_attachment_metadata(attachment_id, owner_principal_id=owner_principal_id) is None
+            self.load_attachment_metadata(attachment_id, owner_principal_id=owner_principal_id)
+            is None
             for attachment_id in attachment_ids
         ):
             raise ValueError("unknown_project_attachment")
@@ -3445,7 +3746,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                   memory_mode = excluded.memory_mode,
                   updated_at = excluded.updated_at
                 """,
-                (project_id, instructions, json.dumps(attachment_ids), int(mode == "enabled"), mode, utc_now()),
+                (
+                    project_id,
+                    instructions,
+                    json.dumps(attachment_ids),
+                    int(mode == "enabled"),
+                    mode,
+                    utc_now(),
+                ),
             )
 
     def list_projects(self, user_id: str | None = None) -> list[dict[str, Any]]:
@@ -3460,10 +3768,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 -- can name it without one extra query per row.
                 LEFT JOIN brain_source_grants AS grants
                        ON grants.root_id = projects.root_grant_id
-                """ + (" WHERE projects.owner_user_id = ? " if user_id else "") + """
+                """
+                + (" WHERE projects.owner_user_id = ? " if user_id else "")
+                + """
                 GROUP BY projects.project_id
                 ORDER BY projects.created_at DESC
-                """, (user_id,) if user_id else ()
+                """,
+                (user_id,) if user_id else (),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -3477,16 +3788,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 owner = self._original_owner_from_connection(connection)
                 if owner is not None:
                     principal = connection.execute(
-                        "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?", (owner,)
+                        "SELECT delegated_by_user_id FROM principals WHERE principal_id = ?",
+                        (owner,),
                     ).fetchone()
-                    owner_user_id = str(principal["delegated_by_user_id"] or owner.removeprefix("principal_")) if principal else ""
+                    owner_user_id = (
+                        str(principal["delegated_by_user_id"] or owner.removeprefix("principal_"))
+                        if principal
+                        else ""
+                    )
                     if owner_user_id:
                         row = connection.execute(
                             "SELECT project_id FROM active_project WHERE scope_id = ?",
                             (f"{self.ACTIVE_PROJECT_SCOPE}{owner_user_id}",),
                         ).fetchone()
         project_id = str(row["project_id"]) if row is not None and row["project_id"] else None
-        if project_id is not None and user_id is not None and self.load_project(project_id, user_id) is None:
+        if (
+            project_id is not None
+            and user_id is not None
+            and self.load_project(project_id, user_id) is None
+        ):
             return None
         return project_id
 
@@ -4299,10 +4619,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     arg_sensitivity, result_sensitivity, observed_at)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    activity_id, principal_id, capability, subject_id, operation,
-                    json.dumps(sorted(hosts or [])), json.dumps(sorted(tools or [])),
-                    int(calls), int(bytes_in), int(bytes_out), int(error_count), outcome,
-                    reason_code, arg_sensitivity, result_sensitivity, observed_at or utc_now(),
+                    activity_id,
+                    principal_id,
+                    capability,
+                    subject_id,
+                    operation,
+                    json.dumps(sorted(hosts or [])),
+                    json.dumps(sorted(tools or [])),
+                    int(calls),
+                    int(bytes_in),
+                    int(bytes_out),
+                    int(error_count),
+                    outcome,
+                    reason_code,
+                    arg_sensitivity,
+                    result_sensitivity,
+                    observed_at or utc_now(),
                 ),
             )
         return activity_id
@@ -4347,9 +4679,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             query += " AND capability = ?"
             params.append(capability)
         with self.connect() as connection:
-            rows = connection.execute(
-                query + " ORDER BY updated_at DESC", tuple(params)
-            ).fetchall()
+            rows = connection.execute(query + " ORDER BY updated_at DESC", tuple(params)).fetchall()
         return [dict(row) for row in rows]
 
     def set_capability_containment(
@@ -4411,9 +4741,19 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                      contained_at=excluded.contained_at, probe_after=excluded.probe_after,
                      updated_at=excluded.updated_at""",
                 (
-                    principal_id, capability, subject_id, row["label"], row["state"],
-                    row["reason"], row["source"], row["finding_id"], row["failure_streak"],
-                    row["last_failure_code"], row["contained_at"], row["probe_after"], now,
+                    principal_id,
+                    capability,
+                    subject_id,
+                    row["label"],
+                    row["state"],
+                    row["reason"],
+                    row["source"],
+                    row["finding_id"],
+                    row["failure_streak"],
+                    row["last_failure_code"],
+                    row["contained_at"],
+                    row["probe_after"],
+                    now,
                 ),
             )
         return {
@@ -4426,17 +4766,45 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def delete_project(self, project_id: str) -> bool:
         with self.connect() as connection:
-            session_ids = [r[0] for r in connection.execute("SELECT session_id FROM sessions WHERE project_id = ?", (project_id,))]
-            if connection.execute("SELECT 1 FROM projects WHERE project_id = ?", (project_id,)).fetchone() is None:
+            session_ids = [
+                r[0]
+                for r in connection.execute(
+                    "SELECT session_id FROM sessions WHERE project_id = ?", (project_id,)
+                )
+            ]
+            if (
+                connection.execute(
+                    "SELECT 1 FROM projects WHERE project_id = ?", (project_id,)
+                ).fetchone()
+                is None
+            ):
                 return False
             if session_ids:
                 marks = ",".join("?" for _ in session_ids)
                 action_ids = f"SELECT action_id FROM tool_actions WHERE session_id IN ({marks})"
-                connection.execute(f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids)
-                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags"):
-                    connection.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
-                connection.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
-            connection.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
+                connection.execute(
+                    f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids
+                )
+                for table in (
+                    "events_index",
+                    "tool_actions",
+                    "checkpoints",
+                    "tasks",
+                    "turns",
+                    "model_session_state",
+                    "model_fallback_sequence",
+                    "model_advisor",
+                    "session_tags",
+                ):
+                    connection.execute(
+                        f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids
+                    )
+                connection.execute(
+                    f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids
+                )
+            connection.execute(
+                "UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,)
+            )
             connection.execute("DELETE FROM project_contexts WHERE project_id = ?", (project_id,))
             connection.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
@@ -4447,7 +4815,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # hard-delete. Path trigger auto-syncs on parent_id change. Partial index
     # on active tree for fast daily queries.
 
-    def list_project_tree(self, include_archived: bool = False, user_id: str | None = None) -> list[dict[str, Any]]:
+    def list_project_tree(
+        self, include_archived: bool = False, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """Return nested tree of projects (active by default)."""
         conditions = [] if include_archived else ["is_archived = 0"]
         params: list[Any] = []
@@ -4456,9 +4826,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             params.append(user_id)
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
         with self.connect() as conn:
-            rows = conn.execute(f"""
+            rows = conn.execute(
+                f"""
                 SELECT * FROM projects {where} ORDER BY path, created_at
-            """, params).fetchall()
+            """,
+                params,
+            ).fetchall()
         nodes = {row["project_id"]: {**dict(row), "children": []} for row in rows}
         roots = []
         for row in rows:
@@ -4472,13 +4845,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def move_project(self, project_id: str, new_parent_id: str | None) -> bool:
         """Move project (and subtree) under new parent. Returns False if cycle or not found."""
         with self.connect() as conn:
-            row = conn.execute("SELECT project_id, path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            row = conn.execute(
+                "SELECT project_id, path FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
             if not row:
                 return False
             old_path = row["path"]
             new_path = f"/{project_id}/"
             if new_parent_id:
-                new_parent_row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (new_parent_id,)).fetchone()
+                new_parent_row = conn.execute(
+                    "SELECT path FROM projects WHERE project_id = ?", (new_parent_id,)
+                ).fetchone()
                 if not new_parent_row:
                     return False
                 new_parent_path = new_parent_row["path"]
@@ -4498,7 +4875,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def archive_project(self, project_id: str) -> bool:
         """Soft-archive project and all descendants. Idempotent."""
         with self.connect() as conn:
-            row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            row = conn.execute(
+                "SELECT path FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
             if not row:
                 return False
             path = row["path"]
@@ -4512,18 +4891,37 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def delete_project_with_orphanage(self, project_id: str) -> bool:
         """Hard-delete project; archive descendants + reparent to NULL with orphaned/ path."""
         with self.connect() as conn:
-            row = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            row = conn.execute(
+                "SELECT path FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
             if not row:
                 return False
             path = row["path"]
             now = utc_now()
             # Delete sessions for target project (FK: ON DELETE NO ACTION)
-            session_ids = [r[0] for r in conn.execute("SELECT session_id FROM sessions WHERE project_id = ?", (project_id,))]
+            session_ids = [
+                r[0]
+                for r in conn.execute(
+                    "SELECT session_id FROM sessions WHERE project_id = ?", (project_id,)
+                )
+            ]
             if session_ids:
                 marks = ",".join("?" for _ in session_ids)
                 action_ids = f"SELECT action_id FROM tool_actions WHERE session_id IN ({marks})"
-                conn.execute(f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids)
-                for table in ("events_index", "tool_actions", "checkpoints", "tasks", "turns", "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags"):
+                conn.execute(
+                    f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", session_ids
+                )
+                for table in (
+                    "events_index",
+                    "tool_actions",
+                    "checkpoints",
+                    "tasks",
+                    "turns",
+                    "model_session_state",
+                    "model_fallback_sequence",
+                    "model_advisor",
+                    "session_tags",
+                ):
                     conn.execute(f"DELETE FROM {table} WHERE session_id IN ({marks})", session_ids)
                 conn.execute(f"DELETE FROM sessions WHERE session_id IN ({marks})", session_ids)
             # 1) Archive descendants (excluding target)
@@ -4531,7 +4929,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE projects SET is_archived = 1, archived_at = ?, parent_id = CASE WHEN parent_id = ? THEN NULL ELSE parent_id END, path = '/orphaned/' || ? || '/' || substr(path, ?), updated_at = ? WHERE path LIKE ? AND project_id != ?",
                 (now, project_id, project_id, len(path) + 1, now, path + "%", project_id),
             )
-            conn.execute("UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,))
+            conn.execute(
+                "UPDATE active_project SET project_id = NULL WHERE project_id = ?", (project_id,)
+            )
             # 2) Clear the project's catalogue. `managed_files.project_id`
             # references `projects` with no ON DELETE, so a project with any
             # indexed file could not be deleted at all -- the whole delete failed
@@ -4546,23 +4946,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             conn.execute("DELETE FROM projects WHERE project_id = ?", (project_id,))
         return True
 
-    def get_ancestor_contexts(self, project_id: str, *, user_id: str | None = None) -> list[dict[str, Any]]:
+    def get_ancestor_contexts(
+        self, project_id: str, *, user_id: str | None = None
+    ) -> list[dict[str, Any]]:
         """Return context rows for all active ancestors of project_id, ordered root→leaf."""
         with self.connect() as conn:
-            target = conn.execute("SELECT path FROM projects WHERE project_id = ?", (project_id,)).fetchone()
+            target = conn.execute(
+                "SELECT path FROM projects WHERE project_id = ?", (project_id,)
+            ).fetchone()
             if not target:
                 return []
             path = target["path"]
-            rows = conn.execute("""
+            rows = conn.execute(
+                """
                 SELECT pc.* FROM project_contexts pc
                 JOIN projects p ON p.project_id = pc.project_id
                 WHERE ? LIKE p.path || '%' AND p.project_id != ? AND p.is_archived = 0
-                """ + (" AND p.owner_user_id = ?" if user_id is not None else "") + """
+                """
+                + (" AND p.owner_user_id = ?" if user_id is not None else "")
+                + """
                 ORDER BY LENGTH(p.path) ASC
-            """, (path, project_id, *([user_id] if user_id is not None else []))).fetchall()
+            """,
+                (path, project_id, *([user_id] if user_id is not None else [])),
+            ).fetchall()
         return [dict(r) for r in rows]
 
-    def load_effective_project_context(self, project_id: str, *, user_id: str | None = None) -> dict[str, Any]:
+    def load_effective_project_context(
+        self, project_id: str, *, user_id: str | None = None
+    ) -> dict[str, Any]:
         """Return the project's context merged with every active ancestor's.
 
         Instructions concatenate root→leaf so the nearest folder speaks last;
@@ -4635,9 +5046,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return True
 
-    def rename_session(
-        self, session_id: str, title: str, user_id: str | None = None
-    ) -> bool:
+    def rename_session(self, session_id: str, title: str, user_id: str | None = None) -> bool:
         """Set one session's title. The caller supplies the already-normalized
         title. Returns False if the session does not exist or is owned by
         another account (isolation mirrors set_session_pinned)."""
@@ -4670,11 +5079,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             exists, owner = self._session_owner(connection, session_id)
             if not exists:
                 return False
-            if (
-                user_id is not None
-                and owner is not None
-                and str(owner) != user_id
-            ):
+            if user_id is not None and owner is not None and str(owner) != user_id:
                 return False
             if project_id is not None:
                 project = connection.execute(
@@ -4688,20 +5093,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return True
 
-    def set_session_pinned(
-        self, session_id: str, pinned: bool, user_id: str | None = None
-    ) -> bool:
+    def set_session_pinned(self, session_id: str, pinned: bool, user_id: str | None = None) -> bool:
         """Pin (or unpin) a session. Returns False if the session does not exist
         or is owned by another account (user isolation mirrors list_sessions)."""
         with self.connect() as connection:
             exists, owner = self._session_owner(connection, session_id)
             if not exists:
                 return False
-            if (
-                user_id is not None
-                and owner is not None
-                and str(owner) != user_id
-            ):
+            if user_id is not None and owner is not None and str(owner) != user_id:
                 return False
             connection.execute(
                 "UPDATE sessions SET pinned = ?, updated_at = ? WHERE session_id = ?",
@@ -4739,15 +5138,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             exists, owner = self._session_owner(connection, session_id)
             if not exists:
                 return False
-            if (
-                user_id is not None
-                and owner is not None
-                and str(owner) != user_id
-            ):
+            if user_id is not None and owner is not None and str(owner) != user_id:
                 return False
-            connection.execute(
-                "DELETE FROM session_tags WHERE session_id = ?", (session_id,)
-            )
+            connection.execute("DELETE FROM session_tags WHERE session_id = ?", (session_id,))
             if tags:
                 now = utc_now()
                 connection.executemany(
@@ -4770,11 +5163,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             exists, owner = self._session_owner(connection, session_id)
             if not exists:
                 return False
-            if (
-                user_id is not None
-                and owner is not None
-                and str(owner) != user_id
-            ):
+            if user_id is not None and owner is not None and str(owner) != user_id:
                 return False
             self._delete_session_rows(connection, session_id)
         # Remove the per-session events transcript file (best-effort; the db rows
@@ -4790,13 +5179,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             f"DELETE FROM policy_decisions WHERE action_id IN ({action_ids})", (session_id,)
         )
         for table in (
-            "events_index", "tool_actions", "checkpoints", "tasks", "turns",
-            "model_session_state", "model_fallback_sequence", "model_advisor", "session_tags",
+            "events_index",
+            "tool_actions",
+            "checkpoints",
+            "tasks",
+            "turns",
+            "model_session_state",
+            "model_fallback_sequence",
+            "model_advisor",
+            "session_tags",
             # Session-keyed rows added after this cascade was written, each of
             # which holds conversation content or state that must not outlive the
             # conversation: the source ledger and its recorded passages (C6/C4),
             # the agent's standing plan (B6), and any parked stop/steer (B17/C13).
-            "turn_sources", "agent_plans", "turn_controls",
+            "turn_sources",
+            "agent_plans",
+            "turn_controls",
         ):
             connection.execute(f"DELETE FROM {table} WHERE session_id = ?", (session_id,))
         connection.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
@@ -4808,7 +5206,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             for session_id in session_ids:
                 exists, owner = self._session_owner(connection, session_id)
-                if not exists or (user_id is not None and owner is not None and str(owner) != user_id):
+                if not exists or (
+                    user_id is not None and owner is not None and str(owner) != user_id
+                ):
                     return False
             for session_id in session_ids:
                 self._delete_session_rows(connection, session_id)
@@ -4844,7 +5244,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return {str(row["memory_id"]) for row in rows}
 
     def is_memory_incognito(self, owner_principal_id: str | None = None) -> bool:
-        scope_id = f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}" if owner_principal_id else self.MEMORY_SETTINGS_SCOPE
+        scope_id = (
+            f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+            if owner_principal_id
+            else self.MEMORY_SETTINGS_SCOPE
+        )
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT incognito FROM memory_settings WHERE scope_id = ?",
@@ -4869,7 +5273,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?)
                 ON CONFLICT(scope_id) DO UPDATE SET incognito = excluded.incognito, updated_at = excluded.updated_at
                 """,
-                (f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}" if owner_principal_id else self.MEMORY_SETTINGS_SCOPE, 1 if incognito else 0, utc_now()),
+                (
+                    f"{self.MEMORY_SETTINGS_SCOPE}:{owner_principal_id}"
+                    if owner_principal_id
+                    else self.MEMORY_SETTINGS_SCOPE,
+                    1 if incognito else 0,
+                    utc_now(),
+                ),
             )
 
     # ── Embedding backend selection (MEM-03) ──────────────────────────────
@@ -4898,7 +5308,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                         "SELECT embedding_backend FROM memory_settings WHERE scope_id = ?",
                         (f"{self.MEMORY_SETTINGS_SCOPE}:{original}",),
                     ).fetchone()
-        return str(row["embedding_backend"]) if row is not None and row["embedding_backend"] else "auto"
+        return (
+            str(row["embedding_backend"])
+            if row is not None and row["embedding_backend"]
+            else "auto"
+        )
 
     def set_memory_embedding_backend(
         self, backend: str, owner_principal_id: str | None = None
@@ -4976,11 +5390,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def list_memory_embedding_spaces(
         self, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:
-        """Every ``(model, dimensions)`` this workspace holds memory vectors in.
+        """Every ``(model, dimensions)`` this workspace can recall from.
 
-        Only spaces reachable from an *active* approved memory are listed: a
-        space whose every projection has been archived is not one a search could
-        answer from, and offering it would be offering an empty corpus.
+        Active approved-memory and current managed-file projections both count.
+        A space whose every source was archived or retired is not one a search
+        could answer from, and offering it would be offering an empty corpus.
         """
         now = utc_now()
         sql = """
@@ -5003,7 +5417,30 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         sql += " GROUP BY v.embedding_model, v.dimensions ORDER BY v.embedding_model"
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()
-        return [dict(row) for row in rows]
+            file_sql = """
+                SELECT v.embedding_model AS embedding_model,
+                       v.dimensions AS dimensions, COUNT(*) AS vector_count
+                FROM vector_records v
+                JOIN managed_file_chunk_vectors p ON p.vector_id = v.vector_id
+                JOIN managed_file_chunks c ON c.chunk_id = p.chunk_id
+                JOIN managed_files f ON f.file_id = c.file_id
+                WHERE v.embedding IS NOT NULL AND f.retired_at IS NULL
+            """
+            file_params: list[Any] = []
+            if owner_principal_id:
+                file_sql += " AND c.owner_principal_id = ?"
+                file_params.append(owner_principal_id)
+            file_sql += " GROUP BY v.embedding_model, v.dimensions"
+            file_rows = connection.execute(file_sql, file_params).fetchall()
+        merged: dict[tuple[str, int], int] = {}
+        for raw in [*rows, *file_rows]:
+            row = dict(raw)
+            key = (str(row["embedding_model"]), int(row["dimensions"]))
+            merged[key] = merged.get(key, 0) + int(row["vector_count"])
+        return [
+            {"embedding_model": model, "dimensions": dimensions, "vector_count": count}
+            for (model, dimensions), count in sorted(merged.items())
+        ]
 
     def list_turns(self, session_id: str, limit: int = 50) -> list[dict[str, Any]]:
         with self.connect() as connection:
@@ -5015,9 +5452,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_turn(self, turn_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM turns WHERE turn_id = ?", (turn_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM turns WHERE turn_id = ?", (turn_id,)).fetchone()
         return dict(row) if row else None
 
     def insert_turn(
@@ -5168,8 +5603,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return [dict(row) for row in connection.execute(sql, params).fetchall()]
 
     def add_web_blocklist_rule(
-        self, rule: str, kind: str, *, principal_id: str | None = None,
-        note: str = "", created_by: str = "",
+        self,
+        rule: str,
+        kind: str,
+        *,
+        principal_id: str | None = None,
+        note: str = "",
+        created_by: str = "",
     ) -> str:
         rule_id = new_id("wbl_")
         with self.connect() as connection:
@@ -5193,8 +5633,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # ── Git credential grants (RAIKER-2022) ──────────────────────────────────
 
     def create_git_credential_grant(
-        self, *, principal_id: str, scope: str, expires_at: str,
-        session_id: str | None = None, reason: str = "",
+        self,
+        *,
+        principal_id: str,
+        scope: str,
+        expires_at: str,
+        session_id: str | None = None,
+        reason: str = "",
     ) -> dict[str, Any]:
         """Record one owner decision to lend the git credential.
 
@@ -5219,8 +5664,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (grant_id, principal_id, session_id, scope, reason[:500], now, expires_at),
             )
         return {
-            "grant_id": grant_id, "scope": scope, "status": "active",
-            "granted_at": now, "expires_at": expires_at, "session_id": session_id,
+            "grant_id": grant_id,
+            "scope": scope,
+            "status": "active",
+            "granted_at": now,
+            "expires_at": expires_at,
+            "session_id": session_id,
         }
 
     def active_git_credential_grant(
@@ -5277,7 +5726,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         """Owner-started repair. Returns the number of indexed rows."""
         with self.connect() as connection:
             self._rebuild_conversation_fts(connection)
-            return int(connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0] or 0)
+            return int(
+                connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0] or 0
+            )
 
     @staticmethod
     def _match_terms(query: str) -> list[str]:
@@ -5394,7 +5845,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def index_event(
-        self, event: AgentEvent, jsonl_path: str, jsonl_offset: int, payload_sha256: str,
+        self,
+        event: AgentEvent,
+        jsonl_path: str,
+        jsonl_offset: int,
+        payload_sha256: str,
         prev_event_sha256: str | None = None,
     ) -> None:
         with self.connect() as connection:
@@ -5478,27 +5933,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     action.action_id,
                     utc_now(),
                     utc_now()
-                      if status in {"success", "failed", "denied", "approval_required"}
-                      else None,
-                      action.proposed_by,
-                      owner_principal_id,
-                      action.action_id,
-                      machine_subject,
-                      action.action_id,
-                      machine_token_id,
-                      action.action_id,
-                      machine_key_id,
-                      action.action_id,
-                      machine_issued_at,
-                      action.action_id,
-                      machine_expires_at,
-                      action.action_id,
-                  ),
+                    if status in {"success", "failed", "denied", "approval_required"}
+                    else None,
+                    action.proposed_by,
+                    owner_principal_id,
+                    action.action_id,
+                    machine_subject,
+                    action.action_id,
+                    machine_token_id,
+                    action.action_id,
+                    machine_key_id,
+                    action.action_id,
+                    machine_issued_at,
+                    action.action_id,
+                    machine_expires_at,
+                    action.action_id,
+                ),
             )
 
-    def list_turn_tool_actions(
-        self, session_id: str, turn_id: str | None
-    ) -> list[dict[str, Any]]:
+    def list_turn_tool_actions(self, session_id: str, turn_id: str | None) -> list[dict[str, Any]]:
         """Every tool action proposed in one turn, oldest first.
 
         BUG-218 — the record `auto` mode's alignment check reads. A turn's own
@@ -5581,9 +6034,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         created_at = created.isoformat().replace("+00:00", "Z")
         expires_at: str | None = None
         if ttl_hours is not None and ttl_hours > 0:
-            expires_at = (
-                (created + timedelta(hours=ttl_hours)).isoformat().replace("+00:00", "Z")
-            )
+            expires_at = (created + timedelta(hours=ttl_hours)).isoformat().replace("+00:00", "Z")
         with self.connect() as connection:
             connection.execute(
                 """
@@ -5765,9 +6216,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         self, session_id: str, principal_id: str, turn_id: str | None = None
     ) -> list[dict[str, Any]]:
         """This conversation's recorded sources. Owner-scoped: never cross-account."""
-        query = (
-            "SELECT * FROM turn_sources WHERE session_id = ? AND principal_id = ?"
-        )
+        query = "SELECT * FROM turn_sources WHERE session_id = ? AND principal_id = ?"
         params: list[Any] = [session_id, principal_id]
         if turn_id:
             query += " AND turn_id = ?"
@@ -5831,9 +6280,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if principal_id:
             sql += " AND s.principal_id = ?"
             params.append(principal_id)
-        sql += (
-            " GROUP BY s.session_id ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
-        )
+        sql += " GROUP BY s.session_id ORDER BY refs DESC, last_referenced_at DESC LIMIT ?"
         params.append(limit)
         with self.connect() as connection:
             rows = connection.execute(sql, params).fetchall()
@@ -5933,9 +6380,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     # ── turn controls (B17/C13 — stop or steer a turn that is running) ───────
 
-    def request_turn_stop(
-        self, session_id: str, principal_id: str, *, reason: str
-    ) -> str:
+    def request_turn_stop(self, session_id: str, principal_id: str, *, reason: str) -> str:
         """Ask the turn running in this conversation to stop at its next boundary."""
         now = utc_now()
         with self.connect() as connection:
@@ -6041,11 +6486,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'suspended', NULL, ?, NULL,
                            ?, ?, ?)""",
                 (
-                    record["approval_id"], record["session_id"], record["turn_id"],
-                    record["request_id"], record["principal_id"], record["action_id"],
-                    record["tool_name"], record["call_id"], record["prompt_text"],
-                    record["messages_json"], record["options_json"], record["client_json"],
-                    int(record.get("tool_calls_made", 0)), utc_now(),
+                    record["approval_id"],
+                    record["session_id"],
+                    record["turn_id"],
+                    record["request_id"],
+                    record["principal_id"],
+                    record["action_id"],
+                    record["tool_name"],
+                    record["call_id"],
+                    record["prompt_text"],
+                    record["messages_json"],
+                    record["options_json"],
+                    record["client_json"],
+                    int(record.get("tool_calls_made", 0)),
+                    utc_now(),
                     # ADD-02 — the rest of the batch travels with the turn. A
                     # caller that parks a single call writes the defaults, which
                     # are exactly the pre-queue behaviour.
@@ -6646,7 +7100,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return self._task_from_row(scheduled), None
 
     def reschedule_task(self, task_id: str, scheduled_at: str, summary: str) -> None:
-        self._update_task(task_id, status="queued", scheduled_at=scheduled_at, current_step="Waiting for next scheduled run", progress_percent=0, completed_at=None, summary=summary)
+        self._update_task(
+            task_id,
+            status="queued",
+            scheduled_at=scheduled_at,
+            current_step="Waiting for next scheduled run",
+            progress_percent=0,
+            completed_at=None,
+            summary=summary,
+        )
 
     def _update_task(self, task_id: str, **updates: str | int | None) -> None:
         now = utc_now()
@@ -6793,9 +7255,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             # recorded on runtime channels that are not sessions — inside the
             # evidence. It cannot leak another account's conversation: theirs are
             # session records, so they fail both clauses and stay filtered.
-            unowned = (
-                "events_index.session_id NOT IN (SELECT session_id FROM sessions)"
-            )
+            unowned = "events_index.session_id NOT IN (SELECT session_id FROM sessions)"
             if user_id is None:
                 conditions.append(
                     "(events_index.session_id IN "
@@ -6863,7 +7323,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT COUNT(*) AS cnt FROM approvals WHERE status = 'pending'"
-                + (" AND action_id IN (SELECT action_id FROM tool_actions WHERE session_id = ?)" if session_id else ""),
+                + (
+                    " AND action_id IN (SELECT action_id FROM tool_actions WHERE session_id = ?)"
+                    if session_id
+                    else ""
+                ),
                 (session_id,) if session_id else (),
             ).fetchone()
         return int(row["cnt"]) if row else 0
@@ -6985,7 +7449,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 owner_filter = " AND connector_write_intents.principal_id = ?"
                 params = (approval_id, principal_id)
             else:
-                owner_filter = " AND (sessions.user_id = ? OR connector_write_intents.principal_id = ?)"
+                owner_filter = (
+                    " AND (sessions.user_id = ? OR connector_write_intents.principal_id = ?)"
+                )
                 params = (approval_id, user_id, principal_id)
         elif user_id is not None:
             owner_join = (
@@ -7019,9 +7485,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                   ON machine.principal_id = tool_actions.proposed_by
                 LEFT JOIN principals AS authorizer
                   ON authorizer.principal_id = approvals.approved_by
-                """ + owner_join + """
+                """
+                + owner_join
+                + """
                 WHERE approvals.approval_id = ?
-                """ + owner_filter,
+                """
+                + owner_filter,
                 params,
             ).fetchone()
         return dict(row) if row else None
@@ -7069,7 +7538,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return cursor.rowcount > 0
 
-    def list_memory_candidates(self, decision: str | None = None, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
+    def list_memory_candidates(
+        self, decision: str | None = None, *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM memory_candidates"
         params: list[Any] = []
         if decision is not None:
@@ -7224,12 +7695,27 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     storage_bytes, created_at, backend_version, scope, workload,
                     latency_distribution_json
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (evaluation_id, report.corpus_version, strategy or report.strategy, report.case_count, report.precision_at_k,
-                 report.recall_at_k, report.mean_reciprocal_rank, report.ndcg_at_k,
-                 report.policy_leak_count, report.p50_latency_ms, report.p95_latency_ms,
-                 report.token_count, report.compute_cost_usd, report.storage_bytes, utc_now(),
-                 report.backend_version, report.scope, report.workload,
-                 json.dumps(report.latency_distribution, sort_keys=True)),
+                (
+                    evaluation_id,
+                    report.corpus_version,
+                    strategy or report.strategy,
+                    report.case_count,
+                    report.precision_at_k,
+                    report.recall_at_k,
+                    report.mean_reciprocal_rank,
+                    report.ndcg_at_k,
+                    report.policy_leak_count,
+                    report.p50_latency_ms,
+                    report.p95_latency_ms,
+                    report.token_count,
+                    report.compute_cost_usd,
+                    report.storage_bytes,
+                    utc_now(),
+                    report.backend_version,
+                    report.scope,
+                    report.workload,
+                    json.dumps(report.latency_distribution, sort_keys=True),
+                ),
             )
         return evaluation_id
 
@@ -7434,24 +7920,55 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def link_memory_entities(
-        self, relationship_id: str, subject_entity_id: str, predicate: str, object_entity_id: str,
-        evidence_memory_id: str, confidence: float,
+        self,
+        relationship_id: str,
+        subject_entity_id: str,
+        predicate: str,
+        object_entity_id: str,
+        evidence_memory_id: str,
+        confidence: float,
     ) -> None:
-        if not predicate.strip() or not 0 <= confidence <= 1 or self.get_active_approved_memory(evidence_memory_id) is None:
+        if (
+            not predicate.strip()
+            or not 0 <= confidence <= 1
+            or self.get_active_approved_memory(evidence_memory_id) is None
+        ):
             raise ValueError("invalid_memory_relationship")
         with self.connect() as connection:
             connection.execute(
                 "INSERT OR IGNORE INTO memory_entity_relationships VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-                (relationship_id, subject_entity_id, predicate.strip(), object_entity_id, evidence_memory_id, confidence, utc_now()),
+                (
+                    relationship_id,
+                    subject_entity_id,
+                    predicate.strip(),
+                    object_entity_id,
+                    evidence_memory_id,
+                    confidence,
+                    utc_now(),
+                ),
             )
-        self.link_memory_projection(evidence_memory_id, "graph", relationship_id, "memory-entity-v1")
+        self.link_memory_projection(
+            evidence_memory_id, "graph", relationship_id, "memory-entity-v1"
+        )
 
     def create_memory_relationship_candidate(
-        self, candidate_id: str, *, subject_name: str, subject_type: str, predicate: str,
-        object_name: str, object_type: str, evidence_memory_id: str, confidence: float,
-        owner_principal_id: str | None = None, extractor_version: str = "manual-v1",
+        self,
+        candidate_id: str,
+        *,
+        subject_name: str,
+        subject_type: str,
+        predicate: str,
+        object_name: str,
+        object_type: str,
+        evidence_memory_id: str,
+        confidence: float,
+        owner_principal_id: str | None = None,
+        extractor_version: str = "manual-v1",
     ) -> bool:
-        if not all(value.strip() for value in (subject_name, subject_type, predicate, object_name, object_type)):
+        if not all(
+            value.strip()
+            for value in (subject_name, subject_type, predicate, object_name, object_type)
+        ):
             raise ValueError("invalid_memory_relationship_candidate")
         evidence = self.get_active_approved_memory(
             evidence_memory_id, owner_principal_id=owner_principal_id
@@ -7517,9 +8034,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def list_memory_relationships(
-        self, owner_principal_id: str
-    ) -> list[dict[str, Any]]:
+    def list_memory_relationships(self, owner_principal_id: str) -> list[dict[str, Any]]:
         """Active graph edges whose approved evidence belongs to one owner."""
         now = utc_now()
         with self.connect() as connection:
@@ -7575,7 +8090,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return True
 
     def resolve_memory_relationship_candidate(
-        self, candidate_id: str, *, decision: str, resolved_by: str,
+        self,
+        candidate_id: str,
+        *,
+        decision: str,
+        resolved_by: str,
     ) -> bool:
         if decision not in {"approved", "denied"} or not resolved_by.strip():
             raise ValueError("invalid_memory_relationship_resolution")
@@ -7747,7 +8266,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def mark_approved_memory_forgotten(
-        self, memory_id: str, *, deleted_at: str, updated_at: str,
+        self,
+        memory_id: str,
+        *,
+        deleted_at: str,
+        updated_at: str,
         owner_principal_id: str | None = None,
     ) -> bool:
         with self.connect() as connection:
@@ -7757,30 +8280,66 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 SET approval_state = ?, deleted_at = ?, updated_at = ?
                 WHERE memory_id = ? AND deleted_at IS NULL"""
                 + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                ("forgotten", deleted_at, updated_at, memory_id, *([owner_principal_id] if owner_principal_id else [])),
+                (
+                    "forgotten",
+                    deleted_at,
+                    updated_at,
+                    memory_id,
+                    *([owner_principal_id] if owner_principal_id else []),
+                ),
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
         return cursor.rowcount > 0
 
-    def set_approved_memory_archived(self, memory_id: str, *, archived_at: str | None, updated_at: str | None, owner_principal_id: str | None = None) -> bool:
+    def set_approved_memory_archived(
+        self,
+        memory_id: str,
+        *,
+        archived_at: str | None,
+        updated_at: str | None,
+        owner_principal_id: str | None = None,
+    ) -> bool:
         with self.connect() as connection:
             cursor = connection.execute(
                 "UPDATE approved_memory SET archived_at = ?, updated_at = ? WHERE memory_id = ? AND deleted_at IS NULL"
                 + (" AND owner_principal_id = ?" if owner_principal_id else ""),
-                (archived_at, updated_at, memory_id, *([owner_principal_id] if owner_principal_id else [])),
+                (
+                    archived_at,
+                    updated_at,
+                    memory_id,
+                    *([owner_principal_id] if owner_principal_id else []),
+                ),
             )
             self._sync_memory_fts(connection, memory_id)
             self._sync_memory_projection_eligibility(connection, memory_id)
         return cursor.rowcount > 0
 
-    def create_memory_purge_record(self, purge_id: str, memory_id: str, requested_by: str, confirmed_at: str, disposition: dict[str, Any]) -> None:
+    def create_memory_purge_record(
+        self,
+        purge_id: str,
+        memory_id: str,
+        requested_by: str,
+        confirmed_at: str,
+        disposition: dict[str, Any],
+    ) -> None:
         with self.connect() as connection:
-            connection.execute("INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)", (purge_id, memory_id, requested_by, confirmed_at, json.dumps(disposition, sort_keys=True)))
+            connection.execute(
+                "INSERT INTO memory_purge_records (purge_id, memory_id, requested_by, confirmed_at, disposition_json) VALUES (?, ?, ?, ?, ?)",
+                (
+                    purge_id,
+                    memory_id,
+                    requested_by,
+                    confirmed_at,
+                    json.dumps(disposition, sort_keys=True),
+                ),
+            )
 
     def deactivate_memory_projections(self, memory_id: str) -> None:
         with self.connect() as connection:
-            connection.execute("UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,))
+            connection.execute(
+                "UPDATE memory_projections SET active = 0 WHERE memory_id = ?", (memory_id,)
+            )
 
     def set_memory_projections_active(self, memory_id: str, active: bool) -> None:
         with self.connect() as connection:
@@ -7802,12 +8361,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             (int(enabled), now, now, now, memory_id),
         )
 
-    def link_memory_projection(self, memory_id: str, projection_type: str, projection_id: str, source_version: str, *, owner_principal_id: str | None = None) -> None:
+    def link_memory_projection(
+        self,
+        memory_id: str,
+        projection_type: str,
+        projection_id: str,
+        source_version: str,
+        *,
+        owner_principal_id: str | None = None,
+    ) -> None:
         if projection_type not in {"fts", "vector", "graph"}:
             raise ValueError("invalid_memory_projection_type")
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT 1 FROM approved_memory WHERE memory_id = ?" + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                "SELECT 1 FROM approved_memory WHERE memory_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
                 (memory_id, *([owner_principal_id] if owner_principal_id else [])),
             ).fetchone()
             if row is None:
@@ -7820,7 +8388,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def list_memory_projections(self, memory_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:
-            rows = connection.execute("SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id", (memory_id,)).fetchall()
+            rows = connection.execute(
+                "SELECT * FROM memory_projections WHERE memory_id = ? ORDER BY projection_type, projection_id",
+                (memory_id,),
+            ).fetchall()
         return [dict(row) for row in rows]
 
     def get_active_approved_memory(
@@ -7840,7 +8411,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return dict(row) if row else None
 
-    def reconcile_memory_projections(self, *, owner_principal_id: str | None = None) -> dict[str, int]:
+    def reconcile_memory_projections(
+        self, *, owner_principal_id: str | None = None
+    ) -> dict[str, int]:
         with self.connect() as connection:
             now = utc_now()
             cursor = connection.execute(
@@ -7852,7 +8425,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     AND (m.valid_from IS NULL OR m.valid_from <= ?)
                     AND (m.valid_until IS NULL OR m.valid_until > ?) AND m.superseded_at IS NULL
                 ) THEN 1 ELSE 0 END"""
-                + (" WHERE memory_id IN (SELECT memory_id FROM approved_memory WHERE owner_principal_id = ?)" if owner_principal_id else ""),
+                + (
+                    " WHERE memory_id IN (SELECT memory_id FROM approved_memory WHERE owner_principal_id = ?)"
+                    if owner_principal_id
+                    else ""
+                ),
                 (now, now, now, *([owner_principal_id] if owner_principal_id else [])),
             )
             if owner_principal_id is None:
@@ -7919,16 +8496,23 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 f"{SQLiteStore.text_search_engine(connection)}("
                 "memory_id UNINDEXED, text, tags)"
             )
-        connection.execute("""INSERT INTO approved_memory_fts(memory_id, text, tags)
+        connection.execute(
+            """INSERT INTO approved_memory_fts(memory_id, text, tags)
             SELECT memory_id, text, tags_json FROM approved_memory
             WHERE deleted_at IS NULL AND archived_at IS NULL AND search_enabled = 1
               AND (expires_at IS NULL OR expires_at > ?)
               AND (valid_from IS NULL OR valid_from <= ?) AND (valid_until IS NULL OR valid_until > ?)
-              AND superseded_at IS NULL""", (utc_now(), utc_now(), utc_now()))
+              AND superseded_at IS NULL""",
+            (utc_now(), utc_now(), utc_now()),
+        )
 
     def search_approved_memory(
-        self, query: str, scope: str | None = None, limit: int = 20,
-        *, owner_principal_id: str | None = None,
+        self,
+        query: str,
+        scope: str | None = None,
+        limit: int = 20,
+        *,
+        owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
         terms = self._match_terms(query)
         if not terms:
@@ -8004,7 +8588,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
-    def delete_approved_memory(self, memory_id: str, *, owner_principal_id: str | None = None) -> None:
+    def delete_approved_memory(
+        self, memory_id: str, *, owner_principal_id: str | None = None
+    ) -> None:
         with self.connect() as connection:
             connection.execute("DELETE FROM approved_memory_fts WHERE memory_id = ?", (memory_id,))
             connection.execute(
@@ -8014,7 +8600,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
 
     def list_approved_memory(
-        self, scope: str | None = None, limit: int = 50, *, include_search_disabled: bool = False,
+        self,
+        scope: str | None = None,
+        limit: int = 50,
+        *,
+        include_search_disabled: bool = False,
         owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
         now = utc_now()
@@ -8045,7 +8635,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode, reasoning_budget_tokens, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (state.session_id, state.profile_id, state.model, int(state.reasoning_enabled), state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
+                (
+                    state.session_id,
+                    state.profile_id,
+                    state.model,
+                    int(state.reasoning_enabled),
+                    state.reasoning_effort,
+                    state.reasoning_mode,
+                    state.reasoning_budget_tokens,
+                    utc_now(),
+                ),
             )
 
     def load_model_setup_state(self, owner_principal_id: str) -> ModelSetupState:
@@ -8099,17 +8698,31 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def replace_local_models(self, owner_principal_id: str, models: list[LocalModel]) -> None:
         with self.connect() as connection:
-            connection.execute("DELETE FROM local_models WHERE owner_principal_id = ?", (owner_principal_id,))
+            connection.execute(
+                "DELETE FROM local_models WHERE owner_principal_id = ?", (owner_principal_id,)
+            )
             connection.executemany(
                 """INSERT INTO local_models
                 (owner_principal_id, root_path, model_id, name, architecture, quantization,
                  primary_path, shard_count, expected_shards, complete, size_bytes, indexed_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                [(
-                    model.owner_principal_id, model.root_path, model.model_id, model.name,
-                    model.architecture, model.quantization, model.primary_path, model.shard_count,
-                    model.expected_shards, int(model.complete), model.size_bytes, model.indexed_at,
-                ) for model in models],
+                [
+                    (
+                        model.owner_principal_id,
+                        model.root_path,
+                        model.model_id,
+                        model.name,
+                        model.architecture,
+                        model.quantization,
+                        model.primary_path,
+                        model.shard_count,
+                        model.expected_shards,
+                        int(model.complete),
+                        model.size_bytes,
+                        model.indexed_at,
+                    )
+                    for model in models
+                ],
             )
 
     def list_local_models(self, owner_principal_id: str) -> list[LocalModel]:
@@ -8139,7 +8752,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return ModelOperation(**dict(row))
 
     def update_model_operation(self, operation_id: str, **updates: Any) -> None:
-        allowed = {"state", "phase", "progress_bytes", "total_bytes", "progress_percent", "error_code", "error_detail"}
+        allowed = {
+            "state",
+            "phase",
+            "progress_bytes",
+            "total_bytes",
+            "progress_percent",
+            "error_code",
+            "error_detail",
+        }
         fields = {key: value for key, value in updates.items() if key in allowed}
         if not fields:
             return
@@ -8188,8 +8809,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (owner_principal_id, status, step, path, selected_profile_id, selected_model, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    saved.owner_principal_id, saved.status, saved.step, saved.path,
-                    saved.selected_profile_id, saved.selected_model, saved.created_at, saved.updated_at,
+                    saved.owner_principal_id,
+                    saved.status,
+                    saved.step,
+                    saved.path,
+                    saved.selected_profile_id,
+                    saved.selected_model,
+                    saved.created_at,
+                    saved.updated_at,
                 ),
             )
         return saved
@@ -8209,7 +8836,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def save_setup_state(self, state: SetupState) -> SetupState:
         now = utc_now()
-        saved = SetupState(**(state.to_dict() | {"created_at": state.created_at or now, "updated_at": now}))
+        saved = SetupState(
+            **(state.to_dict() | {"created_at": state.created_at or now, "updated_at": now})
+        )
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO setup_state
@@ -8218,11 +8847,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                  backup_target, backup_verified_at, background_service_enabled, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    saved.owner_principal_id, saved.status, saved.stage,
-                    saved.selected_profile_id, saved.selected_model, int(saved.model_deferred),
-                    saved.privacy_mode, saved.privacy_acknowledged_at, saved.backup_mode,
-                    saved.backup_target, saved.backup_verified_at,
-                    int(saved.background_service_enabled), saved.created_at, saved.updated_at,
+                    saved.owner_principal_id,
+                    saved.status,
+                    saved.stage,
+                    saved.selected_profile_id,
+                    saved.selected_model,
+                    int(saved.model_deferred),
+                    saved.privacy_mode,
+                    saved.privacy_acknowledged_at,
+                    saved.backup_mode,
+                    saved.backup_target,
+                    saved.backup_verified_at,
+                    int(saved.background_service_enabled),
+                    saved.created_at,
+                    saved.updated_at,
                 ),
             )
         return saved
@@ -8289,9 +8927,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_user(self, user_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM users WHERE user_id = ?", (user_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM users WHERE user_id = ?", (user_id,)).fetchone()
         return dict(row) if row else None
 
     def deactivate_user(self, user_id: str) -> bool:
@@ -8328,9 +8964,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_role(self, role_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM roles WHERE role_id = ?", (role_id,)
-            ).fetchone()
+            row = connection.execute("SELECT * FROM roles WHERE role_id = ?", (role_id,)).fetchone()
         return dict(row) if row else None
 
     def delete_role(self, role_id: str) -> bool:
@@ -8441,9 +9075,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return str(row["payload_sha256"]) if row else None
 
-    def list_session_events_for_integrity(
-        self, session_id: str
-    ) -> list[dict[str, Any]]:
+    def list_session_events_for_integrity(self, session_id: str) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
                 "SELECT event_id, payload_sha256, prev_event_sha256, jsonl_path, jsonl_offset FROM events_index WHERE session_id = ? ORDER BY jsonl_offset ASC",
@@ -8516,7 +9148,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (routine_id, name, routine_type, schedule, endpoint, enabled, created_by, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (routine.routine_id, routine.name, routine.routine_type, routine.schedule, routine.endpoint, int(routine.enabled), routine.created_by, routine.created_at, routine.updated_at),
+                (
+                    routine.routine_id,
+                    routine.name,
+                    routine.routine_type,
+                    routine.schedule,
+                    routine.endpoint,
+                    int(routine.enabled),
+                    routine.created_by,
+                    routine.created_at,
+                    routine.updated_at,
+                ),
             )
 
     def list_hosted_routines(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -8544,7 +9186,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (budget_id, name, max_cost, current_cost, currency, scope, enabled, created_by, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (budget.budget_id, budget.name, budget.max_cost, budget.current_cost, budget.currency, budget.scope, int(budget.enabled), budget.created_by, budget.created_at, budget.updated_at),
+                (
+                    budget.budget_id,
+                    budget.name,
+                    budget.max_cost,
+                    budget.current_cost,
+                    budget.currency,
+                    budget.scope,
+                    int(budget.enabled),
+                    budget.created_by,
+                    budget.created_at,
+                    budget.updated_at,
+                ),
             )
 
     def list_budget_records(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -8580,7 +9233,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (policy_id, target_type, retention_days, legal_hold, enabled, created_by, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (policy.policy_id, policy.target_type, policy.retention_days, int(policy.legal_hold), int(policy.enabled), policy.created_by, policy.created_at, policy.updated_at),
+                (
+                    policy.policy_id,
+                    policy.target_type,
+                    policy.retention_days,
+                    int(policy.legal_hold),
+                    int(policy.enabled),
+                    policy.created_by,
+                    policy.created_at,
+                    policy.updated_at,
+                ),
             )
 
     def list_retention_policies(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -8602,10 +9264,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                  encryption_key_id, retention_until, legal_hold, erasure_requested_at, erased_at, restore_verified_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (manifest.manifest_id, manifest.backup_type, manifest.scope_json, manifest.path, manifest.checksum, manifest.size_bytes, manifest.created_by, manifest.created_at, manifest.encryption_key_id, manifest.retention_until, int(manifest.legal_hold), manifest.erasure_requested_at, manifest.erased_at, manifest.restore_verified_at),
+                (
+                    manifest.manifest_id,
+                    manifest.backup_type,
+                    manifest.scope_json,
+                    manifest.path,
+                    manifest.checksum,
+                    manifest.size_bytes,
+                    manifest.created_by,
+                    manifest.created_at,
+                    manifest.encryption_key_id,
+                    manifest.retention_until,
+                    int(manifest.legal_hold),
+                    manifest.erasure_requested_at,
+                    manifest.erased_at,
+                    manifest.restore_verified_at,
+                ),
             )
         self.record_memory_lifecycle_event(
-            f"backup:{manifest.manifest_id}", "backup_access", manifest.created_by, {"operation": "catalog_register"}
+            f"backup:{manifest.manifest_id}",
+            "backup_access",
+            manifest.created_by,
+            {"operation": "catalog_register"},
         )
 
     def list_backup_manifests(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -8624,7 +9304,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         changed = cursor.rowcount > 0
         if changed:
             self.record_memory_lifecycle_event(
-                f"backup:{manifest_id}", "backup_access", actor_id, {"operation": "erasure_requested"}
+                f"backup:{manifest_id}",
+                "backup_access",
+                actor_id,
+                {"operation": "erasure_requested"},
             )
         return changed
 
@@ -8650,7 +9333,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         changed = cursor.rowcount > 0
         if changed:
             self.record_memory_lifecycle_event(
-                f"backup:{manifest_id}", "backup_access", actor_id, {"operation": "restore_verified"}
+                f"backup:{manifest_id}",
+                "backup_access",
+                actor_id,
+                {"operation": "restore_verified"},
             )
         return changed
 
@@ -8681,7 +9367,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (job_id, job_type, dedup_key, max_attempts, now, now),
             )
             row = connection.execute(
-                "SELECT job_id FROM memory_jobs WHERE job_type = ? AND dedup_key = ?", (job_type, dedup_key)
+                "SELECT job_id FROM memory_jobs WHERE job_type = ? AND dedup_key = ?",
+                (job_type, dedup_key),
             ).fetchone()
         return str(row["job_id"])
 
@@ -8691,7 +9378,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
                 """SELECT * FROM memory_jobs WHERE status IN ('queued', 'retry')
-                OR (status = 'running' AND lease_until < ?) ORDER BY created_at LIMIT 1""", (now,)
+                OR (status = 'running' AND lease_until < ?) ORDER BY created_at LIMIT 1""",
+                (now,),
             ).fetchone()
             if row is None:
                 return None
@@ -8699,7 +9387,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE memory_jobs SET status = 'running', attempts = attempts + 1, lease_until = ?, updated_at = ? WHERE job_id = ?",
                 (lease_until, now, row["job_id"]),
             )
-            claimed = connection.execute("SELECT * FROM memory_jobs WHERE job_id = ?", (row["job_id"],)).fetchone()
+            claimed = connection.execute(
+                "SELECT * FROM memory_jobs WHERE job_id = ?", (row["job_id"],)
+            ).fetchone()
         return dict(claimed) if claimed else None
 
     def finish_memory_job(self, job_id: str, error: str | None = None) -> bool:
@@ -8707,7 +9397,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             if error is None:
                 cursor = connection.execute(
-                    "UPDATE memory_jobs SET status = 'completed', lease_until = NULL, updated_at = ? WHERE job_id = ? AND status = 'running'", (now, job_id)
+                    "UPDATE memory_jobs SET status = 'completed', lease_until = NULL, updated_at = ? WHERE job_id = ? AND status = 'running'",
+                    (now, job_id),
                 )
             else:
                 cursor = connection.execute(
@@ -8724,14 +9415,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             row = connection.execute(
-                "SELECT count FROM memory_job_rate_windows WHERE job_type = ? AND window_started_at = ?", (job_type, window)
+                "SELECT count FROM memory_job_rate_windows WHERE job_type = ? AND window_started_at = ?",
+                (job_type, window),
             ).fetchone()
             count = int(row["count"]) if row else 0
             if count >= limit_per_minute:
                 return False
             connection.execute(
                 """INSERT INTO memory_job_rate_windows VALUES (?, ?, 1)
-                ON CONFLICT(job_type, window_started_at) DO UPDATE SET count = count + 1""", (job_type, window)
+                ON CONFLICT(job_type, window_started_at) DO UPDATE SET count = count + 1""",
+                (job_type, window),
             )
         return True
 
@@ -8756,20 +9449,44 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             "average_completion_latency_ms": float(completed["latency_ms"] or 0.0),
         }
 
-    def record_memory_lifecycle_event(self, memory_id: str, action: str, actor_id: str, details: dict[str, Any] | None = None) -> str:
+    def record_memory_lifecycle_event(
+        self, memory_id: str, action: str, actor_id: str, details: dict[str, Any] | None = None
+    ) -> str:
         from raiker.contracts.ids import new_id
 
         if action not in {
-            "archive", "restore", "forget", "purge", "correct", "export", "import", "recall",
-            "approve", "reject", "edit", "pin", "unpin", "scope_change", "expiry_change",
-            "legal_hold", "backup_access", "admin_access",
+            "archive",
+            "restore",
+            "forget",
+            "purge",
+            "correct",
+            "export",
+            "import",
+            "recall",
+            "approve",
+            "reject",
+            "edit",
+            "pin",
+            "unpin",
+            "scope_change",
+            "expiry_change",
+            "legal_hold",
+            "backup_access",
+            "admin_access",
         }:
             raise ValueError("invalid_memory_lifecycle_action")
         audit_id = new_id("mla_")
         with self.connect() as connection:
             connection.execute(
                 "INSERT INTO memory_lifecycle_audit VALUES (?, ?, ?, ?, ?, ?)",
-                (audit_id, memory_id, action, actor_id, json.dumps(details or {}, sort_keys=True), utc_now()),
+                (
+                    audit_id,
+                    memory_id,
+                    action,
+                    actor_id,
+                    json.dumps(details or {}, sort_keys=True),
+                    utc_now(),
+                ),
             )
         return audit_id
 
@@ -8789,10 +9506,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 FROM memory_lifecycle_audit WHERE memory_id = ? ORDER BY created_at DESC, audit_id DESC""",
                 (memory_id,),
             ).fetchall()
-        return [
-            {**dict(row), "details": json.loads(row["details_json"] or "{}")}
-            for row in rows
-        ]
+        return [{**dict(row), "details": json.loads(row["details_json"] or "{}")} for row in rows]
 
     # ── Phase 6: Channels & Relay ──
 
@@ -8804,7 +9518,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (pairing_id, connector_id, channel_type, display_name, paired_at, paired_by, enabled, sender_allowlist_json)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (pairing.pairing_id, pairing.connector_id, pairing.channel_type, pairing.display_name, pairing.paired_at, pairing.paired_by, int(pairing.enabled), pairing.sender_allowlist_json),
+                (
+                    pairing.pairing_id,
+                    pairing.connector_id,
+                    pairing.channel_type,
+                    pairing.display_name,
+                    pairing.paired_at,
+                    pairing.paired_by,
+                    int(pairing.enabled),
+                    pairing.sender_allowlist_json,
+                ),
             )
 
     def list_channel_pairings(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -8875,7 +9598,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (relay_id, pairing_id, action_id, status, requested_at, resolved_at, resolved_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (relay.relay_id, relay.pairing_id, relay.action_id, relay.status, relay.requested_at, relay.resolved_at, relay.resolved_by),
+                (
+                    relay.relay_id,
+                    relay.pairing_id,
+                    relay.action_id,
+                    relay.status,
+                    relay.requested_at,
+                    relay.resolved_at,
+                    relay.resolved_by,
+                ),
             )
 
     # ── Phase 4 slice 2: scheduled routines (on-demand; no daemon) ──
@@ -8889,9 +9620,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    routine["routine_id"], routine["name"], int(routine["interval_seconds"]),
-                    routine["payload_json"], int(routine.get("enabled", 0)), routine["next_run"],
-                    routine.get("last_run"), routine["created_by"], routine["created_at"],
+                    routine["routine_id"],
+                    routine["name"],
+                    int(routine["interval_seconds"]),
+                    routine["payload_json"],
+                    int(routine.get("enabled", 0)),
+                    routine["next_run"],
+                    routine.get("last_run"),
+                    routine["created_by"],
+                    routine["created_at"],
                     routine.get("status", "scheduled"),
                 ),
             )
@@ -8921,7 +9658,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def update_scheduled_routine_run(self, routine_id: str, *, last_run: str, next_run: str) -> None:
+    def update_scheduled_routine_run(
+        self, routine_id: str, *, last_run: str, next_run: str
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 "UPDATE scheduled_routines SET last_run = ?, next_run = ? WHERE routine_id = ?",
@@ -8938,7 +9677,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (subagent_id, parent_task_id, name, mode, allowed_tools_json, max_depth, max_runtime_seconds, max_cost, created_by, created_at, status, max_steps, max_tool_calls, max_tokens)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (contract.subagent_id, contract.parent_task_id, contract.name, contract.mode, contract.allowed_tools_json, contract.max_depth, contract.max_runtime_seconds, contract.max_cost, contract.created_by, contract.created_at, contract.status, contract.max_steps, contract.max_tool_calls, contract.max_tokens),
+                (
+                    contract.subagent_id,
+                    contract.parent_task_id,
+                    contract.name,
+                    contract.mode,
+                    contract.allowed_tools_json,
+                    contract.max_depth,
+                    contract.max_runtime_seconds,
+                    contract.max_cost,
+                    contract.created_by,
+                    contract.created_at,
+                    contract.status,
+                    contract.max_steps,
+                    contract.max_tool_calls,
+                    contract.max_tokens,
+                ),
             )
 
     def list_subagent_contracts(self) -> list[dict[str, Any]]:
@@ -8958,7 +9712,17 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (team_id, name, mode, members_json, max_depth, max_cost, created_by, created_at, status)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (team.team_id, team.name, team.mode, team.members_json, team.max_depth, team.max_cost, team.created_by, team.created_at, team.status),
+                (
+                    team.team_id,
+                    team.name,
+                    team.mode,
+                    team.members_json,
+                    team.max_depth,
+                    team.max_cost,
+                    team.created_by,
+                    team.created_at,
+                    team.status,
+                ),
             )
 
     def list_team_ledgers(self) -> list[dict[str, Any]]:
@@ -8978,10 +9742,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (profile_id, profile_type, name, config_json, enabled, created_by, created_at, updated_at, owner_principal_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (profile.profile_id, profile.profile_type, profile.name, profile.config_json, int(profile.enabled), profile.created_by, profile.created_at, profile.updated_at, profile.created_by),
+                (
+                    profile.profile_id,
+                    profile.profile_type,
+                    profile.name,
+                    profile.config_json,
+                    int(profile.enabled),
+                    profile.created_by,
+                    profile.created_at,
+                    profile.updated_at,
+                    profile.created_by,
+                ),
             )
 
-    def list_remote_execution_profiles(self, enabled_only: bool = False, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
+    def list_remote_execution_profiles(
+        self, enabled_only: bool = False, *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM remote_execution_profiles"
         params: list[Any] = []
         conditions: list[str] = []
@@ -9025,7 +9801,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return str(row["profile_id"]) if row else "local_native"
 
     @staticmethod
-    def _cloud_cost_totals(rows: list[Any]) -> tuple[Decimal, Decimal, Decimal, list[dict[str, Any]]]:
+    def _cloud_cost_totals(
+        rows: list[Any],
+    ) -> tuple[Decimal, Decimal, Decimal, list[dict[str, Any]]]:
         actions: dict[str, dict[str, Any]] = {}
         provider_snapshots: list[Decimal] = []
         history: list[dict[str, Any]] = []
@@ -9042,7 +9820,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             else:
                 action = actions.setdefault(
                     str(item["action_id"]),
-                    {"estimated": Decimal("0"), "actual": None, "released": False, "status": "pending"},
+                    {
+                        "estimated": Decimal("0"),
+                        "actual": None,
+                        "released": False,
+                        "status": "pending",
+                    },
                 )
             if event_type == "reserved":
                 assert action is not None
@@ -9053,7 +9836,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             elif event_type == "released":
                 assert action is not None
                 action.update(released=True, status="released")
-            elif event_type == "provider_unavailable" and action is not None and action["status"] == "reserved":
+            elif (
+                event_type == "provider_unavailable"
+                and action is not None
+                and action["status"] == "reserved"
+            ):
                 action["status"] = "provider_unavailable"
             history.append(
                 {
@@ -9080,7 +9867,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         )
         provider_spend = (
             max(provider_snapshots[-1] - provider_snapshots[0], Decimal("0"))
-            if len(provider_snapshots) >= 2 else Decimal("0")
+            if len(provider_snapshots) >= 2
+            else Decimal("0")
         )
         return actual, reserved, provider_spend, history
 
@@ -9104,7 +9892,10 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ORDER BY rowid""",
                 (owner_principal_id, profile_id),
             ).fetchall()
-            if any(str(row["action_id"]) == action_id and row["event_type"] == "reserved" for row in rows):
+            if any(
+                str(row["action_id"]) == action_id and row["event_type"] == "reserved"
+                for row in rows
+            ):
                 return False
             actual, reserved, provider_spend, _history = self._cloud_cost_totals(list(rows))
             if limit <= 0 or max(actual, provider_spend) + reserved + estimate > limit:
@@ -9114,7 +9905,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (event_id, owner_principal_id, profile_id, action_id, event_type, amount,
                  provider_reference, reason, recorded_at)
                 VALUES (?, ?, ?, ?, 'reserved', ?, NULL, NULL, ?)""",
-                (new_id("cost_"), owner_principal_id, profile_id, action_id, str(estimate), utc_now()),
+                (
+                    new_id("cost_"),
+                    owner_principal_id,
+                    profile_id,
+                    action_id,
+                    str(estimate),
+                    utc_now(),
+                ),
             )
         return True
 
@@ -9129,7 +9927,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         provider_reference: str | None = None,
         reason: str | None = None,
     ) -> None:
-        if event_type not in {"reconciled", "released", "provider_snapshot", "provider_unavailable"}:
+        if event_type not in {
+            "reconciled",
+            "released",
+            "provider_snapshot",
+            "provider_unavailable",
+        }:
             raise ValueError("invalid_cloud_cost_event")
         with self.connect() as connection:
             connection.execute(
@@ -9138,8 +9941,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                  provider_reference, reason, recorded_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
-                    new_id("cost_"), owner_principal_id, profile_id, action_id, event_type,
-                    str(Decimal(str(max(amount, 0)))), provider_reference, reason, utc_now(),
+                    new_id("cost_"),
+                    owner_principal_id,
+                    profile_id,
+                    action_id,
+                    event_type,
+                    str(Decimal(str(max(amount, 0)))),
+                    provider_reference,
+                    reason,
+                    utc_now(),
                 ),
             )
 
@@ -9161,10 +9971,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             "provider_cost": float(provider_spend),
             "reserved_cost": float(reserved),
             "committed_cost": float(committed),
-            "remaining_cost": float(max(limit - committed, Decimal("0"))) if limit is not None else None,
+            "remaining_cost": float(max(limit - committed, Decimal("0")))
+            if limit is not None
+            else None,
             "reconciliation_status": (
-                "provider_unavailable" if any(item["event_type"] == "provider_unavailable" for item in history)
-                and reserved > 0 else "reconciled" if history and reserved == 0 else "reserved" if reserved > 0 else "not_started"
+                "provider_unavailable"
+                if any(item["event_type"] == "provider_unavailable" for item in history)
+                and reserved > 0
+                else "reconciled"
+                if history and reserved == 0
+                else "reserved"
+                if reserved > 0
+                else "not_started"
             ),
             "history": history,
         }
@@ -9177,7 +9995,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (budget_id, name, max_cost, current_cost, currency, profile_id, enabled, created_by, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (budget.budget_id, budget.name, budget.max_cost, budget.current_cost, budget.currency, budget.profile_id, int(budget.enabled), budget.created_by, budget.created_at, budget.updated_at),
+                (
+                    budget.budget_id,
+                    budget.name,
+                    budget.max_cost,
+                    budget.current_cost,
+                    budget.currency,
+                    budget.profile_id,
+                    int(budget.enabled),
+                    budget.created_by,
+                    budget.created_at,
+                    budget.updated_at,
+                ),
             )
 
     def list_execution_budgets(self, enabled_only: bool = False) -> list[dict[str, Any]]:
@@ -9207,13 +10036,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (execution_id, plugin_id, version, trust_level, permissions_json, entrypoint, status, started_at, completed_at, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.execution_id, record.plugin_id, record.version, record.trust_level, record.permissions_json, record.entrypoint, record.status, record.started_at, record.completed_at, record.created_by),
+                (
+                    record.execution_id,
+                    record.plugin_id,
+                    record.version,
+                    record.trust_level,
+                    record.permissions_json,
+                    record.entrypoint,
+                    record.status,
+                    record.started_at,
+                    record.completed_at,
+                    record.created_by,
+                ),
             )
 
     def list_plugin_execution_records(self, limit: int = 20) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM plugin_execution_records ORDER BY COALESCE(started_at, created_by) DESC LIMIT ?", (limit,)
+                "SELECT * FROM plugin_execution_records ORDER BY COALESCE(started_at, created_by) DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -9227,13 +10068,23 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (index_id, workspace_root, status, nodes_count, edges_count, started_at, completed_at, created_by)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.index_id, record.workspace_root, record.status, record.nodes_count, record.edges_count, record.started_at, record.completed_at, record.created_by),
+                (
+                    record.index_id,
+                    record.workspace_root,
+                    record.status,
+                    record.nodes_count,
+                    record.edges_count,
+                    record.started_at,
+                    record.completed_at,
+                    record.created_by,
+                ),
             )
 
     def list_graph_index_records(self, limit: int = 20) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM graph_index_records ORDER BY COALESCE(started_at, index_id) DESC LIMIT ?", (limit,)
+                "SELECT * FROM graph_index_records ORDER BY COALESCE(started_at, index_id) DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -9247,13 +10098,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (write_id, content_summary, embedding_model, vector_count, status, approved_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.write_id, record.content_summary, record.embedding_model, record.vector_count, record.status, record.approved_by, record.created_at),
+                (
+                    record.write_id,
+                    record.content_summary,
+                    record.embedding_model,
+                    record.vector_count,
+                    record.status,
+                    record.approved_by,
+                    record.created_at,
+                ),
             )
 
     def list_semantic_memory_writes(self, limit: int = 20) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
-                "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?", (limit,)
+                "SELECT * FROM semantic_memory_write_records ORDER BY created_at DESC LIMIT ?",
+                (limit,),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -9267,10 +10127,34 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (vector_id, content_hash, content_preview, embedding_model, dimensions, scope, sensitivity, embedding, created_at, owner_principal_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (record.vector_id, record.content_hash, record.content_preview, record.embedding_model, record.dimensions, record.scope, record.sensitivity, record.embedding, record.created_at, record.owner_principal_id),
+                (
+                    record.vector_id,
+                    record.content_hash,
+                    record.content_preview,
+                    record.embedding_model,
+                    record.dimensions,
+                    record.scope,
+                    record.sensitivity,
+                    record.embedding,
+                    record.created_at,
+                    record.owner_principal_id,
+                ),
             )
 
-    def list_vector_records(self, scope: str | None = None, limit: int = 50, *, owner_principal_id: str | None = None) -> list[dict[str, Any]]:
+    def delete_vector_record(
+        self, vector_id: str, *, owner_principal_id: str | None = None
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM vector_records WHERE vector_id = ?"
+                + (" AND owner_principal_id = ?" if owner_principal_id else ""),
+                (vector_id, *([owner_principal_id] if owner_principal_id else [])),
+            )
+        return bool(cursor.rowcount)
+
+    def list_vector_records(
+        self, scope: str | None = None, limit: int = 50, *, owner_principal_id: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM vector_records"
         params: list[Any] = []
         conditions: list[str] = []
@@ -9288,7 +10172,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
 
-    def get_vector_record(self, vector_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
+    def get_vector_record(
+        self, vector_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Return one vector record by id (or ``None``). Includes the stored preview."""
         with self.connect() as connection:
             row = connection.execute(
@@ -9299,7 +10185,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return dict(row) if row is not None else None
 
     def list_vector_embeddings(
-        self, embedding_model: str, scope: str | None = None, *, owner_principal_id: str | None = None
+        self,
+        embedding_model: str,
+        scope: str | None = None,
+        *,
+        owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
         """Return ``(vector_id, embedding)`` rows for one embedding model.
 
@@ -9325,7 +10215,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def list_active_memory_vector_embeddings(
-        self, embedding_model: str, scope: str | None = None, *, owner_principal_id: str | None = None
+        self,
+        embedding_model: str,
+        scope: str | None = None,
+        *,
+        owner_principal_id: str | None = None,
     ) -> list[dict[str, Any]]:
         now = utc_now()
         query = """SELECT v.vector_id, v.embedding, p.memory_id FROM vector_records v
@@ -9360,7 +10254,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (symbol_id, name, kind, file_path, line_number, module, parent_symbol_id, doc_preview)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (node.symbol_id, node.name, node.kind, node.file_path, node.line_number, node.module, node.parent_symbol_id, node.doc_preview),
+                (
+                    node.symbol_id,
+                    node.name,
+                    node.kind,
+                    node.file_path,
+                    node.line_number,
+                    node.module,
+                    node.parent_symbol_id,
+                    node.doc_preview,
+                ),
             )
 
     def list_symbol_nodes(self, kind: str | None = None, limit: int = 100) -> list[dict[str, Any]]:
@@ -9383,7 +10286,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (edge_id, source_symbol_id, target_symbol_id, dep_type, file_path, line_number, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (edge.edge_id, edge.source_symbol_id, edge.target_symbol_id, edge.dep_type, edge.file_path, edge.line_number, edge.created_at),
+                (
+                    edge.edge_id,
+                    edge.source_symbol_id,
+                    edge.target_symbol_id,
+                    edge.dep_type,
+                    edge.file_path,
+                    edge.line_number,
+                    edge.created_at,
+                ),
             )
 
     # ── Phase 9: Project Graphs ──
@@ -9396,7 +10307,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (graph_id, workspace_root, module_count, dependency_count, built_at)
                 VALUES (?, ?, ?, ?, ?)
                 """,
-                (graph.graph_id, graph.workspace_root, graph.module_count, graph.dependency_count, graph.built_at),
+                (
+                    graph.graph_id,
+                    graph.workspace_root,
+                    graph.module_count,
+                    graph.dependency_count,
+                    graph.built_at,
+                ),
             )
 
     def list_project_graphs(self, limit: int = 10) -> list[dict[str, Any]]:
@@ -9416,10 +10333,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (candidate_id, name, description, source_workflow_json, suggested_tools_json, provenance, status, created_by, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (candidate.candidate_id, candidate.name, candidate.description, candidate.source_workflow_json, candidate.suggested_tools_json, candidate.provenance, candidate.status, candidate.created_by, candidate.created_at),
+                (
+                    candidate.candidate_id,
+                    candidate.name,
+                    candidate.description,
+                    candidate.source_workflow_json,
+                    candidate.suggested_tools_json,
+                    candidate.provenance,
+                    candidate.status,
+                    candidate.created_by,
+                    candidate.created_at,
+                ),
             )
 
-    def list_skill_candidates(self, status: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+    def list_skill_candidates(
+        self, status: str | None = None, limit: int = 50
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM skill_candidates"
         params: list[Any] = []
         if status:
@@ -9433,7 +10362,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
 
     def load_model_session_state(self, session_id: str) -> ModelSessionState | None:
         with self.connect() as connection:
-            row = connection.execute("SELECT * FROM model_session_state WHERE session_id = ?", (session_id,)).fetchone()
+            row = connection.execute(
+                "SELECT * FROM model_session_state WHERE session_id = ?", (session_id,)
+            ).fetchone()
         if row is None:
             return None
         return ModelSessionState(
@@ -9452,8 +10383,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO principal_model_control
                 (principal_id, profile_id, model, reasoning_enabled, reasoning_effort, reasoning_mode,
                  reasoning_budget_tokens, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (principal_id, state.profile_id, state.model, int(state.reasoning_enabled),
-                 state.reasoning_effort, state.reasoning_mode, state.reasoning_budget_tokens, utc_now()),
+                (
+                    principal_id,
+                    state.profile_id,
+                    state.model,
+                    int(state.reasoning_enabled),
+                    state.reasoning_effort,
+                    state.reasoning_mode,
+                    state.reasoning_budget_tokens,
+                    utc_now(),
+                ),
             )
 
     def load_principal_model_state(self, principal_id: str) -> ModelSessionState | None:
@@ -9464,10 +10403,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         if row is None:
             return None
         return ModelSessionState(
-            session_id=principal_id, profile_id=str(row["profile_id"]),
+            session_id=principal_id,
+            profile_id=str(row["profile_id"]),
             model=str(row["model"]) if row["model"] else None,
             reasoning_enabled=bool(row["reasoning_enabled"]),
-            reasoning_effort=row["reasoning_effort"], reasoning_mode=row["reasoning_mode"],
+            reasoning_effort=row["reasoning_effort"],
+            reasoning_mode=row["reasoning_mode"],
             reasoning_budget_tokens=row["reasoning_budget_tokens"],
         )
 
@@ -9493,7 +10434,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                         "[redacted]"
                         if any(
                             marker in str(key).casefold()
-                            for marker in ("authorization", "api_key", "apikey", "secret", "token", "credential")
+                            for marker in (
+                                "authorization",
+                                "api_key",
+                                "apikey",
+                                "secret",
+                                "token",
+                                "credential",
+                            )
                         )
                         else redact(item)
                     )
@@ -9626,9 +10574,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (principal_id, surface, profile_id, model, utc_now()),
             )
 
-    def load_surface_model_default(
-        self, principal_id: str, surface: str
-    ) -> tuple[str, str] | None:
+    def load_surface_model_default(self, principal_id: str, surface: str) -> tuple[str, str] | None:
         """The surface's default, or None when it has no opinion of its own."""
         with self.connect() as connection:
             row = connection.execute(
@@ -9645,9 +10591,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 WHERE principal_id = ? ORDER BY surface""",
                 (principal_id,),
             ).fetchall()
-        return [
-            (str(row["surface"]), str(row["profile_id"]), str(row["model"])) for row in rows
-        ]
+        return [(str(row["surface"]), str(row["profile_id"]), str(row["model"])) for row in rows]
 
     def clear_surface_model_default(self, principal_id: str, surface: str) -> None:
         with self.connect() as connection:
@@ -9706,7 +10650,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             return []
         return [str(item) for item in value] if isinstance(value, list) else []
 
-    def save_principal_model_fallback_sequence(self, principal_id: str, profile_ids: list[str]) -> None:
+    def save_principal_model_fallback_sequence(
+        self, principal_id: str, profile_ids: list[str]
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO principal_model_fallback_sequence
@@ -9735,9 +10681,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         """
         with self.connect() as connection:
             if not profile_id:
-                connection.execute(
-                    "DELETE FROM model_advisor WHERE session_id = ?", (session_id,)
-                )
+                connection.execute("DELETE FROM model_advisor WHERE session_id = ?", (session_id,))
                 return
             connection.execute(
                 """
@@ -9759,17 +10703,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def save_principal_model_advisor(self, principal_id: str, profile_id: str | None) -> None:
         with self.connect() as connection:
             if not profile_id:
-                connection.execute("DELETE FROM principal_model_advisor WHERE principal_id = ?", (principal_id,))
+                connection.execute(
+                    "DELETE FROM principal_model_advisor WHERE principal_id = ?", (principal_id,)
+                )
                 return
             connection.execute(
                 """INSERT OR REPLACE INTO principal_model_advisor (principal_id, profile_id, updated_at)
-                VALUES (?, ?, ?)""", (principal_id, profile_id, utc_now())
+                VALUES (?, ?, ?)""",
+                (principal_id, profile_id, utc_now()),
             )
 
     def load_principal_model_advisor(self, principal_id: str) -> str | None:
         with self.connect() as connection:
             row = connection.execute(
-                "SELECT profile_id FROM principal_model_advisor WHERE principal_id = ?", (principal_id,)
+                "SELECT profile_id FROM principal_model_advisor WHERE principal_id = ?",
+                (principal_id,),
             ).fetchone()
         return str(row["profile_id"]) if row is not None else None
 
@@ -9795,10 +10743,22 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (attachment_id, kind, filename, media_type, byte_size, sha256, data, created_at, owner_principal_id)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (attachment_id, kind, filename, media_type, len(data), sha256, data, utc_now(), owner_principal_id),
+                (
+                    attachment_id,
+                    kind,
+                    filename,
+                    media_type,
+                    len(data),
+                    sha256,
+                    data,
+                    utc_now(),
+                    owner_principal_id,
+                ),
             )
 
-    def load_attachment(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
+    def load_attachment(
+        self, attachment_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Return the stored attachment (metadata + raw bytes), or None if unknown."""
         # ``None`` means "no owner scoping requested"; an empty string is a
         # caller bug that must fail closed (match nothing), never drop the
@@ -9816,7 +10776,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         record["data"] = bytes(record["data"])
         return record
 
-    def load_attachment_metadata(self, attachment_id: str, *, owner_principal_id: str | None = None) -> dict[str, Any] | None:
+    def load_attachment_metadata(
+        self, attachment_id: str, *, owner_principal_id: str | None = None
+    ) -> dict[str, Any] | None:
         """Return attachment metadata only — the bytes never ride this path."""
         # ``None`` disables owner scoping; an empty string fails closed rather
         # than dropping the predicate (see ``load_attachment``).
@@ -9826,7 +10788,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """
                 SELECT attachment_id, kind, filename, media_type, byte_size, sha256, created_at
                 FROM attachments WHERE attachment_id = ?
-                """ + (" AND owner_principal_id = ?" if scoped else ""),
+                """
+                + (" AND owner_principal_id = ?" if scoped else ""),
                 (attachment_id, *([owner_principal_id] if scoped else [])),
             ).fetchone()
         return dict(row) if row is not None else None
@@ -9834,8 +10797,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     # ── Session attachment references (BUG-07: the file inspector's grant) ──
 
     def save_session_attachment_ref(
-        self, *, session_id: str, attachment_id: str, owner_principal_id: str,
-        turn_id: str, source: str = "uploaded",
+        self,
+        *,
+        session_id: str,
+        attachment_id: str,
+        owner_principal_id: str,
+        turn_id: str,
+        source: str = "uploaded",
     ) -> None:
         """Record that one attachment was carried by one session's prompt turn.
 
@@ -9891,8 +10859,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         return [dict(row) for row in rows]
 
     def put_session_command_grant(
-        self, *, session_id: str, principal_id: str, commands: list[list[str]],
-        timeout_seconds: int, expires_at: str,
+        self,
+        *,
+        session_id: str,
+        principal_id: str,
+        commands: list[list[str]],
+        timeout_seconds: int,
+        expires_at: str,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
@@ -9903,7 +10876,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    commands_json=excluded.commands_json,
                    timeout_seconds=excluded.timeout_seconds,
                    expires_at=excluded.expires_at, revoked=0, created_at=excluded.created_at""",
-                (session_id, principal_id, json.dumps(commands), timeout_seconds, expires_at, utc_now()),
+                (
+                    session_id,
+                    principal_id,
+                    json.dumps(commands),
+                    timeout_seconds,
+                    expires_at,
+                    utc_now(),
+                ),
             )
 
     def load_session_command_grant(
@@ -10068,15 +11048,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
         return cursor.rowcount == 1
 
-    def insert_principal(self, principal_id: str, principal_type: str, display_name: str,
-                         delegated_by_user_id: str | None = None,
-                         model_profile_id: str | None = None,
-                         session_id: str | None = None,
-                         role_ids: tuple[str, ...] = (),
-                         domain_scopes: tuple[str, ...] = (),
-                         max_runtime_mode: str = "raiker_runtime",
-                         expires_at: str | None = None,
-                         is_active: bool = True) -> None:
+    def insert_principal(
+        self,
+        principal_id: str,
+        principal_type: str,
+        display_name: str,
+        delegated_by_user_id: str | None = None,
+        model_profile_id: str | None = None,
+        session_id: str | None = None,
+        role_ids: tuple[str, ...] = (),
+        domain_scopes: tuple[str, ...] = (),
+        max_runtime_mode: str = "raiker_runtime",
+        expires_at: str | None = None,
+        is_active: bool = True,
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
@@ -10087,11 +11072,18 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    principal_id, principal_type, display_name, delegated_by_user_id,
-                    model_profile_id, session_id,
+                    principal_id,
+                    principal_type,
+                    display_name,
+                    delegated_by_user_id,
+                    model_profile_id,
+                    session_id,
                     json.dumps(list(role_ids), sort_keys=True),
                     json.dumps(list(domain_scopes), sort_keys=True),
-                    max_runtime_mode, utc_now(), expires_at, int(is_active),
+                    max_runtime_mode,
+                    utc_now(),
+                    expires_at,
+                    int(is_active),
                 ),
             )
 
@@ -10248,9 +11240,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             if not violations:
                 return
             for violation in violations:
-                connection.execute(
-                    f'DELETE FROM "{violation[0]}" WHERE rowid = ?', (violation[1],)
-                )
+                connection.execute(f'DELETE FROM "{violation[0]}" WHERE rowid = ?', (violation[1],))
         raise RuntimeError("purge_orphan_cleanup_did_not_converge")
 
     def purge_account(self, principal_id: str) -> None:
@@ -10283,26 +11273,57 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ).fetchall()
             ]
             user_id = self._principal_user_id_from_connection(connection, principal_id)
-            session_ids = [str(row["session_id"]) for row in connection.execute(
-                "SELECT session_id FROM sessions WHERE user_id = ?", (user_id,)
-            ).fetchall()] if user_id else []
-            project_ids = [str(row["project_id"]) for row in connection.execute(
-                "SELECT project_id FROM projects WHERE owner_user_id = ?", (user_id,)
-            ).fetchall()] if user_id else []
-            excluded = {"account_credentials", "api_sessions", "instance_account_guard", "migrations", "principals", "users"}
-            for table_row in connection.execute("SELECT name FROM sqlite_master WHERE type = 'table'").fetchall():
+            session_ids = (
+                [
+                    str(row["session_id"])
+                    for row in connection.execute(
+                        "SELECT session_id FROM sessions WHERE user_id = ?", (user_id,)
+                    ).fetchall()
+                ]
+                if user_id
+                else []
+            )
+            project_ids = (
+                [
+                    str(row["project_id"])
+                    for row in connection.execute(
+                        "SELECT project_id FROM projects WHERE owner_user_id = ?", (user_id,)
+                    ).fetchall()
+                ]
+                if user_id
+                else []
+            )
+            excluded = {
+                "account_credentials",
+                "api_sessions",
+                "instance_account_guard",
+                "migrations",
+                "principals",
+                "users",
+            }
+            for table_row in connection.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table'"
+            ).fetchall():
                 table = str(table_row["name"])
                 if table.startswith("sqlite_") or table in excluded:
                     continue
-                columns = {str(column["name"]) for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()}
+                columns = {
+                    str(column["name"])
+                    for column in connection.execute(f'PRAGMA table_info("{table}")').fetchall()
+                }
                 for column, values in (
-                    ("owner_principal_id", [principal_id]), ("principal_id", [principal_id]),
-                    ("owner_user_id", [user_id] if user_id else []), ("user_id", [user_id] if user_id else []),
-                    ("session_id", session_ids), ("project_id", project_ids),
+                    ("owner_principal_id", [principal_id]),
+                    ("principal_id", [principal_id]),
+                    ("owner_user_id", [user_id] if user_id else []),
+                    ("user_id", [user_id] if user_id else []),
+                    ("session_id", session_ids),
+                    ("project_id", project_ids),
                 ):
                     if column in columns and values:
                         marks = ",".join("?" for _ in values)
-                        connection.execute(f'DELETE FROM "{table}" WHERE "{column}" IN ({marks})', values)
+                        connection.execute(
+                            f'DELETE FROM "{table}" WHERE "{column}" IN ({marks})', values
+                        )
             for sql in (
                 "DELETE FROM account_credentials WHERE principal_id = ?",
                 "DELETE FROM user_settings WHERE principal_id = ?",
@@ -10406,7 +11427,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         result["is_active"] = bool(result.get("is_active", 1))
         return result
 
-    def list_principals(self, active_only: bool = True, principal_type: str | None = None) -> list[dict[str, Any]]:
+    def list_principals(
+        self, active_only: bool = True, principal_type: str | None = None
+    ) -> list[dict[str, Any]]:
         query = "SELECT * FROM principals"
         params: list[Any] = []
         conditions: list[str] = []
@@ -10474,8 +11497,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ),
             )
 
-    def find_valid_risk_acceptance(self, principal_id: str, action_type: str,
-                                    domain_scope: str, risk_level: str) -> dict[str, Any] | None:
+    def find_valid_risk_acceptance(
+        self, principal_id: str, action_type: str, domain_scope: str, risk_level: str
+    ) -> dict[str, Any] | None:
         now = utc_now()
         with self.connect() as connection:
             row = connection.execute(
@@ -10555,8 +11579,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO principal_runtime_mode_state
                 (principal_id, mode_name, status, activated_by, activated_at, reason, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                (principal_id, record["mode_name"], record["status"], record.get("activated_by"),
-                 record.get("activated_at"), record.get("reason"), record["updated_at"]),
+                (
+                    principal_id,
+                    record["mode_name"],
+                    record["status"],
+                    record.get("activated_by"),
+                    record.get("activated_at"),
+                    record.get("reason"),
+                    record["updated_at"],
+                ),
             )
 
     def insert_runtime_mode_state(self, record: dict[str, Any]) -> None:
@@ -10590,9 +11621,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def update_runtime_mode_state(self, runtime_mode_id: str, updates: dict[str, Any]) -> None:
         sets: list[str] = []
         params: list[Any] = []
-        for key in ("status", "mode_name", "activated_by", "activated_at", "disabled_by",
-                     "disabled_at", "reason", "risk_acceptance_id", "approval_id",
-                     "policy_decision_id", "validation_evidence_id", "updated_at"):
+        for key in (
+            "status",
+            "mode_name",
+            "activated_by",
+            "activated_at",
+            "disabled_by",
+            "disabled_at",
+            "reason",
+            "risk_acceptance_id",
+            "approval_id",
+            "policy_decision_id",
+            "validation_evidence_id",
+            "updated_at",
+        ):
             if key in updates:
                 sets.append(f"{key} = ?")
                 params.append(updates[key])
@@ -10642,17 +11684,28 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def upsert_principal_capability_gate_state(self, principal_id: str, record: dict[str, Any]) -> None:
+    def upsert_principal_capability_gate_state(
+        self, principal_id: str, record: dict[str, Any]
+    ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO principal_capability_gate_state
                 (principal_id, capability, state, requested_by, requested_at, activated_by, activated_at,
                  reason, readiness_snapshot_json, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (principal_id, record["capability"], record["state"], record.get("requested_by"),
-                 record.get("requested_at"), record.get("activated_by"), record.get("activated_at"),
-                 record.get("reason"), record.get("readiness_snapshot_json"), record["created_at"],
-                 record["updated_at"]),
+                (
+                    principal_id,
+                    record["capability"],
+                    record["state"],
+                    record.get("requested_by"),
+                    record.get("requested_at"),
+                    record.get("activated_by"),
+                    record.get("activated_at"),
+                    record.get("reason"),
+                    record.get("readiness_snapshot_json"),
+                    record["created_at"],
+                    record["updated_at"],
+                ),
             )
 
     def list_capability_gate_states(self) -> list[dict[str, Any]]:
@@ -10711,11 +11764,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchone()
         return str(row["decision_mode"]) if row else None
 
-    def get_principal_capability_decision_mode(self, principal_id: str, capability: str) -> str | None:
+    def get_principal_capability_decision_mode(
+        self, principal_id: str, capability: str
+    ) -> str | None:
         with self.connect() as connection:
             row = connection.execute(
                 "SELECT decision_mode FROM principal_capability_decision_mode "
-                "WHERE principal_id = ? AND capability = ?", (principal_id, capability)
+                "WHERE principal_id = ? AND capability = ?",
+                (principal_id, capability),
             ).fetchone()
         return str(row["decision_mode"]) if row else None
 
@@ -10735,8 +11791,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 """INSERT OR REPLACE INTO principal_capability_decision_mode
                 (principal_id, capability, decision_mode, set_by, set_at, reason, created_at, updated_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-                (principal_id, record["capability"], record["decision_mode"], record.get("set_by"),
-                 record.get("set_at"), record.get("reason"), record["created_at"], record["updated_at"]),
+                (
+                    principal_id,
+                    record["capability"],
+                    record["decision_mode"],
+                    record.get("set_by"),
+                    record.get("set_at"),
+                    record.get("reason"),
+                    record["created_at"],
+                    record["updated_at"],
+                ),
             )
 
     def list_capability_decision_modes(self) -> dict[str, str]:
@@ -10793,9 +11857,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     def list_reminders(self, *, status: str | None = None) -> list[dict[str, Any]]:
         with self.connect() as connection:
             if status is None:
-                rows = connection.execute(
-                    "SELECT * FROM reminders ORDER BY created_at"
-                ).fetchall()
+                rows = connection.execute("SELECT * FROM reminders ORDER BY created_at").fetchall()
             else:
                 rows = connection.execute(
                     "SELECT * FROM reminders WHERE status = ? ORDER BY created_at",
@@ -10803,7 +11865,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 ).fetchall()
         return [dict(row) for row in rows]
 
-    def list_due_reminders(self, due_before: str, *, delivery_status: str = "active") -> list[dict[str, Any]]:
+    def list_due_reminders(
+        self, due_before: str, *, delivery_status: str = "active"
+    ) -> list[dict[str, Any]]:
         with self.connect() as connection:
             rows = connection.execute(
                 "SELECT * FROM reminders WHERE delivery_status = ? AND due_at IS NOT NULL AND due_at <= ? ORDER BY due_at ASC",
@@ -10811,7 +11875,16 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
-    def update_reminder_status(self, reminder_id: str, status: str, *, delivery_status: str | None = None, delivered_at: str | None = None, retry_count: int | None = None, updated_at: str) -> bool:
+    def update_reminder_status(
+        self,
+        reminder_id: str,
+        status: str,
+        *,
+        delivery_status: str | None = None,
+        delivered_at: str | None = None,
+        retry_count: int | None = None,
+        updated_at: str,
+    ) -> bool:
         sets = ["status = ?", "updated_at = ?"]
         params: list[Any] = [status, updated_at]
         if delivery_status is not None:
@@ -10843,9 +11916,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    record["event_id"], record["title"], record.get("starts_at"),
-                    record.get("ends_at"), record.get("location"), record.get("notes"),
-                    record["status"], record["created_by"], record["created_at"],
+                    record["event_id"],
+                    record["title"],
+                    record.get("starts_at"),
+                    record.get("ends_at"),
+                    record.get("location"),
+                    record.get("notes"),
+                    record["status"],
+                    record["created_by"],
+                    record["created_at"],
                     record["updated_at"],
                 ),
             )
@@ -10875,9 +11954,14 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
-                    record["draft_id"], record["subject"], record.get("recipients"),
-                    record.get("body"), record["status"], record["created_by"],
-                    record["created_at"], record["updated_at"],
+                    record["draft_id"],
+                    record["subject"],
+                    record.get("recipients"),
+                    record.get("body"),
+                    record["status"],
+                    record["created_by"],
+                    record["created_at"],
+                    record["updated_at"],
                 ),
             )
 

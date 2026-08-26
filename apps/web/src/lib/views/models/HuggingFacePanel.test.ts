@@ -36,6 +36,34 @@ describe("HuggingFacePanel", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
+  it("offers the curated local semantic-recall model without requiring a search", async () => {
+    stubFetch({
+      "GET /api/hugging-face/nomic-ai/nomic-embed-text-v1.5-GGUF/variants": {
+        items: [
+          {
+            repo_id: "nomic-ai/nomic-embed-text-v1.5-GGUF",
+            revision: "a".repeat(40),
+            files: ["nomic-embed-text-v1.5.Q4_K_M.gguf"],
+            format: "gguf",
+            quantization: "Q4_K_M",
+            total_bytes: 84_100_000,
+            cached_bytes: 0,
+            gated: false,
+            license_id: "apache-2.0",
+            complete: true,
+          },
+        ],
+      },
+      "GET /api/model-library": { roots: [{ path: "/models" }], models: [] },
+    });
+    render(HuggingFacePanel);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Review variants" }));
+
+    expect(await screen.findByText("Q4_K_M")).toBeInTheDocument();
+    expect(screen.getByText("Ready to deploy")).toBeInTheDocument();
+  });
+
   it("searches and labels ready GGUF separately from conversion sources", async () => {
     stubFetch({
       "GET /api/hugging-face/search": {

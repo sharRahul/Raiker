@@ -194,6 +194,21 @@
       >{tokenOpen ? "Close token setup" : "Set access token"}</button
     >
   </section>
+  <section class="card curated-embedding" aria-label="Curated local embedding model">
+    <div>
+      <p class="eyebrow">Curated for semantic recall</p>
+      <strong>Nomic Embed Text v1.5 · GGUF · Apache-2.0</strong>
+      <p>
+        The recommended Q4_K_M variant is about 81 MiB. Raiker resolves the
+        current immutable revision and exact byte count before you approve any download.
+      </p>
+    </div>
+    <button
+      class="btn btn-sm"
+      type="button"
+      onclick={() => void chooseRepo("nomic-ai/nomic-embed-text-v1.5-GGUF")}
+    >Review variants</button>
+  </section>
   {#if tokenOpen}<form
       class="token-card card"
       onsubmit={(e) => {
@@ -560,6 +575,18 @@
   .notice {
     color: var(--success, #15803d);
   }
+  .curated-embedding {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px 18px;
+    border-left: 3px solid var(--accent, #2563eb);
+  }
+  .curated-embedding p {
+    margin: 3px 0 0;
+    color: var(--text-muted);
+  }
   @media (max-width: 850px) {
     .catalogue,
     .download-drawer,
@@ -577,6 +604,10 @@
     }
     .search-box {
       grid-template-columns: 1fr;
+    }
+    .curated-embedding {
+      align-items: flex-start;
+      flex-direction: column;
     }
   }
 </style>

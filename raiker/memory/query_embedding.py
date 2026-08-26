@@ -1,4 +1,5 @@
 """Governed, ephemeral query embeddings for semantic memory retrieval."""
+
 from __future__ import annotations
 
 import hashlib
@@ -41,7 +42,11 @@ def query_embedding_available(
     a human caller as pre-approved would make the Memory card disagree with an
     agent search. The owner can choose Always allow or Auto to enable this leg.
     """
-    if not backend.semantic or backend.kind != "provider" or not owner_principal_id:
+    if (
+        not backend.semantic
+        or backend.kind not in {"provider", "local_model"}
+        or not owner_principal_id
+    ):
         return False
     admission = capability_admission(store, owner_principal_id, "model_provider_runtime")
     return admission.gate_enabled and admission.decision_mode in _EXECUTING_MODES

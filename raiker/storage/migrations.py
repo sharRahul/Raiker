@@ -228,7 +228,9 @@ CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_events (
 );
 """
 
-PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID = "RAIKER-1308-phase3-storage-lifecycle-retention-cleanup-handoff"
+PHASE_3_STORAGE_LIFECYCLE_RETENTION_MIGRATION_ID = (
+    "RAIKER-1308-phase3-storage-lifecycle-retention-cleanup-handoff"
+)
 
 PHASE_3_STORAGE_LIFECYCLE_RETENTION_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_retention (
@@ -276,7 +278,9 @@ CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_retention_events (
 );
 """
 
-PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID = "RAIKER-1309-phase3-storage-lifecycle-evidence-simulation"
+PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_MIGRATION_ID = (
+    "RAIKER-1309-phase3-storage-lifecycle-evidence-simulation"
+)
 
 PHASE_3_STORAGE_LIFECYCLE_EVIDENCE_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_storage_lifecycle_evidence_bundles (
@@ -323,7 +327,9 @@ CREATE TABLE IF NOT EXISTS phase3_graph_codemap_readiness (
 """
 
 
-PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID = "RAIKER-1311-phase3-semantic-memory-readiness-metadata"
+PHASE_3_SEMANTIC_MEMORY_READINESS_MIGRATION_ID = (
+    "RAIKER-1311-phase3-semantic-memory-readiness-metadata"
+)
 
 PHASE_3_SEMANTIC_MEMORY_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_semantic_memory_readiness (
@@ -337,7 +343,9 @@ CREATE TABLE IF NOT EXISTS phase3_semantic_memory_readiness (
 """
 
 
-PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_MIGRATION_ID = "RAIKER-1312-phase3-approval-preview-persistence-readiness-metadata"
+PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_MIGRATION_ID = (
+    "RAIKER-1312-phase3-approval-preview-persistence-readiness-metadata"
+)
 
 PHASE_3_APPROVAL_PREVIEW_PERSISTENCE_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_approval_preview_persistence_readiness (
@@ -351,7 +359,9 @@ CREATE TABLE IF NOT EXISTS phase3_approval_preview_persistence_readiness (
 """
 
 
-PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_MIGRATION_ID = "RAIKER-1313-phase3-storage-cleanup-execution-readiness-metadata"
+PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_MIGRATION_ID = (
+    "RAIKER-1313-phase3-storage-cleanup-execution-readiness-metadata"
+)
 
 PHASE_3_STORAGE_CLEANUP_EXECUTION_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_storage_cleanup_execution_readiness (
@@ -365,7 +375,9 @@ CREATE TABLE IF NOT EXISTS phase3_storage_cleanup_execution_readiness (
 """
 
 
-PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_MIGRATION_ID = "RAIKER-1314-phase3-plugin-server-startup-readiness-metadata"
+PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_MIGRATION_ID = (
+    "RAIKER-1314-phase3-plugin-server-startup-readiness-metadata"
+)
 
 PHASE_3_PLUGIN_SERVER_STARTUP_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_plugin_server_startup_readiness (
@@ -379,7 +391,9 @@ CREATE TABLE IF NOT EXISTS phase3_plugin_server_startup_readiness (
 """
 
 
-PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_MIGRATION_ID = "RAIKER-1315-phase3-external-channels-notifications-readiness-metadata"
+PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_MIGRATION_ID = (
+    "RAIKER-1315-phase3-external-channels-notifications-readiness-metadata"
+)
 
 PHASE_3_EXTERNAL_CHANNELS_NOTIFICATIONS_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_external_channels_notifications_readiness (
@@ -393,7 +407,9 @@ CREATE TABLE IF NOT EXISTS phase3_external_channels_notifications_readiness (
 """
 
 
-PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID = "RAIKER-1316-phase3-remote-container-cloud-readiness-metadata"
+PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_MIGRATION_ID = (
+    "RAIKER-1316-phase3-remote-container-cloud-readiness-metadata"
+)
 
 PHASE_3_REMOTE_CONTAINER_CLOUD_READINESS_SQL = """
 CREATE TABLE IF NOT EXISTS phase3_remote_container_cloud_readiness (
@@ -430,7 +446,9 @@ CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_status ON proposal_lifecycle_r
 CREATE INDEX IF NOT EXISTS idx_proposal_lifecycle_updated ON proposal_lifecycle_records(updated_at);
 """
 
-PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID = "RAIKER-1402-phase3-slice-b-approval-planning-preview"
+PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_MIGRATION_ID = (
+    "RAIKER-1402-phase3-slice-b-approval-planning-preview"
+)
 
 PHASE_3_SLICE_B_APPROVAL_PLANNING_PREVIEW_SQL = """
 CREATE TABLE IF NOT EXISTS proposal_approval_previews (
@@ -477,9 +495,7 @@ CREATE INDEX IF NOT EXISTS idx_approved_memory_scope ON approved_memory(scope);
 CREATE INDEX IF NOT EXISTS idx_approved_memory_created ON approved_memory(created_at);
 """
 
-PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID = (
-    "RAIKER-2002-phase4-memory-governance-hardening"
-)
+PHASE_4_MEMORY_GOVERNANCE_HARDENING_MIGRATION_ID = "RAIKER-2002-phase4-memory-governance-hardening"
 
 PHASE_4_MEMORY_GOVERNANCE_HARDENING_SQL = """
 ALTER TABLE approved_memory ADD COLUMN provenance_json TEXT NOT NULL DEFAULT '{}';
@@ -1774,6 +1790,7 @@ def memory_fts_sql(engine: str) -> str:
 
 def memory_sqlcipher_fts_sql(engine: str) -> str:
     return MEMORY_SQLCIPHER_FTS_SQL_TEMPLATE.format(engine=require_text_search_engine(engine))
+
 
 MEMORY_RETRIEVAL_AUTHORITY_MIGRATION_ID = "RAIKER-2009-memory-retrieval-authority"
 MEMORY_RETRIEVAL_AUTHORITY_SQL = """
@@ -3424,4 +3441,23 @@ MCP_PROTOCOL_VERSION_MIGRATION_ID = "RAIKER-2039-mcp-protocol-version"
 
 MCP_PROTOCOL_VERSION_SQL = """
 ALTER TABLE mcp_servers ADD COLUMN protocol_version TEXT;
+"""
+
+
+# BUG-240 — semantic projections for managed knowledge-file chunks. The stored
+# file bytes remain authoritative; this table only links a revision-bound text
+# chunk to a vector that can be deleted and rebuilt with the chunk projection.
+MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID = "RAIKER-2044-managed-file-chunk-vectors"
+
+MANAGED_FILE_CHUNK_VECTORS_SQL = """
+CREATE TABLE IF NOT EXISTS managed_file_chunk_vectors (
+  chunk_id TEXT NOT NULL REFERENCES managed_file_chunks(chunk_id),
+  vector_id TEXT NOT NULL REFERENCES vector_records(vector_id),
+  embedding_model TEXT NOT NULL,
+  content_hash TEXT NOT NULL,
+  PRIMARY KEY (chunk_id, embedding_model),
+  UNIQUE (vector_id)
+);
+CREATE INDEX IF NOT EXISTS idx_managed_file_chunk_vectors_space
+  ON managed_file_chunk_vectors(embedding_model, chunk_id);
 """

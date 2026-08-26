@@ -1965,6 +1965,7 @@ export interface MemorySettingsView {
   // are waiting to be embedded into one.
   embedding_providers: EmbeddingProviderView[];
   unindexed_memories: number;
+  unindexed_file_chunks: number;
 }
 
 // raiker/vector/backends.py embedding_capable_profiles(). A description of what
@@ -1977,6 +1978,11 @@ export interface EmbeddingProviderView {
   // The label the vectors will carry, and so the space that becomes selectable.
   space: string;
   local_only: boolean;
+  // The next governed run is capped at 500 total items. Counts are per vector
+  // space so the confirmation always describes the model the owner selected.
+  unindexed_memories?: number;
+  unindexed_file_chunks?: number;
+  pending_count?: number;
   requires_network: boolean;
 }
 

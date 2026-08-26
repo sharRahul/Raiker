@@ -565,6 +565,7 @@ class MemorySettingsView:
     #: many approved memories are waiting to be embedded into one.
     embedding_providers: tuple[dict[str, Any], ...] = ()
     unindexed_memories: int = 0
+    unindexed_file_chunks: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -574,6 +575,7 @@ class MemorySettingsView:
             "spaces": [dict(space) for space in self.spaces],
             "embedding_providers": [dict(item) for item in self.embedding_providers],
             "unindexed_memories": self.unindexed_memories,
+            "unindexed_file_chunks": self.unindexed_file_chunks,
         }
 
 
@@ -747,7 +749,11 @@ def _read_reservation(path: Path) -> dict[str, str] | None:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return None
-    return data if isinstance(data, dict) and all(isinstance(value, str) for value in data.values()) else None
+    return (
+        data
+        if isinstance(data, dict) and all(isinstance(value, str) for value in data.values())
+        else None
+    )
 
 
 def _project_migration_area(workspace: Path) -> Path:
@@ -769,8 +775,7 @@ def _is_reparse_point(path: Path) -> bool:
     except FileNotFoundError:
         return False
     return path.is_symlink() or bool(
-        getattr(info, "st_file_attributes", 0)
-        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+        getattr(info, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
     )
 
 
@@ -964,7 +969,11 @@ def _new_reservation(
 
 
 def _reservation_tree(
-    workspace: Path, migration_area: Path, reservation: dict[str, str], project_id: str, raw_root: str
+    workspace: Path,
+    migration_area: Path,
+    reservation: dict[str, str],
+    project_id: str,
+    raw_root: str,
 ) -> tuple[Path, Path] | None:
     if reservation.get("project_id") != project_id or reservation.get("raw_root") != raw_root:
         return None
@@ -1013,9 +1022,7 @@ def _find_reservation(
     return candidates[0] if candidates else None
 
 
-def migrate_project_roots(
-    workspace_root: Path, store: SQLiteStore
-) -> ProjectRootMigrationReport:
+def migrate_project_roots(workspace_root: Path, store: SQLiteStore) -> ProjectRootMigrationReport:
     """Move legacy ``projects/<slug>`` folders below `.raiker/projects` safely.
 
     A row changes only after its source and destination have passed containment
@@ -1125,9 +1132,15 @@ def migrate_project_roots(
                     raise FileExistsError(destination)
                 staged = _find_reservation(workspace, migration_area, project_id, raw_root)
                 if staged is not None:
-                    _copy_project_tree_resuming(source if source.exists() else staged[2], destination)
+                    _copy_project_tree_resuming(
+                        source if source.exists() else staged[2], destination
+                    )
                     return
-                if was_moved_with_parent and source.exists() and _same_project_tree(source, destination):
+                if (
+                    was_moved_with_parent
+                    and source.exists()
+                    and _same_project_tree(source, destination)
+                ):
                     return
                 if was_moved_with_parent and not source.exists():
                     return
@@ -1140,7 +1153,9 @@ def migrate_project_roots(
                 return
             stage, tree = _stage_project_tree(source, migration_area)
             reservation = _new_reservation(workspace, project_id, raw_root, stage.name)
-            _write_reservation(migration_area / f"{reservation['reservation_id']}.json", reservation)
+            _write_reservation(
+                migration_area / f"{reservation['reservation_id']}.json", reservation
+            )
             destination.mkdir()
             _copy_project_tree_resuming(tree, destination)
 
@@ -1158,7 +1173,9 @@ def migrate_project_roots(
             migrated.append(project_id)
             managed_roots.append(relative)
             if source_identity is not None and not was_moved_with_parent:
-                residue = _retain_migrated_source(workspace, source, source_identity, migration_area)
+                residue = _retain_migrated_source(
+                    workspace, source, source_identity, migration_area
+                )
                 if residue is not None:
                     retained_residues.append(str(residue.relative_to(workspace)).replace("\\", "/"))
         else:
@@ -1166,6 +1183,7 @@ def migrate_project_roots(
     return ProjectRootMigrationReport(
         tuple(migrated), tuple(conflicts), tuple(unchanged), tuple(retained_residues)
     )
+
 
 @dataclass(frozen=True)
 class ProjectsListView:
@@ -1744,9 +1762,7 @@ class DashboardService:
     def __init__(self, workspace_root: str | Path = ".") -> None:
         self.workspace_root = Path(workspace_root)
         self.store = SQLiteStore(self.workspace_root)
-        self.project_root_migration_report = migrate_project_roots(
-            self.workspace_root, self.store
-        )
+        self.project_root_migration_report = migrate_project_roots(self.workspace_root, self.store)
         self.control = RuntimeControlService(self.workspace_root)
 
     def _workspace_source(self, raw_path: str) -> tuple[str, Path]:
@@ -1782,14 +1798,10 @@ class DashboardService:
         # Scoped to this owner's projects, exactly as the Projects page is: a
         # root list built from every project in the workspace would offer
         # another account's folder as somewhere to browse.
-        user_id = (
-            self.store.principal_user_id(owner_principal_id) if owner_principal_id else None
-        )
+        user_id = self.store.principal_user_id(owner_principal_id) if owner_principal_id else None
         projects = self.store.list_projects(user_id)
         grants = (
-            self.store.list_brain_source_grants(owner_principal_id)
-            if owner_principal_id
-            else []
+            self.store.list_brain_source_grants(owner_principal_id) if owner_principal_id else []
         )
         return build_roots(self.workspace_root.resolve(), projects, grants)
 
@@ -1806,9 +1818,7 @@ class DashboardService:
         return {"roots": [root.to_dict() for root in self._scope_roots(owner_principal_id)]}
 
     def add_brain_source(self, raw_path: str, *, owner_principal_id: str) -> dict[str, Any]:
-        root, relative, _path = self._scoped_source(
-            raw_path, owner_principal_id=owner_principal_id
-        )
+        root, relative, _path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         stored = scope_path(root, relative)
         self.store.add_brain_source(owner_principal_id, stored)
         return {"ok": True, "path": stored}
@@ -1996,9 +2006,7 @@ class DashboardService:
         self, raw_path: str, *, owner_principal_id: str | None = None
     ) -> dict[str, Any]:
         """Build a bounded, read-only indexing plan before a source is selected."""
-        root, relative, path = self._scoped_source(
-            raw_path, owner_principal_id=owner_principal_id
-        )
+        root, relative, path = self._scoped_source(raw_path, owner_principal_id=owner_principal_id)
         relative_path = scope_path(root, relative)
         candidates = [path] if path.is_file() else path.rglob("*")
         supported = 0
@@ -2013,7 +2021,9 @@ class DashboardService:
         base = root.path.resolve() if root.path is not None else path
         for candidate in candidates:
             if scanned >= 5000:
-                warnings.append("More than 5,000 entries were found; review is capped and indexing will remain incremental.")
+                warnings.append(
+                    "More than 5,000 entries were found; review is capped and indexing will remain incremental."
+                )
                 break
             try:
                 resolved = candidate.resolve()
@@ -2028,7 +2038,10 @@ class DashboardService:
             except (OSError, ValueError):
                 continue
             scanned += 1
-            if candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS and size <= 5 * 1024 * 1024:
+            if (
+                candidate.suffix.casefold() in KNOWLEDGE_SOURCE_EXTENSIONS
+                and size <= 5 * 1024 * 1024
+            ):
                 supported += 1
                 total_bytes += size
                 if len(examples) < 8:
@@ -2036,7 +2049,9 @@ class DashboardService:
             else:
                 unsupported += 1
         if total_bytes > 100 * 1024 * 1024:
-            warnings.append("The selected source exceeds 100 MB; content will be loaded incrementally as it is needed.")
+            warnings.append(
+                "The selected source exceeds 100 MB; content will be loaded incrementally as it is needed."
+            )
         if unsupported:
             warnings.append(f"{unsupported} unsupported or oversized file(s) will be skipped.")
         return {
@@ -2061,7 +2076,10 @@ class DashboardService:
         serialized = json.dumps(clean, sort_keys=True)
         if len(serialized) > 100_000:
             raise ValueError("brain_preferences_too_large")
-        if not all(isinstance(value, (dict, list, str, int, float, bool, type(None))) for value in clean.values()):
+        if not all(
+            isinstance(value, (dict, list, str, int, float, bool, type(None)))
+            for value in clean.values()
+        ):
             raise ValueError("invalid_brain_preferences")
         updated_at = self.store.save_brain_preferences(owner_principal_id, clean)
         return {"ok": True, "settings": clean, "updated_at": updated_at}
@@ -2070,9 +2088,7 @@ class DashboardService:
         """List selectable execution targets without exposing credential values."""
         selected = self.store.selected_execution_environment(owner_principal_id)
         allowed_images = sorted(container_image_allowlist())
-        gate = self.control.get_capability_gate(
-            "container_execution_cap", owner_principal_id
-        )
+        gate = self.control.get_capability_gate("container_execution_cap", owner_principal_id)
         gate_enabled = gate is not None and gate.state not in _DISABLED_STATES
         default_image = allowed_images[0] if allowed_images else None
         default_profile = ExecutionProfile(
@@ -2109,10 +2125,17 @@ class DashboardService:
         )
         environments: list[dict[str, Any]] = [
             {
-                "profile_id": "local_native", "kind": "local", "name": "Local strict",
-                "enabled": True, "configured": True, "available": True,
-                "status": "ready", "selected": selected == "local_native",
-                "credential_configured": True, "budget": None, "cost": None,
+                "profile_id": "local_native",
+                "kind": "local",
+                "name": "Local strict",
+                "enabled": True,
+                "configured": True,
+                "available": True,
+                "status": "ready",
+                "selected": selected == "local_native",
+                "credential_configured": True,
+                "budget": None,
+                "cost": None,
                 "selected_for_commands": selected == "local_native",
                 "assigned_tools": ["run_command"],
                 "features": asdict(local_profile.features),
@@ -2122,12 +2145,17 @@ class DashboardService:
                 "probe_observations": {},
             },
             {
-                "profile_id": "native_sandbox", "kind": "native", "name": "Native OS sandbox",
-                "enabled": True, "configured": True,
+                "profile_id": "native_sandbox",
+                "kind": "native",
+                "name": "Native OS sandbox",
+                "enabled": True,
+                "configured": True,
                 "available": native_probe.available,
                 "status": "ready" if native_probe.available else "unavailable",
                 "selected": selected == "native_sandbox",
-                "credential_configured": True, "budget": None, "cost": None,
+                "credential_configured": True,
+                "budget": None,
+                "cost": None,
                 "selected_for_commands": selected == "native_sandbox",
                 "assigned_tools": ["shell", "run_command"],
                 "features": asdict(native_probe.features or native_profile.features),
@@ -2138,14 +2166,23 @@ class DashboardService:
                 "runner_trust": native_probe.runner_trust,
             },
             {
-                "profile_id": "container_default", "kind": "container", "name": "Local container",
-                "enabled": True, "configured": default_image is not None,
+                "profile_id": "container_default",
+                "kind": "container",
+                "name": "Local container",
+                "enabled": True,
+                "configured": default_image is not None,
                 "available": default_reason is None,
                 "status": "ready" if default_reason is None else "unavailable",
-                "selected": selected == "container_default", "credential_configured": True, "budget": None,
-                "cost": None, "runtime": "docker", "image": default_image,
-                "repository_access": "read_only", "writable_output": True,
-                "assigned_tool_count": 1, "availability_reason": default_reason,
+                "selected": selected == "container_default",
+                "credential_configured": True,
+                "budget": None,
+                "cost": None,
+                "runtime": "docker",
+                "image": default_image,
+                "repository_access": "read_only",
+                "writable_output": True,
+                "assigned_tool_count": 1,
+                "availability_reason": default_reason,
                 "selected_for_commands": selected == "container_default",
                 "assigned_tools": ["shell"],
                 "features": asdict(default_profile.features),
@@ -2228,7 +2265,9 @@ class DashboardService:
                 )
                 continue
             credential_env = str(config.get("credential_env") or config.get("api_key_env") or "")
-            credential_configured = bool(credential_env and os.environ.get(credential_env, "").strip())
+            credential_configured = bool(
+                credential_env and os.environ.get(credential_env, "").strip()
+            )
             configured = (
                 bool(
                     config.get("host")
@@ -2263,29 +2302,62 @@ class DashboardService:
                 and remote_proof.available
             )
             budget = config.get("max_cost") if kind == "daytona" else None
-            cost = self.store.cloud_execution_cost_summary(
-                owner_principal_id, str(row["profile_id"]), max_cost=float(budget or 0)
-            ) if kind == "daytona" else None
+            cost = (
+                self.store.cloud_execution_cost_summary(
+                    owner_principal_id, str(row["profile_id"]), max_cost=float(budget or 0)
+                )
+                if kind == "daytona"
+                else None
+            )
             environments.append(
                 {
-                    "profile_id": str(row["profile_id"]), "kind": kind, "name": str(row["name"]),
-                    "enabled": bool(row["enabled"]), "configured": configured, "available": available,
-                    "status": "ready" if available else ("credential_required" if configured and not credential_configured else "unavailable" if remote_proof is not None else "configuration_required"),
-                    "selected": selected == row["profile_id"], "credential_configured": credential_configured,
+                    "profile_id": str(row["profile_id"]),
+                    "kind": kind,
+                    "name": str(row["name"]),
+                    "enabled": bool(row["enabled"]),
+                    "configured": configured,
+                    "available": available,
+                    "status": "ready"
+                    if available
+                    else (
+                        "credential_required"
+                        if configured and not credential_configured
+                        else "unavailable"
+                        if remote_proof is not None
+                        else "configuration_required"
+                    ),
+                    "selected": selected == row["profile_id"],
+                    "credential_configured": credential_configured,
                     "budget": budget,
                     "cost": cost,
                     "selected_for_commands": selected == row["profile_id"],
                     "assigned_tools": ["shell"],
                     "features": asdict(remote_profile.features),
-                    "probe_checked_at": remote_proof.checked_at if remote_proof is not None else utc_now(),
-                    "boundary": remote_proof.boundary if remote_proof is not None else "remote_recipient_tcb",
-                    "probe_observations": dict(remote_proof.observations) if remote_proof is not None else {},
-                    "availability_reason": None if available else (remote_proof.reason_code if remote_proof is not None else (
-                        "execution_environment_credential_required"
-                        if configured and not credential_configured
-                        else "execution_environment_configuration_required"
-                    )),
-                    "config": {key: value for key, value in config.items() if key not in {"password", "token", "api_key", "secret"}},
+                    "probe_checked_at": remote_proof.checked_at
+                    if remote_proof is not None
+                    else utc_now(),
+                    "boundary": remote_proof.boundary
+                    if remote_proof is not None
+                    else "remote_recipient_tcb",
+                    "probe_observations": dict(remote_proof.observations)
+                    if remote_proof is not None
+                    else {},
+                    "availability_reason": None
+                    if available
+                    else (
+                        remote_proof.reason_code
+                        if remote_proof is not None
+                        else (
+                            "execution_environment_credential_required"
+                            if configured and not credential_configured
+                            else "execution_environment_configuration_required"
+                        )
+                    ),
+                    "config": {
+                        key: value
+                        for key, value in config.items()
+                        if key not in {"password", "token", "api_key", "secret"}
+                    },
                 }
             )
         if not any(item["selected"] for item in environments):
@@ -2315,7 +2387,9 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="unsupported_execution_environment")
         forbidden = {"password", "token", "api_key", "secret", "private_key"}
         if any(key.casefold() in forbidden for key in config):
-            return ControlResult(ok=False, reason_code="execution_credentials_must_use_environment_reference")
+            return ControlResult(
+                ok=False, reason_code="execution_credentials_must_use_environment_reference"
+            )
         if kind == "container":
             raw_tools = config.get("tools")
             tools = (
@@ -2331,9 +2405,7 @@ class DashboardService:
                 runtime=cast(ContainerRuntime | None, config.get("runtime")),
                 image=str(config.get("image") or "") or None,
                 tools=tools,
-                repository_access=cast(
-                    RepositoryAccess, config.get("repository_access", "none")
-                ),
+                repository_access=cast(RepositoryAccess, config.get("repository_access", "none")),
                 writable_output=bool(config.get("writable_output", False)),
             )
             reason = validate_execution_profile(profile)
@@ -2360,22 +2432,27 @@ class DashboardService:
                 }
         env_key = "credential_env" if kind == "ssh" else "api_key_env"
         credential_env = str(config.get(env_key, "")).strip()
-        if kind != "container" and credential_env and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env):
+        if (
+            kind != "container"
+            and credential_env
+            and not re.fullmatch(r"[A-Z][A-Z0-9_]{2,127}", credential_env)
+        ):
             return ControlResult(ok=False, reason_code="invalid_execution_credential_reference")
         if kind == "ssh":
             host = str(config.get("host", "")).strip()
             user = str(config.get("user", "")).strip()
-            if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) or not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", user):
+            if not re.fullmatch(r"[A-Za-z0-9.-]{1,253}", host) or not re.fullmatch(
+                r"[A-Za-z0-9._-]{1,64}", user
+            ):
                 return ControlResult(ok=False, reason_code="invalid_ssh_profile")
             try:
                 from raiker.execution.commands.known_hosts import host_key_fingerprint
 
-                if host_key_fingerprint(str(config.get("host_public_key", ""))) != str(
-                    config.get("host_key_sha256", "")
-                ).strip():
-                    return ControlResult(
-                        ok=False, reason_code="ssh_host_key_fingerprint_mismatch"
-                    )
+                if (
+                    host_key_fingerprint(str(config.get("host_public_key", "")))
+                    != str(config.get("host_key_sha256", "")).strip()
+                ):
+                    return ControlResult(ok=False, reason_code="ssh_host_key_fingerprint_mismatch")
             except ValueError:
                 return ControlResult(ok=False, reason_code="ssh_host_key_invalid")
         elif kind == "daytona" and not str(config.get("sandbox_id", "")).strip():
@@ -2397,10 +2474,11 @@ class DashboardService:
             RemoteExecutionProfile(
                 actual_id,
                 "ssh" if kind == "ssh" else ("cloud" if kind == "daytona" else "container"),
-                name.strip() or (
-                    "SSH host" if kind == "ssh" else (
-                        "Daytona sandbox" if kind == "daytona" else "Local container"
-                    )
+                name.strip()
+                or (
+                    "SSH host"
+                    if kind == "ssh"
+                    else ("Daytona sandbox" if kind == "daytona" else "Local container")
                 ),
                 json.dumps(config, sort_keys=True),
                 enabled,
@@ -2415,7 +2493,9 @@ class DashboardService:
         self, profile_id: str, owner_principal_id: str
     ) -> ControlResult:
         view = self.execution_environments(owner_principal_id)
-        environment = next((item for item in view["environments"] if item["profile_id"] == profile_id), None)
+        environment = next(
+            (item for item in view["environments"] if item["profile_id"] == profile_id), None
+        )
         if environment is None:
             return ControlResult(ok=False, reason_code="unknown_execution_environment")
         if not environment["available"]:
@@ -2439,9 +2519,7 @@ class DashboardService:
         if environment is None:
             return ControlResult(ok=False, reason_code="unknown_execution_environment")
         if not environment.get("features", {}).get("persistent_environment"):
-            return ControlResult(
-                ok=False, reason_code="execution_environment_not_persistent"
-            )
+            return ControlResult(ok=False, reason_code="execution_environment_not_persistent")
         if not session_id.strip():
             return ControlResult(ok=False, reason_code="execution_environment_session_required")
         from raiker.execution.commands.service import CommandService
@@ -2532,9 +2610,7 @@ class DashboardService:
             user_id,
             {"repo_id": repo_id, "kind": "local", "local_subpath": relative_path},
         )
-        indexed = self._index_code_map(
-            relative_path, repo_id, owner_principal_id, user_id
-        )
+        indexed = self._index_code_map(relative_path, repo_id, owner_principal_id, user_id)
         return ControlResult(
             ok=True,
             data={
@@ -2610,9 +2686,7 @@ class DashboardService:
         )
         return ControlResult(ok=True, data={"repo_id": repo_id})
 
-    def select_code_repo(
-        self, repo_id: str | None, *, owner_principal_id: str
-    ) -> ControlResult:
+    def select_code_repo(self, repo_id: str | None, *, owner_principal_id: str) -> ControlResult:
         """Point the Build workspace at one repository, or at none with ``None``."""
         row = None
         if repo_id is not None:
@@ -2634,9 +2708,7 @@ class DashboardService:
             )
             if subpath and service.index_row(subpath) is None:
                 indexed = self._index_code_map(subpath, repo_id or "", owner_principal_id, None)
-        return ControlResult(
-            ok=True, data={"selected_repo_id": repo_id, "code_map": indexed}
-        )
+        return ControlResult(ok=True, data={"selected_repo_id": repo_id, "code_map": indexed})
 
     # ── B9: the repository code map ──────────────────────────────────────────
 
@@ -2664,17 +2736,15 @@ class DashboardService:
         """Re-scan the selected repository on the owner's explicit request."""
         from raiker.graph.codemap_service import CodeMapService
 
-        service = CodeMapService(
-            self.workspace_root, self.store, principal_id=owner_principal_id
-        )
+        service = CodeMapService(self.workspace_root, self.store, principal_id=owner_principal_id)
         result = service.build()
         if str(result.get("status", "")) not in ("indexed", "partial"):
             error = result.get("error", {}) if isinstance(result.get("error"), dict) else {}
-            return ControlResult(
-                ok=False, reason_code=str(error.get("type", "code_map_failed"))
-            )
+            return ControlResult(ok=False, reason_code=str(error.get("type", "code_map_failed")))
         self._record_repo_event(
-            "code_map_indexed", owner_principal_id, user_id,
+            "code_map_indexed",
+            owner_principal_id,
+            user_id,
             {k: v for k, v in result.items() if k not in ("languages", "skipped")},
         )
         return ControlResult(ok=True, data=result)
@@ -2718,7 +2788,9 @@ class DashboardService:
         if str(result.get("status", "")) not in ("indexed", "partial"):
             return None
         self._record_repo_event(
-            "code_map_indexed", owner_principal_id, user_id,
+            "code_map_indexed",
+            owner_principal_id,
+            user_id,
             {k: v for k, v in result.items() if k not in ("languages", "skipped")},
         )
         return result
@@ -2798,19 +2870,21 @@ class DashboardService:
         approval_queue = self.store.suspended_turn_queue_positions(
             [str(row.get("approval_id", "")) for row in approval_rows]
         )
-        approvals = [
-            self._approval_view(row, queue=approval_queue) for row in approval_rows
-        ]
+        approvals = [self._approval_view(row, queue=approval_queue) for row in approval_rows]
         subagents = [
-            row for row in self.store.list_subagent_contracts()
+            row
+            for row in self.store.list_subagent_contracts()
             if str(row.get("parent_task_id", "")) in task_ids
         ]
         memories = list_memory(
-            workspace_root=self.workspace_root, store=self.store, limit=100,
+            workspace_root=self.workspace_root,
+            store=self.store,
+            limit=100,
             owner_principal_id=principal_id,
         )
         backups = [
-            row for row in self.store.list_backup_manifests()
+            row
+            for row in self.store.list_backup_manifests()
             if str(row.get("created_by", "")) == principal_id
         ]
         nodes = [BrainNodeView(f"principal:{principal_id}", "user", "You", "active")]
@@ -2864,14 +2938,31 @@ class DashboardService:
             )
         for task in tasks:
             node_id = f"task:{task.task_id}"
-            nodes.append(BrainNodeView(node_id, "task", task.title or "Untitled task", task.status, _task_detail(task), task.progress_percent))
-            edges.append(BrainEdgeView(f"session:{task.session_id}", node_id, "tracks", task.status == "running"))
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "task",
+                    task.title or "Untitled task",
+                    task.status,
+                    _task_detail(task),
+                    task.progress_percent,
+                )
+            )
+            edges.append(
+                BrainEdgeView(
+                    f"session:{task.session_id}", node_id, "tracks", task.status == "running"
+                )
+            )
             # Only work that is actually waiting for its slot is scheduled work.
             # A task that has already run keeps its `scheduled_at`, so listing it
             # here showed a finished or blocked run as "Waiting" indefinitely.
             if task.scheduled_at and task.status == "queued":
                 schedule_id = f"schedule:{task.task_id}"
-                nodes.append(BrainNodeView(schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at))
+                nodes.append(
+                    BrainNodeView(
+                        schedule_id, "schedule", "Scheduled work", "waiting", task.scheduled_at
+                    )
+                )
                 edges.append(BrainEdgeView(schedule_id, node_id, "starts"))
         for agent in subagents:
             node_id = f"agent:{agent['subagent_id']}"
@@ -2885,7 +2976,14 @@ class DashboardService:
                     parent_task.title if parent_task else None,
                 )
             )
-            edges.append(BrainEdgeView(f"task:{agent['parent_task_id']}", node_id, "delegates", str(agent["status"]) == "running"))
+            edges.append(
+                BrainEdgeView(
+                    f"task:{agent['parent_task_id']}",
+                    node_id,
+                    "delegates",
+                    str(agent["status"]) == "running",
+                )
+            )
         # BUG-218 — one node per *tool*, not one per event.
         #
         # This used to emit a node per row of `list_event_index(limit=250)`,
@@ -2961,9 +3059,7 @@ class DashboardService:
                         f"{kind}" + (f" · via {cited['tool_name']}" if cited["tool_name"] else ""),
                     )
                 )
-            edges.append(
-                BrainEdgeView(f"session:{cited['session_id']}", node_id, "grounded_in")
-            )
+            edges.append(BrainEdgeView(f"session:{cited['session_id']}", node_id, "grounded_in"))
 
         # BUG-218 — files the owner attached to a conversation. Metadata only;
         # the stored bytes are never read to draw a node.
@@ -2980,9 +3076,7 @@ class DashboardService:
                     str(attached["media_type"]),
                 )
             )
-            edges.append(
-                BrainEdgeView(f"session:{attached['session_id']}", node_id, "attached")
-            )
+            edges.append(BrainEdgeView(f"session:{attached['session_id']}", node_id, "attached"))
 
         event_ids = {event.event_id for event in events}
         # One lookup for every memory whose source event is outside the window,
@@ -2992,13 +3086,19 @@ class DashboardService:
         )
         for memory in memories:
             node_id = f"memory:{memory.memory_id}"
-            nodes.append(BrainNodeView(node_id, "memory", f"Memory · {memory.scope}", "available", memory.sensitivity))
+            nodes.append(
+                BrainNodeView(
+                    node_id, "memory", f"Memory · {memory.scope}", "available", memory.sensitivity
+                )
+            )
             # BUG-218 — a memory whose source event fell outside the event
             # window used to be drawn with no edge at all: a fact floating free
             # of the work that produced it. The session is the durable anchor,
             # so it is the fallback rather than leaving the node orphaned.
             if memory.source_event_id in event_ids:
-                edges.append(BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered"))
+                edges.append(
+                    BrainEdgeView(f"event:{memory.source_event_id}", node_id, "remembered")
+                )
             elif distant.get(memory.source_event_id, "") in session_ids:
                 edges.append(
                     BrainEdgeView(
@@ -3056,11 +3156,22 @@ class DashboardService:
 
         for approval in approvals:
             node_id = f"approval:{approval.approval_id}"
-            nodes.append(BrainNodeView(node_id, "approval", approval.tool_name, approval.status, approval.capability))
+            nodes.append(
+                BrainNodeView(
+                    node_id, "approval", approval.tool_name, approval.status, approval.capability
+                )
+            )
             edges.append(BrainEdgeView(f"session:{approval.session_id}", node_id, "requires"))
         for backup in backups:
             node_id = f"backup:{backup['manifest_id']}"
-            nodes.append(BrainNodeView(node_id, "backup", "Backup", "verified" if backup.get("restore_verified_at") else "catalogued"))
+            nodes.append(
+                BrainNodeView(
+                    node_id,
+                    "backup",
+                    "Backup",
+                    "verified" if backup.get("restore_verified_at") else "catalogued",
+                )
+            )
             edges.append(BrainEdgeView(f"principal:{principal_id}", node_id, "backs_up"))
         # Sources are addressed within the Knowledge Map's boundary, so a stored
         # source that no longer resolves — its grant revoked, its folder gone —
@@ -3075,7 +3186,11 @@ class DashboardService:
             base = source_root.path.resolve() if source_root.path is not None else path
             source_id = f"source:{relative_path}"
             source_type = "folder" if path.is_dir() else "file"
-            nodes.append(BrainNodeView(source_id, source_type, path.name or relative_path, "selected", relative_path))
+            nodes.append(
+                BrainNodeView(
+                    source_id, source_type, path.name or relative_path, "selected", relative_path
+                )
+            )
             edges.append(BrainEdgeView(f"principal:{principal_id}", source_id, "added"))
             if path.is_dir():
                 try:
@@ -3088,13 +3203,13 @@ class DashboardService:
                     )
                     child_id = f"source:{child_path}"
                     child_type = "folder" if child.is_dir() else "file"
-                    nodes.append(BrainNodeView(child_id, child_type, child.name, "available", child_path))
+                    nodes.append(
+                        BrainNodeView(child_id, child_type, child.name, "available", child_path)
+                    )
                     edges.append(BrainEdgeView(source_id, child_id, "contains"))
         return BrainView(utc_now(), tuple(nodes), tuple(edges))
 
-    def get_session(
-        self, session_id: str, user_id: str | None = None
-    ) -> SessionDetailView | None:
+    def get_session(self, session_id: str, user_id: str | None = None) -> SessionDetailView | None:
         row = self.store.load_session(session_id)
         if row is None:
             return None
@@ -3185,7 +3300,9 @@ class DashboardService:
             )
 
     def search_sessions(self, query: str, user_id: str | None = None) -> list[SessionView]:
-        return [self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)]
+        return [
+            self._session_view(row) for row in self.store.search_sessions(query.strip(), user_id)
+        ]
 
     def get_turn(self, turn_id: str, user_id: str | None = None) -> TurnDetailView | None:
         row = self.store.load_turn(turn_id)
@@ -3229,9 +3346,7 @@ class DashboardService:
         user_id = principal.delegated_by_user_id
         if not self.store.set_session_pinned(session_id, pinned, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
-        return ControlResult(
-            ok=True, data={"session_id": session_id, "pinned": pinned}
-        )
+        return ControlResult(ok=True, data={"session_id": session_id, "pinned": pinned})
 
     # ── Safe session rename / archive lifecycle (Control Deck task 3) ────────
     # Renaming and archiving are organizing actions only — they grant nothing
@@ -3295,9 +3410,7 @@ class DashboardService:
                 },
             )
         )
-        return ControlResult(
-            ok=True, data={"session_id": session_id, "title": normalized}
-        )
+        return ControlResult(ok=True, data={"session_id": session_id, "title": normalized})
 
     def _dispatch_session_end_hook(self, session_id: str, reason: str) -> None:
         """`SessionEnd` for the one thing that really ends a web conversation.
@@ -3365,9 +3478,7 @@ class DashboardService:
         )
         if archived:
             self._dispatch_session_end_hook(session_id, "archived")
-        return ControlResult(
-            ok=True, data={"session_id": session_id, "archived": archived}
-        )
+        return ControlResult(ok=True, data={"session_id": session_id, "archived": archived})
 
     # ── Governed local MCP server profiles (Control Deck task 4) ─────────────
     def list_mcp_servers(self, principal_id: str) -> list[McpServerView]:
@@ -3434,9 +3545,7 @@ class DashboardService:
             acting_principal_id, name, endpoint_url, auth_ref
         )
 
-    def connect_mcp_server(
-        self, acting_principal_id: str | None, server_id: str
-    ) -> ControlResult:
+    def connect_mcp_server(self, acting_principal_id: str | None, server_id: str) -> ControlResult:
         """Governed test-connect of a stored MCP server (delegates)."""
         return self.control.connect_mcp_server(acting_principal_id, server_id)
 
@@ -3446,9 +3555,7 @@ class DashboardService:
         """Owner-scoped, human-only rename of one MCP server profile."""
         return self.control.rename_mcp_server(acting_principal_id, server_id, name)
 
-    def delete_mcp_server(
-        self, acting_principal_id: str | None, server_id: str
-    ) -> ControlResult:
+    def delete_mcp_server(self, acting_principal_id: str | None, server_id: str) -> ControlResult:
         """Owner-scoped, human-only delete of one MCP server profile."""
         return self.control.delete_mcp_server(acting_principal_id, server_id)
 
@@ -3459,9 +3566,7 @@ class DashboardService:
         """Owner-scoped, human-only one-call stop of a connection (delegates)."""
         return self.control.pause_mcp_server(acting_principal_id, server_id, reason)
 
-    def resume_mcp_server(
-        self, acting_principal_id: str | None, server_id: str
-    ) -> ControlResult:
+    def resume_mcp_server(self, acting_principal_id: str | None, server_id: str) -> ControlResult:
         """Owner-scoped, human-only resume of a paused/killed connection."""
         return self.control.resume_mcp_server(acting_principal_id, server_id)
 
@@ -3514,7 +3619,9 @@ class DashboardService:
     def list_security_credentials(self, principal_id: str) -> list[CredentialLifecycleView]:
         return CredentialLifecycle(self.store).list(principal_id)
 
-    def verify_security_credential(self, principal_id: str, provider: str) -> CredentialLifecycleView:
+    def verify_security_credential(
+        self, principal_id: str, provider: str
+    ) -> CredentialLifecycleView:
         return CredentialLifecycle(self.store).verify_replacement(principal_id, provider)
 
     def scan_security(self, principal_id: str) -> list[SecurityFindingView]:
@@ -3572,7 +3679,9 @@ class DashboardService:
         containment = CapabilityContainment(self.store)
         if action == "pause":
             view = containment.pause(
-                principal_id, capability, subject_id,
+                principal_id,
+                capability,
+                subject_id,
                 reason="Paused by you. It will not run until you resume it.",
             )
         elif action == "kill":
@@ -3633,6 +3742,7 @@ class DashboardService:
             source = rule.source
             dispatched = rule.event in DISPATCHED_HOOK_EVENTS
             deciding = rule.event in DECIDING_HOOK_EVENTS
+
             # A builtin naming a handler this build does not have raises at
             # dispatch time and is recorded as `hook_failed`. The config parses,
             # the rule matches, and nothing happens — so it is the same class of
@@ -3642,8 +3752,7 @@ class DashboardService:
                 return handler.type != "builtin" or (handler.builtin or "") in BUILTIN_HANDLERS
 
             authoritative = any(
-                (handler.decision_authority or handler.type == "builtin")
-                and _available(handler)
+                (handler.decision_authority or handler.type == "builtin") and _available(handler)
                 for handler in rule.handlers
             )
             rules.append(
@@ -3708,9 +3817,7 @@ class DashboardService:
         # BUG-222 — off is a state to display, not a reason to hide what would
         # otherwise run: the rules stay listed and the page says they are off.
         disabled = (
-            hooks_disabled(self.workspace_root, principal_id)
-            if principal_id is not None
-            else False
+            hooks_disabled(self.workspace_root, principal_id) if principal_id is not None else False
         )
         return {
             "active": not disabled and not registry.is_empty(),
@@ -3896,9 +4003,7 @@ class DashboardService:
                 "outbound": {},
                 "inbound": {},
             }
-        pairings = {
-            str(row.get("connector_id")): row for row in self.store.list_channel_pairings()
-        }
+        pairings = {str(row.get("connector_id")): row for row in self.store.list_channel_pairings()}
         gate = self.control.get_capability_gate("external_channel_runtime", principal_id)
         allowlist = channel_egress_allowlist()
         rows: list[dict[str, Any]] = []
@@ -3998,11 +4103,14 @@ class DashboardService:
     def list_security_findings(self, principal_id: str) -> list[SecurityFindingView]:
         return [
             SecurityFindingView(
-                finding_id=str(row["finding_id"]), source=str(row.get("source", "")),
-                severity=str(row.get("severity", "")), code=str(row.get("code", "")),
+                finding_id=str(row["finding_id"]),
+                source=str(row.get("source", "")),
+                severity=str(row.get("severity", "")),
+                code=str(row.get("code", "")),
                 summary=str(row.get("summary", "")),
                 redacted_detail=dict(row.get("redacted_detail", {}) or {}),
-                subject_id=row.get("subject_id"), state=str(row.get("state", "open")),
+                subject_id=row.get("subject_id"),
+                state=str(row.get("state", "open")),
                 created_at=str(row.get("created_at", "")),
             )
             for row in self.store.list_security_findings(principal_id)
@@ -4028,16 +4136,12 @@ class DashboardService:
             for row in self.store.list_mcp_session_logs(server_id, principal_id, limit=10)
         ]
 
-    def mark_notification_read(
-        self, notification_id: str, principal_id: str
-    ) -> ControlResult:
+    def mark_notification_read(self, notification_id: str, principal_id: str) -> ControlResult:
         """Owner-scoped mark-as-read for one notification."""
         ok = self.store.mark_notification_read(notification_id, principal_id)
         return ControlResult(ok=ok, reason_code=None if ok else "unknown_notification")
 
-    def delete_session(
-        self, session_id: str, acting_principal_id: str | None
-    ) -> ControlResult:
+    def delete_session(self, session_id: str, acting_principal_id: str | None) -> ControlResult:
         """Permanently delete one session and its cascaded rows (human-only).
 
         Respects user/session visibility: an account cannot delete another
@@ -4055,7 +4159,9 @@ class DashboardService:
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         return ControlResult(ok=True, data={"session_id": session_id})
 
-    def delete_sessions(self, session_ids: list[str], acting_principal_id: str | None) -> ControlResult:
+    def delete_sessions(
+        self, session_ids: list[str], acting_principal_id: str | None
+    ) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
@@ -4088,7 +4194,9 @@ class DashboardService:
         if project_id is not None and self.store.load_project(project_id, user_id=user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
         session = self.store.load_session(session_id)
-        previous_project_id = str(session["project_id"]) if session and session.get("project_id") else None
+        previous_project_id = (
+            str(session["project_id"]) if session and session.get("project_id") else None
+        )
         if not self.store.set_session_project(session_id, project_id, user_id=user_id):
             return ControlResult(ok=False, reason_code=f"unknown_session:{session_id}")
         from raiker.events.types import make_event
@@ -4106,9 +4214,7 @@ class DashboardService:
                 },
             )
         )
-        return ControlResult(
-            ok=True, data={"session_id": session_id, "project_id": project_id}
-        )
+        return ControlResult(ok=True, data={"session_id": session_id, "project_id": project_id})
 
     # ── Session tags (conversation organisation remainder) ──────────────────
     # A tag is an organizing label only (like the per-session `pinned` flag
@@ -4241,7 +4347,9 @@ class DashboardService:
         ]
         if acting_principal_id:
             self.store.record_memory_lifecycle_event(
-                "workspace_memory_control", "admin_access", acting_principal_id,
+                "workspace_memory_control",
+                "admin_access",
+                acting_principal_id,
                 {"operation": "list", "scope": scope, "memory_count": len(views)},
             )
         return views
@@ -4255,7 +4363,14 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
         if principal.principal_type != PrincipalType.HUMAN:
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        if get_memory(memory_id, workspace_root=self.workspace_root, owner_principal_id=principal.principal_id) is None:
+        if (
+            get_memory(
+                memory_id,
+                workspace_root=self.workspace_root,
+                owner_principal_id=principal.principal_id,
+            )
+            is None
+        ):
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         self.store.set_memory_pinned(memory_id, pinned)
         self.store.record_memory_lifecycle_event(
@@ -4275,13 +4390,9 @@ class DashboardService:
     ) -> list[dict[str, Any]]:
         if not self._is_human(acting_principal_id):
             return []
-        return self.store.list_memory_relationship_candidates(
-            acting_principal_id or ""
-        )
+        return self.store.list_memory_relationship_candidates(acting_principal_id or "")
 
-    def scan_memory_relationships(
-        self, acting_principal_id: str | None
-    ) -> ControlResult:
+    def scan_memory_relationships(self, acting_principal_id: str | None) -> ControlResult:
         """Owner-started, idempotent backfill over currently approved memory."""
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
@@ -4321,9 +4432,7 @@ class DashboardService:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if decision not in {"approved", "denied"}:
-            return ControlResult(
-                ok=False, reason_code="invalid_memory_relationship_decision"
-            )
+            return ControlResult(ok=False, reason_code="invalid_memory_relationship_decision")
         try:
             relationship_id = self.store.resolve_memory_relationship_candidate_atomic(
                 candidate_id,
@@ -4334,9 +4443,7 @@ class DashboardService:
             )
         except ValueError as exc:
             if str(exc) == "stale_memory_relationship_candidate":
-                return ControlResult(
-                    ok=False, reason_code="stale_memory_relationship_proposal"
-                )
+                return ControlResult(ok=False, reason_code="stale_memory_relationship_proposal")
             raise
         return ControlResult(
             ok=True,
@@ -4475,9 +4582,7 @@ class DashboardService:
             },
         )
 
-    def memory_history(
-        self, memory_id: str, acting_principal_id: str | None
-    ) -> ControlResult:
+    def memory_history(self, memory_id: str, acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         events = self.store.list_memory_lifecycle_events(
@@ -4579,48 +4684,99 @@ class DashboardService:
         self.store.record_memory_lifecycle_event(memory_id, "forget", principal.principal_id)
         return ControlResult(ok=True, data={"memory_id": memory_id})
 
-    def set_memory_archived(self, memory_id: str, archived: bool, acting_principal_id: str | None) -> ControlResult:
+    def set_memory_archived(
+        self, memory_id: str, archived: bool, acting_principal_id: str | None
+    ) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.store import set_memory_archived
-        entry = set_memory_archived(memory_id, archived=archived, workspace_root=self.workspace_root, store=self.store, owner_principal_id=acting_principal_id)
+
+        entry = set_memory_archived(
+            memory_id,
+            archived=archived,
+            workspace_root=self.workspace_root,
+            store=self.store,
+            owner_principal_id=acting_principal_id,
+        )
         if entry is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
-        self.store.record_memory_lifecycle_event(memory_id, "archive" if archived else "restore", acting_principal_id or "")
+        self.store.record_memory_lifecycle_event(
+            memory_id, "archive" if archived else "restore", acting_principal_id or ""
+        )
         return ControlResult(ok=True, data={"memory_id": memory_id, "archived": archived})
 
-    def preview_memory_purge(self, memory_id: str, acting_principal_id: str | None) -> ControlResult:
+    def preview_memory_purge(
+        self, memory_id: str, acting_principal_id: str | None
+    ) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.store import get_memory
-        memory = get_memory(memory_id, workspace_root=self.workspace_root, include_expired=True, include_archived=True, owner_principal_id=acting_principal_id)
+
+        memory = get_memory(
+            memory_id,
+            workspace_root=self.workspace_root,
+            include_expired=True,
+            include_archived=True,
+            owner_principal_id=acting_principal_id,
+        )
         if memory is None:
             return ControlResult(ok=False, reason_code=f"unknown_memory:{memory_id}")
         memory_path = internal_io_path(
             self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
         )
-        return ControlResult(ok=True, data={"memory_id": memory_id, "artifacts": [display_path(memory_path)], "backup_disposition": "retained backups are not immediately erased", "requires_confirmation": memory_id})
+        return ControlResult(
+            ok=True,
+            data={
+                "memory_id": memory_id,
+                "artifacts": [display_path(memory_path)],
+                "backup_disposition": "retained backups are not immediately erased",
+                "requires_confirmation": memory_id,
+            },
+        )
 
-    def purge_memory(self, memory_id: str, confirmation: str | None, acting_principal_id: str | None) -> ControlResult:
+    def purge_memory(
+        self, memory_id: str, confirmation: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
         preview = self.preview_memory_purge(memory_id, acting_principal_id)
         if not preview.ok:
             return preview
         if confirmation != memory_id:
             return ControlResult(ok=False, reason_code="memory_purge_confirmation_required")
         from raiker.contracts.ids import utc_now
-        path = internal_io_path(
-            self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md"
-        )
+
+        path = internal_io_path(self.workspace_root / ".raiker" / "memory" / f"{memory_id}.md")
         path.unlink(missing_ok=True)
         projections = self.store.list_memory_projections(memory_id)
         self.store.deactivate_memory_projections(memory_id)
         self.store.delete_approved_memory(memory_id, owner_principal_id=acting_principal_id)
-        disposition = {**preview.data, "projections": projections, "completed_storage_locations": ["markdown_export", "sqlite_approved_memory", "sqlite_fts", "projection_mappings"]}
-        self.store.create_memory_purge_record(new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition)
-        self.store.record_memory_lifecycle_event(memory_id, "purge", acting_principal_id or "", disposition)
-        return ControlResult(ok=True, data={"memory_id": memory_id, "purged": True, "backup_disposition": preview.data["backup_disposition"]})
+        disposition = {
+            **preview.data,
+            "projections": projections,
+            "completed_storage_locations": [
+                "markdown_export",
+                "sqlite_approved_memory",
+                "sqlite_fts",
+                "projection_mappings",
+            ],
+        }
+        self.store.create_memory_purge_record(
+            new_id("pur_"), memory_id, acting_principal_id or "", utc_now(), disposition
+        )
+        self.store.record_memory_lifecycle_event(
+            memory_id, "purge", acting_principal_id or "", disposition
+        )
+        return ControlResult(
+            ok=True,
+            data={
+                "memory_id": memory_id,
+                "purged": True,
+                "backup_disposition": preview.data["backup_disposition"],
+            },
+        )
 
-    def edit_memory_controlled(self, memory_id: str, text: str, acting_principal_id: str | None) -> ControlResult:
+    def edit_memory_controlled(
+        self, memory_id: str, text: str, acting_principal_id: str | None
+    ) -> ControlResult:
         return self._update_memory_controlled(
             memory_id, text=text, search_enabled=None, acting_principal_id=acting_principal_id
         )
@@ -4633,26 +4789,49 @@ class DashboardService:
         from raiker.memory.store import MemoryGovernance, correct_memory
 
         replacement = correct_memory(
-            memory_id, text, workspace_root=self.workspace_root, store=self.store,
+            memory_id,
+            text,
+            workspace_root=self.workspace_root,
+            store=self.store,
             remembered_reason=reason,
             owner_principal_id=self.store.account_scope(acting_principal_id),
             governance=MemoryGovernance(
-                source_event_id=new_id("evt_"), source_session_id="", source_turn_id=None,
-                source_type="human_correction", confidence=1.0, trust_score=1.0,
-                retention="until_forget", approval_state="approved", created_by=acting_principal_id or "",
+                source_event_id=new_id("evt_"),
+                source_session_id="",
+                source_turn_id=None,
+                source_type="human_correction",
+                confidence=1.0,
+                trust_score=1.0,
+                retention="until_forget",
+                approval_state="approved",
+                created_by=acting_principal_id or "",
             ),
         )
         if replacement is None:
             return ControlResult(ok=False, reason_code="invalid_memory_correction")
-        self.store.record_memory_lifecycle_event(memory_id, "correct", acting_principal_id or "", {"replacement_memory_id": replacement.memory_id, "reason": reason})
-        return ControlResult(ok=True, data={"memory_id": replacement.memory_id, "supersedes_memory_id": memory_id})
-
-    def set_memory_search_enabled(self, memory_id: str, search_enabled: bool, acting_principal_id: str | None) -> ControlResult:
-        return self._update_memory_controlled(
-            memory_id, text=None, search_enabled=search_enabled, acting_principal_id=acting_principal_id
+        self.store.record_memory_lifecycle_event(
+            memory_id,
+            "correct",
+            acting_principal_id or "",
+            {"replacement_memory_id": replacement.memory_id, "reason": reason},
+        )
+        return ControlResult(
+            ok=True, data={"memory_id": replacement.memory_id, "supersedes_memory_id": memory_id}
         )
 
-    def set_memory_expiry(self, memory_id: str, expires_at: str | None, acting_principal_id: str | None) -> ControlResult:
+    def set_memory_search_enabled(
+        self, memory_id: str, search_enabled: bool, acting_principal_id: str | None
+    ) -> ControlResult:
+        return self._update_memory_controlled(
+            memory_id,
+            text=None,
+            search_enabled=search_enabled,
+            acting_principal_id=acting_principal_id,
+        )
+
+    def set_memory_expiry(
+        self, memory_id: str, expires_at: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
         return self._update_memory_controlled(
             memory_id,
             text=None,
@@ -4665,17 +4844,25 @@ class DashboardService:
     def export_memories(self, acting_principal_id: str | None) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        memories = [m.to_dict() for m in self.list_memories(acting_principal_id=acting_principal_id)]
+        memories = [
+            m.to_dict() for m in self.list_memories(acting_principal_id=acting_principal_id)
+        ]
         self.store.record_memory_lifecycle_event(
-            "workspace_memory_export", "export", acting_principal_id or "", {"memory_count": len(memories)}
+            "workspace_memory_export",
+            "export",
+            acting_principal_id or "",
+            {"memory_count": len(memories)},
         )
         return ControlResult(ok=True, data={"memories": memories})
 
-    def import_memories(self, memories: list[dict[str, Any]], acting_principal_id: str | None) -> ControlResult:
+    def import_memories(
+        self, memories: list[dict[str, Any]], acting_principal_id: str | None
+    ) -> ControlResult:
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.entity_extraction import propose_memory_relationships
         from raiker.memory.store import MemoryGovernance, update_memory, write_memory
+
         relationship_proposals = 0
         for item in memories:
             text = str(item.get("text", "")).strip()
@@ -4687,8 +4874,15 @@ class DashboardService:
                 scope=str(item.get("scope", "project")),
                 store=self.store,
                 governance=MemoryGovernance(
-                    new_id("evt_"), "", None, "user_import", 1.0, 1.0,
-                    str(item.get("retention", "until_forget")), "approved", acting_principal_id or "",
+                    new_id("evt_"),
+                    "",
+                    None,
+                    "user_import",
+                    1.0,
+                    1.0,
+                    str(item.get("retention", "until_forget")),
+                    "approved",
+                    acting_principal_id or "",
                 ),
                 owner_principal_id=acting_principal_id,
             )
@@ -4719,7 +4913,10 @@ class DashboardService:
         """Owner-started repair; never runs as an autonomous background worker."""
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
-        return ControlResult(ok=True, data=self.store.reconcile_memory_projections(owner_principal_id=acting_principal_id))
+        return ControlResult(
+            ok=True,
+            data=self.store.reconcile_memory_projections(owner_principal_id=acting_principal_id),
+        )
 
     def list_observations(self, acting_principal_id: str | None) -> ControlResult:
         """MEM-04 — what the runtime captured, and what it refused to.
@@ -4738,7 +4935,9 @@ class DashboardService:
         with self.store.connect() as connection:
             gists = {
                 str(row["observation_id"]): (
-                    str(row["gist_id"]), str(row["status"]), str(row["summary"])
+                    str(row["gist_id"]),
+                    str(row["status"]),
+                    str(row["summary"]),
                 )
                 for row in connection.execute(
                     "SELECT gist_id, observation_id, status, summary FROM gist_memories"
@@ -4874,6 +5073,7 @@ class DashboardService:
         if text is not None and not text.strip():
             return ControlResult(ok=False, reason_code="empty_memory_text")
         from raiker.memory.store import update_memory
+
         updated = update_memory(
             memory_id,
             workspace_root=self.workspace_root,
@@ -4917,6 +5117,33 @@ class DashboardService:
 
         owner = self.store.account_scope(acting_principal_id) if acting_principal_id else None
         active = resolve_embedding_backend(self.store, owner_principal_id=owner)
+        providers: list[dict[str, Any]] = []
+        for offered in embedding_capable_profiles():
+            item = dict(offered)
+            model = str(item["space"])
+            pending_memories = len(
+                self.store.list_memories_missing_embedding(
+                    model,
+                    owner_principal_id=owner,
+                    limit=MAX_MEMORY_INDEX_BATCH,
+                )
+            )
+            remaining = max(0, MAX_MEMORY_INDEX_BATCH - pending_memories)
+            pending_files = (
+                len(
+                    self.store.list_managed_file_chunks_missing_embedding(
+                        model,
+                        owner_principal_id=owner,
+                        limit=remaining,
+                    )
+                )
+                if owner and remaining
+                else 0
+            )
+            item["unindexed_memories"] = pending_memories
+            item["unindexed_file_chunks"] = pending_files
+            item["pending_count"] = pending_memories + pending_files
+            providers.append(item)
         return MemorySettingsView(
             incognito=self.store.is_memory_incognito(acting_principal_id),
             embedding_backend=self.store.get_memory_embedding_backend(owner),
@@ -4936,13 +5163,29 @@ class DashboardService:
                 space.describe()
                 for space in list_embedding_spaces(self.store, owner_principal_id=owner)
             ),
-            embedding_providers=tuple(embedding_capable_profiles()),
+            # Pending counts belong to a vector space, not to the current
+            # recall selection. Keeping them on each offered profile means a
+            # newly added memory or file remains indexable after semantic
+            # recall is already active, and changing the target cannot show a
+            # count for the wrong model.
+            embedding_providers=tuple(providers),
             unindexed_memories=len(
                 self.store.list_memories_missing_embedding(
                     active.model_label if active.semantic else None,
                     owner_principal_id=owner,
                     limit=MAX_MEMORY_INDEX_BATCH,
                 )
+            ),
+            unindexed_file_chunks=(
+                len(
+                    self.store.list_managed_file_chunks_missing_embedding(
+                        active.model_label if active.semantic else "__no_semantic_space__",
+                        owner_principal_id=owner,
+                        limit=MAX_MEMORY_INDEX_BATCH,
+                    )
+                )
+                if owner
+                else 0
             ),
         )
 
@@ -5045,7 +5288,11 @@ class DashboardService:
         ]
 
     def list_checkpoints(
-        self, session_id: str | None = None, limit: int = 50, project_id: str | None = None, user_id: str | None = None
+        self,
+        session_id: str | None = None,
+        limit: int = 50,
+        project_id: str | None = None,
+        user_id: str | None = None,
     ) -> list[CheckpointView]:
         return [
             self._checkpoint_view(r)
@@ -5054,7 +5301,9 @@ class DashboardService:
             and (user_id is None or session.get("user_id") == user_id)
         ]
 
-    def get_checkpoint(self, checkpoint_id: str, user_id: str | None = None) -> CheckpointView | None:
+    def get_checkpoint(
+        self, checkpoint_id: str, user_id: str | None = None
+    ) -> CheckpointView | None:
         row = self.store.load_checkpoint_by_id(checkpoint_id)
         if row is None:
             return None
@@ -5074,7 +5323,9 @@ class DashboardService:
     def list_projects(self, user_id: str | None = None) -> ProjectsListView:
         active = self.store.get_active_project(user_id)
         return ProjectsListView(
-            projects=tuple(self._project_view(row, active) for row in self.store.list_projects(user_id)),
+            projects=tuple(
+                self._project_view(row, active) for row in self.store.list_projects(user_id)
+            ),
             active_project_id=active,
         )
 
@@ -5084,7 +5335,8 @@ class DashboardService:
             return None
         active = self.store.get_active_project(user_id)
         sessions = tuple(
-            self._session_view(s) for s in self.store.list_sessions(limit=200, project_id=project_id, user_id=user_id)
+            self._session_view(s)
+            for s in self.store.list_sessions(limit=200, project_id=project_id, user_id=user_id)
         )
         checkpoints = tuple(
             self._checkpoint_view(c) for c in self.store.list_checkpoints(project_id=project_id)
@@ -5097,9 +5349,7 @@ class DashboardService:
             context=self.store.load_project_context(project_id),
         )
 
-    def export_project(
-        self, project_id: str, acting_principal_id: str | None
-    ) -> ControlResult:
+    def export_project(self, project_id: str, acting_principal_id: str | None) -> ControlResult:
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
             return ControlResult(ok=False, reason_code="principal_not_resolved")
@@ -5149,7 +5399,10 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="invalid_project_name")
         if self.store.load_project_by_name(cleaned) is not None:
             return ControlResult(ok=False, reason_code="duplicate_project_name")
-        if parent_id is not None and self.store.load_project(parent_id, principal.delegated_by_user_id) is None:
+        if (
+            parent_id is not None
+            and self.store.load_project(parent_id, principal.delegated_by_user_id) is None
+        ):
             return ControlResult(ok=False, reason_code=f"unknown_parent:{parent_id}")
         if any(
             (parsed := _project_root_parts(str(project.get("root_subpath") or "")))
@@ -5163,7 +5416,10 @@ class DashboardService:
             # creating a second one under `.raiker/projects/` would leave an
             # empty directory that nothing ever uses.
             self.store.create_project(
-                project_id, cleaned, "", parent_id=parent_id,
+                project_id,
+                cleaned,
+                "",
+                parent_id=parent_id,
                 owner_user_id=principal.delegated_by_user_id,
             )
             attached = self.attach_project_folder(
@@ -5189,10 +5445,21 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="project_root_escapes_workspace")
         resolved = contained_root[2]
         resolved.mkdir(parents=True, exist_ok=True)
-        self.store.create_project(project_id, cleaned, root_subpath, parent_id=parent_id, owner_user_id=principal.delegated_by_user_id)
+        self.store.create_project(
+            project_id,
+            cleaned,
+            root_subpath,
+            parent_id=parent_id,
+            owner_user_id=principal.delegated_by_user_id,
+        )
         return ControlResult(
             ok=True,
-            data={"project_id": project_id, "name": cleaned, "root_subpath": root_subpath, "parent_id": parent_id},
+            data={
+                "project_id": project_id,
+                "name": cleaned,
+                "root_subpath": root_subpath,
+                "parent_id": parent_id,
+            },
         )
 
     def attach_project_folder(
@@ -5266,9 +5533,7 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        if not self.store.detach_project_root(
-            project_id, user_id=principal.delegated_by_user_id
-        ):
+        if not self.store.detach_project_root(project_id, user_id=principal.delegated_by_user_id):
             return ControlResult(ok=False, reason_code="detach_failed")
         return ControlResult(ok=True, data={"project_id": project_id})
 
@@ -5279,7 +5544,9 @@ class DashboardService:
             return False
         return True
 
-    def select_project(self, project_id: str | None, acting_principal_id: str | None) -> ControlResult:
+    def select_project(
+        self, project_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
         """Set (or clear, with null/empty) the active project (human gate-manager only).
 
         New sessions are stamped with the active project. Selecting grants
@@ -5299,7 +5566,9 @@ class DashboardService:
         self.store.save_active_project(cleaned, principal.delegated_by_user_id)
         return ControlResult(ok=True, data={"active_project_id": cleaned})
 
-    def delete_project(self, project_id: str, acting_principal_id: str | None, confirm: bool = False) -> ControlResult:
+    def delete_project(
+        self, project_id: str, acting_principal_id: str | None, confirm: bool = False
+    ) -> ControlResult:
         """Human-only hard delete with orphanage cascade. Requires confirmed=True."""
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -5358,7 +5627,8 @@ class DashboardService:
         if any(
             self.store.load_attachment_metadata(
                 attachment_id, owner_principal_id=principal.principal_id
-            ) is None
+            )
+            is None
             for attachment_id in unique_ids
         ):
             return ControlResult(ok=False, reason_code="unknown_project_attachment")
@@ -5372,7 +5642,8 @@ class DashboardService:
         )
         context = self.store.load_project_context(project_id)
         return ControlResult(
-            ok=True, data=context,
+            ok=True,
+            data=context,
         )
 
     # ── Nested projects/folders (conversation organisation remainder) ─────
@@ -5393,7 +5664,9 @@ class DashboardService:
         self.store.archive_project(project_id)
         return ControlResult(ok=True, data={"project_id": project_id, "archived": True})
 
-    def move_project(self, project_id: str, new_parent_id: str | None, acting_principal_id: str | None) -> ControlResult:
+    def move_project(
+        self, project_id: str, new_parent_id: str | None, acting_principal_id: str | None
+    ) -> ControlResult:
         """Move a project to a new parent (human-only)."""
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         if principal is None:
@@ -5402,12 +5675,17 @@ class DashboardService:
             return ControlResult(ok=False, reason_code="not_authorized_human")
         if self.store.load_project(project_id, principal.delegated_by_user_id) is None:
             return ControlResult(ok=False, reason_code=f"unknown_project:{project_id}")
-        if new_parent_id is not None and self.store.load_project(new_parent_id, principal.delegated_by_user_id) is None:
+        if (
+            new_parent_id is not None
+            and self.store.load_project(new_parent_id, principal.delegated_by_user_id) is None
+        ):
             return ControlResult(ok=False, reason_code=f"unknown_parent:{new_parent_id}")
         ok = self.store.move_project(project_id, new_parent_id)
         if not ok:
             return ControlResult(ok=False, reason_code="move_failed_or_cycle")
-        return ControlResult(ok=True, data={"project_id": project_id, "new_parent_id": new_parent_id})
+        return ControlResult(
+            ok=True, data={"project_id": project_id, "new_parent_id": new_parent_id}
+        )
 
     def get_session_context(self, session_id: str) -> dict:
         """Return the session's effective project context (ancestors merged in).
@@ -5509,10 +5787,17 @@ class DashboardService:
                 clean_attachments.append({"type": "path", "path": entry["path"].strip()})
                 continue
             attachment_id = entry.get("attachment_id")
-            if kind in {"image", "document"} and isinstance(attachment_id, str) and attachment_id.strip():
-                if self.store.load_attachment_metadata(
-                    attachment_id.strip(), owner_principal_id=principal_id
-                ) is None:
+            if (
+                kind in {"image", "document"}
+                and isinstance(attachment_id, str)
+                and attachment_id.strip()
+            ):
+                if (
+                    self.store.load_attachment_metadata(
+                        attachment_id.strip(), owner_principal_id=principal_id
+                    )
+                    is None
+                ):
                     raise ValueError("attachment_not_found")
                 clean_attachments.append({"type": kind, "attachment_id": attachment_id.strip()})
                 continue
@@ -5532,10 +5817,13 @@ class DashboardService:
             raise ValueError(f"unknown_project:{project_id}")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
-            parent_session = self.store.load_session(parent.session_id) if parent is not None else None
-            if parent is None or parent_session is None or (
-                user_id is not None
-                and parent_session.get("user_id") not in (None, user_id)
+            parent_session = (
+                self.store.load_session(parent.session_id) if parent is not None else None
+            )
+            if (
+                parent is None
+                or parent_session is None
+                or (user_id is not None and parent_session.get("user_id") not in (None, user_id))
             ):
                 raise ValueError(f"unknown_parent_task:{parent_task_id}")
         inbox_session_id = f"sess_inbox_{principal_id}"
@@ -5592,9 +5880,7 @@ class DashboardService:
         user_id: str | None = None,
         principal_id: str | None = None,
     ) -> list[ApprovalView]:
-        rows = self.store.list_approvals(
-            status=status, user_id=user_id, principal_id=principal_id
-        )
+        rows = self.store.list_approvals(status=status, user_id=user_id, principal_id=principal_id)
         # ADD-02 — one join for the whole page rather than a query per row, so a
         # batched turn's approvals can each say which decision they are.
         positions = self.store.suspended_turn_queue_positions(
@@ -5609,9 +5895,7 @@ class DashboardService:
         user_id: str | None = None,
         principal_id: str | None = None,
     ) -> ApprovalDetailView | None:
-        row = self.store.load_approval(
-            approval_id, user_id=user_id, principal_id=principal_id
-        )
+        row = self.store.load_approval(approval_id, user_id=user_id, principal_id=principal_id)
         if row is None:
             return None
         return self._approval_detail(row, principal_id=principal_id)
@@ -5626,22 +5910,33 @@ class DashboardService:
         )
         state = (
             self.store.load_principal_model_state(scoped_principal)
-            if scoped_principal else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
+            if scoped_principal
+            else self.store.load_model_session_state(TERMINAL_MODEL_SESSION_ID)
         )
         native_default = next(
-            (profile for profile in registry.list_profiles() if profile.raw.get("is_native_default")),
+            (
+                profile
+                for profile in registry.list_profiles()
+                if profile.raw.get("is_native_default")
+            ),
             None,
         )
-        current = state.profile_id if state is not None else (
-            native_default.profile_id if native_default is not None else None
+        current = (
+            state.profile_id
+            if state is not None
+            else (native_default.profile_id if native_default is not None else None)
         )
         # The persisted per-profile model override (e.g. an Ollama/OpenAI model
         # picked at selection time) is what the runtime actually binds, so the
         # selected profile card shows it instead of the profile's placeholder.
         override = state.model if state is not None and state.model else None
         hosted_gate = self.control.get_capability_gate(HOSTED_MODEL_GATE, acting_principal_id)
-        private_gate = self.control.get_capability_gate(PRIVATE_NETWORK_MODEL_GATE, acting_principal_id)
-        advisor_gate = self.control.get_capability_gate("advisor_model_runtime", acting_principal_id)
+        private_gate = self.control.get_capability_gate(
+            PRIVATE_NETWORK_MODEL_GATE, acting_principal_id
+        )
+        advisor_gate = self.control.get_capability_gate(
+            "advisor_model_runtime", acting_principal_id
+        )
         from raiker.models.connections import get_model_connection
         from raiker.models.readiness import ModelReadinessService, ProviderCatalogueProbe
         from raiker.runtime.model_usage import ModelUsageLedger, sum_totals
@@ -5766,12 +6061,9 @@ class DashboardService:
                 ),
                 ready=bool(readiness and readiness.ready),
                 supports_reasoning=bool(profile.raw.get("supports_reasoning", False)),
-                supports_reasoning_effort=bool(
-                    profile.raw.get("supports_reasoning_effort", False)
-                ),
+                supports_reasoning_effort=bool(profile.raw.get("supports_reasoning_effort", False)),
                 reasoning_effort_values=tuple(
-                    str(value)
-                    for value in profile.raw.get("reasoning_effort_values", [])
+                    str(value) for value in profile.raw.get("reasoning_effort_values", [])
                 ),
                 reasoning_modes=tuple(
                     str(value) for value in profile.raw.get("reasoning_modes", [])
@@ -5783,9 +6075,7 @@ class DashboardService:
             )
 
         configured_pairs = (
-            self.store.list_configured_models(acting_principal_id)
-            if acting_principal_id
-            else []
+            self.store.list_configured_models(acting_principal_id) if acting_principal_id else []
         )
         configured_by_profile: dict[str, list[str]] = {}
         for profile_id, configured_model in configured_pairs:
@@ -5811,9 +6101,9 @@ class DashboardService:
         chat_profiles: list[ModelProfileView] = []
         seen_choices: set[tuple[str, str]] = set()
         for profile in registry_profiles:
-            choices = ([] if profile.model == "<model>" else [profile.model]) + configured_by_profile.get(
-                profile.profile_id, []
-            )
+            choices = (
+                [] if profile.model == "<model>" else [profile.model]
+            ) + configured_by_profile.get(profile.profile_id, [])
             for configured_model in choices:
                 key = (profile.profile_id, configured_model)
                 if key in seen_choices:
@@ -5825,8 +6115,7 @@ class DashboardService:
                         configured_model,
                         selected=(
                             profile.profile_id == current
-                            and configured_model
-                            == (override or profile.model)
+                            and configured_model == (override or profile.model)
                         ),
                     )
                 )
@@ -5835,7 +6124,9 @@ class DashboardService:
             chat_profiles=tuple(chat_profiles),
             current_profile_id=current,
             hosted_model_gate_state=hosted_gate.state if hosted_gate is not None else "unknown",
-            private_network_model_gate_state=private_gate.state if private_gate is not None else "unknown",
+            private_network_model_gate_state=private_gate.state
+            if private_gate is not None
+            else "unknown",
             model_egress_allowlist_configured=bool(
                 os.environ.get(MODEL_EGRESS_ALLOWLIST_ENV, "").strip()
             ),
@@ -5843,7 +6134,8 @@ class DashboardService:
             ready_provider_count=sum(1 for p in profiles if p.ready),
             fallback_sequence=tuple(
                 self.store.load_principal_model_fallback_sequence(scoped_principal)
-                if scoped_principal else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
+                if scoped_principal
+                else self.store.load_model_fallback_sequence(TERMINAL_MODEL_SESSION_ID)
             ),
             current_model=(
                 self._current_model(registry, state)
@@ -5852,7 +6144,8 @@ class DashboardService:
             ),
             advisor_profile_id=(
                 self.store.load_principal_model_advisor(scoped_principal)
-                if scoped_principal else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
+                if scoped_principal
+                else self.store.load_model_advisor(TERMINAL_MODEL_SESSION_ID)
             ),
             advisor_model_gate_state=advisor_gate.state if advisor_gate is not None else "unknown",
             **self._advisor_readiness_fields(readiness_service, acting_principal_id),
@@ -5889,9 +6182,7 @@ class DashboardService:
             return blank
         profile_id, model = resolved
         try:
-            readiness = readiness_service.current_selected(
-                acting_principal_id, profile_id, model
-            )
+            readiness = readiness_service.current_selected(acting_principal_id, profile_id, model)
         except Exception:  # noqa: BLE001 — an unresolvable endpoint is "not checked"
             return {**blank, "advisor_model": model}
         return {
@@ -5927,9 +6218,7 @@ class DashboardService:
 
         allowlist = connector_egress_allowlist()
         connectors: list[ConnectorView] = []
-        gh_gate = self.control.get_capability_gate(
-            "connector_github_runtime", acting_principal_id
-        )
+        gh_gate = self.control.get_capability_gate("connector_github_runtime", acting_principal_id)
         connectors.append(
             ConnectorView(
                 connector_id="github",
@@ -5967,9 +6256,7 @@ class DashboardService:
                 kind="read_only",
             )
         )
-        gcal_gate = self.control.get_capability_gate(
-            "connector_gcal_runtime", acting_principal_id
-        )
+        gcal_gate = self.control.get_capability_gate("connector_gcal_runtime", acting_principal_id)
         connectors.append(
             ConnectorView(
                 connector_id="gcal",
@@ -6017,7 +6304,9 @@ class DashboardService:
         )
 
     @staticmethod
-    def _current_model(registry: ModelProfileRegistry, state: ModelSessionState | None) -> str | None:
+    def _current_model(
+        registry: ModelProfileRegistry, state: ModelSessionState | None
+    ) -> str | None:
         """The concrete model the current selection binds, or None."""
         if state is None:
             return None
@@ -6128,9 +6417,9 @@ class DashboardService:
         # policy metadata is still authoritative: a non-local provider that
         # requires network access is off-machine even before its first request.
         if not off_machine:
-            off_machine = bool(getattr(profile, "requires_network", raw.get("requires_network", False))) and not bool(
-                getattr(profile, "local_only", raw.get("local_only", False))
-            )
+            off_machine = bool(
+                getattr(profile, "requires_network", raw.get("requires_network", False))
+            ) and not bool(getattr(profile, "local_only", raw.get("local_only", False)))
         if not off_machine:
             return False
         keyed = bool(raw.get("requires_api_key")) or bool(raw.get("api_key_env"))
@@ -6147,6 +6436,7 @@ class DashboardService:
         """
         from raiker.models.price_registry import PriceRegistry
         from raiker.models.pricing import resolve_model_facts
+
         facts_store = ModelFactsStore(self.store)
         registered = (
             PriceRegistry(self.store).resolve(principal_id, profile.provider, model)
@@ -6155,11 +6445,13 @@ class DashboardService:
         )
         owner_price = (
             facts_store.owner_price(principal_id, profile.provider, model)
-            if principal_id and model else None
+            if principal_id and model
+            else None
         )
         provider_facts = (
             facts_store.provider_facts(principal_id, profile.provider, model)
-            if principal_id and model else None
+            if principal_id and model
+            else None
         )
         raw = getattr(profile, "raw", {}) or {}
         configured_window = raw.get("context_window_tokens")
@@ -6181,7 +6473,8 @@ class DashboardService:
         )
         owner_capacity = (
             facts_store.owner_context_capacity(principal_id, profile.provider, model)
-            if principal_id and model else None
+            if principal_id and model
+            else None
         )
         if owner_capacity is not None:
             resolved = replace(
@@ -6225,9 +6518,13 @@ class DashboardService:
         # The model that actually served this conversation beats the currently
         # selected one: re-pricing history at a newly picked model's rate would
         # misreport what the user already spent.
-        model = session_rows[-1].model if session_rows else (
-            (state.model if state is not None and state.model else None)
-            or (profile.model if profile is not None else None)
+        model = (
+            session_rows[-1].model
+            if session_rows
+            else (
+                (state.model if state is not None and state.model else None)
+                or (profile.model if profile is not None else None)
+            )
         )
         if model in (None, "", "<model>"):
             model = None
@@ -6235,7 +6532,8 @@ class DashboardService:
         billable = bool(profile is not None and self._profile_is_billable(profile))
         facts = (
             self._resolve_facts(profile, model, acting_principal_id)
-            if profile is not None and model else None
+            if profile is not None and model
+            else None
         )
 
         def _priced_total(rows: list[Any]) -> Decimal | None:
@@ -6261,8 +6559,7 @@ class DashboardService:
         provider_total: Decimal | None = None
         if billable and profile is not None and principal:
             matching = [
-                row for row in ledger.provider_usage(principal)
-                if row.provider == profile.provider
+                row for row in ledger.provider_usage(principal) if row.provider == profile.provider
             ]
             provider_total = _priced_total(matching) if matching else None
 
@@ -6281,17 +6578,13 @@ class DashboardService:
         if acting_principal_id:
             from raiker.runtime.conversation_compaction import ContextCompactionStore
 
-            compacted = ContextCompactionStore(self.store).latest(
-                acting_principal_id, session_id
-            )
+            compacted = ContextCompactionStore(self.store).latest(acting_principal_id, session_id)
             if compacted is not None:
                 latest_compaction = {
                     "status": compacted.status,
                     "created_at": compacted.created_at,
                     "source_turn_count": compacted.source_turn_count,
-                    "estimated_input_tokens_before": (
-                        compacted.estimated_input_tokens_before
-                    ),
+                    "estimated_input_tokens_before": (compacted.estimated_input_tokens_before),
                     "estimated_summary_tokens": compacted.estimated_summary_tokens,
                     "reason_code": compacted.reason_code,
                 }
@@ -6362,9 +6655,7 @@ class DashboardService:
             if bool(profile.raw.get("test_only", False)):
                 continue
             pricing_block = profile.raw.get("pricing")
-            models = (
-                pricing_block.get("models") if isinstance(pricing_block, dict) else None
-            )
+            models = pricing_block.get("models") if isinstance(pricing_block, dict) else None
             if isinstance(models, dict) and isinstance(pricing_block, dict):
                 for model_id in models:
                     if isinstance(model_id, str):
@@ -6384,12 +6675,12 @@ class DashboardService:
                                 )
                             except (TypeError, ValueError):
                                 review_by_model[(profile.provider, model_id)] = (
-                                    reviewed_at, "", "invalid",
+                                    reviewed_at,
+                                    "",
+                                    "invalid",
                                 )
             if isinstance(profile.model, str) and profile.model not in ("", "<model>"):
-                profile_by_model.setdefault(
-                    (profile.provider, profile.model), profile.profile_id
-                )
+                profile_by_model.setdefault((profile.provider, profile.model), profile.profile_id)
 
         entries: list[ModelPricingEntryView] = []
         for provider, model in registry.models(owner):
@@ -6422,11 +6713,14 @@ class DashboardService:
                     effective_from=current.effective_from,
                     as_of=current.as_of,
                     reviewed_at=(review_by_model.get((provider, model)) or (None, None, None))[0]
-                    if current.source == "config" else None,
+                    if current.source == "config"
+                    else None,
                     review_due_at=(review_by_model.get((provider, model)) or (None, None, None))[1]
-                    if current.source == "config" else None,
+                    if current.source == "config"
+                    else None,
                     review_status=(review_by_model.get((provider, model)) or (None, None, None))[2]
-                    if current.source == "config" else None,
+                    if current.source == "config"
+                    else None,
                     recorded_at=current.recorded_at,
                     recorded_by=current.recorded_by,
                     reason=current.reason,
@@ -6531,7 +6825,10 @@ class DashboardService:
             for profile in registry.list_profiles()
             if profile.local_only and not bool(profile.raw.get("test_only", False))
         ]
-        due = any(facts_store.capacity_refresh_due(acting_principal_id, profile_id) for profile_id in local_ids)
+        due = any(
+            facts_store.capacity_refresh_due(acting_principal_id, profile_id)
+            for profile_id in local_ids
+        )
         principal = self.control._resolve_or_none(acting_principal_id)  # noqa: SLF001
         return ControlResult(
             ok=True,
@@ -6555,7 +6852,9 @@ class DashboardService:
         for profile in registry.list_profiles():
             if not profile.local_only or bool(profile.raw.get("test_only", False)):
                 continue
-            if not force and not facts_store.capacity_refresh_due(acting_principal_id, profile.profile_id):
+            if not force and not facts_store.capacity_refresh_due(
+                acting_principal_id, profile.profile_id
+            ):
                 continue
             view = await self.list_provider_models(profile.profile_id, acting_principal_id)
             status_value = view.status if view is not None else "unavailable"
@@ -6564,7 +6863,11 @@ class DashboardService:
                 acting_principal_id, profile.profile_id, status_value, reason_code
             )
             refreshed.append(
-                {"profile_id": profile.profile_id, "status": status_value, "reason_code": reason_code}
+                {
+                    "profile_id": profile.profile_id,
+                    "status": status_value,
+                    "reason_code": reason_code,
+                }
             )
         return ControlResult(ok=True, data={"profiles": refreshed})
 
@@ -6599,7 +6902,9 @@ class DashboardService:
             )
         except ValueError as exc:
             return ControlResult(ok=False, reason_code=str(exc))
-        return ControlResult(ok=True, data={"profile_id": profile_id, "model": model, "tokens": tokens})
+        return ControlResult(
+            ok=True, data={"profile_id": profile_id, "model": model, "tokens": tokens}
+        )
 
     def set_model_price(
         self,
@@ -6645,9 +6950,7 @@ class DashboardService:
         facts_store = ModelFactsStore(self.store)
         if input_per_mtok is None and output_per_mtok is None:
             facts_store.clear_owner_price(acting_principal_id, profile.provider, model)
-            price_registry.clear_source(
-                acting_principal_id, profile.provider, model, "owner"
-            )
+            price_registry.clear_source(acting_principal_id, profile.provider, model, "owner")
             self._record_price_audit(
                 acting_principal_id, profile.provider, model, "cleared", reason
             )
@@ -6699,9 +7002,7 @@ class DashboardService:
             )
         except PriceRegistryError as exc:
             return ControlResult(ok=False, reason_code=str(exc))
-        self._record_price_audit(
-            acting_principal_id, profile.provider, model, "set", reason
-        )
+        self._record_price_audit(acting_principal_id, profile.provider, model, "set", reason)
         return ControlResult(
             ok=True,
             data={
@@ -6770,9 +7071,11 @@ class DashboardService:
         router = ModelRouter(
             registry,
             runtime_policy=provider_runtime_policy_from_gates(self.store, acting_principal_id),
-            connection_resolver=lambda current_profile_id: get_model_connection(
-                self.store, acting_principal_id or "", current_profile_id
-            ) if acting_principal_id else None,
+            connection_resolver=lambda current_profile_id: (
+                get_model_connection(self.store, acting_principal_id or "", current_profile_id)
+                if acting_principal_id
+                else None
+            ),
         )
         try:
             models = await router.alist_models_for_profile(profile)
@@ -6863,7 +7166,9 @@ class DashboardService:
 
             validator = ModelProviderFactory(
                 policy=provider_runtime_policy_from_gates(self.store, principal.principal_id),
-                connection=get_model_connection(self.store, principal.principal_id, profile.profile_id),
+                connection=get_model_connection(
+                    self.store, principal.principal_id, profile.profile_id
+                ),
             ).create(effective)
         except Exception as exc:  # noqa: BLE001 — provider policy failures fail closed
             self._append_model_event(
@@ -6880,13 +7185,13 @@ class DashboardService:
         if aclose is not None:
             await aclose()
         state = ModelSessionState(
-                session_id=principal.principal_id if self.store.get_account(principal.principal_id) is not None else TERMINAL_MODEL_SESSION_ID,
-                profile_id=profile.profile_id,
-                model=(None if resolved_model == profile.model else resolved_model),
-            )
-        self.store.save_configured_model(
-            principal.principal_id, profile.profile_id, resolved_model
+            session_id=principal.principal_id
+            if self.store.get_account(principal.principal_id) is not None
+            else TERMINAL_MODEL_SESSION_ID,
+            profile_id=profile.profile_id,
+            model=(None if resolved_model == profile.model else resolved_model),
         )
+        self.store.save_configured_model(principal.principal_id, profile.profile_id, resolved_model)
         if self.store.get_account(principal.principal_id) is not None:
             self.store.save_principal_model_state(principal.principal_id, state)
         else:
@@ -6941,9 +7246,7 @@ class DashboardService:
         if checkpoint_health is not None:
             checkpoint_health["ok"] = bool(checkpoint_health["ok"])
             readiness_summary["checkpoint_capture"] = checkpoint_health
-        disabled = tuple(
-            g.capability for g in readiness.gates if g.state in _DISABLED_STATES
-        )
+        disabled = tuple(g.capability for g in readiness.gates if g.state in _DISABLED_STATES)
         counts = {
             "sessions": len(self.store.list_sessions(limit=1000)),
             "events": self.store.count_events(),
@@ -7015,8 +7318,13 @@ class DashboardService:
         if principal is None:
             return AuthError(reason_code="no_local_owner", message=error)
         if principal.principal_type != PrincipalType.HUMAN:
-            return AuthError(reason_code="ai_principal_not_allowed", message="AI principals cannot mint a session.")
-        raw_token, session = ApiSessionStore(self.workspace_root).create_session(principal.principal_id)
+            return AuthError(
+                reason_code="ai_principal_not_allowed",
+                message="AI principals cannot mint a session.",
+            )
+        raw_token, session = ApiSessionStore(self.workspace_root).create_session(
+            principal.principal_id
+        )
         return AuthSessionView(
             token=raw_token,
             session_id=session.session_id,
@@ -7056,9 +7364,7 @@ class DashboardService:
             summary=row.get("summary"),
             reasoning_chars=int(row.get("reasoning_chars") or 0),
             reasoning=row.get("reasoning_text"),
-            tool_rows=self._turn_tool_rows(
-                str(row["session_id"]), str(row.get("turn_id") or "")
-            ),
+            tool_rows=self._turn_tool_rows(str(row["session_id"]), str(row.get("turn_id") or "")),
         )
 
     #: How a stored action's status reads as a transcript row. `proposed` is a
@@ -7093,19 +7399,23 @@ class DashboardService:
             tool_name = str(stored.get("tool_name") or "")
             if not tool_name:
                 continue
-            rows.append({
-                "action_id": str(stored.get("action_id") or ""),
-                **tool_row(tool_name, arguments if isinstance(arguments, dict) else {}).to_payload(),
-                "status": self._STORED_ROW_STATES.get(str(stored.get("status") or ""), "running"),
-            })
+            rows.append(
+                {
+                    "action_id": str(stored.get("action_id") or ""),
+                    **tool_row(
+                        tool_name, arguments if isinstance(arguments, dict) else {}
+                    ).to_payload(),
+                    "status": self._STORED_ROW_STATES.get(
+                        str(stored.get("status") or ""), "running"
+                    ),
+                }
+            )
         return tuple(rows)
 
     @staticmethod
     def _event_view(row: dict[str, Any]) -> EventView:
         machine_identity = (
-            DashboardService._proposal_identity(row)
-            if row.get("proposed_by")
-            else None
+            DashboardService._proposal_identity(row) if row.get("proposed_by") else None
         )
         return EventView(
             event_id=str(row["event_id"]),
@@ -7151,9 +7461,7 @@ class DashboardService:
         principal_type = str(row.get("proposer_principal_type") or "unknown")
         turn_id = str(row.get("turn_id") or "") or None
         expires_at = str(row.get("machine_expires_at") or "") or None
-        if row.get("machine_is_active") is not None and not bool(
-            row.get("machine_is_active")
-        ):
+        if row.get("machine_is_active") is not None and not bool(row.get("machine_is_active")):
             state = "inactive"
         elif expires_at and expires_at < utc_now():
             state = "expired"
@@ -7217,9 +7525,7 @@ class DashboardService:
             is_expired=status == "pending" and bool(expires_at and utc_now() > expires_at),
             proposed_by=proposed_by,
             approved_by=approved_by,
-            machine_identity=(
-                proposed_by if proposed_by.principal_type == "ai_agent" else None
-            ),
+            machine_identity=(proposed_by if proposed_by.principal_type == "ai_agent" else None),
             critical=bool(row.get("critical")),
             resolved_by=(str(row["approved_by"]) if row.get("approved_by") else None),
             queue_position=queue_position,
@@ -7373,9 +7679,7 @@ class DashboardService:
         if not turn_id:
             return ""
         viewer = EventViewer(self.store)
-        for row in viewer.list_events(
-            turn_id=turn_id, event_type="approval_requested", limit=50
-        ):
+        for row in viewer.list_events(turn_id=turn_id, event_type="approval_requested", limit=50):
             event = viewer.read_event_payload(str(row.get("event_id", "")))
             payload = event.get("payload") if isinstance(event, dict) else None
             if not isinstance(payload, dict) or payload.get("approval_id") != approval_id:
@@ -7396,9 +7700,11 @@ class DashboardService:
         # Relay audit events use the resolving API session id, not the original
         # chat session id. A turn id remains stable across both boundaries and
         # narrows the durable lookup to the approval's own execution history.
-        event_rows = viewer.list_events(
-            turn_id=turn_id, event_type="approval_executed", limit=50
-        ) if turn_id else viewer.list_events(event_type="approval_executed", limit=500)
+        event_rows = (
+            viewer.list_events(turn_id=turn_id, event_type="approval_executed", limit=50)
+            if turn_id
+            else viewer.list_events(event_type="approval_executed", limit=500)
+        )
         for row in event_rows:
             event = viewer.read_event_payload(str(row.get("event_id", "")))
             payload = event.get("payload") if isinstance(event, dict) else None
@@ -7453,9 +7759,7 @@ class DashboardService:
         "apply_patch": "path",
     }
 
-    def _oversize_target(
-        self, tool_name: str, args: dict[str, Any]
-    ) -> tuple[str, int] | None:
+    def _oversize_target(self, tool_name: str, args: dict[str, Any]) -> tuple[str, int] | None:
         """``(path, size)`` when the target is too large to checkpoint, else None.
 
         BUG-233. Only an *existing* file has a pre-image to lose, so a new file is
@@ -7577,18 +7881,31 @@ class DashboardService:
             diffs: list[str] = []
             for change in changes:
                 path = str(change.get("path", ""))
-                diffs.append("".join(difflib.unified_diff(
-                    redact_secret_like_text(change.get("before_snapshot") or "").splitlines(keepends=True),
-                    redact_secret_like_text(str(change.get("proposed_text", ""))).splitlines(keepends=True),
-                    fromfile=f"a/{path}", tofile=f"b/{path}",
-                )))
+                diffs.append(
+                    "".join(
+                        difflib.unified_diff(
+                            redact_secret_like_text(change.get("before_snapshot") or "").splitlines(
+                                keepends=True
+                            ),
+                            redact_secret_like_text(
+                                str(change.get("proposed_text", ""))
+                            ).splitlines(keepends=True),
+                            fromfile=f"a/{path}",
+                            tofile=f"b/{path}",
+                        )
+                    )
+                )
             paths = [str(item.get("path", "")) for item in changes]
             return "".join(diffs), ", ".join(paths), "file_diff"
         if tool_name == "connector_write":
             connector = str(args.get("connector_id", "connector"))
             operation = str(args.get("operation_id", "operation"))
             request_arguments = self._redact_value(args.get("arguments", {}))
-            return json.dumps(request_arguments, indent=2, sort_keys=True), f"{connector} / {operation}", "connector_request"
+            return (
+                json.dumps(request_arguments, indent=2, sort_keys=True),
+                f"{connector} / {operation}",
+                "connector_request",
+            )
         # B11 — the git write path. A commit is reviewed the way a file change
         # is, as a diff; a branch is reviewed as the two refs it moves between,
         # because there is no diff to show and pretending otherwise would be
@@ -7633,9 +7950,7 @@ class DashboardService:
                 f"checked out   {snapshot['current_branch'] or '(detached HEAD)'} → {snapshot['name']}",
             ]
             if snapshot["uncommitted_files"]:
-                lines.append(
-                    f"carried over  {snapshot['uncommitted_files']} uncommitted file(s)"
-                )
+                lines.append(f"carried over  {snapshot['uncommitted_files']} uncommitted file(s)")
             return "\n".join(lines), str(snapshot["name"]), "git_change"
         # BUG-67 — a push has no diff either. What the owner needs before
         # deciding is where it goes and what it carries, so that is what is

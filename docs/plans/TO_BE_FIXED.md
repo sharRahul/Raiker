@@ -693,9 +693,9 @@ silently degraded.
 
 ## BUG-240 — A semantic space can be built, and a question is not embedded into it
 
-**Severity: Medium → Low. Area: memory / retrieval. Status: provider-memory
-half fixed 2026-08-26 as [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered);
-managed knowledge-file projections remain open.**
+**Severity: Medium → Low. Area: memory / retrieval. Status: fixed 2026-08-26.
+The provider-memory half is [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered);
+the managed knowledge-file remainder is [FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words).**
 
 **Observed.** After building a semantic index — a real OpenAI
 `text-embedding-3-small` space, 1536 dimensions, resolved by `auto` over the
@@ -770,6 +770,6 @@ model-facing tool invocation); and the routed action records only the model,
 dimension count and content hash. The query and vector travel through a
 non-audited, in-process result field and are never persisted. Ambient recall and
 `memory_search` both supply this governed embedder, and the Memory settings card
-reads the same admission state. The managed-file half described above remains:
-file chunks have no provider vector projection yet, so this entry is reduced
-rather than deleted.
+reads the same admission state. The managed-file half now uses that same cached
+query vector. Its vectors are revision-bound projections, owner/project scoped,
+and retired with the exact file revision; see FIXED-294. This entry is closed.

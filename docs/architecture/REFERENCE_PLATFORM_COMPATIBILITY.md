@@ -369,7 +369,7 @@ for every row that is not `Implemented`, `N/A` or `Different by design`.
 |---|---|---|---|---|---|---|
 | Durable memory across sessions | ChatGPT, Cowork, Hermes | Memory | Implemented | `raiker/memory/store.py`; `memory_write` / `memory_forget` behind their own gate, **off** by default | — | PARITY |
 | A memory write is a reviewed proposal, not a side effect | None — reference products write memories automatically | Memory | Implemented | Exact text shown; credential-like text refused before the decision | — | **YES — differentiator** |
-| Semantic retrieval by meaning | ChatGPT, Cowork, Hermes (Honcho, Mem0, and other providers) | Memory | Partial | `raiker/vector/__init__.py` is a feature-hashing bag-of-tokens embedding with no model | A default install can recall a paraphrase only through shared words (MEM-10) | PARITY |
+| Semantic retrieval by meaning | ChatGPT, Cowork, Hermes (Honcho, Mem0, and other providers) | Memory | Implemented | Named provider or local `llama.cpp` spaces; one governed query embedding is shared by ambient and explicit recall; managed-file chunks carry revision-bound projections | Linear scoring remains backlog #5, a scale limit rather than a semantic correctness gap | **YES — improvement.** Provider/local choice, deny-safe lexical fallback, secret exclusion, exact retrieval legs and revision provenance are one control contract |
 | Lexical retrieval ranked by relevance | All | Memory, Search Chat | Implemented | FTS5 + `bm25()`, with an honest FTS4/recency fallback reported on `/api/health` | — | PARITY |
 | Approximate-nearest-neighbour vector index | ChatGPT, Cowork, Hermes memory providers | Memory | Partial | Every recall loads all active vectors and scores them in Python | ~431 ms at 3 000 memories, linear, paid every turn | PARITY |
 | Retrieval says how each hit was found | None | Memory | Implemented | Per-hit `lexical` / `vector` / `graph` legs; the reply names the embedding space | — | **YES — differentiator** |
@@ -715,14 +715,14 @@ one.** Items 10, 11, 12 and 25 are struck through in place with what closed them
 and item 1's provider leg is done. Recorded here rather than removed, because a
 reader arriving with one of those numbers should not have to guess:
 
-- **#1 (write half) — semantic recall can now be *built*, not only selected**
-  ([FIXED-283](../plans/FIXED_ITEMS.md)). The executor behind it had been
-  registered, gated, threat-modelled, acceptance-tested and **never routed** —
-  and its only unmocked path held three separate breakages that no test could
-  reach. Verifying it live then found the same shape one layer in: the space is
-  built, and nothing embeds the *question* into it, so a paraphrase still does
-  not recall ([BUG-240](../plans/TO_BE_FIXED.md)). **PARITY**, and a reminder
-  that "built" and "reachable" are different claims — twice in one item.
+- **#1 — semantic recall closed end to end** ([FIXED-283](../plans/FIXED_ITEMS.md),
+  [FIXED-292](../plans/FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered),
+  [FIXED-293](../plans/FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider),
+  [FIXED-294](../plans/FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words)).
+  Provider and keyless-local writes and reads now share one governed route;
+  managed files use revision-safe semantic projections. The remaining linear
+  scan is scale backlog #5, not an incomplete semantic path. **YES —
+  improvement** for the combined consent, provenance and fallback contract.
 - **#12 — the retention sweep** ([FIXED-284](../plans/FIXED_ITEMS.md)).
 - **#10 — every cadence reachable, anchored to a chosen first run**
   ([FIXED-285](../plans/FIXED_ITEMS.md)).
@@ -783,7 +783,7 @@ had to be true first:
 
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
-| 1 | Semantic memory retrieval (MEM-10) | **Provider path done 2026-08-26 — [FIXED-283](../plans/FIXED_ITEMS.md), [FIXED-292](../plans/FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered).** Memory → Recall backend builds a named semantic space, and ambient recall plus `memory_search` now embed the question once through that same governed provider runtime. Ask/deny/off fall back without blocking a read; the audit keeps model/dimension/hash metadata, never the query or vector. The local leg — a curated GGUF model for an owner who accepts no provider egress — remains | Provider-backed paraphrase recall is now end-to-end rather than a selectable write-only space. A keyless install remains the largest honest gap | PARITY |
+| ~~1~~ | ~~Semantic memory retrieval (MEM-10)~~ | **Done 2026-08-26 — [FIXED-283](../plans/FIXED_ITEMS.md), [FIXED-292](../plans/FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered), [FIXED-293](../plans/FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider), [FIXED-294](../plans/FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words).** Provider and local GGUF paths build and query named spaces through one governed runtime; managed-file passages are revision-bound and owner/project-scoped | Ask/deny/off fall back without blocking a read; secret-like text is excluded; audit stores model/dimension/hash metadata rather than query text or vectors | **YES — improvement.** The reference semantic feature is parity; the combined local/hosted consent, fallback and exact-provenance control set goes beyond it |
 | 2 | Channel routing modes and approval relay (BUG-225) | Implement the spec's routing modes behind their own gate, with the accepted authority contract unchanged | An inbound message becoming work is the highest-risk transition in the product; it needs its own gate, not the transport's | PARITY |
 | ~~3~~ | ~~Auto mode has no alignment check (BUG-218)~~ | **Done 2026-08-24 — [FIXED-282](../plans/FIXED_ITEMS.md).** A deterministic check over the turn's own record: an existing file the turn never read, listed or was asked about falls back to the approval queue, with the path named | `auto` is the only mode where an action runs with no human in the loop, and it now performs the review its label implies | **YES — differentiator.** Both reference implementations are model judgements; this one is set membership over the audit trail, with no model in the authority path and an answer that can be recomputed months later |
 | 4 | Owner-authored slash commands | Extend the skill store with a trigger token, stating the authority the command carries | Reference products treat a command as a privileged harness path; Raiker's would grant nothing, which is the differentiator | **YES — improvement** |

@@ -305,6 +305,11 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-290](#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to) | Medium | Projects / Build / Chat / Workbench | Fixed (raised and closed 2026-08-25 by the screenshot refresh) |
 | [FIXED-291](#fixed-291--a-project-could-only-ever-be-a-folder-raiker-made) | Medium | Projects / path containment / knowledge indexing / Build retrieval | Fixed (closed 2026-08-26) |
 | [FIXED-292](#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium | Memory / governed model egress | Fixed (closed 2026-08-26) |
+| [FIXED-293](#fixed-293--local-semantic-recall-was-declared-and-blocked-by-a-remote-egress-check) | High | Memory / local models / governance | Fixed (closed 2026-08-26) |
+| [FIXED-294](#fixed-294--managed-documents-could-only-be-recalled-with-shared-words) | High | Memory / Projects / managed files | Fixed (was BUG-240 remainder; closed 2026-08-26) |
+| [FIXED-295](#fixed-295--ollama-cloud-chat-was-offered-as-an-embedding-model) | Medium | Models / Memory UI honesty | Fixed (found and closed 2026-08-26) |
+| [FIXED-296](#fixed-296--a-library-change-left-semantic-index-controls-stale) | Medium | Memory / managed-file UX | Fixed (found and closed 2026-08-26) |
+| [FIXED-297](#fixed-297--web-development-dependencies-regained-known-denial-of-service-advisories) | High | Web development dependencies | Fixed (found and closed 2026-08-26) |
 
 ---
 
@@ -12620,3 +12625,142 @@ one call across repeated retrieval in a turn, Ask creates no approval, query and
 vector absent from audit, query vector not persisted); existing semantic-index
 and provider-runtime suites cover batching, egress refusal and fail-closed
 provider behavior.
+
+---
+
+## FIXED-293 — Local semantic recall was declared and blocked by a remote egress check
+
+**Severity: High. Area: Memory / local models / governance. Closed 2026-08-26.**
+
+**Observed.** Memory offered the shipped loopback llama.cpp embedding profiles
+as local targets, then `model_provider_runtime` refused the batch unless
+`RAIKER_MODEL_EGRESS_ALLOWLIST` named a remote host. If vectors already existed,
+the backend resolver classified the stored `llama.cpp:...` label as a provider
+space, and the governed query embedder refused to query a local-model space.
+The owner could see a local choice whose write and read halves could not work.
+
+**Fixed.** Locality is resolved from the shipped model profile, never inferred
+from an action argument. Loopback-only profiles retain the same capability gate,
+decision mode, authority route, audit record and stop switch, but do not require
+a fictional remote allowlist and carry Low rather than Medium egress risk.
+Stored llama.cpp spaces are classified as local semantic models and the same
+ephemeral, cached query path searches them. Unknown model labels receive no
+local exemption.
+
+**User-interface outcome.** Confirmation says local content is *processed on
+this machine* rather than *sent*. Memory links to a curated Apache-2.0 Nomic
+Embed Text v1.5 GGUF option; Models resolves its immutable revision and exact
+download bytes before the owner approves it. General model-library download and
+deployment controls remain the single acquisition path.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Local semantic
+recall is not itself beyond the reference set. The improvement is preserving one
+audited authority path across local and hosted embeddings while removing only
+the risk control that does not apply; the model-space identity, explicit
+acquisition consent and non-persistence of queries remain identical.
+
+**Evidence.** `tests/test_memory_semantic_index.py`
+(`test_local_index_needs_no_remote_egress_allowlist`); Memory and Hugging Face
+component tests cover local/off-machine copy and the curated immutable-download
+entry point.
+
+---
+
+## FIXED-294 — Managed documents could only be recalled with shared words
+
+**Severity: High. Area: Memory / Projects / managed files. Closed 2026-08-26.**
+
+**Observed.** Managed document bytes were stored safely and their extracted
+passages had exact file/revision provenance, but only the lexical projection was
+searched. A question phrased differently from the source returned nothing even
+after the owner built a semantic recall space. This was the managed-file
+remainder of BUG-240 and the last blocker named for P1.
+
+**Fixed.** The existing owner-confirmed semantic-index action now projects both
+eligible approved memories and current managed-file passages, within the same
+500-item ceiling and one governed provider/local-model route. Secret-like and
+credential-like passages are excluded before they enter the pending count or a
+model call. A revision-bound mapping links each passage to its vector; replacing,
+reindexing, retiring or deleting a file removes both the mapping and vector.
+
+Ambient Chat and Build recall reuse the turn's cached query vector and merge
+positive semantic hits with lexical hits. Owner and project filters are applied
+inside both queries, so semantic search cannot widen Build beyond account files
+plus its selected project. Every returned passage still resolves to the exact
+file id, path, content hash and chunk index that supplied it.
+
+**User-interface outcome.** Memory states and confirms the number of approved
+memories *and* managed document passages that will be embedded, identifies
+whether processing is local or off-machine, and reports both completed counts.
+Counts are model-specific, remain available when recall is already semantic,
+and refresh immediately when the managed library changes.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Semantic file
+search is parity. Raiker goes beyond the references by coupling it to
+revision-safe projection retirement, per-surface project scope, explicit
+local/egress consent, secret exclusion, a single cached query action, and exact
+source provenance rather than treating a vector index as a second record.
+
+**Evidence.** `tests/test_memory_semantic_index.py`
+(`test_managed_file_passage_is_semantic_and_revision_safe`),
+`tests/test_managed_file_indexing.py`, `tests/test_managed_file_api.py`, and
+`apps/web/src/lib/views/MemoryView.test.ts`.
+
+---
+
+## FIXED-295 — Ollama cloud Chat was offered as an embedding model
+
+**Severity: Medium. Area: Models / Memory UI honesty. Closed 2026-08-26.**
+
+**Observed.** The shipped `gemma4:31b-cloud` Ollama profile declared embedding
+support. The live Ollama catalogue reports completion, thinking, tools and
+vision — not embeddings — so Memory offered an index action that could only
+fail. The `-cloud` model is reached through a loopback daemon, which made the
+incorrect local label especially easy to trust.
+
+**Fixed.** The exact profile no longer declares an embedding model or embedding
+capability. It remains unchanged and available for Chat/Build. Memory lists only
+profiles that can produce a named embedding space.
+
+**Beyond-reference assessment: NO — correctness, not advantage.** This removes
+an inert control and restores truthful capability discovery.
+
+---
+
+## FIXED-296 — A library change left semantic-index controls stale
+
+**Severity: Medium. Area: Memory / managed-file UX. Closed 2026-08-26.**
+
+**Observed.** Adding, retrying or removing a Memory document refreshed the file
+list but not the parent Memory settings. The new semantic passage count and its
+index action appeared only after a manual page refresh.
+
+**Fixed.** The shared file library emits a successful-change callback after
+import, retry and removal. Memory reloads its governed settings immediately, so
+the per-model pending count and confirmation always describe the visible
+library state.
+
+**Beyond-reference assessment: NO — correctness, not advantage.** The
+revision-safe indexing controls are the improvement; keeping them current is a
+baseline interaction requirement.
+
+**Evidence.** `apps/web/e2e/memory-semantic-live.spec.ts` uploads a real managed
+document and observes the index control without reloading; component and type
+checks cover the callback contract.
+
+---
+
+## FIXED-297 — Web development dependencies regained known denial-of-service advisories
+
+**Severity: High. Area: Web development dependencies. Closed 2026-08-26.**
+
+**Observed.** `npm audit` reported high-severity advisories in the transitive
+`brace-expansion` and `nanoid` development chains.
+
+**Fixed.** The application lockfile now resolves compatible patched releases.
+`npm audit` reports zero known vulnerabilities; production behavior and direct
+dependency ranges are unchanged.
+
+**Beyond-reference assessment: NO — safeguard maintenance, not advantage.**
+Keeping the build chain free of known advisories preserves Raiker's stated
+control posture but is expected of every reference-quality product.

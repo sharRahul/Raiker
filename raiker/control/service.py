@@ -970,6 +970,11 @@ class RuntimeControlService:
             # could not name afterwards, and an unnameable space is not
             # selectable, which is the whole point of building one.
             return ControlResult(ok=False, reason_code="embedding_model_not_offered")
+        selected = next(
+            item
+            for item in embedding_capable_profiles()
+            if (item["provider"], item["model"]) == (provider, model)
+        )
         action = GovernedAction(
             action_id=new_id("act_"),
             principal_id=principal.principal_id,
@@ -981,7 +986,11 @@ class RuntimeControlService:
                 "model": model,
                 "limit": MAX_MEMORY_INDEX_BATCH,
             },
-            risk_level=RiskLevelValue.MEDIUM,
+            # A loopback embedding keeps the same governed/audited path but
+            # does not carry the egress risk that made this action Medium.
+            risk_level=(
+                RiskLevelValue.LOW if selected["local_only"] else RiskLevelValue.MEDIUM
+            ),
         )
         result = self._authority.route_action(action, principal)
         mapped = self._mcp_action_result(result)

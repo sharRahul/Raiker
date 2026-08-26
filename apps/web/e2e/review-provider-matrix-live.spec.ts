@@ -88,7 +88,7 @@ async function dismissFirstRun(page: Page): Promise<void> {
     await expect(skip).toBeHidden({ timeout: 30_000 });
     return;
   }
-  for (const name of ["Decide later", "Balanced", "Set up later", "Open Workbench"]) {
+  for (const name of ["Continue", "Decide later", "Balanced", "Set up later", "Open Workbench"]) {
     const button = page.getByRole("button", { name, exact: true });
     if (await button.isVisible().catch(() => false)) {
       await button.click();
@@ -174,7 +174,7 @@ test("owner registers and every backend reaches a classified readiness state", a
       .first();
     await pinned.getByRole("button", { name: "Test", exact: true }).click();
     const verdict = pinned.getByText(
-      /can reach|cannot execute|not reachable|rejected|no credit|no quota|unauthor/i,
+      /can reach|responded|exposed|cannot execute|not reachable|rejected|no credit|no quota|unauthor/i,
     );
     await expect(verdict).toBeVisible({ timeout: 180_000 });
     const text = (await verdict.first().textContent())?.trim() ?? "";
@@ -196,6 +196,17 @@ test("a ready backend answers a real governed turn in Chat", async ({ page }) =>
   test.skip(configured.length === 0, "no provider key supplied");
 
   await signIn(page);
+  // Readiness and selection are separate controls. Pick a backend whose
+  // exact-model execution probe succeeded so the suite cannot report a live
+  // Chat pass after stopping at catalogue discovery.
+  await openHosted(page);
+  const readyCard = page
+    .locator("article.provider-card")
+    .filter({ hasText: /Ready · confirmed/i })
+    .first();
+  await expect(readyCard).toBeVisible({ timeout: 60_000 });
+  const selectReady = readyCard.getByRole("button", { name: "Select", exact: true });
+  if (await selectReady.isVisible().catch(() => false)) await selectReady.click();
   // `#/chat` is not a route — it falls through to Build, whose composer looks
   // close enough to pass a careless locator while starting a build run instead
   // of a chat turn. Chat is `#/new-chat`.
@@ -211,18 +222,15 @@ test("a ready backend answers a real governed turn in Chat", async ({ page }) =>
   }
   await composer.first().fill("Reply with exactly: REVIEW CHAT OK");
   const send = page.getByRole("button", { name: /^(Send|Start build)$/ }).first();
-  const enabled = await send.isEnabled().catch(() => false);
-  console.log(`CHAT SEND ENABLED: ${enabled}`);
-  if (enabled) {
-    await send.click();
-    // Assert on Raiker's own bubble, never the page: the prompt stays in the
-    // composer's DOM text, so a page-wide text match passes before the model has
-    // been asked anything at all.
-    const answer = page.locator(".message-bubble-raiker").last();
-    await expect(answer).toBeVisible({ timeout: 300_000 });
-    await expect(answer).toContainText(/REVIEW CHAT OK/i, { timeout: 300_000 });
-    console.log("ANSWER:", (await answer.innerText()).replace(/\s+/g, " ").slice(0, 300));
-    await page.screenshot({ path: join(SHOTS, "review-04-chat-answer.png"), fullPage: true });
-  }
+  await expect(send).toBeEnabled({ timeout: 60_000 });
+  await send.click();
+  // Assert on Raiker's own bubble, never the page: the prompt stays in the
+  // composer's DOM text, so a page-wide text match passes before the model has
+  // been asked anything at all.
+  const answer = page.locator(".message-bubble-raiker").last();
+  await expect(answer).toBeVisible({ timeout: 300_000 });
+  await expect(answer).toContainText(/REVIEW CHAT OK/i, { timeout: 300_000 });
+  console.log("ANSWER:", (await answer.innerText()).replace(/\s+/g, " ").slice(0, 300));
+  await page.screenshot({ path: join(SHOTS, "review-04-chat-answer.png"), fullPage: true });
   console.log(`CONSOLE ERRORS: ${consoleErrors.length}`);
 });

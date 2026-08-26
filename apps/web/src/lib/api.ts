@@ -1554,6 +1554,7 @@ export const api = {
       ok: boolean;
       embedding_model: string;
       indexed_count: number;
+      indexed_file_chunk_count: number;
       skipped_count: number;
     }>("/api/memory/embedding-index", { provider, model }),
   // MEM-04 — what the runtime captured while it worked. The counts come back

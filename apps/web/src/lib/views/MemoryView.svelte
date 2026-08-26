@@ -118,13 +118,14 @@
   );
   async function buildEmbeddingIndex() {
     if (!indexTarget || busy) return;
-    const waiting = settings?.unindexed_memories ?? 0;
+    const waiting = indexTarget.unindexed_memories ?? 0;
+    const waitingFiles = indexTarget.unindexed_file_chunks ?? 0;
     const where = indexTarget.local_only ? "on this machine" : `to ${indexTarget.provider}`;
-    if (!window.confirm(`Send the text of ${waiting} approved ${waiting === 1 ? "memory" : "memories"} ${where} to be embedded as ${indexTarget.model}? Memories marked secret-like or credential-like are never sent.`)) return;
+    if (!window.confirm(`${indexTarget.local_only ? "Process" : "Send"} ${waiting} approved ${waiting === 1 ? "memory" : "memories"} and ${waitingFiles} managed document ${waitingFiles === 1 ? "passage" : "passages"} ${where} to be embedded as ${indexTarget.model}? Secret-like or credential-like content is never embedded.`)) return;
     busy = true; actionError = null; indexResult = null;
     try {
       const result = await api.buildMemoryEmbeddingIndex(indexTarget.provider, indexTarget.model);
-      indexResult = `Embedded ${result.indexed_count} into ${result.embedding_model}.`;
+      indexResult = `Embedded ${result.indexed_count} memories and ${result.indexed_file_chunk_count ?? 0} document passages into ${result.embedding_model}.`;
       await load();
     } catch (e) {
       actionError = e instanceof ApiError ? `Could not build the index (${e.status}).` : "Could not build the index.";
@@ -364,7 +365,7 @@
       <!-- MEM-10 — the select opposite can only offer spaces that already hold
            vectors, so on a default install it offers the fallback and nothing
            else. This row is the way out of that: it builds one. -->
-      {#if recall !== "semantic" && settings.unindexed_memories > 0 && (settings.embedding_providers ?? []).length}
+      {#if (settings.embedding_providers ?? []).some((provider) => (provider.pending_count ?? 0) > 0)}
         <div class="index-row">
           <label class="index-field">
             <span class="sr-only">Embedding model to build with</span>
@@ -378,10 +379,20 @@
           <button
             class="btn btn-sm"
             type="button"
-            disabled={busy || !indexTarget || !settings.unindexed_memories}
+            disabled={busy || !indexTarget || !(indexTarget.pending_count ?? 0)}
             onclick={() => void buildEmbeddingIndex()}
-          >Embed {settings.unindexed_memories}</button>
+          >Embed {indexTarget?.pending_count ?? 0}</button>
         </div>
+        {#if settings.embedding_providers.some((provider) => provider.provider === "llama.cpp")}
+          <p class="posture-line">
+            <Icon name="download" size={14} />
+            <span>
+              Need a local embedding model? The curated Apache-2.0 Nomic Embed
+              Q4_K_M option is about 81 MiB. <a href="#/models?tab=huggingface">Review and download it in Models</a>;
+              Raiker pins the revision and shows the exact bytes before download.
+            </span>
+          </p>
+        {/if}
         {#if indexResult}<p class="posture-line" data-semantic="true"><Icon name="check" size={14} /><span>{indexResult}</span></p>{/if}
       {/if}
     </div>
@@ -420,6 +431,7 @@
       scope="memory"
       heading="Document library"
       description="Files kept under Raiker's managed memory storage. Uploaded content is data, never instructions."
+      onLibraryChange={() => void load()}
     />
   </section>
 

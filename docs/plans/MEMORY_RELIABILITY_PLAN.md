@@ -64,7 +64,7 @@ their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Fixed 2026-08-25 (FIXED-284) |
 | [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
 | [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
-| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | Open — provider path complete 2026-08-26 (FIXED-283, FIXED-292). A linear scan and a keyless default install remain |
+| [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | **Fixed 2026-08-26** (FIXED-283, FIXED-292, FIXED-293, FIXED-294). Linear scaling is tracked separately as backlog #5 |
 | [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
 | [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-13](#mem-13--the-knowledge-graph-was-drawn-for-a-person-and-unreachable-from-a-turn) | Medium | Agent reach | Fixed 2026-08-17 |
@@ -495,8 +495,10 @@ log, which is the same class of defect one layer down.
 ## MEM-10 — Semantic recall is selectable, but a default install has nothing to select
 
 **Severity: Medium → Low. Area: retrieval quality. Raised 2026-08-17 while
-closing MEM-03. Status: reduced 2026-08-25 by
-[FIXED-283](FIXED_ITEMS.md#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select).**
+closing MEM-03. Status: fixed 2026-08-26 by [FIXED-283](FIXED_ITEMS.md#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select),
+[FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered),
+[FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider), and
+[FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words).**
 
 **2026-08-25 update — the proposed fix was the second-cheapest of the two ways
 in, and the cheapest one was already built.** This entry proposed serving a
@@ -513,22 +515,26 @@ meaning-based index**, one governed action over the owner's approved memories,
 with the model named and the count stated before anything leaves the machine.
 Verified live on 2026-08-25 against a real OpenAI embedding call.
 
-**What remains of MEM-10:**
+**2026-08-26 closure:**
 
 * **The provider read half closed 2026-08-26.** Ambient recall and
   `memory_search` now embed the question once in the selected provider space
   through `model_provider_runtime` ([FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)).
   Ask/deny/off drop the vector leg without parking a read; Allow and low-risk
   Auto execute. Query text and vectors are not persisted in audit events.
-* **A default install with no provider key still has only the fallback.** The
-  curated GGUF download below is unchanged as the proposal for that, and is now
-  the whole of this entry's open work rather than half of it.
+* **The keyless local leg is closed.** A `llama.cpp` embedding profile now uses
+  the same gated write and read path without requiring an egress allowlist, and
+  Memory links directly to the curated Apache-2.0 Nomic Embed Q4_K_M choice in
+  the existing revision-pinned model-library flow ([FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider)).
+* **Managed-file meaning recall is closed.** Current file revisions project
+  into the same named space with owner/project scope, secret exclusion and
+  exact file/chunk provenance; re-index and retirement remove the projection
+  ([FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words)).
 * **Vector recall is still a linear scan** — roughly 431 ms at 3 000 memories,
   paid every turn. That is [backlog #5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort)
   and is a different problem: an index over a space, not a space to index.
 
-The analysis below is kept as written, because the local-model leg still needs
-it.
+The analysis below is kept as the record that led to the local-model closure.
 
 **Observed.** Memory → **Recall backend** offers **Automatic** and nothing else
 on a workspace that has never been configured, and states plainly that

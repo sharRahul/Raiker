@@ -3043,6 +3043,78 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 raise
         return True
 
+    def register_discovered_file(
+        self,
+        *,
+        file_id: str,
+        owner_principal_id: str,
+        scope_kind: str,
+        project_id: str | None,
+        relative_path: str,
+        media_type: str,
+        size_bytes: int,
+        content_hash: str,
+        source_mtime_ns: int,
+    ) -> bool:
+        """Catalogue bytes that are already on disk, writing no file.
+
+        The sibling of `publish_managed_file_atomic`, for a root Raiker does not
+        own: the bytes were never imported, so there is nothing to publish — only
+        a row to record, plus the mtime that lets the next reconcile skip the
+        file without re-reading it. Returns False when an active row for the same
+        path already exists, so a racing second scan cannot double-index.
+        """
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                active = connection.execute(
+                    """
+                    SELECT 1 FROM managed_files
+                    WHERE owner_principal_id = ? AND scope_kind = ?
+                      AND project_id IS ? AND relative_path = ? AND retired_at IS NULL
+                    """,
+                    (owner_principal_id, scope_kind, project_id, relative_path),
+                ).fetchone()
+                if active is not None:
+                    connection.rollback()
+                    return False
+                self._insert_managed_file(
+                    connection,
+                    file_id=file_id,
+                    owner_principal_id=owner_principal_id,
+                    scope_kind=scope_kind,
+                    project_id=project_id,
+                    relative_path=relative_path,
+                    media_type=media_type,
+                    size_bytes=size_bytes,
+                    content_hash=content_hash,
+                    index_state="queued",
+                    index_error=None,
+                    created_at=now,
+                    updated_at=now,
+                )
+                connection.execute(
+                    "UPDATE managed_files SET source_mtime_ns = ? WHERE file_id = ?",
+                    (int(source_mtime_ns), file_id),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return True
+
+    def set_managed_file_source_mtime(
+        self, file_id: str, owner_principal_id: str, mtime_ns: int
+    ) -> bool:
+        with self.connect() as connection:
+            updated = connection.execute(
+                "UPDATE managed_files SET source_mtime_ns = ? "
+                "WHERE file_id = ? AND owner_principal_id = ?",
+                (int(mtime_ns), file_id, owner_principal_id),
+            )
+        return updated.rowcount == 1
+
     def list_managed_files(
         self,
         owner_principal_id: str,

@@ -151,6 +151,13 @@ class ManagedFileService:
             project = self.store.load_project(scope.project_id or "", user_id=owner_user_id)
             if project is None:
                 raise ManagedFileError("managed_file_scope_not_found")
+            attached = self._attached_root(project, owner_principal_id)
+            if attached is not None:
+                # The owner's own folder. Import, extraction, chunking and
+                # retirement all follow it with no other change — the one thing
+                # that differs is who owns the bytes, which `owns_bytes` below
+                # is what answers.
+                return attached
             projects_root = internal_io_path(runtime_root / "projects")
             self._require_within(projects_root.resolve(), runtime_root.resolve())
             root = self._managed_project_root(str(project["root_subpath"]), projects_root)
@@ -176,15 +183,51 @@ class ManagedFileService:
             raise ManagedFileError("managed_file_retired")
         root = self.scope_root(record.scope(), owner_principal_id)
         destination = self.contained_destination(root, record.relative_path)
-        try:
-            destination.unlink(missing_ok=True)
-        except OSError as exc:
-            raise ManagedFileError("managed_file_delete_failed") from exc
+        if self.owns_bytes(record.scope(), owner_principal_id):
+            try:
+                destination.unlink(missing_ok=True)
+            except OSError as exc:
+                raise ManagedFileError("managed_file_delete_failed") from exc
         self.store.retire_managed_file(file_id, owner_principal_id)
         reloaded = self.store.get_managed_file(file_id, owner_principal_id)
         if reloaded is None:  # pragma: no cover - the row was read moments ago
             raise ManagedFileError("managed_file_not_found")
         return ManagedFileRecord.from_row(reloaded)
+
+    def owns_bytes(self, scope: ManagedFileScope, owner_principal_id: str) -> bool:
+        """Whether removing a catalogue row should remove the file too.
+
+        Raiker wrote a managed file's bytes, so retiring it takes them with it.
+        The bytes under an attached root are the owner's, discovered rather than
+        imported: retiring the row must drop only the projection, or reindexing
+        an edited file would delete the file that was edited.
+        """
+        if scope.kind != "project":
+            return True
+        owner_user_id = self.store.principal_user_id(owner_principal_id)
+        project = self.store.load_project(scope.project_id or "", user_id=owner_user_id)
+        return self._attached_root(project, owner_principal_id) is None
+
+    def _attached_root(
+        self, project: dict[str, object] | None, owner_principal_id: str
+    ) -> Path | None:
+        """This project's attached folder, or nothing if it has none."""
+        from raiker.control.project_roots import resolve_project_root
+
+        if project is None:
+            return None
+        root = resolve_project_root(
+            project, self.store.list_brain_source_grants(owner_principal_id), self.workspace_root
+        )
+        if root.kind != "attached":
+            return None
+        if root.path is None or root.missing:
+            raise ManagedFileError("managed_file_scope_not_found")
+        # Normalised the same way every other scope root is, so the containment
+        # check below compares two paths of the same shape. On Windows a bare
+        # path and its extended-length form are not `relative_to` each other,
+        # which would make every file in an attached root look like an escape.
+        return internal_io_path(root.path)
 
     def _managed_project_root(self, root_subpath: str, projects_root: Path) -> Path:
         """Resolve legacy `projects/<slug>` rows into Task 2's destination."""

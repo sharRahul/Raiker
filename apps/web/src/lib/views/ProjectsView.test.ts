@@ -28,6 +28,8 @@ function project(partial: Partial<ProjectView>): ProjectView {
     path: "/",
     is_archived: false,
     archived_at: null,
+    root_kind: "managed",
+    root_label: "alpha",
     ...partial,
   };
 }
@@ -162,8 +164,10 @@ describe("ProjectsView", () => {
     setToken("export-token");
 
     render(ProjectsView);
-    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByText("Details"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /open project alpha/i })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /open project alpha/i }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Export project" })).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
 
@@ -211,8 +215,10 @@ describe("ProjectsView", () => {
     vi.stubGlobal("fetch", mock);
 
     render(ProjectsView);
-    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByText("Details"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /open project alpha/i })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /open project alpha/i }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Export project" })).toBeInTheDocument());
     await fireEvent.click(screen.getByRole("button", { name: "Export project" }));
 
@@ -249,9 +255,11 @@ describe("ProjectsView", () => {
 });
 
 // ── Project context home ──────────────────────────────────────────────────
-// Opening a project shows its files and the work scoped to it. Files are
-// metadata plus provenance — never content — and selecting one links the change
-// back to the turn that made it.
+// Opening a project shows one file list, not two. The managed document library
+// and the walk of the project folder described the same files differently,
+// which left the owner deciding which to believe; the explorer replaced both.
+// Provenance survived that merge, because nothing else records who changed a
+// file.
 describe("ProjectsView context home", () => {
   const DETAIL = {
     project: project({}),
@@ -260,22 +268,46 @@ describe("ProjectsView context home", () => {
     checkpoints: [],
   };
 
+  const BROWSE = {
+    path: "",
+    parent: null,
+    entries: [
+      {
+        name: "brief.md",
+        relative_path: "brief.md",
+        is_directory: false,
+        size_bytes: 2048,
+        media_type: "text/markdown",
+        index_state: "ready",
+      },
+    ],
+    truncated: false,
+    root_kind: "managed",
+    root_label: "alpha",
+    root_missing: false,
+  };
+
+  const STATUS = {
+    ok: true,
+    project_id: "proj_1",
+    root_kind: "managed",
+    root_label: "alpha",
+    root_path: null,
+    root_missing: false,
+    writable: true,
+    watching: false,
+    watch_reason: "not_started",
+    last_scanned_at: "",
+    indexed_files: 1,
+  };
+
   const FILES = {
     project_id: "proj_1",
     root_subpath: "projects/alpha",
     root_exists: true,
     truncated: false,
     note: "Metadata only. Raiker never serves workspace file content to the browser.",
-    files: [
-      {
-        workspace_path: "projects/alpha/brief.md",
-        name: "brief.md",
-        is_directory: false,
-        size_bytes: 2048,
-        modified_at: "2026-07-24T00:00:00Z",
-        depth: 0,
-      },
-    ],
+    files: [],
     provenance: {
       "projects/alpha/brief.md": [
         {
@@ -299,6 +331,14 @@ describe("ProjectsView context home", () => {
       "GET /api/projects/tree": [],
       "GET /api/projects/proj_1": DETAIL,
       "GET /api/projects/proj_1/files": FILES,
+      "GET /api/projects/proj_1/browse": BROWSE,
+      "GET /api/projects/proj_1/root/status": STATUS,
+      "GET /api/projects/proj_1/managed-files": {
+        ok: true,
+        scope_kind: "project",
+        project_id: "proj_1",
+        files: [],
+      },
       "GET /api/tasks": [],
       ...overrides,
     };
@@ -307,20 +347,28 @@ describe("ProjectsView context home", () => {
   async function openDetail(routeMap: Record<string, unknown>) {
     stubFetch(routeMap);
     render(ProjectsView);
-    await waitFor(() => expect(screen.getByText("Details")).toBeInTheDocument());
-    await fireEvent.click(screen.getByText("Details"));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /open project alpha/i })).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByRole("button", { name: /open project alpha/i }));
   }
 
-  it("lists project files as metadata and flags governed changes", async () => {
+  it("renders exactly one file list", async () => {
     await openDetail(routes());
-    expect(await screen.findByLabelText("Inspect projects/alpha/brief.md")).toBeInTheDocument();
-    expect(screen.getByText("2.0 KB")).toBeInTheDocument();
-    expect(screen.getByText("governed change")).toBeInTheDocument();
+    await screen.findByRole("tree", { name: /project files/i });
+    expect(screen.getAllByRole("tree").length).toBe(1);
   });
 
-  it("links a file's provenance back to the session and audit log", async () => {
+  it("lists project files through the explorer", async () => {
     await openDetail(routes());
-    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
+    expect(await screen.findByRole("button", { name: "Inspect brief.md" })).toBeInTheDocument();
+    expect(screen.getByText("2.0 KB")).toBeInTheDocument();
+    expect(screen.getByText("Ready")).toBeInTheDocument();
+  });
+
+  it("links a selected file's provenance back to the session and audit log", async () => {
+    await openDetail(routes());
+    await fireEvent.click(await screen.findByRole("button", { name: "Inspect brief.md" }));
 
     expect(await screen.findByText("Provenance")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /session sess_alpha/i })).toHaveAttribute(
@@ -333,38 +381,164 @@ describe("ProjectsView context home", () => {
     );
   });
 
-  it("states that content is never shown, only what changed", async () => {
-    await openDetail(routes());
-    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
-    expect(
-      await screen.findByText(/shows what changed and who changed it, never the file's contents/i),
-    ).toBeInTheDocument();
-  });
-
   it("says a file has no recorded governed write rather than implying one", async () => {
     await openDetail(routes({ "GET /api/projects/proj_1/files": { ...FILES, provenance: {} } }));
-    await fireEvent.click(await screen.findByLabelText("Inspect projects/alpha/brief.md"));
+    await fireEvent.click(await screen.findByRole("button", { name: "Inspect brief.md" }));
     expect(
       await screen.findByText(/no governed write is recorded against this path/i),
     ).toBeInTheDocument();
   });
 
-  it("explains a project folder that does not exist on disk yet", async () => {
-    await openDetail(
-      routes({
-        "GET /api/projects/proj_1/files": { ...FILES, root_exists: false, files: [], provenance: {} },
-      }),
-    );
-    expect(await screen.findByText(/does not exist on disk yet/i)).toBeInTheDocument();
-  });
-
-  it("degrades politely when the file listing is unavailable", async () => {
+  it("keeps the file list when provenance is unavailable", async () => {
+    // Provenance is supplementary now. Losing it must cost one line, not the
+    // tree — which is the whole reason the tree no longer reads from it.
     const withoutFiles = Object.fromEntries(
       Object.entries(routes()).filter(([key]) => key !== "GET /api/projects/proj_1/files"),
     );
     await openDetail(withoutFiles);
+    expect(await screen.findByRole("button", { name: "Inspect brief.md" })).toBeInTheDocument();
     expect(await screen.findByText(/files unavailable \(404\)/i)).toBeInTheDocument();
-    // The rest of the project home stays usable.
-    expect(await screen.findByText("Project context")).toBeInTheDocument();
+  });
+
+  it("offers attaching a folder to a managed project", async () => {
+    await openDetail(routes());
+    expect(await screen.findByRole("button", { name: "Attach a folder" })).toBeVisible();
+  });
+
+  it("does not offer attaching to a project that already has a folder", async () => {
+    await openDetail(
+      routes({
+        "GET /api/projects/proj_1": {
+          ...DETAIL,
+          project: project({ root_kind: "attached", root_label: "repo" }),
+        },
+        "GET /api/projects/proj_1/browse": { ...BROWSE, root_kind: "attached", root_label: "repo" },
+        "GET /api/projects/proj_1/root/status": { ...STATUS, root_kind: "attached" },
+      }),
+    );
+    await screen.findByRole("tree", { name: /project files/i });
+    expect(screen.queryByRole("button", { name: "Attach a folder" })).not.toBeInTheDocument();
+  });
+});
+
+// ── Attaching a folder ────────────────────────────────────────────────────
+// For anyone whose work already lives in a folder, attaching one *is* how they
+// make a project. It sits beside creating one rather than inside a project they
+// had to create first.
+describe("ProjectsView folder attachment", () => {
+  function listRoutes(overrides: Record<string, unknown> = {}) {
+    return {
+      "GET /api/projects": { projects: [project({})], active_project_id: null },
+      "GET /api/projects/tree": [],
+      ...overrides,
+    };
+  }
+
+  it("offers attaching an existing folder beside creating one", async () => {
+    stubFetch(listRoutes());
+    render(ProjectsView);
+
+    expect(await screen.findByRole("button", { name: "Create project" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Attach existing folder…" })).toBeVisible();
+  });
+
+  it("states that the folder is read where it lives and never copied", async () => {
+    stubFetch(listRoutes());
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Attach existing folder…" }));
+
+    expect(await screen.findByText(/read where it lives on this machine/i)).toBeVisible();
+    expect(screen.getByText(/will not delete the folder/i)).toBeVisible();
+  });
+
+  it("sends the folder path and the write decision together", async () => {
+    const mock = stubFetch(
+      listRoutes({
+        "POST /api/projects": {
+          ok: true,
+          project_id: "proj_attached",
+          name: "Repo",
+          root_subpath: "",
+        },
+      }),
+    );
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Attach existing folder…" }));
+    await fireEvent.input(screen.getByLabelText("Attached project name"), {
+      target: { value: "Repo" },
+    });
+    await fireEvent.input(screen.getByLabelText("Folder path"), {
+      target: { value: "C:/work/repo" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Attach folder" }));
+
+    await waitFor(() => {
+      const post = mock.mock.calls.find(
+        (call) => (call[1]?.method ?? "GET").toUpperCase() === "POST",
+      );
+      expect(post).toBeTruthy();
+      expect(JSON.parse(post![1]!.body as string)).toEqual({
+        name: "Repo",
+        attach_path: "C:/work/repo",
+        attach_writable: true,
+      });
+    });
+  });
+
+  it("surfaces the server's refusal by name rather than as a generic failure", async () => {
+    stubFetch(
+      listRoutes({
+        "POST /api/projects": {
+          __status: 400,
+          detail: { reason_code: "attach_path_inside_workspace" },
+        },
+      }),
+    );
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Attach existing folder…" }));
+    await fireEvent.input(screen.getByLabelText("Attached project name"), {
+      target: { value: "Repo" },
+    });
+    await fireEvent.input(screen.getByLabelText("Folder path"), {
+      target: { value: "C:/ws/inside" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Attach folder" }));
+
+    expect(await screen.findByText(/attach_path_inside_workspace/)).toBeInTheDocument();
+  });
+});
+
+// ── Deleting ──────────────────────────────────────────────────────────────
+describe("ProjectsView deletion", () => {
+  it("states that deleting an attached project keeps the folder", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    stubFetch({
+      "GET /api/projects": {
+        projects: [project({ root_kind: "attached", root_label: "repo" })],
+        active_project_id: null,
+      },
+      "GET /api/projects/tree": [],
+    });
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
+
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/folder repo will not be deleted/i);
+  });
+
+  it("keeps today's wording for a managed project", async () => {
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(false);
+    stubFetch({
+      "GET /api/projects": { projects: [project({})], active_project_id: null },
+      "GET /api/projects/tree": [],
+    });
+    render(ProjectsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: /^Delete$/ }));
+
+    expect(confirmSpy.mock.calls[0][0]).toMatch(/permanently delete all project chats and files/i);
   });
 });

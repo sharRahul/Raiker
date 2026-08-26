@@ -8,11 +8,11 @@
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { startInBuild } from "../buildProject";
-  import FileLibrary from "../components/FileLibrary.svelte";
+  import ProjectExplorer from "../components/ProjectExplorer.svelte";
   import { api, ApiError } from "../api";
   import type {
+    ProjectBrowseEntry,
     ProjectDetail,
-    ProjectFile,
     ProjectFilesView,
     ProjectsList,
     ProjectTreeNode as TreeNode,
@@ -29,6 +29,17 @@
   let newName = $state("");
   let creating = $state(false);
   let createError = $state<string | null>(null);
+
+  // Attaching an existing folder sits beside creating one, because for anyone
+  // whose work already lives in a folder it *is* the way they make a project.
+  // Hiding it inside a created project's detail would make the common case the
+  // one they have to go looking for.
+  let attachOpen = $state(false);
+  let attachName = $state("");
+  let attachPath = $state("");
+  let attachWritable = $state(true);
+  let attaching = $state(false);
+  let attachError = $state<string | null>(null);
 
 
   let detail = $state<ProjectDetail | null>(null);
@@ -103,8 +114,16 @@
     }
   }
 
-  async function remove(projectId: string) {
-    if (!window.confirm("This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.")) return;
+  async function remove(projectId: string, rootKind: "managed" | "attached", rootLabel: string) {
+    // The two roots deserve different sentences, because they have different
+    // consequences. Telling an owner their attached folder will be deleted
+    // would be false; telling a managed project's owner it survives would be
+    // worse.
+    const message =
+      rootKind === "attached"
+        ? `This will remove the project and its chats from Raiker. The folder ${rootLabel} will not be deleted.`
+        : "This will permanently delete all project chats and files in this project folder. To save chats, move them to your chat list or another project before deleting.";
+    if (!window.confirm(message)) return;
     try { deleteError = null; await api.deleteProject(projectId, true); detail = null; await load(); onchanged?.(); }
     catch (e) { deleteError = e instanceof ApiError ? `Could not delete (${e.status}).` : "Could not delete"; }
   }
@@ -142,20 +161,80 @@
     }
   }
 
+  async function attachFolder() {
+    const name = attachName.trim();
+    const path = attachPath.trim();
+    if (name === "" || path === "" || attaching) return;
+    attaching = true;
+    attachError = null;
+    try {
+      await api.createProject(name, path, attachWritable);
+      attachName = "";
+      attachPath = "";
+      attachOpen = false;
+      await load();
+      onchanged?.();
+    } catch (e) {
+      attachError =
+        e instanceof ApiError
+          ? `Could not attach (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not attach";
+    } finally {
+      attaching = false;
+    }
+  }
+
+  async function attachToExisting(projectId: string) {
+    const path = window.prompt(
+      "Full path to the folder. It is read where it lives — Raiker copies nothing.",
+    );
+    if (path === null || path.trim() === "") return;
+    try {
+      attachError = null;
+      await api.attachProjectFolder(projectId, path.trim(), true);
+      await load();
+      await open(projectId);
+    } catch (e) {
+      attachError =
+        e instanceof ApiError
+          ? `Could not attach (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          : "Could not attach";
+    }
+  }
+
   // ── Project context home ─────────────────────────────────────────────
   // Opening a project shows everything scoped to it in one place: its files,
   // the work running under it, its stored knowledge, and its checkpoint
   // timeline. Files are metadata only — Raiker never serves workspace content
   // to the browser — and selecting one opens an inspect pane whose provenance
   // links back to the turn that wrote it.
+  // `files` is read for its provenance map alone. The listing it also carries
+  // is no longer rendered: the explorer is the one file list, and two lists of
+  // the same files described differently is exactly what this replaced. The
+  // provenance is not duplicated anywhere, so it is still read here.
   let files = $state<ProjectFilesView | null>(null);
   let filesError = $state<string | null>(null);
-  let selectedFile = $state<ProjectFile | null>(null);
+  let selectedFile = $state<ProjectBrowseEntry | null>(null);
   let projectTasks = $state<TaskView[]>([]);
 
-  const fileProvenance = $derived(
-    selectedFile === null ? [] : (files?.provenance[selectedFile.workspace_path] ?? []),
-  );
+  const detailProjectId = $derived(detail?.project.project_id ?? "");
+  const detailRootKind = $derived(detail?.project.root_kind ?? "managed");
+  const detailRootLabel = $derived(detail?.project.root_label ?? "");
+
+  const fileProvenance = $derived.by(() => {
+    if (selectedFile === null || files === null) return [];
+    // A governed write is recorded against a workspace-relative path, while the
+    // explorer names a file relative to its own root. For a managed project the
+    // two differ by the project's subpath; for an attached one they can also
+    // agree outright, so both keys are tried rather than one guessed at.
+    const relative = selectedFile.relative_path;
+    const subpath = files.root_subpath;
+    return (
+      files.provenance[relative] ??
+      files.provenance[subpath === "" ? relative : `${subpath}/${relative}`] ??
+      []
+    );
+  });
 
   function formatBytes(bytes: number): string {
     if (bytes < 1024) return `${bytes} B`;
@@ -277,10 +356,66 @@
   <button type="submit" class="btn btn-primary btn-sm" disabled={creating || newName.trim() === ""}>
     {creating ? "Creating…" : "Create project"}
   </button>
+  <button
+    type="button"
+    class="btn btn-ghost btn-sm"
+    onclick={() => (attachOpen = !attachOpen)}
+    aria-expanded={attachOpen}
+  >
+    Attach existing folder…
+  </button>
   {#if createError}
     <span class="error" role="alert">{createError}</span>
   {/if}
 </form>
+
+{#if attachOpen}
+  <form
+    class="card attach-form"
+    onsubmit={(e) => {
+      e.preventDefault();
+      void attachFolder();
+    }}
+  >
+    <h3 class="kicker">Attach an existing folder</h3>
+    <p class="sub">
+      The folder is read where it lives on this machine. Nothing is copied into Raiker, and
+      deleting the project later will not delete the folder.
+    </p>
+    <input
+      class="input"
+      type="text"
+      placeholder="Project name…"
+      bind:value={attachName}
+      aria-label="Attached project name"
+      maxlength={100}
+    />
+    <input
+      class="input"
+      type="text"
+      placeholder="Full path to the folder…"
+      bind:value={attachPath}
+      aria-label="Folder path"
+    />
+    <label class="check-row">
+      <input type="checkbox" bind:checked={attachWritable} />
+      Let Raiker write into this folder (still subject to your approvals)
+    </label>
+    <div class="attach-actions">
+      <button
+        type="submit"
+        class="btn btn-primary btn-sm"
+        disabled={attaching || attachName.trim() === "" || attachPath.trim() === ""}
+      >
+        {attaching ? "Attaching…" : "Attach folder"}
+      </button>
+      <button type="button" class="btn btn-ghost btn-sm" onclick={() => (attachOpen = false)}>
+        Cancel
+      </button>
+    </div>
+    {#if attachError}<p class="error" role="alert">{attachError}</p>{/if}
+  </form>
+{/if}
 
 {#if loadError}
   <PageState state="error" title="Couldn't load projects" detail={loadError} />
@@ -306,17 +441,30 @@
           ondragleave={() => onDragLeave(p.project_id)}
           ondrop={(e) => void onDrop(e, p.project_id)}
         >
-          <div class="project-head">
-            <h2 class="project-name">{p.name}</h2>
-            {#if p.selected}
-              <Badge variant="active" label="active" />
-            {/if}
-          </div>
-          <p class="sub">
-            <code class="mono">{p.root_subpath}</code>
-            · {p.session_count} session{p.session_count === 1 ? "" : "s"}
-            · created {relativeTime(p.created_at)}
-          </p>
+          <!-- The card body opens the project. A "Details" button beside five
+               other buttons made the card's own name inert, which is the one
+               thing a person tries first. -->
+          <button
+            type="button"
+            class="project-open"
+            onclick={() => void open(p.project_id)}
+            aria-label={`Open project ${p.name}`}
+          >
+            <span class="project-head">
+              <span class="project-name">{p.name}</span>
+              {#if p.selected}
+                <Badge variant="active" label="active" />
+              {/if}
+              {#if p.root_kind === "attached"}
+                <Badge variant="read-only" label="attached folder" />
+              {/if}
+            </span>
+            <span class="sub">
+              <code class="mono">{p.root_kind === "attached" ? p.root_label : p.root_subpath}</code>
+              · {p.session_count} session{p.session_count === 1 ? "" : "s"}
+              · created {relativeTime(p.created_at)}
+            </span>
+          </button>
           <div class="project-actions">
             <button
               type="button"
@@ -328,16 +476,13 @@
             <button type="button" class="btn btn-primary btn-sm" onclick={() => newChatInProject()}>
               New chat
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void open(p.project_id)}>
-              Details
-            </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void archiveProject(p.project_id)} disabled={archiving === p.project_id}>
               Archive
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => void startMove(p.project_id)}>
               Move
             </button>
-            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id)}>Delete</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick={() => void remove(p.project_id, p.root_kind, p.root_label)}>Delete</button>
           </div>
           {#if dragOverId === p.project_id}
             <p class="drop-hint" role="status">Drop to move chat into “{p.name}”.</p>
@@ -411,12 +556,30 @@
         <p class="sub">Shared attachment IDs: {detail.context.attachment_ids.length ? detail.context.attachment_ids.join(", ") : "none"}</p>
         <button type="button" class="btn btn-sm" onclick={() => void saveContext()} disabled={savingContext}>{savingContext ? "Saving…" : "Save context"}</button>
         {#if contextError}<p class="error" role="alert">{contextError}</p>{/if}
-        <FileLibrary
-          scope="project"
+        {#if detailRootKind === "managed"}
+          <div class="attach-inline">
+            <button
+              type="button"
+              class="btn btn-ghost btn-sm"
+              onclick={() => void attachToExisting(detailProjectId)}
+            >
+              Attach a folder
+            </button>
+            <span class="sub">Use a folder you already have as this project's root instead.</span>
+          </div>
+        {/if}
+        {#if attachError}<p class="error" role="alert">{attachError}</p>{/if}
+        <ProjectExplorer
           projectId={detail.project.project_id}
-          heading="Project files"
-          description="Files kept under this project's managed root. Build can read them only while this project is selected."
+          rootKind={detailRootKind}
+          rootLabel={detailRootLabel}
+          onselect={(entry) => (selectedFile = entry)}
         />
+        {#if filesError}
+          <!-- Provenance is read alongside the tree. Losing it degrades this one
+               line rather than the file list, which no longer depends on it. -->
+          <p class="sub" role="status">{filesError}</p>
+        {/if}
         <h3 class="kicker">Sessions</h3>
         {#if detail.sessions.length === 0}
           <p class="sub">No sessions yet — chats started while this project is active land here.</p>
@@ -449,52 +612,6 @@
           <a class="cross-link" href="#/tasks">Open Tasks</a>
         {/if}
 
-        <h3 class="kicker">Files</h3>
-        {#if filesError}
-          <!-- A failed file read degrades this one section politely: the rest of
-               the project home stays usable, so it announces rather than
-               interrupts. -->
-          <p class="error" role="status">{filesError}</p>
-        {:else if files === null}
-          <p class="sub">Reading the project folder…</p>
-        {:else if !files.root_exists}
-          <p class="sub">
-            <code class="mono">{files.root_subpath}</code> does not exist on disk yet. It is created
-            the first time a governed action writes into this project.
-          </p>
-        {:else if files.files.length === 0}
-          <p class="sub">The project folder is empty.</p>
-        {:else}
-          <p class="sub">{files.note}</p>
-          <ul class="file-list">
-            {#each files.files as file (file.workspace_path)}
-              <li style={`--depth:${file.depth}`}>
-                <button
-                  type="button"
-                  class="file-row"
-                  class:selected={selectedFile?.workspace_path === file.workspace_path}
-                  onclick={() => (selectedFile = file)}
-                  aria-label={`Inspect ${file.workspace_path}`}
-                >
-                  <Icon name={file.is_directory ? "projects" : "file"} size={14} />
-                  <span class="file-name">{file.name}</span>
-                  {#if !file.is_directory}
-                    <span class="file-meta">{formatBytes(file.size_bytes)}</span>
-                  {/if}
-                  {#if (files.provenance[file.workspace_path] ?? []).length > 0}
-                    <span class="file-flag">governed change</span>
-                  {/if}
-                </button>
-              </li>
-            {/each}
-          </ul>
-          {#if files.truncated}
-            <p class="sub">
-              The listing stopped at its size limit. Deeper folders are not shown.
-            </p>
-          {/if}
-        {/if}
-
         <h3 class="kicker">Checkpoints</h3>
         {#if detail.checkpoints.length === 0}
           <p class="sub">No checkpoints for this project's sessions yet.</p>
@@ -516,7 +633,7 @@
     <SidePanel
       open={selectedFile !== null}
       title={selectedFile?.name ?? ""}
-      subtitle={selectedFile?.workspace_path ?? null}
+      subtitle={selectedFile?.relative_path ?? null}
       onclose={() => (selectedFile = null)}
     >
       {#if selectedFile}
@@ -527,8 +644,10 @@
             <dt>Size</dt>
             <dd>{formatBytes(selectedFile.size_bytes)}</dd>
           {/if}
-          <dt>Modified</dt>
-          <dd title={selectedFile.modified_at}>{relativeTime(selectedFile.modified_at)}</dd>
+          {#if selectedFile.index_state !== null}
+            <dt>Index</dt>
+            <dd>{humanize(selectedFile.index_state)}</dd>
+          {/if}
         </dl>
 
         <h3 class="panel-h">Provenance</h3>
@@ -724,61 +843,6 @@
     font-size: 0.8rem;
     font-weight: 600;
     margin-bottom: var(--space-2);
-  }
-  .file-list {
-    list-style: none;
-    margin: 0 0 var(--space-2);
-    padding: 0;
-    display: grid;
-    gap: 1px;
-    max-height: 20rem;
-    overflow: auto;
-  }
-  .file-row {
-    display: flex;
-    align-items: center;
-    gap: 0.45rem;
-    width: 100%;
-    margin-left: calc(var(--depth) * 0.9rem);
-    max-width: calc(100% - var(--depth) * 0.9rem);
-    text-align: left;
-    background: transparent;
-    border: 0;
-    border-radius: var(--r-sm);
-    color: var(--text-2);
-    font: inherit;
-    font-size: 0.82rem;
-    padding: 0.28rem 0.45rem;
-    cursor: pointer;
-  }
-  .file-row:hover {
-    background: var(--sunken);
-    color: var(--text-1);
-  }
-  .file-row.selected {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .file-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .file-meta {
-    margin-left: auto;
-    color: var(--text-3);
-    font-size: 0.72rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .file-flag {
-    border: 1px solid var(--info-border);
-    background: var(--info-soft);
-    color: var(--info);
-    border-radius: var(--r-pill);
-    font-size: 0.65rem;
-    font-weight: 650;
-    padding: 0 0.45rem;
-    white-space: nowrap;
   }
   .panel-h {
     margin: var(--space-2) 0 0;

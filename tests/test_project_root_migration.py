@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -19,6 +20,13 @@ def store(tmp_path: Path) -> SQLiteStore:
     return SQLiteStore(tmp_path)
 
 
+def _project(store: SQLiteStore, project_id: str) -> dict[str, Any]:
+    """The stored row, failing by name when a migration lost the project."""
+    row = store.load_project(project_id)
+    assert row is not None, project_id
+    return row
+
+
 def test_existing_project_root_moves_without_overwrite(tmp_path: Path, store: SQLiteStore) -> None:
     """Removing the file move would leave a legacy project's files behind."""
     old = tmp_path / "projects" / "alpha"
@@ -32,7 +40,7 @@ def test_existing_project_root_moves_without_overwrite(tmp_path: Path, store: SQ
     assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
         encoding="utf-8"
     ) == "alpha"
-    assert store.load_project("proj_a")["root_subpath"] == ".raiker/projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == ".raiker/projects/alpha"
     assert len(report.retained_residues) == 1
     residue = tmp_path / report.retained_residues[0]
     assert residue.parent == tmp_path / ".raiker" / "project-migrations"
@@ -67,7 +75,7 @@ def test_post_commit_replacement_source_is_not_deleted(
     store.create_project("proj_a", "Alpha", "projects/alpha")
     original_publish = store.publish_project_root_atomic
 
-    def publish_then_replace(*args: object, **kwargs: object) -> bool:
+    def publish_then_replace(*args: Any, **kwargs: Any) -> bool:
         updated = original_publish(*args, **kwargs)
         if updated:
             old.rename(old.with_name("alpha-original"))
@@ -97,7 +105,7 @@ def test_post_commit_changed_source_file_is_not_deleted(
     store.create_project("proj_a", "Alpha", "projects/alpha")
     original_publish = store.publish_project_root_atomic
 
-    def publish_then_change(*args: object, **kwargs: object) -> bool:
+    def publish_then_change(*args: Any, **kwargs: Any) -> bool:
         updated = original_publish(*args, **kwargs)
         if updated:
             notes.write_text("changed after commit", encoding="utf-8")
@@ -126,7 +134,7 @@ def test_post_commit_identical_nested_file_replacement_is_not_deleted(
     store.create_project("proj_a", "Alpha", "projects/alpha")
     original_publish = store.publish_project_root_atomic
 
-    def publish_then_replace_nested_file(*args: object, **kwargs: object) -> bool:
+    def publish_then_replace_nested_file(*args: Any, **kwargs: Any) -> bool:
         updated = original_publish(*args, **kwargs)
         if updated:
             notes.unlink()
@@ -155,7 +163,7 @@ def test_replacement_after_cleanup_check_is_not_deleted(
     original_is_unchanged = dashboard._source_is_unchanged
     replaced = False
 
-    def replace_after_check(path: Path, identity: str) -> bool:
+    def replace_after_check(path: Path, identity: dashboard._SourceIdentity) -> bool:
         nonlocal replaced
         unchanged = original_is_unchanged(path, identity)
         if unchanged and path == old and not replaced:
@@ -188,7 +196,7 @@ def test_parent_commit_with_retained_legacy_tree_migrates_nested_child(
 
     assert set(report.migrated) == {"proj_parent", "proj_child"}
     assert report.conflicts == ()
-    assert store.load_project("proj_child")["root_subpath"] == ".raiker/projects/alpha/child"
+    assert _project(store, "proj_child")["root_subpath"] == ".raiker/projects/alpha/child"
     assert (child / "notes.txt").read_text(encoding="utf-8") == "child"
 
 
@@ -203,7 +211,7 @@ def test_retry_before_destination_claim_reuses_the_pending_reservation(
     store.create_project("proj_a", "Alpha", "projects/alpha")
     original_mkdir = Path.mkdir
 
-    def fail_claim(path: Path, *args: object, **kwargs: object) -> None:
+    def fail_claim(path: Path, *args: Any, **kwargs: Any) -> None:
         if path == destination:
             raise OSError("injected_before_destination_claim")
         original_mkdir(path, *args, **kwargs)
@@ -261,7 +269,7 @@ def test_dashboard_startup_migrates_existing_legacy_project_roots(
 
     DashboardService(tmp_path)
 
-    assert store.load_project("proj_a")["root_subpath"] == ".raiker/projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == ".raiker/projects/alpha"
     assert (tmp_path / ".raiker" / "projects" / "alpha" / "notes.txt").read_text(
         encoding="utf-8"
     ) == "alpha"
@@ -287,7 +295,7 @@ def test_failed_row_reservation_leaves_the_legacy_root_coherent(
     assert report.conflicts == ("proj_a",)
     assert (old / "notes.txt").read_text(encoding="utf-8") == "alpha"
     assert not (tmp_path / ".raiker" / "projects" / "alpha").exists()
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
 
 
 def test_existing_destination_conflict_preserves_legacy_project(tmp_path: Path, store: SQLiteStore) -> None:
@@ -306,7 +314,7 @@ def test_existing_destination_conflict_preserves_legacy_project(tmp_path: Path, 
     assert report.conflicts == ("proj_a",)
     assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
     assert (destination / "notes.txt").read_text(encoding="utf-8") == "managed"
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
 
 
 def test_destination_claim_race_never_overwrites_or_strands_the_legacy_root(
@@ -321,7 +329,7 @@ def test_destination_claim_race_never_overwrites_or_strands_the_legacy_root(
     original_mkdir = Path.mkdir
     claimed = False
 
-    def claim_destination(path: Path, *args: object, **kwargs: object) -> None:
+    def claim_destination(path: Path, *args: Any, **kwargs: Any) -> None:
         nonlocal claimed
         if path == destination and not claimed:
             claimed = True
@@ -338,7 +346,7 @@ def test_destination_claim_race_never_overwrites_or_strands_the_legacy_root(
     assert report.conflicts == ("proj_a",)
     assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
     assert (destination / "racer.txt").read_text(encoding="utf-8") == "do not replace"
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
 
     monkeypatch.undo()
     shutil.rmtree(destination)
@@ -367,7 +375,7 @@ def test_incomplete_owned_publication_resumes_without_replacing_files(
 
     assert failed.conflicts == ("proj_a",)
     assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
 
     monkeypatch.undo()
     (old / "added-after-interruption.txt").write_text("current source", encoding="utf-8")
@@ -409,7 +417,7 @@ def test_forged_reservation_cannot_adopt_or_delete_a_legacy_project(
     assert report.conflicts == ("proj_a",)
     assert (old / "notes.txt").read_text(encoding="utf-8") == "legacy"
     assert not (destination / "notes.txt").exists()
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
 
 
 def test_migration_is_idempotent_after_a_successful_move(tmp_path: Path, store: SQLiteStore) -> None:
@@ -440,8 +448,8 @@ def test_migration_keeps_nested_project_rows_with_their_moved_parent(
 
     assert set(report.migrated) == {"proj_parent", "proj_child"}
     assert report.conflicts == ()
-    assert store.load_project("proj_parent")["root_subpath"] == ".raiker/projects/alpha"
-    assert store.load_project("proj_child")["root_subpath"] == ".raiker/projects/alpha/child"
+    assert _project(store, "proj_parent")["root_subpath"] == ".raiker/projects/alpha"
+    assert _project(store, "proj_child")["root_subpath"] == ".raiker/projects/alpha/child"
     assert (tmp_path / ".raiker" / "projects" / "alpha" / "child" / "notes.txt").read_text(
         encoding="utf-8"
     ) == "child"
@@ -456,7 +464,7 @@ def test_migration_refuses_a_legacy_root_that_escapes_the_workspace(
     report = migrate_project_roots(tmp_path, store)
 
     assert report.conflicts == ("proj_bad",)
-    assert store.load_project("proj_bad")["root_subpath"] == "projects/../../outside"
+    assert _project(store, "proj_bad")["root_subpath"] == "projects/../../outside"
 
 
 def test_knowledge_roots_offer_only_the_stored_managed_project_path(
@@ -525,7 +533,7 @@ def test_legacy_container_symlink_cannot_migrate_runtime_data(tmp_path: Path) ->
 
     assert report.conflicts == ("proj_memory",)
     assert (memory / "keep.txt").read_text(encoding="utf-8") == "keep"
-    assert store.load_project("proj_memory")["root_subpath"] == "projects/memory"
+    assert _project(store, "proj_memory")["root_subpath"] == "projects/memory"
 
 
 def test_source_container_swap_before_publication_cannot_copy_runtime_data(
@@ -541,7 +549,7 @@ def test_source_container_swap_before_publication_cannot_copy_runtime_data(
     store.create_project("proj_a", "Alpha", "projects/alpha")
     original_publish = store.publish_project_root_atomic
 
-    def swap_then_publish(*args: object, **kwargs: object) -> bool:
+    def swap_then_publish(*args: Any, **kwargs: Any) -> bool:
         old.parent.rename(tmp_path / "projects-before-swap")
         try:
             (tmp_path / "projects").symlink_to(tmp_path / ".raiker", target_is_directory=True)
@@ -554,7 +562,7 @@ def test_source_container_swap_before_publication_cannot_copy_runtime_data(
     report = migrate_project_roots(tmp_path, store)
 
     assert report.conflicts == ("proj_a",)
-    assert store.load_project("proj_a")["root_subpath"] == "projects/alpha"
+    assert _project(store, "proj_a")["root_subpath"] == "projects/alpha"
     assert not (tmp_path / ".raiker" / "projects" / "alpha").exists()
     assert (runtime_source / "secret.txt").read_text(encoding="utf-8") == "secret"
 

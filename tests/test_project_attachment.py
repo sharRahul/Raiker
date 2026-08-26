@@ -17,7 +17,11 @@ import pytest
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.control.dashboard import DashboardService
 from raiker.control.knowledge_scope import grant_root_id
-from raiker.control.project_roots import authority_for_project, resolve_project_root
+from raiker.control.project_roots import (
+    ProjectRoot,
+    authority_for_project,
+    resolve_project_root,
+)
 from raiker.tools.filesystem import FilesystemSafetyError
 
 OWNER = "principal_owner"
@@ -36,7 +40,7 @@ def service(workspace: Path) -> DashboardService:
     return DashboardService(workspace)
 
 
-def _root_of(service: DashboardService, project_id: str):
+def _root_of(service: DashboardService, project_id: str) -> ProjectRoot:
     return resolve_project_root(
         service.store.load_project(project_id),
         service.store.list_brain_source_grants(OWNER),

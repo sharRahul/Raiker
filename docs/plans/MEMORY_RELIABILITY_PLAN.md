@@ -497,7 +497,7 @@ log, which is the same class of defect one layer down.
 **Severity: Medium → Low. Area: retrieval quality. Raised 2026-08-17 while
 closing MEM-03. Status: fixed 2026-08-26 by [FIXED-283](FIXED_ITEMS.md#fixed-283--semantic-recall-was-selectable-and-nothing-could-ever-produce-a-space-to-select),
 [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered),
-[FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider), and
+[FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-recall-was-declared-and-blocked-by-a-remote-egress-check), and
 [FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words).**
 
 **2026-08-25 update — the proposed fix was the second-cheapest of the two ways
@@ -525,7 +525,7 @@ Verified live on 2026-08-25 against a real OpenAI embedding call.
 * **The keyless local leg is closed.** A `llama.cpp` embedding profile now uses
   the same gated write and read path without requiring an egress allowlist, and
   Memory links directly to the curated Apache-2.0 Nomic Embed Q4_K_M choice in
-  the existing revision-pinned model-library flow ([FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-memory-still-required-a-hosted-provider)).
+  the existing revision-pinned model-library flow ([FIXED-293](FIXED_ITEMS.md#fixed-293--local-semantic-recall-was-declared-and-blocked-by-a-remote-egress-check)).
 * **Managed-file meaning recall is closed.** Current file revisions project
   into the same named space with owner/project scope, secret exclusion and
   exact file/chunk provenance; re-index and retirement remove the projection

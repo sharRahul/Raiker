@@ -168,10 +168,8 @@ async function runGovernedBuildCommand(leg: ProviderLeg): Promise<void> {
   await receipt.locator("summary").click();
   await expect(receipt).toContainText("approval");
   await expect(receipt).toContainText(/local[_ ]strict/i);
-  await page.screenshot({
-    path: join(SHOTS, `governed-shell-${leg.provider.toLowerCase()}-live.png`),
-    fullPage: true,
-  });
+  // Normal 1440 × 1000 viewport capture — deliberately not a full-page/high-res image.
+  await page.screenshot({ path: join(SHOTS, `governed-shell-${leg.provider.toLowerCase()}-live.png`) });
 }
 
 test.beforeAll(async ({ browser }) => {

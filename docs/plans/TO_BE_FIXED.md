@@ -113,6 +113,12 @@ there rather than being duplicated here.
 **Severity: Low (was Medium, was High). Area: shell / sandbox / recovery.
 Status: Open — reduced three times.**
 
+**2026-08-28 verification.** Docker is installed but its daemon is unavailable
+on this host, and Podman is not installed. Raiker therefore continues to refuse
+container-network execution rather than claim unverified direct-DNS/direct-TCP
+bypass, active-stream revocation, or copy-on-write credential-delivery proof.
+The container proof and a production signing anchor remain open.
+
 **2026-08-21 update.** Foreground SSH and Daytona now enter the same
 `CommandService` lifecycle through a canonical length-prefixed envelope, exact
 SSH host-key pin, Daytona cost reservation and fixed remote supervisor path;

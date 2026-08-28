@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+from collections import defaultdict
 from typing import Any
 
 # Name recorded on every locally-created embedding record. Bump the suffix if the
@@ -109,3 +110,152 @@ class VectorIndex:
             chunks.append(text[start:end])
             start += chunk_size - overlap
         return chunks
+
+
+class ApproximateVectorIndex(VectorIndex):
+    """Bounded LSH candidate lookup with exact cosine re-ranking.
+
+    The vector store is deliberately simple SQLite, which made every recall
+    rebuild an in-memory index and linearly compare every vector.  This index
+    keeps that exact path for small corpora, then uses deterministic sparse
+    random-projection buckets to find a bounded candidate set.  Candidate scores
+    are always re-ranked with the same exact cosine calculation ``VectorIndex``
+    has always used, so approximation affects which vectors are considered, not
+    what a displayed score means.
+
+    The projections contain no model text or owner data: their layout is derived
+    solely from ``dimensions``, table and bit number.  They are intentionally
+    process-local; ``MemoryVectorIndexCache`` owns freshness against SQLite.
+    """
+
+    #: Below this count exact search is faster and gives a stronger result.
+    EXACT_SEARCH_LIMIT = 512
+    _TABLES = 10
+    _BITS_PER_TABLE = 12
+    _SPARSE_DIMENSIONS = 12
+    _MIN_CANDIDATES = 96
+
+    def __init__(self, dimensions: int = 384) -> None:
+        super().__init__(dimensions)
+        self._buckets: list[dict[int, set[str]]] = [defaultdict(set) for _ in range(self._TABLES)]
+        self._signatures: dict[str, tuple[int, ...]] = {}
+        self._projections = tuple(
+            tuple(
+                tuple(
+                    self._projection_sample(dimensions, table, bit, sample)
+                    for sample in range(self._SPARSE_DIMENSIONS)
+                )
+                for bit in range(self._BITS_PER_TABLE)
+            )
+            for table in range(self._TABLES)
+        )
+
+    def upsert(self, vector_id: str, vector: list[float], metadata: dict[str, Any] | None = None) -> None:
+        previous = self._signatures.pop(vector_id, None)
+        if previous is not None:
+            for table, signature in enumerate(previous):
+                self._buckets[table][signature].discard(vector_id)
+        super().upsert(vector_id, vector, metadata)
+        signatures = self._signatures_for(vector)
+        self._signatures[vector_id] = signatures
+        for table, signature in enumerate(signatures):
+            self._buckets[table][signature].add(vector_id)
+
+    def delete(self, vector_id: str) -> bool:
+        signatures = self._signatures.pop(vector_id, None)
+        if signatures is not None:
+            for table, signature in enumerate(signatures):
+                self._buckets[table][signature].discard(vector_id)
+        return super().delete(vector_id)
+
+    def search(self, query_vector: list[float], top_k: int = 10) -> list[dict[str, Any]]:
+        if len(query_vector) != self.dimensions:
+            raise ValueError(f"expected {self.dimensions} dimensions, got {len(query_vector)}")
+        if len(self._vectors) < self.EXACT_SEARCH_LIMIT:
+            return super().search(query_vector, top_k)
+        candidates = self._candidates(query_vector)
+        # A sparse or adversarially-shaped corpus may not populate enough LSH
+        # buckets.  Falling back to the exact path makes recall quality fail-safe
+        # rather than silently dropping the one relevant memory.
+        if len(candidates) < max(int(top_k), self._MIN_CANDIDATES):
+            return super().search(query_vector, top_k)
+        scores = [
+            (self._cosine_similarity(query_vector, self._vectors[vector_id]), vector_id)
+            for vector_id in candidates
+        ]
+        scores.sort(key=lambda item: (-item[0], item[1]))
+        return [
+            {
+                "vector_id": vector_id,
+                "score": round(score, 6),
+                "metadata": self._metadata.get(vector_id, {}),
+            }
+            for score, vector_id in scores[:top_k]
+        ]
+
+    def _candidates(self, query_vector: list[float]) -> set[str]:
+        candidates: set[str] = set()
+        for table, signature in enumerate(self._signatures_for(query_vector)):
+            candidates.update(self._buckets[table].get(signature, ()))
+            if len(candidates) >= self._MIN_CANDIDATES:
+                continue
+            # One-bit neighbours preserve the usual near-boundary LSH hits while
+            # keeping the work bounded (12 extra bucket reads per table).
+            for bit in range(self._BITS_PER_TABLE):
+                candidates.update(self._buckets[table].get(signature ^ (1 << bit), ()))
+                if len(candidates) >= self._MIN_CANDIDATES:
+                    break
+        return candidates
+
+    def _signatures_for(self, vector: list[float]) -> tuple[int, ...]:
+        signatures: list[int] = []
+        for table_projections in self._projections:
+            signature = 0
+            for bit, samples in enumerate(table_projections):
+                projection = sum(vector[dimension] * sign for dimension, sign in samples)
+                if projection >= 0.0:
+                    signature |= 1 << bit
+            signatures.append(signature)
+        return tuple(signatures)
+
+    @staticmethod
+    def _projection_sample(dimensions: int, table: int, bit: int, sample: int) -> tuple[int, float]:
+        digest = hashlib.blake2s(
+            f"raiker-ann-v1:{dimensions}:{table}:{bit}:{sample}".encode(), digest_size=8
+        ).digest()
+        return int.from_bytes(digest[:4], "big") % dimensions, 1.0 if digest[4] & 1 else -1.0
+
+
+class MemoryVectorIndexCache:
+    """Revision-aware cache around an ``ApproximateVectorIndex``.
+
+    Callers provide a database revision and a loader.  The loader is invoked
+    only after a relevant memory/vector mutation, so an ordinary turn no longer
+    pays to decode every stored embedding before it can answer.
+    """
+
+    def __init__(self) -> None:
+        self._revision: int | None = None
+        self._index: ApproximateVectorIndex | None = None
+
+    def search(
+        self,
+        *,
+        revision: int,
+        dimensions: int,
+        query_vector: list[float],
+        top_k: int,
+        load: Any,
+    ) -> list[dict[str, Any]]:
+        if self._revision != revision or self._index is None or self._index.dimensions != dimensions:
+            index = ApproximateVectorIndex(dimensions)
+            for row in load():
+                try:
+                    vector = row["vector"]
+                    if isinstance(vector, list) and len(vector) == dimensions:
+                        index.upsert(str(row["vector_id"]), vector, dict(row.get("metadata", {})))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            self._index = index
+            self._revision = revision
+        return self._index.search(query_vector, top_k)

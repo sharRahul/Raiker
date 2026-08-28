@@ -13,7 +13,7 @@
  * without a browser.
  */
 
-export type MemoryWritePostureKind = "proposes" | "gate_off" | "denied" | "unknown";
+export type MemoryWritePostureKind = "loading" | "proposes" | "gate_off" | "denied" | "unknown";
 
 export interface MemoryWritePosture {
   kind: MemoryWritePostureKind;
@@ -25,7 +25,14 @@ export interface MemoryWritePosture {
 
 const ENABLED_STATES = new Set(["enabled_read_only", "enabled_policy_gated", "enabled_runtime"]);
 
-export function memoryWritePosture(gates: CapabilityGateLike[] | null): MemoryWritePosture {
+export function memoryWritePosture(gates: CapabilityGateLike[] | null | undefined): MemoryWritePosture {
+  if (gates === undefined) {
+    return {
+      kind: "loading",
+      headline: "Checking memory permissions…",
+      action: null,
+    };
+  }
   if (gates === null) {
     return {
       kind: "unknown",

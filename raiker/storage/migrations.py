@@ -3355,6 +3355,53 @@ CREATE INDEX IF NOT EXISTS idx_turn_sources_locator
 """
 
 
+# MEM-10 remainder — a vector index is only safe if it is rebuilt whenever the
+# *eligible* corpus changes.  This durable monotonic revision lets a process-local
+# ANN cache answer the common read without re-decoding every embedding, while SQL
+# itself invalidates it on vector, projection or memory-state mutations.
+MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID = "RAIKER-2080-memory-vector-search-revision"
+
+MEMORY_VECTOR_SEARCH_REVISION_SQL = """
+CREATE TABLE IF NOT EXISTS memory_vector_search_state (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  revision INTEGER NOT NULL
+);
+INSERT OR IGNORE INTO memory_vector_search_state(singleton, revision) VALUES (1, 0);
+
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_vector_insert
+AFTER INSERT ON vector_records BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_vector_delete
+AFTER DELETE ON vector_records BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_vector_update
+AFTER UPDATE OF embedding, embedding_model, dimensions, scope, owner_principal_id ON vector_records BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_projection_insert
+AFTER INSERT ON memory_projections BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_projection_delete
+AFTER DELETE ON memory_projections BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_projection_update
+AFTER UPDATE OF projection_id, projection_type, active, memory_id ON memory_projections BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+
+CREATE TRIGGER IF NOT EXISTS memory_vector_search_memory_eligibility
+AFTER UPDATE OF deleted_at, archived_at, search_enabled, sensitivity, expires_at,
+  valid_from, valid_until, superseded_at, scope, owner_principal_id ON approved_memory BEGIN
+  UPDATE memory_vector_search_state SET revision = revision + 1 WHERE singleton = 1;
+END;
+"""
+
+
 # BUG-216 — the last checkpoint-capture result is a durable readiness fact.
 CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID = "RAIKER-2036-checkpoint-capture-health"
 

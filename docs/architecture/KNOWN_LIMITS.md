@@ -348,15 +348,11 @@ on the shipped build, not estimated.
   from two years ago ranks first instead of being dropped. The engine is probed
   at runtime and reported on `/api/health`; a build genuinely without FTS5 still
   falls back to FTS4 and recency, and says so. Closed as FIXED-231.
-- **Every recall reads every embedding.** Retrieval loads all active vectors for
-  the scope, rebuilds the index in memory, and scores them in Python on each
-  call. There is no approximate-nearest-neighbour index and no cache. After the
-  2026-08-15 fix to the query plan (FIXED-200) one recall costs ~30 ms at 200
-  memories, ~124 ms at 1 000 and ~431 ms at 3 000 — linear, paid on every turn,
-  before the model is asked anything. It is usable into the low thousands and
-  degrades steadily above that; the vector stores comparable products use are
-  sublinear and measured in millions. Raiker will not fall over at 10 000
-  memories, but recall will cost more than a second of every turn.
+- ~~**Every recall reads every embedding.**~~ **Fixed 2026-08-28
+  (FIXED-301).** Eligible-memory mutations increment a durable revision; recall
+  reuses its selected owner/scope/model index until that revision changes. Small
+  spaces retain exact cosine ranking and large ones use bounded approximate
+  lookup followed by exact score re-ranking.
 - **A natural-language question drops the lexical half of retrieval
   altogether.** Terms shorter than three characters are discarded and the rest
   are combined with an implicit `AND`, so *"Kubernetes rollout"* matches and

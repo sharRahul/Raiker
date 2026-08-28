@@ -42,7 +42,10 @@
   // BUG-71 — the two facts that decide whether this page may promise proposals
   // at all. Read alongside the memories so the promise and the gate can never
   // disagree; a failed read says so rather than assuming the happy answer.
-  let gates = $state<CapabilityGate[] | null>(null);
+  // `undefined` is an in-flight read; `null` is a failed read. Keeping those
+  // distinct prevents a short normal request from being presented as a broken
+  // permission system (BUG-302).
+  let gates = $state<CapabilityGate[] | null | undefined>(undefined);
   const posture = $derived(memoryWritePosture(gates));
 
   // MEM-03 — what recall is actually searching. Defaulted rather than assumed
@@ -362,6 +365,13 @@
           {/if}
         </span>
       </p>
+      {#if settings.vector_search_strategy === "exact_then_approximate"}
+        <p class="control-note">
+          Recall keeps a revision-checked index: it ranks up to {settings.vector_search_exact_limit ?? 512}
+          vectors exactly, then uses bounded approximate lookup with exact score re-ranking. The index
+          rebuilds whenever an eligible memory changes.
+        </p>
+      {/if}
       <!-- MEM-10 — the select opposite can only offer spaces that already hold
            vectors, so on a default install it offers the fallback and nothing
            else. This row is the way out of that: it builds one. -->

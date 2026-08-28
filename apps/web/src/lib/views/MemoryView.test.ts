@@ -73,6 +73,37 @@ describe("MemoryView", () => {
     );
   });
 
+  it("states how recall scales without implying an unearned warm cache", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": {
+        incognito: false,
+        vector_search_strategy: "exact_then_approximate",
+        vector_search_exact_limit: 512,
+      },
+    });
+    render(MemoryView);
+
+    expect(await screen.findByText(/recall keeps a revision-checked index/i)).toBeInTheDocument();
+    expect(screen.getByText(/exact score re-ranking/i)).toBeInTheDocument();
+  });
+
+  it("distinguishes a permission check in progress from a failed permission read", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false },
+      "GET /api/capability-gates": [{
+        capability: "memory_write_execution",
+        state: "disabled",
+        decision_mode: "ask",
+      }],
+    });
+    render(MemoryView);
+
+    expect(await screen.findByText(/memory store is off/i)).toBeInTheDocument();
+    expect(screen.queryByText(/could not read your memory permissions/i)).not.toBeInTheDocument();
+  });
+
   it("reviews governed proposals directly on the Memory page", async () => {
     const fetchMock = stubFetch({
       "GET /api/memory": [],

@@ -1975,6 +1975,10 @@ export interface MemorySettingsView {
   embedding_providers: EmbeddingProviderView[];
   unindexed_memories: number;
   unindexed_file_chunks: number;
+  /** Exact cosine ranking stays in force for small corpora; larger spaces use
+   * approximate candidate lookup followed by exact re-ranking. */
+  vector_search_strategy?: "exact_then_approximate";
+  vector_search_exact_limit?: number;
 }
 
 // raiker/vector/backends.py embedding_capable_profiles(). A description of what

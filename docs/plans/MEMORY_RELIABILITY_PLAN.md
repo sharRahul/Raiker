@@ -530,9 +530,10 @@ Verified live on 2026-08-25 against a real OpenAI embedding call.
   into the same named space with owner/project scope, secret exclusion and
   exact file/chunk provenance; re-index and retirement remove the projection
   ([FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words)).
-* **Vector recall is still a linear scan** — roughly 431 ms at 3 000 memories,
-  paid every turn. That is [backlog #5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort)
-  and is a different problem: an index over a space, not a space to index.
+* **Vector recall scaling closed 2026-08-28** as
+  [FIXED-301](FIXED_ITEMS.md#fixed-301--every-memory-recall-rebuilt-and-linearly-scanned-the-entire-vector-space).
+  Exact cosine ranking remains for small spaces; larger spaces use a
+  revision-checked approximate candidate index with exact score re-ranking.
 
 The analysis below is kept as the record that led to the local-model closure.
 

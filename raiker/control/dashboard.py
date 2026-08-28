@@ -566,6 +566,10 @@ class MemorySettingsView:
     embedding_providers: tuple[dict[str, Any], ...] = ()
     unindexed_memories: int = 0
     unindexed_file_chunks: int = 0
+    #: The retrieval implementation, stated separately from the embedding model:
+    #: the owner should not have to infer whether growing history changes lookup.
+    vector_search_strategy: str = "exact_then_approximate"
+    vector_search_exact_limit: int = 512
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -576,6 +580,8 @@ class MemorySettingsView:
             "embedding_providers": [dict(item) for item in self.embedding_providers],
             "unindexed_memories": self.unindexed_memories,
             "unindexed_file_chunks": self.unindexed_file_chunks,
+            "vector_search_strategy": self.vector_search_strategy,
+            "vector_search_exact_limit": self.vector_search_exact_limit,
         }
 
 
@@ -5181,6 +5187,11 @@ class DashboardService:
             # recall is already active, and changing the target cannot show a
             # count for the wrong model.
             embedding_providers=tuple(providers),
+            # The cache rebuilds on a durable SQLite eligibility revision. This
+            # names the strategy, not a live cache hit, so a fresh process never
+            # presents a warm-cache performance claim it has not earned yet.
+            vector_search_strategy="exact_then_approximate",
+            vector_search_exact_limit=512,
             unindexed_memories=len(
                 self.store.list_memories_missing_embedding(
                     active.model_label if active.semantic else None,

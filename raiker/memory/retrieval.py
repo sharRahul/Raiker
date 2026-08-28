@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from raiker.storage.sqlite import SQLiteStore
-from raiker.vector import VectorIndex
+from raiker.vector import MemoryVectorIndexCache
 from raiker.vector.backends import EmbeddingBackend, resolve_embedding_backend
 
 
@@ -60,6 +60,28 @@ _MAX_GRAPH_ANCHORS = 3
 #: egress-gated path stays where the capability check is — this module never
 #: performs a provider call on its own.
 QueryEmbedder = Callable[[EmbeddingBackend, str], list[float] | None]
+
+
+def _memory_vector_cache(
+    store: SQLiteStore, *, model: str, scope: str | None, owner_principal_id: str | None
+) -> MemoryVectorIndexCache:
+    """One cache per selected, owner-scoped vector space on a store instance.
+
+    SQLite's revision is global to eligible memory/vector mutations, so the
+    cache never survives an archive, expiry, projection change or vector write.
+    Separate space/scope keys ensure a broad Chat recall cannot reuse Build's
+    narrower candidate set (or vice versa).
+    """
+    caches = getattr(store, "_memory_vector_index_caches", None)
+    if caches is None:
+        caches = {}
+        store._memory_vector_index_caches = caches  # type: ignore[attr-defined]
+    key = (model, scope or "", owner_principal_id or "")
+    cache = caches.get(key)
+    if cache is None:
+        cache = MemoryVectorIndexCache()
+        caches[key] = cache
+    return cache
 
 
 def default_query_embedder() -> QueryEmbedder | None:
@@ -115,18 +137,45 @@ def retrieve_hybrid_memory(
     candidates: dict[str, tuple[float, set[str], dict[str, float]]] = {}
     for row in store.search_approved_memory(query, scope=scope, limit=limit, owner_principal_id=owner_principal_id):
         candidates[str(row["memory_id"])] = (weights.lexical, {"lexical"}, {"lexical": weights.lexical})
-    index = VectorIndex(backend.dimensions)
-    for row in store.list_active_memory_vector_embeddings(
-        backend.model_label, scope=scope, owner_principal_id=owner_principal_id
-    ):
-        try:
-            vector = json.loads(str(row["embedding"]))
-        except (TypeError, ValueError):
-            continue
-        if isinstance(vector, list) and len(vector) == backend.dimensions:
-            index.upsert(str(row["vector_id"]), vector, {"memory_id": str(row["memory_id"])})
     query_vector = _embed_query(backend, query, query_embedder)
-    for hit in ([] if query_vector is None else index.search(query_vector, top_k=limit)):
+    cache = _memory_vector_cache(
+        store,
+        model=backend.model_label,
+        scope=scope,
+        owner_principal_id=owner_principal_id,
+    )
+
+    def load_vectors() -> list[dict[str, object]]:
+        loaded: list[dict[str, object]] = []
+        for row in store.list_active_memory_vector_embeddings(
+            backend.model_label, scope=scope, owner_principal_id=owner_principal_id
+        ):
+            try:
+                vector = json.loads(str(row["embedding"]))
+            except (TypeError, ValueError):
+                continue
+            if isinstance(vector, list) and len(vector) == backend.dimensions:
+                loaded.append(
+                    {
+                        "vector_id": str(row["vector_id"]),
+                        "vector": vector,
+                        "metadata": {"memory_id": str(row["memory_id"])},
+                    }
+                )
+        return loaded
+
+    hits = (
+        []
+        if query_vector is None
+        else cache.search(
+            revision=store.active_memory_vector_revision(),
+            dimensions=backend.dimensions,
+            query_vector=query_vector,
+            top_k=limit,
+            load=load_vectors,
+        )
+    )
+    for hit in hits:
         # `search` returns the top *k* by similarity with no floor, so on a small
         # or unrelated corpus it returns every memory in scope, including the ones
         # that share no token with the query at all. Admitting those puts

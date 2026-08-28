@@ -186,6 +186,8 @@ from raiker.storage.migrations import (
     MEMORY_SQLCIPHER_FTS_MIGRATION_ID,
     MEMORY_TEMPORAL_EVALUATION_MIGRATION_ID,
     MEMORY_TEMPORAL_EVALUATION_SQL,
+    MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID,
+    MEMORY_VECTOR_SEARCH_REVISION_SQL,
     MODEL_ADVISOR_MIGRATION_ID,
     MODEL_ADVISOR_SQL,
     MODEL_CAPACITY_CONTROL_MIGRATION_ID,
@@ -1494,6 +1496,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
                 TURN_SOURCE_LOCATOR_INDEX_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MEMORY_VECTOR_SEARCH_REVISION_MIGRATION_ID,
+                MEMORY_VECTOR_SEARCH_REVISION_SQL,
                 connection,
             )
             # Before the backfills: converting an index and then deciding it is
@@ -10323,6 +10330,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         with self.connect() as connection:
             rows = connection.execute(query, params).fetchall()
         return [dict(row) for row in rows]
+
+    def active_memory_vector_revision(self) -> int:
+        """A durable invalidation generation for the eligible memory-vector corpus.
+
+        It is intentionally global rather than an optimisation that attempts to
+        infer an owner/scope from a write. Rebuilding an extra cache after an
+        unrelated owner update is cheap; reusing one after an archive or scope
+        change could disclose memory that the retrieval SQL would now withhold.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT revision FROM memory_vector_search_state WHERE singleton = 1"
+            ).fetchone()
+        return int(row["revision"]) if row is not None else 0
 
     # ── Phase 9: Symbol Nodes & Dependency Edges ──
 

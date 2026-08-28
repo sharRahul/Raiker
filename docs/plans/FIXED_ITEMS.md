@@ -313,6 +313,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-298](#fixed-298--a-paired-channel-could-still-only-record-a-message) | High | Channels / routing / approval relay | Fixed (was BUG-225; closed 2026-08-27) |
 | [FIXED-299](#fixed-299--skills-had-no-owner-authored-command-handle) | High | Skills / Chat / Build commands | Fixed (was backlog #4 and C9 remainder; closed 2026-08-27) |
 | [FIXED-300](#fixed-300--the-mlx-runtime-test-assumed-posix-path-rendering-on-windows) | Low | Test portability / MLX | Fixed (found during release verification; closed 2026-08-28) |
+| [FIXED-301](#fixed-301--every-memory-recall-rebuilt-and-linearly-scanned-the-entire-vector-space) | High | Memory / retrieval scale / web UI | Fixed (was backlog #5; closed 2026-08-28) |
+| [FIXED-302](#fixed-302--memory-permission-loading-was-presented-as-a-permission-read-failure) | Low | Memory / web UI | Fixed (found during live vector-retrieval verification; closed 2026-08-28) |
 
 ---
 
@@ -12862,3 +12864,57 @@ declared slot, and port.
 
 **Evidence.** `tests/test_managed_mlx_runtime.py` passes on Windows and retains
 the same assertion on POSIX hosts.
+
+---
+
+## FIXED-301 — Every memory recall rebuilt and linearly scanned the entire vector space
+
+**Severity: High. Area: Memory / retrieval scale / web UI. Closed 2026-08-28.**
+
+**Observed.** Every hybrid recall decoded every eligible embedding, reconstructed
+an in-memory index and scored the whole selected vector space before the model
+could answer. The measured cost grew with the owner's history and was paid again
+on the next turn.
+
+**Fixed.** Each selected owner/scope/model space now keeps a revision-checked
+process-local index. SQLite increments the durable revision for vector,
+projection and memory-eligibility mutations, so an archive, expiry, scope change
+or new embedding rebuilds rather than reuses candidates. Small corpora retain
+exact cosine ranking; at 512 vectors the index uses bounded deterministic LSH
+candidate lookup and exactly re-ranks those candidates before returning scores.
+Sparse candidate sets fail safe to the exact path.
+
+Memory → Recall backend now states this strategy in the owner-facing UI without
+claiming a warm-cache hit on a fresh process.
+
+**Beyond-reference assessment: PARITY.** This is a meaningful reliability and
+latency improvement, but approximate vector search is a standard capability of
+the reference memory providers rather than a differentiator. Raiker's improvement
+is the revision invalidation contract: performance cannot reuse a candidate set
+after the eligibility rules would withhold it.
+
+**Evidence.** `tests/test_memory_vector_index_cache.py`, hybrid-memory and
+embedding-backend regression suites, `apps/web/src/lib/views/MemoryView.test.ts`,
+and `apps/web/e2e/memory-vector-index-live.spec.ts` against a real local
+`raiker-web` instance.
+
+---
+
+## FIXED-302 — Memory permission loading was presented as a permission-read failure
+
+**Severity: Low. Area: Memory / web UI. Closed 2026-08-28.**
+
+**Observed.** A normal visit to Memory could briefly say Raiker could not read
+the owner’s permissions while the authenticated capability-gate request was
+still in flight. The request had not failed; the UI used one null state for both
+loading and failure.
+
+**Fixed.** The page now keeps loading and failed gate reads distinct. It says
+“Checking memory permissions…” until the response arrives, retains the existing
+explicit error only for a failed request, and then renders the actual Memory
+store posture.
+
+**Beyond-reference assessment: NO — correctness repair, not a new capability.**
+
+**Evidence.** `apps/web/src/lib/views/MemoryView.test.ts` and
+`apps/web/e2e/memory-vector-index-live.spec.ts` against a real local instance.

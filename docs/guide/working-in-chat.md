@@ -16,6 +16,7 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |
 | **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
+| **Summarise up to here** | — | On your own messages. Shortens what the model is sent; removes nothing from the transcript. |
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 | **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
 | **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
@@ -503,6 +504,20 @@ full transcript stays unchanged. The panel shows **Earlier context compacted**
 with before/after estimates, or **Recent history retained** when the provider or
 a `PreCompact` hook made compaction unavailable. An unknown capacity uses bounded
 recent history and never pretends the 90 % boundary was measured.
+
+**Summarising a range yourself.** Hover any of your own messages and choose
+**Summarise up to here**. Everything up to and including that exchange is
+replaced, *in what the model is sent*, by one summary — so a long digression at
+the start of a conversation stops costing you context on every later turn. This
+is the same operation automatic compaction performs, started for a different
+reason, so it asks the same `PreCompact` hooks, records the same compaction, and
+is recorded in the audit log with `started_by: owner`.
+
+It removes nothing. The transcript keeps every turn: still on screen, still
+exportable, still what a branch is taken from. Unlike the automatic case it does
+not hold the newest two exchanges back — if you mark the exchange you are in, you
+meant it. Marking a point that an earlier summary already covers says so and
+changes nothing.
 
 **API cost.** Shown only for providers Raiker authenticates with an API key and
 reaches off this machine. A local runtime says *"Runs on this machine — no API

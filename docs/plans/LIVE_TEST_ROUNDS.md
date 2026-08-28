@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-29 | Targeted | `fixed-306-` | Anthropic | Owner-guided compaction: a summarised range, and a transcript that kept every turn |
 | 2026-08-28 | Targeted | `fixed-305-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | The last three lifecycle hook events, on a real tool-using turn and across four providers |
 | 2026-08-28 | Full sweep + targeted | `pages/`, `fixed-299-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama — existing credentials managed through the Raiker interface | All 26 route/tab states at mobile, 1080p, 4K and 8K in both themes; channel routing and approval-relay controls; owner skill commands in Chat and Build; four-provider readiness from the Models UI |
 | 2026-08-25 | Targeted | `r0825-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | A semantic space built against a real embedding call — **and measured, which found the read half missing** — the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at five widths |
@@ -51,6 +52,33 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-29 — the owner's own compaction
+
+**Tier: Targeted.** Chromium via Playwright at 1440 × 1000, light. **Provider:**
+Anthropic (`claude-haiku-4-5-20251001`). The key was supplied to the runner as an
+environment variable for the length of the round and entered through the
+product's own Connect dialog; none was placed in source, a test fixture, or this
+document. **Prefix:** `fixed-306-`.
+
+### What it proved
+
+* **Summarise up to here** appears on the owner's own message beside Copy, Edit,
+  Retry and Branch, and summarising through the first of two real turns reported
+  "Summarised 1 earlier exchange for the model. Nothing was removed from this
+  transcript."
+* Both exchanges were still on screen afterwards, which is the half of the claim
+  a person would not think to check and the half that makes the control safe to
+  offer (`fixed-306-summarise-up-to-here.png`).
+* Marking the same point a second time answered "Everything up to that point is
+  already summarised" rather than compacting again or failing.
+
+### What it found
+
+Nothing this round. The control was exercised on the path an owner takes and
+behaved as the entry records it.
 
 ---
 

@@ -85,6 +85,11 @@ class SessionCommandGrantRequest(BaseModel):
     ttl_minutes: int = 120
 
 
+class CompactConversationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    through_turn_id: str
+
+
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: str

@@ -1084,6 +1084,38 @@
     }
   }
 
+  // ── Backlog #9 — summarise up to here ────────────────────────────────
+  // Compaction was the threshold's decision: a conversation crossed 90% of the
+  // window and Raiker summarised the oldest exchanges it was allowed to. The
+  // owner is the one who knows the first forty turns were a digression, so this
+  // is the same operation started for a different reason. It shortens what the
+  // *model* is sent and removes nothing: every turn stays in the transcript,
+  // which is why the notice says so rather than asking for a confirmation.
+  let compactingTurn = $state<string | null>(null);
+
+  async function compactThroughTurn(turnId: string) {
+    if (sessionId === null || streaming) return;
+    compactingTurn = turnId;
+    projectNotice = null;
+    try {
+      const result = await api.compactConversation(sessionId, turnId);
+      projectNotice = result.compacted
+        ? `Summarised ${result.source_turn_count} earlier ${
+            result.source_turn_count === 1 ? "exchange" : "exchanges"
+          } for the model. Nothing was removed from this transcript.`
+        : result.reason_code === "nothing_to_summarise"
+          ? "Everything up to that point is already summarised."
+          : `That range could not be summarised (${result.reason_code}).`;
+    } catch (error) {
+      projectNotice =
+        error instanceof ApiError
+          ? `That range could not be summarised (${error.reasonCode ?? error.status}).`
+          : "That range could not be summarised.";
+    } finally {
+      compactingTurn = null;
+    }
+  }
+
   async function stopRunningTurn() {
     if (sessionId === null) return;
     try {
@@ -1526,6 +1558,10 @@
                 ? () => void branchFromTurn(turn.response?.turn_id ?? "")
                 : undefined}
               branching={branchingTurn === turn.response?.turn_id}
+              oncompact={turn.response?.turn_id
+                ? () => void compactThroughTurn(turn.response?.turn_id ?? "")
+                : undefined}
+              compacting={compactingTurn === turn.response?.turn_id}
             />
           {/if}
           <!-- BUG-208 slice F. An emoji used to be appended here, to the

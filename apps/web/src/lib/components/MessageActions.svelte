@@ -20,10 +20,16 @@
    *   disabled, when the surface cannot branch — a Build workspace conversation
    *   has nowhere to open a branch as itself, and a turn with no checkpoint has
    *   no point to branch from.
+   * * **Summarise up to here** — replaces everything up to and including this
+   *   turn with a summary, in what the *model* is sent. The transcript is not
+   *   touched: every turn stays on screen, stays exportable, and stays what a
+   *   branch is taken from. Absent, rather than disabled, where the surface
+   *   cannot compact.
    *
    * None of them re-runs a tool, re-uses an approval, or replays a governed
-   * action. They put text in a box, send text, or open a second conversation:
-   * everything that follows is governed exactly as it was the first time.
+   * action. They put text in a box, send text, open a second conversation, or
+   * shorten what the next turn carries: everything that follows is governed
+   * exactly as it was the first time.
    */
   import Icon from "./Icon.svelte";
 
@@ -34,6 +40,8 @@
     onretry,
     onbranch,
     branching = false,
+    oncompact,
+    compacting = false,
   }: {
     text: string;
     disabled?: boolean;
@@ -42,6 +50,9 @@
     /** Omitted where branching is not possible, so the control is absent. */
     onbranch?: () => void;
     branching?: boolean;
+    /** Omitted where compaction is not possible, so the control is absent. */
+    oncompact?: () => void;
+    compacting?: boolean;
   } = $props();
 
   let copied = $state<"idle" | "copied" | "failed">("idle");
@@ -89,6 +100,18 @@
       aria-label="Branch a second conversation from this point"
     >
       <Icon name="branch" size={13} /><span>{branching ? "Branching…" : "Branch"}</span>
+    </button>
+  {/if}
+  {#if oncompact}
+    <button
+      type="button"
+      class="msg-action"
+      disabled={disabled || compacting}
+      onclick={() => oncompact()}
+      aria-label="Summarise this conversation up to and including this message"
+      title="Shortens what the model is sent. Nothing is removed from this transcript."
+    >
+      <Icon name="fit" size={13} /><span>{compacting ? "Summarising…" : "Summarise up to here"}</span>
     </button>
   {/if}
 </div>

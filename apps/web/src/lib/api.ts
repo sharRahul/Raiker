@@ -19,6 +19,7 @@ import type {
   ContainedSubject,
   ContextUsage,
   ConversationBranch,
+  ConversationCompaction,
   ConversationBranchOrigin,
   ConversationBranchPlan,
   Checkpoint,
@@ -1271,6 +1272,11 @@ export const api = {
     postJson<ConversationBranch>(
       `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch`,
       { title },
+    ),
+  compactConversation: (sessionId: string, throughTurnId: string) =>
+    postJson<ConversationCompaction>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/compact`,
+      { through_turn_id: throughTurnId },
     ),
   conversationBranchOrigin: (sessionId: string) =>
     request<ConversationBranchOrigin>(

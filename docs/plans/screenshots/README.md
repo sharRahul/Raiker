@@ -69,6 +69,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `fixed-306-` | **2026-08-29**, the owner summarising a range through a chosen turn, with every turn still in the transcript afterwards | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-305-` | **2026-08-28**, the last three lifecycle hook events in the catalogue, two of them fired by a real tool-using turn, and the turn-end event across four providers | Anthropic (`claude-haiku-4-5-20251001`), OpenAI, OpenRouter, local Ollama (`gemma4:31b-cloud`) |
 | `pages/`, `fixed-299-`, refreshed `bug-225-` | **2026-08-28**, full responsive catalogue, owner skill commands in both composers, stored channel routes and exact approval-relay opt-in | Anthropic, OpenAI, OpenRouter and local Ollama, using credentials already managed through the interface |
 | `r0825-` | **2026-08-25**, a semantic space built against a real embedding call and then measured, the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at 390/768/1024/1440/1920 | Anthropic, OpenAI, OpenRouter and Ollama, every key entered through the interface |

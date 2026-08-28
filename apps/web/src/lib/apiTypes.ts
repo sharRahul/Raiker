@@ -1134,6 +1134,25 @@ export interface ConversationBranch {
 }
 
 /** Where a conversation came from. `source_session_id` is null for a root. */
+/**
+ * The result of an owner-guided compaction (backlog #9).
+ *
+ * `compacted: false` is a state rather than a failure: a mark already covered by
+ * an earlier boundary has nothing behind it to summarise, and the reason code
+ * says which case it was.
+ */
+export interface ConversationCompaction {
+  session_id: string;
+  compacted: boolean;
+  reason_code?: string;
+  through_turn_id?: string | null;
+  source_turn_count?: number;
+  estimated_summary_tokens?: number;
+  provider?: string;
+  model?: string;
+  created_at?: string;
+}
+
 export interface ConversationBranchOrigin {
   session_id: string;
   source_session_id: string | null;

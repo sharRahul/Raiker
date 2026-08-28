@@ -318,6 +318,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-303](#fixed-303--prompt-hooks-needed-a-model-call-without-a-private-authority-path) | Medium | Hooks / model governance / web UI | Fixed (was backlog #15, BUG-226 remainder; closed 2026-08-28) |
 | [FIXED-304](#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) | Medium | Hooks / Settings / web UI | Fixed (was backlog #14, first half; closed 2026-08-28) |
 | [FIXED-305](#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site) | Medium | Hooks / runtime / notifications / web UI | Fixed (closed backlog #14; closed 2026-08-28) |
+| [FIXED-306](#fixed-306--compaction-was-the-thresholds-decision-and-the-owner-had-no-say) | Medium | Chat / context / web UI | Fixed (closed backlog #9; closed 2026-08-29) |
 
 ---
 
@@ -13084,3 +13085,71 @@ lifecycle event was additionally driven on Anthropic, OpenAI, OpenRouter and loc
 Ollama, so these events are a property of the runtime rather than of one adapter.
 Recorded as the `fixed-305-` round in
 [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md#2026-08-28--the-last-three-lifecycle-hook-events-on-four-providers).
+
+---
+
+## FIXED-306 — Compaction was the threshold's decision and the owner had no say
+
+**Severity: Medium. Area: Chat / context / web UI. Closed 2026-08-29.**
+
+**Observed.** Raiker compacted a conversation when its replay crossed 90% of the
+model's context window, summarising the oldest completed exchanges it was allowed
+to and holding the newest two back. That is the right default. It was also the
+only option: an owner who knew that the first forty turns were a digression and
+the last four were the work had no way to say so, and paid for the digression in
+context on every later turn. Claude Code has offered `Summarize from here` /
+`up to here` for this reason; Raiker's context popover said plainly that it
+"never compacts the conversation", which was honest and was the gap.
+
+**Fixed.** **Summarise up to here** appears on any of the owner's own messages,
+beside Branch. It replaces everything up to and including that exchange with one
+summary *in what the model is sent*.
+
+The part that matters is what it reuses. Summarising and recording now live in
+one place — `ConversationCompactor` — and both reasons for starting a compaction
+go through it. `PreCompact` therefore decides on the owner's compaction exactly
+as it decides on the threshold's; the transcript is framed as untrusted data in
+both; the summary is bound to an exact turn id in both; the usage and the
+`PostCompact` announcement happen in both. A second implementation behind the
+route would have been the second route into a governed action that
+[§4.5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#45-a-second-route-into-a-governed-action)
+refuses — and, in practice, the half that quietly skipped the hook.
+
+Two deliberate differences from the automatic case, both because the owner asked:
+`RETAIN_NEWEST_EXCHANGES` is not applied, since an owner who marks the exchange
+they are in has said they want it summarised and holding two turns back would
+make the control lie about its name; and a mark that an earlier boundary already
+covers answers `compacted: false` with `nothing_to_summarise` rather than an
+error, because an owner who asks for something already true has not made a bad
+request.
+
+**Nothing is deleted.** Compaction changes only the messages a model is sent.
+Every turn stays in the transcript — on screen, in an export, and as the point a
+branch is taken from. The control says so in its own tooltip rather than relying
+on the owner to know it, because the alternative reading of "summarise up to
+here" is the frightening one.
+
+**User-interface outcome.** A fifth action on the owner's message, absent rather
+than disabled where the surface cannot compact. The result is reported in the
+owner's language — how many exchanges were summarised, and that nothing was
+removed — or as the exact reason it did not happen. The Chat guide's context
+section now documents it beside automatic compaction, and its action table no
+longer implies the context popover is the only compaction-related control.
+
+**Beyond-reference assessment: YES — meaningful improvement.** The control
+itself is parity with Claude Code. Raiker goes beyond the reference control set
+by making the owner's compaction answer to the same `PreCompact` decision the
+automatic one does, recording it as an ordinary audited compaction with
+`started_by: owner` rather than as an untracked UI convenience, and binding the
+summary to an exact turn id so replay stays deterministic. The reviewed
+documentation for Claude Cowork, ChatGPT Chat/Work, Codex, OpenClaw, DeepSeek
+Harness and Hermes Agent did not establish an owner-triggered summarisation that
+is hook-governed and audited on the same terms as the automatic path.
+
+**Evidence.** `tests/test_owner_guided_compaction.py` — the mark is inclusive and
+stops there, the newest exchanges are not withheld from it, a mark naming nothing
+left is a state rather than an error, the route writes the record the turn path
+would have written and deletes no turn, another principal's conversation is not
+found, and a `PreCompact` refusal stops the owner's compaction too.
+`apps/web/src/lib/components/MessageActions.test.ts` — the action is absent when
+it cannot work, carries the "removes nothing" claim, and cannot be pressed twice.

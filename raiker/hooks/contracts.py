@@ -22,6 +22,10 @@ HOOK_EVENTS = {
     "SubagentStop",
     "TaskCreated",
     "TaskCompleted",
+    "ConfigChange",
+    "Notification",
+    "PostToolBatch",
+    "InstructionsLoaded",
 }
 
 #: The events this build actually emits. `HOOK_EVENTS` is what a config file may
@@ -55,6 +59,10 @@ DISPATCHED_HOOK_EVENTS = {
     "SubagentStop",
     "TaskCreated",
     "TaskCompleted",
+    "ConfigChange",
+    "Notification",
+    "PostToolBatch",
+    "InstructionsLoaded",
 }
 
 #: One line per event, in the owner's language, for the surfaces that list them.
@@ -75,14 +83,18 @@ HOOK_EVENT_SUMMARIES = {
     "SubagentStop": "A subagent finished, with what it found and whether it succeeded.",
     "TaskCreated": "A task was created.",
     "TaskCompleted": "A task reached a terminal state — done, failed or cancelled.",
+    "ConfigChange": "Before an authenticated owner setting changes; values are never exposed.",
+    "Notification": "A notification reached the owner. The delivery has already happened.",
+    "PostToolBatch": "Every call in one proposed tool batch reached an outcome.",
+    "InstructionsLoaded": "The standing context a turn was given, as counts and source types.",
 }
 
 #: The one event whose decision the runtime honours. Every other event is
 #: observation only, so a handler that returns `deny` on `PostToolUse` changes
 #: nothing — which the hooks surface has to say rather than imply.
-DECIDING_HOOK_EVENTS = {"PreToolUse", "PreCompact"}
+DECIDING_HOOK_EVENTS = {"PreToolUse", "PreCompact", "ConfigChange"}
 
-HANDLER_TYPES = {"command", "builtin"}
+HANDLER_TYPES = {"command", "builtin", "prompt"}
 HOOK_DECISIONS = {"allow", "deny", "ask", "defer", "no_decision", "add_context_only"}
 # Highest authority first. A lower scope can never override a higher-scope deny.
 HOOK_SCOPES = ("managed", "user", "project", "local", "plugin", "skill", "session")
@@ -98,8 +110,11 @@ class HookHandler:
     type: str
     command: list[str] | None = None
     builtin: str | None = None
+    prompt: str | None = None
+    model: str | None = None
     args: list[str] = field(default_factory=list)
     timeout_ms: int = 5000
+    max_tokens: int = 256
     decision_authority: bool = False
 
     def __post_init__(self) -> None:
@@ -115,8 +130,16 @@ class HookHandler:
             raise HookConfigError("command_handler_requires_argv_list")
         if self.type == "builtin" and not self.builtin:
             raise HookConfigError("builtin_handler_requires_name")
+        if self.type == "prompt" and (
+            not isinstance(self.prompt, str) or not self.prompt.strip()
+        ):
+            raise HookConfigError("prompt_handler_requires_prompt")
+        if self.prompt is not None and len(self.prompt) > 4_000:
+            raise HookConfigError("prompt_handler_prompt_too_large")
         if self.timeout_ms <= 0:
             raise HookConfigError("hook_timeout_must_be_positive")
+        if not 1 <= self.max_tokens <= 1_024:
+            raise HookConfigError("prompt_handler_token_budget_out_of_range")
 
 
 @dataclass(frozen=True)

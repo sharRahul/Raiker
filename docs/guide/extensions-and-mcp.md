@@ -302,26 +302,44 @@ alone cannot show you:
   reported, because the schema and the emitted set are allowed to diverge again:
   a rule on an event a later build accepts before wiring parses cleanly and never
   runs, and would be shown as such rather than left looking enforcing.
-- **A rule that cannot change anything.** Only `PreToolUse` and `PreCompact`
-  decisions are honoured, and only from a handler holding decision authority — a
-  builtin always has it, a `command` handler only when you set
-  `"decision_authority": true`. Everything else observes. The tab labels each
-  rule **Can deny or ask** or **Observes only**, and warns when a rule names a
-  builtin this build does not have.
+- **A rule that cannot change anything.** Only `PreToolUse`, `PreCompact` and
+  `ConfigChange` decisions are honoured, and only from a handler holding decision
+  authority — a builtin always has it, a `command` handler only when you set
+  `"decision_authority": true`, and a `prompt` handler never does. Everything
+  else observes. The tab labels each rule **Can deny or ask** or **Observes
+  only**, and warns when a rule names a builtin this build does not have.
 
 The tab also lists every event a rule may name and every builtin handler that
 exists, because you are writing the file by hand and guessing a name produces a
-rule that fails every time it matches. There are sixteen events: the session
+rule that fails every time it matches. There are twenty events: the session
 starting and ending, a prompt being submitted, the turn's two possible endings
 (`Stop` when it produced an answer, `StopFailure` when it failed, was stopped, or
 is parked on an approval), compaction either side, every tool call and its
-approval outcomes, a delegation starting and stopping, and a task being created
-and reaching a terminal state.
+approval outcomes, the end of a proposed batch of them, a delegation starting and
+stopping, a task being created and reaching a terminal state, the standing
+context a turn was given, a notification reaching you, and an owner setting about
+to change.
 
-Two limits worth knowing before you write a rule. Only `PreToolUse` and
-`PreCompact` decisions change an outcome — every other event is observation, and
-the tab says which of the two a rule is. And a hook may only ever make an action
-**stricter**: it can deny a call or turn it into a decision, and nothing it
+Three of those are worth separating out, because they are the newest and the
+easiest to misread:
+
+- **`ConfigChange`** runs before an authenticated settings write and *can* refuse
+  it. It is told which setting keys changed and never what they changed to or
+  from. Your global hook off switch is above every rule: turning hooks off is the
+  one settings change no configured rule is consulted about.
+- **`InstructionsLoaded`** and **`PostToolBatch`** observe. The first says what
+  standing context a turn was assembled with — counts, source types and whether
+  it was truncated or redacted, never the content itself. The second fires once
+  per batch of tool calls the model proposed, after every call in it reached an
+  outcome, and says how many ran, how many were refused, whether they ran
+  concurrently, and whether the batch parked on an approval.
+- **`Notification`** observes a notification that has already been delivered. It
+  carries the kind and the ids, never the title or body.
+
+Two limits worth knowing before you write a rule. Only `PreToolUse`, `PreCompact`
+and `ConfigChange` decisions change an outcome — every other event is
+observation, and the tab says which a rule is. And a hook may only ever make an
+action **stricter**: it can deny a call or turn it into a decision, and nothing it
 returns can allow one the runtime refused.
 
 Every match, run, decision, timeout and failure is in **Observability → Audit

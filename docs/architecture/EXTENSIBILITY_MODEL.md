@@ -33,7 +33,7 @@ manifest, pairing, or managed policy.
 | Surface | What it extends | Registration | Execution path | Code state | Spec |
 |---|---|---|---|---|---|
 | **Tools** | New actions the agent can take | Tool broker registry | Broker → policy → (approval) → execute | ✅ built-in tools real; plugin tools planned | `docs/architecture/TOOLS_AND_PERMISSIONS_SPEC.md` |
-| **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/architecture/HOOKS_SPEC.md`, `raiker/hooks/` |
+| **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt, owner-setting change) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin` + `command` + bounded advisory `prompt`); `http`/`mcp_tool`/`agent` deferred | `docs/architecture/HOOKS_SPEC.md`, `raiker/hooks/` |
 | **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store; measured against the [Agent Skills standard](https://agentskills.io/specification) and **reported, never refused** | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills), including standard conformance and the deliberate refusal of `allowed-tools` | `docs/guide/extensions-and-mcp.md`, `docs/architecture/SELF_IMPROVEMENT_MODEL.md` |
 | **Plugins** | Bundles that contribute *through* the other surfaces | Plugin manifest + permission diff + supply-chain and signature checks | Each kind registers through the surface that already governs it; **no plugin code executes** | ✅ hook rules (`event:hook`), skills (`skill:contribute`, installed inactive) and MCP-server **offers** (`mcp:server`); revocation deletes what was contributed. Panels (BUG-228) and LSP (BUG-227) open | `docs/architecture/PLUGIN_SYSTEM_SPEC.md`, `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` |
 | **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist, signed with `X-Raiker-Signature` when a secret is set; inbound behind an owner secret, sender allowlisting, 60/min per sender, owner-stored routing, and separately enabled exact approval response | ✅ transport, owner surface, routing, and relay (`raiker/channels/`, Extensions → Channels; FIXED-298) | `docs/architecture/CHANNELS_SPEC.md` |
@@ -137,9 +137,10 @@ plan with execution disabled).
   routing now covers record-only, owner new turns, tool-free side questions and
   target-bound interrupt/steer. Approval response is separately enabled, exact,
   single-use, and local-only for critical or connector-write decisions.
-- **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
-  decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
-  `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.
+- **Hooks:** **implemented** (`raiker/hooks/`) — `builtin`, `command` and bounded tool-free
+  advisory `prompt` handlers, scoped config, decision authority, and lifecycle dispatch wired
+  through the broker, gateway and authenticated settings boundary. `http`, `mcp_tool` and
+  `agent` handlers are deferred until their gated surfaces exist.
 - **Skills:** **implemented** (`raiker/skills/`, `raiker/api/routes_skills.py`, Extensions →
   Skills). A skill is instruction text, never code Raiker executes, which is why it is the one
   surface with no capability gate of its own: it cannot add authority, so there is nothing to

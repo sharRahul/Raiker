@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-28 | Targeted | `fixed-305-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | The last three lifecycle hook events, on a real tool-using turn and across four providers |
 | 2026-08-28 | Full sweep + targeted | `pages/`, `fixed-299-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama — existing credentials managed through the Raiker interface | All 26 route/tab states at mobile, 1080p, 4K and 8K in both themes; channel routing and approval-relay controls; owner skill commands in Chat and Build; four-provider readiness from the Models UI |
 | 2026-08-25 | Targeted | `r0825-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | A semantic space built against a real embedding call — **and measured, which found the read half missing** — the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at five widths |
 | 2026-08-24 | Targeted | `r0824-` | Anthropic (`claude-haiku-4-5-20251001`) | What each capability switch actually decides, Agent Skills conformance on the Skills tab, and Auto's alignment check against a real turn |
@@ -50,6 +51,60 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-28 — the last three lifecycle hook events, on four providers
+
+**Tier: Targeted.** Chromium via Playwright at 1440 × 1000, light. **Providers:**
+Anthropic (`claude-haiku-4-5-20251001`), OpenAI, OpenRouter, and local Ollama
+(`gemma4:31b-cloud`). Every key was supplied to the runner as an environment
+variable for the length of the round and entered through the product's own
+Connect dialog; none was placed in source, a test fixture, or this document.
+**Prefix:** `fixed-305-`.
+
+### What it proved
+
+* `Notification`, `PostToolBatch` and `InstructionsLoaded` appear in the
+  Extensions → Hooks event catalogue, each tagged **Observes**, with no event in
+  the catalogue marked **Never fires**
+  (`fixed-305-lifecycle-event-catalogue.png`).
+* A `config/hooks.json` naming `InstructionsLoaded` and `PostToolBatch` loaded on
+  a running host, and both rules were reported as **Observes only** before any
+  turn ran.
+* One real tool-using Anthropic turn fired both events. The durable record
+  carries `hook_matched`, `hook_executed` and `hook_decision` for each, under the
+  turn's own id, with `no_decision` from the observing handler
+  (`fixed-305-lifecycle-hooks-fired-on-a-real-turn.png`).
+* The turn-end lifecycle event fired on a turn answered by each of Anthropic,
+  OpenAI, OpenRouter and Ollama, on a workspace per provider matrix — so the
+  lifecycle events are a property of the runtime rather than of one adapter.
+
+### What it found
+
+Two defects, both fixed in the same pass.
+
+**Recent hook activity named neither the event nor the handler.** Every row read
+as its verb and a relative time — "matched, just now" — which was legible while
+the build emitted a handful of events and is not at twenty: an owner watching for
+one rule could not tell whether the row that appeared was theirs. Both facts were
+already in the payload the row is built from, so the row now carries them as a
+label. Nothing is read from a hook's input or output, so the label cannot carry
+the content those payloads deliberately exclude.
+
+**A `fullPage` capture does not reach past the shell's own scroll container.**
+The first two captures of this round were byte-identical because both showed the
+top of the Hooks page, and the section each was named for was inside an inner
+scroll area the capture never reached. A screenshot that does not contain the
+thing it is named for is not evidence; the specs now scroll the section into view
+before capturing. Other live specs passing `fullPage: true` against this shell
+have the same limitation and are recorded in
+[`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-241--fullpage-screenshots-do-not-reach-past-the-app-shells-scroll-container).
+
+Sign-in against a workspace an earlier spec had already configured failed twice
+during this round, which is [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace)
+behaving exactly as recorded rather than a new defect. Each spec was given its
+own empty workspace.
 
 ---
 

@@ -74,14 +74,15 @@
 > semantics here follow that reference.
 >
 > Raiker's event list and handler types are a **subset**, not a superset. This
-> banner used to say the opposite. Raiker emits **16 of the 31**, and every one of
-> its 16 is one of the reference's; the 15 with no Raiker equivalent are `Setup`,
-> `UserPromptExpansion`, `PostToolBatch`, `Notification`, `MessageDisplay`,
-> `TeammateIdle`, `InstructionsLoaded`, `ConfigChange`, `CwdChanged`,
+> banner used to say the opposite. Raiker emits **20 of the 31**, and every one of
+> its 20 is one of the reference's; the 11 with no Raiker equivalent are `Setup`,
+> `UserPromptExpansion`, `MessageDisplay`,
+> `TeammateIdle`, `CwdChanged`,
 > `DirectoryAdded`, `FileChanged`, `WorktreeCreate`, `WorktreeRemove`,
 > `Elicitation` and `ElicitationResult`. Of the 5 handler types Raiker builds
-> `command`; `builtin` is Raiker's own in-process code and is not one of the five,
-> and the remaining four are refused at parse time (BUG-226).
+> `command` and bounded, tool-free `prompt`; `builtin` is Raiker's own in-process
+> code and is not one of the five, and `http`, `mcp_tool` and `agent` remain
+> refused at parse time (BUG-226 remainder).
 >
 > Two places Raiker is deliberately **not** aligned, and will not be:
 > a Raiker hook can return only `deny` or `ask` from an authoritative handler, so
@@ -93,6 +94,22 @@
 >
 > **Re-verified 2026-08-23** against the reference page itself: 31 events, 5
 > handler types, both counts and all 15 missing names unchanged.
+>
+> **Updated 2026-08-28.** `ConfigChange` and `prompt` now ship. The current
+> Claude Code reference also makes `ConfigChange` blockable, so the event is
+> parity rather than the differentiator this document previously claimed. The
+> improvement is Raiker's control set: only changed key names cross the hook
+> boundary, prompt output is advisory, content stays out of audit metadata, and
+> no hook can veto the owner's global off switch.
+>
+> **Updated 2026-08-28, second pass.** `Notification`, `PostToolBatch` and
+> `InstructionsLoaded` now ship too, which is every event the table below marked
+> **Add**. All three observe and none is in `DECIDING_HOOK_EVENTS`: each fires
+> after the thing it describes has already happened, so a decision there would be
+> a second authority path over work `PreToolUse` already governed. Twenty of
+> thirty-one is the ceiling this document said was worth aiming at, and it is now
+> reached; the eleven that remain are refused or not applicable rather than
+> pending.
 
 ### Which of the fifteen are worth adding
 
@@ -100,10 +117,10 @@ Parity is not the goal, so the fifteen are not one backlog item. Categorically:
 
 | Event | Verdict | Why |
 |---|---|---|
-| `ConfigChange` | **Add — YES, differentiator** | "The owner changed a setting" is a governance fact Raiker records nowhere as a hook. It is the one missing event that would let an owner enforce a rule about their *own* configuration drifting |
-| `Notification` | **Add — PARITY** | Raiker already has a notification path (`raiker/notify/`); it has no hook, so nothing can react to one |
-| `PostToolBatch` | **Add — PARITY** | Raiker executes validated read-only calls concurrently and already knows when a batch ends. The event exists in the runtime in all but name |
-| `InstructionsLoaded` | **Add — PARITY** | Project instructions are owner records rather than repository files, so the event is cheap and lets a hook see what standing context a turn got |
+| `ConfigChange` | **Added 2026-08-28 — PARITY event, YES control improvement** | Authenticated owner-setting writes can be refused before persistence; values are withheld and no rule can block the global off switch |
+| `Notification` | **Added 2026-08-28 — PARITY** | A delivered notification is now hookable; the kind and ids cross the boundary, never the title or body, and the dispatch is isolated so a failing handler cannot break the approval flow it describes |
+| `PostToolBatch` | **Added 2026-08-28 — PARITY** | Fires once per proposed batch after every call in it reached an outcome, with the tool names, the executed/refused counts, whether it ran concurrently and whether it parked on an approval |
+| `InstructionsLoaded` | **Added 2026-08-28 — PARITY** | Fires with the context bundle's own metadata-only payload — counts, source types, truncation and redaction flags — so a handler learns what standing context a turn got without being able to read it |
 | `FileChanged` | **Consider — NO, little advantage** | Raiker's mutations are approved and already emit events; a filesystem watcher would be a second, weaker source of the same fact |
 | `Elicitation`, `ElicitationResult` | **Blocked, not refused** | There is no mid-turn question surface to hook. If [backlog item 22](REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) is built, these follow it |
 | `Setup`, `UserPromptExpansion`, `MessageDisplay` | **NO — little advantage** | Each names a step in the reference's own harness rather than a boundary Raiker has |
@@ -111,10 +128,13 @@ Parity is not the goal, so the fifteen are not one backlog item. Categorically:
 | `CwdChanged`, `DirectoryAdded` | **N/A** | A Raiker session has one workspace, resolved once and confined |
 | `WorktreeCreate`, `WorktreeRemove` | **N/A** | Raiker has no worktree surface, deliberately — see [§2.8](REFERENCE_PLATFORM_COMPATIBILITY.md#28-coding-agent--raiker-build) |
 
-So of fifteen: **four worth adding**, two blocked behind a surface that does not
-exist, four not applicable to a single-owner local product, and five of little
-value. "Sixteen of thirty-one" is the honest count; "twenty of thirty-one" is the
-ceiling worth aiming at.
+So of the original fifteen: **four are added and none remains worth adding**, two
+are blocked behind a surface that does not exist, four are not applicable to a
+single-owner local product, and five are of little value. "Twenty of thirty-one"
+is now both the honest count and the ceiling this document set — the remaining
+eleven are refused, blocked or N/A on their own stated grounds rather than
+waiting to be built. `Elicitation` and `ElicitationResult` are the only two that
+could move, and only if the mid-turn question surface they need is built.
 
 Hooks let users, projects, plugins, administrators, and skills run controlled logic at lifecycle points in Raiker.
 
@@ -135,7 +155,7 @@ Raiker hooks must support lifecycle automation, policy enforcement, validation a
 | `command` | Local command or script | untrusted unless scoped |
 | `http` | HTTP endpoint | denied unless network enabled |
 | `mcp_tool` | MCP server tool | untrusted, brokered |
-| `prompt` | LLM prompt hook | untrusted model output |
+| `prompt` | One bounded call through the owner-selected provider, with no tools or nested hooks | advisory context only; never decision authority |
 | `agent` | Subagent hook | untrusted until policy-reviewed |
 | `builtin` | Raiker built-in handler | trusted internal code |
 
@@ -462,6 +482,26 @@ Required controls:
 - event logging;
 - test coverage;
 - managed-policy override.
+
+### Prompt handler boundary
+
+A `prompt` handler requires non-empty `prompt` text and may set `model`,
+`timeout_ms`, and `max_tokens` (1–1,024). The event's already-authorised provider
+is fixed; `model` can select only a model id within that provider, so a project
+hook cannot reach another provider credential. Event JSON is bounded and
+secret-redacted before egress, private routing fields are removed, tools are
+absent, reasoning is disabled, and the direct provider call dispatches no nested
+hook. Returned text is bounded and inserted as explicitly advisory system
+context. Prompt and response content never enter hook audit events.
+
+### ConfigChange boundary
+
+`ConfigChange` runs before an authenticated `/api/settings` write and can deny,
+ask or defer the mutation. It receives `source=user_settings`, a sorted list of
+changed leaf-key names and a count; it never receives old or new values. The
+owner's transition to `hooks.disabled=true` bypasses configured rules, because
+a project file must not be able to veto being turned off. External configuration
+file watching and the remaining sources are not claimed by this slice.
 
 ---
 

@@ -3783,7 +3783,11 @@ class DashboardService:
                             "target": (
                                 " ".join(handler.command)
                                 if handler.type == "command" and handler.command
-                                else (handler.builtin or "")
+                                else (
+                                    handler.builtin or ""
+                                    if handler.type == "builtin"
+                                    else (handler.model or "owner-selected model")
+                                )
                             ),
                             "timeout_ms": handler.timeout_ms,
                             # A builtin is Raiker's own code and always carries

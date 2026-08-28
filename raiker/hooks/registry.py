@@ -31,14 +31,22 @@ PLUGIN_HOOKS_FILE = "hooks.json"
 
 
 def _parse_handler(data: dict[str, Any]) -> HookHandler:
+    handler_type = str(data.get("type", ""))
     return HookHandler(
         id=str(data.get("id", "")),
-        type=str(data.get("type", "")),
+        type=handler_type,
         command=list(data["command"]) if isinstance(data.get("command"), list) else None,
         builtin=str(data["builtin"]) if data.get("builtin") is not None else None,
+        prompt=str(data["prompt"]) if data.get("prompt") is not None else None,
+        model=str(data["model"]) if data.get("model") is not None else None,
         args=[str(a) for a in data.get("args", [])],
         timeout_ms=int(data.get("timeout_ms", 5000)),
-        decision_authority=bool(data.get("decision_authority", False)),
+        max_tokens=int(data.get("max_tokens", 256)),
+        # A model's output is evidence, never authority. Even a project file that
+        # asks for it cannot turn an advisory prompt into a policy decision.
+        decision_authority=(
+            bool(data.get("decision_authority", False)) if handler_type != "prompt" else False
+        ),
     )
 
 

@@ -49,6 +49,12 @@ def notify_integrity_deviation(store: SQLiteStore, principal_id: str, count: int
         body=body,
     )
     fire_os_notification(title, body)
+    dispatch_notification_hook(
+        store,
+        owner_principal_id=principal_id,
+        kind=INTEGRITY_DEVIATION_KIND,
+        notification_id=notification_id,
+    )
     return notification_id
 
 
@@ -125,6 +131,13 @@ def notify_approval_pending(
     # Best-effort OS-level push. Isolated: a failure here never affects the row
     # above or the parked turn.
     fire_os_notification(title, body)
+    dispatch_notification_hook(
+        store,
+        owner_principal_id=owner_principal_id,
+        kind=APPROVAL_PENDING_KIND,
+        notification_id=notification_id,
+        subject_id=approval_id,
+    )
     return notification_id
 
 
@@ -165,4 +178,61 @@ def notify_critical_approval_pending(
         subject_id=approval_id,
     )
     fire_os_notification(title, body)
+    dispatch_notification_hook(
+        store,
+        owner_principal_id=owner_principal_id,
+        kind=CRITICAL_APPROVAL_PENDING_KIND,
+        notification_id=notification_id,
+        subject_id=approval_id,
+    )
     return notification_id
+
+
+def dispatch_notification_hook(
+    store: SQLiteStore,
+    *,
+    owner_principal_id: str,
+    kind: str,
+    notification_id: str,
+    subject_id: str = "",
+) -> None:
+    """Let a hook react to a notification that has already been delivered.
+
+    Observation only, and deliberately so. By the time this runs the row above is
+    written and, for an approval, the action is already parked — so there is no
+    outcome left for a handler to change, and a `deny` here would name a decision
+    the runtime cannot honour. `Notification` is therefore not in
+    ``DECIDING_HOOK_EVENTS``.
+
+    Isolated for the same reason :func:`fire_os_notification` is: a hook a
+    repository's own ``config/hooks.json`` introduced must never be able to break
+    the approval flow by failing, timing out, or having no model to call. The copy
+    that crosses the boundary stays metadata-only, exactly as the notification's
+    own does — the kind and the ids, never the title or body.
+    """
+    try:
+        from raiker.hooks.contracts import HookInput
+        from raiker.hooks.factory import dispatcher_for_workspace
+
+        dispatcher = dispatcher_for_workspace(
+            store, acting_principal_id=owner_principal_id
+        )
+        if not dispatcher.is_active():
+            return
+        session_id = f"notification_{owner_principal_id}"
+        dispatcher.dispatch(
+            HookInput(
+                event_name="Notification",
+                tool_name="notification",
+                context={
+                    "kind": kind,
+                    "notification_id": notification_id,
+                    "subject_id": subject_id,
+                },
+                session_id=session_id,
+            ),
+            session_id=session_id,
+            turn_id=None,
+        )
+    except Exception:
+        return

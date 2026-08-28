@@ -273,6 +273,39 @@ describe("Extensions → Hooks", () => {
     expect(within(builtins).getByText("block_destructive_shell")).toBeInTheDocument();
   });
 
+  it("presents prompt handlers as tool-free advisories, never decision authorities", async () => {
+    stubFetch(
+      routes(
+        hooks({
+          rule_count: 1,
+          rules: [
+            rule({
+              event: "UserPromptSubmit",
+              event_summary: "A prompt is submitted, before the turn runs.",
+              matcher: "*",
+              can_decide: false,
+              handlers: [
+                {
+                  id: "review-intent",
+                  type: "prompt",
+                  target: "owner-selected model",
+                  timeout_ms: 2500,
+                  decision_authority: false,
+                  available: true,
+                },
+              ],
+            }),
+          ],
+        }),
+      ),
+    );
+    render(ExtensionsView, { tab: "hooks" });
+
+    expect(await screen.findByText("tool-free model advisory")).toBeInTheDocument();
+    expect(screen.getByText(/per-handler timeout and token budget/i)).toBeInTheDocument();
+    expect(screen.queryByText("Can deny or ask")).not.toBeInTheDocument();
+  });
+
   it("keeps the rules listed when the owner turns hooks off", async () => {
     stubFetch(routes(hooks({ active: false, disabled: true, rule_count: 1, rules: [rule({})] })));
     render(ExtensionsView, { tab: "hooks" });

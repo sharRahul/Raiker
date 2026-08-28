@@ -36,20 +36,21 @@ alternative would be worse.
   consequential controls will not ship without visible confirmation and the
   same policy/audit route as typed controls.
 
-- **Hooks cover half the reference lifecycle; plugins are two kinds short;
+- **Hooks cover part of the reference lifecycle; plugins are two kinds short;
   channels stop below routing.** Of the three extension surfaces Claude Code
   ships:
 
-  **Hooks** are complete against *Raiker's own* event list and half-covered
-  against the reference. All sixteen events Raiker's format accepts are emitted,
-  `PreToolUse` and `PreCompact` decisions are honoured, and both `builtin` and
-  `command` handlers execute under a bounded timeout with the program resolved
+  **Hooks** are complete against *Raiker's own* event list and partly covered
+  against the reference. All twenty events Raiker's format accepts are emitted,
+  `PreToolUse`, `PreCompact` and `ConfigChange` decisions are honoured, and
+  `builtin`, `command` and bounded tool-free `prompt` handlers execute with
+  explicit limits; command programs remain resolved
   inside the workspace. **Turn every hook off** on the Hooks tab stops all of them
   at once and is your setting rather than a fourth config file, so a
   `config/hooks.json` that arrived with a repository cannot re-enable itself. Of
-  the five handler types in the reference format, `command` is built and four are
-  not: `http`, `mcp_tool`, `prompt` and `agent` need network, model and subagent
-  surfaces that are still gated. Claude Code
+  the five handler types in the reference format, `command` and `prompt` are built
+  and three are not: `http`, `mcp_tool` and `agent` need network, broker and
+  subagent surfaces that are still gated. Claude Code
   [documents all five](https://code.claude.com/docs/en/hooks), so this is a real
   gap rather than a gap against Raiker's own document. (Raiker's second handler
   type, `builtin`, is its own in-process code and is not one of the five.)
@@ -373,13 +374,17 @@ on the shipped build, not estimated.
   production signing anchor, so live egress bypass, credential delivery/merge
   and publisher verification remain unavailable rather than configuration-
   enabled. PTY and restart reattachment are POSIX-only; see BUG-194.
-- **Hooks cover half the reference lifecycle; channels stop short of routing.**
-  Every event Raiker's own format accepts is emitted — sixteen — with an owner off
+- **Hooks cover part of the reference lifecycle; channels stop short of routing.**
+  Every event Raiker's own format accepts is emitted — twenty — with an owner off
   switch and a page that states which rules actually enforce. Measured against
   [Claude Code's thirty-one](https://code.claude.com/docs/en/hooks) that is
-  **sixteen of thirty-one**. Two handler types run — `command`, and Raiker's own
-  in-process `builtin` — but of the five the reference *format* specifies, only
-  `command` is built. Plugins contribute
+  **twenty of thirty-one**, which is the ceiling
+  [`HOOKS_SPEC.md`](../architecture/HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding)
+  assessed as worth reaching: of the eleven left, two are blocked behind a
+  mid-turn question surface that does not exist, four do not apply to a
+  single-owner local product, and five were judged of little value. Three handler types run — `command`, bounded
+  tool-free `prompt`, and Raiker's own in-process `builtin` — so two of the five
+  reference types are built. Plugins contribute
   hook rules, skills and MCP-server offers; panels and LSP servers do not, and
   four kinds Claude Code has — subagents, monitors, `bin/` executables, themes —
   Raiker

@@ -89,6 +89,7 @@ class ModelRouter:
         reasoning: ReasoningOptions | None = None,
         response_schema: dict[str, object] | None = None,
         response_schema_name: str = "raiker_response",
+        max_tokens: int | None = None,
     ) -> ModelRequest:
         return ModelRequest(
             profile.profile_id,
@@ -97,7 +98,9 @@ class ModelRouter:
             messages,
             tools,
             temperature=float(profile.raw.get("temperature", 0.2)),
-            max_tokens=int(profile.raw.get("max_tokens", 1024)),
+            max_tokens=(
+                max_tokens if max_tokens is not None else int(profile.raw.get("max_tokens", 1024))
+            ),
             stream=stream,
             tool_call_mode=str(profile.raw.get("tool_call_mode", "text_json")),
             reasoning=reasoning if reasoning is not None else self.reasoning,
@@ -116,6 +119,7 @@ class ModelRouter:
         reasoning: ReasoningOptions | None = None,
         response_schema: dict[str, object] | None = None,
         response_schema_name: str = "raiker_response",
+        max_tokens: int | None = None,
     ) -> ModelResponse:
         profile = self._profile(provider, model)
         model_provider = self._factory(profile).create(profile)
@@ -129,6 +133,7 @@ class ModelRouter:
             reasoning=reasoning,
             response_schema=response_schema,
             response_schema_name=response_schema_name,
+            max_tokens=max_tokens,
         )
         try:
             return await model_provider.chat(request)

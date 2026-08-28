@@ -315,6 +315,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-300](#fixed-300--the-mlx-runtime-test-assumed-posix-path-rendering-on-windows) | Low | Test portability / MLX | Fixed (found during release verification; closed 2026-08-28) |
 | [FIXED-301](#fixed-301--every-memory-recall-rebuilt-and-linearly-scanned-the-entire-vector-space) | High | Memory / retrieval scale / web UI | Fixed (was backlog #5; closed 2026-08-28) |
 | [FIXED-302](#fixed-302--memory-permission-loading-was-presented-as-a-permission-read-failure) | Low | Memory / web UI | Fixed (found during live vector-retrieval verification; closed 2026-08-28) |
+| [FIXED-303](#fixed-303--prompt-hooks-needed-a-model-call-without-a-private-authority-path) | Medium | Hooks / model governance / web UI | Fixed (was backlog #15, BUG-226 remainder; closed 2026-08-28) |
+| [FIXED-304](#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) | Medium | Hooks / Settings / web UI | Fixed (was backlog #14, first half; closed 2026-08-28) |
+| [FIXED-305](#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site) | Medium | Hooks / runtime / notifications / web UI | Fixed (closed backlog #14; closed 2026-08-28) |
 
 ---
 
@@ -12918,3 +12921,166 @@ store posture.
 
 **Evidence.** `apps/web/src/lib/views/MemoryView.test.ts` and
 `apps/web/e2e/memory-vector-index-live.spec.ts` against a real local instance.
+
+---
+
+## FIXED-303 — Prompt hooks needed a model call without a private authority path
+
+**Severity: Medium. Area: Hooks / model governance / web UI. Closed 2026-08-28.**
+
+**Observed.** Raiker accepted only `command` and its own `builtin` hook handlers.
+Claude Code, DeepSeek Harness and Hermes expose model-facing hook or context
+injection paths, while a Raiker hook could not ask the owner's selected model for
+a bounded advisory review. Placing a normal model turn inside the hook dispatcher
+would have created recursion, tools, an unstated token budget and a second route
+to provider credentials.
+
+**Fixed.** A `prompt` handler now makes one direct, tool-free call through the
+already-authorised owner-selected provider. Each handler has a positive timeout
+and 1–1,024-token budget. Event JSON is bounded, secret-redacted and stripped of
+private routing fields; the call disables reasoning, never dispatches nested
+hooks, and its optional model id cannot select another provider. Output is
+bounded advisory context: `decision_authority` is forced off even when a project
+file asks for it. Audit records provider/model/token metadata, never instruction,
+event or response content.
+
+**User-interface outcome.** Extensions → Hooks labels prompt rules “tool-free
+model advisory,” identifies the owner-selected model, and states the timeout,
+budget, non-nesting and authority contract alongside the handler catalogue.
+
+**Beyond-reference assessment: YES — meaningful improvement.** The handler
+type is parity with Claude Code, while model-facing context hooks are also
+present in DeepSeek Harness and Hermes. Raiker goes beyond the reference control
+set by preserving user-owned provider choice, redacting and bounding model
+input, making model judgment structurally advisory, exposing no tools, refusing
+provider widening, and omitting content from the audit trail. Official OpenAI
+documentation reviewed for Codex and ChatGPT Work did not establish an
+equivalent configurable prompt-hook contract.
+
+**Evidence.** `tests/test_hooks.py`, `tests/test_hooks_surface.py`,
+`tests/test_hooks_lifecycle.py`, and
+`apps/web/src/lib/views/ExtensionsHooks.test.ts`.
+
+---
+
+## FIXED-304 — Owner-setting changes had no hookable governance boundary
+
+**Severity: Medium. Area: Hooks / Settings / web UI. Closed 2026-08-28.**
+
+**Observed.** Authenticated settings writes persisted directly. A hook could
+govern a tool call, task or compaction, but could neither observe nor refuse a
+change to the owner's runtime posture. The comparison plan called this a
+differentiator; the current Claude Code reference now documents a blockable
+`ConfigChange`, making the event itself parity work.
+
+**Fixed.** `ConfigChange` runs before `/api/settings` and composer-mode writes.
+It receives only the source, sorted changed leaf-key names and their count—never
+old or new values—and is audited through the same scoped dispatcher. Deny, ask
+and defer fail the write closed. The owner's global hook-off transition bypasses
+all configured rules, so a project cannot preserve its own execution by vetoing
+the kill switch. The Extensions event catalogue derives the new event from its
+real call site and marks it as deciding.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Blocking a
+configuration change is now parity with Claude Code. Raiker's improvement is the
+combined control contract: value-free input, secret-redacted key names,
+managed-to-session scope precedence, append-only evidence, a visible deciding
+label, and a kill switch no lower-scope rule can block. DeepSeek Harness,
+Hermes, OpenClaw, and the official OpenAI Codex/ChatGPT Work documentation
+reviewed for this pass did not establish that combined contract.
+
+**Evidence.** `tests/test_routes_settings.py`, `tests/test_hooks_surface.py`,
+and `apps/web/src/lib/views/ExtensionsHooks.test.ts`.
+
+---
+
+## FIXED-305 — The three remaining worth-adding hook events had no call site
+
+**Severity: Medium. Area: Hooks / runtime / notifications / web UI. Closed
+2026-08-28.**
+
+**Observed.** [`HOOKS_SPEC.md`](../architecture/HOOKS_SPEC.md#which-of-the-fifteen-are-worth-adding)
+assessed each of the fifteen reference events Raiker did not emit and marked
+exactly four **Add**. FIXED-304 shipped one of them. The other three —
+`Notification`, `PostToolBatch` and `InstructionsLoaded` — were still absent, and
+each named a boundary the runtime already crossed without announcing it: a
+notification row was written and delivered, a proposed batch of tool calls
+reached its last outcome, and a turn's standing context was assembled and handed
+to the model. Nothing could react to any of the three. Backlog item 14 was
+therefore closed against its own criterion only in part, and the honest count
+stayed at seventeen of thirty-one against a stated ceiling of twenty.
+
+**Fixed.** All three now dispatch, and all three observe. None is in
+`DECIDING_HOOK_EVENTS`, because each fires after the thing it describes has
+already happened: a decision there would be a second authority path over work
+`PreToolUse` had already governed, which is the inversion
+[§4.3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#43-a-hook-that-can-grant)
+refuses.
+
+* `Notification` fires from one shared helper in `raiker/notify/approval_notifier.py`,
+  called by all three notification paths — approval pending, critical approval
+  pending, and integrity deviation. It carries the kind, the notification id and
+  the subject id, and never the title, body, tool name or criterion. The whole
+  dispatch is isolated exactly as `fire_os_notification` is, so a handler that
+  fails, times out, or has no model to call cannot break the approval flow it is
+  reporting on.
+* `PostToolBatch` fires once per batch the model proposed, after every call in it
+  reached an outcome, with the tool names, the call count, the executed and
+  refused counts, whether the batch ran concurrently, and whether it parked on an
+  approval. A turn that proposed no tool call fires nothing, so a handler
+  counting a turn's work counts batches rather than turns.
+* `InstructionsLoaded` fires with the context bundle's own metadata-only event
+  payload — counts, source types, and the truncation and redaction flags. Item
+  content never crosses the boundary, so a `command` handler a repository's
+  `config/hooks.json` introduced cannot read the owner's project instructions,
+  recalled memories or attached documents out of it.
+
+**User-interface outcome.** Extensions → Hooks derives its event catalogue from
+the runtime, so all three appear with their owner-language summary and an
+**Observes** tag without a change to the panel.
+
+Live verification found the panel's other half was not ready for twenty events.
+**Recent hook activity** listed every row as its verb and a relative time —
+"matched, just now" — with no indication of which event or which handler. That is
+legible while a build emits a handful of events and is not at twenty: an owner
+watching for one rule could not tell whether the row that appeared was theirs.
+Both facts were already in the payload each row is built from, so a row now
+carries them as its summary — `PostToolBatch · lifecycle-watch` — with the verb
+left to the tag it already had. Nothing is read from a hook's own input or
+output, so the label cannot carry the content those payloads deliberately
+exclude.
+
+The extensions guide was corrected in the same pass: it had said there were
+sixteen events and that only `PreToolUse` and `PreCompact` decide, both of which
+had been wrong since FIXED-304, and it now names the twenty and separates the
+decider from the three observers.
+
+**Beyond-reference assessment: PARITY on the events; YES — meaningful
+improvement on the control set.** All three events exist in Claude Code, so
+emitting them is parity and is recorded as such. What Raiker adds is what crosses
+the boundary: every one of the three carries counts, kinds and identifiers rather
+than content, which is the property that decides whether a hook is an observation
+surface or a second read path around redaction. The reviewed documentation for
+Claude Cowork, ChatGPT Chat/Work, Codex, OpenClaw, DeepSeek Harness and Hermes
+Agent did not establish an equivalent content-free contract for lifecycle
+observation, nor a notification hook isolated from the approval flow it reports.
+This closes backlog item 14 and reaches the twenty-of-thirty-one ceiling
+`HOOKS_SPEC.md` set; the eleven events that remain are refused, not applicable to
+a single-owner product, or blocked behind a mid-turn question surface that does
+not exist.
+
+**Evidence.** `tests/test_hooks_lifecycle.py` — eight tests covering each call
+site, the content-free payloads, the once-per-batch and no-batch cases, the
+owner kill switch, a notification that survives a hook subsystem that raises, and
+the activity label. `tests/test_hooks_surface.py` derives the dispatched set from
+the source and asserts it equals the published one.
+
+`apps/web/e2e/fixed-305-lifecycle-hooks-live.spec.ts` against a real host: the
+catalogue offers all three as **Observes** with nothing marked never-firing, both
+configured rules load as **Observes only**, and one real tool-using Anthropic turn
+leaves `hook_matched`, `hook_executed` and `hook_decision` for
+`InstructionsLoaded` and `PostToolBatch` under the turn's own id. The turn-end
+lifecycle event was additionally driven on Anthropic, OpenAI, OpenRouter and local
+Ollama, so these events are a property of the runtime rather than of one adapter.
+Recorded as the `fixed-305-` round in
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md#2026-08-28--the-last-three-lifecycle-hook-events-on-four-providers).

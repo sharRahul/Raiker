@@ -362,6 +362,7 @@ EVENT_TYPES = {
     "hook_decision",
     "hook_failed",
     "hook_timeout",
+    "hook_context_added",
     "review_started",
     "review_completed",
     "review_failed",

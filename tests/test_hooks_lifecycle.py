@@ -379,3 +379,338 @@ def test_a_failed_delegation_still_fires_its_stop(
     )
 
     assert "hook_executed" in _hook_events(SQLiteStore(workspace), "sess_spawn")
+
+
+# ── Notification / PostToolBatch / InstructionsLoaded (FIXED-305) ────────────
+#
+# The three events that close backlog #14. All three observe: each fires after
+# the thing it describes has already happened, so what is proved here is that the
+# call site runs and that the payload it carries is metadata, not content. A
+# handler that could read a turn's standing context or a notification's body out
+# of these would be a new way for a repository's `config/hooks.json` to reach
+# what the owner's own surfaces redact.
+
+
+def _notification_session(principal_id: str = OWNER_PRINCIPAL) -> str:
+    """The synthetic session a notification's audit rows are written under."""
+    return f"notification_{principal_id}"
+
+
+def test_an_approval_notification_fires_notification(workspace: Path) -> None:
+    from raiker.notify.approval_notifier import notify_approval_pending
+
+    _write_hooks(workspace, "Notification")
+    store = SQLiteStore(workspace)
+
+    notification_id = notify_approval_pending(
+        store,
+        acting_principal_id=OWNER_PRINCIPAL,
+        approval_id="apr_1",
+        tool_name="write_file",
+        risk_level="high",
+    )
+
+    assert notification_id is not None
+    assert "hook_executed" in _hook_events(store, _notification_session())
+
+
+def test_a_notification_hook_carries_the_kind_and_ids_and_no_copy(
+    workspace: Path,
+) -> None:
+    # The notification's own title and body are owner-facing copy, and the tool
+    # name and criterion are in it. A `command` handler a repository introduced
+    # must not be able to read any of that, so the dispatched context is asserted
+    # field by field rather than by shape.
+    from raiker.hooks.contracts import HookInput
+    from raiker.hooks.dispatcher import HookDispatcher
+    from raiker.notify.approval_notifier import notify_critical_approval_pending
+
+    _write_hooks(workspace, "Notification")
+    store = SQLiteStore(workspace)
+    seen: list[HookInput] = []
+    original = HookDispatcher.dispatch
+
+    def record(self: HookDispatcher, hook_input: HookInput, **rest: Any) -> Any:
+        seen.append(hook_input)
+        return original(self, hook_input, **rest)
+
+    HookDispatcher.dispatch = record  # type: ignore[method-assign]
+    try:
+        notify_critical_approval_pending(
+            store,
+            acting_principal_id=OWNER_PRINCIPAL,
+            approval_id="apr_critical",
+            tool_name="delete_file",
+            criterion="irreversible",
+            risk_level="critical",
+        )
+    finally:
+        HookDispatcher.dispatch = original  # type: ignore[method-assign]
+
+    assert len(seen) == 1
+    context = seen[0].context
+    assert context["kind"] == "critical_approval_pending"
+    assert context["subject_id"] == "apr_critical"
+    assert set(context) == {"kind", "notification_id", "subject_id"}
+    # Nothing from the owner-facing copy reached the handler.
+    blob = json.dumps(context)
+    assert "delete_file" not in blob
+    assert "irreversible" not in blob
+
+
+def test_a_failing_notification_hook_never_breaks_the_notification(
+    workspace: Path,
+) -> None:
+    # The module's standing contract: a hook failure must not affect the approval
+    # flow. The notification row and its id are the flow's output, so both have to
+    # survive a dispatcher that raises on construction.
+    from raiker.hooks import factory
+    from raiker.notify.approval_notifier import notify_approval_pending
+
+    _write_hooks(workspace, "Notification")
+    store = SQLiteStore(workspace)
+    original = factory.dispatcher_for_workspace
+
+    def explode(*_args: Any, **_kwargs: Any) -> Any:
+        raise RuntimeError("hook subsystem is down")
+
+    factory.dispatcher_for_workspace = explode  # type: ignore[assignment]
+    try:
+        notification_id = notify_approval_pending(
+            store,
+            acting_principal_id=OWNER_PRINCIPAL,
+            approval_id="apr_2",
+            tool_name="write_file",
+        )
+    finally:
+        factory.dispatcher_for_workspace = original  # type: ignore[assignment]
+
+    assert notification_id is not None
+    assert store.list_notifications(OWNER_PRINCIPAL)
+
+
+def test_the_owner_switch_stops_the_notification_event(workspace: Path) -> None:
+    from raiker.notify.approval_notifier import notify_approval_pending
+
+    _write_hooks(workspace, "Notification")
+    store = SQLiteStore(workspace)
+    store.put_user_settings(
+        OWNER_PRINCIPAL, json.dumps({"hooks": {"disabled": True}}), utc_now()
+    )
+
+    notify_approval_pending(
+        store,
+        acting_principal_id=OWNER_PRINCIPAL,
+        approval_id="apr_3",
+        tool_name="write_file",
+    )
+
+    assert _hook_events(store, _notification_session()) == []
+
+
+class _ScriptedRouter:
+    """A model whose turn is fixed in advance, so the turn under test is the runtime's."""
+
+    def __init__(self, responses: list[Any]) -> None:
+        self._responses = responses
+        self._calls = 0
+
+    def chat(self, provider: str, model: str, messages: Any, tools: Any = None) -> Any:
+        index = min(self._calls, len(self._responses) - 1)
+        self._calls += 1
+        return self._responses[index]
+
+    async def achat(
+        self, provider: str, model: str, messages: Any, tools: Any = None, **_: Any
+    ) -> Any:
+        return self.chat(provider, model, messages, tools)
+
+
+def _turn(workspace: Path, responses: list[Any]) -> tuple[Any, str]:
+    """Run one real turn with hooks attached, and return the orchestrator and session id."""
+    from raiker.contracts.ids import new_id
+    from raiker.contracts.models import (
+        ClientMetadata,
+        PromptEnvelope,
+        PromptOptions,
+        PromptPayload,
+        UserMetadata,
+    )
+    from raiker.hooks.factory import dispatcher_for_workspace
+    from raiker.policy.config import StaticPolicyConfig
+    from raiker.policy.engine import PolicyEngine
+    from raiker.runtime.identity.lifecycle import TurnMachineIdentityLifecycle
+    from raiker.runtime.orchestrator import RuntimeOrchestrator
+    from raiker.tools.broker import ToolBroker
+
+    store = SQLiteStore(workspace)
+    writer = EventLogWriter(store)
+    broker = ToolBroker(
+        workspace_root=workspace,
+        policy_engine=PolicyEngine(StaticPolicyConfig(workspace)),
+        store=store,
+        writer=writer,
+        hook_dispatcher=dispatcher_for_workspace(store, acting_principal_id=OWNER_PRINCIPAL),
+        principal_id=OWNER_PRINCIPAL,
+    )
+    orchestrator = RuntimeOrchestrator(
+        workspace_root=workspace,
+        writer=writer,
+        tool_broker=broker,
+        model_router=_ScriptedRouter(responses),  # type: ignore[arg-type]
+    )
+    envelope = PromptEnvelope(
+        request_id=new_id("req_"),
+        session_id=new_id("sess_"),
+        turn_id=new_id("turn_"),
+        client=ClientMetadata(type="test_harness", name="tests", version="0.0.0"),
+        user=UserMetadata(),
+        prompt=PromptPayload(text="List the files."),
+        options=PromptOptions(max_tool_calls=10, approval_mode="manual"),
+    )
+    store.create_session(envelope.session_id, str(workspace))
+    store.insert_turn(envelope.session_id, envelope.turn_id, envelope.prompt.text)
+    identity = TurnMachineIdentityLifecycle(workspace, store, writer).start(
+        owner_principal_id=OWNER_PRINCIPAL,
+        session_id=envelope.session_id,
+        turn_id=envelope.turn_id,
+        role_ids=("assistant",),
+    )
+    orchestrator.handle(envelope, identity=identity)
+    return orchestrator, envelope.session_id
+
+
+def _hook_contexts(event_name: str) -> tuple[list[dict[str, Any]], Any]:
+    """Record every dispatched context for one event, and the undo for the patch."""
+    from raiker.hooks.contracts import HookInput
+    from raiker.hooks.dispatcher import HookDispatcher
+
+    contexts: list[dict[str, Any]] = []
+    original = HookDispatcher.dispatch
+
+    def record(self: HookDispatcher, hook_input: HookInput, **rest: Any) -> Any:
+        if hook_input.event_name == event_name:
+            contexts.append(dict(hook_input.context))
+        return original(self, hook_input, **rest)
+
+    HookDispatcher.dispatch = record  # type: ignore[method-assign]
+    return contexts, original
+
+
+def test_a_turn_fires_instructionsloaded_with_counts_and_no_content(
+    workspace: Path,
+) -> None:
+    from raiker.hooks.dispatcher import HookDispatcher
+    from raiker.models.contracts import ModelResponse
+
+    (workspace / "secret-note.md").write_text("launch code 12345", encoding="utf-8")
+    _write_hooks(workspace, "InstructionsLoaded")
+    contexts, original = _hook_contexts("InstructionsLoaded")
+    try:
+        _orchestrator, session_id = _turn(
+            workspace, [ModelResponse(text="Nothing to do.", finish_reason="stop")]
+        )
+    finally:
+        HookDispatcher.dispatch = original  # type: ignore[method-assign]
+
+    assert "hook_executed" in _hook_events(SQLiteStore(workspace), session_id)
+    assert len(contexts) == 1
+    context = contexts[0]
+    # The bundle's own metadata-only payload, and nothing beyond it.
+    assert "included_count" in context
+    assert "source_types" in context
+    assert "items" not in context
+    assert "launch code" not in json.dumps(context)
+
+
+def test_a_tool_batch_fires_posttoolbatch_once_with_its_shape(workspace: Path) -> None:
+    from raiker.hooks.dispatcher import HookDispatcher
+    from raiker.models.contracts import ModelResponse, ToolCallProposal
+
+    (workspace / "README.md").write_text("hi", encoding="utf-8")
+    _write_hooks(workspace, "PostToolBatch")
+    contexts, original = _hook_contexts("PostToolBatch")
+    try:
+        _orchestrator, session_id = _turn(
+            workspace,
+            [
+                ModelResponse(
+                    text="",
+                    tool_calls=[
+                        ToolCallProposal(
+                            call_id="call_ls",
+                            tool_name="list_directory",
+                            arguments={"path": "."},
+                        ),
+                        ToolCallProposal(
+                            call_id="call_ls2",
+                            tool_name="list_directory",
+                            arguments={"path": "."},
+                        ),
+                    ],
+                    finish_reason="tool_calls",
+                ),
+                ModelResponse(text="Here are the files.", finish_reason="stop"),
+            ],
+        )
+    finally:
+        HookDispatcher.dispatch = original  # type: ignore[method-assign]
+
+    assert "hook_executed" in _hook_events(SQLiteStore(workspace), session_id)
+    # One event for the one batch the model proposed, not one per call.
+    assert len(contexts) == 1
+    context = contexts[0]
+    assert context["call_count"] == 2
+    assert context["tool_names"] == ["list_directory", "list_directory"]
+    assert context["executed_count"] == 2
+    assert context["refused_count"] == 0
+    assert context["parked_for_approval"] is False
+    # Two independent reads are evaluated together, and the handler is told so.
+    assert context["concurrent"] is True
+
+
+def test_a_turn_with_no_tool_call_fires_no_posttoolbatch(workspace: Path) -> None:
+    # The event describes a batch. A turn that proposed none has no batch to
+    # report, and firing an empty one would make a handler that counts a turn's
+    # work count turns instead.
+    from raiker.hooks.dispatcher import HookDispatcher
+    from raiker.models.contracts import ModelResponse
+
+    _write_hooks(workspace, "PostToolBatch")
+    contexts, original = _hook_contexts("PostToolBatch")
+    try:
+        _turn(workspace, [ModelResponse(text="No tools needed.", finish_reason="stop")])
+    finally:
+        HookDispatcher.dispatch = original  # type: ignore[method-assign]
+
+    assert contexts == []
+
+
+def test_an_activity_row_names_the_event_and_the_handler(workspace: Path) -> None:
+    """The Hooks tab lists rows by verb and time; at twenty events that is not enough.
+
+    An owner watching for one rule could not tell whether the row that just
+    appeared was theirs. Both facts that answer it are already in the payload the
+    row is built from, so the summary is a label rather than new data — and it is
+    asserted through `DashboardService`, which is the object the page reads.
+    """
+    from raiker.notify.approval_notifier import notify_approval_pending
+
+    _write_hooks(workspace, "Notification")
+    store = SQLiteStore(workspace)
+    notify_approval_pending(
+        store,
+        acting_principal_id=OWNER_PRINCIPAL,
+        approval_id="apr_summary",
+        tool_name="write_file",
+    )
+
+    activity = DashboardService(workspace).list_hooks(OWNER_PRINCIPAL)["activity"]
+    summaries = {str(entry["summary"] or "") for entry in activity}
+
+    # The verb is the row's tag, not part of the label.
+    assert "Notification" in summaries
+    assert "Notification · watch-Notification" in summaries
+    # The label is built from the row's own metadata, never from a hook's input
+    # or output — so it cannot carry the content those payloads exclude.
+    assert not any("apr_summary" in summary for summary in summaries)

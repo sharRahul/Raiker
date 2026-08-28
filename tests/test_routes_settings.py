@@ -6,6 +6,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
+from raiker.hooks.contracts import HookOutcome
 
 
 @pytest.fixture()
@@ -137,3 +138,70 @@ def test_composer_approval_mode_rejects_unknown_value(client: TestClient) -> Non
     )
 
     assert response.status_code == 422
+
+
+def test_config_change_hook_can_refuse_settings_without_receiving_values(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = _token(client, "alice")
+    observed = []
+
+    class DenyingDispatcher:
+        def is_active(self) -> bool:
+            return True
+
+        def dispatch(self, hook_input, **_kwargs):  # type: ignore[no-untyped-def]
+            observed.append(hook_input)
+            return HookOutcome(decision="deny", reasons=["settings_change_refused"])
+
+    monkeypatch.setattr(
+        "raiker.api.routes_settings.dispatcher_for_workspace",
+        lambda *_args, **_kwargs: DenyingDispatcher(),
+    )
+
+    response = client.put(
+        "/api/settings",
+        json={"settings": {"personalisation": {"theme": "dark"}, "token": "never-log-me"}},
+        headers=_h(token),
+    )
+
+    assert response.status_code == 409
+    assert response.json()["detail"] == "settings_change_refused"
+    assert client.get("/api/settings", headers=_h(token)).json()["settings"] == {}
+    assert observed[0].event_name == "ConfigChange"
+    assert observed[0].context == {
+        "source": "user_settings",
+        "changed_keys": ["personalisation.theme", "token"],
+        "changed_key_count": 2,
+    }
+    assert "never-log-me" not in repr(observed[0])
+
+
+def test_config_change_hook_cannot_prevent_owner_turning_hooks_off(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = _token(client, "alice")
+
+    class DenyingDispatcher:
+        def is_active(self) -> bool:
+            return True
+
+        def dispatch(self, *_args, **_kwargs):  # type: ignore[no-untyped-def]
+            return HookOutcome(decision="deny", reasons=["project_wants_to_stay_on"])
+
+    monkeypatch.setattr(
+        "raiker.api.routes_settings.dispatcher_for_workspace",
+        lambda *_args, **_kwargs: DenyingDispatcher(),
+    )
+
+    response = client.put(
+        "/api/settings",
+        json={"settings": {"hooks": {"disabled": True}, "personalisation": {"theme": "dark"}}},
+        headers=_h(token),
+    )
+
+    assert response.status_code == 200
+    assert client.get("/api/settings", headers=_h(token)).json()["settings"] == {
+        "hooks": {"disabled": True},
+        "personalisation": {"theme": "dark"},
+    }

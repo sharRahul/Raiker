@@ -81,7 +81,7 @@ names.
 | [MEM-07](MEMORY_RELIABILITY_PLAN.md#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) … [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. |
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
-| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
+| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
@@ -89,6 +89,7 @@ names.
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
 | [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium → Low | Memory / retrieval | Provider-memory half fixed 2026-08-26 as FIXED-292. Managed knowledge files still lack write-time vector projections |
+| [BUG-241](#bug-241--fullpage-screenshots-do-not-reach-past-the-app-shells-scroll-container) | Low | Live test harness / evidence | Open — raised 2026-08-28 while capturing FIXED-305 evidence |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (12 complete, 6 open; C9 skill commands closed as FIXED-299 and C14 branch-from-here as FIXED-227) |
 
@@ -388,18 +389,18 @@ and evidence moved to the closed-work ledger.
 
 ## BUG-226 — Three of the five hook handler types do not exist
 
-**Severity: Low. Area: hooks / handlers. Status: Open — raised 2026-08-22.**
+**Severity: Low. Area: hooks / handlers. Status: Open remainder — reduced
+2026-08-28 (FIXED-303).**
 
 **Observed.** The hooks reference Raiker maps itself against documents five
-handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. `HANDLER_TYPES`
-in `raiker/hooks/contracts.py` accepts two — `command` and `builtin`, the second
-being Raiker's own in-process code rather than one of the five. A rule naming
-`http` is refused at parse time with `unsupported_handler_type:http`, which is
-the right failure.
+handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. Before
+FIXED-303, `HANDLER_TYPES` accepted only `command` and Raiker's own `builtin`.
+It now also accepts a bounded `prompt`; a rule naming `http`, `mcp_tool` or
+`agent` is still refused at parse time, which is the right failure until each
+has a governed resource path.
 
-**The title undercounts: it is four, not three** — `http`, `mcp_tool`, `prompt`
-and `agent`. The title is left as raised so the anchor other documents link to
-keeps working; the count here is the accurate one.
+The title originally undercounted four missing types. After FIXED-303 it is now
+accurate: three remain — `http`, `mcp_tool` and `agent`.
 
 **Corrected 2026-08-22.** This entry used to say `command` is the only handler
 type Claude Code's own hooks have, and that the gap was therefore against
@@ -411,11 +412,11 @@ stays Low because each missing type needs a resource the hook path deliberately
 does not have (below), not because the reference lacks them.
 
 This is the remainder of the hooks gap after BUG-223 — and the *events* are not
-at parity either: Raiker emits sixteen of the thirty-one Claude Code documents.
+at parity either: Raiker emits seventeen of the thirty-one Claude Code documents.
 See
 [`../REFERENCE_PLATFORM_COMPATIBILITY.md`](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#25-extensibility--hooks).
 
-**Root cause.** Each of the four needs a resource the hook path deliberately
+**Root cause.** Each originally missing type needs a resource the hook path deliberately
 does not have:
 
 * `http` needs egress. A hook has no implicit network access by design, and
@@ -423,13 +424,13 @@ does not have:
 * `mcp_tool` needs the MCP broker inside the hook path, which would let a hook
   reach a tool the turn's own policy might have refused — the exact inversion the
   hook model forbids.
-* `prompt` and `agent` need a model call, which means a token budget, a timeout
-  that is not the handler's 5-second one, and an answer to what happens when the
-  model call itself triggers hooks.
+* `agent` needs a multi-turn model loop and tools, which means its own budget,
+  capability set and answer to inherited authority. The single-turn `prompt`
+  case no longer shares that blocker.
 
-**Proposed fix.** `prompt` is the cheapest and the least dangerous: it makes no
-outbound request of its own and its output is context, not a decision. Take it
-first, with its own budget and a hard refusal to nest. `http` follows only once a
+**Completed first slice.** FIXED-303 adds `prompt` with a per-handler token
+budget and timeout, the owner-selected governed provider, no tools, no nesting,
+redacted bounded event data and advisory-only output. `http` follows only once a
 hook can be given a named, revocable egress grant of the kind the container work
 already built. `mcp_tool` and `agent` should stay refused until there is a stated
 answer to a hook reaching authority the turn did not have.
@@ -687,3 +688,35 @@ non-audited, in-process result field and are never persisted. Ambient recall and
 reads the same admission state. The managed-file half now uses that same cached
 query vector. Its vectors are revision-bound projections, owner/project scoped,
 and retired with the exact file revision; see FIXED-294. This entry is closed.
+
+---
+
+## BUG-241 — `fullPage` screenshots do not reach past the app shell's scroll container
+
+**Severity: Low. Area: live test harness / evidence. Status: Open — raised
+2026-08-28.**
+
+**Observed.** Two captures taken by `fixed-305-lifecycle-hooks-live.spec.ts` at
+different points in a round — one before any turn, one after a turn that
+demonstrably fired two hooks — were **byte-identical**. Both passed
+`fullPage: true`. The app shell gives the routed view its own scrolling
+container, so the page itself does not grow: `fullPage` captures the viewport and
+stops, and every capture of a long page shows the same top of it.
+
+**Why it matters more than it looks.** These captures are the evidence behind
+`FIXED-*` entries and the rounds in
+[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md). A screenshot that does not contain
+the thing it is named for does not fail — it is filed, linked and read as proof.
+That is the same shape as an inert switch: not a missing control, but a wrong
+belief about one.
+
+**Scope.** Every live spec that passes `fullPage: true` and asserts against a
+section below the first viewport. `fixed-305-lifecycle-hooks-live.spec.ts` scrolls
+the section under test into view before capturing, which is the local fix; the
+open work is deciding whether the harness should do that for every spec — a
+shared capture helper that takes a locator — or whether the shell should let the
+page scroll so `fullPage` means what it says everywhere.
+
+**Not a product defect.** Nothing an owner uses is wrong: the page scrolls
+correctly in a browser. What is wrong is what the evidence files contain, which
+is why this is filed against the harness rather than the web UI.

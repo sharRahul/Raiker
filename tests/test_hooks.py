@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from pathlib import Path
@@ -7,11 +8,15 @@ from pathlib import Path
 import pytest
 
 from raiker.cli.commands import build_prompt_envelope
+from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
-from raiker.hooks.contracts import HookConfigError, HookInput
+from raiker.hooks.contracts import HookConfigError, HookInput, HookOutput
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.hooks.handlers.prompt import prompt_runner
 from raiker.hooks.matchers import matches
 from raiker.hooks.registry import HooksRegistry
+from raiker.models.contracts import ModelResponse
+from raiker.storage.sqlite import SQLiteStore
 
 # --- unit: config validation, matchers, dispatcher -------------------------------------------
 
@@ -309,3 +314,170 @@ def test_managed_scope_deny(
     events = _events(response.events_path or "")
     assert response.status == "failed"
     assert "hook_decision" not in events
+
+
+def test_prompt_handler_requires_bounded_instruction_text() -> None:
+    registry = HooksRegistry.from_config(
+        {
+            "schema_version": "1.0",
+            "hooks": {
+                "UserPromptSubmit": [
+                    {
+                        "matcher": "*",
+                        "handlers": [
+                            {
+                                "id": "review-intent",
+                                "type": "prompt",
+                                "prompt": "Identify one ambiguity the main model should consider.",
+                                "timeout_ms": 2500,
+                                "max_tokens": 128,
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    )
+
+    handler = registry.rules[0].handlers[0]
+    assert handler.prompt == "Identify one ambiguity the main model should consider."
+    assert handler.max_tokens == 128
+    assert handler.decision_authority is False
+
+    with pytest.raises(HookConfigError, match="prompt_handler_requires_prompt"):
+        HooksRegistry.from_config(
+            {
+                "schema_version": "1.0",
+                "hooks": {
+                    "UserPromptSubmit": [
+                        {"matcher": "*", "handlers": [{"id": "empty", "type": "prompt"}]}
+                    ]
+                },
+            }
+        )
+
+
+def test_prompt_handler_is_advisory_tool_free_and_audited_without_content(
+    tmp_path: Path,
+) -> None:
+    seen: list[tuple[object, HookInput]] = []
+
+    async def prompt_runner(handler, hook_input):  # type: ignore[no-untyped-def]
+        seen.append((handler, hook_input))
+        return HookOutput(
+            decision="add_context_only",
+            additional_context="Check whether the target environment was specified.",
+            metadata={"provider": "test", "model": "reviewer", "output_tokens": 9},
+        )
+
+    registry = HooksRegistry.from_config(
+        {
+            "schema_version": "1.0",
+            "hooks": {
+                "UserPromptSubmit": [
+                    {
+                        "matcher": "*",
+                        "handlers": [
+                            {
+                                "id": "review-intent",
+                                "type": "prompt",
+                                "prompt": "Find ambiguity.",
+                                "decision_authority": True,
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    )
+    store = SQLiteStore(tmp_path)
+    dispatcher = HookDispatcher(
+        registry,
+        workspace_root=tmp_path,
+        writer=EventLogWriter(store),
+        prompt_runner=prompt_runner,
+    )
+
+    outcome = asyncio.run(
+        dispatcher.adispatch(
+            HookInput(
+                event_name="UserPromptSubmit",
+                context={"prompt_length": 42, "_model_provider": "test", "_model": "reviewer"},
+            ),
+            session_id="sess_prompt_hook",
+            turn_id="turn_prompt_hook",
+        )
+    )
+
+    assert outcome.decision == "no_decision"
+    assert outcome.additional_context == [
+        "Check whether the target environment was specified."
+    ]
+    assert len(seen) == 1
+    events = store.list_event_index(session_id="sess_prompt_hook", limit=20)
+    assert any(row["event_type"] == "hook_executed" for row in events)
+    event_text = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in (tmp_path / ".raiker" / "events").rglob("*.jsonl")
+    )
+    assert "Find ambiguity" not in event_text
+    assert "Check whether the target" not in event_text
+    assert '"provider":"test"' in event_text.replace(" ", "")
+
+
+def test_prompt_runner_uses_selected_provider_without_tools_and_redacts_event_data() -> None:
+    calls = []
+
+    class FakeRouter:
+        async def achat(self, provider, model, messages, tools, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((provider, model, messages, tools, kwargs))
+            return ModelResponse(
+                text="Check the deployment target.",
+                usage={"input_tokens": 31, "output_tokens": 6},
+            )
+
+    handler = HooksRegistry.from_config(
+        {
+            "schema_version": "1.0",
+            "hooks": {
+                "UserPromptSubmit": [
+                    {
+                        "matcher": "*",
+                        "handlers": [
+                            {
+                                "id": "review",
+                                "type": "prompt",
+                                "prompt": "Find a missing constraint.",
+                                "max_tokens": 64,
+                            }
+                        ],
+                    }
+                ]
+            },
+        }
+    ).rules[0].handlers[0]
+
+    output = asyncio.run(
+        prompt_runner(FakeRouter(), ("fallback", "fallback-model"))(
+            handler,
+            HookInput(
+                event_name="UserPromptSubmit",
+                tool_input={"authorization": "Bearer abcdefghijklmnopqrstuvwxyz"},
+                context={"_model_provider": "openai", "_model": "gpt-test", "prompt_length": 20},
+            ),
+        )
+    )
+
+    provider, model, messages, tools, kwargs = calls[0]
+    assert (provider, model) == ("openai", "gpt-test")
+    assert tools is None
+    assert kwargs["max_tokens"] == 64
+    assert "abcdefghijklmnopqrstuvwxyz" not in messages[1].content
+    assert "_model_provider" not in messages[1].content
+    assert output.decision == "add_context_only"
+    assert output.metadata == {
+        "provider": "openai",
+        "model": "gpt-test",
+        "input_tokens": 31,
+        "output_tokens": 6,
+    }

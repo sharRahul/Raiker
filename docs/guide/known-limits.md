@@ -55,9 +55,12 @@ confinement, sandboxing, or critical holds.
 
 ## Hooks, plugins, and MCP
 
-- Hooks cover 16 of the 31 lifecycle events in the reference format.
+- Hooks cover 20 of the 31 lifecycle events in the reference format. The 11
+  that remain are refused, not applicable to a single-owner product, or
+  blocked behind a mid-turn question surface Raiker does not have.
 - Hook execution supports `command` plus Raiker's `builtin` handler; other
-  reference handler types are not implemented.
+  reference handler types (`http`, `mcp_tool`, `agent`) are not implemented;
+  bounded tool-free `prompt` handlers are implemented.
 - A plugin runs no code merely because it is installed. It contributes governed
   hook rules, disabled-by-default skills, and offered—not automatically
   connected—MCP servers.

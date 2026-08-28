@@ -8,6 +8,7 @@ plus derived read-only status the UI needs (vault state, MFA enrollment).
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -18,8 +19,11 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import ComposerApprovalModeRequest, SettingsRequest
 from raiker.auth.accounts import AccountService
 from raiker.auth.vault_key_file import vault_status
+from raiker.context.redaction import redact_text
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import ContractValidationError, normalize_approval_mode
+from raiker.hooks.contracts import HookInput
+from raiker.hooks.factory import dispatcher_for_workspace
 from raiker.storage.sqlite import SQLiteStore
 
 router = APIRouter()
@@ -68,6 +72,77 @@ def load_composer_approval_mode(ws: str | Path, principal_id: str) -> str:
         return "manual"
 
 
+def _leaf_keys(value: Any, prefix: str = "") -> set[str]:
+    if isinstance(value, dict):
+        keys: set[str] = set()
+        for key, child in value.items():
+            path = f"{prefix}.{key}" if prefix else str(key)
+            keys.update(_leaf_keys(child, path))
+        return keys
+    return {prefix} if prefix else set()
+
+
+def _changed_keys(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    candidates = _leaf_keys(before) | _leaf_keys(after)
+
+    def value_at(source: dict[str, Any], path: str) -> Any:
+        value: Any = source
+        for part in path.split("."):
+            if not isinstance(value, dict) or part not in value:
+                return object()
+            value = value[part]
+        return value
+
+    return sorted(key for key in candidates if value_at(before, key) != value_at(after, key))
+
+
+async def _check_config_change(
+    ws: str | Path,
+    principal_id: str,
+    before: dict[str, Any],
+    after: dict[str, Any],
+) -> None:
+    changed_keys = _changed_keys(before, after)
+    if not changed_keys:
+        return
+    # The owner's kill switch is above every configured hook. A project file
+    # must never be able to veto being turned off.
+    before_hooks_value = before.get("hooks")
+    after_hooks_value = after.get("hooks")
+    before_hooks: dict[str, Any] = (
+        before_hooks_value if isinstance(before_hooks_value, dict) else {}
+    )
+    after_hooks: dict[str, Any] = (
+        after_hooks_value if isinstance(after_hooks_value, dict) else {}
+    )
+    if after_hooks.get("disabled") is True and before_hooks.get("disabled") is not True:
+        return
+    changed = [redact_text(key)[0] for key in changed_keys]
+    dispatcher = dispatcher_for_workspace(
+        SQLiteStore(ws), acting_principal_id=principal_id
+    )
+    if not dispatcher.is_active():
+        return
+    outcome = await asyncio.to_thread(
+        dispatcher.dispatch,
+        HookInput(
+            event_name="ConfigChange",
+            tool_name="user_settings",
+            context={
+                "source": "user_settings",
+                "changed_keys": changed,
+                "changed_key_count": len(changed),
+            },
+        ),
+        session_id=f"settings_{principal_id}",
+        turn_id=None,
+        client=None,
+    )
+    if outcome.decision in {"deny", "ask", "defer"}:
+        reason = outcome.reasons[0] if outcome.reasons else "settings_change_refused"
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=reason)
+
+
 @router.get("/api/settings")
 async def get_settings(request: Request) -> dict[str, Any]:
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
@@ -94,6 +169,7 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="invalid_speech_language",
         )
+    await _check_config_change(ws, principal.principal_id, _load(ws, principal.principal_id), body.settings)
     SQLiteStore(ws).put_user_settings(
         principal.principal_id, json.dumps(body.settings), utc_now()
     )
@@ -123,5 +199,6 @@ async def put_composer_approval_mode(
         composer = {}
         settings["composer"] = composer
     composer["approval_mode"] = approval_mode
+    await _check_config_change(ws, principal.principal_id, _load(ws, principal.principal_id), settings)
     SQLiteStore(ws).put_user_settings(principal.principal_id, json.dumps(settings), utc_now())
     return {"approval_mode": approval_mode}

@@ -22,8 +22,14 @@ from pathlib import Path
 
 from raiker.events.writer import EventLogWriter
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.hooks.handlers.prompt import prompt_runner
 from raiker.hooks.owner_switch import hooks_disabled
 from raiker.hooks.registry import HooksRegistry
+from raiker.models.connections import get_model_connection
+from raiker.models.policy_state import provider_runtime_policy_from_gates
+from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
+from raiker.models.router import ModelRouter
+from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -37,12 +43,36 @@ def dispatcher_for_workspace(
     from raiker.notify.approval_notifier import resolve_owner_principal_id
 
     workspace_root = Path(store.paths.workspace_root)
+    event_writer = writer if writer is not None else EventLogWriter(store)
     dispatcher = HookDispatcher(
         HooksRegistry.load(workspace_root),
         workspace_root=workspace_root,
-        writer=writer if writer is not None else EventLogWriter(store),
+        writer=event_writer,
     )
     owner = resolve_owner_principal_id(store, acting_principal_id)
+    if owner is not None:
+        registry = ModelProfileRegistry.load()
+        router = ModelRouter(
+            registry,
+            event_writer,
+            runtime_policy=provider_runtime_policy_from_gates(store, owner),
+            connection_resolver=lambda profile_id: get_model_connection(store, owner, profile_id),
+        )
+        default_provider = router.default_provider()
+        state = store.load_principal_model_state(owner) or store.load_model_session_state(
+            TERMINAL_MODEL_SESSION_ID
+        )
+        if state is not None:
+            try:
+                profile = registry.resolve_profile_id(state.profile_id)
+                selected_model = state.model or profile.model
+                if selected_model and "<" not in selected_model:
+                    if selected_model != profile.model:
+                        registry.register(profile_with_model(profile, selected_model))
+                    default_provider = (profile.provider, selected_model)
+            except RegistryError:
+                pass
+        dispatcher.prompt_runner = prompt_runner(router, default_provider)
     dispatcher.set_disabled(owner is not None and hooks_disabled(workspace_root, owner))
     return dispatcher
 

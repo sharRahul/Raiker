@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 
@@ -22,8 +23,9 @@ from raiker.contracts.models import (
 from raiker.contracts.streaming import FINAL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
-from raiker.hooks.contracts import HookInput
+from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
+from raiker.hooks.handlers.prompt import prompt_runner
 from raiker.hooks.owner_switch import hooks_disabled
 from raiker.hooks.registry import HooksRegistry
 from raiker.models.connections import get_model_connection
@@ -112,6 +114,9 @@ class AgentGateway:
         # production never falls back to deterministic test providers.
         # Honor the operator's selected model profile (e.g. via `/model use`); fall back to the native default.
         self.default_provider = self._resolve_default_provider()
+        self.hook_dispatcher.prompt_runner = prompt_runner(
+            self.model_router, self.default_provider
+        )
         self.runtime = RuntimeOrchestrator(
             workspace_root=self.workspace_root,
             writer=self.writer,
@@ -230,18 +235,30 @@ class AgentGateway:
                 chain.append(resolved)
         return chain
 
-    def _dispatch_lifecycle_hook(
+    async def _dispatch_lifecycle_hook(
         self,
         event_name: str,
         envelope: PromptEnvelope,
         context: dict[str, object] | None = None,
-    ) -> None:
-        self.hook_dispatcher.dispatch(
+    ) -> HookOutcome:
+        resolved = (
+            self._resolve_profile_for_turn(
+                envelope.options.model_profile, envelope.options.model or None
+            )
+            if envelope.options.model_profile
+            else None
+        ) or self.default_provider
+        return await self.hook_dispatcher.adispatch(
             HookInput(
                 event_name=event_name,
                 tool_name=None,
                 tool_input={},
-                context={"prompt_length": len(envelope.prompt.text), **(context or {})},
+                context={
+                    "prompt_length": len(envelope.prompt.text),
+                    "_model_provider": resolved[0],
+                    "_model": resolved[1],
+                    **(context or {}),
+                },
                 session_id=envelope.session_id,
                 turn_id=envelope.turn_id,
                 cwd=str(self.workspace_root),
@@ -251,7 +268,7 @@ class AgentGateway:
             client=envelope.client,
         )
 
-    def _dispatch_turn_end_hook(
+    async def _adispatch_turn_end_hook(
         self, envelope: PromptEnvelope, response: AgentResponse
     ) -> None:
         """`Stop` when the turn produced an answer, `StopFailure` when it did not.
@@ -280,11 +297,17 @@ class AgentGateway:
         if not self.hook_dispatcher.is_active():
             return
         completed = response.status == "completed"
-        self._dispatch_lifecycle_hook(
+        await self._dispatch_lifecycle_hook(
             "Stop" if completed else "StopFailure",
             envelope,
             {"status": response.status, "reply_length": len(response.message)},
         )
+
+    def _dispatch_turn_end_hook(
+        self, envelope: PromptEnvelope, response: AgentResponse
+    ) -> None:
+        """Synchronous compatibility boundary used by lifecycle tests/callers."""
+        asyncio.run(self._adispatch_turn_end_hook(envelope, response))
 
     @staticmethod
     def _coerce_envelope(
@@ -306,7 +329,7 @@ class AgentGateway:
             )
         return prompt_envelope, None
 
-    def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
+    async def _aprepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
         input_mode = normalize_input_mode(
             prompt_envelope.prompt.metadata.get("input_mode", "typed")
         )
@@ -343,15 +366,24 @@ class AgentGateway:
             )
         )
         if self.hook_dispatcher.is_active():
+            additions: list[str] = []
             if existing_session is None:
-                self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
-            self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
+                started = await self._dispatch_lifecycle_hook("SessionStart", prompt_envelope)
+                additions.extend(started.additional_context)
+            submitted = await self._dispatch_lifecycle_hook("UserPromptSubmit", prompt_envelope)
+            additions.extend(submitted.additional_context)
+            if additions:
+                prompt_envelope.prompt.metadata["_hook_context"] = additions
         return self.machine_identities.start(
             owner_principal_id=self.owner_principal_id,
             session_id=prompt_envelope.session_id,
             turn_id=prompt_envelope.turn_id,
             role_ids=("assistant",),
         )
+
+    def _prepare_turn(self, prompt_envelope: PromptEnvelope) -> TrustedTurnIdentity:
+        """Synchronous compatibility boundary used by direct runtime callers."""
+        return asyncio.run(self._aprepare_turn(prompt_envelope))
 
     async def _model_readiness_refusal(
         self, prompt_envelope: PromptEnvelope
@@ -438,7 +470,7 @@ class AgentGateway:
             return ""
         return response.message[:TURN_SUMMARY_MAX_CHARS]
 
-    def _finalize_turn(
+    async def _afinalize_turn(
         self, prompt_envelope: PromptEnvelope, response: AgentResponse
     ) -> AgentResponse:
         checkpoint, checkpoint_path = self.checkpoints.write_turn_checkpoint(
@@ -521,7 +553,7 @@ class AgentGateway:
                         client=prompt_envelope.client,
                     )
                 )
-        self._dispatch_turn_end_hook(prompt_envelope, response)
+        await self._adispatch_turn_end_hook(prompt_envelope, response)
         events_path = str(self.writer.path_for_session(prompt_envelope.session_id))
         return AgentResponse(
             request_id=response.request_id,
@@ -536,6 +568,12 @@ class AgentGateway:
             last_event_id=self.writer.last_event_id,
         )
 
+    def _finalize_turn(
+        self, prompt_envelope: PromptEnvelope, response: AgentResponse
+    ) -> AgentResponse:
+        """Synchronous compatibility boundary used by direct runtime callers."""
+        return asyncio.run(self._afinalize_turn(prompt_envelope, response))
+
     async def submit_prompt_async(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         prompt_envelope, error = self._coerce_envelope(envelope)
         if prompt_envelope is None:
@@ -543,11 +581,11 @@ class AgentGateway:
             return error
         if refusal := await self._model_readiness_refusal(prompt_envelope):
             return refusal
-        identity = self._prepare_turn(prompt_envelope)
+        identity = await self._aprepare_turn(prompt_envelope)
         response: AgentResponse | None = None
         try:
             response = await self.runtime.ahandle(prompt_envelope, identity=identity)
-            return self._finalize_turn(prompt_envelope, response)
+            return await self._afinalize_turn(prompt_envelope, response)
         finally:
             if response is None or response.status != "needs_approval":
                 self.machine_identities.finish(identity)
@@ -573,7 +611,7 @@ class AgentGateway:
                 response=refusal,
             )
             return
-        identity = self._prepare_turn(prompt_envelope)
+        identity = await self._aprepare_turn(prompt_envelope)
         tasks = TaskManager(self.store, self.writer)
         task = tasks.create_task(
             session_id=prompt_envelope.session_id,
@@ -604,7 +642,7 @@ class AgentGateway:
                     continue
                 yield event
             assert final is not None
-            enriched = self._finalize_turn(prompt_envelope, final)
+            enriched = await self._afinalize_turn(prompt_envelope, final)
             yield StreamEvent(kind=FINAL, response=enriched)
         finally:
             if final is None or final.status != "needs_approval":
@@ -737,7 +775,7 @@ class AgentGateway:
                 if event.kind == FINAL and event.response is not None:
                     final = event.response
             assert final is not None
-            finalized = self._finalize_turn(envelope, final)
+            finalized = await self._afinalize_turn(envelope, final)
             return finalized
         finally:
             if final is None or final.status != "needs_approval":
@@ -777,7 +815,7 @@ class AgentGateway:
                     continue
                 yield event
             assert final is not None
-            finalized = self._finalize_turn(envelope, final)
+            finalized = await self._afinalize_turn(envelope, final)
             yield StreamEvent(kind=FINAL, response=finalized)
         finally:
             if final is None or final.status != "needs_approval":

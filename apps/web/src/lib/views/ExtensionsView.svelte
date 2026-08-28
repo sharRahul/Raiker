@@ -572,9 +572,11 @@
     <section class="card">
       <h2>Hooks</h2>
       <p class="note">
-        A hook runs your own logic at a point in a turn. It can only make an action
+        A hook runs your own logic at a lifecycle point. It can only make an action
         <strong>stricter</strong> — a hook may deny a tool call or turn it into a decision, and can
         never allow one the runtime refused, skip an approval, or reach past the tool broker.
+        Prompt handlers are tool-free model advisories; their output can add context and never
+        carries decision authority.
       </p>
       {#if hooks === null}
         <p class="note">{hooksError ?? "Reading hook configuration…"}</p>
@@ -662,7 +664,9 @@
                         no builtin by this name in this build — it will fail every time it matches
                       </span>
                     {:else if !handler.decision_authority}
-                      <span class="note">advisory</span>
+                      <span class="note">
+                        {handler.type === "prompt" ? "tool-free model advisory" : "advisory"}
+                      </span>
                     {/if}
                   </li>
                 {/each}
@@ -700,6 +704,17 @@
             </li>
           {/each}
         </ul>
+      </section>
+
+      <section class="card">
+        <h2>Handler types</h2>
+        <p class="note">
+          <strong>command</strong> runs a bounded workspace-local program. <strong>prompt</strong>
+          uses the owner-selected provider with a per-handler timeout and token budget, exposes no
+          tools, refuses nesting, and contributes advisory context only. <strong>builtin</strong>
+          runs Raiker's reviewed in-process logic. HTTP, MCP tool, and agent handlers remain
+          refused rather than gaining an ungoverned execution path.
+        </p>
       </section>
 
       <section class="card">

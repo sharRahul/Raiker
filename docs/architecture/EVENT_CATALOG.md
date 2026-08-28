@@ -62,7 +62,10 @@ human authorizer, runtime authority, or other literal actor.
 | `skill_activated` | A skill was turned on, so its index entry reaches turns again |
 | `skill_deactivated` | A skill was turned off; it stays stored and is withheld from every turn |
 | `skill_deleted` | A skill's stored document was removed from the workspace |
+| `skill_command_changed` | The owner added, changed, or removed a slash handle for an installed skill; the handle carries no authority |
 | `skills_indexed` | A turn advertised the owner's active skills to the model (count and names only — bodies are loaded on demand by `skill_load`) |
+| `channel_routing_changed` | The owner replaced a pairing's stored inbound route, target, owner identity, or relay choice |
+| `channel_message_routed` | An accepted channel message entered the owner-selected route; payload names the mode and bounded result, never grants authority |
 | `brain_source_folder_granted` | The owner gave the Knowledge Map access to one folder on this machine; the payload carries the path, because what was opened is the whole point of the record |
 | `brain_source_folder_revoked` | That access was withdrawn; every source indexed under the folder is removed with it |
 | `checkpoint_created` | The gateway recorded a turn checkpoint |
@@ -130,7 +133,7 @@ withholds therefore emits `approval_auto_withheld` followed by
 alignment-checked and never emits it.
 
 **This catalogue is a reader's guide, not the registry.** The registry is
-`raiker/contracts/models.py::EVENT_TYPES`, which declares 269 event types; the
+`raiker/contracts/models.py::EVENT_TYPES`, which declares 273 event types; the
 tables above cover the ones a person reading the audit log most often needs
 explained. An event type that exists in the registry and not here is documented
 by its emitting call site, not missing from the product.

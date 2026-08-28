@@ -393,6 +393,7 @@ class BuildSkillRequest(BaseModel):
     name: str
     description: str
     body: str
+    command_trigger: str | None = None
 
 
 class RenameSkillRequest(BaseModel):
@@ -405,6 +406,12 @@ class SetSkillActiveRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     active: bool
+
+
+class SetSkillCommandRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    command_trigger: str | None = None
 
 
 class BrainSourceRequest(BaseModel):
@@ -681,6 +688,17 @@ class ChannelSendersRequest(BaseModel):
     senders: list[str]
 
 
+class ChannelRoutingRequest(BaseModel):
+    """Owner-selected route. An inbound payload cannot override these fields."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    routing_mode: Literal["record_only", "new_turn", "side_question", "interrupt"]
+    target_session_id: str | None = None
+    owner_sender_id: str | None = None
+    approval_relay_enabled: bool = False
+
+
 class ChannelTestDeliveryRequest(BaseModel):
     """One test delivery through the governed outbound path."""
 
@@ -690,11 +708,24 @@ class ChannelTestDeliveryRequest(BaseModel):
 
 
 
-@dataclass
-class InboundChannelMessage:
+class InboundChannelMessage(BaseModel):
     # Inbound channel payload. Always treated as untrusted; never executed.
+    model_config = ConfigDict(extra="forbid")
+
     sender_id: str
     text: str = ""
+
+
+class ChannelApprovalResponse(BaseModel):
+    """One exact, single-use response to a pending relayed approval."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sender_id: str
+    relay_id: str
+    action_id: str
+    approve: bool
+    reason: str = ""
 
 
 @dataclass

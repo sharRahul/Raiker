@@ -56,6 +56,7 @@
     mentionAt,
     slashFragment,
     stripSlashToken,
+    type SlashCommand,
   } from "../composerCommands";
   import { collectText } from "../turnPhases";
   import { humanize, relativeTime } from "../format";
@@ -831,12 +832,13 @@
   let mentionItems = $state<MenuItem[]>([]);
   let mentionNotice = $state<{ text: string; href?: string; linkLabel?: string } | null>(null);
   let shortcutsOpen = $state(false);
+  let ownerSlashCommands = $state<SlashCommand[]>([]);
   let mentionRequest = 0;
 
   const slashItems = $derived.by<MenuItem[]>(() => {
     const fragment = menuKind === "slash" ? slashFragment(promptText, caret()) : null;
     if (fragment === null) return [];
-    return matchCommands("chat", fragment).map((command) => ({
+    return matchCommands("chat", fragment, ownerSlashCommands).map((command) => ({
       id: command.name,
       label: `/${command.name}`,
       detail: command.summary,
@@ -847,6 +849,22 @@
   function caret(): number {
     return promptEl?.selectionStart ?? promptText.length;
   }
+
+  async function loadOwnerSlashCommands() {
+    try {
+      ownerSlashCommands = (await api.skills())
+        .filter((skill) => skill.active && skill.command_trigger)
+        .map((skill) => ({
+          name: skill.command_trigger as string,
+          summary: `Use ${skill.name} · permissions unchanged`,
+          action: "skill" as const,
+        }));
+    } catch {
+      ownerSlashCommands = [];
+    }
+  }
+
+  onMount(loadOwnerSlashCommands);
 
   function trackPromptSelection() {
     promptSelectionStart = promptEl?.selectionStart ?? promptText.length;
@@ -958,6 +976,12 @@
 
   /** Run one command. Each of these is a control the owner already has. */
   function runSlashCommand(name: string) {
+    if (ownerSlashCommands.some((command) => command.name === name)) {
+      const args = promptText.trim();
+      promptText = `/${name}${args ? ` ${args}` : ""}`;
+      void submit();
+      return;
+    }
     switch (name) {
       case "new": newConversation(); break;
       case "model": modelPickerOpen = true; break;

@@ -155,6 +155,16 @@ class ChannelApprovalRelayExecutor:
                 reason_code="channel_not_paired_or_disabled",
                 summary="Approval relay denied: connector is not paired/enabled.",
             )
+        if not bool(pairing.get("approval_relay_enabled")) or not str(
+            pairing.get("owner_sender_id") or ""
+        ):
+            return ExecutionResult(
+                ok=False,
+                capability=self.capability,
+                action_id=action.action_id,
+                reason_code="channel_approval_relay_not_enabled",
+                summary="Approval relay denied: bind the owner sender and enable relay first.",
+            )
         relay = ApprovalRelayRecord(
             relay_id=new_id("chr_"),
             pairing_id=str(pairing["pairing_id"]),

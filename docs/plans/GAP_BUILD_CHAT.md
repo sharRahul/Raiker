@@ -90,7 +90,7 @@ that proves it, what is missing, and the concrete work.
 | [C6](#c6--no-citations-on-tool-derived-answers) | CHAT | TIER 1 | Done |
 | [C7](#c7--no-web-access) | CHAT | TIER 1 | Done |
 | [C8](#c8--mcp-tools-unreachable) | CHAT | TIER 1 | Done |
-| [C9](#c9--no-skills-or-reusable-procedures) | CHAT | TIER 1 | Open |
+| [C9](#c9--no-skills-or-reusable-procedures) | CHAT | TIER 1 | Done |
 | [C10](#c10--the-assistant-lives-in-one-browser-tab) | CHAT | TIER 2 | Open |
 | [C11](#c11--background-work-is-not-conversational) | CHAT | TIER 2 | Open |
 | [C12](#c12--no-collaboration) | CHAT | TIER 2 | Open |
@@ -408,11 +408,10 @@ on the owner's own message, and an edit adds a turn rather than rewriting the
 transcript. The prompt box grows with what is written, and `/shortcuts` opens a
 per-surface keyboard map built from the bindings the handlers implement.
 
-Two pieces of the original entry are deliberately still open and are *not*
-claimed here: syntax highlighting in transcript code (deferred in FIXED-06 —
-per-code-block copy already ships) and owner-authored custom slash commands,
-which is a governance design task rather than a parser change, because an
-honest custom command has to state what authority it carries.
+Syntax highlighting in transcript code remains deferred in FIXED-06;
+per-code-block copy already ships. Owner-authored slash commands closed as
+FIXED-299: an active skill may have one owner-scoped trigger, and invoking it
+loads instructions without changing any capability, decision, or approval mode.
 
 #### B20 — Sandboxed execution environment
 
@@ -624,11 +623,10 @@ its answer back.
 
 #### C9 — No skills or reusable procedures
 
-`raiker/skills/` holds a candidate
-store and nothing else; `docs/architecture/SELF_IMPROVEMENT_MODEL.md` describes procedural
-memory that is never consulted at turn time. A work assistant should learn "how
-we do the weekly report here" once. **Work:** promote approved procedural
-memories into a named, model-selectable skill set, injected only when relevant.
+✅ **Done — FIXED-299.** Installed and built skills are model-selectable through
+progressive `skill_load`; an active skill can also carry an owner-authored slash
+trigger in Chat and Build. The trigger is a convenience handle for the same
+reviewed instructions and explicitly grants no capability or approval bypass.
 
 ### Tier 2 — presence and continuity
 

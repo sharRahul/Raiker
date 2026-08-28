@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-28 | Full sweep + targeted | `pages/`, `fixed-299-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama — existing credentials managed through the Raiker interface | All 26 route/tab states at mobile, 1080p, 4K and 8K in both themes; channel routing and approval-relay controls; owner skill commands in Chat and Build; four-provider readiness from the Models UI |
 | 2026-08-25 | Targeted | `r0825-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | A semantic space built against a real embedding call — **and measured, which found the read half missing** — the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at five widths |
 | 2026-08-24 | Targeted | `r0824-` | Anthropic (`claude-haiku-4-5-20251001`) | What each capability switch actually decides, Agent Skills conformance on the Skills tab, and Auto's alignment check against a real turn |
 | 2026-08-23 | Targeted | `r0823-` | Anthropic, OpenAI, OpenRouter | The checkpoint rewind end to end, the audit export, the deleted second egress path, and two defects the rewind exposed |
@@ -49,6 +50,47 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-28 — channel routes, skill commands, and a complete responsive catalogue
+
+**Tier: Full sweep plus targeted.** Chromium via Playwright. **Providers:**
+Anthropic, OpenAI, OpenRouter, and local Ollama, using the credentials and model
+selection already stored through Raiker's interface. No credential was placed in
+source, a test fixture, or this document. **Prefixes:** mutable `pages/`,
+`fixed-299-`, and refreshed `bug-225-` evidence.
+
+### What it proved
+
+* Every one of the 26 route/tab states rendered in light and dark at 390 × 844,
+  1920 × 1080, 3840 × 2160, and 7680 × 4320: 208 captures, with no horizontal
+  overflow, empty icon, off-screen selected tab, console error, or PNG dimension
+  mismatch.
+* Anthropic, OpenAI, OpenRouter, and Ollama were each opened on the appropriate
+  Models tab and exercised with that provider card's **Test** control. Every card
+  produced its own non-empty terminal result; the run did not infer provider
+  health from a stored credential.
+* A command was assigned to the shipped `algorithm-creator` skill through
+  Extensions → Skills, appeared in both Chat and Build command menus, and was
+  removed through the same owner surface after the assertion
+  (`fixed-299-chat-skill-command.png`).
+* Webhooks were paired with an allowlist, left off until a separate owner action,
+  configured for **New turn** with an exact owner and approval-relay opt-in,
+  exercised through the governed delivery path, then unpaired. The route and
+  relay state remained visible on the closed card (`bug-225-channel-paired.png`).
+* The Channels view fit at 390, 834, and 1440 pixels after the state badges were
+  added; the refreshed page catalogue additionally proves it at the declared
+  4K and 8K display classes.
+
+### What it found
+
+The approval-response endpoint initially shared authentication and exact-owner
+binding with inbound messages but not their rate budget. It now uses the same
+per-connector/per-sender limiter. Visual review also found that a saved route
+became invisible when its editor closed; the connector card now keeps a quiet
+route badge and, when enabled, an approval-relay badge. No open defect remains
+from this round.
 
 ---
 

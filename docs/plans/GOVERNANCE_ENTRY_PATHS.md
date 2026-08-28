@@ -121,11 +121,13 @@ it can reach is this.*
 | 4 | **Turn resumed after an approval** | `routes_approvals.py:479` / `:495` → `AgentGateway` | A, then B; plus the parked-turn single-resumption claim | The remainder of the parked turn, re-governed |
 | 5 | **CLI agentic turn** | `cli/commands.py:1743`, `:3251` → `AgentGateway` | Identical | Identical — the terminal client is not a privileged path |
 | 6 | **Task cycle / scheduled routine** | `tasks/scheduler.py:142`, `:213` → `AgentGateway` | Identical, plus: unattended, so an action needing a decision **parks** as `task_blocked` | One governed turn per cycle. A task inherits no standing permission from having been approved once |
+| 7 | **Owner-stored channel route** | `POST /api/channels/{connector_id}/inbound` → `routes_channels.py` → `AgentGateway` | Authenticated channel secret, enabled pairing, sender allowlist, rate budget, then A and B. External text stays in the assistant/data slot; the runtime authors the instruction | Record only, a governed new turn, a tool-free side question, or an interrupt to the exact owner-selected conversation |
 
-All six construct `AgentGateway`, and **there are exactly eight construction
-sites in four modules** — `routes_prompts.py` (`:327`, `:401`),
+All seven construct `AgentGateway`, and **there are exactly nine construction
+sites in five modules** — `routes_prompts.py` (`:327`, `:401`),
 `routes_approvals.py` (`:479`, `:495`), `cli/commands.py` (`:1743`, `:3251`) and
-`tasks/scheduler.py` (`:142`, `:213`). Nothing else in the tree constructs one,
+`tasks/scheduler.py` (`:142`, `:213`), plus `routes_channels.py`. Nothing else in
+the tree constructs one,
 which is what makes "every interface enters through the Agent Gateway"
 (`NESTED_BOUNDARIES_ARCHITECTURE.md:29`) a claim that currently holds. It is
 worth asserting, because it is the claim that stops a new surface reaching the
@@ -159,7 +161,7 @@ orchestrator directly.
 
 | # | Path | Crosses | Reaches |
 |---|---|---|---|
-| 17 | **Inbound channel message** | Owner secret, sender allowlist, 60/sender/minute, recorded and quarantined | **Nothing.** It is untrusted content with a named sender who is not the owner. Routing modes are not built: an inbound message never becomes work on its own |
+| 17 | **Inbound channel message** | Owner secret, sender allowlist, 60/sender/minute, and an owner-stored pairing route | `record_only` grants nothing; `side_question` has no tools; `new_turn` and `interrupt` require the exact paired owner and still use ordinary runtime governance. Message content cannot select the route |
 | 18 | **MCP tool call** | **A** (read-shaped), then a **local** gate + decision-mode check in `tools/mcp_tools.py` — see §4 | A bounded stdio JSON-RPC session against an owner-configured server |
 | 19 | **Fetched web page** | The `web_fetch` gate, blocklist, address guard, sanitiser | The turn's context as **untrusted data**. Nothing fetched raises a turn's authority |
 | 20 | **Hook handler** | `command` or `builtin`, bounded timeout, program resolved inside the workspace | Only `deny` or `ask`. `combine()` refuses `allow` from any handler — **a hook can never grant** |
@@ -184,7 +186,7 @@ and the Capabilities page read —
 | `plugin_sandboxed_runtime_cap` | The container-isolated plugin runtime has no owner surface |
 | `plugin_sandbox_image_pull_cap` | Nothing runs a sandboxed plugin, so nothing pulls its image |
 | `plugin_revocation_cap` | Revocation is performed by the plugin registry directly; no governed action is constructed for it |
-| `channel_approval_relay` | An inbound channel message never becomes work, so no approval is ever relayed to a channel ([BUG-225](TO_BE_FIXED.md#bug-225--a-channel-can-be-described-and-never-reached)) |
+| `channel_approval_relay` | Separately off by default. Queueing requires an enabled pairing with an explicit owner binding; response requires the exact owner, relay id and immutable action id and is single-use. Critical and connector-write approvals stay local ([FIXED-298](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message)) |
 | `reminder_runtime` | No owner surface and no model tool. Nothing creates, lists or delivers a reminder |
 | `calendar_runtime` | No owner surface and no model tool. Nothing syncs and nothing creates an event |
 | `email_runtime` | No owner surface and no model tool. Nothing drafts, and nothing has ever sent |
@@ -368,7 +370,7 @@ defect this repository has already had.
 | # | Invariant | Would have caught |
 |---|---|---|
 | I1 | `route_action` has exactly six call sites, in the five modules named in §2 | A seventh entry path appearing unreviewed |
-| I2 | `AgentGateway` is constructed in exactly the four modules named in §3.1 | A surface that reaches the orchestrator without the gateway |
+| I2 | `AgentGateway` is constructed in exactly the five modules named in §3.1 | A surface that reaches the orchestrator without the gateway |
 | I3 | Every capability in `REAL_EXECUTOR_CAPABILITIES` is named in this document **and** classified in `entry_paths.py` | **The two-egress problem** and the unreachable checkpoint restore, both since closed; the invariant is what keeps a new registered executor from repeating either |
 | I3b | The tool-reachable set is exactly sixteen | A capability moving between §3.6's categories without the document moving |
 | I4 | Every module reading a capability gate itself calls `capability_admission`, and is listed in §4 | A further local gate check appearing silently. **The original form of this — "has a local `_ENABLED_GATE_STATES`" — already missed one**: `context/gatherer.py` spelled the constant without the leading underscore and was absent from §4 for that reason alone |

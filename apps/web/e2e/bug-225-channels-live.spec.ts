@@ -61,7 +61,7 @@ test("the tab states what a channel message is (BUG-225)", async ({ page }) => {
   await signIn(page);
   await channels(page);
 
-  await expect(page.getByRole("heading", { name: "What a channel message is" })).toBeVisible({
+  await expect(page.getByRole("heading", { name: "Channels", exact: true })).toBeVisible({
     timeout: 30_000,
   });
   await expect(
@@ -141,6 +141,15 @@ test("pairing links a channel without switching it on", async ({ page }) => {
   await expect(row).toContainText("Linked, off");
   await expect(row).toContainText("2 senders");
   await expect(row.getByRole("button", { name: "Turn on" })).toBeVisible();
+
+  // Routing is pairing-owned state, not a field an inbound message can choose.
+  await row.getByRole("button", { name: "Routing" }).click();
+  await row.getByLabel("Inbound").selectOption("new_turn");
+  await row.getByLabel("Owner sender").selectOption("ops");
+  await row.getByText("Allow exact pending approval responses from the bound owner").click();
+  await row.getByRole("button", { name: "Save routing" }).click();
+  await expect(row.getByText("New turn", { exact: true })).toBeVisible();
+  await expect(row.getByText("Approval relay", { exact: true })).toBeVisible();
 
   await page.screenshot({ path: `${SHOTS}/bug-225-channel-paired.png`, fullPage: true });
 });

@@ -159,14 +159,14 @@ is BUG-194 — interactive, background and remote execution inside the sandbox.
 |---|---|---|
 | MCP protocol revision | [FIXED-274](FIXED_ITEMS.md#fixed-274--the-mcp-client-was-five-protocol-revisions-behind) | **Closed 2026-08-23** — `2026-07-28` offered, three older revisions accepted, the negotiated one shown. What Raiker *uses* of it is still the bounded session |
 | Streamable-HTTP session semantics, remote OAuth, `server/discover` | [BUG-234 remainder](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Open — no longer blocked by the revision, now their own work |
-| Channel routing modes and approval relay | [BUG-225](TO_BE_FIXED.md#bug-225--a-channel-can-be-described-and-never-reached) | Open — an inbound message never becomes work |
+| Channel routing modes and approval relay | [FIXED-298](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | **Closed 2026-08-27** — record-only, new turn, tool-free side question, interrupt/steer, and exact owner approval response ship |
 | Four hook handler types refused | [BUG-226](TO_BE_FIXED.md#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Open — `prompt` first; it needs no new surface |
 | Hook lifecycle coverage | [backlog #14](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Open — four of the fifteen worth adding; `ConfigChange` is the differentiator |
 | Agent Skills standard conformance | [backlog #13](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-low-effort), [ADD-21](TO_BE_ADDED.md#add-21--conformance-to-the-agent-skills-open-standard) | Proposed — interoperability with ~40 products for very little work |
 | MCP Apps (SEP-1865) | [backlog #28](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#low-priority-medium-effort), [ADD-24](TO_BE_ADDED.md#add-24--mcp-apps-sandboxed-server-contributed-interactive-ui) | Proposed — **and it supersedes plugin panels**; build at most one |
 | Plugin panels | [BUG-228](TO_BE_FIXED.md#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Open, and **reassessed**: the row above is the better answer |
 | MCP tool search / deferred tool schemas | [backlog #16](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Proposed |
-| Owner-authored slash commands | [backlog #4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-medium-effort) | Proposed |
+| Owner-authored slash commands | [FIXED-299](FIXED_ITEMS.md#fixed-299--skills-had-no-owner-authored-command-handle) | **Closed 2026-08-27** — active skills can have owner-scoped command handles that grant nothing |
 | Autonomous skill creation with a review gate | [ADD-06](TO_BE_ADDED.md#add-06--a-zero-trust-gate-for-self-authored-skills) | Proposed |
 | Governed browser control | [backlog #24](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort), [ADD-23](TO_BE_ADDED.md#add-23--governed-browser-control-as-a-narrow-tool-set) | Proposed — **an owner decision** |
 | Live-spec sign-in | [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Open |

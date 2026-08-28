@@ -13,6 +13,7 @@ fetched bytes are validated as a skill before anything is written.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -46,6 +47,7 @@ IMPORT_HOSTS: frozenset[str] = frozenset(
 )
 
 MAX_IMPORT_BYTES = 512 * 1024
+_COMMAND_RE = re.compile(r"^[a-z][a-z0-9-]{0,39}$")
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,7 @@ class SkillView:
     byte_size: int
     created_at: str
     updated_at: str
+    command_trigger: str | None = None
     # ADD-21 — how this skill measures against the Agent Skills standard, so an
     # owner can answer "will this work anywhere else?" without leaving the page.
     # Derived from the stored document on every read rather than persisted, so
@@ -85,6 +88,7 @@ class SkillView:
             "byte_size": self.byte_size,
             "created_at": self.created_at,
             "updated_at": self.updated_at,
+            "command_trigger": self.command_trigger,
             "conformance": self.conformance.to_dict(),
         }
 
@@ -103,6 +107,7 @@ def _view(row: dict[str, Any]) -> SkillView:
         byte_size=int(row.get("byte_size", 0) or 0),
         created_at=str(row.get("created_at", "")),
         updated_at=str(row.get("updated_at", "")),
+        command_trigger=(str(row["command_trigger"]) if row.get("command_trigger") else None),
         conformance=report_for_document(str(row.get("skill_md", "") or "")),
     )
 
@@ -424,7 +429,12 @@ class SkillsService:
         )
 
     def build_skill(
-        self, acting_principal_id: str | None, name: str, description: str, body: str
+        self,
+        acting_principal_id: str | None,
+        name: str,
+        description: str,
+        body: str,
+        command_trigger: str | None = None,
     ) -> ControlResult:
         """Install a skill Raiker authored, from a name, a description, and a body.
 
@@ -447,13 +457,80 @@ class SkillsService:
             package = read_skill_md(document, fallback_name=clean_name)
         except SkillValidationError as exc:
             return ControlResult(ok=False, reason_code=exc.reason)
-        return self._installed(
+        result = self._installed(
             principal_id,
             package,
             source="built",
             source_ref=None,
             event_type="skill_built",
         )
+        if result.ok and command_trigger:
+            skill_id = str(result.data.get("skill_id", ""))
+            command_result = self.set_command(principal_id, skill_id, command_trigger)
+            if not command_result.ok:
+                return command_result
+            row = self._store.get_skill(skill_id, principal_id)
+            result.data["skill"] = _view(row).to_dict() if row else None
+        return result
+
+    def set_command(
+        self, acting_principal_id: str | None, skill_id: str, trigger: str | None
+    ) -> ControlResult:
+        """Attach one owner-only slash handle to an installed skill.
+
+        The handle loads instructions; it never changes a capability, decision
+        mode, approval mode, or standing grant.
+        """
+        principal_id, err = self._human(acting_principal_id)
+        if principal_id is None:
+            return ControlResult(ok=False, reason_code=err)
+        row = self._store.get_skill(skill_id, principal_id)
+        if row is None:
+            return ControlResult(ok=False, reason_code="unknown_skill")
+        clean = (trigger or "").strip().lower().lstrip("/")
+        if clean and not _COMMAND_RE.fullmatch(clean):
+            return ControlResult(ok=False, reason_code="skill_invalid_command")
+        try:
+            updated = self._store.set_skill_command(
+                skill_id, principal_id, clean or None
+            )
+        except Exception as exc:  # unique owner/trigger constraint
+            if "UNIQUE" in str(exc).upper():
+                return ControlResult(ok=False, reason_code="skill_command_in_use")
+            raise
+        if not updated:
+            return ControlResult(ok=False, reason_code="unknown_skill")
+        self._writer.append(
+            make_event(
+                session_id="skills",
+                turn_id=None,
+                event_type="skill_command_changed",
+                actor="skills_service",
+                payload={"skill_id": skill_id, "command_trigger": clean or None},
+            )
+        )
+        return ControlResult(
+            ok=True, data={"skill_id": skill_id, "command_trigger": clean or None}
+        )
+
+    def expand_command(self, principal_id: str, text: str) -> tuple[str, str | None]:
+        """Expand an active owner command into an explicit skill invocation."""
+        match = re.match(r"^/([a-z][a-z0-9-]{0,39})(?:\s+(.*))?$", text.strip(), re.DOTALL)
+        if match is None:
+            return text, None
+        trigger = match.group(1).lower()
+        row = self._store.get_active_skill_by_command(principal_id, trigger)
+        if row is None:
+            return text, None
+        arguments = (match.group(2) or "").strip()
+        instruction = (
+            f"Use the installed skill '{row['name']}' for this request. "
+            "Load it with skill_load before acting. This slash command grants no "
+            "capability and changes no approval or decision mode."
+        )
+        if arguments:
+            instruction += f"\n\nOwner input: {arguments}"
+        return instruction, trigger
 
     def rename(
         self, acting_principal_id: str | None, skill_id: str, name: str

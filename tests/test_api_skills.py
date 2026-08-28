@@ -202,6 +202,30 @@ class TestBuild:
         assert resp.status_code == 422
         assert resp.json()["detail"]["reason_code"] == "skill_invalid_name"
 
+    def test_built_skill_command_is_owner_scoped_metadata(
+        self, client: TestClient, headers: dict[str, str]
+    ) -> None:
+        resp = client.post(
+            "/api/skills/build",
+            headers=headers,
+            json={
+                "name": "release-notes",
+                "description": "Draft release notes.",
+                "body": "# Release notes",
+                "command_trigger": "release",
+            },
+        )
+        assert resp.status_code == 200, resp.text
+        skill = resp.json()["skill"]
+        assert skill["command_trigger"] == "release"
+        changed = client.put(
+            f"/api/skills/{skill['skill_id']}/command",
+            headers=headers,
+            json={"command_trigger": "notes"},
+        )
+        assert changed.status_code == 200, changed.text
+        assert changed.json()["command_trigger"] == "notes"
+
 
 class TestImport:
     def test_an_unsupported_host_is_refused_without_reaching_it(

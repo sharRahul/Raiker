@@ -490,21 +490,20 @@ describe("ExtensionsView", () => {
     ).toBeInTheDocument();
   });
 
-  it("still separates what is built from what is not", async () => {
+  it("explains the completed owner-safe routing contract", async () => {
     stubFetch({ "GET /api/channels": channelsView() });
     render(ExtensionsView, { props: { tab: "channels" } });
-    await screen.findByText(/What is still not built/i);
-    expect(screen.getByText(/Outbound delivery/).closest("li")).toHaveTextContent("Done");
-    expect(screen.getByText(/Rate limits/).closest("li")).toHaveTextContent("Done");
-    expect(screen.getByText(/Routing modes/).closest("li")).toHaveTextContent("Next");
-    expect(screen.getByText(/Approval relay/).closest("li")).toHaveTextContent("Not planned yet");
+    await screen.findByRole("heading", { name: "Routing contract" });
+    expect(screen.getByText(/Record only is the default/i)).toBeInTheDocument();
+    expect(screen.getByText(/side questions cannot use tools/i)).toBeInTheDocument();
+    expect(screen.getByText(/approval response must match one pending relay exactly/i)).toBeInTheDocument();
   });
 
   it("mounts the Skills tab as its own destination", async () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
     render(ExtensionsView, { props: { tab: "skills" } });
     expect(await screen.findByRole("heading", { name: "Skills" })).toBeInTheDocument();
-    expect(screen.getByText(/grants no capability, opens no gate/i)).toBeInTheDocument();
+    expect(screen.getByText(/grant no capability and run no code/i)).toBeInTheDocument();
   });
 
   it("exposes each tab through the ARIA tabs pattern", async () => {

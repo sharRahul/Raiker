@@ -32,6 +32,7 @@ ROUTE_ACTION_CALLERS = {
 #: interface enters through the Agent Gateway" checkable rather than asserted.
 GATEWAY_CONSTRUCTORS = {
     "raiker/api/routes_approvals.py",
+    "raiker/api/routes_channels.py",
     "raiker/api/routes_prompts.py",
     "raiker/cli/commands.py",
     "raiker/tasks/scheduler.py",

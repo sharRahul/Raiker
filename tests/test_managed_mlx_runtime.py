@@ -44,7 +44,7 @@ def test_mlx_runtime_targets_declared_slot_and_loopback(tmp_path: Path) -> None:
     assert status.slot == "raiker-local-mlx-3"
     assert status.endpoint == "http://127.0.0.1:8092/v1"
     assert calls == [[
-        "/opt/bin/mlx_lm",
+        str(Path("/opt/bin/mlx_lm")),
         "server",
         "--model",
         str(model),

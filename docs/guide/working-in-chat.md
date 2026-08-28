@@ -377,13 +377,10 @@ install can offer nothing but the fallback. **Build a meaning-based index** is h
 the first real space comes to exist: pick an embedding model and Raiker sends the
 text of each approved memory to it, once, as one governed action you approve.
 
-**Matching a *question* against that space is not connected yet.** Building the
-index is the write half; embedding your question so it can be compared against
-those vectors means calling the provider on every search, which is egress on a
-read path and needs its own permission rather than a shortcut. Until it has one,
-the card reads *"Stored in … Recall still matches words: a question is not
-embedded into this space yet"*, and a paraphrase does not recall. Tracked as
-BUG-240.
+When a semantic space is selected, Raiker embeds the question once through the
+same governed provider or local path and uses it for both ambient and explicit
+recall. If you deny provider egress or the backend fails, the read continues with
+the lexical fallback and says which retrieval path produced each source.
 
 - Memories marked **secret-like** or **credential-like** are never sent.
 - Re-running it embeds only what has been approved since, so keeping the index

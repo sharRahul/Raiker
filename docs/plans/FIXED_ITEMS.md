@@ -310,6 +310,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-295](#fixed-295--ollama-cloud-chat-was-offered-as-an-embedding-model) | Medium | Models / Memory UI honesty | Fixed (found and closed 2026-08-26) |
 | [FIXED-296](#fixed-296--a-library-change-left-semantic-index-controls-stale) | Medium | Memory / managed-file UX | Fixed (found and closed 2026-08-26) |
 | [FIXED-297](#fixed-297--web-development-dependencies-regained-known-denial-of-service-advisories) | High | Web development dependencies | Fixed (found and closed 2026-08-26) |
+| [FIXED-298](#fixed-298--a-paired-channel-could-still-only-record-a-message) | High | Channels / routing / approval relay | Fixed (was BUG-225; closed 2026-08-27) |
+| [FIXED-299](#fixed-299--skills-had-no-owner-authored-command-handle) | High | Skills / Chat / Build commands | Fixed (was backlog #4 and C9 remainder; closed 2026-08-27) |
+| [FIXED-300](#fixed-300--the-mlx-runtime-test-assumed-posix-path-rendering-on-windows) | Low | Test portability / MLX | Fixed (found during release verification; closed 2026-08-28) |
 
 ---
 
@@ -12764,3 +12767,98 @@ dependency ranges are unchanged.
 **Beyond-reference assessment: NO — safeguard maintenance, not advantage.**
 Keeping the build chain free of known advisories preserves Raiker's stated
 control posture but is expected of every reference-quality product.
+
+---
+
+## FIXED-298 — A paired channel could still only record a message
+
+**Severity: High. Area: Channels / routing / approval relay. Closed 2026-08-27
+(was BUG-225).**
+
+**Observed.** The transport, pairing surface, sender allowlist, inbound secret,
+rate limit, and signed outbound delivery existed, but every accepted inbound
+message stopped at recorded quarantine. The approval executor could create a
+pending relay that no channel response could resolve.
+
+**Fixed.** A pairing now stores one owner-selected route atomically:
+`record_only`, `new_turn`, `side_question`, or `interrupt`. Existing pairings
+remain record-only. New turns and interrupts require the exact owner sender
+stored on the pairing; side questions have no tool budget; interrupts require a
+stored conversation target. Channel text cannot select any of those facts.
+
+Routed text occupies an untrusted data slot and a separate runtime-authored
+instruction describes the selected route, so external content never becomes the
+owner prompt. Approval response is a separate endpoint and switch: it requires
+the inbound secret, exact paired owner, exact pending relay id, and immutable
+action id. The relay is claimed with a single compare-and-set before resolution,
+making replays and concurrent duplicate responses fail. Critical approvals and
+connector writes remain local-only.
+
+**User-interface outcome.** Extensions → Channels exposes the four compact
+routing choices, explicit owner and target bindings, and the separate relay
+switch only where the profile supports approvals. The page states the contract
+in one short block and remains record-only until the owner changes it.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Routing inbound
+messages is parity with OpenClaw and Hermes. Raiker goes beyond the reference
+set by keeping route and identity out of message-controlled fields, structurally
+separating data from instructions, giving side questions no tools, and binding a
+single-use approval response to an exact owner/relay/action triple.
+
+**Evidence.** `tests/test_phase_4_channels.py`,
+`tests/test_channel_owner_surface.py`,
+`apps/web/src/lib/views/ExtensionsView.test.ts`, and the live responsive round
+recorded in `docs/plans/LIVE_TEST_ROUNDS.md`.
+
+---
+
+## FIXED-299 — Skills had no owner-authored command handle
+
+**Severity: High. Area: Skills / Chat / Build commands. Closed 2026-08-27 (was
+reference backlog #4 and the C9/B19 remainder).**
+
+**Observed.** Raiker shipped active, progressively loaded skills and a built-in
+composer command menu, but an owner could not give a reviewed procedure a short
+command such as `/release`. Claude Code, Codex, and OpenClaw offer custom command
+paths, leaving Raiker behind on daily reuse.
+
+**Fixed.** An installed skill may carry one optional, owner-scoped, unique slash
+trigger. It can be set while building a skill or edited inline on its card. Chat
+and Build load active triggers into their existing command menu, while the
+server performs the authoritative expansion into an explicit `skill_load`
+instruction. Deactivating the skill disables the command; reinstalling preserves
+the owner's trigger.
+
+**User-interface outcome.** Skill commands appear as quiet `/name` metadata,
+can be edited without a browser prompt, and say “Permissions stay unchanged.”
+The Chat and Build menus identify them as skill commands and keep the existing
+minimal keyboard flow.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Custom commands
+are parity. Raiker goes beyond the references because the trigger is only a
+handle for reviewed instruction text: it grants no capability, opens no gate,
+and changes no decision or approval mode.
+
+**Evidence.** `tests/test_skills.py`, `tests/test_api_skills.py`,
+`apps/web/src/lib/views/SkillsView.test.ts`, the Chat/Build component suites, and
+the live responsive round recorded in `docs/plans/LIVE_TEST_ROUNDS.md`.
+
+---
+
+## FIXED-300 — The MLX runtime test assumed POSIX path rendering on Windows
+
+**Severity: Low. Area: Test portability / MLX. Closed 2026-08-28.**
+
+**Observed.** The complete suite failed only on Windows because a test passed a
+`Path("/opt/bin/mlx_lm")` but compared the launched argument with the literal
+POSIX spelling. `pathlib` correctly renders that same Path with Windows
+separators on Windows; runtime behavior was unchanged.
+
+**Fixed.** The assertion now derives the expected executable argument from the
+same platform-native `Path`, while still checking the exact argv, loopback host,
+declared slot, and port.
+
+**Beyond-reference assessment: NO — test portability, not a product advantage.**
+
+**Evidence.** `tests/test_managed_mlx_runtime.py` passes on Windows and retains
+the same assertion on POSIX hosts.

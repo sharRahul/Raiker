@@ -120,7 +120,7 @@ named as next, and settled the decision channels were blocked on.
 | What a channel message is in a turn | OpenClaw treats channels as where external input enters, framed as guidance to the model | Accepted contract: untrusted content with a named sender who is not the owner; never a prompt, never able to raise the turn's authority, trust resolved from the pairing record | **Beyond** (FIXED-261) |
 | Channel delivery | OpenClaw ships inbound and outbound; Claude Code has no equivalent | Outbound through a capability gate and an egress allowlist; inbound behind an owner secret with sender allowlisting, recorded untrusted and quarantined. All of it was built and **unreachable** — no way to pair — until the owner surface shipped | **At parity for transport** (FIXED-265) |
 | Separating linked / enabled / trusted / reachable | No cited reference separates them; a connector is configured and then it works | Four stored facts with four remedies, shown as four things: pairing, an enable switch, a sender allowlist, and three fail-closed gates named individually | **Beyond** (FIXED-265) |
-| Channel routing modes | OpenClaw routes an inbound message into work | Recorded and quarantined only. No routing mode is implemented, so a channel message never becomes work on its own | **Behind, deliberately** — BUG-225 |
+| Channel routing modes | OpenClaw routes an inbound message into work | Owner-stored record-only, owner new turn, tool-free side question, and target-bound interrupt/steer; content cannot choose the route | **Beyond the parity route** — FIXED-298 |
 | Channel rate limits | Present in the reference set | Fixed window per `(connector, sender)`, 60/min by default, with the refusal recorded as an event rather than a silent 429 | **At parity**, and the recorded refusal is slightly beyond (FIXED-267) |
 | Outbound webhook signing | Signed webhooks are standard | `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes) plus a delivered-at header; unset secret means unsigned and **says so on the page**, rather than silently unsigned | **At parity**, and reporting it is beyond (FIXED-268) |
 | Unattended approval posture | Claude Code's `dontAsk` auto-denies anything not already allowed by a rule. [Permissions](https://code.claude.com/docs/en/permissions) | `dont_ask`, a fourth composer mode: an otherwise-eligible action is refused rather than queued, so a scheduled run carries on with what it is allowed instead of parking | **At parity** (FIXED-262) |
@@ -139,7 +139,7 @@ named as next, and settled the decision channels were blocked on.
 | Deciding what a channel message **is** before building transport | **Yes — this is where Raiker should intend to lead.** Claude Code has no channel concept. OpenClaw's framing is guidance to the model rather than a structural envelope. ChatGPT Work's connectors and Hermes' inbound paths carry sender identity but no stated "cannot raise authority" rule. The transport is commodity; the contract is not | Shipped (FIXED-261) |
 | Giving channels an owner surface | **Yes — and it corrected the round's premise.** Delivery was not missing; it was unreachable, because nothing let the owner pair a connector. The lesson generalises: a gap read as "unbuilt" should be checked against the code before it is built twice | Shipped (FIXED-265) |
 | Reporting each fail-closed gate separately | **Yes.** Three defaults refuse — the capability, the egress allowlist, the inbound secret — and each has a different remedy. Every cited reference collapses this into one enable switch, which is why "it's on and nothing happens" is a support question there and a readable page here | Shipped (FIXED-265) |
-| Routing an inbound message into a turn | **No — refused.** Recording and quarantining are the safe defaults, and the routing modes in `CHANNELS_SPEC.md` are a target rather than a description. Implementing them before rate limits and the relay story would be the wrong order | Open on BUG-225 |
+| Routing an inbound message into a turn | **Yes — meaningful improvement.** Record-only remains the default; active modes come only from owner-stored pairing state, external content is structurally data, and side questions have no tools | Shipped as FIXED-298 |
 | Exempting booleans from key-based redaction | **Yes — small and general.** A filter that replaces `False` with a truthy marker does not protect a secret; it states the negation of a fact, and every client reads it confidently | Shipped (FIXED-266) |
 | Bounding an allowlisted channel sender | **No — parity**, and closing a gap Raiker's own spec had named. The *recorded* refusal is the part worth keeping: a 429 with no audit trail leaves the owner unable to tell "nobody is sending" from "everything is being dropped" | Shipped (FIXED-267) |
 | Signing outbound deliveries, and saying when they are not signed | **Partly.** Signed webhooks are standard; it was Raiker that was behind its own connector profile. What goes beyond is telling the owner *on the page* that deliveries are currently unsigned — the gap between what a profile declares and what the transport does is exactly what a governed product should surface | Shipped (FIXED-268) |
@@ -154,10 +154,9 @@ named as next, and settled the decision channels were blocked on.
 * **Plugin panels.** The last contribution kind. Tracked as BUG-228, split out of
   BUG-221 so it can be worked on its own terms.
 * **Plugin LSP servers.** No surface exists to contribute to. Tracked as BUG-227.
-* **Channels.** *Superseded:* outbound and inbound both existed and are now
-  reachable (FIXED-265), rate-limited (FIXED-267) and signed (FIXED-268). What is
-  still behind is above the transport — the spec's routing modes, and resolving
-  an approval over a channel. Tracked as BUG-225.
+* ~~**Channels.**~~ Closed through FIXED-265, FIXED-267, FIXED-268 and
+  FIXED-298: the transport is reachable, bounded, signed, owner-routed, and its
+  approval response is exact and single-use.
 * **A marketplace or plugin directory.** Still not planned; installing from a
   path or URL with a reviewed permission diff is the local-first equivalent.
 * **Hook handler types.** Unchanged from the first pass, and worth restating:
@@ -211,7 +210,7 @@ Status: ✅ implemented · 🟡 partial/stub · 🔒 phase_scheduled_disabled ·
 | [`checkpointing`](https://code.claude.com/docs/en/checkpointing) (snapshot before each prompt; `/rewind` restores code, conversation or both; summarize-from/up-to-here) | `docs/architecture/CHECKPOINTING_AND_REWIND_SPEC.md` | 🟡 capture real and automatic; a real `CheckpointRestoreExecutor` exists and is registered, but **no route, command or tool proposes a restore** — every owner surface shows a preflight only. Conversation branching from a checkpoint ships (FIXED-227) |
 | `hooks` (31 events; `command` \| `http` \| `mcp_tool` \| `prompt` \| `agent`; matchers; `if`) | `docs/architecture/HOOKS_SPEC.md` | 🟡 dispatcher, matchers and `if` real; **16 events, all of them emitted** (FIXED-255), 2 handler types, owner off switch and owner surface at Extensions → Hooks |
 | [`plugins-reference`](https://code.claude.com/docs/en/plugins-reference) (`plugin.json`; skills, agents, hooks, MCP servers, LSP servers, monitors, `bin/`, themes, output styles, workflows, `userConfig`, `channels`, `dependencies`; marketplaces) | `docs/architecture/PLUGIN_SYSTEM_SPEC.md`, `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` | 🟡 manifest validation, supply chain and signature level, plus contributed **hook rules** (FIXED-256), **skills** (FIXED-259) and **MCP-server offers** (FIXED-260). Agents, LSP servers, monitors, `bin/` executables, themes and output styles are not contributable — several deliberately, see [§4](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused). No marketplace, by decision ([§3.4](REFERENCE_PLATFORM_COMPATIBILITY.md#34-a-reviewed-permission-diff-instead-of-a-marketplace)) |
-| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/architecture/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | 🟡 *corrected 2026-08-23:* transport, pairing, sender allowlist, inbound secret, per-sender rate limit and signed outbound delivery all ship (FIXED-265, FIXED-267, FIXED-268). Routing modes and approval relay do not (BUG-225) |
+| `channels-reference` (MCP `claude/channel` capability; `notifications/claude/channel`; sender gating; permission relay) | `docs/architecture/CHANNELS_SPEC.md`, `raiker/config/channel-connectors.json` | ✅ transport, pairing, sender allowlist, inbound secret, per-sender rate limit, signed outbound, owner-stored routing and exact single-use approval response ship (FIXED-265, FIXED-267, FIXED-268, FIXED-298) |
 
 > Alignment notes: the Claude Code hooks reference documents **31 events** (incl.
 > `SessionStart`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, `PreCompact`, `PostCompact`,
@@ -1376,7 +1375,7 @@ Each is recorded where the work is tracked rather than implied to exist.
 
 | Proposal | Beyond the reference set? | Why it was not built now |
 |---|---|---|
-| Owner-authored custom slash commands | **No — parity** (Claude Code, Codex, OpenClaw have them) | The skill store already holds owner-authored instructions with a review path. The honest version has to state what authority a command carries, which makes it a governance design task rather than a parser change. |
+| ~~Owner-authored custom slash commands~~ | **Built — parity plus an improvement** (FIXED-299) | An active owner skill carries the optional trigger. The server expands it into an explicit skill load and states that it grants no capability or approval bypass. |
 | `@`-mention of a connector, a memory or a past conversation | **Yes**, if the menu names the authority each row would use | One completion menu over four governed reads becomes a way to reach a capability without noticing, unless the row says which one. That is the design work. |
 | Branch-a-conversation-from-here | **Built in the second round of the same day** — see [FIXED-227](../plans/FIXED_ITEMS.md) | It needed a conversation fork over the existing checkpoint manifest plus a surface that makes two branches legible; both landed, and the lineage band is the part no reference product has. |
 | A slash command that shows the capability gate it would cross | **Yes** | No reference product's command surface is governed at all, so none can show this. It would make the governed shape of a shortcut visible before it runs. |
@@ -1567,7 +1566,7 @@ was missing was everything an owner could see or trust:
 | ~~**22 of ~31 lifecycle events**~~ | Claude Code fires `Stop`, `SubagentStart/Stop`, `TaskCreated/Completed`, `PostToolBatch`, `Notification`, `FileChanged`, `ConfigChange`, `Elicitation`, `WorktreeCreate/Remove` and more | **Closed 2026-08-22 as [FIXED-255](../plans/FIXED_ITEMS.md).** Sixteen events accepted, all sixteen emitted — `Stop`, `StopFailure`, `SubagentStart/Stop`, `TaskCreated/Completed` and `SessionEnd` gained call sites | The rule this round established held: an event is published as dispatched only when a test can derive it from the code, and the test now derives all sixteen |
 | **Four of five handler types** | `http`, `mcp_tool`, `prompt`, `agent` | `command` and `builtin`. Unchanged; now tracked as **BUG-226** | Each needs a gated surface Raiker keeps closed: network egress, the MCP broker, a model call, a subagent. A hook that reaches the network is an egress decision before it is a hook |
 | **Plugin execution** | Claude Code plugins bundle skills, agents, hooks, MCP servers, LSP servers and monitors; Cowork installs them from **Customize** | **Reduced 2026-08-22 as [FIXED-256](../plans/FIXED_ITEMS.md), then again the same day.** *Superseded by the second pass:* skills shipped as FIXED-259 and MCP-server **offers** as FIXED-260. `execution_enabled` stays `False` — a contributed rule runs as a *hook* | The blocking question was what a plugin's code is allowed to be, and the answer taken is that it gets no execution surface of its own. Panels (BUG-228) and LSP (BUG-227) remain |
-| **Channel delivery** | Claude Code channels relay permissions and messages over MCP | *Superseded by the second pass:* delivery was not absent, it was **unreachable** — no way to pair. Pairing, the sender allowlist, the inbound secret, per-sender rate limits and signed outbound delivery all shipped (FIXED-265, FIXED-267, FIXED-268). What remains is above the transport: routing modes and approval relay, tracked as **BUG-225** | The gate is a decision about what an inbound message becoming *work* means, not the transport code |
+| ~~**Channel delivery**~~ | Claude Code channels relay permissions and messages over MCP | **Closed as FIXED-298.** Pairing, sender allowlist, inbound secret, rate limits, signed outbound, owner-stored routing, and exact single-use approval response ship | The route is stored out of band; channel text cannot promote itself into authority |
 
 ### Recommended improvements, in the order they are worth doing
 
@@ -1581,9 +1580,8 @@ was missing was everything an owner could see or trust:
    [FIXED-256](../plans/FIXED_ITEMS.md). It was a design task about authority, and
    the answer was that a plugin gets no execution surface of its own. Skills,
    MCP servers and panels remain, in that order.
-4. ~~**Channel activation**~~ (BUG-225) — the transport half shipped 2026-08-22
-   as [FIXED-265](../plans/FIXED_ITEMS.md), [FIXED-267](../plans/FIXED_ITEMS.md) and
-   [FIXED-268](../plans/FIXED_ITEMS.md). Routing modes and approval relay remain,
-   and their gate is still a threat model rather than an implementation.
+4. ~~**Channel activation**~~ — transport shipped 2026-08-22 as FIXED-265,
+   FIXED-267 and FIXED-268; routing and exact approval response closed 2026-08-27
+   as [FIXED-298](../plans/FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message).
 5. **The four refused handler types** (BUG-226). `prompt` first — it makes no
    outbound request and its output is context, not a decision.

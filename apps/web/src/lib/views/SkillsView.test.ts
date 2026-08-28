@@ -45,7 +45,7 @@ describe("SkillsView", () => {
     stubFetch({ "GET /api/skills": { skills: [] } });
     render(SkillsView);
     expect(
-      await screen.findByText(/grants no capability, opens no gate/i),
+      await screen.findByText(/grant no capability and run no code/i),
     ).toBeInTheDocument();
   });
 
@@ -147,6 +147,7 @@ describe("SkillsView", () => {
       name: "release-notes",
       description: "Draft release notes. Use when cutting a release.",
       body: "# Release notes",
+      command_trigger: null,
     });
   });
 
@@ -158,6 +159,27 @@ describe("SkillsView", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Details" }));
     expect(screen.getByText(/aaaaaaaaaaaaaaaa…/)).toBeInTheDocument();
     expect(screen.getByText("algorithm-creator/SKILL.md")).toBeInTheDocument();
+  });
+
+  it("edits a slash command inline and states its authority", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/skills": { skills: [skill()] },
+      "PUT /api/skills/skl_1/command": {
+        ok: true,
+        skill_id: "skl_1",
+        command_trigger: "algorithm",
+      },
+    });
+    render(SkillsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Add command" }));
+    expect(screen.getByText(/Permissions stay unchanged/i)).toBeInTheDocument();
+    await fireEvent.input(screen.getByLabelText("Slash command"), {
+      target: { value: "algorithm" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByText(/grants no capability/i)).toBeInTheDocument());
+    const call = fetchMock.mock.calls.find(([url]) => String(url).endsWith("/command"));
+    expect(JSON.parse(String(call?.[1]?.body))).toEqual({ command_trigger: "algorithm" });
   });
 });
 

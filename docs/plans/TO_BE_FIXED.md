@@ -80,7 +80,7 @@ names.
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
 | [MEM-07](MEMORY_RELIABILITY_PLAN.md#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) … [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. |
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
-| [BUG-225](#bug-225--a-channel-can-be-described-and-never-reached) | Medium → Low | Channels / extensibility | Open — reduced three times 2026-08-22 (FIXED-261, FIXED-265, FIXED-267). **The premise was wrong**: the transport existed and had no owner surface. Contract, surface and rate limits ship; routing modes and approval-relay resolution remain |
+| [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open — raised 2026-08-22 |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
@@ -90,7 +90,7 @@ names.
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
 | [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium → Low | Memory / retrieval | Provider-memory half fixed 2026-08-26 as FIXED-292. Managed knowledge files still lack write-time vector projections |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
-| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (11 complete, 7 open; C14 branch-from-here closed as FIXED-227) |
+| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (12 complete, 6 open; C9 skill commands closed as FIXED-299 and C14 branch-from-here as FIXED-227) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -373,102 +373,10 @@ task at a time.
 
 ## BUG-225 — A channel can be described and never reached
 
-**Severity: Medium. Area: channels / extensibility. Status: Open — reduced
-2026-08-22 (FIXED-261). Raised 2026-08-22 while closing the hooks and plugin
-halves of the same gap.**
-
-**2026-08-22 update — the premise was wrong, and the surface now exists
-(FIXED-265).** This entry said *"nothing consumes them for delivery"*. Building
-delivery started by reading `raiker/channels/` and found that it was already
-built: `ExternalChannelExecutor` does bounded outbound webhook delivery against
-the channel egress allowlist, `POST /api/channels/{id}/inbound` receives messages
-behind an owner secret with sender allowlisting and marks every one untrusted and
-quarantined, and `ChannelApprovalRelayExecutor` can only ever queue a *pending*
-relay. The capability is registered, gated, phase-gated and audited.
-
-What was missing was **any way for the owner to pair a connector**. With no
-pairing the executors refuse and the receiver 404s, so the tab's "channels do not
-exist" was true in effect and wrong about the cause — and it is the failure this
-document's own standard forbids: backend work that leaves an invisible surface.
-
-Pairing, enable/disable, sender allowlist, unpair and a governed test delivery
-now exist, and the tab reports the three fail-closed gates separately. See
-FIXED-265.
-
-**What is actually left**, restated against the code rather than the original
-guess:
-
-* ~~**Rate limits.**~~ Closed the same day as FIXED-267: a fixed window per
-  `(connector, sender)`, 60/min by default, with the refusal recorded.
-* **Approval-relay resolution.** The queue exists and is deliberately
-  pending-only. Resolving an approval over a channel still has no anti-phishing
-  story, and should stay refused until it does.
-* **Routing modes.** An inbound message is recorded and quarantined; none of the
-  routing modes in the spec (`new_turn`, `side_question`, `interrupt`, …) is
-  implemented, so a channel message never becomes work on its own. That is the
-  safe default and it is *not* what the spec's Channel Type Matrix implies.
-
-**2026-08-22 update — step 1 is done (FIXED-261).** The decision this entry named
-as the blocker is written down and accepted: a channel message is **untrusted
-content with a named sender who is not the owner**, in `docs/architecture/CHANNELS_SPEC.md` →
-*What a channel message is in a turn*, with the matching rows in
-`docs/architecture/THREAT_MODEL.md`. Five enforceable rules follow — never a prompt, trust from
-the pairing record rather than from the message, no raising of the turn's
-authority, outbound-is-a-capability vs inbound-is-a-boundary, and nothing
-implicit. Extensions → Channels states the contract and the four steps with the
-state of each, so an accepted spec cannot be mistaken for a shipped feature.
-
-**Steps 2, 3 and 4 remain open**, and the code below now has a contract to
-satisfy. Outbound delivery is next.
-
-**Observed.** `config/channel-connectors.json` describes channel connectors in
-detail — transport, auth method, whether pairing is required, whether a sender
-allowlist is required, whether network is required, the capability policy
-template — and `ConnectorRegistry` validates every one of those fields at
-startup, refusing a profile that omits any. Then nothing consumes them for
-delivery. Extensions → **Channels** says so:
-
-> Inbound and outbound delivery needs an accepted contract and threat model
-> before Raiker offers controls for it.
-
-That is honest, and it is now the largest remaining piece of the hooks →
-plugins → channels gap: hooks reached parity 2026-08-22 (FIXED-255) and plugins
-took their first contribution kind (FIXED-256).
-
-**Root cause.** Not the registry, which already models the right things. What is
-missing is a decision about the boundary: a channel is the point at which
-**content Raiker did not ask for enters a turn**. Every other input path has an
-answer for that — a prompt is the owner speaking, a tool result is data the model
-is told to distrust, a subagent digest is quoted as untrusted. A channel message
-has no such framing yet, and neither has the sender.
-
-**What the reference set does.** OpenClaw leads here; its own documentation
-treats channels as where external input enters. Claude Code has no equivalent.
-This is therefore the one part of the three-way gap where being behind is not
-automatically a defect — shipping delivery without the framing would be worse
-than not shipping it.
-
-**Proposed fix, in the order the authority story has to be written.**
-
-1. ~~**Decide what a channel message *is* in a turn.**~~ **Done — FIXED-261.** It
-   is untrusted content with a named sender, and the sender is not the owner.
-   Written down in `docs/architecture/CHANNELS_SPEC.md` and the threat model, so the code
-   below now has a contract to satisfy.
-2. ~~**Outbound first.**~~ **Already existed; reachable since FIXED-265.** The
-   executor, the capability gate, the egress allowlist and the audit path were
-   built. What it lacked was a pairing the owner could create.
-3. ~~**Then inbound, paired and allowlisted.**~~ **Already existed; reachable
-   since FIXED-265.** `requires_pairing` and `requires_sender_allowlist` were
-   enforced by the receiver and unreachable for the same reason.
-4. **Permission relay last** — still open, and still for the original reason: a
-   channel that can raise an approval is a channel that can be used to *ask for
-   one*, and the anti-phishing story for that does not exist. The relay queue is
-   deliberately pending-only until it does.
-5. ~~**Rate limits**~~ — raised by this work and closed by it (FIXED-267).
-
-The tab now states the contract, offers the controls, and reports each
-fail-closed gate separately — so "nothing has been delivered" and "nothing can be
-delivered" stop looking the same.
+**Closed 2026-08-27 as
+[FIXED-298](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message).**
+The full observation, authority contract, anti-phishing controls, UI outcome,
+and evidence moved to the closed-work ledger.
 
 ---
 

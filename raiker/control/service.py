@@ -829,6 +829,76 @@ class RuntimeControlService:
         )
         return ControlResult(ok=True, data={"pairing_id": pairing_id, "sender_count": len(cleaned)})
 
+    def set_channel_routing(
+        self,
+        acting_principal_id: str | None,
+        pairing_id: str,
+        *,
+        routing_mode: str,
+        target_session_id: str | None,
+        owner_sender_id: str | None,
+        approval_relay_enabled: bool,
+    ) -> ControlResult:
+        """Store the route the owner chose; the message may never choose it."""
+        import json as _json
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        pairing = self._store.get_channel_pairing(pairing_id)
+        if pairing is None:
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        if routing_mode not in {"record_only", "new_turn", "side_question", "interrupt"}:
+            return ControlResult(ok=False, reason_code="channel_routing_mode_invalid")
+        target = (target_session_id or "").strip() or None
+        owner_sender = (owner_sender_id or "").strip() or None
+        try:
+            senders = set(_json.loads(pairing.get("sender_allowlist_json") or "[]"))
+        except (TypeError, ValueError):
+            senders = set()
+        if owner_sender is not None and owner_sender not in senders:
+            return ControlResult(ok=False, reason_code="channel_owner_not_allowlisted")
+        if routing_mode in {"side_question", "interrupt"} and target is None:
+            return ControlResult(ok=False, reason_code="channel_target_session_required")
+        if target is not None:
+            session = self._store.load_session(target)
+            owner_user_id = self._store.principal_user_id(principal.principal_id)
+            if session is None or (
+                session.get("user_id") is not None
+                and str(session.get("user_id")) != str(owner_user_id)
+            ):
+                return ControlResult(ok=False, reason_code="channel_target_session_unknown")
+        if routing_mode in {"new_turn", "interrupt"} and owner_sender is None:
+            return ControlResult(ok=False, reason_code="channel_owner_sender_required")
+        if approval_relay_enabled and owner_sender is None:
+            return ControlResult(ok=False, reason_code="channel_owner_sender_required")
+        if not self._store.set_channel_pairing_routing(
+            pairing_id,
+            routing_mode=routing_mode,
+            target_session_id=target,
+            owner_sender_id=owner_sender,
+            approval_relay_enabled=approval_relay_enabled,
+        ):
+            return ControlResult(ok=False, reason_code="unknown_channel_pairing")
+        self._writer.append(
+            make_event(
+                session_id="channels",
+                turn_id=None,
+                event_type="channel_routing_changed",
+                actor="control_service",
+                payload={
+                    "pairing_id": pairing_id,
+                    "routing_mode": routing_mode,
+                    "has_target": target is not None,
+                    "has_owner_sender": owner_sender is not None,
+                    "approval_relay_enabled": approval_relay_enabled,
+                },
+            )
+        )
+        return ControlResult(ok=True, data={"pairing_id": pairing_id, "routing_mode": routing_mode})
+
     def unpair_channel(self, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
         """Remove the pairing. Both executors and the inbound receiver read this
         table, so deleting the row is what actually stops the channel."""

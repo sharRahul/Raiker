@@ -12,7 +12,9 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.schemas import (
+    ChannelApprovalResponse,
     ChannelEnabledRequest,
+    ChannelRoutingRequest,
     ChannelSendersRequest,
     ChannelTestDeliveryRequest,
     InboundChannelMessage,
@@ -21,6 +23,13 @@ from raiker.api.schemas import (
 from raiker.api.sessions import ApiSession
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id
+from raiker.contracts.models import (
+    ClientMetadata,
+    PromptEnvelope,
+    PromptOptions,
+    PromptPayload,
+    UserMetadata,
+)
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.runtime.authority.models import Principal
@@ -29,9 +38,9 @@ from raiker.storage.sqlite import SQLiteStore
 router = APIRouter()
 
 # Inbound channel receiver (Phase 4 slice 4 / Phase 8 gate). Inbound traffic is
-# authenticated by an owner-set channel secret (NOT the owner bearer token) and
-# is ALWAYS labelled untrusted + quarantined: it records a message and emits a
-# governed event, and never executes anything or grants any authority.
+# authenticated by an owner-set channel secret (NOT the owner bearer token).
+# Content remains structurally untrusted; only an owner-stored route may place
+# it in a governed turn, and doing so never increases that turn's authority.
 
 
 def _ws(request: Request) -> str | Path:
@@ -203,6 +212,25 @@ async def set_channel_senders(
     )
 
 
+@router.put("/api/channels/pairings/{pairing_id}/routing")
+async def set_channel_routing(
+    pairing_id: str,
+    body: ChannelRoutingRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _channel_result(
+        _service(request).set_channel_routing(
+            auth_data[0].principal_id,
+            pairing_id,
+            routing_mode=body.routing_mode,
+            target_session_id=body.target_session_id,
+            owner_sender_id=body.owner_sender_id,
+            approval_relay_enabled=body.approval_relay_enabled,
+        )
+    )
+
+
 @router.delete("/api/channels/pairings/{pairing_id}")
 async def unpair_channel(
     pairing_id: str,
@@ -321,8 +349,11 @@ async def receive_inbound(
             },
         )
 
-    # Allowlisted sender, within budget: still untrusted + quarantined;
-    # instructions are inert.
+    # Allowlisted sender, within budget: content stays structurally untrusted.
+    # The stored owner route — never a field in this request — decides whether
+    # anything else happens.
+    owner_sender_id = str(pairing.get("owner_sender_id") or "")
+    is_owner = bool(owner_sender_id and hmac.compare_digest(body.sender_id, owner_sender_id))
     writer.append(make_event(
         session_id="channels",
         turn_id=None,
@@ -333,15 +364,280 @@ async def receive_inbound(
             "connector_id": connector_id,
             "channel_type": channel_type,
             "sender_id": body.sender_id,
-            "trust_level": "untrusted",
+            "trust_level": "owner" if is_owner else "untrusted",
             "quarantined": True,
             "instructions_inert": True,
             "preview": preview,
         },
     ))
+    routed = await _route_inbound_message(
+        request,
+        store,
+        pairing,
+        channel_message_id=channel_message_id,
+        sender_id=body.sender_id,
+        text=body.text,
+        is_owner=is_owner,
+    )
     return {
         "ok": True,
         "channel_message_id": channel_message_id,
-        "trust_level": "untrusted",
-        "quarantined": True,
+        "trust_level": "owner" if is_owner else "untrusted",
+        "quarantined": not bool(routed.get("routed")),
+        **routed,
+    }
+
+
+@router.post("/api/channels/{connector_id}/approval-response")
+async def receive_approval_response(
+    connector_id: str,
+    body: ChannelApprovalResponse,
+    request: Request,
+    x_raiker_channel_secret: str | None = Header(default=None),
+) -> dict[str, Any]:
+    """Resolve one relayed approval through the paired owner identity.
+
+    The exact relay and action ids are mandatory, the relay is single-use, and
+    critical approvals and connector writes remain local-only.  This is the
+    anti-phishing boundary: a generic "approve" message has no meaning here.
+    """
+    secret = os.environ.get("RAIKER_CHANNEL_INBOUND_SECRET", "").strip()
+    if not secret:
+        raise HTTPException(status_code=503, detail={"ok": False, "reason_code": "channel_inbound_disabled"})
+    if not x_raiker_channel_secret or not hmac.compare_digest(x_raiker_channel_secret, secret):
+        raise HTTPException(status_code=401, detail={"ok": False, "reason_code": "invalid_channel_secret"})
+    store = SQLiteStore(_ws(request))
+    pairing = _enabled_pairing(store, connector_id)
+    if pairing is None or not bool(pairing.get("approval_relay_enabled")):
+        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "channel_approval_relay_not_enabled"})
+    owner_sender = str(pairing.get("owner_sender_id") or "")
+    if not owner_sender or not hmac.compare_digest(body.sender_id, owner_sender):
+        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "channel_owner_sender_required"})
+    if not _within_inbound_budget(connector_id, body.sender_id):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={"ok": False, "reason_code": "rate_limited"},
+        )
+    relay = store.get_approval_relay(body.relay_id)
+    if (
+        relay is None
+        or str(relay.get("pairing_id")) != str(pairing.get("pairing_id"))
+        or str(relay.get("action_id")) != body.action_id
+        or str(relay.get("status")) != "pending"
+    ):
+        raise HTTPException(status_code=409, detail={"ok": False, "reason_code": "channel_approval_relay_mismatch"})
+
+    from raiker.approvals import ApprovalInbox
+    from raiker.approvals.execution import ApprovalExecutionBridge, executable_capability
+    from raiker.cli.principal_resolver import resolve_local_principal
+    from raiker.runtime.turn_suspension import approval_outcome
+
+    principal_id = str(pairing.get("paired_by") or "")
+    principal, _ = resolve_local_principal(_ws(request), principal_id)
+    if principal is None:
+        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "principal_not_resolved"})
+    user_id = store.principal_user_id(principal_id)
+    # A relay is bound to the immutable tool-action id, while resolution APIs
+    # load the richer joined row by approval id. Resolve the indirection first;
+    # never accept an approval id in the action-id field.
+    with store.connect() as connection:
+        approval_ref = connection.execute(
+            "SELECT approval_id FROM approvals WHERE action_id = ?", (body.action_id,)
+        ).fetchone()
+    approval = (
+        store.load_approval(str(approval_ref["approval_id"]), user_id=user_id)
+        if approval_ref is not None
+        else None
+    )
+    if approval is None or str(approval.get("action_id")) != body.action_id:
+        raise HTTPException(status_code=404, detail={"ok": False, "reason_code": "approval_not_found"})
+    approval_id = str(approval.get("approval_id") or "")
+    if bool(approval.get("critical")):
+        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "critical_approval_requires_local_step_up"})
+    with store.connect() as connection:
+        connector_intent = connection.execute(
+            "SELECT 1 FROM connector_write_intents WHERE approval_id = ?", (approval_id,)
+        ).fetchone()
+    if connector_intent is not None:
+        raise HTTPException(status_code=403, detail={"ok": False, "reason_code": "connector_write_requires_local_approval"})
+
+    writer = EventLogWriter(store)
+    relay_status = "approved" if body.approve else "denied"
+    # Claim the single-use relay before resolving or executing the action. Two
+    # concurrent responses can both read "pending", but only one can win this
+    # compare-and-set and cross the execution boundary.
+    if not store.resolve_approval_relay(
+        body.relay_id, status=relay_status, resolved_by=principal_id
+    ):
+        raise HTTPException(status_code=409, detail={"ok": False, "reason_code": "channel_approval_relay_already_resolved"})
+    capability = executable_capability(str(approval.get("tool_name") or "")) or str(
+        approval.get("tool_name") or ""
+    )
+    executed = False
+    artifacts: dict[str, Any] = {}
+    if body.approve:
+        bridge = ApprovalExecutionBridge(store, writer)
+        if bridge.executes_on_resolution(
+            str(approval.get("tool_name") or ""), principal_id, critical=False
+        ):
+            execution = bridge.execute(
+                approval,
+                principal,
+                session_id="channel_approval",
+                reason=(body.reason or "approved over paired owner channel")[:500],
+            )
+            if not execution.ok:
+                raise HTTPException(status_code=409, detail={"ok": False, "reason_code": execution.reason_code})
+            executed = True
+            capability = execution.capability
+            artifacts = dict(execution.artifacts)
+            from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn
+
+            _record_generated_file_attachments_for_turn(
+                _ws(request),
+                session_id=str(approval.get("session_id") or ""),
+                turn_id=str(approval.get("turn_id") or ""),
+                principal_id=principal_id,
+            )
+        else:
+            ApprovalInbox(store, writer).resolve(
+                approval_id,
+                approve=True,
+                resolved_by=principal_id,
+                reason=(body.reason or "approved over paired owner channel")[:500],
+                user_id=user_id,
+            )
+    else:
+        ApprovalInbox(store, writer).resolve(
+            approval_id,
+            approve=False,
+            resolved_by=principal_id,
+            reason=(body.reason or "denied over paired owner channel")[:500],
+            user_id=user_id,
+        )
+    suspended = store.load_suspended_turn(approval_id, principal_id=principal_id)
+    if suspended is not None and str(suspended.get("status")) == "suspended":
+        store.record_suspended_turn_outcome(
+            approval_id,
+            json.dumps(
+                approval_outcome(
+                    approved=body.approve,
+                    executed=executed,
+                    capability=capability,
+                    artifacts=artifacts,
+                ),
+                sort_keys=True,
+            ),
+        )
+    writer.append(make_event(
+        session_id=str(approval.get("session_id") or "channels"),
+        turn_id=approval.get("turn_id"),
+        event_type="approval_relay_approved" if body.approve else "approval_relay_denied",
+        actor="channel_approval_relay",
+        payload={"relay_id": body.relay_id, "approval_id": approval_id, "executed": executed},
+    ))
+    return {
+        "ok": True,
+        "relay_id": body.relay_id,
+        "approval_id": approval_id,
+        "status": "executed" if executed else relay_status,
+        "resumable": suspended is not None,
+    }
+
+
+async def _route_inbound_message(
+    request: Request,
+    store: SQLiteStore,
+    pairing: dict[str, Any],
+    *,
+    channel_message_id: str,
+    sender_id: str,
+    text: str,
+    is_owner: bool,
+) -> dict[str, Any]:
+    """Apply only the route stored on the pairing; message fields grant nothing."""
+    mode = str(pairing.get("routing_mode") or "record_only")
+    if mode == "record_only":
+        return {"routed": False, "routing_mode": mode}
+    principal_id = str(pairing.get("paired_by") or "")
+    target = str(pairing.get("target_session_id") or "") or None
+    if mode in {"new_turn", "interrupt"} and not is_owner:
+        return {
+            "routed": False,
+            "routing_mode": mode,
+            "reason_code": "channel_owner_sender_required",
+        }
+    if mode == "interrupt":
+        if target is None:
+            return {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+        if text.strip().lower() in {"stop", "cancel", "pause"}:
+            store.request_turn_stop(target, principal_id, reason="owner requested stop over paired channel")
+            action = "stop"
+        else:
+            store.queue_turn_steer(target, principal_id, text=text[:4000])
+            action = "steer"
+        EventLogWriter(store).append(make_event(
+            session_id=target,
+            turn_id=None,
+            event_type="channel_message_routed",
+            actor="channel_router",
+            payload={"channel_message_id": channel_message_id, "routing_mode": mode, "action": action},
+        ))
+        return {"routed": True, "routing_mode": mode, "action": action, "session_id": target}
+
+    if mode not in {"new_turn", "side_question"}:
+        return {"routed": False, "routing_mode": mode, "reason_code": "channel_routing_mode_unsupported"}
+    if mode == "side_question" and target is None:
+        return {"routed": False, "routing_mode": mode, "reason_code": "channel_target_session_required"}
+
+    from raiker.gateway.agent_gateway import AgentGateway
+
+    session_id = target or new_id("sess_")
+    channel_type = str(pairing.get("channel_type") or "webhooks")
+    envelope = PromptEnvelope(
+        request_id=new_id("req_"),
+        session_id=session_id,
+        turn_id=new_id("turn_"),
+        client=ClientMetadata(type=channel_type, name=f"raiker-{channel_type}", version="1.0"),
+        user=UserMetadata(id=principal_id),
+        prompt=PromptPayload(
+            text=text[:16000] or "(empty channel message)",
+            metadata={
+                "entry_command": channel_type,
+                "surface": "chat",
+                "input_mode": "typed",
+                "channel_message": {
+                    "id": channel_message_id,
+                    "connector_id": str(pairing.get("connector_id") or ""),
+                    "sender_id": sender_id,
+                    "trust_level": "owner" if is_owner else "untrusted",
+                    "routing_mode": mode,
+                },
+            },
+        ),
+        # A side question observes; it cannot turn an allowlisted external
+        # sender into the owner of the active task.  Owner new turns use the
+        # owner's ordinary standing controls and still pass every gate.
+        options=PromptOptions(max_tool_calls=0 if mode == "side_question" else 12),
+    )
+    response = await AgentGateway(_ws(request), principal_id=principal_id).submit_prompt_async(envelope)
+    EventLogWriter(store).append(make_event(
+        session_id=session_id,
+        turn_id=envelope.turn_id,
+        event_type="channel_message_routed",
+        actor="channel_router",
+        payload={
+            "channel_message_id": channel_message_id,
+            "routing_mode": mode,
+            "status": response.status,
+            "tool_budget": envelope.options.max_tool_calls,
+        },
+    ))
+    return {
+        "routed": True,
+        "routing_mode": mode,
+        "session_id": session_id,
+        "turn_id": envelope.turn_id,
+        "status": response.status,
+        "reply": response.message,
     }

@@ -160,6 +160,8 @@ export interface SkillView {
   byte_size: number;
   created_at: string;
   updated_at: string;
+  /** Optional owner-authored slash handle. It loads this skill and grants nothing. */
+  command_trigger?: string | null;
   // Optional so older payloads and existing test fixtures stay valid; absent is
   // read as "not measured", which renders nothing rather than a false pass.
   conformance?: SkillConformance;
@@ -424,6 +426,13 @@ export interface ChannelProfile {
   display_label: string | null;
   sender_count: number;
   senders: string[];
+  routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
+  target_session_id: string | null;
+  owner_sender_id: string | null;
+  approval_relay_enabled: boolean;
+  supports_side_questions: boolean;
+  supports_interrupts: boolean;
+  supports_approvals: boolean;
 }
 
 export interface ChannelsView {

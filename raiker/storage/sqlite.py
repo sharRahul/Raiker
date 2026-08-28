@@ -79,6 +79,8 @@ from raiker.storage.migrations import (
     CAPABILITY_DECISION_MODE_SQL,
     CAPABILITY_MONITORING_MIGRATION_ID,
     CAPABILITY_MONITORING_SQL,
+    CHANNEL_ROUTING_MIGRATION_ID,
+    CHANNEL_ROUTING_SQL,
     CHECKPOINT_CAPTURE_HEALTH_MIGRATION_ID,
     CHECKPOINT_CAPTURE_HEALTH_SQL,
     CHECKPOINT_CAPTURE_MANIFEST_MIGRATION_ID,
@@ -325,6 +327,8 @@ from raiker.storage.migrations import (
     SESSION_TAGS_SQL,
     SETUP_STATE_MIGRATION_ID,
     SETUP_STATE_SQL,
+    SKILL_COMMANDS_MIGRATION_ID,
+    SKILL_COMMANDS_SQL,
     SKILLS_MIGRATION_ID,
     SKILLS_SQL,
     STANDING_GRANTS_MIGRATION_ID,
@@ -1474,6 +1478,12 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 MANAGED_FILE_CHUNK_VECTORS_MIGRATION_ID,
                 MANAGED_FILE_CHUNK_VECTORS_SQL,
                 connection,
+            )
+            self._apply_migration(
+                CHANNEL_ROUTING_MIGRATION_ID, CHANNEL_ROUTING_SQL, connection
+            )
+            self._apply_migration(
+                SKILL_COMMANDS_MIGRATION_ID, SKILL_COMMANDS_SQL, connection
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
             self._apply_migration(
@@ -4157,18 +4167,20 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         now = utc_now()
         with self.connect() as connection:
             existing = connection.execute(
-                "SELECT skill_id, created_at, active FROM skills WHERE principal_id = ? AND name = ?",
+                "SELECT skill_id, created_at, active, command_trigger FROM skills "
+                "WHERE principal_id = ? AND name = ?",
                 (principal_id, name),
             ).fetchone()
             resolved_id = str(existing["skill_id"]) if existing else skill_id
             created_at = str(existing["created_at"]) if existing else now
             resolved_active = bool(existing["active"]) if existing else active
+            command_trigger = existing["command_trigger"] if existing else None
             connection.execute(
                 """INSERT OR REPLACE INTO skills
                    (skill_id, principal_id, name, description, version, source, source_ref,
                     checksum, active, skill_md, bundle, files_json, byte_size,
-                    created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    created_at, updated_at, command_trigger)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     resolved_id,
                     principal_id,
@@ -4185,6 +4197,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     int(byte_size),
                     created_at,
                     now,
+                    command_trigger,
                 ),
             )
         return resolved_id
@@ -4196,7 +4209,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(
                 """SELECT skill_id, principal_id, name, description, version, source,
                           source_ref, checksum, active, skill_md, files_json, byte_size,
-                          created_at, updated_at
+                          created_at, updated_at, command_trigger
                    FROM skills WHERE principal_id = ? ORDER BY created_at DESC""",
                 (principal_id,),
             ).fetchall()
@@ -9580,6 +9593,32 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             return cursor.rowcount > 0
 
+    def set_channel_pairing_routing(
+        self,
+        pairing_id: str,
+        *,
+        routing_mode: str,
+        target_session_id: str | None,
+        owner_sender_id: str | None,
+        approval_relay_enabled: bool,
+    ) -> bool:
+        """Replace the inbound route as one atomic owner decision."""
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE channel_pairings
+                   SET routing_mode = ?, target_session_id = ?, owner_sender_id = ?,
+                       approval_relay_enabled = ?
+                   WHERE pairing_id = ?""",
+                (
+                    routing_mode,
+                    target_session_id,
+                    owner_sender_id,
+                    1 if approval_relay_enabled else 0,
+                    pairing_id,
+                ),
+            )
+            return cursor.rowcount > 0
+
     def delete_channel_pairing(self, pairing_id: str) -> bool:
         """Unpair. Both executors and the inbound receiver read the pairing table,
         so deleting the row is what actually stops a channel — there is no state
@@ -9608,6 +9647,47 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     relay.resolved_by,
                 ),
             )
+
+    def get_approval_relay(self, relay_id: str) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM approval_relay_records WHERE relay_id = ?", (relay_id,)
+            ).fetchone()
+        return dict(row) if row is not None else None
+
+    def resolve_approval_relay(
+        self, relay_id: str, *, status: str, resolved_by: str
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE approval_relay_records
+                   SET status = ?, resolved_at = ?, resolved_by = ?
+                   WHERE relay_id = ? AND status = 'pending'""",
+                (status, utc_now(), resolved_by, relay_id),
+            )
+            return cursor.rowcount == 1
+
+    def set_skill_command(
+        self, skill_id: str, principal_id: str, trigger: str | None
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE skills SET command_trigger = ?, updated_at = ? "
+                "WHERE skill_id = ? AND principal_id = ?",
+                (trigger, utc_now(), skill_id, principal_id),
+            )
+            return cursor.rowcount == 1
+
+    def get_active_skill_by_command(
+        self, principal_id: str, trigger: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM skills
+                   WHERE principal_id = ? AND command_trigger = ? AND active = 1""",
+                (principal_id, trigger),
+            ).fetchone()
+        return dict(row) if row is not None else None
 
     # ── Phase 4 slice 2: scheduled routines (on-demand; no daemon) ──
 

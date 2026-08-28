@@ -13,10 +13,12 @@ in
 
 What ships today: pairing, an enable switch, a sender allowlist, an inbound
 secret, a fixed-window bound of 60 messages per `(connector, sender)` per minute,
-and outbound delivery signed with `X-Raiker-Signature`. What does not: the
-routing modes described below, and resolving an approval over a channel. An
-inbound message is recorded and quarantined and **never becomes work on its
-own** — tracked as BUG-225 in [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md).
+signed outbound delivery, and owner-stored inbound routing. Existing pairings
+remain `record_only`; the owner may explicitly choose a normal new turn, a
+tool-free side question, or an interrupt/steer bound to one conversation.
+Approval responses are disabled separately and require the exact paired owner,
+relay id, and immutable action id. See
+[FIXED-298](../plans/FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message).
 
 A channel is not just a UI. It is an untrusted input surface and must be treated as a security boundary. A channel can still be an equal-status primary interface when it is linked, enabled, trusted, and policy-permitted.
 
@@ -222,8 +224,9 @@ Five rules follow, and each is enforceable rather than advisory:
    or approve anything. The routing modes that *look* like authority
    (`approval_response`, `task_control`, `channel_admin`, `model_control`) are
    refused on any channel whose sender is not the paired owner, and
-   `approval_response` is refused outright until the anti-phishing story in step
-   4 below exists.
+   `approval_response` is accepted only from the exact owner identity stored on
+   the pairing and only for one exact pending relay/action pair. Critical and
+   connector-write approvals remain local-only.
 4. **Outbound is a capability; inbound is a boundary.** Delivering a result the
    owner asked for is governed by the ordinary capability gate, decision mode and
    audit event. Accepting a message is governed by pairing, the sender allowlist,
@@ -243,19 +246,21 @@ each step is refused until the one before it is done:
 |---|---|---|
 | 1 | **This section**, in the spec and the threat model | **Done.** Nothing below has a contract to satisfy without it. |
 | 2 | **Outbound delivery** — connector profile, capability gate, egress allowlist, audit event | **Done.** `ExternalChannelExecutor` under `external_channel_runtime`. Deliveries carry `X-Raiker-Signature` (HMAC-SHA256 over the exact bytes, keyed by `RAIKER_CHANNEL_OUTBOUND_SECRET`) so `signed_http_callback` describes the wire and not just the profile. Unset means **unsigned, not refused** — the owner controls both ends of a webhook they configured — and the state is reported on the tab and in the delivery artifacts. |
-| 3 | **Inbound, paired and allowlisted** | **Done.** The receiver enforces `requires_pairing` and `requires_sender_allowlist`, and marks every accepted message untrusted, quarantined and instructions-inert. |
+| 3 | **Inbound, paired and allowlisted** | **Done.** The receiver enforces `requires_pairing` and `requires_sender_allowlist`. Allowlisted non-owners remain untrusted; routed content occupies a data slot rather than the owner's instruction slot. |
 | 4 | **An owner surface for all of it** | **Done (FIXED-265).** Steps 2 and 3 were built and had no way in: with no pairing the executors refuse and the receiver 404s, so the transport was unreachable and the tab reported that channels did not exist. |
 | 5 | **Rate limits** — a per-sender inbound budget | **Done.** Fixed window per `(connector, sender)`, default 60/min, `RAIKER_CHANNEL_INBOUND_RATE` overrides; a refusal is a recorded `channel_message_rejected` event with `reason: rate_limited`. Allowlisting says *who*, this says *how often*. |
-| 6 | **Routing modes** — `new_turn`, `side_question`, `interrupt`, … | **Open.** An inbound message is recorded and quarantined; none of the modes below is implemented, so a channel message never becomes work on its own. |
-| 7 | **Permission relay** | **Open, and last.** A channel that can raise an approval is a channel that can be used to *ask for one*. The relay queue exists and is deliberately pending-only; nothing on a channel resolves an approval. |
+| 6 | **Routing modes** | **Done (FIXED-298).** `record_only` is the migration-safe default; `new_turn` requires the bound owner; `side_question` has a zero tool budget; `interrupt` requires the bound owner and a stored target. Message content cannot select its mode. |
+| 7 | **Permission relay** | **Done (FIXED-298).** Separately off by default; exact owner, relay id and action id; single-use compare-and-set; critical and connector-write approvals stay local. |
 
 Extensions → **Channels** states the contract above, offers pairing, enable and a
 governed test delivery, and reports each of the three fail-closed gates — the
 capability, `RAIKER_CHANNEL_EGRESS_ALLOWLIST` and `RAIKER_CHANNEL_INBOUND_SECRET`
 — separately, because each has a different remedy.
 
-**The Routing Modes table below is a target, not a description.** Only recording
-and quarantining are implemented; a mode named there does not run today.
+The four modes below are the canonical inbound routes. Action-shaped labels from
+earlier drafts are deliberately collapsed into a normal governed turn rather
+than creating a second API for task, model, memory, graph, diagnostics, or
+channel administration.
 
 ---
 
@@ -298,17 +303,12 @@ and quarantining are implemented; a mode named there does not run today.
 | Mode | Behaviour |
 |---|---|
 | `new_turn` | Starts a normal user turn. |
-| `side_question` | Asks a question while current work continues. |
-| `interrupt` | Requests active task pause/cancel/change. |
-| `approval_response` | Responds to an approval request. |
-| `task_note` | Adds context to an active background task. |
-| `task_control` | Applies pause, cancel, steer, fork, rewind, or summarise action. |
-| `model_control` | Launches, switches, or checks model profile. |
-| `channel_admin` | Pairing/configuration/admin action. |
-| `memory_action` | Searches, corrects, forgets, or proposes memory. |
-| `graph_query` | Runs graph/codemap query through policy. |
-| `diagnostic_action` | Runs diagnostics. |
-| `notification_ack` | Acknowledges notification. |
+| `side_question` | Answers against the selected conversation with no tool budget. |
+| `interrupt` | Stops on `stop` / `cancel` / `pause`; otherwise queues a bounded steer for the selected conversation. |
+
+Approval response is its own authenticated endpoint rather than a routing mode.
+That separation prevents arbitrary message text from being interpreted as a
+decision.
 
 ---
 
@@ -448,15 +448,17 @@ Required handling:
 
 Some channels may relay approvals.
 
-Approval relay is disabled by default. To enable it:
+Approval relay is disabled by default. When enabled:
 
 - sender must be trusted;
 - channel must be paired;
-- approval must show exact action ID and arguments;
+- response must carry the exact pending relay ID and immutable action ID;
 - approval response must be authenticated by the linked channel;
 - action must not have changed since approval request;
 - event log must record channel approval source;
 - stale mobile or channel state must refresh before approval can be accepted.
+- critical and connector-write approvals remain local-only;
+- the relay is claimed atomically before the approval can resolve or execute.
 
 ---
 

@@ -83,13 +83,13 @@ alternative would be worse.
   *enabled*, *trusted* and *reachable* are now four facts shown as four things.
   Each condition is its own row with its own remedy — the capability, the egress
   allowlist, whether deliveries are signed, the inbound secret, and the inbound
-  budget of 60 messages per sender per minute, since allowlisting says *who* may
-  speak and not how often. The spec's routing modes
-  and resolving an approval over a channel are not built: an inbound message
-  never becomes work on its own.
+  budget of 60 messages per sender per minute. Routing is owner-stored and
+  defaults to record-only; side questions have no tools, active turns require an
+  exact owner/target binding, and channel approval responses are separately off,
+  exact and single-use. Critical and connector-write approvals remain local.
 
-  Tracked in [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md) → BUG-225 (channel routing modes and
-  relay resolution), BUG-226 (the four hook handler types this build refuses),
+  Remaining channel-adjacent limits are tracked in
+  [`plans/TO_BE_FIXED.md`](../plans/TO_BE_FIXED.md) → BUG-226 (the four hook handler types this build refuses),
   BUG-227 (no LSP surface), BUG-228 (plugin panels) and BUG-229 (a live-spec
   sign-in that only works on an empty workspace).
 
@@ -327,15 +327,12 @@ on the shipped build, not estimated.
   secret-shaped rows, with the model and the count stated before anything leaves
   the machine. Measured live on 2026-08-25 against `text-embedding-3-small`: the
   space becomes selectable and `auto` resolves to it over the fallback.
-  **The read half is not connected, and this is the one that decides whether a
-  paraphrase works.** `_embed_query` drops the vector leg for a semantic backend
-  unless a caller supplies a `query_embedder`, and none does — embedding the
-  owner's question is provider egress on a read path, once per search, so it
-  needs the gate rather than a bypass. Measured on the same install: *"where
-  should backups go"* returned nothing while *"encrypted NAS"* matched on shared
-  words. Raised as BUG-240, and
-  `raiker/memory/retrieval.py::query_embedding_available()` is the single fact
-  every surface reads, so the claim tracks the behaviour.
+  **The read half closed 2026-08-26 (FIXED-292 through FIXED-294).** Questions
+  are embedded once through the same governed provider/local path and that one
+  vector is shared by ambient and explicit recall. Denial or backend failure
+  falls back to lexical results without blocking the read. Managed-file passages
+  participate in the same owner/project-scoped query and carry revision-bound
+  source provenance.
   **Also still behind:** an install with **no** provider key and no local
   embedding model has only the labelled hashing fallback — nothing is bundled, by
   design — and recall over the chosen space is a linear scan whose cost grows

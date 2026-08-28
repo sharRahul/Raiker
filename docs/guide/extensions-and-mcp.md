@@ -189,10 +189,11 @@ silently re-enables something you turned off.
 
 ### Managing them
 
-Each row offers **Activate** / **Deactivate**, **Rename**, **Download**, and
-**Delete**, plus a details panel with the checksum, the source, and the file
-list. An uploaded archive downloads byte-for-byte; a skill that arrived as a
-bare document is packed into `<name>.skill` on demand.
+Each row offers **Activate** / **Deactivate**, **Add/Edit command**, **Rename**,
+**Download**, and **Delete**, plus a details panel with the checksum, source, and
+file list. The optional slash command is unique among your skills and appears in
+Chat and Build. An uploaded archive downloads byte-for-byte; a skill that
+arrived as a bare document is packed into `<name>.skill` on demand.
 
 Deactivating keeps the skill stored and withholds it from every turn — the fast
 way to test whether a skill is helping.
@@ -204,6 +205,12 @@ into a turn's system context. When one applies, the model calls the `skill_load`
 tool to read its body, and can pass a `file` from the skill's own file list to
 read one bundled reference. Ten installed skills therefore cost ten lines, not
 ten documents.
+
+Typing an active skill's command, such as `/release version 2.0`, asks the
+runtime to load that skill and passes the remaining text as owner input.
+Deactivating the skill also disables its command. A command is only a handle for
+reviewed instructions: it grants no capability, opens no gate, and changes no
+decision or approval mode.
 
 ### Shipped skills
 
@@ -442,6 +449,9 @@ separate facts, and the tab shows them separately:
   event all apply. It is not a shortcut that proves nothing.
 - **Unpair** deletes the link. Both the outbound executor and the inbound
   receiver read that record, so unpairing is what actually stops the channel.
+- **Routing** chooses `record_only`, a normal owner turn, a tool-free side
+  question, or an interrupt/steer bound to one conversation. The pairing stores
+  this choice; message content cannot choose it.
 
 Four things are fail-closed or off by default, and each has its own remedy, so
 the tab reports them one by one rather than as a single "ready":
@@ -459,11 +469,13 @@ speak; the budget says how often, and they are different questions — a sender
 that goes over is refused and the refusal is recorded, so a channel that goes
 quiet is answerable from Observability rather than a mystery.
 
-**An inbound message never becomes a turn on its own.** It is recorded as a
-governed event, quarantined, and its instructions are inert whatever the sender
-wrote. Accepted and rejected messages both appear in Observability → Activity.
+`record_only` is the default and keeps the message quarantined. A routed message
+is still structurally untrusted data: it never occupies the owner's instruction
+slot and cannot raise authority. New turns and interrupts require the exact
+owner identity stored on the pairing; side questions have no tool budget.
+Accepted, routed, and rejected messages appear in Observability → Activity.
 
-Still unbuilt: the routing modes in the spec, and resolving an approval over a
-channel — the relay queue is deliberately pending-only, because a channel that
-can raise an approval can be used to *ask for* one.
+Approval response is separately off. When enabled it accepts only the bound
+owner and one exact pending relay/action pair, once. Critical and connector-write
+approvals remain local-only.
 Full contract: [`docs/architecture/CHANNELS_SPEC.md`](../architecture/CHANNELS_SPEC.md).

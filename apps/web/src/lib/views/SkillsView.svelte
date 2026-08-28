@@ -37,6 +37,8 @@
   let importUrl = $state("");
   let renamingId = $state<string | null>(null);
   let renameValue = $state("");
+  let commandEditingId = $state<string | null>(null);
+  let commandValue = $state("");
   let expanded = $state<string | null>(null);
 
   // Build-a-skill: Raiker writes the document, the same reader validates it.
@@ -44,6 +46,7 @@
   let buildName = $state("");
   let buildDescription = $state("");
   let buildBody = $state("");
+  let buildCommand = $state("");
 
   const visible = $derived(
     (skills ?? []).filter((skill) =>
@@ -70,6 +73,9 @@
     skill_archive_url_unsupported:
       "A .skill archive cannot be imported from a link. Download it and upload the file.",
     skill_rename_failed: "That name is already used by another of your skills.",
+    skill_invalid_command:
+      "Use 1–40 lowercase letters, numbers, or dashes, starting with a letter.",
+    skill_command_in_use: "That slash command already loads another skill.",
     skill_provided_by_plugin:
       "This skill comes from a plugin, so it cannot be renamed or deleted here. Revoke the plugin on Extensions → Plugins to remove it.",
     unknown_skill: "That skill is no longer installed.",
@@ -175,11 +181,14 @@
     error = null;
     notice = null;
     try {
-      const result = await api.buildSkill(buildName.trim(), buildDescription.trim(), buildBody);
+      const result = await api.buildSkill(
+        buildName.trim(), buildDescription.trim(), buildBody, buildCommand.trim(),
+      );
       notice = `Built “${result.skill?.name ?? buildName.trim()}”.`;
       buildName = "";
       buildDescription = "";
       buildBody = "";
+      buildCommand = "";
       buildOpen = false;
       await load();
     } catch (e) {
@@ -230,6 +239,29 @@
     }
   }
 
+  function startCommandEdit(skill: SkillView) {
+    commandEditingId = skill.skill_id;
+    commandValue = skill.command_trigger ?? skill.name;
+  }
+
+  async function commitCommand(skill: SkillView) {
+    busy = skill.skill_id;
+    error = null;
+    notice = null;
+    try {
+      const result = await api.setSkillCommand(skill.skill_id, commandValue.trim() || null);
+      notice = result.command_trigger
+        ? `/${result.command_trigger} now loads “${skill.name}”. It grants no capability.`
+        : `Removed the slash command from “${skill.name}”.`;
+      commandEditingId = null;
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
   async function download(skill: SkillView) {
     busy = skill.skill_id;
     error = null;
@@ -271,12 +303,9 @@
   <div class="header">
     <div>
       <h2 id="skills-h">Skills</h2>
-      <p class="page-lead">
-        A skill is a <code>SKILL.md</code> document — instructions Raiker follows when the task
-        matches. Installing one adds guidance and nothing else: it grants no capability, opens no
-        gate, and Raiker never runs code a skill ships. An inactive skill stays here and is withheld
-        from every turn.
-      </p>
+    <p class="page-lead">
+      Reusable <code>SKILL.md</code> instructions. Skills grant no capability and run no code.
+    </p>
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
       <Icon name="refresh" size={15} /> Refresh
@@ -356,6 +385,17 @@
         />
       </div>
       <div class="field">
+        <label class="field-label" for="build-command">Slash command <span class="muted">optional</span></label>
+        <input
+          id="build-command"
+          class="input"
+          bind:value={buildCommand}
+          placeholder="release-notes"
+          autocomplete="off"
+        />
+        <p class="field-help">Typing this in Chat or Build loads the skill. It never grants permissions.</p>
+      </div>
+      <div class="field">
         <label class="field-label" for="build-description">
           Description — what it does, and when it applies
         </label>
@@ -428,6 +468,7 @@
                   <Badge variant="idle" label="inactive" />
                 {/if}
                 {#if skill.version}<span class="version">v{skill.version}</span>{/if}
+                {#if skill.command_trigger}<Badge variant="metadata-only" label={`/${skill.command_trigger}`} />{/if}
                 {#if skill.conformance}
                   <!-- Conformance is a property of the document, not a
                        lifecycle state. A quiet tag unless there is something to
@@ -458,6 +499,9 @@
                   disabled={busy === skill.skill_id}
                 >{skill.active ? "Deactivate" : "Activate"}</button>
                 {#if !isPluginSkill(skill)}
+                  <button type="button" class="btn btn-sm" onclick={() => startCommandEdit(skill)} disabled={busy !== null} aria-expanded={commandEditingId === skill.skill_id}>
+                    {skill.command_trigger ? "Edit command" : "Add command"}
+                  </button>
                   <button
                     type="button"
                     class="btn btn-sm"
@@ -487,6 +531,22 @@
               </div>
             {/if}
           </div>
+
+          {#if commandEditingId === skill.skill_id}
+            <form class="command-editor" onsubmit={(event) => { event.preventDefault(); commitCommand(skill); }}>
+              <label class="field-label" for={`command-${skill.skill_id}`}>Slash command</label>
+              <div class="command-row">
+                <span aria-hidden="true">/</span>
+                <input id={`command-${skill.skill_id}`} class="input" bind:value={commandValue} placeholder="release-notes" autocomplete="off" />
+                <button class="btn btn-sm btn-primary" type="submit" disabled={busy === skill.skill_id}>Save</button>
+                {#if skill.command_trigger}
+                  <button class="btn btn-sm" type="button" onclick={() => { commandValue = ""; commitCommand(skill); }} disabled={busy === skill.skill_id}>Remove</button>
+                {/if}
+                <button class="btn btn-sm" type="button" onclick={() => (commandEditingId = null)}>Cancel</button>
+              </div>
+              <p class="muted command-note">Loads this skill. Permissions stay unchanged.</p>
+            </form>
+          {/if}
 
           <p class="description">{skill.description}</p>
 
@@ -732,7 +792,30 @@
   }
   .actions { display: flex; gap: 0.3rem; flex-wrap: wrap; }
   .rename { max-width: 16rem; }
-  .description { margin: 0.35rem 0 0.4rem; color: var(--text-2); }
+  .command-editor {
+    margin-top: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--sunken);
+  }
+  .command-row {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .command-row .input { flex: 1 1 12rem; min-width: 0; }
+  .command-note { margin: 0.35rem 0 0; font-size: 0.75rem; }
+  .description {
+    margin: 0.35rem 0 0.4rem;
+    color: var(--text-2);
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    line-clamp: 2;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+  }
   .facts {
     display: flex;
     gap: 0.75rem;

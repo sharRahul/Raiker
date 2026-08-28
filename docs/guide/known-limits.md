@@ -18,24 +18,14 @@ differ, that ledger is canonical.
 
 ## Memory and recall
 
-**Recall matches words, not meaning.** The default “vector” representation is
-feature hashing over tokens, so both retrieval paths are lexical in practice and
-a paraphrase with few shared words may not recall the relevant record.
+Meaning-based recall works for approved memories and managed files when the
+owner has selected and built a provider or local embedding space. Query
+embedding uses the same governed consent and falls back to lexical search when
+the owner denies it or the backend is unavailable.
 
-**Memory → Recall backend** always says which of three states you are in, and
-offers **Build a meaning-based index** where an embedding model is available: one
-governed run over your approved memories, with the model named and the count
-stated before anything leaves the machine. That builds the space and stores your
-memories as learned embeddings.
-
-**It does not yet make a paraphrase work.** Comparing a *question* against that
-space means embedding the question too — a provider call on every search — and
-that path needs its own permission rather than a shortcut, so it is not
-connected. The card says so rather than implying otherwise. Tracked as BUG-240.
-
-Two further limits. An install with no provider key and no local embedding model
-has only the lexical fallback — nothing is bundled, by design. And recall over
-the chosen space is a linear scan, so its cost grows with the number of memories.
+Two limits remain. An install with no provider key and no local embedding model
+has only the lexical fallback—nothing is bundled, by design. Vector recall is a
+linear scan, so its cost grows with the number of memories and indexed passages.
 
 Conversation context is also bounded by the selected model. Raiker compacts
 older exchanges near a known context limit while preserving the visible

@@ -3461,3 +3461,31 @@ CREATE TABLE IF NOT EXISTS managed_file_chunk_vectors (
 CREATE INDEX IF NOT EXISTS idx_managed_file_chunk_vectors_space
   ON managed_file_chunk_vectors(embedding_model, chunk_id);
 """
+
+
+# BUG-225 — a pairing's inbound route is owner configuration, not a field an
+# untrusted message may choose.  ``record_only`` preserves the historical
+# fail-closed behaviour for every existing pairing.  The owner sender and
+# target are separate facts so an allowlisted sender never becomes the owner by
+# implication, and approval relay remains independently off.
+CHANNEL_ROUTING_MIGRATION_ID = "RAIKER-2045-channel-routing"
+
+CHANNEL_ROUTING_SQL = """
+ALTER TABLE channel_pairings ADD COLUMN routing_mode TEXT NOT NULL DEFAULT 'record_only';
+ALTER TABLE channel_pairings ADD COLUMN target_session_id TEXT;
+ALTER TABLE channel_pairings ADD COLUMN owner_sender_id TEXT;
+ALTER TABLE channel_pairings ADD COLUMN approval_relay_enabled INTEGER NOT NULL DEFAULT 0;
+"""
+
+
+# Owner-authored slash commands are handles for active skills.  They expand to
+# instruction text and grant nothing, so the trigger belongs to the owner-scoped
+# skill row rather than to the capability or policy tables.
+SKILL_COMMANDS_MIGRATION_ID = "RAIKER-2046-skill-commands"
+
+SKILL_COMMANDS_SQL = """
+ALTER TABLE skills ADD COLUMN command_trigger TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_owner_command
+  ON skills(principal_id, command_trigger)
+  WHERE command_trigger IS NOT NULL AND command_trigger != '';
+"""

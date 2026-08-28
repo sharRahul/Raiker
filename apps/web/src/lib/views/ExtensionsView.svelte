@@ -101,6 +101,11 @@
   let pairSenders = $state("");
   let testFor = $state<string | null>(null);
   let testUrl = $state("");
+  let routingFor = $state<string | null>(null);
+  let routeMode = $state<"record_only" | "new_turn" | "side_question" | "interrupt">("record_only");
+  let routeTarget = $state("");
+  let routeOwner = $state("");
+  let routeRelay = $state(false);
 
   const CHANNEL_REASONS: Record<string, string> = {
     disabled_by_capability_gate:
@@ -111,6 +116,10 @@
     channel_not_paired_or_disabled: "Pair the connector and switch it on first.",
     unknown_channel_pairing: "That pairing is no longer there.",
     not_authorized_human: "Only you can change a channel pairing.",
+    channel_owner_not_allowlisted: "Choose an owner sender from this channel's allowlist.",
+    channel_owner_sender_required: "This route needs an explicit owner sender.",
+    channel_target_session_required: "Side questions and interrupts need a target conversation.",
+    channel_target_session_unknown: "That conversation is unavailable to this account.",
   };
 
   function channelReason(error: unknown): string {
@@ -179,6 +188,36 @@
       () => api.deliverChannelTest(profile.connector_id, url, "Raiker test delivery."),
       "Delivered. The destination accepted it.",
     );
+  }
+
+  function openRouting(profile: ChannelProfile) {
+    routingFor = routingFor === profile.connector_id ? null : profile.connector_id;
+    routeMode = profile.routing_mode ?? "record_only";
+    routeTarget = profile.target_session_id ?? "";
+    routeOwner = profile.owner_sender_id ?? "";
+    routeRelay = profile.approval_relay_enabled ?? false;
+  }
+
+  function routeLabel(mode: ChannelProfile["routing_mode"]): string {
+    if (mode === "new_turn") return "New turn";
+    if (mode === "side_question") return "Side question";
+    if (mode === "interrupt") return "Interrupt";
+    return "Record only";
+  }
+
+  function saveRouting(profile: ChannelProfile) {
+    void runChannelAction(
+      `routing:${profile.connector_id}`,
+      () => api.setChannelRouting(profile.pairing_id ?? "", {
+        routing_mode: routeMode,
+        target_session_id: routeTarget.trim() || null,
+        owner_sender_id: routeOwner.trim() || null,
+        approval_relay_enabled: routeRelay,
+      }),
+      routeMode === "record_only"
+        ? `${profile.display_name} records inbound messages without starting work.`
+        : `${profile.display_name} now routes ${routeMode.replace("_", " ")}.`,
+    ).then(() => (routingFor = null));
   }
 
   async function loadPlugins() {
@@ -812,16 +851,13 @@
     {/if}
 
     <section class="card" data-testid="channel-posture">
-      <h2>What a channel message is</h2>
+      <h2>Channels</h2>
       <p>
-        A channel is the one place where content Raiker did not ask for enters a turn. A channel
-        message is <strong>untrusted content with a named sender who is not you</strong> — never a
-        prompt, never able to raise a turn's authority, and never trusted because it is linked.
+        A channel message is <strong>untrusted content with a named sender who is not you</strong>.
+        It cannot raise a turn's authority.
       </p>
       <p class="note">
-        Nothing here is implicit. Linked is not enabled, enabled is not trusted, and a channel that
-        is all three still reaches nothing until you name the host — so every condition is its own
-        row, with its own remedy.
+        Linked, enabled, trusted, and reachable are separate.
         <GuideLink route="extensions" label="How extension surfaces are governed" />
       </p>
       {#if channels !== null}
@@ -833,8 +869,8 @@
             </span>
             <span class="note">
               {channels.outbound.runtime_enabled
-                ? "Delivery runs as a governed action, with its own audit event."
-                : "Turn on external channel runtime in Permissions before anything can be delivered."}
+                ? "Governed and audited."
+                : "Turn on external channel runtime in Permissions."}
             </span>
           </li>
           <li class:event-dead={!channels.outbound.egress_configured}>
@@ -845,8 +881,7 @@
                 : "None allowlisted"}
             </span>
             <span class="note">
-              Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>. It is empty by default, so a channel
-              that is linked, enabled and trusted still reaches nothing until you name the host.
+              Set <code>RAIKER_CHANNEL_EGRESS_ALLOWLIST</code>; empty denies all hosts.
             </span>
           </li>
           <li class:event-dead={!channels.outbound.signing_configured}>
@@ -855,10 +890,7 @@
               {channels.outbound.signing_configured ? "Signed" : "Unsigned"}
             </span>
             <span class="note">
-              Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> and every delivery carries an
-              HMAC the destination can check. Unset still delivers — you control both ends of a
-              webhook you configured — but the receiver cannot tell a Raiker delivery from
-              anything else that reaches the URL.
+              Set <code>RAIKER_CHANNEL_OUTBOUND_SECRET</code> for HMAC-signed delivery.
             </span>
           </li>
           <li class:event-dead={!channels.inbound.secret_configured}>
@@ -867,8 +899,7 @@
               {channels.inbound.secret_configured ? "Secret set" : "Refusing everything"}
             </span>
             <span class="note">
-              Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>. Every accepted message is still
-              quarantined and its instructions are inert, whatever the sender wrote.
+              Set <code>RAIKER_CHANNEL_INBOUND_SECRET</code>; unset refuses every message.
             </span>
           </li>
           <li>
@@ -877,9 +908,7 @@
               {channels.inbound.rate_limit_per_minute ?? 60}/min
             </span>
             <span class="note">
-              Per sender, per channel. Allowlisting says <em>who</em> may speak; this says how
-              often. A sender over budget is refused and the refusal is recorded, so a channel
-              that goes quiet is answerable rather than a mystery. Override with
+              Per sender and channel; refusals are recorded. Override with
               <code>RAIKER_CHANNEL_INBOUND_RATE</code>.
             </span>
           </li>
@@ -906,6 +935,10 @@
                   <span class="hook-tag" class:hook-tag-dead={profile.sender_count === 0}>
                     {profile.sender_count} sender{profile.sender_count === 1 ? "" : "s"}
                   </span>
+                {/if}
+                {#if profile.linked}
+                  <span class="hook-tag">{routeLabel(profile.routing_mode)}</span>
+                  {#if profile.approval_relay_enabled}<span class="hook-tag">Approval relay</span>{/if}
                 {/if}
               </div>
               <span class="note">
@@ -938,6 +971,13 @@
                       testUrl = "";
                     }}
                   >Send a test delivery</button>
+                  <button
+                    type="button"
+                    class="btn btn-sm"
+                    disabled={channelBusy !== null}
+                    onclick={() => openRouting(profile)}
+                    aria-expanded={routingFor === profile.connector_id}
+                  >Routing</button>
                   <button
                     type="button"
                     class="btn btn-sm btn-danger"
@@ -977,6 +1017,39 @@
                       This runs the same governed path a real delivery takes: the capability gate,
                       the decision mode, the egress allowlist and the audit event all apply.
                     </p>
+                  </form>
+                {/if}
+                {#if routingFor === profile.connector_id}
+                  <form class="channel-form routing-form" onsubmit={(event) => { event.preventDefault(); saveRouting(profile); }}>
+                    <div class="route-grid">
+                      <label class="field-label" for={`route-${profile.connector_id}`}>Inbound</label>
+                      <select id={`route-${profile.connector_id}`} class="input" bind:value={routeMode}>
+                        <option value="record_only">Record only</option>
+                        <option value="new_turn">New turn</option>
+                        {#if profile.supports_side_questions}<option value="side_question">Side question</option>{/if}
+                        {#if profile.supports_interrupts}<option value="interrupt">Interrupt or steer</option>{/if}
+                      </select>
+                      <label class="field-label" for={`owner-${profile.connector_id}`}>Owner sender</label>
+                      <select id={`owner-${profile.connector_id}`} class="input" bind:value={routeOwner}>
+                        <option value="">Not bound</option>
+                        {#each profile.senders as sender}<option value={sender}>{sender}</option>{/each}
+                      </select>
+                      {#if routeMode === "side_question" || routeMode === "interrupt"}
+                        <label class="field-label" for={`target-${profile.connector_id}`}>Conversation ID</label>
+                        <input id={`target-${profile.connector_id}`} class="input" bind:value={routeTarget} placeholder="sess_…" autocomplete="off" />
+                      {/if}
+                    </div>
+                    {#if profile.supports_approvals}
+                      <label class="check-row">
+                        <input type="checkbox" bind:checked={routeRelay} disabled={!routeOwner} />
+                        <span>Allow exact pending approval responses from the bound owner</span>
+                      </label>
+                    {/if}
+                    <div class="channel-actions">
+                      <button class="btn btn-sm btn-primary" type="submit" disabled={channelBusy !== null}>Save routing</button>
+                      <button class="btn btn-sm" type="button" onclick={() => (routingFor = null)}>Cancel</button>
+                    </div>
+                    <p class="note">Messages cannot choose their route. Side questions have no tool budget; approvals require the exact relay and action identity.</p>
                   </form>
                 {/if}
               {:else}
@@ -1030,21 +1103,8 @@
     </section>
 
     <section class="card deferred">
-      <h2>What is still not built</h2>
-      <ol class="channel-steps">
-        <li><strong>The contract</strong> — what a channel message is in a turn. <span class="hook-tag">Done</span></li>
-        <li><strong>Outbound delivery</strong> — sending a result to a paired channel, through the capability gate and the egress allowlist. <span class="hook-tag">Done</span></li>
-        <li><strong>Inbound</strong> — paired and sender-allowlisted; every message quarantined and its instructions inert. <span class="hook-tag">Done</span></li>
-        <li><strong>Rate limits</strong> — a per-sender inbound budget, refusals recorded. <span class="hook-tag">Done</span></li>
-        <li><strong>Routing modes</strong> — turning an inbound message into work. <span class="hook-tag hook-tag-dead">Next</span></li>
-        <li><strong>Approval relay</strong> — last; a channel that can raise an approval can be used to ask for one. The queue exists and can only ever hold a <em>pending</em> relay: nothing on a channel resolves an approval. <span class="hook-tag hook-tag-dead">Not planned yet</span></li>
-      </ol>
-      <p class="note">
-        An inbound message never becomes a turn on its own. It is recorded as a governed event,
-        quarantined, and its instructions are inert whatever the sender wrote — acting on it is
-        yours. Accepted and rejected messages both appear in
-        <a href="#/observe?tab=activity">Observability → Activity</a>.
-      </p>
+      <h2>Routing contract</h2>
+      <p class="note">Record only is the default. Active routes come only from the pairing above; message content cannot select one. Owner turns keep normal governance, side questions cannot use tools, and an approval response must match one pending relay exactly.</p>
     </section>
   </div>
 {/if}
@@ -1336,23 +1396,6 @@
      meaning to get it. */
   .measure { max-width: 46rem; }
   .deferred h2 { margin-top: 0; }
-
-  /* An ordered list of steps, not a set of findings: numbered, quiet, and with
-     the state chip inline so "Done" and "Next" read at the same weight as the
-     step they belong to. */
-  .channel-steps {
-    margin: var(--space-3) 0 0;
-    padding-left: 1.3rem;
-    display: grid;
-    gap: var(--space-2);
-    color: var(--text-2);
-    font-size: 0.88rem;
-  }
-  .channel-steps strong { color: var(--text-1); }
-  .channel-steps .hook-tag { margin-left: var(--space-2); }
-  /* The closing note is a footnote to the list, not the fifth step — it needs the
-     gap that says so. */
-  .channel-steps + .note { margin-top: var(--space-3); }
 
   /* A connector row: identity and state on one line, the controls under it, and
      the form under those — so the row reads the same whether it is 1440px wide

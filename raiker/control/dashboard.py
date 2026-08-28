@@ -4034,6 +4034,13 @@ class DashboardService:
                     # The identifiers themselves are the owner's contact list and
                     # never leave the store; the count answers the page's question.
                     "senders": senders,
+                    "routing_mode": str(pairing.get("routing_mode") or "record_only") if pairing else "record_only",
+                    "target_session_id": pairing.get("target_session_id") if pairing else None,
+                    "owner_sender_id": pairing.get("owner_sender_id") if pairing else None,
+                    "approval_relay_enabled": bool(pairing.get("approval_relay_enabled")) if pairing else False,
+                    "supports_side_questions": bool(profile.raw.get("supports_side_questions")),
+                    "supports_interrupts": bool(profile.raw.get("supports_interrupts")),
+                    "supports_approvals": bool(profile.raw.get("supports_approvals")),
                 }
             )
         return {
@@ -4091,6 +4098,11 @@ class DashboardService:
         self, acting_principal_id: str | None, pairing_id: str, senders: list[str]
     ) -> ControlResult:
         return self.control.set_channel_senders(acting_principal_id, pairing_id, senders)
+
+    def set_channel_routing(
+        self, acting_principal_id: str | None, pairing_id: str, **settings: Any
+    ) -> ControlResult:
+        return self.control.set_channel_routing(acting_principal_id, pairing_id, **settings)
 
     def unpair_channel(self, acting_principal_id: str | None, pairing_id: str) -> ControlResult:
         return self.control.unpair_channel(acting_principal_id, pairing_id)

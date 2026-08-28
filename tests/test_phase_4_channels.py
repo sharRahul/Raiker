@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.cli.principal_resolver import bootstrap_owner
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ChannelPairing
+from raiker.contracts.models import ApprovalRelayRecord, ChannelPairing, ToolAction
 from raiker.control.service import RuntimeControlService
 from raiker.events.query import EventViewer
 from raiker.events.writer import EventLogWriter
@@ -189,6 +189,17 @@ def test_approval_relay_records_pending(tmp_path: Path) -> None:
     ws = _ws(tmp_path)
     _enable(ws, "channel_approval_relay")
     _pairing(ws)
+    pairing = SQLiteStore(ws).get_channel_pairing_by_connector("channel.webhook")
+    assert pairing is not None
+    configured = RuntimeControlService(ws).set_channel_routing(
+        None,
+        pairing["pairing_id"],
+        routing_mode="record_only",
+        target_session_id=None,
+        owner_sender_id="alice",
+        approval_relay_enabled=True,
+    )
+    assert configured.ok is True, configured.reason_code
     authority, principal = _authority(ws)
     result = authority.route_action(
         _action("channel_approval_relay", principal.principal_id,
@@ -254,6 +265,104 @@ def test_inbound_allowlisted_is_untrusted(tmp_path: Path, monkeypatch: pytest.Mo
     inner = payload.get("payload", {})
     assert inner.get("trust_level") == "untrusted"
     assert inner.get("instructions_inert") is True
+
+
+def test_owner_selects_route_out_of_band(tmp_path: Path) -> None:
+    ws = _ws(tmp_path)
+    bootstrap_owner("owner", "Owner", workspace_root=ws)
+    _pairing(ws, senders=["alice"])
+    store = SQLiteStore(ws)
+    pairing = store.get_channel_pairing_by_connector("channel.webhook")
+    assert pairing is not None
+
+    refused = RuntimeControlService(ws).set_channel_routing(
+        None,
+        pairing["pairing_id"],
+        routing_mode="new_turn",
+        target_session_id=None,
+        owner_sender_id="mallory",
+        approval_relay_enabled=False,
+    )
+    assert refused.reason_code == "channel_owner_not_allowlisted"
+
+    configured = RuntimeControlService(ws).set_channel_routing(
+        None,
+        pairing["pairing_id"],
+        routing_mode="new_turn",
+        target_session_id=None,
+        owner_sender_id="alice",
+        approval_relay_enabled=False,
+    )
+    assert configured.ok is True
+    saved = store.get_channel_pairing_by_connector("channel.webhook")
+    assert saved is not None
+    assert saved["routing_mode"] == "new_turn"
+    assert saved["owner_sender_id"] == "alice"
+
+
+def test_channel_approval_response_is_exact_and_single_use(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    ws = _ws(tmp_path)
+    monkeypatch.setenv("RAIKER_CHANNEL_INBOUND_SECRET", "s3cret")
+    client = _client(ws)
+    _pairing(ws, senders=["alice"])
+    store = SQLiteStore(ws)
+    pairing = store.get_channel_pairing_by_connector("channel.webhook")
+    assert pairing is not None
+    configured = RuntimeControlService(ws).set_channel_routing(
+        None,
+        pairing["pairing_id"],
+        routing_mode="record_only",
+        target_session_id=None,
+        owner_sender_id="alice",
+        approval_relay_enabled=True,
+    )
+    assert configured.ok
+    store.create_session("sess_channel_approval", str(ws))
+    action = ToolAction(
+        action_id="act_channel_exact",
+        tool_name="write_file",
+        arguments={"path": "never-written.txt", "text": "no"},
+        risk_level="high",
+        requires_approval=True,
+    )
+    store.insert_tool_action(
+        action,
+        session_id="sess_channel_approval",
+        turn_id="turn_channel_approval",
+        status="approval_required",
+    )
+    store.insert_approval("appr_channel_exact", action)
+    store.insert_approval_relay(ApprovalRelayRecord(
+        relay_id="chr_exact",
+        pairing_id=pairing["pairing_id"],
+        action_id=action.action_id,
+        status="pending",
+        requested_at=utc_now(),
+        resolved_at=None,
+        resolved_by=None,
+    ))
+    payload = {
+        "sender_id": "alice",
+        "relay_id": "chr_exact",
+        "action_id": "act_channel_exact",
+        "approve": False,
+    }
+    response = client.post(
+        "/api/channels/channel.webhook/approval-response",
+        json=payload,
+        headers={"X-Raiker-Channel-Secret": "s3cret"},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "denied"
+    replay = client.post(
+        "/api/channels/channel.webhook/approval-response",
+        json=payload,
+        headers={"X-Raiker-Channel-Secret": "s3cret"},
+    )
+    assert replay.status_code == 409
+    assert replay.json()["detail"]["reason_code"] == "channel_approval_relay_mismatch"
 
 
 def test_inbound_rejects_unknown_sender(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

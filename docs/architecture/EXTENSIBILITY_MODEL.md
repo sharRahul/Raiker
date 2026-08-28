@@ -36,7 +36,7 @@ manifest, pairing, or managed policy.
 | **Hooks** | Logic at lifecycle points (pre/post tool, session, prompt) | Hook config (scoped) | Hook dispatcher with bounded decision authority | ✅ implemented (`builtin`+`command`); `http`/`mcp_tool`/`prompt`/`agent` deferred | `docs/architecture/HOOKS_SPEC.md`, `raiker/hooks/` |
 | **Skills** | Reusable instruction documents (`SKILL.md`, `*.skill`) | Frontmatter validated on install; owner-scoped store; measured against the [Agent Skills standard](https://agentskills.io/specification) and **reported, never refused** | Indexed into the turn; body read through the governed `skill_load` tool | ✅ implemented (`raiker/skills/`, Extensions → Skills), including standard conformance and the deliberate refusal of `allowed-tools` | `docs/guide/extensions-and-mcp.md`, `docs/architecture/SELF_IMPROVEMENT_MODEL.md` |
 | **Plugins** | Bundles that contribute *through* the other surfaces | Plugin manifest + permission diff + supply-chain and signature checks | Each kind registers through the surface that already governs it; **no plugin code executes** | ✅ hook rules (`event:hook`), skills (`skill:contribute`, installed inactive) and MCP-server **offers** (`mcp:server`); revocation deletes what was contributed. Panels (BUG-228) and LSP (BUG-227) open | `docs/architecture/PLUGIN_SYSTEM_SPEC.md`, `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` |
-| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist, signed with `X-Raiker-Signature` when a secret is set; inbound behind an owner secret with sender allowlisting, bounded to 60/min per sender, recorded untrusted and quarantined | ✅ transport, owner surface and rate limits (`raiker/channels/`, Extensions → Channels); routing modes and approval relay open (BUG-225) | `docs/architecture/CHANNELS_SPEC.md` |
+| **Channels** | New interfaces/transports (chat, webhook, voice) | Connector profile + pairing | Outbound through `external_channel_runtime` + egress allowlist, signed with `X-Raiker-Signature` when a secret is set; inbound behind an owner secret, sender allowlisting, 60/min per sender, owner-stored routing, and separately enabled exact approval response | ✅ transport, owner surface, routing, and relay (`raiker/channels/`, Extensions → Channels; FIXED-298) | `docs/architecture/CHANNELS_SPEC.md` |
 
 Legend: ✅ implemented · 🔒 phase_scheduled_disabled · 📘 specified_not_implemented.
 
@@ -133,9 +133,10 @@ plan with execution disabled).
   **Per-sender rate limiting is built** — 60 messages per sender per minute
   (`CHANNEL_INBOUND_DEFAULT_MAX`, `RAIKER_CHANNEL_INBOUND_RATE` overrides), with
   a rejection recorded as `channel_message_rejected` / `rate_limited` so a
-  channel that stops working is answerable from Observability. Routing modes and
-  approval-relay resolution remain unbuilt: an inbound message never becomes work
-  on its own.
+  channel that stops working is answerable from Observability. Owner-stored
+  routing now covers record-only, owner new turns, tool-free side questions and
+  target-bound interrupt/steer. Approval response is separately enabled, exact,
+  single-use, and local-only for critical or connector-write decisions.
 - **Hooks:** **implemented** (`raiker/hooks/`) — `builtin` + `command` handlers, scoped config,
   decision authority, and lifecycle dispatch wired through the broker and gateway. `http`,
   `mcp_tool`, `prompt`, and `agent` handlers are deferred until their gated surfaces exist.

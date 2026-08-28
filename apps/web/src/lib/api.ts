@@ -1288,11 +1288,12 @@ export const api = {
     postJson<SkillVerification>("/api/skills/verify", { url }),
   importSkillUrl: (url: string) =>
     postJson<SkillMutationResult>("/api/skills/import", { url }),
-  buildSkill: (name: string, description: string, body: string) =>
+  buildSkill: (name: string, description: string, body: string, command_trigger?: string) =>
     postJson<SkillMutationResult>("/api/skills/build", {
       name,
       description,
       body,
+      command_trigger: command_trigger || null,
     }),
   renameSkill: (id: string, name: string) =>
     request<{ ok: boolean; skill_id: string; name: string }>(
@@ -1310,6 +1311,32 @@ export const api = {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ active }),
+      },
+    ),
+  setChannelRouting: (
+    pairingId: string,
+    settings: {
+      routing_mode: "record_only" | "new_turn" | "side_question" | "interrupt";
+      target_session_id: string | null;
+      owner_sender_id: string | null;
+      approval_relay_enabled: boolean;
+    },
+  ) =>
+    request<{ ok: boolean; pairing_id: string; routing_mode: string }>(
+      `/api/channels/pairings/${encodeURIComponent(pairingId)}/routing`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(settings),
+      },
+    ),
+  setSkillCommand: (id: string, command_trigger: string | null) =>
+    request<{ ok: boolean; skill_id: string; command_trigger: string | null }>(
+      `/api/skills/${encodeURIComponent(id)}/command`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command_trigger }),
       },
     ),
   downloadSkill: (id: string) =>

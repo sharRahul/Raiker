@@ -12,7 +12,7 @@ evidence those write-ups point at.
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 
-## Current adaptive-shell catalogue — 2026-08-25
+## Current adaptive-shell catalogue — 2026-08-28
 
 The mutable `pages/` catalogue contains 208 viewport-only PNG files:
 
@@ -35,32 +35,19 @@ overflow, and reads the PNG header to prove its dimensions equal the viewport.
 Tablet widths, the exact 1024-pixel breakpoint, and 1440-pixel desktop remain
 automated layout assertions rather than additional committed screenshot classes.
 
-**All 208 files were recaptured on 2026-08-25**, against a real host serving the
-current build. This replaced the earlier refresh, which had regenerated only the
-156 desktop files and preserved the 52 mobile ones byte-for-byte. That
-preservation guarantee no longer holds and is not claimed anywhere: mobile was
-regenerated in the same run, from the same build, so every image in `pages/`
-now comes from one instance at one moment rather than from two rounds months
-apart. The combined SHA-256 catalogue checksum over all 208 files —
-name-then-content, in sorted filename order — is
-`7681C01627F539EC54BC3377DC563D47910103CAFA73C15928AB0F7ABACB11FB`.
+**All 208 files were recaptured on 2026-08-28**, against a real host serving the
+current build. Mobile and all three desktop classes were generated in the same
+run, from the same build, so every image in `pages/` comes from one instance at
+one moment. The sweep itself reads every PNG header and refuses a capture whose
+dimensions do not exactly match its declared viewport.
 
 They record the binary hide/show navigation model, direct Core routes,
 collapsible Knowledge/Manage/Observe/Support groups, recent-first Search chats,
 fixed desktop type and controls, the bounded reading/workspace/operational/
-work-surface canvases, and — new in this round — the managed document libraries
-on Memory and Projects, Build's required project selector, and a top bar
-carrying neither a project selector nor a theme toggle.
-
-**The capture is what caught the defects it was run to document.** Four of them,
-all consequences of removing the global project selector, none visible from the
-tests: a **Set active** button on Projects that wrote a preference no route reads
-any more, an account-level fallback that let Build's side rail name a different
-project than the turn ran in, the same fallback in Chat which has no project
-boundary at all, and a Workbench tile naming an "active project" that steered
-nothing. They were fixed and the whole catalogue recaptured before these images
-were kept — see
-[FIXED-290](../FIXED_ITEMS.md#fixed-290--four-controls-that-outlived-the-selector-they-belonged-to).
+work-surface canvases, the managed document libraries on Memory and Projects,
+Build's required project selector, the compact Skills list, and the channel
+routing surface. The selected hub tab remains visible at mobile width even when
+its strip scrolls.
 
 The same run also exercises all seven Models tabs and all nine Settings sections
 as rendered audit states. Those extra deep links are assertions rather than new
@@ -68,28 +55,6 @@ committed capture names, so the catalogue remains exactly 208 PNGs.
 
 Only `pages/` is replaced by this sweep. `working/` and `not-working/` retain
 round-specific evidence and must never be deleted during a catalogue refresh.
-
-### Outstanding: the Projects captures predate FIXED-291
-
-**`{mobile,1080p,4k,8k}-{light,dark}-projects.png` — 8 of the 208 — show the
-Projects page as it was before
-[FIXED-291](../FIXED_ITEMS.md#fixed-291--a-project-could-only-ever-be-a-folder-raiker-made).**
-They do not show *Attach existing folder…* beside *Create project*, the card
-body as the control that opens a project, or the single file explorer that
-replaced the two lists. Nothing else in the catalogue is affected: FIXED-291
-changed no other route.
-
-They are **not** recaptured here, because the sweep signs in as the owner
-against a real credentialled host on `127.0.0.1:8765` and that is the owner's
-own instance to run:
-
-```bash
-npm --prefix apps/web run test:e2e:live
-```
-
-Until that runs, treat these eight as historical rather than current — which is
-the one thing this folder otherwise promises they never are. The checksum above
-still describes the committed 208 and will change when they are replaced.
 
 **Part of `working/` was pruned, and the write-ups still name what it held.**
 Forty-seven captures from the 2026-07-26 → 2026-08-10 rounds were removed from
@@ -104,6 +69,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `pages/`, `fixed-299-`, refreshed `bug-225-` | **2026-08-28**, full responsive catalogue, owner skill commands in both composers, stored channel routes and exact approval-relay opt-in | Anthropic, OpenAI, OpenRouter and local Ollama, using credentials already managed through the interface |
 | `r0825-` | **2026-08-25**, a semantic space built against a real embedding call and then measured, the retention sweep, task cadences, delegated-task ownership, tool rows after a reload, and a responsive sweep at 390/768/1024/1440/1920 | Anthropic, OpenAI, OpenRouter and Ollama, every key entered through the interface |
 | `r0824-` | **2026-08-24**, what each capability switch actually decides, Agent Skills standard conformance on the Skills tab, and Auto's alignment check against a real turn | hosted Anthropic (`claude-haiku-4-5-20251001`) |
 | `r0823-` | **2026-08-23**, the checkpoint rewind end to end, the audit export, and the Permissions surface after `network_execution` was deleted | hosted Anthropic, OpenAI, OpenRouter |

@@ -28,6 +28,7 @@ from raiker.api.schemas import (
     BuildSkillRequest,
     RenameSkillRequest,
     SetSkillActiveRequest,
+    SetSkillCommandRequest,
     SkillUrlRequest,
     UploadSkillRequest,
     serialize_dto,
@@ -59,6 +60,8 @@ _INVALID_REASONS = frozenset(
         "skill_unsupported_source",
         "skill_archive_url_unsupported",
         "skill_rename_failed",
+        "skill_invalid_command",
+        "skill_command_in_use",
     }
 )
 
@@ -158,7 +161,11 @@ async def build_skill(
     """Install a skill Raiker authored. Held to the same contract as an upload."""
     return _result(
         _service(request).build_skill(
-            auth_data[0].principal_id, body.name, body.description, body.body
+            auth_data[0].principal_id,
+            body.name,
+            body.description,
+            body.body,
+            body.command_trigger,
         )
     )
 
@@ -209,6 +216,20 @@ async def set_skill_active(
     withheld from every turn until the owner turns it back on."""
     return _result(
         _service(request).set_active(auth_data[0].principal_id, skill_id, body.active)
+    )
+
+
+@router.put("/api/skills/{skill_id}/command")
+async def set_skill_command(
+    skill_id: str,
+    body: SetSkillCommandRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    return _result(
+        _service(request).set_command(
+            auth_data[0].principal_id, skill_id, body.command_trigger
+        )
     )
 
 

@@ -371,6 +371,51 @@ class TestSkillsService:
         assert result.data["skill"]["name"] == "release-notes"
         assert result.data["skill"]["source"] == "built"
 
+    def test_owner_command_loads_a_skill_without_granting_authority(
+        self, workspace: Path
+    ) -> None:
+        service = SkillsService(workspace)
+        built = service.build_skill(
+            "principal_owner",
+            "Release-Notes",
+            "Draft release notes. Use when cutting a release.",
+            "# Release notes\n\nSummarise the diff.",
+            command_trigger="release",
+        )
+        assert built.ok, built.reason_code
+        expanded, trigger = service.expand_command(
+            "principal_owner", "/release version 2.0"
+        )
+        assert trigger == "release"
+        assert "skill_load" in expanded
+        assert "Owner input: version 2.0" in expanded
+        assert "grants no capability" in expanded
+
+        skill_id = built.data["skill_id"]
+        assert service.set_active("principal_owner", skill_id, False).ok
+        unchanged, inactive_trigger = service.expand_command(
+            "principal_owner", "/release version 2.0"
+        )
+        assert unchanged == "/release version 2.0"
+        assert inactive_trigger is None
+
+    def test_owner_command_is_unique_and_owner_scoped(self, workspace: Path) -> None:
+        service = SkillsService(workspace)
+        first = service.build_skill(
+            "principal_owner", "First", "First skill.", "# First", command_trigger="run"
+        )
+        second = service.build_skill(
+            "principal_owner", "Second", "Second skill.", "# Second"
+        )
+        assert first.ok and second.ok
+        duplicate = service.set_command(
+            "principal_owner", second.data["skill_id"], "run"
+        )
+        assert duplicate.reason_code == "skill_command_in_use"
+        assert not service.set_command(
+            "principal_other", first.data["skill_id"], "other"
+        ).ok
+
     def test_another_owner_cannot_touch_a_skill(self, workspace: Path) -> None:
         service = SkillsService(workspace)
         skill_id = service.list_skills("principal_owner")[0].skill_id

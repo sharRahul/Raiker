@@ -54,7 +54,8 @@ export interface SlashCommand {
     | "repos"
     | "schedule"
     | "tasks"
-    | "shortcuts";
+    | "shortcuts"
+    | "skill";
 }
 
 /**
@@ -118,9 +119,14 @@ export function slashFragment(text: string, caret: number): string | null {
 export function matchCommands(
   surface: ComposerSurface,
   fragment: string,
+  ownerCommands: readonly SlashCommand[] = [],
 ): readonly SlashCommand[] {
   const needle = fragment.trim().toLowerCase();
-  const all = slashCommands(surface);
+  const builtInNames = new Set(slashCommands(surface).map((command) => command.name));
+  const all = [
+    ...slashCommands(surface),
+    ...ownerCommands.filter((command) => !builtInNames.has(command.name)),
+  ].sort((a, b) => a.name.localeCompare(b.name));
   if (needle === "") return all;
   return all.filter((command) => command.name.toLowerCase().startsWith(needle));
 }

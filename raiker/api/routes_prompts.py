@@ -144,6 +144,14 @@ def _validated_attachments(raw: list[dict[str, Any]] | None) -> list[dict[str, A
 def _build_envelope(
     body: PromptRequest, principal_id: str = "local_user", workspace: str | Path | None = None
 ) -> PromptEnvelope:
+    prompt_text = body.text
+    command_trigger: str | None = None
+    if workspace is not None:
+        from raiker.skills.service import SkillsService
+
+        prompt_text, command_trigger = SkillsService(workspace).expand_command(
+            principal_id, body.text
+        )
     options = PromptOptions(
         planning_mode=body.planning_mode or "auto",
         approval_mode=(
@@ -160,6 +168,16 @@ def _build_envelope(
         capability_modes=body.capability_modes or {},
     )
     client = _PROMPT_CLIENTS.get(body.client_type or "web_ui", WEB_UI_CLIENT)
+    metadata: dict[str, Any] = {
+        "entry_command": client.type,
+        "input_mode": normalize_input_mode(body.input_mode),
+        "surface": normalize_prompt_surface(body.surface),
+        # Carried on the turn, not looked up later: the boundary a turn
+        # ran under has to be part of what the turn recorded.
+        "project_id": (body.project_id or "").strip() or None,
+    }
+    if command_trigger is not None:
+        metadata["skill_command"] = command_trigger
     return PromptEnvelope(
         request_id=new_id("req_"),
         session_id=body.session_id or new_id("sess_"),
@@ -167,16 +185,9 @@ def _build_envelope(
         client=client,
         user=UserMetadata(id=principal_id),
         prompt=PromptPayload(
-            text=body.text,
+            text=prompt_text,
             attachments=_validated_attachments(body.attachments),
-            metadata={
-                "entry_command": client.type,
-                "input_mode": normalize_input_mode(body.input_mode),
-                "surface": normalize_prompt_surface(body.surface),
-                # Carried on the turn, not looked up later: the boundary a turn
-                # ran under has to be part of what the turn recorded.
-                "project_id": (body.project_id or "").strip() or None,
-            },
+            metadata=metadata,
         ),
         options=options,
     )

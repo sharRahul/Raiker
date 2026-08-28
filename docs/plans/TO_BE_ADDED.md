@@ -835,6 +835,29 @@ instead of guessing and being corrected after the work is done. Also gives MCP
 novel; doing it with no authority attached, in a product where every other
 interruption carries authority, is.
 
+**Scoped 2026-08-29, and the first thing to change is not the question.**
+Reusing the approval transport is still right, but the transport as it stands
+cannot carry a question honestly. `PolicyEngine.decide` has one branch for a tool
+in `approval_required_actions`, and that branch hardcodes `risk_level="high"`
+(`raiker/policy/engine.py`). A question would therefore reach the owner labelled
+a high-risk approval — which is worse than not having it: the whole value of an
+approval queue is that its entries mean something, and teaching an owner that
+some "high-risk approvals" are actually harmless multiple-choice questions is how
+an approval queue stops being read.
+
+So the work has a prerequisite that is small but is in the most sensitive file in
+the product: the parking decision has to carry the *proposal's own* risk band and
+a kind, rather than asserting high for everything that parks. Everything after
+that is ordinary — a registry entry with `capability=None`, an answer route that
+refuses ordinary approvals and a resolve route that refuses questions, an
+`approval_outcome` variant returning the chosen option, and a question card that
+renders model-authored text as data.
+
+**Sequencing note.** Do not build the question first and relabel it afterwards.
+The relabelling is what makes it safe, and a surface that shipped as a
+"high-risk approval" for even one release teaches exactly the habit this item
+exists to avoid.
+
 ---
 
 ## ADD-23 — Governed browser control, as a narrow tool set

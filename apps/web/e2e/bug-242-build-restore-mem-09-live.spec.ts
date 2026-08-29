@@ -148,7 +148,23 @@ test("every route renders at four widths with no console error", async () => {
       await page.goto(`${BASE}/#/${route}`);
       await expect(page.locator("main#main")).toBeVisible();
       await page.waitForLoadState("networkidle");
-      await page.waitForTimeout(400);
+      // Several views render their shell immediately and then hydrate panels.
+      // Capturing before those settle files a screenshot of a loading state
+      // under the name of the page it was going to become — the same class of
+      // wrong evidence FIXED-313 is about, one layer up.
+      await page.waitForFunction(
+        () =>
+          ![...document.querySelectorAll("main#main *")].some((element) => {
+            const node = element as HTMLElement;
+            const visible = node.offsetWidth > 0 || node.offsetHeight > 0;
+            return visible && /^(loading|reading|checking|verifying)\b/i.test(
+              (node.textContent ?? "").trim(),
+            );
+          }),
+        undefined,
+        { timeout: 30_000 },
+      );
+      await page.waitForTimeout(300);
       // No route may scroll the page sideways at any width.
       const overflow = await page.evaluate(
         () => document.documentElement.scrollWidth - document.documentElement.clientWidth,

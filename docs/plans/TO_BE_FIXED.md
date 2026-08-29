@@ -78,7 +78,7 @@ names.
 | ID | Severity | Area | Status |
 |---|---|---|---|
 | [BUG-194](#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Low | Shell / sandbox / recovery | Open — reduced again 2026-08-21; foreground SSH/Daytona and safeguarded egress/credential/trust foundations ship, while live container and external trust-anchor proofs remain |
-| [MEM-07](MEMORY_RELIABILITY_PLAN.md#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) … [MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Memory reliability | Open: MEM-07 … MEM-10. MEM-06 closed 2026-08-21 (FIXED-241); MEM-11/12 remain regression-proven. |
+| [MEM-08](MEMORY_RELIABILITY_PLAN.md#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium → Low | Memory reliability | Open: MEM-08 only. MEM-06 closed 2026-08-21 (FIXED-241), MEM-07 as FIXED-284, MEM-09 2026-08-29 as FIXED-310, and MEM-10 as FIXED-283/292/293/294. |
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
@@ -88,11 +88,13 @@ names.
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
-| [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium → Low | Memory / retrieval | Provider-memory half fixed 2026-08-26 as FIXED-292. Managed knowledge files still lack write-time vector projections |
-| [BUG-241](#bug-241--fullpage-screenshots-do-not-reach-past-the-app-shells-scroll-container) | Low | Live test harness / evidence | Open — raised 2026-08-28 while capturing FIXED-305 evidence |
-| [BUG-242](#bug-242--build-opens-an-empty-conversation-after-a-reload) | Medium | Build / web UI | Open — raised 2026-08-29 by the real-work live round |
-| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
-| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (12 complete, 6 open; C9 skill commands closed as FIXED-299 and C14 branch-from-here as FIXED-227) |
+| [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
+| [BUG-241](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | **Closed 2026-08-29 (FIXED-313)** — one shared capture helper; all 56 live specs go through it |
+| [BUG-242](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload) | Medium | Build / web UI | **Closed 2026-08-29 (FIXED-309)** — the conversation rides in the URL and Build restores it |
+| [BUG-243](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | **Closed 2026-08-29 (FIXED-314)** — raised while verifying FIXED-311: a question was being used as a filter |
+| [BUG-244](#bug-244--importing-the-same-memory-twice-stores-it-twice) | Low | Memory / import | Open — raised 2026-08-29 while seeding a memory for the FIXED-311 round |
+| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 3 partial, 4 open; B14's review half closed 2026-08-29 as FIXED-312) |
+| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -607,150 +609,62 @@ silently degraded.
 
 ---
 
-## BUG-240 — A semantic space can be built, and a question is not embedded into it
+## BUG-240, BUG-241, BUG-242 and BUG-243 — closed
 
-**Severity: Medium → Low. Area: memory / retrieval. Status: fixed 2026-08-26.
-The provider-memory half is [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered);
-the managed knowledge-file remainder is [FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words).**
+Their full records — what was observed, the root cause, and the interface
+outcome that had to be true before each could be called closed — are in
+[`FIXED_ITEMS.md`](FIXED_ITEMS.md):
 
-**Observed.** After building a semantic index — a real OpenAI
-`text-embedding-3-small` space, 1536 dimensions, resolved by `auto` over the
-fallback — a paraphrase still recalls nothing:
-
-```
-'where should backups go'   -> []
-'encrypted NAS'             -> [('mem_19c1146bc9', 3.0)]
-'when do releases ship'     -> []
-```
-
-The one hit is the lexical leg matching shared words. The vector leg contributed
-nothing to any of the three.
-
-**Root cause, and it is deliberate as far as it goes.**
-`raiker/memory/retrieval.py::_embed_query` returns `None` when the resolved
-backend is semantic and no `query_embedder` was supplied, because the alternative
-— embedding the question with the hashing fallback and comparing it against
-learned vectors — is a cosine between two unrelated spaces, which is not a weaker
-signal but a meaningless one. That reasoning is right. What is missing is the
-other branch: **no caller supplies an embedder, and there is nothing for one to
-call.**
-
-**Why it was not fixed alongside FIXED-283.** The shortest fix is a helper that
-calls `ModelRouter.aembed` directly from the retrieval path. That is a second
-route into a governed action, which
-[`REFERENCE_PLATFORM_COMPATIBILITY.md` §4.5](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#45-a-second-route-into-a-governed-action)
-refuses on purpose and
-[`GOVERNANCE_ENTRY_PATHS.md`](GOVERNANCE_ENTRY_PATHS.md) exists to make
-checkable. Embedding a query is **provider egress, on a read path, once per
-search** — three properties that each argue for the gate rather than around it.
-Shipping the write half and stating the read half honestly is better than
-shipping a bypass and having to remove it.
-
-**What this now also decides (2026-08-25,
-[FIXED-289](FIXED_ITEMS.md#fixed-289--uploaded-files-had-nowhere-to-live-and-build-inherited-a-project-nothing-on-screen-named)).**
-The managed knowledge libraries added a second body of retrievable text — the
-extracted chunks of the owner's uploaded files — and it was given a lexical index
-and **no vector projection**, on exactly this reasoning. Embedding file chunks at
-write time is the easy half; without the read half, a stored file vector could
-never be matched at query time. It would be an index nothing reads, and it would
-let Memory and Projects imply a semantic file search that does not exist. So this
-entry no longer scopes only approved memory: closing it gains a paraphrase over
-the owner's documents as well as over their remembered sentences, and until it
-closes, "search my files" means lexical search with exact provenance and says so.
-
-**The three questions the fix has to answer**, none of which is obvious:
-
-1. **What does `ask` mean for a search?** Blocking a search on an approval makes
-   recall unusable; running it anyway makes the mode a lie. The likely answer is
-   that `ask` drops the vector leg and says so, so the decision mode changes
-   recall *quality* rather than gating a keystroke — but that is a real design
-   decision, not an implementation detail.
-2. **Once per search, or once per turn?** Context gathering, the model's own
-   `memory_search`, and the Memory page's search box are three callers. Each
-   embedding is an egress and a cost.
-3. **What is recorded?** The query is the owner's own words leaving the machine.
-   It should be an audited action like any other, and the audit record must not
-   itself become a second copy of every question the owner has ever asked.
-
-**Required user-interface outcome.** Memory → Recall backend already states which
-of the three states it is in — lexical, stored-but-not-searchable, or genuinely
-semantic — from
-`raiker/memory/retrieval.py::query_embedding_available()`. When this closes, that
-one function changes and every surface that quotes it changes with it. Nothing
-should need to be remembered.
-
-**2026-08-26 result.** The three questions now have explicit answers for
-approved memory: Ask drops the vector leg without creating an approval; one
-embedder instance caches by backend/query for the whole ambient turn (and one
-model-facing tool invocation); and the routed action records only the model,
-dimension count and content hash. The query and vector travel through a
-non-audited, in-process result field and are never persisted. Ambient recall and
-`memory_search` both supply this governed embedder, and the Memory settings card
-reads the same admission state. The managed-file half now uses that same cached
-query vector. Its vectors are revision-bound projections, owner/project scoped,
-and retired with the exact file revision; see FIXED-294. This entry is closed.
+* **BUG-240** — a semantic space could be built and the question was never
+  embedded into it. Closed 2026-08-26 as
+  [FIXED-292](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered)
+  (approved memory) and
+  [FIXED-294](FIXED_ITEMS.md#fixed-294--managed-documents-could-only-be-recalled-with-shared-words)
+  (managed knowledge files). The index row above was still marked open after the
+  second half landed; that was a stale row, not remaining work.
+* **BUG-241** — `fullPage` evidence captures stopped at the first viewport.
+  Closed 2026-08-29 as
+  [FIXED-313](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport).
+* **BUG-242** — Build opened an empty conversation after a reload. Closed
+  2026-08-29 as
+  [FIXED-309](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload).
+* **BUG-243** — a question could not recall the memory that answered it. Raised
+  and closed 2026-08-29 as
+  [FIXED-314](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it),
+  found while verifying FIXED-311 against a live turn.
 
 ---
 
-## BUG-241 — `fullPage` screenshots do not reach past the app shell's scroll container
+## BUG-244 — Importing the same memory twice stores it twice
 
-**Severity: Low. Area: live test harness / evidence. Status: Open — raised
-2026-08-28.**
+**Severity: Low. Area: memory / import. Status: Open — raised 2026-08-29.**
 
-**Observed.** Two captures taken by `fixed-305-lifecycle-hooks-live.spec.ts` at
-different points in a round — one before any turn, one after a turn that
-demonstrably fired two hooks — were **byte-identical**. Both passed
-`fullPage: true`. The app shell gives the routed view its own scrolling
-container, so the page itself does not grow: `fullPage` captures the viewport and
-stops, and every capture of a long page shows the same top of it.
+**Observed.** Memory → *Advanced memory management* → **Review import** was used
+four times with the same one-record file while seeding the FIXED-311 round. The
+result was four approved memories with identical text, identical scope and
+identical provenance, and the recall strip under the next answer named all four.
+Nothing warned, and nothing offered to reconcile them.
 
-**Why it matters more than it looks.** These captures are the evidence behind
-`FIXED-*` entries and the rounds in
-[`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md). A screenshot that does not contain
-the thing it is named for does not fail — it is filed, linked and read as proof.
-That is the same shape as an inert switch: not a missing control, but a wrong
-belief about one.
+**Why.** `import_memories` writes each reviewed record through the ordinary
+governed write path, which is right — an import must not be a second way into
+the store. What it does not do is ask whether the workspace already holds that
+sentence. Every other correction path in memory has an answer for this: editing
+records a correction, and supersession links let retrieval prefer the valid
+record over its predecessor. Import has neither, so a re-import is the one way to
+create a contradiction-free duplicate.
 
-**Scope.** Every live spec that passes `fullPage: true` and asserts against a
-section below the first viewport. `fixed-305-lifecycle-hooks-live.spec.ts` scrolls
-the section under test into view before capturing, which is the local fix; the
-open work is deciding whether the harness should do that for every spec — a
-shared capture helper that takes a locator — or whether the shell should let the
-page scroll so `fullPage` means what it says everywhere.
+**Why it matters more than a tidy list.** Recall is budgeted. Four copies of one
+sentence occupy four of the slots a turn has for remembering anything, and the
+[FIXED-311](FIXED_ITEMS.md#fixed-311--recall-was-invisible-at-the-moment-it-was-used)
+strip now shows that cost to the owner rather than hiding it — which is how this
+was noticed at all.
 
-**Not a product defect.** Nothing an owner uses is wrong: the page scrolls
-correctly in a browser. What is wrong is what the evidence files contain, which
-is why this is filed against the harness rather than the web UI.
+**Proposed fix.** Compare each reviewed record's `content_checksum` against the
+owner's live memories before writing. A match is reported in the review step —
+"3 of 4 records are already stored" — and skipped rather than written, with the
+owner able to import anyway if they intend a second scope. The checksum already
+exists and is already computed on write; nothing new has to be stored.
 
----
-
-## BUG-242 — Build opens an empty conversation after a reload
-
-**Severity: Medium. Area: Build / web UI. Status: Open — raised 2026-08-29.**
-
-**Observed.** Ask Build to write a file, watch it do the work, then reload the
-page. Build comes back with an empty conversation. The turn is not lost — the
-session, its transcript and its tool rows are all still stored, and Search chats
-finds them — but the page the owner was working on a second ago does not come
-back, and nothing on screen says where the work went.
-
-**Why.** `sessionId` in `apps/web/src/lib/views/BuildView.svelte` is only ever
-assigned from the streaming response (and cleared on a new conversation). It is
-never read from the URL and never restored, so `#/build` always mounts a fresh
-one. Chat does restore, which is what makes this a gap rather than a design
-choice: the same interruption costs an owner their place in one surface and not
-the other.
-
-**Why it matters more in Build than it would in Chat.** A Build conversation is
-where the approvals for a change live. An owner who reloads mid-change loses the
-thread that raised them, and has to find the session again to see what was
-already decided — at exactly the moment they are most likely to reload, which is
-when something looked wrong.
-
-**Found by** the real-work live round, which is the point of that round: a
-scenario that only asks Build to answer a question never reloads, and a scenario
-that asks it to do a job does.
-
-**Not a data-loss defect.** Nothing is deleted and the audit trail is complete.
-The fix is navigational: carry the session in the URL as Chat does, and restore
-it on mount.
+**Required user-interface outcome.** The review step states how many of the
+records are new before anything is written, and the import count afterwards
+matches what actually changed.

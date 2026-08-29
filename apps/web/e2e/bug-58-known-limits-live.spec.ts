@@ -43,6 +43,7 @@
  * state the previous run left, not the state the README describes.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -172,7 +173,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "bug-58-model-connected.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-model-connected.png"));
 
   await newChat();
   const answer = await ask("Reply with exactly: KNOWN LIMITS LIVE");
@@ -193,7 +194,7 @@ test("the parallel bullet — a read-only batch is answered as a batch, not one 
   await expect(answer).toContainText("alpha-marker-ONE");
   await expect(answer).toContainText("beta-marker-TWO");
   await expect(answer).toContainText("gamma-marker-THREE");
-  await page.screenshot({ path: join(SHOTS, "bug-58-parallel-read-batch.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-parallel-read-batch.png"));
 });
 
 test("the patching bullet — one diff spanning two files is one decision", async () => {
@@ -231,7 +232,7 @@ test("the patching bullet — one diff spanning two files is one decision", asyn
   const diff = page.locator("pre.diff");
   await expect(diff).toContainText("alpha-marker-ONE-PATCHED");
   await expect(diff).toContainText("beta-marker-TWO-PATCHED");
-  await page.screenshot({ path: join(SHOTS, "bug-58-multi-file-patch.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-multi-file-patch.png"));
 });
 
 test("the web bullet — fetch withholds by default and search is not configured", async () => {
@@ -244,7 +245,7 @@ test("the web bullet — fetch withholds by default and search is not configured
   );
   await expect(fetched).toContainText(/web_fetch/i);
   await expect(fetched).toContainText(/gate|disabled|capabilit|withheld|decision mode/i);
-  await page.screenshot({ path: join(SHOTS, "bug-58-web-fetch-withheld.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-web-fetch-withheld.png"));
 
   // Search is the same gate pointed at an owner-configured endpoint, so the
   // "no search endpoint" claim is only reachable once the gate is out of the
@@ -260,7 +261,7 @@ test("the web bullet — fetch withholds by default and search is not configured
       "sentence, exactly what the tool returned — including any refusal reason.",
   );
   await expect(searched).toContainText(/not configured|not_configured|no search (provider|endpoint)/i);
-  await page.screenshot({ path: join(SHOTS, "bug-58-web-search-unconfigured.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-web-search-unconfigured.png"));
 });
 
 test("the shell/network/process bullet — Permissions carries all three, told apart", async () => {
@@ -278,5 +279,5 @@ test("the shell/network/process bullet — Permissions carries all three, told a
   }
   await search.fill("Shell");
   await expect(page.locator(".cap.card").first()).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "bug-58-execution-capabilities.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-58-execution-capabilities.png"));
 });

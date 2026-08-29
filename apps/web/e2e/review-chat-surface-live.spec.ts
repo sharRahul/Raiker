@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -55,7 +56,7 @@ test("a single turn's transcript, mid-stream and settled", async ({ page }) => {
   await page.waitForTimeout(1200);
   const streamingText = await page.locator(".message-group-raiker").last().innerText();
   console.log("MID-STREAM:\n" + streamingText.replace(/\n{2,}/g, "\n"));
-  await page.screenshot({ path: join(SHOTS, "review-chat-midstream.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-chat-midstream.png"));
 
   const answer = page.locator(".message-bubble-raiker").last();
   await expect(answer).toBeVisible({ timeout: 300_000 });
@@ -75,5 +76,5 @@ test("a single turn's transcript, mid-stream and settled", async ({ page }) => {
     return [...new Set(seen)];
   });
   console.log("ELEMENT CLASSES IN ONE TURN: " + parts.join(", "));
-  await page.screenshot({ path: join(SHOTS, "review-chat-settled.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-chat-settled.png"));
 });

@@ -69,6 +69,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `fixed-309-` … `fixed-312-`, `r0829-` | **2026-08-29**, Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build, and a responsive sweep at 375/768/1024/1440 with zero console errors | Anthropic (`claude-haiku-4-5-20251001`) |
 | `real-work-` | **2026-08-29**, the first round that ends at facts outside the transcript: a scheduled task, a created project, a dashboard opened in a browser, and a program Build wrote that the round ran | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-306-` | **2026-08-29**, the owner summarising a range through a chosen turn, with every turn still in the transcript afterwards | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-305-` | **2026-08-28**, the last three lifecycle hook events in the catalogue, two of them fired by a real tool-using turn, and the turn-end event across four providers | Anthropic (`claude-haiku-4-5-20251001`), OpenAI, OpenRouter, local Ollama (`gemma4:31b-cloud`) |

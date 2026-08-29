@@ -43,3 +43,34 @@ def test_hybrid_retrieval_rejects_negative_weights() -> None:
         assert str(error) == "invalid_hybrid_retrieval_weights"
     else:
         raise AssertionError("negative weights must fail closed")
+
+
+def test_a_question_recalls_the_memory_that_answers_it(tmp_path: Path) -> None:
+    """BUG-243 — a question is not a filter.
+
+    The full-text join is an AND, so every indexable word in the query had to
+    appear in the stored sentence. "Where do my nightly backups go?" therefore
+    found nothing against a memory that says exactly where they go, because the
+    memory does not contain the word "where". Ambient recall fired for keyword
+    queries and almost never for a sentence, which is the shape of a memory
+    system that looks present and is not.
+    """
+    store = SQLiteStore(tmp_path)
+    governance = MemoryGovernance("evt", "sess", None, "test", 1, 1, "until_forget", "approved", "test")
+    answer = write_memory(
+        "My nightly backups go to the encrypted NAS in the garage.",
+        workspace_root=tmp_path, store=store, governance=governance,
+    )
+
+    found = retrieve_hybrid_memory(store=store, query="Where do my nightly backups go?")
+    assert [m.memory_id for m in found] == [answer.memory_id]
+
+    # Precision is not traded for it: the join stays an AND over the words that
+    # carry meaning, so an unrelated question still recalls nothing.
+    assert retrieve_hybrid_memory(store=store, query="What is the weather?") == []
+
+    # And a query that is only function words still searches for them literally,
+    # rather than silently becoming a search for nothing.
+    assert [m.memory_id for m in retrieve_hybrid_memory(store=store, query="the")] == [
+        answer.memory_id
+    ]

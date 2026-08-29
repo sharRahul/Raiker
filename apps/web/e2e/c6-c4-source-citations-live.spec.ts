@@ -19,6 +19,7 @@
  *      spec can put a file where the agent's read tools will find it
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
@@ -121,7 +122,7 @@ test("an answer drawn from a workspace file cites it, and the ledger is under th
   const strip = page.getByRole("region", { name: "Sources this answer used" }).last();
   await expect(strip).toBeVisible({ timeout: 60_000 });
   await expect(strip.getByRole("button", { name: /meridian\.md/ })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "c6-source-ledger-under-answer.png"), fullPage: true });
+  await capture(page, join(SHOTS, "c6-source-ledger-under-answer.png"));
 });
 
 test("the inline marker the model wrote is a chip, and it opens the source at the passage", async () => {
@@ -136,7 +137,7 @@ test("the inline marker the model wrote is a chip, and it opens the source at th
   const inspector = page.getByRole("complementary", { name: "File preview" });
   await expect(inspector).toBeVisible({ timeout: 60_000 });
   await expect(inspector.locator("mark")).toContainText(/14 March 2029/, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "c4-source-opened-at-passage.png"), fullPage: true });
+  await capture(page, join(SHOTS, "c4-source-opened-at-passage.png"));
   await inspector.getByRole("button", { name: "Close file preview" }).click();
 });
 
@@ -177,7 +178,7 @@ test("an attached document is citable, and opens at the passage it contributed",
   const inspector = page.getByRole("complementary", { name: "File preview" });
   await expect(inspector).toBeVisible({ timeout: 60_000 });
   await expect(inspector.locator("mark")).toContainText(/41 sites/, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "c4-attachment-opened-at-passage.png"), fullPage: true });
+  await capture(page, join(SHOTS, "c4-attachment-opened-at-passage.png"));
   await inspector.getByRole("button", { name: "Close file preview" }).click();
 });
 
@@ -204,7 +205,7 @@ test("Build gets the same account, opened where the citation is", async () => {
   const panel = page.getByRole("region", { name: "Cited source" });
   await expect(panel).toBeVisible({ timeout: 60_000 });
   await expect(panel.locator("mark")).toContainText(/14 March 2029/, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "c6-build-source-inline.png"), fullPage: true });
+  await capture(page, join(SHOTS, "c6-build-source-inline.png"));
 });
 
 test("a marker the runtime never recorded is not a citation", async () => {
@@ -221,5 +222,5 @@ test("a marker the runtime never recorded is not a citation", async () => {
   const answer = page.locator(".message-bubble-raiker").last();
   await expect(answer).toContainText("[s7]", { timeout: 60_000 });
   await expect(answer.locator(".md-cite")).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "c6-uncited-marker-stays-text.png"), fullPage: true });
+  await capture(page, join(SHOTS, "c6-uncited-marker-stays-text.png"));
 });

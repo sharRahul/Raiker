@@ -588,3 +588,79 @@ class TestMemoryApi:
         )
         assert rejected.status_code == 200, rejected.text
         assert store.list_memory_relationships(OWNER) == []
+
+    def test_integrity_report_is_reachable_and_names_its_repair(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        """MEM-09 — the report existed and nothing could reach it.
+
+        Adding a count to a report no route serves and no page renders satisfies
+        the letter of the check and none of its purpose, so the route and the
+        repair are asserted together.
+        """
+        assert client.get("/api/memory/integrity").status_code == 401
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_session("sess_integrity", "projects/demo")
+        store.insert_turn("sess_integrity", "turn_a", "Where do backups go?")
+        store.complete_turn("turn_a", "completed", "The encrypted NAS.")
+        store.insert_turn("sess_integrity", "turn_b", "When do releases ship?")
+        store.complete_turn("turn_b", "completed", "The first Tuesday.")
+
+        clean = client.get("/api/memory/integrity", headers=headers)
+        assert clean.status_code == 200, clean.text
+        assert clean.json()["clean"] is True
+        assert clean.json()["conversation_index_count"] == 4
+
+        # An interrupted write: the turn landed, its index rows did not.
+        with store.connect() as connection:
+            connection.execute("DELETE FROM conversation_fts WHERE turn_id = ?", ("turn_b",))
+        drifted = client.get("/api/memory/integrity", headers=headers).json()
+        assert drifted["clean"] is False
+        assert drifted["stale_conversation_index_count"] == 2
+
+        repaired = client.post("/api/memory/conversation-index/rebuild", headers=headers)
+        assert repaired.status_code == 200, repaired.text
+        assert repaired.json() == {"ok": True, "indexed_rows": 4}
+        assert client.get("/api/memory/integrity", headers=headers).json()["clean"] is True
+
+    def test_recall_is_readable_and_correctable_from_the_transcript(
+        self, client: TestClient, workspace: Path
+    ) -> None:
+        """C17 — what was remembered, at the moment it was used.
+
+        Ambient recall leaves no citation to click, so the transcript could not
+        say which memories shaped an answer and the owner could only correct one
+        from the Memory route. The read is live, which is what makes forgetting
+        from the transcript mean the same thing as forgetting anywhere else.
+        """
+        headers = self._headers(client)
+        store = SQLiteStore(workspace)
+        store.create_session("sess_recall", "projects/demo")
+        store.insert_turn("sess_recall", "turn_recall", "Where do backups go?")
+        kept = _seed_memory(store, workspace, text="Backups go to the encrypted NAS.")
+        dropped = _seed_memory(store, workspace, text="Releases ship on Tuesdays.")
+        store.record_turn_recall(
+            session_id="sess_recall",
+            turn_id="turn_recall",
+            principal_id=OWNER,
+            memory_ids=[kept, dropped],
+        )
+
+        recall = client.get("/api/sessions/sess_recall/recall", headers=headers)
+        assert recall.status_code == 200, recall.text
+        assert [m["memory_id"] for m in recall.json()["memories"]] == [kept, dropped]
+        assert recall.json()["memories"][0]["text"] == "Backups go to the encrypted NAS."
+
+        corrected = client.put(
+            f"/api/memory/{kept}", json={"text": "Backups go to the offsite vault."}, headers=headers
+        )
+        assert corrected.status_code == 200, corrected.text
+        forgotten = client.delete(f"/api/memory/{dropped}", headers=headers)
+        assert forgotten.status_code == 200, forgotten.text
+
+        # The read is live: the correction shows, and the forgotten memory is
+        # gone rather than left behind as a tombstone.
+        after = client.get("/api/sessions/sess_recall/recall", headers=headers).json()["memories"]
+        assert [m["memory_id"] for m in after] == [kept]
+        assert after[0]["text"] == "Backups go to the offsite vault."

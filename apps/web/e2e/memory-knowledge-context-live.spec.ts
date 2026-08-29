@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 
 test("live Memory, Knowledge Map, and context usage review", async ({ page }) => {
   await page.goto("http://127.0.0.1:8765/#/memory");
@@ -21,7 +22,7 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
   await expect(page.getByRole("switch", { name: "Incognito session" })).toBeVisible();
   await expect(page.getByText("No approved memories yet")).toBeVisible();
   await expect(page.getByText("Advanced memory management")).toBeVisible();
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/memory-redesign-live.png", fullPage: true });
+  await capture(page, "../../docs/plans/screenshots/working/memory-redesign-live.png");
 
   await page.goto("http://127.0.0.1:8765/#/brain");
   await expect(page.getByRole("heading", { name: "Knowledge Map", level: 2 })).toBeVisible();
@@ -33,7 +34,7 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
   await expect(page.getByRole("complementary", { name: "Graph settings" })).toBeVisible();
   await expect(page.getByText("Centre force")).toBeVisible();
   await expect(page.getByText("Always alive")).toBeVisible();
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/knowledge-map-redesign-live.png", fullPage: true });
+  await capture(page, "../../docs/plans/screenshots/working/knowledge-map-redesign-live.png");
 
   await page.route("**/api/sessions/*/context-usage", async (route) => {
     await route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({
@@ -68,5 +69,5 @@ test("live Memory, Knowledge Map, and context usage review", async ({ page }) =>
   await expect(page.getByText(/Reported by Ollama/)).toBeVisible();
   await expect(page.getByText(/Capacity reported by runtime/)).toBeVisible();
   await expect(page.getByText(/no API cost/i)).toBeVisible();
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/local-context-window-live.png", fullPage: true });
+  await capture(page, "../../docs/plans/screenshots/working/local-context-window-live.png");
 });

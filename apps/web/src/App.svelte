@@ -223,7 +223,7 @@
           {:else if chatVisited}
             <div hidden={current !== "new-chat"}>
               <ChatView
-                sessionId={continuedSessionId}
+                sessionId={current === "new-chat" ? continuedSessionId : null}
                 {projects}
                 onProjectsChanged={refreshProjects}
                 visible={current === "new-chat"}
@@ -233,6 +233,7 @@
           {#if buildVisited}
             <div hidden={current !== "build"}>
               <BuildView
+                sessionId={current === "build" ? continuedSessionId : null}
                 {projects}
                 onProjectsChanged={refreshProjects}
                 visible={current === "build"}

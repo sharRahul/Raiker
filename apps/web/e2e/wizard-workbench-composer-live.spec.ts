@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -169,7 +170,7 @@ test("the first-run wizard answers the model question on its own screen", async 
     detectedOptions.some((option) => option.trim() !== "" && !/No model detected|Asking/.test(option)) ||
       /not running on this device|could not be reached/.test(localState),
   ).toBe(true);
-  await page.screenshot({ path: join(SHOTS, "r0816b-01-first-run-provider-matrix.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-01-first-run-provider-matrix.png"));
 
   // ── With an API key: the key, then that provider's own catalogue ───────
   const listed: string[] = [];
@@ -197,7 +198,7 @@ test("the first-run wizard answers the model question on its own screen", async 
     expect((await page.content()).includes(key)).toBe(false);
   }
   console.log("Wizard provider rows —\n" + listed.join("\n"));
-  await page.screenshot({ path: join(SHOTS, "r0816b-02-first-run-catalogues-listed.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-02-first-run-catalogues-listed.png"));
 
   // ── Pin one model from a real catalogue ───────────────────────────────
   if (KEYS.Anthropic !== "") {
@@ -218,7 +219,7 @@ test("the first-run wizard answers the model question on its own screen", async 
     });
     await expect(anthropic.getByText(/^Selected:/)).toBeVisible({ timeout: 60_000 });
   }
-  await page.screenshot({ path: join(SHOTS, "r0816b-03-first-run-model-pinned.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-03-first-run-model-pinned.png"));
 
   // ── Finish the wizard ──────────────────────────────────────────────────
   await page.getByRole("button", { name: /^Continue$|^Decide later$/ }).click();
@@ -245,7 +246,7 @@ test("the Workbench is a board over the running work, not a composer", async ({ 
   for (const action of ["Start a conversation", "Start a build", "Plan a task or agent"]) {
     await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
   }
-  await page.screenshot({ path: join(SHOTS, "r0816b-04-workbench-board.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-04-workbench-board.png"));
 
   // A real standing agent, so the board is proven against live rows rather than
   // against three empty cards. Planning one needs a model that has passed a
@@ -281,7 +282,7 @@ test("the Workbench is a board over the running work, not a composer", async ({ 
   await expect(
     page.getByRole("region", { name: "Running now" }).getByText("Watch the release branch"),
   ).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "r0816b-05-workbench-standing-agent.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-05-workbench-standing-agent.png"));
 });
 
 test("both composers carry the reference control set, and Chat still sends", async ({ page }) => {
@@ -299,7 +300,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   await expect(page.getByRole("button", { name: /^Approval mode:/ })).toBeVisible();
   const modelChip = page.getByRole("button", { name: /^Model for this turn:/ });
   await expect(modelChip).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "r0816b-06-chat-composer.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-06-chat-composer.png"));
 
   // The thinking budget belongs to the model, so it is a section of the model
   // menu rather than a second dropdown beside it.
@@ -312,7 +313,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
     await expect(
       page.getByRole("group", { name: "Effort" }).getByRole("switch", { name: /Thinking/ }),
     ).toBeVisible();
-    await page.screenshot({ path: join(SHOTS, "r0816b-06b-chat-model-effort.png"), fullPage: true });
+    await capture(page, join(SHOTS, "r0816b-06b-chat-model-effort.png"));
   }
   await page.keyboard.press("Escape");
 
@@ -337,7 +338,7 @@ test("both composers carry the reference control set, and Chat still sends", asy
   if (sendable) {
     await send.click();
     await expect(page.getByText(marker).first()).toBeVisible({ timeout: 300_000 });
-    await page.screenshot({ path: join(SHOTS, "r0816b-07-chat-live-turn.png"), fullPage: true });
+    await capture(page, join(SHOTS, "r0816b-07-chat-live-turn.png"));
     // Every completed turn offers Branch — the last open part of C14.
     await expect(
       page.getByRole("button", { name: /Branch a second conversation/ }).first(),
@@ -365,14 +366,14 @@ test("both composers carry the reference control set, and Chat still sends", asy
   for (const option of ["Plan", "Edit", "Auto"]) {
     await expect(page.getByRole("menuitemradio", { name: new RegExp(`^${option}`) })).toBeVisible();
   }
-  await page.screenshot({ path: join(SHOTS, "r0816b-08-build-composer-mode.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-08-build-composer-mode.png"));
   await page.keyboard.press("Escape");
 
   // The palette, in both themes, on the surface that shows the most of it.
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto(`${BASE}/#/new-chat`);
   await expect(page.getByLabel("Prompt", { exact: true })).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "r0816b-09-chat-dark.png"), fullPage: true });
+  await capture(page, join(SHOTS, "r0816b-09-chat-dark.png"));
   await page.emulateMedia({ colorScheme: "light" });
 
   expect(consoleErrors, `console errors: ${consoleErrors.join(" | ")}`).toEqual([]);

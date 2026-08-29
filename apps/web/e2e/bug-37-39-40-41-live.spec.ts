@@ -46,6 +46,7 @@
  */
 import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -114,7 +115,7 @@ test("a real Anthropic turn answers, so the rest of this file is evidence", asyn
   // adds a trailing word is still a live turn. What is being proved here is that
   // the credential, the egress policy and the streaming path all work.
   await expect(page.getByText(/VISUAL LIVE/).last()).toBeVisible({ timeout: 180_000 });
-  await page.screenshot({ path: join(SHOTS, "185-live-turn-visual-language.png"), fullPage: true });
+  await capture(page, join(SHOTS, "185-live-turn-visual-language.png"));
 });
 
 // ── BUG-37 ───────────────────────────────────────────────────────────────
@@ -235,7 +236,7 @@ test("the finished visual language is recorded in both themes", async () => {
         await expect(page.getByRole("radiogroup", { name: "Density" })).toBeVisible();
       }
       await page.waitForTimeout(250);
-      await page.screenshot({ path: join(SHOTS, `${name}-${theme}.png`), fullPage: true });
+      await capture(page, join(SHOTS, `${name}-${theme}.png`));
     }
   }
   await page.evaluate(() => {
@@ -278,7 +279,7 @@ test("Compact density shortens a real row, not only the gaps around it", async (
       "aria-checked",
       "true",
     );
-    if (screenshot) await page.screenshot({ path: join(SHOTS, screenshot), fullPage: true });
+    if (screenshot) await capture(page, join(SHOTS, screenshot));
     // Choosing clears any previous confirmation, so waiting for that to go is
     // what stops the assertion below from matching the *last* save's banner and
     // reporting a write that never happened.
@@ -351,7 +352,7 @@ test("a parked scheduled run says approving continues it, and offers a recovery"
   ).toBeVisible();
   // Demoted to a recovery affordance: still there, no longer the fast path.
   await expect(page.getByRole("button", { name: "Continue now" }).first()).toHaveClass(/btn-ghost/);
-  await page.screenshot({ path: join(SHOTS, "193-BUG-39-approval-continues-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "193-BUG-39-approval-continues-live.png"));
 });
 
 // ── BUG-40 ───────────────────────────────────────────────────────────────
@@ -377,12 +378,12 @@ test("the Host control reports the host, and pauses and resumes it", async () =>
   // Named platform mechanism, not a Raiker daemon of its own.
   await expect(panel.getByText(/systemd --user|launchd|Windows per-user startup/)).toBeVisible();
   await expect(panel.getByRole("button", { name: "Quit" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "191-BUG-40-host-control-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "191-BUG-40-host-control-live.png"));
 
   await panel.getByRole("button", { name: "Pause" }).click();
   await expect(panel.getByText("paused", { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(panel.getByText(/Scheduled work will not start until you resume/)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "192-BUG-40-host-paused-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "192-BUG-40-host-paused-live.png"));
 
   await panel.getByRole("button", { name: "Resume" }).click();
   await expect(panel.getByText("needs attention", { exact: true })).toBeVisible({ timeout: 20_000 });

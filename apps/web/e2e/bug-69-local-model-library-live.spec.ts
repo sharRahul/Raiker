@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
 
@@ -71,5 +72,5 @@ test("BUG-69 approved local root detects a GGUF without a system-wide scan", asy
     page.getByText(/will not search the rest of your computer/i),
   ).toHaveCount(0);
   await expect(page.getByText("llama · Q4_K_M")).toBeVisible();
-  await page.screenshot({ path: SHOT, fullPage: true });
+  await capture(page, SHOT);
 });

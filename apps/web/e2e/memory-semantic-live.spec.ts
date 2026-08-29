@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
@@ -25,11 +26,11 @@ test("managed content exposes governed semantic indexing and curated local acqui
   await expect(page.getByLabel("Embedding model", { exact: true })).toBeVisible({ timeout: 60_000 });
   await page.getByLabel("Embedding model", { exact: true }).selectOption("openai:text-embedding-3-small");
   await expect(page.getByRole("button", { name: "Embed 1" })).toBeEnabled();
-  await page.screenshot({ path: join(SHOTS, "review-05-managed-semantic-index.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-05-managed-semantic-index.png"));
 
   await page.goto(`${BASE}/#/models?tab=huggingface`);
   await expect(page.getByRole("heading", { name: "Nomic Embed v1.5" })).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(/Apache-2.0/)).toBeVisible();
   await expect(page.getByText(/81 MiB/)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "review-06-curated-local-embedding.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-06-curated-local-embedding.png"));
 });

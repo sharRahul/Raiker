@@ -20,6 +20,7 @@
  *   3. `RAIKER_LIVE_WORKSPACE` pointing at that same workspace directory
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
@@ -159,7 +160,7 @@ test("a provider key is added through the UI and a model selected", async () => 
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "b9-model-connected.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-model-connected.png"));
 });
 
 test("the code map is off until the owner turns it on, and Build says so", async () => {
@@ -179,7 +180,7 @@ test("the code map is off until the owner turns it on, and Build says so", async
   const map = panel.getByRole("region", { name: "Code map" });
   await expect(map).toContainText(/indexing is off/i, { timeout: 30_000 });
   await expect(map.getByRole("button", { name: /build index/i })).toBeDisabled();
-  await page.screenshot({ path: join(SHOTS, "b9-code-map-off-by-default.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-code-map-off-by-default.png"));
 
   await setCapability("Code map", "Turn on", "indexing this repository so Build can find code");
 });
@@ -249,7 +250,7 @@ test("connecting a repository builds its map, and Build says what the map holds"
     await map.getByRole("button", { name: /rebuild index/i }).click();
   }
   await expect(map).toContainText(/2 files, 3 declarations/i, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "b9-code-map-built-on-connect.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-code-map-built-on-connect.png"));
 });
 
 test("a real turn finds the declaration by name and quotes back its line range", async () => {
@@ -266,7 +267,7 @@ test("a real turn finds the declaration by name and quotes back its line range",
   // Lines 11–13 of the file written above. A model that had not been handed the
   // index could not produce this.
   await expect(answer).toContainText(/11/, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "b9-code-map-search-answer.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-code-map-search-answer.png"));
 });
 
 test("with the capability turned off the same prompt is refused by name", async () => {
@@ -280,7 +281,7 @@ test("with the capability turned off the same prompt is refused by name", async 
   );
 
   await expect(answer).toContainText(/code_map_gate_disabled/i, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "b9-code-map-gate-off.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-code-map-gate-off.png"));
 
   await setCapability("Code map", "Turn on", "restoring the code map for the refresh check");
 });
@@ -320,5 +321,5 @@ test("after an approved write the map describes the file as it is now", async ()
   );
 
   await expect(answer).toContainText(/services\/audit\.py/, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "b9-code-map-refreshed-after-write.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b9-code-map-refreshed-after-write.png"));
 });

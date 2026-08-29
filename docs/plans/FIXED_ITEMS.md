@@ -321,6 +321,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-306](#fixed-306--compaction-was-the-thresholds-decision-and-the-owner-had-no-say) | Medium | Chat / context / web UI | Fixed (closed backlog #9; closed 2026-08-29) |
 | [FIXED-307](#fixed-307--four-risk-bands-no-definitions-and-two-of-them-unreachable) | High | Policy / risk classification / governance | Fixed (closed 2026-08-29) |
 | [FIXED-308](#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant) | Medium | Chat / approvals / web UI | Fixed (closed ADD-22 and backlog #17; closed 2026-08-29) |
+| [FIXED-309](#fixed-309--build-opened-an-empty-conversation-after-a-reload) | Medium | Build / web UI | Fixed (was BUG-242; closed 2026-08-29) |
+| [FIXED-310](#fixed-310--the-memory-integrity-report-existed-and-nothing-could-reach-it) | Medium | Memory / diagnostics / web UI | Fixed (was MEM-09; closed 2026-08-29) |
+| [FIXED-311](#fixed-311--recall-was-invisible-at-the-moment-it-was-used) | Medium | Chat / memory / web UI | Fixed (was C17; closed 2026-08-29) |
+| [FIXED-312](#fixed-312--the-core-act-of-code-review-was-a-route-change-away) | Medium | Build / approvals / web UI | Fixed (was B14's review half; closed 2026-08-29) |
+| [FIXED-313](#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | Fixed (was BUG-241; closed 2026-08-29) |
+| [FIXED-314](#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | Fixed (was BUG-243, raised and closed 2026-08-29) |
 
 ---
 
@@ -12081,7 +12087,7 @@ read-leg gap. Screenshots `r0825-memory-index`, `r0825-memory-recall-state`.
 **What is *not* closed, and one of these is new.**
 
 * **The read leg — a question is not embedded into the space.** Raised as
-  [BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it)
+  [BUG-240](#fixed-292--semantic-memory-built-a-space-the-question-never-entered)
   rather than fixed here, because the shortest fix is a second route into a
   governed action and this codebase refuses those on purpose: embedding a query
   is provider egress, on a read path, once per search, and it needs the gate and
@@ -12370,7 +12376,7 @@ Settings → Personalisation, where System remains the default.
 File chunks get a **lexical** index and exact provenance, and no vector or graph
 projection. The read half of semantic recall is not connected —
 `retrieval.default_query_embedder()` returns `None` for the reasons
-[BUG-240](TO_BE_FIXED.md#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it)
+[BUG-240](#fixed-292--semantic-memory-built-a-space-the-question-never-entered)
 records — so a stored file vector could never be matched at query time. It would
 have been an index nothing reads, and a claim of semantic file search Raiker
 cannot honour.
@@ -13314,3 +13320,280 @@ shape bounds, the two routes refusing each other, the answer being bounded by
 what was asked, single-answer enforcement, and an audit row that records the
 answering without the answer. `apps/web/src/lib/views/ApprovalsView.test.ts` — the
 card offers no way to approve a question and answers through the question route.
+
+---
+
+## FIXED-309 — Build opened an empty conversation after a reload
+
+**Severity: Medium. Area: Build / web UI. Closed 2026-08-29 (was BUG-242).**
+
+**Observed.** Ask Build to write a file, watch it do the work, then reload the
+page. Build came back with an empty conversation. The turn was never lost — the
+session, its transcript and its tool rows were all still stored, and Search chats
+found them — but the page the owner was working on a second ago did not come
+back, and nothing on screen said where the work went.
+
+**Root cause.** `sessionId` in `apps/web/src/lib/views/BuildView.svelte` was only
+ever assigned from the streaming response. It was never read from the URL and
+never restored, so `#/build` always mounted a fresh one. Chat could be *opened*
+on a conversation through `?session=`, which is what made this a gap rather than
+a design choice — but neither surface ever *wrote* that coordinate, so an
+ordinary reload cost an owner their place in both.
+
+**Fixed.** Both halves, for both surfaces.
+
+* `apps/web/src/lib/sessionRoute.ts` records the open conversation in the address
+  bar with `history.replaceState` — never by assigning to `location.hash`, which
+  would fire `hashchange` and reload the transcript already on screen. It writes
+  only when the surface asking is the one the URL currently names, because Chat
+  and Build stay mounted behind each other and a hidden view must not rewrite the
+  visible one's address. Only the session id travels; everything else about a
+  conversation stays behind the governed API, exactly as `routeState.ts` requires.
+* Build now accepts the same `sessionId` prop Chat does and restores the stored
+  turns, their tool rows, their retained working and their attachment chips
+  through the shared `apps/web/src/lib/conversationRestore.ts`, which both
+  surfaces now use rather than keeping two copies of the same rebuild.
+* `App.svelte` hands the coordinate only to the surface the route names. This
+  also closed a latent defect in Chat: following any `?session=` link on another
+  route — `#/sessions?session=…`, `#/approvals?session=…` — used to reload the
+  hidden Chat transcript to that conversation.
+* Sessions → a conversation now offers **Open in Build** beside **Open in chat**,
+  so the restore is reachable from the product and not only from a reload.
+
+**User-interface outcome.** Reloading Build asks for the password, as it always
+did, and then comes back to the conversation — the prompt, the answer, the tool
+rows and the project it was filed under. The address bar carries it, so the
+conversation can be linked to.
+
+**Evidence.** `apps/web/e2e/bug-242-build-restore-mem-09-live.spec.ts` against a
+live Anthropic turn: [`fixed-309-build-turn.png`](screenshots/working/fixed-309-build-turn.png),
+[`fixed-309-build-after-reload.png`](screenshots/working/fixed-309-build-after-reload.png).
+Unit coverage in `apps/web/src/lib/sessionRoute.test.ts` and
+`apps/web/src/lib/views/BuildView.test.ts`.
+
+---
+
+## FIXED-310 — The memory integrity report existed and nothing could reach it
+
+**Severity: Medium. Area: memory / diagnostics / web UI. Closed 2026-08-29 (was
+[MEM-09](MEMORY_RELIABILITY_PLAN.md#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report)).**
+
+**Observed.** `raiker/memory/integrity.py` detected stale FTS, projection and
+graph state for durable memory. `run_one_memory_job` was its only caller, and
+**nothing called `run_one_memory_job`** — no API route, no scheduler entry, no
+Diagnostics panel. The report was computed by tests and by nothing else. It also
+did not know about `conversation_fts`, so a divergence between `turns` and the
+index behind Search chats was invisible: search simply stopped finding
+conversations it had found the week before.
+
+**Why the order mattered.** Adding the conversation-index count first would have
+satisfied the letter of the entry and none of its purpose — a number in a report
+nothing displays is the invisible-surface failure this document exists to
+prevent. So the report was surfaced first, and the check added to a report an
+owner can read.
+
+**Fixed.**
+
+* `MemoryIntegrityReport` gains `conversation_index_count` and
+  `stale_conversation_index_count`, comparing the index against the rows
+  `_rebuild_conversation_fts` would insert — one per non-empty prompt and one per
+  non-empty answer — and counts drift as unclean.
+* `DashboardService.memory_integrity` runs the scan on request, human-only and
+  read-only; `DashboardService.rebuild_conversation_index` is its stated repair.
+  The index is a projection of `turns`, so a rebuild recomputes every row and can
+  lose nothing.
+* `GET /api/memory/integrity` and `POST /api/memory/conversation-index/rebuild`,
+  declared above the `{memory_id}` routes so "integrity" is never read as an id.
+* Observability → Diagnostics carries a **Memory integrity** card.
+
+**User-interface outcome.** The card reports `clean` or names the findings —
+only the non-zero ones, because a report listing ten zeroes hides the one number
+that is not zero — and offers **Rescan**. When the conversation index has
+drifted, and only then, it offers **Rebuild conversation index** beside the
+finding it repairs.
+
+**Evidence.** [`fixed-310-memory-integrity-card.png`](screenshots/working/fixed-310-memory-integrity-card.png),
+captured live. `tests/test_memory_integrity.py` covers the drift and the repair;
+`tests/test_memory_controls.py` covers the route, its auth boundary and the
+round trip; `apps/web/src/lib/views/DiagnosticsView.test.ts` covers both states
+of the card.
+
+---
+
+## FIXED-311 — Recall was invisible at the moment it was used
+
+**Severity: Medium. Area: Chat / memory / web UI. Closed 2026-08-29 (was
+[C17](GAP_BUILD_CHAT.md#c17--recall-is-invisible)).**
+
+**Observed.** Ambient recall reaches a turn through the context bundle, not
+through a tool the transcript can cite, so it left nothing to click. The Memory
+route could list what Raiker remembers; nothing could say **which memories shaped
+this answer**. A remembered sentence that is wrong is most obviously wrong in the
+answer it produced, and that was the one place the owner could not correct it.
+C6 had closed the reading half for `memory_search`, which is a tool call — this
+is the other kind of recall, and it is the kind that happens on every turn.
+
+**Fixed.**
+
+* `ContextBundle.recalled_memory_ids()` reports the ids the bundle actually
+  carried; the `context_gathered` event payload now includes them. Ids only — the
+  sentences stay in the bundle that reached the model and never enter the event
+  log.
+* A `turn_recalls` table (migration `RAIKER-1039-turn-recall`) records them
+  against the turn, owner-scoped by principal exactly as the citation ledger is.
+  Recording is best-effort: a workspace that cannot record which memories were
+  used must still be able to answer.
+* `GET /api/sessions/{id}/recall` reads the sentences **live** from
+  `approved_memory`, so a memory corrected since the turn ran reads as it is now
+  and one that has been forgotten simply stops appearing.
+* Chat renders a **Remembered *n*** strip under each settled answer, collapsed by
+  default, with **Correct** and **Forget** on each row. Both go through the same
+  governed actions the Memory page uses; the strip adds no authority.
+
+**User-interface outcome.** An answer that used memory says so, names the
+sentences, and lets the owner fix or forget one without leaving the conversation.
+An answer that used none shows nothing at all.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Naming what was
+remembered is parity — ChatGPT and Claude both surface memory. Naming *which
+sentences were used in this specific answer*, reading them live so the strip can
+never show a stale copy, and offering correction and forgetting at the point of
+use is not something the reviewed documentation for Cowork, ChatGPT Work, Codex,
+OpenClaw, DeepSeek Harness or Hermes establishes.
+
+**Evidence.** [`fixed-311-chat-recall-strip.png`](screenshots/working/fixed-311-chat-recall-strip.png)
+and [`fixed-311-memory-page.png`](screenshots/working/fixed-311-memory-page.png),
+captured live against a real Anthropic turn.
+`apps/web/e2e/c17-b14-recall-and-inline-diff-live.spec.ts`,
+`apps/web/src/lib/components/RecallStrip.test.ts`, and the live round trip in
+`tests/test_memory_controls.py`.
+
+---
+
+## FIXED-312 — The core act of code review was a route change away
+
+**Severity: Medium. Area: Build / approvals / web UI. Closed 2026-08-29 (was
+[B14](GAP_BUILD_CHAT.md#b14--no-diff-review-surface-in-build)'s review half).**
+
+**Observed.** The unified diff behind a proposed write lived only in the
+Approvals inbox, on a different route. Reviewing a change Build had just proposed
+meant leaving Build at the one moment an owner is reading code, and the diff
+itself was a block of monospaced text: no line numbers, added and removed lines
+told apart by colour alone.
+
+**Fixed.** `apps/web/src/lib/diff.ts` parses a unified diff and invents nothing —
+a line that does not fit the grammar is kept verbatim as context rather than
+dropped, so a preview the server produced is never silently shortened.
+`DiffView.svelte` renders it: per file, with the line numbers the hunk headers
+state, added and removed lines carrying a sign and a screen-reader label as well
+as a colour, and the whole thing scrolling inside itself so a long line never
+widens the page. Build loads the same governed preview the inbox reads
+(`GET /api/approvals/{id}`) for each pending decision in the conversation and
+renders it between the decision and its buttons. Approvals uses the same
+component, so a change looks the same wherever it is decided.
+
+**What did not change, deliberately.** Nothing about the decision moves. Accept
+and Reject resolve the same record through the same route, and **per-hunk
+acceptance is not offered** — the runtime has no such decision to record, and a
+control that split a diff the approval cannot split would be a claim the server
+would not keep. That half of B14 stays open.
+
+**User-interface outcome.** A proposed file change is read where it was proposed:
+the file it touches, `+n −m`, the hunk, and **Accept** / **Reject** on one screen.
+A preview that cannot be read leaves the decision intact and simply shows no diff.
+
+**Evidence.** [`fixed-312-build-inline-diff.png`](screenshots/working/fixed-312-build-inline-diff.png),
+captured live from a real parked `file_write`. `apps/web/src/lib/diff.test.ts`,
+`apps/web/src/lib/components/DiffView.test.ts`, and the inline-review and
+preview-failure cases in `apps/web/src/lib/views/BuildView.test.ts`.
+
+---
+
+## FIXED-313 — `fullPage` evidence captures stopped at the first viewport
+
+**Severity: Low. Area: live test harness / evidence. Closed 2026-08-29 (was
+BUG-241).**
+
+**Observed.** Two captures taken by `fixed-305-lifecycle-hooks-live.spec.ts` at
+different points in a round — one before any turn, one after a turn that
+demonstrably fired two hooks — were byte-identical. Both passed `fullPage: true`.
+The app shell gives the routed view its own scrolling container, so the page
+itself does not grow: `fullPage` captured the viewport and stopped, and every
+capture of a long page showed the same top of it.
+
+**Why it mattered more than it looked.** These captures are the evidence behind
+the `FIXED-*` entries and the rounds in [`LIVE_TEST_ROUNDS.md`](LIVE_TEST_ROUNDS.md).
+A screenshot that does not contain the thing it is named for does not fail — it
+is filed, linked and read as proof. That is the same shape as an inert switch:
+not a missing control, but a wrong belief about one.
+
+**Fixed in the harness, not the product**, because the page scrolls correctly in
+a browser and nothing an owner uses is wrong. `apps/web/e2e/capture.ts` measures
+the tallest content the shell is scrolling, grows the viewport to it (bounded, so
+a capture never becomes a wall of pixels nobody reads), shoots, and restores the
+viewport. It takes an optional locator, scrolled into view first, which is the
+cheapest way to be certain the section a capture is named for is in it;
+`captureElement` shoots one element for evidence about a single card. All 56
+live specs that passed `fullPage: true` now go through it.
+
+**Evidence.** [`fixed-310-memory-integrity-card.png`](screenshots/working/fixed-310-memory-integrity-card.png)
+is 2097 px tall on a 1000 px viewport — the whole Diagnostics route, which is
+what `fullPage` was always supposed to mean.
+
+---
+
+## FIXED-314 — A question could not recall the memory that answered it
+
+**Severity: High. Area: memory / retrieval. Raised and closed 2026-08-29 (was
+BUG-243).**
+
+**Observed, while verifying FIXED-311 against a live turn.** With one approved
+memory reading *"My nightly backups go to the encrypted NAS in the garage."*:
+
+```
+'Where do my nightly backups go?'      -> []
+'Remind me about my nightly backups.'  -> []
+'backups'                              -> [mem_d4b556a3]
+```
+
+Ambient recall fired for keyword queries and almost never for a sentence. Nothing
+reported an error; the turn simply answered without the memory, and the Memory
+page went on saying the memory was approved and searchable — which it was.
+
+**Root cause.** `SQLiteStore._match_terms` kept every alphanumeric token of three
+characters or more, and the MATCH expression joined them with spaces. Space-
+separated barewords are an implicit **AND** in both FTS grammars, so every
+indexable word in the question had to appear in the stored text — including
+*where*, *remind* and *about*. A question was being used as a filter.
+
+**Fixed.** Function words are dropped before the join: `_SEARCH_STOPWORDS` is a
+short, closed-class list — articles, pronouns, auxiliaries, prepositions and the
+question words — and contains no domain word, so no query about Raiker's own
+subject matter loses a term it needed. A query that is *only* function words
+keeps them, so searching for a literal `the` still searches for it. All three
+text indexes share `_match_terms`, so approved memory, the conversation index
+behind Search chats, and managed-file chunks all changed together.
+
+**The join was deliberately left as an AND.** Loosening it to `OR` was tried
+first and rejected on measurement: it made an unrelated question ("what is the
+weather") recall every memory, because *the* matched. Ranking would have put the
+best row first and the strip would still have shown the rest — an answer
+presented for a question nobody asked is a worse failure than finding nothing.
+Precision is kept; only the words that never carried meaning are removed.
+
+**User-interface outcome.** Nothing new to learn: **Memory → Recall backend**
+still states which of the three retrieval states the workspace is in. What
+changed is that a normally-phrased question now reaches the memory that answers
+it, which is what makes FIXED-311's strip appear at all.
+
+**The remaining case is semantic, and already has an answer.** *"Remind me about
+my nightly backups"* still recalls nothing, because *remind* is a content word
+the memory does not contain. That is what the meaning-based index exists for —
+[MEM-10](MEMORY_RELIABILITY_PLAN.md#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select),
+closed as FIXED-283/292/293/294 — and it is honest for a default install to fail
+that query lexically and say so.
+
+**Evidence.** `tests/test_hybrid_memory_retrieval.py` —
+`test_a_question_recalls_the_memory_that_answers_it` asserts all three legs: the
+question recalls the answer, an unrelated question still recalls nothing, and a
+function-word-only query still searches literally.

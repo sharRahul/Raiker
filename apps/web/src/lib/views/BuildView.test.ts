@@ -9,6 +9,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AgentResponse, CodeReposView, ProjectsList, StreamEvent } from "../apiTypes";
 import { makeGate, stubFetch } from "../test-helpers";
 import { resetModels } from "../models.svelte";
+import { routeStateFromHash } from "../routeState";
 
 const streamPromptMock = vi.hoisted(() => vi.fn());
 vi.mock("../api", async (importOriginal) => {
@@ -741,5 +742,168 @@ describe("Build transcript rendering", () => {
     expect(answer.querySelectorAll("ol > li")).toHaveLength(2);
     expect(answer.querySelector("pre code")?.textContent).toBe("const x = 1;");
     expect(answer.textContent).not.toContain("## Plan");
+  });
+});
+
+// BUG-242 — Build used to mount an empty conversation after a reload. The turn
+// was never lost, but the page the owner was working on a second ago did not
+// come back, and nothing on screen said where the work went. Build is where the
+// approvals for a change live, which is why this cost more there than in Chat.
+describe("Build conversation restore", () => {
+  const PRIOR_SESSION = {
+    session: {
+      session_id: "sess_prior",
+      title: "Add a settings page",
+      status: "active",
+      created_at: "2026-08-29T09:00:00Z",
+      turn_count: 1,
+    },
+    turns: [
+      {
+        turn_id: "turn_prior",
+        session_id: "sess_prior",
+        turn_type: "prompt",
+        status: "completed",
+        prompt_text: "Write the settings page",
+        created_at: "2026-08-29T09:00:00Z",
+        completed_at: "2026-08-29T09:01:00Z",
+        summary: "Wrote apps/web/src/lib/views/SettingsView.svelte.",
+        reasoning: null,
+        reasoning_chars: 0,
+        tool_rows: [],
+      },
+    ],
+    parked_approvals: [],
+  };
+
+  function restoreRoutes() {
+    return baseRoutes({
+      "GET /api/sessions/sess_prior": PRIOR_SESSION,
+      "GET /api/sessions/sess_prior/attachments": { session_id: "sess_prior", files: [] },
+      "GET /api/sessions/sess_prior/sources": { session_id: "sess_prior", sources: [] },
+      "GET /api/approvals": [],
+    });
+  }
+
+  it("restores the stored conversation the URL names", async () => {
+    stubFetch(restoreRoutes());
+    render(BuildView, { props: { projects: BUILD_PROJECTS, sessionId: "sess_prior" } });
+
+    expect(await screen.findByText("Write the settings page")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/Wrote apps\/web\/src\/lib\/views\/SettingsView\.svelte\./),
+    ).toBeInTheDocument();
+  });
+
+  it("carries the session in the address bar so a reload can find it again", async () => {
+    window.location.hash = "#/build";
+    stubFetch(restoreRoutes());
+    render(BuildView, { props: { projects: BUILD_PROJECTS, sessionId: "sess_prior" } });
+
+    await waitFor(() =>
+      expect(routeStateFromHash(window.location.hash).sessionId).toBe("sess_prior"),
+    );
+    window.location.hash = "";
+  });
+
+  it("says so when the stored conversation cannot be read", async () => {
+    stubFetch(baseRoutes({ "GET /api/sessions/sess_prior": { __status: 500 } }));
+    render(BuildView, { props: { projects: BUILD_PROJECTS, sessionId: "sess_prior" } });
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/Could not load history/);
+  });
+});
+
+// B14 — the core act of coding review used to be a route change away: the diff
+// lived only in the Approvals inbox. Build now reads it where it was proposed.
+describe("Build inline diff review", () => {
+  const PENDING = {
+    approval_id: "apr_1",
+    action_id: "act_1",
+    status: "pending",
+    tool_name: "file_write",
+    capability: "file_write_execution",
+    risk_level: "medium",
+    session_id: "sess_build",
+    turn_id: "turn_1",
+    created_at: "2026-08-29T09:00:00Z",
+  };
+
+  const DETAIL = {
+    approval: PENDING,
+    arguments: {},
+    diff: [
+      "diff --git a/src/app.py b/src/app.py",
+      "@@ -1,2 +1,2 @@",
+      "-old()",
+      "+new()",
+      "",
+    ].join("\n"),
+    diff_path: "src/app.py",
+    preview_kind: "file_diff",
+    metadata_only_notice: "",
+    executes_on_approval: true,
+    execution_evidence: {},
+  };
+
+  it("shows the proposed change beside Accept and Reject", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/approvals": [PENDING],
+        "GET /api/approvals/apr_1": DETAIL,
+      }),
+    );
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: { ...finalResponse(""), status: "needs_approval" },
+        } as StreamEvent);
+      },
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Rename the entry point" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    // The diff, the file it touches, and the decision are one screen.
+    expect(await screen.findByText("src/app.py")).toBeInTheDocument();
+    expect(await screen.findByText("new()")).toBeInTheDocument();
+    expect(await screen.findByText("old()")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+  });
+
+  it("keeps the decision when the preview cannot be read", async () => {
+    stubFetch(
+      baseRoutes({
+        "GET /api/approvals": [PENDING],
+        "GET /api/approvals/apr_1": { __status: 500 },
+      }),
+    );
+    streamPromptMock.mockImplementation(
+      async (_body: unknown, onEvent: (ev: StreamEvent) => void) => {
+        onEvent({
+          kind: "final",
+          text: "",
+          event_type: "",
+          payload: {},
+          response: { ...finalResponse(""), status: "needs_approval" },
+        } as StreamEvent);
+      },
+    );
+    await renderBuildWithProject();
+
+    await fireEvent.input(await screen.findByLabelText("Describe the change"), {
+      target: { value: "Rename the entry point" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^send$/i }));
+
+    expect(await screen.findByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(screen.queryByText("src/app.py")).toBeNull();
   });
 });

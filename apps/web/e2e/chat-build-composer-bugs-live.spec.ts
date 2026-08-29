@@ -9,6 +9,7 @@
  *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
@@ -59,18 +60,18 @@ test("Models is split by action category, with Pricing on its own tab", async ()
   // Providers is the default and shows only provider work.
   await expect(page.getByRole("heading", { name: "Global model" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Pricing" })).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "130-models-providers-tab-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "130-models-providers-tab-live.png"));
 
   // Each tab is a shareable location, not hidden client state.
   await strip.getByRole("tab", { name: "Routing" }).click();
   await expect(page.getByRole("heading", { name: "Model fallback sequence" })).toBeVisible();
   await expect(page).toHaveURL(/#\/models\?tab=routing$/);
-  await page.screenshot({ path: join(SHOTS, "131-models-routing-tab-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "131-models-routing-tab-live.png"));
 
   await strip.getByRole("tab", { name: "Posture" }).click();
   await expect(page.getByRole("heading", { name: "Off-machine provider posture" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Model fallback sequence" })).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "132-models-posture-tab-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "132-models-posture-tab-live.png"));
 
   // The context popover's Configure -> link lands here directly.
   await page.goto(`${BASE}/#/models?tab=pricing`);
@@ -91,7 +92,7 @@ test("Models is split by action category, with Pricing on its own tab", async ()
 
   await page.getByRole("button", { name: /^History \(/ }).first().click();
   await expect(page.getByRole("heading", { name: /Price history —/ })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "120-BUG-21-pricing-registry-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "120-BUG-21-pricing-registry-live.png"));
 });
 
 test("BUG-21 — an unpriced billable model reads Unknown, never zero", async () => {
@@ -163,7 +164,7 @@ test("BUG-23 — rendered code blocks carry a language label and a copy action",
   const copy = page.getByRole("button", { name: "Copy code" }).first();
   await copy.focus();
   await expect(copy).toBeFocused();
-  await page.screenshot({ path: join(SHOTS, "124-BUG-23-code-block-controls-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "124-BUG-23-code-block-controls-live.png"));
 });
 
 test("BUG-24 — the resumable-turn channel is live and account-scoped", async ({ request }) => {
@@ -195,7 +196,7 @@ test("BUG-24 — the resumable-turn channel is live and account-scoped", async (
 
   await page.goto(`${BASE}/#/new-chat`);
   await expect(page.getByLabel("Prompt")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "125-BUG-24-parked-turn-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "125-BUG-24-parked-turn-live.png"));
 });
 
 test("composer parity — Chat, Build, and Workbench agree on what they offer", async () => {
@@ -217,7 +218,7 @@ test("composer parity — Chat, Build, and Workbench agree on what they offer", 
   // No surface switch, no duplicate capacity chip.
   await expect(page.getByRole("group", { name: "Chat or Build" })).toHaveCount(0);
   await expect(page.getByRole("link", { name: "Model context capacity" })).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "126-build-composer-parity-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "126-build-composer-parity-live.png"));
 
   await page.goto(`${BASE}/#/workbench`);
   // The Workbench has no composer at all now: it could not send anything, and it
@@ -232,5 +233,5 @@ test("composer parity — Chat, Build, and Workbench agree on what they offer", 
   const start = page.getByRole("navigation", { name: "Start work" });
   await expect(start.getByRole("link", { name: /Start a conversation/ })).toBeVisible();
   await expect(start.getByRole("link", { name: /Start a build/ })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "127-workbench-board-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "127-workbench-board-live.png"));
 });

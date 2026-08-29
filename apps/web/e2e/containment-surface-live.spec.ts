@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -49,18 +50,12 @@ test("a contained subject is visible, explained, and revocable", async ({ page }
   await expect(subject).toContainText("Contained after 3 consecutive failures");
   await expect(subject).toContainText("3 consecutive failures (http_500)");
   await containment.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: join(SHOTS, "round0810-10-contained-subject.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-10-contained-subject.png"));
 
   // One press, and it is the owner's again.
   await subject.getByRole("button", { name: "Resume" }).click();
   await expect(subject).toContainText("Connector · active", { timeout: 30_000 });
   await expect(subject.getByRole("button", { name: "Pause" })).toBeVisible();
   await containment.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: join(SHOTS, "round0810-11-containment-resumed.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-11-containment-resumed.png"));
 });

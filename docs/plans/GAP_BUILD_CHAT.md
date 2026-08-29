@@ -75,7 +75,7 @@ that proves it, what is missing, and the concrete work.
 | [B11](#b11--no-git-write-path) | BUILD | TIER 2 | Done |
 | [B12](#b12--no-web-access) | BUILD | TIER 2 | Done |
 | [B13](#b13--no-file-tree-and-no-editor) | BUILD | TIER 3 | Open |
-| [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Open |
+| [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Partial |
 | [B15](#b15--terminaloutput-pane) | BUILD | TIER 3 | Partial |
 | [B16](#b16--tool-activity-is-buried) | BUILD | TIER 3 | Open |
 | [B17](#b17--no-way-to-stop-or-steer-a-running-turn) | BUILD | TIER 3 | Done |
@@ -98,7 +98,7 @@ that proves it, what is missing, and the concrete work.
 | [C14](#c14--no-message-level-actions) | CHAT | TIER 3 | Done |
 | [C15](#c15--attachments-are-one-way) | CHAT | TIER 3 | Open |
 | [C16](#c16--governed-turn-based-voice) | CHAT | TIER 3 | Done |
-| [C17](#c17--recall-is-invisible) | CHAT | TIER 3 | Open |
+| [C17](#c17--recall-is-invisible) | CHAT | TIER 3 | Done |
 | [C18](#c18--no-cross-chat-surface) | CHAT | TIER 3 | Open |
 
 **2026-08-21 compatibility update.** BUG-216 and MEM-06 are closed. Build now
@@ -351,12 +351,18 @@ read-only viewer with syntax highlighting, promoted to an editor once B1 lands.
 
 #### B14 — No diff review surface in Build
 
-The unified diff lives in the
-Approvals inbox, in a different route — so the core act of coding review is a
-context switch away, and it is all-or-nothing: no per-hunk accept, no edit
-before accept, no partial rejection. **Work:** an inline side-by-side diff in
-the Build transcript with per-hunk accept/reject and an "edit then accept" path,
-resolving straight into the existing approval record.
+🟡 **The review half is complete (2026-08-29, [FIXED-312](FIXED_ITEMS.md#fixed-312--the-core-act-of-code-review-was-a-route-change-away)).**
+The unified diff used to live only in the Approvals inbox, in a different route,
+so the core act of coding review was a context switch away. Build now renders the
+same governed preview inline between a pending decision and its Accept/Reject
+buttons, through a shared reader that gives added and removed lines the hunk's
+own line numbers and a screen-reader label rather than colour alone; Approvals
+uses the same component, so a change looks the same wherever it is decided.
+
+**Still open:** per-hunk accept/reject and an "edit then accept" path. Both need
+a decision the runtime can record — today an approval governs the whole change
+set — so neither is offered rather than being shown as a control the server would
+refuse.
 
 #### B15 — Terminal/output pane
 
@@ -722,12 +728,20 @@ visible authority, confirmation and receipt evidence.
 
 #### C17 — Recall is invisible
 
-Once C3 lands, the owner must be able to see what
-was remembered, why it was injected, and correct or forget it inline. The
-Memory route exists for management; the *moment of use* is in Chat. C6 has since
-closed the *reading* half for one class of recall — a `memory_search` that really
-returned rows is a citable source like any other — but correcting or forgetting a
-memory from the transcript is still only available on the Memory route.
+✅ **Complete — see [FIXED-311](FIXED_ITEMS.md#fixed-311--recall-was-invisible-at-the-moment-it-was-used), 2026-08-29.**
+C6 had closed the *reading* half for one class of recall: a `memory_search` that
+really returned rows is a citable source like any other. The other kind — the
+ambient recall that happens on every turn — reaches the model through the context
+bundle and left nothing to click, so the Memory route could say what Raiker
+remembers and nothing could say which memories shaped *this answer*.
+
+A settled answer now carries a collapsed **Remembered *n*** strip naming the
+sentences the turn was given, each with **Correct** and **Forget** going through
+the same governed actions the Memory page uses. The sentences are read live, so a
+memory corrected since the turn ran reads as it is now and a forgotten one stops
+appearing. Verifying it live surfaced [FIXED-314](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it):
+a normally-phrased question recalled nothing at all, which had made the whole
+feature invisible for a different reason than this entry recorded.
 
 #### C18 — No cross-chat surface
 

@@ -19,6 +19,7 @@
     TaskView,
   } from "../apiTypes";
   import { humanize, isRedacted, relativeTime, shortId } from "../format";
+  import { explainReasonCode } from "../reasonCodes";
 
   let { onchanged }: { onchanged?: () => void } = $props();
 
@@ -152,9 +153,11 @@
       await load();
       onchanged?.();
     } catch (e) {
+      // Say what happened, not what the wire said: a duplicate name is an
+      // ordinary refusal and should read like one.
       createError =
         e instanceof ApiError
-          ? `Could not create (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          ? explainReasonCode(e.reasonCode)?.plain ?? `Could not create (${e.status})`
           : "Could not create";
     } finally {
       creating = false;
@@ -177,7 +180,7 @@
     } catch (e) {
       attachError =
         e instanceof ApiError
-          ? `Could not attach (${e.status}${e.reasonCode ? `: ${e.reasonCode}` : ""})`
+          ? explainReasonCode(e.reasonCode)?.plain ?? `Could not attach (${e.status})`
           : "Could not attach";
     } finally {
       attaching = false;

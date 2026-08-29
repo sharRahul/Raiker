@@ -19,6 +19,7 @@
  *   2. RAIKER_LIVE_ANTHROPIC_KEY in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { setThinkingEffort, useHostedModel } from "./hosted-provider";
 
@@ -104,10 +105,7 @@ test("BUG-206 — a tool-using turn shows one row per call, naming what it acted
   // The row is `[icon] [tool] [action]`: the tool in the owner's language, and
   // the action naming the object. Neither is the tool identifier.
   await expect(page.locator(".tool-row .tool-label").first()).toHaveText(/List folder|Read file/);
-  await page.screenshot({
-    path: join(SHOTS, "bug-206-live-tool-rows-streaming.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-206-live-tool-rows-streaming.png"));
 
   await expect(page.locator(".message-bubble-raiker").last()).toBeVisible({ timeout: 240_000 });
   await page.waitForTimeout(3000);
@@ -142,7 +140,7 @@ test("BUG-206 — a tool-using turn shows one row per call, naming what it acted
   expect(activity).not.toContain("read_file");
   expect(activity).not.toContain("list_directory");
 
-  await page.screenshot({ path: join(SHOTS, "bug-206-live-tool-rows-settled.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-206-live-tool-rows-settled.png"));
 });
 
 test("BUG-206 slice E — a call that stops for a decision is that same row, waiting", async () => {
@@ -169,7 +167,7 @@ test("BUG-206 slice E — a call that stops for a decision is that same row, wai
   const spoken = (await waiting.innerText()).replace(/\n/g, " · ");
   console.log("WAITING ROW: " + spoken);
   expect(spoken.match(/waiting for your decision/g)).toHaveLength(1);
-  await page.screenshot({ path: join(SHOTS, "bug-206-live-tool-row-waiting.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-206-live-tool-row-waiting.png"));
 
   // The refusal card BUG-52 put at the bottom of the turn is gone: a refused or
   // parked call is a row now, in the place it happened.
@@ -227,7 +225,7 @@ test("BUG-207 — the turn shows the model's own reasoning, not three canned sen
     .toMatch(/17/);
   const thought = await body.innerText();
   console.log("REASONING WHILE STREAMING:\n" + thought);
-  await page.screenshot({ path: join(SHOTS, "bug-207-live-reasoning-streaming.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-207-live-reasoning-streaming.png"));
 
   // The three fixed sentences the disclosure used to hold, and the label that
   // presented them as the model's thinking. None may return.
@@ -247,7 +245,7 @@ test("BUG-207 — the turn shows the model's own reasoning, not three canned sen
     "aria-expanded",
     "false",
   );
-  await page.screenshot({ path: join(SHOTS, "bug-207-live-reasoning-settled.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-207-live-reasoning-settled.png"));
 });
 
 test("BUG-206 and BUG-207 — Build shows the same rows and the same reasoning", async () => {
@@ -276,7 +274,7 @@ test("BUG-206 and BUG-207 — Build shows the same rows and the same reasoning",
   await expect(turn.locator(".answer").last()).toBeVisible({ timeout: 240_000 });
   await page.waitForTimeout(2500);
   console.log("BUILD TURN:\n" + (await turn.innerText()));
-  await page.screenshot({ path: join(SHOTS, "bug-206-207-live-build-turn.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-206-207-live-build-turn.png"));
 });
 
 test("BUG-207 — a turn with reasoning off streams its answer with no block above it", async () => {
@@ -304,5 +302,5 @@ test("BUG-207 — a turn with reasoning off streams its answer with no block abo
   const lastChatTurn = page.locator("div.turn").last();
   await expect(lastChatTurn.locator("section.reasoning")).toHaveCount(0);
   await expect(lastChatTurn.locator(".tool-activity")).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "bug-207-live-no-reasoning.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-207-live-no-reasoning.png"));
 });

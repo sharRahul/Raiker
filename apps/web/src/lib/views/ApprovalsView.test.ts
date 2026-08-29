@@ -176,7 +176,11 @@ describe("ApprovalsView", () => {
     await waitFor(() => {
       expect(screen.getByText(/metadata-only/i)).toBeInTheDocument();
     });
-    expect(screen.getByText(/\+hello/)).toBeInTheDocument();
+    // B14 — the diff is read as a diff now: the added line is its own row,
+    // labelled for a screen reader rather than told apart by colour alone.
+    expect(screen.getByText("hello")).toBeInTheDocument();
+    expect(screen.getByText("Added:")).toBeInTheDocument();
+    expect(screen.getByText("notes.txt")).toBeInTheDocument();
     // Approve is explicit about not executing.
     expect(screen.getByRole("button", { name: /approve \(record only\)/i })).toBeInTheDocument();
   });

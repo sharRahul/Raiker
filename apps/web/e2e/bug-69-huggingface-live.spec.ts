@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
 
@@ -53,7 +54,7 @@ test("BUG-69 live Hub search presents immutable GGUF-first choices", async ({
   await expect(
     page.getByText("apache-2.0", { exact: true }).first(),
   ).toBeVisible();
-  await page.screenshot({ path: SHOT, fullPage: true });
+  await capture(page, SHOT);
 });
 
 test("BUG-69 downloads a selected immutable GGUF into an approved library", async ({
@@ -100,8 +101,7 @@ test("BUG-69 downloads a selected immutable GGUF into an approved library", asyn
     .filter({ hasText: "deploy" })
     .first();
   await expect(deployment).toContainText("complete", { timeout: 60_000 });
-  await page.screenshot({
-    path: join(
+  await capture(page, join(
       import.meta.dirname,
       "..",
       "..",
@@ -109,7 +109,5 @@ test("BUG-69 downloads a selected immutable GGUF into an approved library", asyn
       "output",
       "playwright",
       "bug69-huggingface-deploy-live.png",
-    ),
-    fullPage: true,
-  });
+    ));
 });

@@ -23,9 +23,17 @@ owner has selected and built a provider or local embedding space. Query
 embedding uses the same governed consent and falls back to lexical search when
 the owner denies it or the backend is unavailable.
 
-Two limits remain. An install with no provider key and no local embedding model
-has only the lexical fallback—nothing is bundled, by design. Vector recall is a
-linear scan, so its cost grows with the number of memories and indexed passages.
+One limit remains, and it is a deliberate one: an install with no provider key
+and no local embedding model has only the lexical fallback—nothing is bundled,
+by design. Lexical recall matches words, not meaning, and requires every word
+that carries meaning to appear in the stored text; the words a question is built
+from (*where*, *what*, *the*, *about*) are dropped before the match, so an
+ordinary question reaches the memory that answers it, but a question phrased in
+words the memory does not use will not. That is what the meaning-based index is
+for.
+
+Vector recall no longer scans linearly: small spaces are ranked exactly and
+larger ones use a bounded approximate lookup with exact score re-ranking.
 
 Conversation context is also bounded by the selected model. Raiker compacts
 older exchanges near a known context limit while preserving the visible

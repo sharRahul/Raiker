@@ -457,7 +457,7 @@ click rather than a manual search.
 
 ## MEM-09 — Conversation index integrity is not covered by the integrity report
 
-**Severity: Low. Area: reliability.**
+**Severity: Low. Area: reliability. Status: fixed 2026-08-29 by [FIXED-310](FIXED_ITEMS.md#fixed-310--the-memory-integrity-report-existed-and-nothing-could-reach-it).**
 
 **Observed.** The owner-started integrity report (`raiker/memory/integrity.py`)
 detects stale FTS, projection and graph state for durable memory. It does not
@@ -471,6 +471,13 @@ the stated repair.
 **Required user-interface outcome.** Observability → Diagnostics names the drift
 and offers the rebuild, rather than the owner discovering it as a search that
 quietly stopped finding things.
+
+**Closed 2026-08-29, in the order the re-scoping demanded.** The report was
+surfaced first — `GET /api/memory/integrity`, an owner-started rescan, and a
+**Memory integrity** card on Observability → Diagnostics — and only then did the
+conversation-index check join a report an owner can read.
+`POST /api/memory/conversation-index/rebuild` is the stated repair, offered on
+the card beside the drift it repairs and nowhere else.
 
 **Re-scoped on 2026-08-16, and it is larger than this entry says.** Adding the
 check is a few lines against `inspect_memory_integrity`. The blocker is that

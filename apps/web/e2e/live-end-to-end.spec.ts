@@ -12,6 +12,7 @@
  *   3. a concrete model selected
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
@@ -63,7 +64,7 @@ test("a real governed turn answers, and the copy action is a glyph", async () =>
   });
   // BUG-23 / composer polish: both copy affordances are glyphs now.
   await expect(page.getByRole("button", { name: "Copy code" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "166-chat-live-turn.png"), fullPage: true });
+  await capture(page, join(SHOTS, "166-chat-live-turn.png"));
 });
 
 test("an attached image opens with working zoom, rotate and reset controls", async () => {
@@ -97,7 +98,7 @@ test("an attached image opens with working zoom, rotate and reset controls", asy
   await page.getByRole("button", { name: /rotate right/i }).click();
   const image = page.getByRole("img", { name: "pixel.png" });
   await expect(image).toHaveAttribute("style", /rotate\(90deg\)/);
-  await page.screenshot({ path: join(SHOTS, "167-image-inspection-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "167-image-inspection-live.png"));
 
   await page.getByRole("button", { name: /reset the view/i }).click();
   await expect(page.getByText("100%")).toBeVisible();
@@ -108,5 +109,5 @@ test("an attached image opens with working zoom, rotate and reset controls", asy
   const download = page.waitForEvent("download");
   await page.getByRole("button", { name: /Download pixel\.png/i }).click();
   expect((await download).suggestedFilename()).toBe("pixel.png");
-  await page.screenshot({ path: join(SHOTS, "168-artifact-download-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "168-artifact-download-live.png"));
 });

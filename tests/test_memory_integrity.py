@@ -112,3 +112,34 @@ def test_integrity_reports_project_parent_path_inconsistency(tmp_path: Path) -> 
     report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
     assert report.project_path_inconsistency_count == 1
     assert not report.clean
+
+
+def test_integrity_reports_conversation_index_drift_and_a_rebuild_repairs_it(tmp_path: Path) -> None:
+    """MEM-09 — the conversation index is a projection like every other one.
+
+    A divergence between ``turns`` and ``conversation_fts`` has no symptom an
+    owner can see: Search chats simply stops finding conversations it found last
+    week. The drift modelled here is the one the entry names — an interrupted
+    write, where the turn landed and its index rows did not. A *wholly* empty
+    index is not the interesting case: opening the workspace backfills that one
+    on its own.
+    """
+    store = SQLiteStore(tmp_path)
+    store.create_session("sess_1", "projects/demo")
+    store.insert_turn("sess_1", "turn_1", "Where do backups go?")
+    store.complete_turn("turn_1", "completed", "They go to the encrypted NAS.")
+    store.insert_turn("sess_1", "turn_2", "And when do releases ship?")
+    store.complete_turn("turn_2", "completed", "On the first Tuesday.")
+    assert inspect_memory_integrity(store=store, workspace_root=tmp_path).clean
+
+    with store.connect() as connection:
+        connection.execute("DELETE FROM conversation_fts WHERE turn_id = ?", ("turn_2",))
+    report = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert report.conversation_index_count == 2
+    assert report.stale_conversation_index_count == 2
+    assert not report.clean
+
+    assert store.rebuild_conversation_fts() == 4
+    repaired = inspect_memory_integrity(store=store, workspace_root=tmp_path)
+    assert repaired.stale_conversation_index_count == 0
+    assert repaired.clean

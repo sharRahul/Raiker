@@ -311,6 +311,19 @@ conversation so you do not need to change surfaces to discover why work paused.
 An approval-blocked item includes **Review approval**, which opens the relevant
 approval for that task.
 
+## What was remembered
+
+A settled reply carries a **Remembered *n*** control when the turn was given
+approved memories. Open it to see the sentences themselves, each with:
+
+- **Correct** — edit the sentence in place. It records a governed correction, the
+  same as editing on the Memory page.
+- **Forget** — remove it from every retrieval path.
+
+The strip is quiet by design: collapsed until you ask, absent entirely when a
+turn used no memory. What it shows is read live, so a memory you corrected a
+moment ago reads as it is now rather than as it was when the answer was written.
+
 ## Conversation memory
 
 For the full owner-facing lifecycle—proposal approval, source provenance,

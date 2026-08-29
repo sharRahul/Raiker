@@ -20,6 +20,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup, refreshHostedReadiness, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -169,7 +170,7 @@ test("under Auto, a real turn writing the file it was asked for still runs unpro
   await expect(page.getByRole("main")).not.toContainText(/approval required|approval is needed/i);
   expect(existsSync(target), "the file the owner asked for was written").toBe(true);
   expect(readFileSync(target, "utf8")).toContain("aligned");
-  await page.screenshot({ path: `${SHOTS}/r0824-auto-aligned-write-ran.png`, fullPage: true });
+  await capture(page, `${SHOTS}/r0824-auto-aligned-write-ran.png`);
 });
 
 test("under Auto, a change to an existing file the owner names still runs unprompted", async () => {
@@ -232,5 +233,5 @@ test("under Auto, the same write in a *later* turn waits, and the approval says 
     timeout: 30_000,
   });
   await expect(page.getByRole("main")).toContainText(/ops\/deploy\.sh/);
-  await page.screenshot({ path: `${SHOTS}/r0824-auto-withheld-approval.png`, fullPage: true });
+  await capture(page, `${SHOTS}/r0824-auto-withheld-approval.png`);
 });

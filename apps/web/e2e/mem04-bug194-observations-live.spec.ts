@@ -16,6 +16,7 @@
  *   control only where a boundary genuinely persists.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { writeFileSync } from "node:fs";
 import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
 
@@ -116,10 +117,7 @@ test("a governed read is recorded as an observation, and Memory shows it (MEM-04
   // the observation has become a second copy of what the agent read.
   await expect(observations).not.toContainText("on-call engineer owns the decision");
 
-  await page.screenshot({
-    path: `${SHOTS}/r0817b-01-memory-observations-captured.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817b-01-memory-observations-captured.png`);
   expect(consoleErrors).toEqual([]);
 });
 
@@ -151,9 +149,6 @@ test("Runtime states what each boundary does between commands (BUG-194)", async 
   await expect(native.getByText("Keeps its state between commands")).toHaveCount(0);
   await expect(native.getByRole("button", { name: "Reset environment" })).toHaveCount(0);
 
-  await page.screenshot({
-    path: `${SHOTS}/r0817b-02-runtime-environment-capabilities.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817b-02-runtime-environment-capabilities.png`);
   expect(consoleErrors).toEqual([]);
 });

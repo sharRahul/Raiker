@@ -20,6 +20,7 @@
  *   2. `python apps/api/main.py --workspace <ws> --port 8765 --no-browser`
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { checkModelReady, hostedProviderCard } from "./hosted-provider";
 
@@ -103,17 +104,11 @@ test("a three-mutation batch parks as decision 1 of 3, not as one call and two l
   await expect(
     page.getByRole("main").getByText(/decision 1 of 3/i),
   ).toBeVisible({ timeout: 180_000 });
-  await page.screenshot({
-    path: join(SHOTS, "add-02-chat-batch-decision-1-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-chat-batch-decision-1-of-3.png"));
 
   await page.goto(`${BASE}/#/approvals`);
   await expect(pendingRow(page).getByText(/decision 1 of 3/i)).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({
-    path: join(SHOTS, "add-02-approvals-decision-1-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-approvals-decision-1-of-3.png"));
 });
 
 /**
@@ -140,29 +135,20 @@ test("approving the first decision advances the queue to the second", async () =
 
   // The review pane names the batch before the decision is made.
   await expect(page.locator("section.detail").getByText(/decision 1 of 3/i)).toBeVisible();
-  await page.screenshot({
-    path: join(SHOTS, "add-02-approval-detail-batch.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-approval-detail-batch.png"));
 
   await page.getByRole("button", { name: /approve/i }).first().click();
   // The banner says what continuing will actually do: two more decisions.
   await expect(page.getByText(/2 more calls from the same batch/i)).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "add-02-resume-banner-two-queued.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-resume-banner-two-queued.png"));
 
   await page.getByRole("button", { name: /continue the turn/i }).click();
   // Continuing lands on the *next* call of the same batch, without going back
   // to the model for a call it has already proposed.
   await settlesOnDecision(page, /decision 2 of 3/i);
-  await page.screenshot({
-    path: join(SHOTS, "add-02-approvals-decision-2-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-approvals-decision-2-of-3.png"));
 });
 
 test("rejecting the second decision skips its call and offers the third", async () => {
@@ -180,10 +166,7 @@ test("rejecting the second decision skips its call and offers the third", async 
   // A refusal is a decision about one call. The third is still the owner's to
   // make — the batch is not abandoned because one part of it was declined.
   await settlesOnDecision(page, /decision 3 of 3/i);
-  await page.screenshot({
-    path: join(SHOTS, "add-02-approvals-decision-3-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-approvals-decision-3-of-3.png"));
 });
 
 test("the turn finishes once the last decision is made", async () => {
@@ -200,10 +183,7 @@ test("the turn finishes once the last decision is made", async () => {
     await page.goto(`${BASE}/#/approvals`);
     await expect(page.getByText(/nothing waiting on you/i)).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 180_000 });
-  await page.screenshot({
-    path: join(SHOTS, "add-02-batch-completed.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "add-02-batch-completed.png"));
 
   // And the refusal is recorded as its own decision — the second of three —
   // rather than as the batch failing.

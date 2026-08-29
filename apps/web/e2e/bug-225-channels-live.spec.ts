@@ -20,6 +20,7 @@
  * 4. Unpairing is what actually stops a channel, and the surface agrees.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -104,7 +105,7 @@ test("the tab states what a channel message is (BUG-225)", async ({ page }) => {
     posture.getByText("Rate limit", { exact: true }).locator("xpath=ancestor::li[1]"),
   ).toContainText(/\d+\/min/);
 
-  await page.screenshot({ path: `${SHOTS}/bug-225-channel-surface.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-225-channel-surface.png`);
 });
 
 test("every connector profile is offered, and none is linked to begin with", async ({ page }) => {
@@ -151,7 +152,7 @@ test("pairing links a channel without switching it on", async ({ page }) => {
   await expect(row.getByText("New turn", { exact: true })).toBeVisible();
   await expect(row.getByText("Approval relay", { exact: true })).toBeVisible();
 
-  await page.screenshot({ path: `${SHOTS}/bug-225-channel-paired.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-225-channel-paired.png`);
 });
 
 test("turning it on is a second decision, and a test delivery runs the governed path", async ({
@@ -176,7 +177,7 @@ test("turning it on is a second decision, and a test delivery runs the governed 
     ),
   ).toBeVisible({ timeout: 60_000 });
 
-  await page.screenshot({ path: `${SHOTS}/bug-225-channel-delivery-refused.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-225-channel-delivery-refused.png`);
 });
 
 test("unpairing is what stops it, and the surface agrees", async ({ page }) => {
@@ -207,6 +208,6 @@ test("the channels tab fits and keeps its icons at every width", async ({ page }
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow, `channels overflows at ${label}`).toBeLessThanOrEqual(1);
-    await page.screenshot({ path: `${SHOTS}/bug-225-channels-${label}.png`, fullPage: true });
+    await capture(page, `${SHOTS}/bug-225-channels-${label}.png`);
   }
 });

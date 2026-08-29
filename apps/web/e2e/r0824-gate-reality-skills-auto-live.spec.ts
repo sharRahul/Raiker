@@ -20,6 +20,7 @@
  * `tests/test_model_tool_call_loop.py` end to end through the broker.
  */
 import { expect, test, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -64,10 +65,7 @@ test.describe("FIXED-280 — a switch says whether it decides anything", () => {
     await expect(page.getByText(/governed turn through the Agent Gateway/i)).toBeVisible({
       timeout: 15_000,
     });
-    await page.screenshot({
-      path: `${SHOTS}/r0824-gate-reality-governed-elsewhere.png`,
-      fullPage: true,
-    });
+    await capture(page, `${SHOTS}/r0824-gate-reality-governed-elsewhere.png`);
   });
 
   test("a capability nothing reaches is marked as having no route", async ({ page }) => {
@@ -125,10 +123,7 @@ test.describe("FIXED-281 — a skill says whether it travels", () => {
     await expect(
       page.getByText(/should install in any tool that reads it/i).first(),
     ).toBeVisible();
-    await page.screenshot({
-      path: `${SHOTS}/r0824-skill-standard-conformance.png`,
-      fullPage: true,
-    });
+    await capture(page, `${SHOTS}/r0824-skill-standard-conformance.png`);
   });
 
   test("the specification is linked, so the rule is checkable rather than asserted", async ({
@@ -159,9 +154,6 @@ test.describe("FIXED-282 — Auto states the promise it keeps", () => {
     await expect(modeButton).toBeVisible({ timeout: 30_000 });
     await modeButton.click();
     await expect(page.getByText(/never looked at/i).first()).toBeVisible({ timeout: 15_000 });
-    await page.screenshot({
-      path: `${SHOTS}/r0824-auto-alignment-promise.png`,
-      fullPage: true,
-    });
+    await capture(page, `${SHOTS}/r0824-auto-alignment-promise.png`);
   });
 });

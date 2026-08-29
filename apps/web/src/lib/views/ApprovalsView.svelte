@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import Badge from "../components/Badge.svelte";
+  import DiffView from "../components/DiffView.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
@@ -526,19 +527,16 @@
 
     {#if selected.preview_kind === "file_diff" || selected.preview_kind === "patch"}
       <h3>{selected.preview_kind === "file_diff" ? "Proposed file change" : "Proposed patch"}</h3>
-      {#if selected.diff_path}
-        <p class="diff-path mono">{selected.diff_path}</p>
-      {/if}
-      <pre class="diff">{selected.diff ?? "(empty diff)"}</pre>
+      <!-- B14 — the same reader Build uses, so a change looks the same wherever
+           it is decided: added and removed lines told apart, the hunk's own
+           line numbers, and long lines scrolling inside the diff. -->
+      <DiffView diff={selected.diff} path={selected.diff_path} />
     {:else if selected.preview_kind === "git_change"}
       <!-- B11 — a repository change is reviewed where the decision is made:
            the exact file list and diff a commit would record, or the refs a
            branch moves between. -->
       <h3>Proposed repository change</h3>
-      {#if selected.diff_path}
-        <p class="diff-path mono">{selected.diff_path}</p>
-      {/if}
-      <pre class="diff">{selected.diff ?? "(nothing to record)"}</pre>
+      <DiffView diff={selected.diff} path={selected.diff_path} emptyLabel="(nothing to record)" />
     {:else if selected.preview_kind === "checkpoint_restore"}
       <!-- BUG-230 — the rewind is decided on its own preflight: which files go
            back, which are deleted, and which cannot be restored at all. -->

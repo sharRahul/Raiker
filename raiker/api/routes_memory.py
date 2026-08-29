@@ -218,6 +218,38 @@ async def reconcile_memory_indexes(
     return {"ok": True, **result.data}
 
 
+@router.get("/api/memory/integrity")
+async def memory_integrity(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """MEM-09 — the owner-started integrity report, read-only.
+
+    Declared above the `{memory_id}` routes so "integrity" is never read as an
+    id. It scans and reports; every repair it names is a separate action.
+    """
+    result = _service(request).memory_integrity(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
+@router.post("/api/memory/conversation-index/rebuild")
+async def rebuild_conversation_index(
+    request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)
+) -> dict[str, Any]:
+    """MEM-09's repair for a drifted conversation index."""
+    result = _service(request).rebuild_conversation_index(auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.get("/api/memory/observations")
 async def list_observations(
     request: Request, auth_data: tuple[ApiSession, Principal] = Depends(_auth)

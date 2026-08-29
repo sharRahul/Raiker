@@ -27,6 +27,7 @@
     ContextUsage,
     ConversationBranchOrigin,
     ProjectsList,
+    RecalledMemory,
     SessionDetail,
     SourceExcerptView,
     StreamEvent,
@@ -41,6 +42,7 @@
   import ToolActivity from "../components/ToolActivity.svelte";
   import SkillLinkNotice from "../components/SkillLinkNotice.svelte";
   import SourceChips from "../components/SourceChips.svelte";
+  import RecallStrip from "../components/RecallStrip.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
@@ -59,7 +61,15 @@
     type SlashCommand,
   } from "../composerCommands";
   import { collectText } from "../turnPhases";
-  import { humanize, relativeTime } from "../format";
+  import { relativeTime } from "../format";
+  import {
+    attachmentChipsByTurn,
+    mergeRestoredChips,
+    parkedByTurn,
+    restoredTurnCore,
+    type ParkedApproval,
+  } from "../conversationRestore";
+  import { rememberSessionInRoute } from "../sessionRoute";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
@@ -183,6 +193,14 @@
       void loadHistory(id);
       void loadBranchOrigin(id);
     });
+  });
+
+  // BUG-242 — the address bar follows the open conversation, so a reload comes
+  // back to it rather than to an empty one. Only the surface on screen writes:
+  // Chat and Build stay mounted behind each other.
+  $effect(() => {
+    if (!visible) return;
+    rememberSessionInRoute("new-chat", sessionId);
   });
   let nextId = 1;
 
@@ -364,6 +382,50 @@
   // the id alone would mark a chip open under every turn that happens to have one.
   let openSourceId = $state<string | null>(null);
   let openSourceTurnId = $state<string | null>(null);
+
+  // C17 — what Raiker remembered for each turn of this conversation. Loaded
+  // with the transcript and refreshed after a correction, so the strip under an
+  // answer says what Raiker knows now rather than what it knew when the turn
+  // ran. A failed read leaves the strip absent: recall that cannot be shown
+  // must never be implied.
+  let recalled = $state<RecalledMemory[]>([]);
+  let recallNotice = $state<string | null>(null);
+
+  async function refreshRecall(id: string) {
+    try {
+      recalled = (await api.sessionRecall(id)).memories;
+    } catch {
+      recalled = [];
+    }
+  }
+
+  function recalledForTurn(turnId: string | undefined): RecalledMemory[] {
+    if (turnId === undefined || turnId === "") return [];
+    return recalled.filter((memory) => memory.turn_id === turnId);
+  }
+
+  async function forgetRecalled(memory: RecalledMemory) {
+    recallNotice = null;
+    try {
+      await api.forgetMemory(memory.memory_id);
+      recallNotice = "Forgotten.";
+    } catch {
+      recallNotice = "Could not forget that memory.";
+    }
+    if (sessionId !== null) await refreshRecall(sessionId);
+  }
+
+  async function correctRecalled(memory: RecalledMemory, text: string) {
+    if (text === "" || text === memory.text) return;
+    recallNotice = null;
+    try {
+      await api.editMemory(memory.memory_id, text);
+      recallNotice = "Corrected.";
+    } catch {
+      recallNotice = "Could not correct that memory.";
+    }
+    if (sessionId !== null) await refreshRecall(sessionId);
+  }
 
   async function refreshTurnSources(id: string) {
     try {
@@ -578,11 +640,12 @@
     closeInspector();
     try {
       const detail = await api.session(id);
-      const parked = new Map((detail.parked_approvals ?? []).map((approval) => [approval.turn_id, approval]));
+      const parked = parkedByTurn(detail);
       turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
       nextId = turns.length + 1;
       await restoreAttachmentChips(id);
       await refreshTurnSources(id);
+      await refreshRecall(id);
       void scrollToEnd();
     } catch (e) {
       historyError =
@@ -604,84 +667,16 @@
       // Chips are a convenience; losing them must not cost the transcript.
       return;
     }
-    const byTurn = new Map<string, ComposerAttachment[]>();
-    for (const file of files) {
-      const chips = byTurn.get(file.turn_id) ?? [];
-      chips.push({
-        kind: file.kind === "image" ? "image" : "document",
-        label: file.filename,
-        detail: `${file.filename} (${file.media_type}, ${file.byte_size} bytes)`,
-        attachmentId: file.attachment_id,
-        source: file.source,
-        createdAt: file.created_at,
-        mediaType: file.media_type,
-        byteSize: file.byte_size,
-      });
-      byTurn.set(file.turn_id, chips);
-    }
-    turns = turns.map((turn) => {
-      const chips = byTurn.get(turn.response?.turn_id ?? "");
-      if (chips === undefined) return turn;
-      const existing = turn.attachments.filter(
-        (a) => a.source !== "generated" || a.attachmentId === undefined,
-      );
-      const merged = [...existing, ...chips.filter((c) => !existing.some((e) => e.attachmentId === c.attachmentId))];
-      return { ...turn, attachments: merged };
-    });
+    turns = mergeRestoredChips(turns, attachmentChipsByTurn(files));
     void resolveThumbnails(turns.flatMap((turn) => turn.attachments));
   }
 
   function restoredTurn(
     t: SessionDetail["turns"][number],
     sessionId: string,
-    parked?: NonNullable<SessionDetail["parked_approvals"]>[number],
+    parked?: ParkedApproval,
   ): ChatTurn {
-    return {
-      id: nextId++,
-      prompt: t.prompt_text ?? "",
-      attachments: [],
-      // Backlog #25 — a reopened turn used to show the answer and nothing about
-      // how it was reached, because the tool rows only ever existed on the
-      // stream it was watched on. The server rebuilds them from the durable
-      // record in the same payload shape a live event carries, so they enter
-      // here as events and `toolActivity` assembles them exactly as it does
-      // live — including merging with a later live event for the same call,
-      // which is what a parked turn resumed in this tab produces.
-      events: (t.tool_rows ?? []).map((payload) => ({
-        kind: "tool" as const,
-        text: "",
-        event_type: "tool_restored",
-        payload,
-        response: null,
-      })),
-      response: {
-        request_id: "",
-        session_id: sessionId,
-        turn_id: t.turn_id,
-        status: t.status,
-        message: t.summary ?? "",
-        events_path: null,
-        checkpoint_path: null,
-        approval: parked ? {
-          action_id: "",
-          approval_id: parked.approval_id,
-          tool_name: parked.tool_name,
-          arguments: {},
-          risk_level: "governed",
-          reasons: [],
-          message: `${humanize(parked.tool_name)} is waiting for your approval.`,
-          expected_effect: "The same parked turn continues after your decision.",
-          resumable: true,
-        } : null,
-        last_event_id: null,
-      },
-      streaming: false,
-      error: null,
-      resumeState: parked ? "waiting" : null,
-      resumeNote: null,
-      retainedReasoning: t.reasoning ?? null,
-      reasoningChars: t.reasoning_chars ?? 0,
-    };
+    return { id: nextId++, ...restoredTurnCore(t, sessionId, parked) };
   }
 
   function answerText(turn: ChatTurn): string {
@@ -766,6 +761,7 @@
             // C6 — the citation markers this answer just wrote need the ledger
             // they resolve against, so it is refreshed with the turn.
             void refreshTurnSources(event.response.session_id);
+            void refreshRecall(event.response.session_id);
             if (contextOpen) void refreshContextUsage();
             if (plan === null) void loadPlan();
             window.dispatchEvent(new Event("raiker:chats-changed"));
@@ -1182,6 +1178,8 @@
     turns = [];
     sessionId = null;
     plan = null;
+    recalled = [];
+    recallNotice = null;
   }
 
   // B6 — the same plan checklist Build shows. The `update_plan` tool is
@@ -1493,6 +1491,9 @@
     </div>
   </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
+  <!-- C17 — the result of a correction or a forget made from the transcript,
+       said once, where the other turn-level outcomes are said. -->
+  {#if recallNotice}<span class="export-notice" role="status" aria-live="polite">{recallNotice}</span>{/if}
   <!-- C14 — a branch says where it grew from, which is what makes two branches of
        one conversation legible rather than two unrelated chats that happen to
        start the same way. The original is reachable and unchanged. -->
@@ -1692,6 +1693,18 @@
               citedIds={citedSourceIds(answer, turnSourceList)}
               openSourceId={openSourceTurnId === turn.response?.turn_id ? openSourceId : null}
               onopen={(source) => void openSource(source, sentenceAround(answer, source.source_id))}
+            />
+          {/if}
+
+          <!-- C17 — the memories this turn was given, correctable here. Recall
+               is ambient, so it leaves no citation to click: without this strip
+               the only place an owner could see what Raiker remembers about
+               them is the Memory route, never the answer it shaped. -->
+          {#if !turn.streaming}
+            <RecallStrip
+              memories={recalledForTurn(turn.response?.turn_id)}
+              onforget={forgetRecalled}
+              oncorrect={correctRecalled}
             />
           {/if}
 

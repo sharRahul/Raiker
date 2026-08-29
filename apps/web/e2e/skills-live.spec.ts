@@ -9,6 +9,7 @@
 // Start the host first:
 //   python -m apps.api.main --workspace .tmp/live-skills --port 8799 --no-browser
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import type { Page } from "@playwright/test";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8799";
@@ -58,13 +59,13 @@ test("live Skills tab: shipped skills, upload, rename, deactivate, delete", asyn
   }
   // The tab must not imply an authority the runtime does not enforce.
   await expect(page.getByText(/grants no capability/i)).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/skills-tab-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-tab-live.png`);
 
   // A bundled skill reports its supporting files, not just its SKILL.md.
   const mcpCard = page.locator(".card", { hasText: "mcp-builder" }).first();
   await mcpCard.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("mcp-builder/references/python.md")).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/skills-bundle-details-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-bundle-details-live.png`);
   await mcpCard.getByRole("button", { name: "Hide details" }).click();
 
   // Upload a document and confirm the server stored what it read.
@@ -86,7 +87,7 @@ test("live Skills tab: shipped skills, upload, rename, deactivate, delete", asyn
     buffer: Buffer.from(document, "utf-8"),
   });
   await expect(page.getByText(/Installed “live-check”/)).toBeVisible({ timeout: 15_000 });
-  await page.screenshot({ path: `${SHOTS}/skills-upload-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-upload-live.png`);
 
   const card = page.locator(".card", { hasText: "live-check" }).first();
 
@@ -101,7 +102,7 @@ test("live Skills tab: shipped skills, upload, rename, deactivate, delete", asyn
   await renamed.getByRole("button", { name: "Deactivate" }).click();
   await expect(page.getByText(/withheld from every turn/i)).toBeVisible({ timeout: 10_000 });
   await expect(renamed.getByText("inactive")).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/skills-deactivated-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-deactivated-live.png`);
 
   // Download returns a real archive.
   const download = page.waitForEvent("download");
@@ -139,14 +140,14 @@ test("live Skills tab: Raiker builds a skill", async ({ page }) => {
   await page
     .getByLabel("Instructions", { exact: true })
     .fill("# Release notes\n\n1. Read the diff since the last tag.\n2. Group by what a user notices.");
-  await page.screenshot({ path: `${SHOTS}/skills-builder-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-builder-live.png`);
   await page.getByRole("button", { name: "Build and install" }).click();
 
   await expect(page.getByText(/Built “release-notes”/)).toBeVisible({ timeout: 15_000 });
   const built = page.locator(".card", { hasText: "release-notes" }).first();
   await built.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("release-notes/SKILL.md")).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/skills-built-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-built-live.png`);
 });
 
 test("live Skills tab: an unsupported import source is refused by name", async ({ page }) => {
@@ -160,7 +161,7 @@ test("live Skills tab: an unsupported import source is refused by name", async (
   await expect(page.getByRole("alert")).toContainText(/imported from GitHub over HTTPS/i, {
     timeout: 15_000,
   });
-  await page.screenshot({ path: `${SHOTS}/skills-import-refused-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-import-refused-live.png`);
 });
 
 test("live composer: a pasted skill link offers verification, not a silent install", async ({ page }) => {
@@ -173,7 +174,7 @@ test("live composer: a pasted skill link offers verification, not a silent insta
   const notice = page.getByRole("status").filter({ hasText: /looks like a skill/i });
   await expect(notice).toBeVisible({ timeout: 10_000 });
   await expect(notice.getByRole("button", { name: "Verify skill" })).toBeVisible();
-  await page.screenshot({ path: `${SHOTS}/skills-composer-notice-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-composer-notice-live.png`);
 
   // Dismissing must leave the typed prompt exactly as it was.
   await notice.getByRole("button", { name: "Dismiss skill link suggestion" }).click();
@@ -196,7 +197,7 @@ test(`live Chat: two conversations answer on ${MODEL}`, async ({ page }) => {
     await expect(page.locator(".message-bubble-raiker").last()).toContainText(/OK/i, {
       timeout: 180_000,
     });
-    await page.screenshot({ path: `${SHOTS}/skills-chat-${index + 1}-live.png`, fullPage: true });
+    await capture(page, `${SHOTS}/skills-chat-${index + 1}-live.png`);
   }
 });
 
@@ -207,7 +208,7 @@ test(`live Build: a conversation answers on ${MODEL}`, async ({ page }) => {
   await page.getByLabel("Describe the change", { exact: true }).fill("Reply with exactly: BUILD ONE OK");
   await page.getByRole("button", { name: /^Send$/ }).click();
   await expect(page.locator(".answer").last()).toContainText(/OK/i, { timeout: 180_000 });
-  await page.screenshot({ path: `${SHOTS}/skills-build-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-build-live.png`);
 });
 
 test(`live Chat: the model loads an installed skill through skill_load`, async ({ page }) => {
@@ -269,7 +270,7 @@ test(`live Chat: the model loads an installed skill through skill_load`, async (
   await expect(page.locator(".message-bubble-raiker").last()).toContainText(passphrase, {
     timeout: 180_000,
   });
-  await page.screenshot({ path: `${SHOTS}/skills-skill-load-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-skill-load-live.png`);
 
   // Deactivating has to withhold it, not merely hide it from the list.
   await page.goto(`${BASE}/#/extensions?tab=skills`);
@@ -284,5 +285,5 @@ test(`live Chat: the model loads an installed skill through skill_load`, async (
   await page.getByRole("button", { name: /^Send$/ }).click();
   await expect(page.locator(".message-bubble-raiker").last()).toBeVisible({ timeout: 180_000 });
   await expect(page.locator(".message-bubble-raiker").last()).not.toContainText(passphrase);
-  await page.screenshot({ path: `${SHOTS}/skills-withheld-live.png`, fullPage: true });
+  await capture(page, `${SHOTS}/skills-withheld-live.png`);
 });

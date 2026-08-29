@@ -360,6 +360,8 @@ from raiker.storage.migrations import (
     TURN_MEMORY_PROVENANCE_SQL,
     TURN_REASONING_MIGRATION_ID,
     TURN_REASONING_SQL,
+    TURN_RECALL_MIGRATION_ID,
+    TURN_RECALL_SQL,
     TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
     TURN_SOURCE_LOCATOR_INDEX_SQL,
     TURN_SOURCES_MIGRATION_ID,
@@ -405,6 +407,31 @@ from raiker.storage.sqlcipher_probe import MemorySecurityProbeResult, probe_memo
 # population is spent against a locked-memory allowance measured in a few
 # megabytes. The ceiling is therefore an absolute number of key-bearing
 # connections: what the process may hold, whatever the server's threadpool does.
+# BUG-243 — words a full-text AND must not be allowed to require.
+#
+# Deliberately short and deliberately closed-class: articles, pronouns,
+# auxiliaries, prepositions and the question words. Every one of them is a word
+# an owner types when asking rather than when naming, and none of them is a term
+# anyone searches *for*. Nothing here is a domain word, so no query about
+# Raiker's own subject matter loses a term it needed.
+_SEARCH_STOPWORDS = frozenset({
+    "about", "after", "again", "all", "already", "also", "and", "any", "anything",
+    "are", "aren", "around", "because", "been", "before", "being", "but", "can",
+    "cannot", "could", "did", "didn", "does", "doesn", "doing", "don", "each",
+    "either", "else", "ever", "every", "for", "from", "get", "got", "had", "has",
+    "have", "her", "here", "hers", "him", "his", "how", "into", "isn", "its",
+    "just", "know", "let", "like", "made", "make", "many", "may", "me", "might",
+    "mine", "more", "most", "much", "must", "need", "not", "now", "off", "one",
+    "only", "onto", "our", "ours", "out", "over", "own", "please", "put", "same",
+    "say", "see", "she", "should", "show", "since", "some", "something", "still",
+    "such", "sure", "tell", "than", "that", "the", "their", "theirs", "them",
+    "then", "there", "these", "they", "thing", "things", "this", "those",
+    "through", "too", "under", "until", "upon", "use", "used", "using", "very",
+    "want", "was", "wasn", "way", "well", "were", "what", "when", "where",
+    "which", "while", "who", "whom", "whose", "why", "will", "with", "won",
+    "would", "you", "your", "yours",
+})
+
 _CONNECTION_CACHE_LIMIT_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_LIMIT"
 _DEFAULT_CONNECTION_CACHE_LIMIT = 8
 _CONNECTION_CACHE_CEILING_ENV = "RAIKER_SQLITE_CONNECTION_CACHE_CEILING"
@@ -1393,6 +1420,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
             self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
+            self._apply_migration(TURN_RECALL_MIGRATION_ID, TURN_RECALL_SQL, connection)
             self._apply_migration(
                 MACHINE_IDENTITIES_MIGRATION_ID, MACHINE_IDENTITIES_SQL, connection
             )
@@ -3659,7 +3687,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             selected = f"{self._snippet_expression('managed_file_chunk_fts', 2)} AS snippet"
             conditions.append("managed_file_chunk_fts MATCH ?")
-            params.append(" ".join(terms))
+            params.append(self._match_expression(terms))
             if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
                 ordering = "bm25(managed_file_chunk_fts, 0.0, 0.0, 1.0) ASC, " + ordering
         else:
@@ -5771,7 +5799,33 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         under both grammars and therefore needs no quoting in either.
         """
         cleaned = "".join(character if character.isalnum() else " " for character in query)
-        return [term.lower() for term in cleaned.split() if len(term) >= 3][:12]
+        terms = [term.lower() for term in cleaned.split() if len(term) >= 3][:12]
+        # BUG-243 — the join is an AND, so every surviving word has to appear in
+        # the stored text. A question carries words that carry no meaning for a
+        # search — "where do my nightly backups go?" failed against a memory
+        # reading "my nightly backups go to the encrypted NAS", because "where"
+        # is not in it. Recall therefore fired for keyword queries and almost
+        # never for a sentence, which is the shape of a memory system that looks
+        # present and is not.
+        #
+        # Function words are dropped rather than the join loosened: an OR over a
+        # whole sentence would rank an unrelated memory highly for containing
+        # "the", which is a worse failure than finding nothing because it is
+        # presented as an answer. A query that is *only* function words keeps
+        # them, so searching for a literal "the" still searches for it.
+        content = [term for term in terms if term not in _SEARCH_STOPWORDS]
+        return content or terms
+
+    def _match_expression(self, terms: list[str]) -> str:
+        """The MATCH expression for *terms*.
+
+        Space-separated barewords are an implicit **AND** in both FTS grammars,
+        which is the right default: a row matching every word the owner typed is
+        what they asked for, and an ``OR`` over a whole sentence would rank an
+        unrelated memory highly for containing the word "the". The join is left
+        alone; what changed is which words reach it — see ``_match_terms``.
+        """
+        return " ".join(terms)
 
     def search_conversation_turns(
         self,
@@ -5813,7 +5867,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 f"{self._snippet_expression('conversation_fts', 3)} AS snippet"
             )
             conditions.append("conversation_fts MATCH ?")
-            params.append(" ".join(terms))
+            params.append(self._match_expression(terms))
             if self.resolved_text_search_engine() == TEXT_SEARCH_FTS5:
                 # Only the `text` column is indexed; the other three are
                 # UNINDEXED and can never contribute, but `bm25` still requires
@@ -6261,6 +6315,46 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (session_id, turn_id, source_id, principal_id),
             ).fetchone()
         return dict(row) if row is not None else None
+
+    # ── C17: what a turn was recalled ────────────────────────────────────────
+    #
+    # Ambient recall reaches a turn through the context bundle, so it leaves no
+    # citation to click. These two methods are the whole record: the ids a turn
+    # was given, and reading them back for the account that owns the
+    # conversation. The sentences themselves are never copied here — they are
+    # read live from `approved_memory`, so a memory corrected or forgotten since
+    # the turn ran reads as it is now rather than as it was.
+
+    def record_turn_recall(
+        self, *, session_id: str, turn_id: str, principal_id: str, memory_ids: Sequence[str]
+    ) -> None:
+        if not memory_ids:
+            return
+        now = utc_now()
+        with self.connect() as connection:
+            connection.executemany(
+                """INSERT OR IGNORE INTO turn_recalls
+                   (session_id, turn_id, principal_id, memory_id, ordinal, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                [
+                    (session_id, turn_id, principal_id, str(memory_id), ordinal, now)
+                    for ordinal, memory_id in enumerate(memory_ids)
+                ],
+            )
+
+    def load_turn_recall(
+        self, session_id: str, principal_id: str, turn_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """Recalled memory ids for this conversation. Owner-scoped, never cross-account."""
+        query = "SELECT * FROM turn_recalls WHERE session_id = ? AND principal_id = ?"
+        params: list[Any] = [session_id, principal_id]
+        if turn_id:
+            query += " AND turn_id = ?"
+            params.append(turn_id)
+        query += " ORDER BY created_at ASC, ordinal ASC"
+        with self.connect() as connection:
+            rows = connection.execute(query, tuple(params)).fetchall()
+        return [dict(row) for row in rows]
 
     # ── the citation ledger read as a reference graph (MEM-14) ───────────────
     #
@@ -8619,7 +8713,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
           AND (m.valid_from IS NULL OR m.valid_from <= ?) AND (m.valid_until IS NULL OR m.valid_until > ?)
           AND m.superseded_at IS NULL"""
         now = utc_now()
-        params: list[Any] = [" ".join(terms), now, now, now]
+        params: list[Any] = [self._match_expression(terms), now, now, now]
         if scope is not None:
             sql += " AND m.scope = ?"
             params.append(scope)

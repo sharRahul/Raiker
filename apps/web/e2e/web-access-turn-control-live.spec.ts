@@ -25,6 +25,7 @@
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 import {
@@ -171,14 +172,14 @@ test("B12/C7 — a web read is withheld with its reason before the owner enables
   // the gate is off on a fresh instance, and once it is on the decision mode
   // still withholds until the owner raises it.
   await expect(answer).toContainText(/gate|disabled|capabilit|withheld|decision mode/i);
-  await page.screenshot({ path: join(SHOTS, "b12-web-fetch-withheld.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b12-web-fetch-withheld.png"));
 });
 
 test("B12/C7 — once enabled and allowed, the agent reads a real page", async () => {
   test.setTimeout(300_000);
   await enableCapability("Web fetch", "B12/C7 live verification");
   await allowCapability("Web fetch", "B12/C7 live verification");
-  await page.screenshot({ path: join(SHOTS, "b12-web-fetch-capability.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b12-web-fetch-capability.png"));
 
   await refreshHostedReadiness(page, BASE, "Anthropic");
   await page.goto(`${BASE}/#/new-chat`);
@@ -196,7 +197,7 @@ test("B12/C7 — once enabled and allowed, the agent reads a real page", async (
     /next generation HTTP client/i,
     { timeout: 30_000 },
   );
-  await page.screenshot({ path: join(SHOTS, "b12-web-fetch-live-page.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b12-web-fetch-live-page.png"));
 });
 
 test("B12/C7 — a host outside the owner's allowlist is still refused", async () => {
@@ -216,7 +217,7 @@ test("B12/C7 — a host outside the owner's allowlist is still refused", async (
   await expect(page.locator(".message-bubble-raiker").last()).toContainText(
     /allowlist|not on the owner|egress/i,
   );
-  await page.screenshot({ path: join(SHOTS, "b12-web-fetch-egress-denied.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b12-web-fetch-egress-denied.png"));
 });
 
 test("B17/C13 — the owner steers a running turn, and its words reach the model", async () => {
@@ -234,20 +235,20 @@ test("B17/C13 — the owner steers a running turn, and its words reach the model
   // The composer becomes the turn's control surface while it streams.
   const control = page.getByTestId("turn-control");
   await expect(control).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "b17-turn-control-visible.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b17-turn-control-visible.png"));
 
   await control.getByLabel("Add to this turn").fill("Reply with exactly: STEERED MIDTURN");
   await control.getByRole("button", { name: /Steer/ }).click();
   await expect(page.getByText(/1 instruction queued for this turn/)).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "b17-steer-queued.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b17-steer-queued.png"));
 
   await expect(page.getByRole("button", { name: "Copy response" }).last()).toBeVisible({
     timeout: 240_000,
   });
   await expect(page.locator(".message-bubble-raiker").last()).toContainText("STEERED MIDTURN");
-  await page.screenshot({ path: join(SHOTS, "b17-steered-answer.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b17-steered-answer.png"));
 });
 
 test("B17/C13 — the owner stops a running turn, and it ends as stopped", async () => {
@@ -266,10 +267,10 @@ test("B17/C13 — the owner stops a running turn, and it ends as stopped", async
   await expect(control).toBeVisible({ timeout: 60_000 });
   await control.getByRole("button", { name: "Stop this turn" }).click();
   await expect(page.getByText(/Stop requested/)).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "b17-stop-requested.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b17-stop-requested.png"));
 
   // The turn really ends, and it ends as a decision rather than a failure.
   await expect(control).toBeHidden({ timeout: 240_000 });
   await expect(page.getByText(/Stopped at your request/).last()).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "b17-turn-stopped.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b17-turn-stopped.png"));
 });

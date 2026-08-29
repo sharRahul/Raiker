@@ -15,7 +15,7 @@
    * authority: it composes the same governed prompt, approval, task, and project
    * surfaces the rest of the workspace uses.
    */
-  import { onMount, tick } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import { readBuildProject, rememberBuildProject } from "../buildProject";
   import Badge from "../components/Badge.svelte";
@@ -25,6 +25,7 @@
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
   import EmptyState from "../components/EmptyState.svelte";
+  import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
   import ContextMeterPopover from "../components/ContextMeterPopover.svelte";
   import ContextRing from "../components/ContextRing.svelte";
@@ -34,6 +35,7 @@
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
+  import DiffView from "../components/DiffView.svelte";
   import SourceChips from "../components/SourceChips.svelte";
   import SourceExcerptPanel from "../components/SourceExcerptPanel.svelte";
   import { api, ApiError, streamPrompt, streamResumeAfterApproval } from "../api";
@@ -51,6 +53,7 @@
     CodeReposView,
     ContextUsage,
     ProjectsList,
+    SessionDetail,
     StreamEvent,
     TurnSourceExcerptView,
     TurnSourceView,
@@ -66,6 +69,14 @@
     type BuildMode,
   } from "../buildModes";
   import { humanize, relativeTime } from "../format";
+  import {
+    attachmentChipsByTurn,
+    mergeRestoredChips,
+    parkedByTurn,
+    restoredTurnCore,
+    type ParkedApproval,
+  } from "../conversationRestore";
+  import { rememberSessionInRoute } from "../sessionRoute";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { approvalBadge } from "../statusMaps";
   import AttachmentCard from "../components/AttachmentCard.svelte";
@@ -110,6 +121,12 @@
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
   let {
+    // BUG-242 — the conversation this surface was opened on, from the URL. Build
+    // used to learn its session only from the stream, so a reload — the thing an
+    // owner does exactly when a change looked wrong — mounted an empty
+    // conversation over a session that was still stored, still findable, and
+    // still holding the approvals for that change.
+    sessionId: continuedSessionId = null,
     projects = null,
     onProjectsChanged,
     // Build keeps its transcript when the owner navigates away — the view is
@@ -119,6 +136,7 @@
     // shown as it stood before a visit to Permissions.
     visible = true,
   }: {
+    sessionId?: string | null;
     projects?: ProjectsList | null;
     onProjectsChanged?: () => void;
     visible?: boolean;
@@ -157,6 +175,12 @@
     // in either surface reads identically in both.
     resumeState?: "waiting" | "continuing" | "elsewhere" | null;
     resumeNote?: string | null;
+    // BUG-215/BUG-242 — a turn rebuilt from the record has no stream to read its
+    // working from, so it carries the kept text and how much there was. The pair
+    // is what keeps a reopened turn honest: none produced, or produced and not
+    // retained, are different statements.
+    retainedReasoning?: string | null;
+    reasoningChars?: number;
   }
 
   // BUG-35 — Build carries files too. Same store, same limits, same governed
@@ -279,6 +303,75 @@
     }
   }
   let nextId = 1;
+
+  // ── BUG-242: restoring the conversation the URL names ─────────────────
+  //
+  // Same shape as Chat, over the same governed session read. A restored turn
+  // carries what is persisted — the prompt, the answer, the status, the tool
+  // rows and the retained working — and nothing that only existed on the
+  // stream. `mode` is not part of the record: the chip on a reopened turn shows
+  // the mode the composer is set to, which is the honest reading of a posture
+  // that is chosen per turn and never stored.
+  let historyError = $state<string | null>(null);
+  let historyLoading = $state(false);
+
+  async function loadHistory(id: string) {
+    historyLoading = true;
+    closeSource();
+    try {
+      const detail = await api.session(id);
+      const parked = parkedByTurn(detail);
+      turns = detail.turns.map((t) => restoredTurn(t, id, parked.get(t.turn_id)));
+      nextId = turns.length + 1;
+      await restoreAttachmentChips(id);
+      await refreshTurnSources(id);
+      await loadApprovals();
+      void scrollToEnd();
+    } catch (e) {
+      historyError =
+        e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
+    } finally {
+      historyLoading = false;
+    }
+  }
+
+  function restoredTurn(
+    t: SessionDetail["turns"][number],
+    id: string,
+    parked?: ParkedApproval,
+  ): BuildTurn {
+    return { id: nextId++, mode, ...restoredTurnCore(t, id, parked) };
+  }
+
+  async function restoreAttachmentChips(id: string) {
+    let files;
+    try {
+      files = (await api.sessionAttachments(id)).files;
+    } catch {
+      // Chips are a convenience; losing them must not cost the transcript.
+      return;
+    }
+    turns = mergeRestoredChips(turns, attachmentChipsByTurn(files));
+  }
+
+  $effect(() => {
+    if (continuedSessionId === null) return;
+    const id = continuedSessionId;
+    // Only the prop may retrigger this — see the matching comment in Chat.
+    untrack(() => {
+      sessionId = id;
+      void loadHistory(id);
+    });
+  });
+
+  // The address bar follows the open conversation, so a reload comes back to
+  // it. Only the surface on screen writes: Build and Chat stay mounted behind
+  // each other.
+  $effect(() => {
+    if (!visible) return;
+    rememberSessionInRoute("build", sessionId);
+  });
+
   let scrollEl: HTMLDivElement | undefined = $state();
   let promptEl: HTMLTextAreaElement | undefined = $state();
 
@@ -1035,6 +1128,7 @@
     turns = [];
     sessionId = null;
     approvals = [];
+    approvalDiffs = {};
     plan = null;
     promptEl?.focus();
   }
@@ -1084,6 +1178,16 @@
   }
 
   // ── Approvals ────────────────────────────────────────────────────────
+  //
+  // B14 — the change itself, where it was proposed. Reviewing a diff used to
+  // mean leaving Build for the Approvals inbox, which is a route change at the
+  // one moment an owner is reading code. The preview is the same governed
+  // read the inbox performs (`GET /api/approvals/{id}`), rendered here; nothing
+  // about the decision moves — Accept and Reject still resolve the same record,
+  // and per-hunk acceptance is not offered because the runtime has no such
+  // decision to record.
+  let approvalDiffs = $state<Record<string, { diff: string | null; path: string | null }>>({});
+
   async function loadApprovals() {
     if (sessionId === null) return;
     try {
@@ -1091,7 +1195,38 @@
       approvals = pending.filter((approval) => approval.session_id === sessionId);
     } catch {
       approvals = [];
+      approvalDiffs = {};
+      return;
     }
+    await loadApprovalDiffs();
+  }
+
+  async function loadApprovalDiffs() {
+    const wanted = approvals.filter((approval) => approvalDiffs[approval.approval_id] === undefined);
+    const loaded = await Promise.all(
+      wanted.map(async (approval) => {
+        try {
+          const detail = await api.approval(approval.approval_id);
+          const shows =
+            detail.preview_kind === "file_diff" ||
+            detail.preview_kind === "patch" ||
+            detail.preview_kind === "git_change";
+          // Only a change with a diff gets one. Everything else keeps the
+          // inbox's own presentation rather than being forced into this shape.
+          return shows
+            ? ([approval.approval_id, { diff: detail.diff, path: detail.diff_path }] as const)
+            : null;
+        } catch {
+          // The preview is a convenience on top of the decision. Losing it must
+          // not remove the Accept and Reject the turn is parked on.
+          return null;
+        }
+      }),
+    );
+    approvalDiffs = {
+      ...approvalDiffs,
+      ...Object.fromEntries(loaded.filter((entry) => entry !== null)),
+    };
   }
 
   async function resolve(approval: ApprovalView, approve: boolean) {
@@ -1265,7 +1400,12 @@
     {/if}
 
     <div class="thread" bind:this={scrollEl}>
-      {#if turns.length === 0}
+      {#if historyError !== null}
+        <p class="error-line" role="alert">{historyError}</p>
+      {/if}
+      {#if historyLoading}
+        <PageState state="loading" title="Loading conversation…" />
+      {:else if turns.length === 0}
         <EmptyState
           icon="code"
           title="What should we build?"
@@ -1280,7 +1420,7 @@
       {#each turns as turn (turn.id)}
         {@const answer = answerText(turn)}
         {@const toolRows = toolActivity(turn.events)}
-        {@const reasoning = collectReasoning(turn.events)}
+        {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
         {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
         <article class="turn">
           <div class="user-message">
@@ -1340,7 +1480,11 @@
             <!-- BUG-207 slices C and D, as in Chat: the model's own reasoning
                  when the turn produced any, collapsed once the answer starts,
                  and nothing at all when it produced none. -->
-            <ReasoningBlock text={reasoning} streaming={turn.streaming} />
+            <ReasoningBlock
+              text={reasoning}
+              streaming={turn.streaming}
+              notKeptChars={turn.reasoningChars ?? 0}
+            />
 
             <!-- BUG-206 slice D, as in Chat: every call this turn made, in call
                  order. Build is where a turn makes the most of them, and where
@@ -1461,6 +1605,13 @@
               <p class="decision-meta">
                 {humanize(approval.capability)} · raised {relativeTime(approval.created_at)}
               </p>
+              {#if approvalDiffs[approval.approval_id] !== undefined}
+                <!-- B14 — the change, read where it was proposed. -->
+                <DiffView
+                  diff={approvalDiffs[approval.approval_id].diff}
+                  path={approvalDiffs[approval.approval_id].path}
+                />
+              {/if}
               <div class="decision-actions">
                 <button
                   type="button"
@@ -1643,15 +1794,14 @@
             </button>
           </div>
         </div>
+        <!-- The composer states the boundary, not the lesson: which project a
+             turn will run in is what changes between turns, and what a project
+             lets Build reach is explained once in the guide. -->
         {#if !projectReady}
-          <p class="project-required" role="status">
-            Select a project to start. Build reads and writes inside one project;
-            it cannot run without one.
-          </p>
+          <p class="project-required" role="status">Select a project to start.</p>
         {:else}
           <p class="project-boundary" role="status">
-            Working in <strong>{selectedProject?.name}</strong>. Build can use this
-            project's files, its memory, and account memory.
+            Working in <strong>{selectedProject?.name}</strong>
           </p>
         {/if}
         <p class="shortcut-hint">
@@ -2103,6 +2253,11 @@
     font-size: 0.75rem;
     color: var(--text-3);
     line-height: 1.5;
+  }
+  .error-line {
+    color: var(--danger);
+    font-size: 0.86rem;
+    margin: 0.35rem 0 0;
   }
   .standing-compact { display: none; }
   .error {

@@ -84,4 +84,69 @@ describe("DiagnosticsView", () => {
     expect(screen.getByText(/writes may not be reversible/i)).toBeInTheDocument();
     expect(screen.getByText(/enable Windows long-path support/i)).toBeInTheDocument();
   });
+
+  // MEM-09 — the integrity report existed and nothing displayed it, so a
+  // divergence between a table and its index was invisible: search simply
+  // stopped finding things. It is a page now, with its repair beside it.
+  const CLEAN_INTEGRITY = {
+    ok: true,
+    clean: true,
+    active_memory_count: 4,
+    fts_count: 4,
+    stale_fts_count: 0,
+    missing_markdown_count: 0,
+    stale_projection_count: 0,
+    stale_graph_edge_count: 0,
+    checksum_mismatch_count: 0,
+    orphaned_markdown_count: 0,
+    failed_purge_location_count: 0,
+    project_path_inconsistency_count: 0,
+    text_search_engine: "fts5",
+    index_engine_mismatch_count: 0,
+    conversation_index_count: 12,
+    stale_conversation_index_count: 0,
+  };
+
+  it("reports a clean memory store without listing ten zeroes", async () => {
+    stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/security/health": [],
+      "GET /api/memory/integrity": CLEAN_INTEGRITY,
+    });
+    render(DiagnosticsView);
+
+    expect(await screen.findByText("Memory integrity")).toBeInTheDocument();
+    expect(await screen.findByText("clean")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /rebuild conversation index/i })).toBeNull();
+  });
+
+  it("names conversation-index drift and offers the rebuild that repairs it", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/diagnostics": DIAGNOSTICS,
+      "GET /api/security/health": [],
+      "GET /api/memory/integrity": {
+        ...CLEAN_INTEGRITY,
+        clean: false,
+        conversation_index_count: 3,
+        stale_conversation_index_count: 9,
+      },
+      "POST /api/memory/conversation-index/rebuild": { ok: true, indexed_rows: 12 },
+    });
+    render(DiagnosticsView);
+
+    expect(await screen.findByText("Conversation search index")).toBeInTheDocument();
+    expect(screen.getByText("9")).toBeInTheDocument();
+
+    const rebuild = screen.getByRole("button", { name: /rebuild conversation index/i });
+    rebuild.click();
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([url]) =>
+          String(url).includes("/api/memory/conversation-index/rebuild"),
+        ),
+      ).toBe(true),
+    );
+    expect(await screen.findByText(/12 rows indexed/i)).toBeInTheDocument();
+  });
 });

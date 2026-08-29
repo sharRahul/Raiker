@@ -22,6 +22,12 @@ in Build, it would be refused in Chat too, and the control that opens it is on
 3. **Decide what the agent may do.** A fresh account has every capability gate
    off. Nothing is broken — you have not opened anything yet. Open only what the
    work needs, on [Permissions](permissions-and-runtime-modes.md).
+4. **Choose a project.** Build reads and writes inside one project and refuses
+   to send without one, so the project picker sits in the composer next to the
+   mode. A turn run in a project may use **that project's files, that project's
+   memory, and your account memory** — nothing from another project. The
+   composer names the project it will run in; this is what that name means.
+   See [Tasks and projects](tasks-and-projects.md).
 
 ## The three modes
 
@@ -95,6 +101,14 @@ turn** rather than rewriting what you asked, because the transcript is a record.
 **One patch, one approval, one reversible change set.** A unified diff may cover
 several files, including creates and deletes, and it is applied as a single
 approval. There is no partial application: one bad hunk fails the whole proposal.
+
+**You read the diff where it was proposed.** A pending decision in Build shows
+the change under it — the file it touches, `+n −m`, and the hunk with its own
+line numbers — with **Accept** and **Reject** beneath. It is the same governed
+preview the Approvals inbox reads and the same record either surface resolves;
+**Open in Approvals** is still there when you want the full detail, the execution
+evidence, or the identity chain. There is no per-hunk accept, because there is no
+per-hunk decision for the runtime to record.
 
 **Matching is strict about which code you named, not about how you typed it.**
 The exact text is tried first; when that finds nothing, the same search runs

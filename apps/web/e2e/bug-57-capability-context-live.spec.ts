@@ -33,6 +33,7 @@
  * `web_fetch` on.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -150,7 +151,7 @@ test("the provider key is added through the UI and a real turn answers", async (
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "bug-57-model-connected.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-57-model-connected.png"));
 
   await newChat();
   const answer = await ask("Reply with exactly: CAPABILITY CONTEXT LIVE");
@@ -175,10 +176,7 @@ test("before the owner touches a gate, the context says disabled and names the g
   // quote one back.
   await expect(answer).not.toContainText("network_execution_enabled");
   await expect(answer).not.toContainText("runtime_execution_enabled");
-  await page.screenshot({
-    path: join(SHOTS, "bug-57-gate-disabled-named.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-57-gate-disabled-named.png"));
 });
 
 test("the workspace summary no longer claims a read-only planning runtime", async () => {
@@ -196,17 +194,14 @@ test("the workspace summary no longer claims a read-only planning runtime", asyn
   await expect(answer).toContainText(/active/i);
   await expect(answer).not.toContainText("local_read_only_planning");
   await expect(answer).not.toContainText("all unsafe runtime flags remain false");
-  await page.screenshot({
-    path: join(SHOTS, "bug-57-runtime-status-live.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-57-runtime-status-live.png"));
 });
 
 test("BUG-57 itself — an enabled capability is used, not argued away", async () => {
   test.setTimeout(420_000);
   await enableCapability("Web fetch", "BUG-57 live verification");
   await allowCapability("Web fetch", "BUG-57 live verification");
-  await page.screenshot({ path: join(SHOTS, "bug-57-web-fetch-enabled.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-57-web-fetch-enabled.png"));
 
   await newChat();
   // The reproduction, exactly: the gate is on, the mode is Allow, the host is
@@ -222,7 +217,7 @@ test("BUG-57 itself — an enabled capability is used, not argued away", async (
     timeout: 30_000,
   });
   await expect(answer).not.toContainText("network_execution_enabled");
-  await page.screenshot({ path: join(SHOTS, "bug-57-web-fetch-used.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-57-web-fetch-used.png"));
 });
 
 test("the enabled gate reads back as enabled, and its neighbours still do not", async () => {
@@ -237,8 +232,5 @@ test("the enabled gate reads back as enabled, and its neighbours still do not", 
   );
   await expect(answer).toContainText(/web_fetch: enabled/);
   await expect(answer).toContainText(/shell_execution: disabled/);
-  await page.screenshot({
-    path: join(SHOTS, "bug-57-gates-read-back.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-57-gates-read-back.png"));
 });

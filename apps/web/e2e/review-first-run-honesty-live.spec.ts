@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -44,8 +45,5 @@ test("stage 02 labels every offered backend", async ({ page }) => {
   // contacted a provider or found a runtime.
   expect(rows.some((row) => /\bConnected\b/.test(row))).toBe(false);
 
-  await page.screenshot({
-    path: join(SHOTS, "first-run-model-choice-labels.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "first-run-model-choice-labels.png"));
 });

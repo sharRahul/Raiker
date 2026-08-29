@@ -15,6 +15,7 @@
  * A live provider turn is covered by `fts5-mem03-bug194-live.spec.ts`.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -69,9 +70,6 @@ test("the Knowledge Map shows chats, build, projects, context and files", async 
   }
 
   await page.waitForTimeout(2_500);
-  await page.screenshot({
-    path: `${SHOTS}/r0817-04-knowledge-map-work-graph.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817-04-knowledge-map-work-graph.png`);
   expect(consoleErrors).toEqual([]);
 });

@@ -46,6 +46,7 @@
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { hostedProviderCard } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -126,10 +127,7 @@ test("the owner's workspace is a working host before any of this", async () => {
   expect(hostDescriptors()).toBeGreaterThan(0);
 
   await openDashboard(page);
-  await page.screenshot({
-    path: join(SHOTS, "bug-50-host-before-many-instances.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-50-host-before-many-instances.png"));
 });
 
 test("the instance surface this exercises is the product's own", async () => {
@@ -141,10 +139,7 @@ test("the instance surface this exercises is the product's own", async () => {
   await expect(login.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
   await login.locator("button.instance-button").click();
   await expect(login.getByLabel("Instance name")).toBeVisible({ timeout: 30_000 });
-  await login.screenshot({
-    path: join(SHOTS, "bug-50-instance-creation-surface.png"),
-    fullPage: true,
-  });
+  await capture(login, join(SHOTS, "bug-50-instance-creation-surface.png"));
   await login.close();
 });
 
@@ -198,10 +193,7 @@ test("the owner's own workspace is untouched by the eviction", async () => {
   // panel is read straight out of this workspace's database.
   await openDashboard(page);
   expect(consoleErrors, consoleErrors.join("\n")).toEqual([]);
-  await page.screenshot({
-    path: join(SHOTS, "bug-50-host-after-many-instances.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-50-host-after-many-instances.png"));
 });
 
 test("a real hosted turn still answers on the host that served them", async () => {
@@ -235,8 +227,5 @@ test("a real hosted turn still answers on the host that served them", async () =
   await expect(page.getByRole("main").getByText("CACHE LIVE", { exact: true })).toBeVisible({
     timeout: 180_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "bug-50-hosted-turn-after-many-instances.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-50-hosted-turn-after-many-instances.png"));
 });

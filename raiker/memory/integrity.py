@@ -30,12 +30,20 @@ class MemoryIntegrityReport:
     #: else would surface: an FTS4 index on an FTS5 host answers every query.
     text_search_engine: str = "fts5"
     index_engine_mismatch_count: int = 0
+    #: MEM-09 — the conversation index is a projection of ``turns`` in exactly
+    #: the way the memory index is a projection of ``approved_memory``, and it
+    #: was the one projection this report did not know about. A divergence has
+    #: no symptom an owner can see: search simply stops finding conversations it
+    #: found last week. ``rebuild_conversation_fts()`` is the stated repair.
+    conversation_index_count: int = 0
+    stale_conversation_index_count: int = 0
 
     @property
     def clean(self) -> bool:
         return not any((
             self.index_engine_mismatch_count,
             self.stale_fts_count,
+            self.stale_conversation_index_count,
             self.missing_markdown_count,
             self.stale_projection_count,
             self.stale_graph_edge_count,
@@ -56,6 +64,17 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
             AND (valid_until IS NULL OR valid_until > ?) AND superseded_at IS NULL""", (now, now, now)
         ).fetchone()[0])
         fts_count = int(connection.execute("SELECT COUNT(*) FROM approved_memory_fts").fetchone()[0])
+        # MEM-09 — the same comparison, for the index behind Search chats. The
+        # expected count is what `_rebuild_conversation_fts` would insert: one
+        # row per non-empty prompt and one per non-empty answer.
+        conversation_index_count = int(
+            connection.execute("SELECT COUNT(*) FROM conversation_fts").fetchone()[0]
+        )
+        indexable_turn_rows = int(connection.execute(
+            """SELECT
+                 (SELECT COUNT(*) FROM turns WHERE prompt_text IS NOT NULL AND TRIM(prompt_text) != '')
+               + (SELECT COUNT(*) FROM turns WHERE summary IS NOT NULL AND TRIM(summary) != '')"""
+        ).fetchone()[0])
         engine = SQLiteStore.text_search_engine(connection)
         index_engine_mismatch_count = sum(
             SQLiteStore._index_engine(connection, table) not in (None, engine)  # noqa: SLF001
@@ -128,4 +147,6 @@ def inspect_memory_integrity(*, store: SQLiteStore, workspace_root: str | Path) 
         project_path_inconsistency_count,
         text_search_engine=engine,
         index_engine_mismatch_count=index_engine_mismatch_count,
+        conversation_index_count=conversation_index_count,
+        stale_conversation_index_count=abs(indexable_turn_rows - conversation_index_count),
     )

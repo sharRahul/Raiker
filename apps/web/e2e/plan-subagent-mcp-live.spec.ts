@@ -18,6 +18,7 @@
  *   2. RAIKER_LIVE_ANTHROPIC_KEY in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -106,7 +107,7 @@ test("B6 — the model's plan renders as a live checklist and is carried into la
     "aria-valuenow",
     "33",
   );
-  await page.screenshot({ path: join(SHOTS, "b6-build-live-plan-checklist.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b6-build-live-plan-checklist.png"));
 
   // A second turn revises the same plan rather than starting a new one.
   await prompt.fill(
@@ -115,7 +116,7 @@ test("B6 — the model's plan renders as a live checklist and is carried into la
   );
   await page.keyboard.press("Enter");
   await expect(plan.getByText("2 of 3 done")).toBeVisible({ timeout: 180_000 });
-  await page.screenshot({ path: join(SHOTS, "b6-build-live-plan-advanced.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b6-build-live-plan-advanced.png"));
 
   // The spine is a recovery point, which means the *model* has to get it back —
   // not just the screen. A third turn that calls no tool can only answer this
@@ -136,7 +137,7 @@ test("B6 — the model's plan renders as a live checklist and is carried into la
   await expect(
     governance.getByText("The standing plan for this conversation was carried into the turn."),
   ).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "b6-build-live-plan-recovered.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b6-build-live-plan-recovered.png"));
 });
 
 test("B7 — a delegated read-only search returns findings without filling the transcript", async () => {
@@ -162,7 +163,7 @@ test("B7 — a delegated read-only search returns findings without filling the t
   await expect(governance.getByText(/Subagent .*finished .* read-only step/)).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "b7-build-live-subagent.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b7-build-live-subagent.png"));
 });
 
 /** Turn one capability on at runtime level, exactly as a person would. */
@@ -213,7 +214,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
     timeout: 30_000,
   });
   await expect(card.getByText("Not callable yet — see above")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "b8-mcp-live-withheld.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b8-mcp-live-withheld.png"));
 
   // Raise the decision mode, which is exactly what the banner told the owner to do.
   await page.goto(`${BASE}/#/capabilities`);
@@ -234,7 +235,7 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
   );
   const connected = page.locator("li.card").filter({ hasText: "echo" }).first();
   await expect(connected.getByText("Callable by Raiker")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "b8-mcp-live-callable.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b8-mcp-live-callable.png"));
 
   // And the claim holds: the model really calls the server's tool. Asserted on
   // the *answer* bubble, never on `main` — the prompt is echoed in the sent
@@ -251,5 +252,5 @@ test("B8 — MCP: a connected server says whether the agent can call it, then do
     timeout: 180_000,
   });
   await expect(page.locator(".message-bubble-raiker").last()).toContainText("MCP REACHED");
-  await page.screenshot({ path: join(SHOTS, "b8-mcp-live-tool-call.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b8-mcp-live-tool-call.png"));
 });

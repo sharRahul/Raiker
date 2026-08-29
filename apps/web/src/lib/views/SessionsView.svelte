@@ -450,6 +450,10 @@
           <p class="sub">Created {relativeTime(detail.session.created_at)} · {detail.turns.length} turns</p>
           <p class="session-links">
             <a href={`#/new-chat?session=${encodeURIComponent(detail.session.session_id)}`}>Open in chat</a>
+            <!-- BUG-242 — Build restores a stored conversation on the same
+                 coordinate Chat does, so the one surface where the approvals
+                 for a change live is reachable from here too. -->
+            <a href={`#/build?session=${encodeURIComponent(detail.session.session_id)}`}>Open in Build</a>
             <a href={`#/tasks?session=${encodeURIComponent(detail.session.session_id)}`}>View session tasks</a>
             <a href={`#/approvals?session=${encodeURIComponent(detail.session.session_id)}`}>View session approvals</a>
             <a href={`#/activity?session=${encodeURIComponent(detail.session.session_id)}`}>View audit events</a>

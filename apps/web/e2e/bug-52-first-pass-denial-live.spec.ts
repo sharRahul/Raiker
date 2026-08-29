@@ -31,6 +31,7 @@
  *      with `RAIKER_MODEL_EGRESS_ALLOWLIST=127.0.0.1`
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { checkModelReady, hostedProviderCard } from "./hosted-provider";
 
@@ -139,10 +140,7 @@ test("a refused first call no longer ends the turn — the read behind it still 
   // row rather than being folded into a summary of the refusal.
   await expect(page.locator(".refusal-card")).toHaveCount(0);
   await expect(page.locator('.tool-row[data-state="success"]')).toHaveCount(1);
-  await page.screenshot({
-    path: join(SHOTS, "bug-52-chat-refusal-does-not-end-the-turn.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-52-chat-refusal-does-not-end-the-turn.png"));
 });
 
 test("a refusal ahead of a write reaches decision 2 of 3 instead of dropping both writes", async () => {
@@ -161,18 +159,12 @@ test("a refusal ahead of a write reaches decision 2 of 3 instead of dropping bot
   await expect(refusedRow(page).locator(".tool-label")).toHaveText("Read file", {
     timeout: 30_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "bug-52-chat-decision-2-of-3-after-a-refusal.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-52-chat-decision-2-of-3-after-a-refusal.png"));
 
   await page.goto(`${BASE}/#/approvals`);
   const pendingRow = page.locator("table.table tbody tr").first();
   await expect(pendingRow.getByText(/decision 2 of 3/i)).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({
-    path: join(SHOTS, "bug-52-approvals-decision-2-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-52-approvals-decision-2-of-3.png"));
 });
 
 test("the third call is still the owner's to decide", async () => {
@@ -192,8 +184,5 @@ test("the third call is still the owner's to decide", async () => {
       page.locator("table.table tbody tr").first().getByText(/decision 3 of 3/i),
     ).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 180_000 });
-  await page.screenshot({
-    path: join(SHOTS, "bug-52-approvals-decision-3-of-3.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-52-approvals-decision-3-of-3.png"));
 });

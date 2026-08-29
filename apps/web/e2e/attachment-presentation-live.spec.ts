@@ -14,6 +14,7 @@
  *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
@@ -67,7 +68,7 @@ test("a picture attaches as a picture and a document as a typed card", async () 
   await expect(row.getByText("PDF", { exact: false }).first()).toBeVisible({ timeout: 30_000 });
 
   await expect(row.getByRole("button", { name: /^Remove attachment/ })).toHaveCount(2);
-  await page.screenshot({ path: join(SHOTS, "169-composer-attachments-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "169-composer-attachments-live.png"));
 });
 
 test("what the transcript shows back is what the composer showed", async () => {
@@ -86,7 +87,7 @@ test("what the transcript shows back is what the composer showed", async () => {
   const sent = page.locator(".turn-attachments").first();
   await expect(sent.locator("img")).toBeVisible();
   await expect(sent.getByRole("button", { name: /^Open / })).toHaveCount(2);
-  await page.screenshot({ path: join(SHOTS, "170-transcript-attachments-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "170-transcript-attachments-live.png"));
 
   // And the composer is empty again, with nothing left behind.
   await expect(page.getByLabel("Attached to this prompt")).toHaveCount(0);
@@ -100,5 +101,5 @@ test("what the transcript shows back is what the composer showed", async () => {
   await page.getByRole("button", { name: /zoom in/i }).click();
   await page.getByRole("button", { name: /zoom in/i }).click();
   await expect(page.getByText("156%")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "171-photo-inspection-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "171-photo-inspection-live.png"));
 });

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 async function unlock(page: import("@playwright/test").Page) {
@@ -51,10 +52,7 @@ test("live empty-account Workbench review", async ({ page }) => {
     await expect(start.getByRole("link", { name: new RegExp(action) })).toBeVisible();
   }
   await expect(page.getByRole("link", { name: /Review issues/ })).toBeVisible();
-  await page.screenshot({
-    path: "../../docs/plans/screenshots/working/workbench-board-live.png",
-    fullPage: true,
-  });
+  await capture(page, "../../docs/plans/screenshots/working/workbench-board-live.png");
   expect(consoleErrors).toEqual([]);
 });
 
@@ -68,16 +66,10 @@ test("live Settings review", async ({ page }) => {
   await page.getByLabel(/Language Controls/).selectOption("en-US");
   await expect(page.getByText("You have unsaved changes")).toBeVisible();
   await expect(page.getByRole("button", { name: "Save changes" })).toBeVisible();
-  await page.screenshot({
-    path: "../../docs/plans/screenshots/working/settings-redesign-live.png",
-    fullPage: true,
-  });
+  await capture(page, "../../docs/plans/screenshots/working/settings-redesign-live.png");
   await settingsNav.getByRole("button", { name: "Runtime configuration" }).click();
   await expect(page.getByRole("heading", { name: "Runtime configuration" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Danger zone" })).toBeVisible();
   await expect(page.getByText("Loading…", { exact: true })).toBeHidden();
-  await page.screenshot({
-    path: "../../docs/plans/screenshots/working/settings-runtime-live.png",
-    fullPage: true,
-  });
+  await capture(page, "../../docs/plans/screenshots/working/settings-runtime-live.png");
 });

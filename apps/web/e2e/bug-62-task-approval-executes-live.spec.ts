@@ -16,6 +16,7 @@
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -126,7 +127,7 @@ test("a provider key is added through the UI and a model selected", async () => 
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "bug-62-model-connected.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-model-connected.png"));
 });
 
 test("Task creation is an owner control on the Permissions page", async () => {
@@ -138,7 +139,7 @@ test("Task creation is an owner control on the Permissions page", async () => {
   await setCapability("Task creation", "Turn on", "let an approved task really be created");
   const card = await openCapability("Task creation");
   await expect(card).toContainText(/Create a task in Tasks when you approve one the agent proposed/i);
-  await page.screenshot({ path: join(SHOTS, "bug-62-capability-control.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-capability-control.png"));
 });
 
 test("asking for a task in Chat raises an approval that says it will create it", async () => {
@@ -159,7 +160,7 @@ test("asking for a task in Chat raises an approval that says it will create it",
   await expect(detail).toContainText(/Approving this creates the task above in Tasks, once/i);
   await expect(detail).not.toContainText(/does NOT execute the action/i);
   await expect(page.getByRole("button", { name: "Approve and execute once" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug-62-approval-will-create.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-approval-will-create.png"));
 });
 
 test("approving it creates the task, and the inbox links to it", async () => {
@@ -173,14 +174,14 @@ test("approving it creates the task, and the inbox links to it", async () => {
   await expect(notice).toContainText(TASK_TITLE);
   await expect(notice).not.toContainText(/metadata-only/i);
   await expect(notice.getByRole("link", { name: "Review in Tasks" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug-62-approved-and-executed.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-approved-and-executed.png"));
 });
 
 test("the task is in Tasks", async () => {
   test.setTimeout(120_000);
   await page.goto(`${BASE}/#/tasks`);
   await expect(page.getByText(TASK_TITLE).first()).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "bug-62-task-in-tasks.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-task-in-tasks.png"));
 });
 
 test("the owner's off switch still wins, and says so before the decision", async () => {
@@ -200,5 +201,5 @@ test("the owner's off switch still wins, and says so before the decision", async
     timeout: 30_000,
   });
   await expect(page.getByRole("button", { name: "Approve (record only)" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug-62-gate-off-record-only.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-62-gate-off-record-only.png"));
 });

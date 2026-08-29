@@ -4,7 +4,12 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
-  import type { CheckpointCaptureHealth, Diagnostics, SecurityHealth } from "../apiTypes";
+  import type {
+    CheckpointCaptureHealth,
+    Diagnostics,
+    MemoryIntegrity,
+    SecurityHealth,
+  } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
   import { humanize, relativeTime } from "../format";
 
@@ -14,6 +19,58 @@
   // its own in-card message; it never hides the rest of the diagnostics.
   let health = $state<SecurityHealth[] | null>(null);
   let healthError = $state<string | null>(null);
+  // MEM-09 — the memory integrity report. It has existed since the memory audit
+  // and nothing displayed it, so a divergence between a table and its index was
+  // invisible: search simply stopped finding things. Read-only, owner-started.
+  let integrity = $state<MemoryIntegrity | null>(null);
+  let integrityError = $state<string | null>(null);
+  let integrityBusy = $state(false);
+  let integrityNotice = $state<string | null>(null);
+
+  // Only the findings worth acting on. A report that lists ten zeroes hides the
+  // one number that is not zero.
+  const integrityFindings = $derived.by(() => {
+    if (integrity === null) return [];
+    const labels: Array<[keyof MemoryIntegrity, string]> = [
+      ["stale_fts_count", "Memory search index"],
+      ["stale_conversation_index_count", "Conversation search index"],
+      ["stale_projection_count", "Memory projections"],
+      ["stale_graph_edge_count", "Knowledge graph edges"],
+      ["missing_markdown_count", "Missing memory files"],
+      ["orphaned_markdown_count", "Orphaned memory files"],
+      ["checksum_mismatch_count", "Checksum mismatches"],
+      ["failed_purge_location_count", "Unfinished purges"],
+      ["project_path_inconsistency_count", "Project paths"],
+      ["index_engine_mismatch_count", "Index engine"],
+    ];
+    return labels
+      .map(([key, label]) => ({ key, label, count: Number(integrity?.[key] ?? 0) }))
+      .filter((finding) => finding.count > 0);
+  });
+
+  async function loadIntegrity() {
+    integrityError = null;
+    try {
+      integrity = await api.memoryIntegrity();
+    } catch (e) {
+      integrity = null;
+      integrityError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
+    }
+  }
+
+  async function rebuildConversationIndex() {
+    integrityBusy = true;
+    integrityNotice = null;
+    try {
+      const result = await api.rebuildConversationIndex();
+      integrityNotice = `Rebuilt — ${result.indexed_rows} rows indexed.`;
+      await loadIntegrity();
+    } catch (e) {
+      integrityNotice = e instanceof ApiError ? `Could not rebuild (${e.status}).` : "Could not rebuild.";
+    } finally {
+      integrityBusy = false;
+    }
+  }
 
   async function load() {
     loadError = null;
@@ -30,6 +87,8 @@
       health = null;
       healthError = e instanceof ApiError ? `Unavailable (${e.status})` : "Unavailable";
     }
+
+    await loadIntegrity();
   }
 
   function healthBadge(state: string): "blocked" | "implemented" | "idle" {
@@ -140,6 +199,52 @@
         {/each}
       </dl>
       <p class="sub">{diag.scope_note}</p>
+    </section>
+
+    <section class="card" aria-labelledby="diag-memory-h">
+      <h2 id="diag-memory-h">Memory integrity</h2>
+      <p class="sub">
+        Every index and projection the memory store depends on, compared against the table that owns
+        the content.
+      </p>
+      {#if integrityError}
+        <p class="error" role="alert">{integrityError}</p>
+      {:else if integrity === null}
+        <p class="sub">Loading…</p>
+      {:else}
+        <p class="big-status">
+          <Badge
+            variant={integrity.clean ? "implemented" : "approval-required"}
+            label={integrity.clean ? "clean" : `${integrityFindings.length} to repair`}
+          />
+        </p>
+        {#if integrityFindings.length > 0}
+          <dl class="kv">
+            {#each integrityFindings as finding (finding.key)}
+              <div><dt>{finding.label}</dt><dd>{finding.count}</dd></div>
+            {/each}
+          </dl>
+        {/if}
+        <div class="card-actions">
+          <button type="button" class="btn btn-ghost btn-sm" onclick={() => void loadIntegrity()}>
+            Rescan
+          </button>
+          {#if integrity.stale_conversation_index_count > 0}
+            <!-- MEM-09 — the stated repair, offered where the drift is reported.
+                 The index is a projection of the turns, so a rebuild recomputes
+                 every row and can lose nothing. -->
+            <button
+              type="button"
+              class="btn btn-primary btn-sm"
+              disabled={integrityBusy}
+              onclick={() => void rebuildConversationIndex()}
+            >
+              Rebuild conversation index
+            </button>
+          {/if}
+        </div>
+        {#if integrityNotice}<p class="sub" role="status">{integrityNotice}</p>{/if}
+      {/if}
     </section>
 
     <section class="card" aria-labelledby="diag-config-h">
@@ -353,5 +458,10 @@
   }
   .error {
     color: var(--danger);
+  }
+  .card-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 </style>

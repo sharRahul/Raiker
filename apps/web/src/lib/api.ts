@@ -40,6 +40,8 @@ import type {
   UpdateCheckResult,
   UpdateStatusView,
   Diagnostics,
+  MemoryIntegrity,
+  SessionRecallView,
   DiagnosticsExport,
   EventEntry,
   ExecutionEnvironment,
@@ -463,6 +465,15 @@ export const api = {
     postJson<UpdateCheckResult>("/api/host/update/check", {}),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
+  // MEM-09 — the memory integrity report, and its one stated repair. The scan
+  // is read-only and starts when the owner asks for it; the rebuild is a
+  // separate, named action over a projection that can lose nothing.
+  memoryIntegrity: () => request<MemoryIntegrity>("/api/memory/integrity"),
+  rebuildConversationIndex: () =>
+    request<{ ok: boolean; indexed_rows: number }>(
+      "/api/memory/conversation-index/rebuild",
+      { method: "POST" },
+    ),
   models: () => request<ModelsView>("/api/models"),
   weeklyModelUsage: (refreshNative = false) =>
     request<ProviderWeeklyUsageView>(
@@ -1079,6 +1090,13 @@ export const api = {
   sessionSources: (sessionId: string) =>
     request<TurnSourcesView>(
       `/api/sessions/${encodeURIComponent(sessionId)}/sources`,
+    ),
+  // C17 — which approved memories this conversation's turns were given.
+  // Read live, so a memory corrected or forgotten since the turn ran reads as
+  // it is now rather than as a stale copy.
+  sessionRecall: (sessionId: string) =>
+    request<SessionRecallView>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/recall`,
     ),
   // C4 — one cited source, opened at the passage the turn used. Resolution is
   // re-run now, so a changed or unreadable source says so instead of showing a

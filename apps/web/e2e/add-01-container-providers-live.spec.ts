@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { hostedProviderCard } from "./hosted-provider";
 
@@ -73,16 +74,16 @@ test("Anthropic and OpenRouter credentials are entered through UI and answer rea
   test.setTimeout(600_000);
   const anthropic = await connectProvider("Anthropic", "Anthropic API key", ANTHROPIC_KEY);
   await connectProvider("OpenRouter", "OpenRouter API key", OPENROUTER_KEY);
-  await page.screenshot({ path: join(SHOTS, "add01-providers-connected-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add01-providers-connected-live.png"));
 
   await chooseFirstModel(anthropic, "claude-haiku-4-5-20251001");
   await runTurn("ADD01 ANTHROPIC LIVE");
-  await page.screenshot({ path: join(SHOTS, "add01-anthropic-turn-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add01-anthropic-turn-live.png"));
 
   const openrouterAgain = await hostedProviderCard(page, BASE, "OpenRouter");
   await chooseFirstModel(openrouterAgain);
   await runTurn("ADD01 OPENROUTER LIVE");
-  await page.screenshot({ path: join(SHOTS, "add01-openrouter-turn-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add01-openrouter-turn-live.png"));
 });
 
 test("Ollama gemma4:31b-cloud answers a real turn", async () => {
@@ -95,7 +96,7 @@ test("Ollama gemma4:31b-cloud answers a real turn", async () => {
   await catalogue.selectOption("gemma4:31b-cloud");
   await ollama.getByRole("button", { name: "Use model" }).click();
   await runTurn("ADD01 OLLAMA LIVE");
-  await page.screenshot({ path: join(SHOTS, "add01-ollama-turn-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add01-ollama-turn-live.png"));
 });
 
 test("container profile is enabled, configured, selected, and visibly bounded", async () => {
@@ -133,7 +134,7 @@ test("container profile is enabled, configured, selected, and visibly bounded", 
   await expect(card.getByText("2 tools")).toBeVisible();
   await card.getByRole("button", { name: "Select" }).click();
   await expect(card.getByRole("button", { name: "Selected" })).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "add01-container-profile-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add01-container-profile-live.png"));
   // Build, not Chat: the environment badge is about where a *command* runs, so
   // it lives on the coding surface. Chat's composer no longer carries it.
   await page.goto(`${BASE}/#/build`);

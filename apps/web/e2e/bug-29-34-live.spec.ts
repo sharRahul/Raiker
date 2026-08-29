@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { hostedProviderCard } from "./hosted-provider";
 
@@ -52,7 +53,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
 
   await ollama.getByRole("button", { name: "Details" }).click();
   await expect(page.getByText("Context capacity")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "173-BUG-33-capacity-admin-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "173-BUG-33-capacity-admin-live.png"));
   await page.getByRole("button", { name: "Close model details" }).click();
 
   await page.goto(`${BASE}/#/settings`);
@@ -64,14 +65,14 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByLabel("Credential environment variable").fill("RAIKER_REVIEW_SSH_KEY");
   await page.getByRole("button", { name: "Save environment" }).click();
   await expect(page.getByText(/SSH environment saved/)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "174-BUG-31-execution-environments-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "174-BUG-31-execution-environments-live.png"));
 
   await page.goto(`${BASE}/#/brain`);
   await page.getByRole("button", { name: "Add workspace source" }).click();
   await page.getByLabel("Workspace-relative path").fill(".");
   await page.getByRole("button", { name: "Review indexing plan" }).click();
   await expect(page.getByRole("heading", { name: "Indexing plan" })).toBeVisible({ timeout: 20_000 });
-  await page.screenshot({ path: join(SHOTS, "175-BUG-30-source-review-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "175-BUG-30-source-review-live.png"));
   await page.getByRole("button", { name: "Add reviewed source" }).click();
   await page.getByRole("button", { name: "Graph settings" }).click();
   await page.getByLabel("Graph settings").getByText("Always alive").click();
@@ -96,7 +97,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   const chatCard = page.locator(".message-group-user .attachment-card").first();
   await expect(chatCard).toBeVisible();
   expect(await chatCard.evaluate((node) => node.closest(".message-bubble-user"))).toBeNull();
-  await page.screenshot({ path: join(SHOTS, "176-chat-attachment-outside-bubble-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "176-chat-attachment-outside-bubble-live.png"));
 
   await page.goto(`${BASE}/#/build`);
   await page.getByRole("button", { name: "Add attachment" }).click();
@@ -108,12 +109,12 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   const buildCard = page.locator(".user-message .attachment-card").first();
   await expect(buildCard).toBeVisible();
   expect(await buildCard.evaluate((node) => node.closest(".message-bubble-user"))).toBeNull();
-  await page.screenshot({ path: join(SHOTS, "177-build-attachment-outside-bubble-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "177-build-attachment-outside-bubble-live.png"));
 
   await page.goto(`${BASE}/#/memory`);
   await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible();
   await expect(page.getByText("Advanced memory management")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "178-BUG-29-memory-lifecycle-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "178-BUG-29-memory-lifecycle-live.png"));
 
   await page.goto(`${BASE}/#/new-chat`);
   await page.getByPlaceholder("How can I help you today?").fill(
@@ -138,5 +139,5 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("link", { name: "Review approval" })).toBeVisible();
   await expect(page.getByText("Loading conversation…")).toBeHidden({ timeout: 20_000 });
-  await page.screenshot({ path: join(SHOTS, "179-BUG-34-reloaded-approval-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "179-BUG-34-reloaded-approval-live.png"));
 });

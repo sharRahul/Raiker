@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -52,7 +53,7 @@ test("the guide opens from the sidebar and from a deep link", async ({ page }) =
   await expect(page1.locator("h1, h2").first()).toBeVisible({ timeout: 60_000 });
   const body = await page1.innerText();
   expect(body).not.toMatch(/^\s*#\s/m);
-  await page.screenshot({ path: join(SHOTS, "guide-surface.png"), fullPage: true });
+  await capture(page, join(SHOTS, "guide-surface.png"));
 
   // A deep link opens the section it names, which is what a contextual
   // "Learn more" from another surface will rely on.

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -92,5 +93,5 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
     console.log(`AFTER ${wait}ms:`, (await pinned.innerText()).replace(/\s+/g, " "));
   }
   console.log("NETWORK DURING TEST:\n" + calls.join("\n"));
-  await page.screenshot({ path: join(SHOTS, "review-readiness-probe.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-readiness-probe.png"));
 });

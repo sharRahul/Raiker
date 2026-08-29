@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -41,10 +42,7 @@ async function signIn(page: Page) {
     await expect(
       page.getByRole("heading", { name: "Choose how to run models" }),
     ).toBeVisible({ timeout: 30_000 });
-    await page.screenshot({
-      path: join(SHOTS, "round0810-01-first-run-model-setup.png"),
-      fullPage: true,
-    });
+    await capture(page, join(SHOTS, "round0810-01-first-run-model-setup.png"));
     await page.getByRole("button", { name: "Skip for now" }).click();
   } else {
     await page.getByRole("button", { name: "Unlock Raiker" }).click();
@@ -83,10 +81,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
     await expect(page.locator("main#main")).toBeVisible();
     await expect(page.locator("main#main")).not.toBeEmpty();
   }
-  await page.screenshot({
-    path: join(SHOTS, "round0810-02-code-split-routes-mount.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-02-code-split-routes-mount.png"));
 
   // FIXED-166 — the plugin signing posture is stated rather than inferred.
   await visit(page, "extensions?tab=plugins");
@@ -94,10 +89,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await expect(page.getByText(/presence marker only/i)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByText(/RAIKER_PLUGIN_SIGNING_KEY/)).toBeVisible({ timeout: 30_000 });
   await page.getByTestId("plugin-signing-posture").scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: join(SHOTS, "round0810-03-plugin-signing-posture.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-03-plugin-signing-posture.png"));
 
   // FIXED-163/164 — containment for every capability, with its own controls.
   await visit(page, "settings?tab=security");
@@ -107,10 +99,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   });
   await expect(containment.getByText(/Connectors, plugins, subagents/)).toBeVisible();
   await containment.scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: join(SHOTS, "round0810-04-capability-containment.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-04-capability-containment.png"));
 
   // FIXED-169 — the readiness window is the owner's, with its bounds stated.
   await visit(page, "settings?tab=runtime");
@@ -132,20 +121,14 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await expect(page.getByRole("spinbutton", { name: /Re-confirm after/ })).toHaveValue("30");
   await page.getByRole("heading", { name: /How long a model check stays good/ })
     .scrollIntoViewIfNeeded();
-  await page.screenshot({
-    path: join(SHOTS, "round0810-05-readiness-window-setting.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-05-readiness-window-setting.png"));
 
   // FIXED-162 — the model activity surface and its controls.
   await visit(page, "models?tab=activity");
   await expect(page.getByRole("heading", { name: "Downloads and model jobs" })).toBeVisible({
     timeout: 30_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "round0810-06-model-activity.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-06-model-activity.png"));
 
   // FIXED-133 — a real provider, connected through the UI, answering a turn.
   await visit(page, "models?tab=hosted");
@@ -154,10 +137,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({
-    path: join(SHOTS, "round0810-07-anthropic-connected.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-07-anthropic-connected.png"));
 
   await card.getByRole("button", { name: /Choose model|Change model/ }).click();
   const catalogue = card.getByLabel("Available models");
@@ -183,10 +163,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await expect(card.locator(".chip").filter({ hasText: /Ready · confirmed/ })).toBeVisible({
     timeout: 180_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "round0810-08-readiness-chip-confirmed.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-08-readiness-chip-confirmed.png"));
 
   await visit(page, "new-chat");
   const prompt = page.getByPlaceholder("How can I help you today?");
@@ -198,10 +175,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
     "ROUND0810 LIVE",
     { timeout: 240_000 },
   );
-  await page.screenshot({
-    path: join(SHOTS, "round0810-09-live-turn-answered.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "round0810-09-live-turn-answered.png"));
 
   expect(consoleErrors).toEqual([]);
 });

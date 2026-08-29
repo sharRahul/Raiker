@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -216,10 +217,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
     await expect(
       page.getByRole("heading", { name: "Choose how to run models" }),
     ).toBeVisible();
-    await page.screenshot({
-      path: join(SHOTS, "bug69-first-run-model-setup-live.png"),
-      fullPage: true,
-    });
+    await capture(page, join(SHOTS, "bug69-first-run-model-setup-live.png"));
     await page.getByRole("button", { name: "Skip for now" }).click();
   } else {
     await page.getByRole("button", { name: "Unlock Raiker" }).click();
@@ -233,10 +231,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   await page.getByLabel("Prompt", { exact: true }).fill("Draft a short project brief");
   await expect(page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
   await expect(page.getByRole("button", { name: "Set up model" })).toBeVisible();
-  await page.screenshot({
-    path: join(SHOTS, "bug69-composer-readiness-gate-live.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug69-composer-readiness-gate-live.png"));
 
   await page.goto(`${BASE}/#/models?tab=hosted`);
   await expect(page.getByRole("tab", { name: "Local" })).toBeVisible();
@@ -245,10 +240,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   for (const leg of available) {
     await connectProvider(page, leg);
   }
-  await page.screenshot({
-    path: join(SHOTS, "bug69-provider-setup-live.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug69-provider-setup-live.png"));
 
   const outcomes: Record<string, string> = {};
 
@@ -272,10 +264,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
       preferredModel: localModel,
       marker: "BUG69 OLLAMA LIVE",
     });
-    await page.screenshot({
-      path: join(SHOTS, `bug69-ollama-${outcomes.Ollama}-live.png`),
-      fullPage: true,
-    });
+    await capture(page, join(SHOTS, `bug69-ollama-${outcomes.Ollama}-live.png`));
   }
   for (const leg of available) {
     await page.goto(`${BASE}/#/models?tab=hosted`);
@@ -284,13 +273,10 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
       leg.preferredModel,
     );
     outcomes[leg.provider] = await driveReadiness(page, leg);
-    await page.screenshot({
-      path: join(
+    await capture(page, join(
         SHOTS,
         `bug69-${leg.provider.toLowerCase()}-${outcomes[leg.provider]}-live.png`,
-      ),
-      fullPage: true,
-    });
+      ));
   }
 
   // Every leg that ran reached one of the two terminal states — never a raw

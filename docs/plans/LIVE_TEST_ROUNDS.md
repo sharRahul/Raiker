@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-29 | Targeted + responsive | `fixed-309-` … `fixed-312-`, `r0829-` | Anthropic | Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build — and a question that could not recall the memory answering it |
 | 2026-08-29 | Targeted | `real-work-` | Anthropic | **What Chat and Build actually do**: a scheduled task, a project, a dashboard that renders, and a program Build wrote that this round executed |
 | 2026-08-29 | Targeted | `fixed-306-` | Anthropic | Owner-guided compaction: a summarised range, and a transcript that kept every turn |
 | 2026-08-28 | Targeted | `fixed-305-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | The last three lifecycle hook events, on a real tool-using turn and across four providers |
@@ -53,6 +54,55 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-29 — Build restore, memory integrity, recall visibility and inline diff
+
+**Tier: Targeted + responsive sweep. Build: production `npm run build`.
+Providers: Anthropic `claude-haiku-4-5-20251001`, key entered through Models.
+Prefixes: `fixed-309-`, `fixed-310-`, `fixed-311-`, `fixed-312-`, `r0829-`.**
+
+Specs: `apps/web/e2e/bug-242-build-restore-mem-09-live.spec.ts` and
+`apps/web/e2e/c17-b14-recall-and-inline-diff-live.spec.ts`.
+
+1. Bootstrap a fresh owner account, dismiss the setup wizard, connect Anthropic
+   through Models and pin an exact model. *(FIXED-133 re-verified.)*
+2. Create a project, run a real Build turn, and confirm the address bar now
+   carries the conversation. Reload. Sign in again — the control session lives
+   in memory, so a reload always asks — and confirm Build comes back to the
+   prompt, the answer and the project it was filed under, rather than to an
+   empty conversation. *(FIXED-309.)*
+3. Observability → Diagnostics. Confirm a **Memory integrity** card reporting
+   `clean`, with **Rescan** beside it and no repair offered where there is
+   nothing to repair. *(FIXED-310.)*
+4. Every route at 375, 768, 1024 and 1440 px: confirm each renders, that no
+   route scrolls the page sideways at any width, and that the round ends with
+   **zero console errors**. *(Responsive sweep.)*
+5. Import one approved memory through Memory → Advanced, ask a question in Chat
+   that the memory answers, and confirm the reply carries a **Remembered**
+   strip naming the sentence, with **Correct** and **Forget** on it.
+   *(FIXED-311.)*
+6. Ask Build to write a file. Confirm the parked decision shows the unified diff
+   under it — the file, `+1 −0`, the hunk and the added line — with **Accept**
+   and **Reject** beneath. *(FIXED-312.)*
+
+**Result: ✅ four entries closed** — FIXED-309 through FIXED-312 — **and one
+raised and closed in the same round.** Step 5 first failed with the memory
+approved, searchable and never recalled: `Where do my nightly backups go?`
+returned nothing against a memory reading *"My nightly backups go to the
+encrypted NAS in the garage."* while `backups` returned it. The full-text join
+is an AND, so every word of the question had to appear in the stored sentence.
+That is [FIXED-314](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it),
+and it is the reason this round is worth more than the four entries it set out to
+prove: the recall strip would have shipped correct and empty.
+
+**A note on the evidence itself.** Every capture in this round went through the
+new `apps/web/e2e/capture.ts`, which is
+[FIXED-313](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport).
+`fixed-310-memory-integrity-card.png` is 2097 px tall on a 1000 px viewport —
+under the old `fullPage: true` it would have been the first 1000 px, and the card
+it is named for sits below that line.
 
 ---
 
@@ -92,7 +142,7 @@ and every scenario ends at a fact outside the transcript.
 
 ### What it found
 
-**[BUG-242](TO_BE_FIXED.md#bug-242--build-opens-an-empty-conversation-after-a-reload)
+**[BUG-242](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload)
 — Build opens an empty conversation after a reload.** A seventh scenario was
 written to assert that Build's record survives a reload, and it does not:
 `sessionId` in `BuildView` is only ever set from the streaming response and is
@@ -199,7 +249,7 @@ scroll area the capture never reached. A screenshot that does not contain the
 thing it is named for is not evidence; the specs now scroll the section into view
 before capturing. Other live specs passing `fullPage: true` against this shell
 have the same limitation and are recorded in
-[`TO_BE_FIXED.md`](TO_BE_FIXED.md#bug-241--fullpage-screenshots-do-not-reach-past-the-app-shells-scroll-container).
+[`TO_BE_FIXED.md`](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport).
 
 Sign-in against a workspace an earlier spec had already configured failed twice
 during this round, which is [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace)

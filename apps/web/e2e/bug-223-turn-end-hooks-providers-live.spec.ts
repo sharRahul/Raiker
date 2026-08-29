@@ -18,6 +18,7 @@
  * that tested four.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
@@ -189,7 +190,7 @@ test("Stop fires on a turn answered by a local Ollama model", async () => {
 
   expect(await hookExecutions()).toBeGreaterThan(before);
 
-  await page.screenshot({ path: join(SHOTS, "bug-223-stop-ollama.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-223-stop-ollama.png"));
 });
 
 for (const entry of PROVIDERS) {
@@ -221,9 +222,6 @@ for (const entry of PROVIDERS) {
     // provider having fired anything.
     expect(await hookExecutions()).toBeGreaterThan(before);
 
-    await page.screenshot({
-      path: join(SHOTS, `bug-223-stop-${entry.provider.toLowerCase()}.png`),
-      fullPage: true,
-    });
+    await capture(page, join(SHOTS, `bug-223-stop-${entry.provider.toLowerCase()}.png`));
   });
 }

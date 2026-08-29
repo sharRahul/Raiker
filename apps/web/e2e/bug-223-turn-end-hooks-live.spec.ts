@@ -13,6 +13,7 @@
  * afterwards is `hook_matched` and `hook_executed` for the turn's own session.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
@@ -145,8 +146,5 @@ test("a real turn fires Stop, and the audit log is the proof", async () => {
   await expect(activity.getByText("matched").first()).toBeVisible({ timeout: 30_000 });
   await expect(activity.getByText("executed").first()).toBeVisible({ timeout: 30_000 });
 
-  await page.screenshot({
-    path: join(SHOTS, "bug-223-stop-fired-on-a-real-turn.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-223-stop-fired-on-a-real-turn.png"));
 });

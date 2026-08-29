@@ -18,6 +18,7 @@
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -105,9 +106,6 @@ test("a cited file that no longer exists is drawn as Missing", async ({ page }) 
     page.locator("circle.node-circle:not(.unresolved)").first(),
   ).toBeVisible();
 
-  await page.screenshot({
-    path: `${SHOTS}/r0817-05-knowledge-map-unresolved-reference.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817-05-knowledge-map-unresolved-reference.png`);
   expect(consoleErrors).toEqual([]);
 });

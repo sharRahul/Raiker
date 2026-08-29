@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 
 test("live Observability and Sessions visual review", async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -28,7 +29,7 @@ test("live Observability and Sessions visual review", async ({ page }) => {
   await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Sessions" })).toBeVisible();
   await expect(page.getByText("Reading runtime status…")).toBeHidden({ timeout: 15_000 });
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/observability-overview.png", fullPage: true });
+  await capture(page, "../../docs/plans/screenshots/working/observability-overview.png");
   await page.getByRole("tab", { name: "Sessions" }).click();
   await expect(page.getByText(/Every conversation with the runtime/)).toBeVisible();
   if (await page.locator(".layout").count()) {
@@ -36,6 +37,6 @@ test("live Observability and Sessions visual review", async ({ page }) => {
   } else {
     await expect(page.getByText("No sessions yet")).toBeVisible();
   }
-  await page.screenshot({ path: "../../docs/plans/screenshots/working/observability-sessions.png", fullPage: true });
+  await capture(page, "../../docs/plans/screenshots/working/observability-sessions.png");
   expect(consoleErrors).toEqual([]);
 });

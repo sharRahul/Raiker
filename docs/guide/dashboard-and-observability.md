@@ -69,9 +69,16 @@ are selected explicitly; it is not a general-purpose file browser. Citations
 are bidirectional, and a missing source remains visible as a hollow node rather
 than silently disappearing from the record.
 
-Current semantic recall is limited: its default vector representation is a
-feature-hashed bag of tokens, not a meaning-aware embedding model. Paraphrases
-without shared terms can be missed. See [Known limits](known-limits.md).
+Current semantic recall is limited unless you build a meaning-based index: the
+default vector representation is a feature-hashed bag of tokens, not a
+meaning-aware embedding model, so paraphrases without shared terms can be missed.
+See [Known limits](known-limits.md).
+
+**Diagnostics → Memory integrity** compares every index and projection memory
+depends on — including the conversation index behind Search chats — against the
+table that owns the content. It reports `clean` or names the drift, **Rescan**
+runs it again on request, and the one repair it offers appears only beside the
+finding it repairs. See [Memory](memory.md#checking-the-indexes).
 
 ## Web access and Git credentials
 

@@ -13,6 +13,7 @@
  *   python apps/api/main.py --workspace <ws> --port 8765 --no-browser
  */
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
@@ -64,7 +65,7 @@ test("Settings states one runtime instead of asking which one to run", async () 
   // The one runtime-level decision that remains.
   await expect(page.getByRole("button", { name: "Disable agent runtime" })).toBeVisible();
 
-  await page.screenshot({ path: join(SHOTS, "160-settings-single-runtime-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "160-settings-single-runtime-live.png"));
 });
 
 test("the Workbench composer carries files and schedules with a time", async () => {
@@ -81,7 +82,7 @@ test("the Workbench composer carries files and schedules with a time", async () 
   await page.getByRole("tab", { name: "Schedule" }).click();
   await expect(page.getByLabel("Scheduled start time")).toBeVisible();
 
-  await page.screenshot({ path: join(SHOTS, "161-workbench-composer-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "161-workbench-composer-live.png"));
 });
 
 test("Chat and Build offer the same composer affordances", async () => {
@@ -95,7 +96,7 @@ test("Chat and Build offer the same composer affordances", async () => {
   await expect(page.getByLabel("Attachment path")).toBeVisible();
   await expect(page.getByLabel("Upload image")).toHaveCount(1);
   await expect(page.getByLabel("Upload document")).toHaveCount(1);
-  await page.screenshot({ path: join(SHOTS, "162-chat-composer-attach-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "162-chat-composer-attach-live.png"));
 
   await page.goto(`${BASE}/#/build`);
   await expect(
@@ -108,7 +109,7 @@ test("Chat and Build offer the same composer affordances", async () => {
   await expect(page.getByLabel("Attachment path")).toBeVisible();
   await expect(page.getByLabel("Upload image")).toHaveCount(1);
   await expect(page.getByLabel("Upload document")).toHaveCount(1);
-  await page.screenshot({ path: join(SHOTS, "163-build-composer-attach-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "163-build-composer-attach-live.png"));
 });
 
 test("Build shows what a turn carried, the same way the composer did", async () => {
@@ -127,7 +128,7 @@ test("Build shows what a turn carried, the same way the composer did", async () 
   await upload.setInputFiles(String(process.env.RAIKER_E2E_IMAGE));
   const row = page.getByLabel("Attached to this prompt");
   await expect(row.locator("img")).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "172-build-attachment-card-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "172-build-attachment-card-live.png"));
 });
 
 test("Memory offers View source on every record", async () => {
@@ -136,7 +137,7 @@ test("Memory offers View source on every record", async () => {
   await expect(page.getByRole("heading", { level: 1, name: "Memory" })).toBeVisible({
     timeout: 20_000,
   });
-  await page.screenshot({ path: join(SHOTS, "164-memory-view-source-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "164-memory-view-source-live.png"));
 });
 
 test("Tasks presents the approval life of a scheduled run", async () => {
@@ -152,5 +153,5 @@ test("Tasks presents the approval life of a scheduled run", async () => {
   await expect(page.getByText("continuing after approval").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue now" }).first()).toBeVisible();
 
-  await page.screenshot({ path: join(SHOTS, "165-tasks-continuation-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "165-tasks-continuation-live.png"));
 });

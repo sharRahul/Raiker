@@ -138,11 +138,36 @@ class ContextBundle:
             "summary": self.summary,
         }
 
+    def recalled_memory_ids(self) -> list[str]:
+        """C17 — which approved memories this turn was actually given.
+
+        Ids only. The text stays in the bundle that reached the model and never
+        enters the event log; the ids are what lets the transcript say *which*
+        memories were used, and let the owner correct or forget one from there
+        instead of hunting for it on the Memory page.
+        """
+        ids: list[str] = []
+        for item in self.included_items:
+            if item.source.source_type != "memory_recall":
+                continue
+            # `metadata` is `dict[str, object]`, so the list has to be recovered
+            # rather than assumed: a bundle carrying something else under this
+            # key contributes nothing instead of raising mid-turn.
+            recalled = item.metadata.get("memory_ids")
+            if not isinstance(recalled, list):
+                continue
+            for memory_id in recalled:
+                text = str(memory_id)
+                if text and text not in ids:
+                    ids.append(text)
+        return ids
+
     def event_payload(self) -> dict[str, object]:
         """Safe metadata-only payload for event logs (no item content)."""
 
         included = self.included_items
         return {
+            "recalled_memory_ids": self.recalled_memory_ids(),
             "bundle_id": self.bundle_id,
             "context_bundle_id": self.bundle_id,
             "item_count": len(self.items),

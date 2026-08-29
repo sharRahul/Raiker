@@ -751,6 +751,23 @@ class RuntimeOrchestrator:
                 StreamEvent(kind=LIFECYCLE, event_type=event_type, payload=dict(payload))
             )
 
+    def _record_turn_recall(self, envelope: PromptEnvelope, memory_ids: list[str]) -> None:
+        """C17 — store this turn's recalled memory ids, if there were any.
+
+        Best-effort: recall is an aid to the answer, and a workspace that cannot
+        record which memories were used must still be able to answer.
+        """
+        store = getattr(self.tool_broker, "store", None)
+        if store is None or not memory_ids:
+            return
+        with contextlib.suppress(Exception):
+            store.record_turn_recall(
+                session_id=envelope.session_id,
+                turn_id=envelope.turn_id,
+                principal_id=envelope.user.id,
+                memory_ids=memory_ids,
+            )
+
     async def _conversation_history(
         self, envelope: PromptEnvelope, fixed_messages: list[ModelMessage]
     ) -> list[ModelMessage]:
@@ -1964,6 +1981,10 @@ class RuntimeOrchestrator:
         )
         context_payload = bundle.event_payload()
         self._event(envelope, "context_gathered", context_payload)
+        # C17 — the memories this turn was given, recorded against the turn so
+        # the transcript can say which ones were used and let the owner correct
+        # or forget one there. Ids only; the sentences are read live.
+        self._record_turn_recall(envelope, bundle.recalled_memory_ids())
         await self._instructions_loaded_hook(envelope, context_payload)
 
         retrieval_context: str | None = None

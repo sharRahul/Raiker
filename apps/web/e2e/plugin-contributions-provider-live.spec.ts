@@ -12,6 +12,7 @@
  * spec, a log, or a screenshot.
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
@@ -105,7 +106,7 @@ test("the Anthropic credential is entered through the UI and a model pinned", as
     model: MODEL,
   });
   await expect(card.getByText(/can reach/i)).toBeVisible({ timeout: 120_000 });
-  await page.screenshot({ path: `${SHOTS}/bug-221-live-anthropic-ready.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-221-live-anthropic-ready.png`);
 });
 
 test("both contributed skills are listed, and both arrive switched off", async () => {
@@ -144,5 +145,5 @@ test("switching one on puts it in a real turn, and the other stays out", async (
   await expect(main).toContainText(ON_SKILL, { timeout: 180_000 });
   await expect(main).not.toContainText(OFF_SKILL);
 
-  await page.screenshot({ path: `${SHOTS}/bug-221-live-skill-in-turn.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-221-live-skill-in-turn.png`);
 });

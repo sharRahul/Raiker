@@ -2506,6 +2506,35 @@ CREATE INDEX IF NOT EXISTS idx_turn_sources_turn
 """
 
 
+# C17 — which approved memories a turn was actually given.
+#
+# Recall is *ambient*: memories reach a turn through the context bundle, not
+# through a tool the transcript can cite, so until now the one place an owner
+# could see what Raiker remembered about them was the Memory page — never the
+# moment the memory was used. A recalled sentence that is wrong is most
+# obviously wrong in the answer it produced, and that is where correcting it
+# belongs.
+#
+# Ids only, as in the event log. The sentence itself is read live from
+# `approved_memory`, so a memory that was corrected or forgotten since the turn
+# ran shows its current state rather than a stale copy — and a forgotten one
+# simply stops appearing, which is what "forget" has to mean.
+TURN_RECALL_MIGRATION_ID = "RAIKER-1039-turn-recall"
+TURN_RECALL_SQL = """
+CREATE TABLE IF NOT EXISTS turn_recalls (
+  session_id TEXT NOT NULL,
+  turn_id TEXT NOT NULL,
+  principal_id TEXT NOT NULL,
+  memory_id TEXT NOT NULL,
+  ordinal INTEGER NOT NULL,
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (session_id, turn_id, memory_id)
+);
+CREATE INDEX IF NOT EXISTS idx_turn_recalls_turn
+  ON turn_recalls(session_id, turn_id, ordinal);
+"""
+
+
 # ADD-03 — a cryptographic identity for each agent turn.
 #
 # The issuer is one active Ed25519 key per workspace database. Its private seed

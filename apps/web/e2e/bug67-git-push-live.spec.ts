@@ -25,6 +25,7 @@
  *      read git's own answer rather than the app's account of it.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
@@ -191,7 +192,7 @@ test("Git push is its own owner control, beside Git writes and not inside it", a
   await expect(card).toContainText(/Send an approved branch to its remote with your own credential/i);
   await expect(card).toContainText(/connector egress allowlist/i);
   await expect(card).toContainText(/never forces or deletes a branch/i);
-  await page.screenshot({ path: join(SHOTS, "bug67-git-push-capability.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug67-git-push-capability.png"));
 });
 
 test("the git tools read the repository connected as a sub-folder", async () => {
@@ -210,7 +211,7 @@ test("the git tools read the repository connected as a sub-folder", async () => 
   const use = row.getByRole("button", { name: "Use" });
   if (await use.isVisible().catch(() => false)) await use.click();
   await expect(row.getByText("Active")).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "bug66-subfolder-repository.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug66-subfolder-repository.png"));
 
   const composer = page.getByPlaceholder(/Describe the change in service…/);
   await expect(composer).toBeVisible({ timeout: 30_000 });
@@ -223,7 +224,7 @@ test("the git tools read the repository connected as a sub-folder", async () => 
   await expect(page.getByRole("main")).toContainText(/initial service commit/i, {
     timeout: 30_000,
   });
-  await page.screenshot({ path: join(SHOTS, "bug66-subfolder-git-log.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug66-subfolder-git-log.png"));
 });
 
 test("clearing the selection puts the tools back on the workspace repository", async () => {
@@ -267,7 +268,7 @@ test("a push approval names the remote, the branch and the commits it would send
   await expect(detail).toContainText(/sends the commits above to the remote shown, once/i);
   await expect(detail).toContainText(/undo it on the remote/i);
   await expect(detail).not.toContainText(/does NOT execute the action/i);
-  await page.screenshot({ path: join(SHOTS, "bug67-push-approval.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug67-push-approval.png"));
 });
 
 test("approving it really publishes the branch", async () => {
@@ -277,7 +278,7 @@ test("approving it really publishes the branch", async () => {
   await expect(page.locator(".notice-ok").first()).toContainText(/Executed once/i, {
     timeout: 120_000,
   });
-  await page.screenshot({ path: join(SHOTS, "bug67-push-executed.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug67-push-executed.png"));
 
   // The product's claim, checked against the remote rather than against the
   // product: the branch GitHub holds is now the commit this machine holds.
@@ -295,7 +296,7 @@ test("with nothing left to send, the tool refuses instead of asking for a decisi
   await newChat();
   await ask("Call git_push once with no arguments, then tell me exactly what the tool returned.");
   await expect(page.getByRole("main")).toContainText(/nothing_to_push/i, { timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "bug67-nothing-to-push.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug67-nothing-to-push.png"));
 });
 
 test("the owner's off switch still wins, and says so before the decision", async () => {
@@ -314,7 +315,7 @@ test("the owner's off switch still wins, and says so before the decision", async
     timeout: 30_000,
   });
   await expect(page.getByRole("button", { name: "Approve (record only)" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug67-gate-off-record-only.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug67-gate-off-record-only.png"));
 
   await page.getByRole("button", { name: "Approve (record only)" }).click();
   // Nothing left the machine: the gate is the owner's, and it held.

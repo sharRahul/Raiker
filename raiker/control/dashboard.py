@@ -4940,6 +4940,78 @@ class DashboardService:
             data=self.store.reconcile_memory_projections(owner_principal_id=acting_principal_id),
         )
 
+    def session_recall(
+        self, session_id: str, *, turn_id: str | None, acting_principal_id: str
+    ) -> ControlResult:
+        """C17 — the memories a conversation's turns were actually given.
+
+        Read live from the memory store rather than from a copy taken at recall
+        time, so a memory corrected since the turn ran reads as it is now, and
+        one that has been forgotten simply stops appearing. That is what makes
+        "forget" from the transcript mean the same thing as "forget" from the
+        Memory page: there is one record, and this is a view of it.
+
+        Owner-scoped by the same rule as the citation ledger: a row is keyed by
+        the principal, so another account's conversation is an empty list rather
+        than a refusal that would confirm the conversation exists.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.store import get_memory
+
+        rows = self.store.load_turn_recall(session_id, acting_principal_id, turn_id)
+        pinned = self.store.list_pinned_memory_ids()
+        memories = []
+        for row in rows:
+            memory_id = str(row["memory_id"])
+            entry = get_memory(
+                memory_id,
+                workspace_root=self.workspace_root,
+                owner_principal_id=acting_principal_id,
+            )
+            if entry is None:
+                # Forgotten, expired or archived since the turn ran. Omitted
+                # rather than shown as a tombstone: the transcript is saying
+                # what Raiker knows now, not what it knew then.
+                continue
+            memories.append({
+                "memory_id": memory_id,
+                "turn_id": str(row["turn_id"]),
+                "text": entry.text,
+                "scope": entry.scope,
+                "pinned": memory_id in pinned,
+            })
+        return ControlResult(ok=True, data={"session_id": session_id, "memories": memories})
+
+    def memory_integrity(self, acting_principal_id: str | None) -> ControlResult:
+        """MEM-09 — the integrity report, on request, where the owner can read it.
+
+        The check itself has existed since the memory audit; nothing called it.
+        A report that is computed and never displayed answers the first half of
+        a reliability question and none of the second, so this is deliberately a
+        read the owner starts and a page renders — not a background sweep whose
+        findings live in a log.
+
+        Read-only. It repairs nothing; the repairs are separate, named actions.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        from raiker.memory.integrity import inspect_memory_integrity
+
+        report = inspect_memory_integrity(store=self.store, workspace_root=self.workspace_root)
+        return ControlResult(ok=True, data={**asdict(report), "clean": report.clean})
+
+    def rebuild_conversation_index(self, acting_principal_id: str | None) -> ControlResult:
+        """MEM-09's stated repair for a drifted `conversation_fts`.
+
+        Owner-started, and safe to run at any time: the index is a projection of
+        `turns`, so rebuilding it recomputes every row from the table that owns
+        the content and can lose nothing.
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        return ControlResult(ok=True, data={"indexed_rows": self.store.rebuild_conversation_fts()})
+
     def list_observations(self, acting_principal_id: str | None) -> ControlResult:
         """MEM-04 — what the runtime captured, and what it refused to.
 

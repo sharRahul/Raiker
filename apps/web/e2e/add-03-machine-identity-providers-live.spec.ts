@@ -1,4 +1,5 @@
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { hostedProviderCard } from "./hosted-provider";
 
@@ -65,7 +66,7 @@ async function runAttributedTurn(marker: string, screenshotName: string): Promis
   await expect(machine).toBeVisible({ timeout: 30_000 });
   await expect(machine).toContainText("Raiker agent");
   await expect(machine).toContainText(/Agent · (active|inactive|expired)/);
-  await page.screenshot({ path: join(SHOTS, screenshotName), fullPage: true });
+  await capture(page, join(SHOTS, screenshotName));
 }
 
 async function waitForApprovalRow(status: "pending" | "denied"): Promise<Locator> {
@@ -120,7 +121,7 @@ async function runGovernedProposal(marker: string, screenshotName: string): Prom
   detail = page.getByLabel(/^Review /);
   await expect(detail.getByText("Authorized by", { exact: true })).toBeVisible({ timeout: 30_000 });
   await expect(detail.locator(".identity-chip").filter({ hasText: "Human" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, screenshotName), fullPage: true });
+  await capture(page, join(SHOTS, screenshotName));
 }
 
 test.beforeAll(async ({ browser }) => {
@@ -149,7 +150,7 @@ test("Permissions separates owner controls from signed-turn authority", async ()
   await expect(page.getByRole("heading", { name: "Owner sets the boundary. The agent inherits less." })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Owner control" })).toBeVisible();
   await expect(page.getByRole("columnheader", { name: "Raiker agent" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "add03-owner-agent-authority-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "add03-owner-agent-authority-live.png"));
 });
 
 test("Anthropic turn records a signed machine actor", async () => {

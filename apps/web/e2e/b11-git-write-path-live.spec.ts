@@ -17,6 +17,7 @@
  *      read git's own answer rather than the app's account of it.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { execFileSync } from "node:child_process";
 import { appendFileSync } from "node:fs";
 import { join } from "node:path";
@@ -145,7 +146,7 @@ test("Git writes is an owner control on the Permissions page", async () => {
   await expect(card).toContainText(
     /Create a branch or record a commit in the workspace repository/i,
   );
-  await page.screenshot({ path: join(SHOTS, "b11-git-write-capability.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-git-write-capability.png"));
 });
 
 test("asking for a branch raises an approval that names the refs it moves between", async () => {
@@ -166,7 +167,7 @@ test("asking for a branch raises an approval that names the refs it moves betwee
   await expect(detail).toContainText(new RegExp(`checked out\\s+main → ${BRANCH.replace("/", "\\/")}`));
   await expect(detail).toContainText(/Approving this creates the branch above and checks it out, once/i);
   await expect(detail).not.toContainText(/does NOT execute the action/i);
-  await page.screenshot({ path: join(SHOTS, "b11-branch-approval.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-branch-approval.png"));
 });
 
 test("approving it creates the branch git itself reports", async () => {
@@ -175,7 +176,7 @@ test("approving it creates the branch git itself reports", async () => {
   await expect(page.locator(".notice-ok").first()).toContainText(/Executed once/i, {
     timeout: 60_000,
   });
-  await page.screenshot({ path: join(SHOTS, "b11-branch-executed.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-branch-executed.png"));
 
   // The product's claim, checked against git rather than against the product.
   expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe(BRANCH);
@@ -200,7 +201,7 @@ test("a commit approval shows the exact file list and diff before the decision",
   // A commit is git history, not a checkpointed file write; the notice must not
   // promise a rewind the checkpoint store cannot perform.
   await expect(detail).not.toContainText(/checkpointed first, so it can be rewound/i);
-  await page.screenshot({ path: join(SHOTS, "b11-commit-approval.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-commit-approval.png"));
 });
 
 test("approving it records the commit, on the branch, without running repository hooks", async () => {
@@ -209,7 +210,7 @@ test("approving it records the commit, on the branch, without running repository
   await expect(page.locator(".notice-ok").first()).toContainText(/Executed once/i, {
     timeout: 60_000,
   });
-  await page.screenshot({ path: join(SHOTS, "b11-commit-executed.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-commit-executed.png"));
 
   expect(git("log", "-1", "--pretty=%s")).toBe("Add subtract to the calculator");
   expect(git("rev-parse", "--abbrev-ref", "HEAD")).toBe(BRANCH);
@@ -237,7 +238,7 @@ test("the owner's off switch still wins, and says so before the decision", async
     timeout: 30_000,
   });
   await expect(page.getByRole("button", { name: "Approve (record only)" })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "b11-gate-off-record-only.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-gate-off-record-only.png"));
 
   await page.getByRole("button", { name: "Approve (record only)" }).click();
   // Nothing was recorded: the gate is the owner's, and it held.
@@ -262,5 +263,5 @@ test("proposing the work outward is a decision too, and the connector gate holds
   await expect(detail).toContainText(/Proposed outbound request \(redacted\)/i);
   await expect(detail).toContainText(/octo\/demo \/ create_pull_request/);
   await expect(detail).toContainText(/does NOT execute the action/i);
-  await page.screenshot({ path: join(SHOTS, "b11-github-write-approval.png"), fullPage: true });
+  await capture(page, join(SHOTS, "b11-github-write-approval.png"));
 });

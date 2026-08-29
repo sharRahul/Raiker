@@ -11,6 +11,7 @@
 // against the surfaces as they are now, and the suite is in CI so the next
 // redesign cannot silently outrun it.
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import AxeBuilder from "@axe-core/playwright";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -143,7 +144,7 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   await page.getByRole("button", { name: "Done dictating" }).click();
   expect(promptPosts).toHaveLength(0);
-  await page.screenshot({ path: join(shots, "voice-chat-desktop.png"), fullPage: true });
+  await capture(page, join(shots, "voice-chat-desktop.png"));
   await page.getByRole("button", { name: "Send" }).click();
   await expect.poll(() => promptPosts.length).toBe(1);
   expect(JSON.parse(promptPosts[0])).toMatchObject({ text: "check the repository", input_mode: "dictated" });
@@ -155,11 +156,11 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await page.evaluate(() => (window as unknown as { __voiceRecognition: { emitFinal(text: string): void } }).__voiceRecognition.emitFinal("discard this"));
   await page.getByRole("button", { name: "Cancel dictation" }).click();
   await expect(build).toHaveValue("keep this");
-  await page.screenshot({ path: join(shots, "voice-build-desktop.png"), fullPage: true });
+  await capture(page, join(shots, "voice-build-desktop.png"));
 
   await page.goto("http://raiker.test/#/settings?tab=general");
   await page.getByLabel("Speech language").selectOption("ja");
-  await page.screenshot({ path: join(shots, "voice-settings.png"), fullPage: true });
+  await capture(page, join(shots, "voice-settings.png"));
   await Promise.all([
     page.waitForRequest((request) => request.method() === "PUT" && new URL(request.url()).pathname === "/api/settings"),
     page.getByRole("button", { name: /save changes/i }).click(),
@@ -173,7 +174,7 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   const mobileDrawer = page.locator("#all-navigation");
   await expect(mobileDrawer).toHaveAttribute("aria-hidden", "true");
   await expect.poll(async () => (await mobileDrawer.boundingBox())?.x ?? 0).toBeLessThan(-200);
-  await page.screenshot({ path: join(shots, "voice-chat-mobile.png"), fullPage: true });
+  await capture(page, join(shots, "voice-chat-mobile.png"));
 });
 
 test("both composers stay anchored to the bottom on a tablet, not floating mid-page", async ({ page }) => {
@@ -277,7 +278,7 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
   await page.getByRole("menuitemradio", { name: /Sonnet 4\.5/i }).click();
-  await page.screenshot({ path: join(shots, "bug15-chat-composer.png"), fullPage: true });
+  await capture(page, join(shots, "bug15-chat-composer.png"));
 
   await page.getByRole("navigation", { name: "All navigation" }).getByRole("link", { name: "Build" }).click();
   await expect(page.getByLabel("Describe the change")).toBeVisible();
@@ -293,7 +294,7 @@ test("Chat and Build composers stay polished and usable", async ({ page }) => {
   await page.keyboard.press("Escape");
   await page.getByRole("button", { name: /Model for this turn/ }).click();
   await expect(page.getByRole("menu", { name: "Models" })).toBeVisible();
-  await page.screenshot({ path: join(shots, "bug15-build-composer.png"), fullPage: true });
+  await capture(page, join(shots, "bug15-build-composer.png"));
 });
 
 test("the Hooks tab tells an enforcing rule from a dead one and a broken file", async ({ page }) => {
@@ -317,7 +318,7 @@ test("the Hooks tab tells an enforcing rule from a dead one and a broken file", 
   await expect(page.getByRole("heading", { name: "Built-in handlers" })).toBeVisible();
 
   expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  await page.screenshot({ path: join(shots, "hooks-tab.png"), fullPage: true });
+  await capture(page, join(shots, "hooks-tab.png"));
 });
 
 test("Settings presents one section rail rather than a wall of fields", async ({ page }) => {
@@ -350,7 +351,7 @@ test("Settings presents one section rail rather than a wall of fields", async ({
   for (const mode of ["Compact", "Comfortable", "Spacious"]) {
     await expect(density.getByRole("radio", { name: new RegExp(mode) })).toBeVisible();
   }
-  await page.screenshot({ path: join(shots, "settings-redesign.png"), fullPage: true });
+  await capture(page, join(shots, "settings-redesign.png"));
 });
 
 test("Models names providers in plain language and offers a real model list", async ({ page }) => {
@@ -362,7 +363,7 @@ test("Models names providers in plain language and offers a real model list", as
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
   await page.getByRole("button", { name: /Change model/i }).first().click();
   await expect(page.getByRole("combobox", { name: "Available models" })).toBeVisible();
-  await page.screenshot({ path: join(shots, "models-redesign.png"), fullPage: true });
+  await capture(page, join(shots, "models-redesign.png"));
 });
 
 test("new-account Workbench is a board over the work, not a second composer", async ({ page }) => {
@@ -395,7 +396,7 @@ test("new-account Workbench is a board over the work, not a second composer", as
 
   await expect(page.getByRole("heading", { name: "Needs your attention" })).toBeVisible();
   await expect(page.getByText("Runtime issues", { exact: true })).toBeVisible();
-  await page.screenshot({ path: join(shots, "workbench-dashboard-redesign.png"), fullPage: true });
+  await capture(page, join(shots, "workbench-dashboard-redesign.png"));
 });
 
 test("desktop view audit covers every route, Models tab, and Settings section", async ({ page }) => {

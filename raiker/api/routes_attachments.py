@@ -355,6 +355,32 @@ def list_session_sources(
     }
 
 
+@router.get("/api/sessions/{session_id}/recall")
+def list_session_recall(
+    session_id: str,
+    request: Request,
+    turn_id: str = "",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """C17 — which approved memories this conversation's turns were given.
+
+    Recall is ambient: it reaches a turn through the context bundle, not through
+    a tool the transcript can cite, so without this the only place an owner
+    could see what Raiker remembers about them was the Memory page — never the
+    moment a memory was used. The sentences are read live, so this says what
+    Raiker knows now; correcting or forgetting one from the transcript is the
+    same governed action as doing it from the Memory page.
+    """
+    from raiker.control.dashboard import DashboardService
+
+    result = DashboardService(_ws(request)).session_recall(
+        session_id, turn_id=turn_id or None, acting_principal_id=auth_data[0].principal_id
+    )
+    if not result.ok:
+        raise _not_found("session_recall_not_found")
+    return {"ok": True, **result.data}
+
+
 @router.get("/api/sessions/{session_id}/turns/{turn_id}/sources/{source_id}/excerpt")
 def get_turn_source_excerpt(
     session_id: str,

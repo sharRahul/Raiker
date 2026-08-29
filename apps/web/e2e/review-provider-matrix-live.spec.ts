@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 /**
@@ -118,7 +119,7 @@ test("owner registers and every backend reaches a classified readiness state", a
   test.skip(configured.length === 0, "no provider key supplied");
 
   await signIn(page);
-  await page.screenshot({ path: join(SHOTS, "review-01-signed-in.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-01-signed-in.png"));
 
   const verdicts: string[] = [];
 
@@ -149,10 +150,7 @@ test("owner registers and every backend reaches a classified readiness state", a
       const status = (await card.innerText()).replace(/\s+/g, " ");
       verdicts.push(`${leg.provider}: catalogue unreachable — card reads "${status.slice(0, 160)}"`);
       expect(status).not.toMatch(/\bConnected\b/);
-      await page.screenshot({
-        path: join(SHOTS, `review-02-${leg.provider.toLowerCase()}-unreachable.png`),
-        fullPage: true,
-      });
+      await capture(page, join(SHOTS, `review-02-${leg.provider.toLowerCase()}-unreachable.png`));
       continue;
     }
     const options = await catalogue.locator("option").allTextContents();
@@ -179,10 +177,7 @@ test("owner registers and every backend reaches a classified readiness state", a
     await expect(verdict).toBeVisible({ timeout: 180_000 });
     const text = (await verdict.first().textContent())?.trim() ?? "";
     verdicts.push(`${leg.provider} [${chosen}] (${options.length} models): ${text}`);
-    await page.screenshot({
-      path: join(SHOTS, `review-02-${leg.provider.toLowerCase()}-readiness.png`),
-      fullPage: true,
-    });
+    await capture(page, join(SHOTS, `review-02-${leg.provider.toLowerCase()}-readiness.png`));
   }
 
   console.log("READINESS VERDICTS:\n" + verdicts.join("\n"));
@@ -213,7 +208,7 @@ test("a ready backend answers a real governed turn in Chat", async ({ page }) =>
   await page.goto(`${BASE}/#/new-chat`);
   await dismissFirstRun(page);
   await expect(page.getByRole("heading", { name: "Chat" })).toBeVisible({ timeout: 60_000 });
-  await page.screenshot({ path: join(SHOTS, "review-03-chat.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-03-chat.png"));
 
   const composer = page.locator("textarea#prompt-input");
   if (!(await composer.first().isVisible().catch(() => false))) {
@@ -231,6 +226,6 @@ test("a ready backend answers a real governed turn in Chat", async ({ page }) =>
   await expect(answer).toBeVisible({ timeout: 300_000 });
   await expect(answer).toContainText(/REVIEW CHAT OK/i, { timeout: 300_000 });
   console.log("ANSWER:", (await answer.innerText()).replace(/\s+/g, " ").slice(0, 300));
-  await page.screenshot({ path: join(SHOTS, "review-04-chat-answer.png"), fullPage: true });
+  await capture(page, join(SHOTS, "review-04-chat-answer.png"));
   console.log(`CONSOLE ERRORS: ${consoleErrors.length}`);
 });

@@ -69,6 +69,14 @@ Both paths use the same eligibility rules. A recalled result carries source and
 trust information so the answer can say where it came from. Use **View source**
 on a memory, or inspect the source chips on a reply, to check the evidence.
 
+The first path leaves nothing to click, because it is not a tool call — so a
+settled answer in Chat carries a collapsed **Remembered *n*** strip naming the
+memories that turn was actually given. **Correct** and **Forget** on a row are
+the same governed actions this page offers; the strip adds no authority. The
+sentences are read live, so a memory corrected since the turn ran reads as it is
+now, and a forgotten one stops appearing. An answer that used no memory shows no
+strip.
+
 Conversation recall is related but distinct. It searches completed exchanges
 from your earlier conversations. Durable memory searches approved facts. Raiker
 labels the source so an old message is treated as historical data, not as a new
@@ -180,6 +188,21 @@ defines four later tracks:
 These tracks do not weaken approval, provenance, correction, scope, sensitivity,
 forget, or purge rules. They are future improvements until their acceptance
 evidence is complete.
+
+## Checking the indexes
+
+Memory keeps rebuildable indexes and projections beside the records that own the
+content — a text index over approved memory, one over your conversations, vector
+projections, and graph edges. A divergence between a record and its index has no
+symptom you would notice: search simply stops finding something it found last
+week.
+
+**Observability → Diagnostics → Memory integrity** compares each one against the
+table that owns it. It reports `clean`, or names only the findings that are not
+zero, and **Rescan** runs it again on request — nothing sweeps in the background.
+When the conversation index has drifted, and only then, the card offers **Rebuild
+conversation index**: that index is a projection of your turns, so rebuilding it
+recomputes every row and can lose nothing.
 
 ## Maintenance contract
 

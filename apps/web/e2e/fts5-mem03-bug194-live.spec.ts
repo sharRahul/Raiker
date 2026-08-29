@@ -16,6 +16,7 @@
  *   a governed turn really answers from it.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -90,10 +91,7 @@ test("Memory names the embedding space recall actually searches (MEM-03)", async
     "recalls on its own and to the ones the assistant looks up",
   );
 
-  await page.screenshot({
-    path: `${SHOTS}/r0817-01-memory-recall-backend.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817-01-memory-recall-backend.png`);
   expect(consoleErrors).toEqual([]);
 });
 
@@ -118,10 +116,7 @@ test("chat search is answered by the FTS5 index, with a marked snippet (MEM-05)"
     model: "claude-haiku-4-5-20251001",
   });
   await expect(card.getByText(/can reach/i)).toBeVisible({ timeout: 120_000 });
-  await page.screenshot({
-    path: `${SHOTS}/r0817-02-anthropic-connected-via-ui.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817-02-anthropic-connected-via-ui.png`);
 
   // One real governed turn against the connected provider, whose answer is then
   // findable through chat search. The prompt asks for a specific word so the
@@ -164,9 +159,6 @@ test("chat search is answered by the FTS5 index, with a marked snippet (MEM-05)"
   await expect(page.getByText(/matching conversation/i)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/“[^”]*rotation[^”]*”/i).first()).toBeVisible({ timeout: 15_000 });
 
-  await page.screenshot({
-    path: `${SHOTS}/r0817-03-chat-search-bm25-ranked.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/r0817-03-chat-search-bm25-ranked.png`);
   expect(consoleErrors).toEqual([]);
 });

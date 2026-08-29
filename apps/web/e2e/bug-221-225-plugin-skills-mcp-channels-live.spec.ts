@@ -17,6 +17,7 @@
  * template renders.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
@@ -130,7 +131,7 @@ test("a plugin's skill arrives switched off and credited to it (BUG-221)", async
   // Reading exactly what it says stays possible.
   await expect(row.getByRole("button", { name: "Download" })).toBeVisible();
 
-  await page.screenshot({ path: `${SHOTS}/bug-221-plugin-skill-inactive.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-221-plugin-skill-inactive.png`);
 });
 
 test("the owner can switch a contributed skill on, and it stays theirs", async ({ page }) => {
@@ -174,7 +175,7 @@ test("an offered MCP server is offered, not connected (BUG-221)", async ({ page 
   await expect(offers.getByText("ACME_MCP_TOKEN")).toBeVisible();
   await expect(offers.getByRole("button", { name: "Add server" })).toBeVisible();
 
-  await page.screenshot({ path: `${SHOTS}/bug-221-plugin-mcp-offer.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-221-plugin-mcp-offer.png`);
 });
 
 // The channel *contract* is asserted here because this spec is where BUG-225's
@@ -197,7 +198,7 @@ test("the channels tab states the contract (BUG-225 step 1)", async ({ page }) =
   // list of what is *not* built stays on the page beside what is.
   await expect(page.getByRole("heading", { name: "What is still not built" })).toBeVisible();
 
-  await page.screenshot({ path: `${SHOTS}/bug-225-channel-contract.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-225-channel-contract.png`);
 });
 
 test("the Plugins tab names all four kinds with three now available", async ({ page }) => {
@@ -219,7 +220,7 @@ test("the Plugins tab names all four kinds with three now available", async ({ p
     kinds.getByText("Panels", { exact: true }).locator("xpath=ancestor::li[1]"),
   ).toContainText("Not yet");
 
-  await page.screenshot({ path: `${SHOTS}/bug-221-contribution-kinds-three.png`, fullPage: true });
+  await capture(page, `${SHOTS}/bug-221-contribution-kinds-three.png`);
 });
 
 test("revoking the plugin withdraws both the skill and the offer (BUG-221)", async ({ page }) => {
@@ -273,6 +274,6 @@ for (const [label, viewport] of [
 
     await page.goto(`${BASE}/#/extensions?tab=skills`);
     await page.waitForTimeout(600);
-    await page.screenshot({ path: `${SHOTS}/bug-221-plugin-skill-${label}.png`, fullPage: true });
+    await capture(page, `${SHOTS}/bug-221-plugin-skill-${label}.png`);
   });
 }

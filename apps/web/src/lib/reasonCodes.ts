@@ -42,6 +42,16 @@ const REASON_CODES: Record<string, ReasonCopy> = {
     plain: "This capability isn't recognised.",
     remediation: "No such gate; nothing to enable.",
   },
+  // Project organisation (dashboard.create_project). Organising refusals, not
+  // authority ones — and the two an owner actually meets.
+  duplicate_project_name: {
+    plain: "A project already has that name.",
+    remediation: "Choose a different name, or open the one that exists.",
+  },
+  duplicate_project_root: {
+    plain: "That folder is already attached to a project.",
+    remediation: "Open the project that holds it, or choose another folder.",
+  },
   // Policy / execution outcomes (route_action).
   denied_by_policy: {
     plain: "Policy blocked this action.",

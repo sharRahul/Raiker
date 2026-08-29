@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { hostedProviderCard } from "./hosted-provider";
 
@@ -53,7 +54,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.getByRole("tab", { name: "Pricing" }).click();
   await expect(page.getByText("Review current").first()).toBeVisible();
   await expect(page.getByText("Review due").first()).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "180-BUG-36-price-review-cadence-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "180-BUG-36-price-review-cadence-live.png"));
 
   const attachment = {
     name: "passage-proof.txt",
@@ -78,7 +79,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   const exportDialog = page.getByRole("dialog", { name: "Export conversation" });
   await expect(exportDialog).toBeVisible();
   expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
-  await page.screenshot({ path: join(SHOTS, "181-BUG-43-export-keyboard-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "181-BUG-43-export-keyboard-live.png"));
   await page.keyboard.press("Escape");
   await expect(exportDialog).toBeHidden();
   await expect(actions).toBeFocused();
@@ -93,7 +94,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.getByLabel("Start time").fill(tomorrow);
   await page.getByRole("button", { name: "Schedule task" }).click();
   await expect(page.getByLabel("Files attached to this task").getByText("docs/plans/TO_BE_FIXED.md").first()).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "182-schedule-attachment-outside-instructions-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "182-schedule-attachment-outside-instructions-live.png"));
 
   await page.goto(`${BASE}/#/settings`);
   await page.getByRole("button", { name: "Runtime configuration" }).click();
@@ -104,7 +105,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.getByLabel("Maximum run cost (USD)").fill("5");
   await page.getByRole("button", { name: "Save environment" }).click();
   await expect(page.getByText(/USD 0\.00 committed.*5\.00 remaining.*not started/i).first()).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "183-BUG-42-cumulative-budget-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "183-BUG-42-cumulative-budget-live.png"));
 
   await page.goto(`${BASE}/#/brain`);
   const addSource = page.getByRole("button", { name: "Add workspace source" });
@@ -112,7 +113,7 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   const sourceDialog = page.getByRole("dialog", { name: "Review workspace source" });
   await expect(sourceDialog).toBeVisible();
   expect((await new AxeBuilder({ page }).include("dialog").analyze()).violations).toEqual([]);
-  await page.screenshot({ path: join(SHOTS, "184-BUG-43-knowledge-map-keyboard-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "184-BUG-43-knowledge-map-keyboard-live.png"));
   await page.keyboard.press("Escape");
   await expect(sourceDialog).toBeHidden();
   await expect(addSource).toBeFocused();

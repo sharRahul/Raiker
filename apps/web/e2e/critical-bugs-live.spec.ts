@@ -21,6 +21,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { useHostedModel, dismissFirstRunModelSetup } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
@@ -130,7 +131,7 @@ test("FIXED-151 — connecting a provider and pinning a model appear in the audi
   await expect(rows.first()).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText("No events match")).toHaveCount(0);
   await expect(page.getByText(/every governed step in this account/i)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "217-FIXED-151-audit-log-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "217-FIXED-151-audit-log-live.png"));
 
   // Overview reads the same source, so it must agree with it.
   await page.goto(`${BASE}/#/observe?tab=overview`);
@@ -197,5 +198,5 @@ test("the six shipped skills install on first visit", async () => {
   }
   // The tab must not imply an authority the runtime does not enforce.
   await expect(page.getByText(/grants no capability/i)).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "220-six-shipped-skills-live.png"), fullPage: true });
+  await capture(page, join(SHOTS, "220-six-shipped-skills-live.png"));
 });

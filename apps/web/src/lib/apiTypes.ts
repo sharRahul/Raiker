@@ -616,6 +616,31 @@ export interface Diagnostics {
   scope_note: string;
 }
 
+/**
+ * MEM-09 — GET /api/memory/integrity. The owner-started scan of every index and
+ * projection the memory store depends on, including the conversation index
+ * behind Search chats. Counts are drift, not errors: each one names rows that
+ * disagree with the table that owns them.
+ */
+export interface MemoryIntegrity {
+  ok: boolean;
+  clean: boolean;
+  active_memory_count: number;
+  fts_count: number;
+  stale_fts_count: number;
+  missing_markdown_count: number;
+  stale_projection_count: number;
+  stale_graph_edge_count: number;
+  checksum_mismatch_count: number;
+  orphaned_markdown_count: number;
+  failed_purge_location_count: number;
+  project_path_inconsistency_count: number;
+  text_search_engine: string;
+  index_engine_mismatch_count: number;
+  conversation_index_count: number;
+  stale_conversation_index_count: number;
+}
+
 export interface CheckpointCaptureHealth {
   ok: boolean;
   stage: "ineligible" | "snapshot_ready" | "snapshot" | "commit";
@@ -1874,6 +1899,27 @@ export interface TurnSourceView {
   attachment_id: string;
   turn_id: string;
   openable: boolean;
+}
+
+/**
+ * C17 — GET /api/sessions/{id}/recall. Which approved memories the turns of
+ * this conversation were actually given. Ambient recall leaves no citation to
+ * click, so this is the only way the transcript can say what was remembered —
+ * and the only place the owner can correct or forget it at the moment it
+ * mattered.
+ */
+export interface RecalledMemory {
+  memory_id: string;
+  turn_id: string;
+  text: string;
+  scope: string;
+  pinned: boolean;
+}
+
+export interface SessionRecallView {
+  ok: boolean;
+  session_id: string;
+  memories: RecalledMemory[];
 }
 
 // GET /api/sessions/{id}/sources

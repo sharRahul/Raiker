@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
@@ -33,11 +34,11 @@ test("refined surfaces read correctly in both themes", async () => {
     await page.goto(`${BASE}/#/workbench`);
     await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible();
     await page.waitForTimeout(250);
-    await page.screenshot({ path: join(SHOTS, `133-visual-refresh-workbench-${theme}.png`), fullPage: true });
+    await capture(page, join(SHOTS, `133-visual-refresh-workbench-${theme}.png`));
 
     await page.goto(`${BASE}/#/models?tab=pricing`);
     await expect(page.getByRole("heading", { name: "Pricing" })).toBeVisible();
     await page.waitForTimeout(250);
-    await page.screenshot({ path: join(SHOTS, `134-visual-refresh-models-${theme}.png`), fullPage: true });
+    await capture(page, join(SHOTS, `134-visual-refresh-models-${theme}.png`));
   }
 });

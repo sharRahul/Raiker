@@ -21,6 +21,7 @@
  *   2. `RAIKER_LIVE_ANTHROPIC_KEY` in the environment (added through the UI below)
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { capture } from "./capture";
 import { join } from "node:path";
 import { useHostedModel } from "./hosted-provider";
 
@@ -113,7 +114,7 @@ test("working-in-chat — a reply is rendered Markdown, not raw text", async () 
   // keyboard-reachable copy control.
   await expect(answer.getByText("TypeScript", { exact: false })).toBeVisible();
   await expect(answer.getByRole("button", { name: /Copy code/i })).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug-61-markdown-rendered.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-markdown-rendered.png"));
 });
 
 test("working-in-chat — the transcript offers export, in three formats", async () => {
@@ -129,7 +130,7 @@ test("working-in-chat — the transcript offers export, in three formats", async
   await expect(dialog).toContainText(/HTML/);
   await expect(dialog).toContainText(/Markdown/);
   await expect(dialog).toContainText(/PDF/);
-  await page.screenshot({ path: join(SHOTS, "bug-61-export-review.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-export-review.png"));
   await page.keyboard.press("Escape");
 });
 
@@ -146,7 +147,7 @@ test("permissions — one runtime, not a five-mode picker", async () => {
   await expect(body).not.toContainText("Development preview");
   await expect(body).not.toContainText("Multi user local runtime");
   await expect(body).not.toContainText("Hosted or networked runtime");
-  await page.screenshot({ path: join(SHOTS, "bug-61-single-runtime.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-single-runtime.png"));
 });
 
 test("getting-started — the sidebar groups are the ones the guide lists", async () => {
@@ -177,7 +178,7 @@ test("getting-started — the sidebar groups are the ones the guide lists", asyn
   }
   await expect(nav.getByRole("link", { name: "Sessions", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Brain", exact: true })).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "bug-61-navigation.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-navigation.png"));
 });
 
 test("extensions-and-mcp — the page states whether the agent can call a server", async () => {
@@ -196,7 +197,7 @@ test("extensions-and-mcp — the page states whether the agent can call a server
     /the MCP connector capability is not enabled at runtime level/i,
   );
   await expect(access.getByRole("link")).toBeVisible();
-  await page.screenshot({ path: join(SHOTS, "bug-61-mcp-agent-access.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-mcp-agent-access.png"));
 });
 
 test("tasks-and-projects — a task run does not appear in RECENT CHATS", async () => {
@@ -216,7 +217,7 @@ test("tasks-and-projects — a task run does not appear in RECENT CHATS", async 
   // list is conversations only.
   const recents = page.getByLabel("Recent chats").getByText("Guide accuracy task");
   await expect(recents).toHaveCount(0);
-  await page.screenshot({ path: join(SHOTS, "bug-61-task-not-in-recents.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-task-not-in-recents.png"));
 });
 
 test("tasks-and-projects — asking for a task in Chat raises a real decision", async () => {
@@ -237,7 +238,7 @@ test("tasks-and-projects — asking for a task in Chat raises a real decision", 
   await page.getByLabel("Sort approvals").selectOption({ label: "Newest first" });
   const row = page.getByRole("row", { name: /Create task/i }).first();
   await expect(row).toBeVisible({ timeout: 30_000 });
-  await page.screenshot({ path: join(SHOTS, "bug-61-chat-created-task.png"), fullPage: true });
+  await capture(page, join(SHOTS, "bug-61-chat-created-task.png"));
 
   // How far the flow actually goes is the part the guide has to state, so it is
   // read off the product rather than assumed. When BUG-61 was written it stopped
@@ -255,10 +256,7 @@ test("tasks-and-projects — asking for a task in Chat raises a real decision", 
   await expect(page.getByText(/was NOT executed \(metadata-only\)/i)).toBeVisible({
     timeout: 60_000,
   });
-  await page.screenshot({
-    path: join(SHOTS, "bug-61-chat-task-record-only.png"),
-    fullPage: true,
-  });
+  await capture(page, join(SHOTS, "bug-61-chat-task-record-only.png"));
 
   // And with the capability off, the task really is not there. Turning it on is
   // one control away — `bug-62-task-approval-executes-live.spec.ts` drives that.

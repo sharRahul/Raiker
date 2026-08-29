@@ -17,6 +17,7 @@
  * the thing under test.
  */
 import { expect, test } from "@playwright/test";
+import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { dismissFirstRunModelSetup } from "./hosted-provider";
@@ -116,10 +117,7 @@ test("no accepted hook event is still marked as never firing (BUG-223)", async (
   // The gap itself is closed: nothing in the catalogue is dead.
   await expect(catalogue.getByText("Never fires")).toHaveCount(0);
 
-  await page.screenshot({
-    path: `${SHOTS}/bug-223-hook-event-catalogue.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/bug-223-hook-event-catalogue.png`);
 });
 
 test("a plugin's contributed rules are listed and credited to it (BUG-221)", async ({ page }) => {
@@ -139,10 +137,7 @@ test("a plugin's contributed rules are listed and credited to it (BUG-221)", asy
   // one combination whose decision the runtime honours.
   await expect(rules.getByText("Can deny or ask").first()).toBeVisible();
 
-  await page.screenshot({
-    path: `${SHOTS}/bug-221-plugin-contributed-rules.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/bug-221-plugin-contributed-rules.png`);
 });
 
 test("the plugins tab says what may be contributed and what may not", async ({ page }) => {
@@ -161,10 +156,7 @@ test("the plugins tab says what may be contributed and what may not", async ({ p
     "Not yet",
   );
 
-  await page.screenshot({
-    path: `${SHOTS}/bug-221-plugin-contribution-kinds.png`,
-    fullPage: true,
-  });
+  await capture(page, `${SHOTS}/bug-221-plugin-contribution-kinds.png`);
 });
 
 test("the hooks and plugins tabs hold together at every window size", async ({ page }) => {

@@ -8,6 +8,7 @@ from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PolicyDecision, ToolAction
 from raiker.memory.policy import MemorySensitivity, classify_memory_sensitivity
 from raiker.policy.config import StaticPolicyConfig
+from raiker.policy.risk import assess
 from raiker.tools.mcp_tools import is_mcp_tool
 
 
@@ -187,6 +188,26 @@ class PolicyEngine:
                 timestamp=utc_now(),
             )
         if action.tool_name in self.config.approval_required_actions:
+            # The decision records the action's *own* band, not "high".
+            #
+            # This branch used to assert `high` for everything that parks, which
+            # made the word mean "this needs approval" rather than "this is
+            # dangerous". Two different facts wearing one name is how an approval
+            # queue stops being read: an owner who learns that "high risk" is
+            # what a routine workspace write looks like has been taught to click
+            # through the ones that are not routine. Parking is decided here;
+            # how dangerous the action is was decided by its declared signals in
+            # `raiker.policy.risk`, and this carries that through unchanged.
+            # The reasons list is matched *exactly* by
+            # `ToolBroker._is_ordinary_approval_decision`, which is how a
+            # composer mode tells an ordinary action-bound pause from a hook
+            # request, a managed-policy refusal, or anything it does not
+            # recognise. Appending the assessment's reasons here is therefore not
+            # free: it silently stopped `auto` from recognising an ordinary file
+            # write, which is the narrowness working as designed. The band is
+            # carried and the reasons are left alone; the signals behind the band
+            # are in the tool's own declaration, so the assessment is still
+            # recomputable from the record without widening this list.
             return PolicyDecision(
                 decision_id=new_id("pol_"),
                 action_id=action.action_id,
@@ -197,7 +218,7 @@ class PolicyEngine:
                 ],
                 requires_user_approval=True,
                 policy_version=self.config.policy_version,
-                risk_level="high",
+                risk_level=assess(declared=action.risk_level).band,
                 timestamp=utc_now(),
             )
         return PolicyDecision(

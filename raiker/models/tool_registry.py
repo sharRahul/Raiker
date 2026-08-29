@@ -33,6 +33,16 @@ from dataclasses import dataclass
 from typing import Any
 
 
+def _derived_risk(name: str, signals: tuple[str, ...]) -> str:
+    """The band these signals produce, or a named failure for an unknown one."""
+    from raiker.policy.risk import RiskModelError, assess
+
+    try:
+        return assess(declared="low", signals=dict.fromkeys(signals, True)).band
+    except RiskModelError as exc:
+        raise ValueError(f"tool_definition_risk_signal_unknown:{name}:{exc}") from None
+
+
 @dataclass(frozen=True)
 class ToolDefinition:
     """Everything the runtime needs to know about one tool, in one place.
@@ -44,7 +54,21 @@ class ToolDefinition:
     #: The exact name a model proposes and the broker executes.
     name: str
     #: Risk band the proposal carries into the policy engine.
+    #:
+    #: **Derived, and checked.** The band is whatever `risk_signals` below
+    #: produces under `raiker.policy.risk`; it is still written out here because
+    #: a registry you have to run code to read is a worse registry, and
+    #: `__post_init__` refuses a definition whose two halves disagree. Before
+    #: this pair existed the band was a free-text field that happened to equal
+    #: `read_shaped ? medium : high` for all 46 tools — four names carrying one
+    #: bit, and `low` and `critical` unreachable although both have real runtime
+    #: behaviour behind them.
     risk: str
+    #: The named properties of this tool that raise its band, from
+    #: `raiker.policy.risk.RISK_SIGNALS`. Empty means the tool changes nothing,
+    #: reaches nothing off this machine, and is bounded to what it was given —
+    #: which is the definition of `low`, not an omission.
+    risk_signals: tuple[str, ...]
     #: Whether the proposal parks for an owner decision before it runs.
     requires_approval: bool
     #: Whether the tool is advertised to the model at all. A tool can be
@@ -82,6 +106,16 @@ class ToolDefinition:
             raise ValueError(f"tool_definition_description_required:{self.name}")
         if self.risk not in {"low", "medium", "high", "critical"}:
             raise ValueError(f"tool_definition_risk_invalid:{self.name}")
+        # The band and the reasons for it cannot drift, because a definition
+        # whose halves disagree does not construct. This is the check that makes
+        # the band mean something: it is no longer a word somebody chose, it is
+        # the consequence of the properties they declared.
+        derived = _derived_risk(self.name, self.risk_signals)
+        if derived != self.risk:
+            raise ValueError(
+                f"tool_definition_risk_not_derived:{self.name}:"
+                f"declared={self.risk}:from_signals={derived}"
+            )
         overlap = set(self.required_args) & set(self.required_list_args)
         if overlap:
             # A tool declares a string argument or a list one, never both
@@ -92,7 +126,8 @@ class ToolDefinition:
 TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="apply_patch",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -109,7 +144,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # The active session is trusted broker context, never a model argument.
     ToolDefinition(
         name="assign_session_project",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -126,6 +162,13 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="cloud_execute",
         risk="high",
+        risk_signals=(
+            "changes_state",
+            "leaves_this_machine",
+            "crosses_sandbox_boundary",
+            "not_covered_by_checkpoint",
+            "spends_owner_credential",
+        ),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -141,7 +184,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="code_map_references",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -170,7 +214,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # a gate that only covers half of it.
     ToolDefinition(
         name="code_map_search",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -194,7 +239,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="connector_read",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -211,6 +257,13 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="connector_write",
         risk="high",
+        risk_signals=(
+            "changes_state",
+            "leaves_this_machine",
+            "observable_by_others",
+            "not_covered_by_checkpoint",
+            "spends_owner_credential",
+        ),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -228,7 +281,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + provider policy at call time.
     ToolDefinition(
         name="consult_advisor",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -250,7 +304,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # year has to be able to say so.
     ToolDefinition(
         name="conversation_search",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -275,6 +330,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="create_document",
         risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -292,7 +348,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # they retain the normal approval path.
     ToolDefinition(
         name="create_task",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -308,7 +365,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="diff_files",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -324,7 +382,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="edit_file",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -344,7 +403,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # in the tool.
     ToolDefinition(
         name="gcal_read",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -363,7 +423,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # approval path and neither is ever proposed as read-shaped.
     ToolDefinition(
         name="git_branch",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -379,7 +440,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_commit",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -404,7 +466,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_diff",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -420,7 +483,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_log",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -442,6 +506,13 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="git_push",
         risk="high",
+        risk_signals=(
+            "changes_state",
+            "leaves_this_machine",
+            "observable_by_others",
+            "not_covered_by_checkpoint",
+            "spends_owner_credential",
+        ),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -457,7 +528,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="git_status",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -475,7 +547,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + owner credential + egress allowlist.
     ToolDefinition(
         name="github_read",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -497,6 +570,13 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="github_write",
         risk="high",
+        risk_signals=(
+            "changes_state",
+            "leaves_this_machine",
+            "observable_by_others",
+            "not_covered_by_checkpoint",
+            "spends_owner_credential",
+        ),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -512,7 +592,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="glob",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -530,7 +611,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # (default `ask` withholds) + owner credential + egress allowlist.
     ToolDefinition(
         name="gmail_read",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -546,7 +628,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="grep",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -562,7 +645,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="list_directory",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -579,6 +663,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="memory_forget",
         risk="high",
+        risk_signals=("changes_state", "not_covered_by_checkpoint"),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -594,7 +679,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_get",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -610,7 +696,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_list",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -632,7 +719,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # writing rather than leaving reads ungoverned.
     ToolDefinition(
         name="knowledge_graph",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -677,7 +765,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="memory_search",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -710,7 +799,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # may say; the sensitivity classifier still refuses credential-like text.
     ToolDefinition(
         name="memory_write",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -726,7 +816,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="read_file",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -743,6 +834,12 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="remote_execute",
         risk="high",
+        risk_signals=(
+            "changes_state",
+            "leaves_this_machine",
+            "crosses_sandbox_boundary",
+            "not_covered_by_checkpoint",
+        ),
         requires_approval=True,
         model_exposed=True,
         contract_known=False,
@@ -758,7 +855,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="run_command",
-        risk="medium",
+        risk="high",
+        risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -799,7 +897,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # happened first — attached a read verdict to host process control.
     ToolDefinition(
         name="background_run",
-        risk="medium",
+        risk="high",
+        risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -839,6 +938,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="shell",
         risk="high",
+        risk_signals=("changes_state", "crosses_sandbox_boundary"),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -858,7 +958,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # `files` list the no-argument call returns.
     ToolDefinition(
         name="skill_load",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -874,7 +975,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="slack_read",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine", "spends_owner_credential"),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -894,6 +996,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="spawn_subagent",
         risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -937,7 +1040,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="stat_path",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=True,
         contract_known=True,
@@ -951,6 +1055,97 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         arg_schemas=(),
         description="Return metadata for a path inside the workspace.",
     ),
+    # ADD-22 — the only mid-turn interruption that is not about permission.
+    #
+    # Raiker could ask *may I do this* and had no way to ask *which of these did
+    # you mean*, so a turn facing two readings picked one and the owner found out
+    # afterwards. This asks. It grants nothing, executes nothing and reaches
+    # nothing, which is why it declares no risk signal and lands in `low` — and
+    # why `low` had to mean something before this could be built honestly. It
+    # parks the turn through the approval transport without being an approval:
+    # what comes back is an answer, never a permission.
+    #
+    # Not delegable. A subagent that could interrupt the owner would be a second
+    # thing competing for their attention with none of the turn's context, and
+    # the reference refuses it for the same reason.
+    ToolDefinition(
+        name="ask_owner_question",
+        risk="low",
+        risk_signals=(),
+        requires_approval=True,
+        model_exposed=True,
+        contract_known=True,
+        capability=None,
+        source_kind=None,
+        delegable=False,
+        read_shaped=False,
+        required_args=(),
+        required_list_args=("questions",),
+        optional_args=(),
+        arg_schemas=(
+            (
+                "questions",
+                {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 4,
+                    "description": (
+                        "One to four questions. Ask only what the owner alone can answer."
+                    ),
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "question": {
+                                "type": "string",
+                                "description": "The full question, in plain language.",
+                            },
+                            "header": {
+                                "type": "string",
+                                "description": "A short label for the question, at most 12 characters.",
+                            },
+                            "options": {
+                                "type": "array",
+                                "minItems": 2,
+                                "maxItems": 4,
+                                "description": (
+                                    "Two to four choices. The owner can always answer in their "
+                                    "own words instead, so do not add an 'Other' option."
+                                ),
+                                "items": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "type": "string",
+                                            "description": "The choice itself, a few words.",
+                                        },
+                                        "description": {
+                                            "type": "string",
+                                            "description": "What choosing this would mean.",
+                                        },
+                                    },
+                                    "required": ["label", "description"],
+                                },
+                            },
+                            "multiSelect": {
+                                "type": "boolean",
+                                "description": "True when more than one option may be chosen.",
+                            },
+                        },
+                        "required": ["question", "header", "options"],
+                    },
+                },
+            ),
+        ),
+        description=(
+            "Ask the owner a question and wait for their answer. Use it only when you are "
+            "blocked on a decision that is genuinely theirs to make — one you cannot settle "
+            "from the request, the workspace, or a sensible default — such as which of two "
+            "readings of an instruction they meant, or a preference that changes the work. "
+            "Do not use it to ask whether to proceed, to confirm something you can check "
+            "yourself, or to hand back a decision you should make. Asking pauses the turn, "
+            "so ask everything you need at once rather than one question at a time."
+        ),
+    ),
     # B6 — the turn's own plan. It writes one owner-scoped row naming the
     # model's *intentions*; it runs nothing, so it carries no approval. Every
     # step it names is still governed when it is actually attempted. `steps` is a
@@ -959,6 +1154,7 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ToolDefinition(
         name="update_plan",
         risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -1007,7 +1203,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # state it.
     ToolDefinition(
         name="vector_get",
-        risk="medium",
+        risk="low",
+        risk_signals=(),
         requires_approval=False,
         model_exposed=False,
         contract_known=False,
@@ -1027,7 +1224,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     # redirects. What comes back is untrusted data, never instructions.
     ToolDefinition(
         name="web_fetch",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine",),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -1043,7 +1241,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="web_search",
-        risk="medium",
+        risk="high",
+        risk_signals=("leaves_this_machine",),
         requires_approval=False,
         model_exposed=True,
         contract_known=False,
@@ -1064,7 +1263,8 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
     ),
     ToolDefinition(
         name="write_file",
-        risk="high",
+        risk="medium",
+        risk_signals=("changes_state",),
         requires_approval=True,
         model_exposed=True,
         contract_known=True,
@@ -1101,6 +1301,38 @@ def all_definitions() -> tuple[ToolDefinition, ...]:
 # is the requirement to remember to write the same name into all of them.
 
 #: Tool -> (risk band, requires approval).
+def tool_risk_band(name: str) -> str:
+    """The band a registered tool carries, for the modules that need it by name.
+
+    Four modules used to hold their own `_READ_RISK = "medium"` / `_CALL_RISK`
+    literal, each with a comment explaining that the action was "not low-risk"
+    because it left the machine. The reasoning was right and the band was a
+    guess: by the definitions in `raiker.policy.risk` every one of them is
+    `high`. They read it from here now, so the reasoning lives in the tool's own
+    declared signals and cannot be restated differently four times.
+    """
+    try:
+        return TOOL_RISK_BANDS[name]
+    except KeyError:
+        raise ValueError(f"unknown_tool_risk:{name}") from None
+
+
+#: A projected MCP tool is not in the registry — which servers exist depends on
+#: what the owner connected — so its band is declared here from the same signals
+#: a registry entry would carry. Reaching an owner-registered server runs code
+#: Raiker does not own, over the network, under the owner's credential.
+MCP_TOOL_RISK_SIGNALS: tuple[str, ...] = (
+    "leaves_this_machine",
+    "crosses_sandbox_boundary",
+    "spends_owner_credential",
+)
+
+
+def mcp_tool_risk_band() -> str:
+    """The band every projected MCP tool carries."""
+    return _derived_risk("mcp__*", MCP_TOOL_RISK_SIGNALS)
+
+
 TOOL_RISK: dict[str, tuple[str, bool]] = {
     item.name: (item.risk, item.requires_approval)
     for item in TOOL_DEFINITIONS
@@ -1108,6 +1340,14 @@ TOOL_RISK: dict[str, tuple[str, bool]] = {
 }
 
 MODEL_EXPOSED_TOOLS: frozenset[str] = frozenset(TOOL_RISK)
+
+#: Every registered tool's band, including the ones no model is offered.
+#:
+#: `TOOL_RISK` is deliberately model-exposed only, because it answers "what may a
+#: model propose". A band has to be answerable for more than that: `vector_get`
+#: is not in the model's catalogue and *is* delegable, so a subagent step needs
+#: its band and would have found nothing here.
+TOOL_RISK_BANDS: dict[str, str] = {item.name: item.risk for item in TOOL_DEFINITIONS}
 
 REQUIRED_ARGS: dict[str, tuple[str, ...]] = {
     item.name: item.required_args for item in TOOL_DEFINITIONS if item.model_exposed

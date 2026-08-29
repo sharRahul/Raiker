@@ -120,7 +120,16 @@ class TestToolSurface:
                     ToolCallProposal(call_id="call_1", tool_name=tool, arguments=args)
                 )
 
-    def test_a_valid_call_is_high_risk_and_approval_bound(self) -> None:
+    def test_a_valid_call_is_medium_risk_and_still_approval_bound(self) -> None:
+        """The two facts this test used to run together, separated.
+
+        A local commit changes state on this machine, nobody outside it can see
+        it, and it is reversible — `medium` by the definitions in
+        `raiker.policy.risk`. It parks anyway, because parking is decided by
+        `approval_required_actions` and not by the band. Asserting both here is
+        the point: "high" used to mean "this parks", which left no word for
+        "this is dangerous".
+        """
         action = validate_tool_call(
             ToolCallProposal(
                 call_id="call_1",
@@ -128,7 +137,7 @@ class TestToolSurface:
                 arguments={"message": "Fix the thing"},
             )
         )
-        assert action.risk_level == "high"
+        assert action.risk_level == "medium"
         assert action.requires_approval is True
 
 

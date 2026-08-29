@@ -3536,3 +3536,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_skills_owner_command
   ON skills(principal_id, command_trigger)
   WHERE command_trigger IS NOT NULL AND command_trigger != '';
 """
+
+
+# ADD-22 — the owner's answer to a mid-turn question.
+#
+# A question rides the approval transport and is not an approval, so its result
+# is not `approved`/`rejected` but the option the owner picked. That does not fit
+# any existing column, and overloading `approval_scope` would have made the one
+# distinction this surface exists to keep — a question is never a permission —
+# depend on reading a field's contents to know which kind of row you had.
+OWNER_QUESTION_ANSWER_MIGRATION_ID = "RAIKER-2047-owner-question-answer"
+
+OWNER_QUESTION_ANSWER_SQL = """
+ALTER TABLE approvals ADD COLUMN answer_json TEXT;
+"""

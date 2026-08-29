@@ -578,4 +578,91 @@ describe("ApprovalsView", () => {
     expect(JSON.parse(String(call?.[1]?.body))).toEqual({ approve: false, reason: "Risk is too high" });
     expect(await screen.findByText(/critical action was denied/i)).toBeInTheDocument();
   });
+
+  // ADD-22 — a question rides the approval transport and must never look like an
+  // approval. These assert the two halves that keep them apart on screen: the
+  // approve/deny controls are *absent*, and the card says what answering does.
+  const QUESTION = {
+    ...PENDING,
+    approval_id: "appr_question",
+    tool_name: "ask_owner_question",
+    capability: null,
+    risk_level: "low",
+  };
+
+  const QUESTION_DETAIL = {
+    approval: QUESTION,
+    arguments: {
+      questions: [
+        {
+          question: "Which database should the new service use?",
+          header: "Database",
+          options: [
+            { label: "Postgres", description: "Relational, like the other services" },
+            { label: "SQLite", description: "Embedded, no server to run" },
+          ],
+        },
+      ],
+    },
+    diff: null,
+    diff_path: null,
+    preview_kind: "arguments",
+    metadata_only_notice: "",
+    executes_on_approval: false,
+  };
+
+  it("offers a question as a question, with no way to approve it", async () => {
+    stubFetch({
+      "GET /api/approvals": [QUESTION],
+      "GET /api/approvals/appr_question": QUESTION_DETAIL,
+    });
+    render(ApprovalsView);
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+
+    expect(await screen.findByText(/Which database should the new service use\?/)).toBeTruthy();
+    expect(screen.getByRole("heading", { name: /Answer a question/i })).toBeTruthy();
+    // The controls that must not exist here. An owner who can "approve" a
+    // question has been shown a decision they were never asked to make.
+    expect(screen.queryByRole("button", { name: /^Approve/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Deny$/ })).toBeNull();
+    expect(screen.getByText(/grants nothing and\s+runs nothing/i)).toBeTruthy();
+  });
+
+  it("will not send an answer until every question has one", async () => {
+    stubFetch({
+      "GET /api/approvals": [QUESTION],
+      "GET /api/approvals/appr_question": QUESTION_DETAIL,
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+
+    const send = await screen.findByRole("button", { name: "Send answer" });
+    expect(send).toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("radio", { name: /Postgres/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Send answer" })).toBeEnabled());
+  });
+
+  it("answers through the question route, never the resolve route", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/approvals": [QUESTION],
+      "GET /api/approvals/appr_question": QUESTION_DETAIL,
+      "POST /api/approvals/appr_question/answer": {
+        approval_id: "appr_question",
+        status: "answered",
+        answered: 1,
+      },
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: "Answer" }));
+    await fireEvent.click(await screen.findByRole("radio", { name: /SQLite/ }));
+    await fireEvent.click(screen.getByRole("button", { name: "Send answer" }));
+
+    await waitFor(() => {
+      const calls = fetchMock.mock.calls.map((call) => String(call[0]));
+      expect(calls.some((url) => url.endsWith("/answer"))).toBe(true);
+      expect(calls.some((url) => url.endsWith("/resolve"))).toBe(false);
+    });
+  });
 });

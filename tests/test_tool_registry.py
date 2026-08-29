@@ -33,7 +33,10 @@ from raiker.tools.broker import ToolBroker
 def _fake(**overrides: object) -> ToolDefinition:
     values: dict[str, object] = {
         "name": "fake_probe_tool",
+        # The band and the reasons for it are one declaration: `risk` has to be
+        # what `risk_signals` produces, or the definition does not construct.
         "risk": "medium",
+        "risk_signals": ("changes_state",),
         "requires_approval": False,
         "model_exposed": True,
         "contract_known": True,
@@ -175,7 +178,27 @@ def test_every_executable_tool_the_broker_offers_is_registered(tmp_path: Path) -
 def test_replacing_a_field_produces_a_new_definition_not_a_mutation() -> None:
     """Frozen, and hashable — `arg_schemas` is a tuple of pairs for this reason."""
     original = _fake()
-    changed = replace(original, risk="high")
-    assert original.risk == "medium"
-    assert changed.risk == "high"
+    changed = replace(original, description="A different description.")
+    assert original.description != changed.description
     assert len({original, changed}) == 2
+
+
+def test_a_band_can_only_change_by_changing_what_the_tool_does() -> None:
+    """The invariant that stops a band from being an opinion.
+
+    Raising `risk` on its own no longer constructs: a band is the consequence of
+    the declared signals, so changing it means changing the claim about what the
+    tool actually does. That is what keeps "high" meaning something a reader can
+    check, rather than a word somebody picked.
+    """
+    with pytest.raises(ValueError, match="tool_definition_risk_not_derived"):
+        replace(_fake(), risk="high")
+
+    raised = replace(_fake(), risk="high", risk_signals=("changes_state", "leaves_this_machine"))
+    assert raised.risk == "high"
+
+
+def test_a_signal_this_build_does_not_define_is_refused() -> None:
+    """A dropped signal would be a control that silently stopped working."""
+    with pytest.raises(ValueError, match="tool_definition_risk_signal_unknown"):
+        _fake(risk_signals=("sounds_dangerous",))

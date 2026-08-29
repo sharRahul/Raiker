@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import PluginExecutionRecord, ToolAction
+from raiker.models.tool_call_validation import risk_for_tool
 from raiker.runtime.executors.base import ExecutionResult
 from raiker.runtime.executors.sandbox import SandboxError, run_command
 
@@ -313,7 +314,11 @@ class PluginExecutionCapExecutor:
             action_id=new_id("tool_"),
             tool_name=tool_name,
             arguments=dict(tool_args),
-            risk_level="medium",
+            # Was a flat `medium` for whatever tool a plugin reached, which
+            # both understated the ones that leave the machine and overstated
+            # local reads. The tool's own declared band, like every other
+            # proposal.
+            risk_level=risk_for_tool(tool_name),
             requires_approval=False,
             proposed_by=principal.principal_id,
         )

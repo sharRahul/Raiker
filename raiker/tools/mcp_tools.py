@@ -42,6 +42,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.models.contracts import ToolSpec
+from raiker.models.tool_registry import mcp_tool_risk_band
 
 if TYPE_CHECKING:
     from raiker.runtime.authority.decision_modes import DecisionMode
@@ -49,9 +50,10 @@ if TYPE_CHECKING:
 
 _CAP = "mcp_connector_runtime"
 
-# Reaching an owner-registered MCP server runs code Raiker does not own, so a
-# call is not low-risk: `auto` withholds it exactly like a connector read.
-_CALL_RISK = "medium"
+# Reaching an owner-registered MCP server runs code Raiker does not own, over
+# the network, under the owner's credential — `high` by the definitions in
+# `raiker.policy.risk`. `auto` withholds it exactly like a connector read.
+_CALL_RISK = mcp_tool_risk_band()
 
 MCP_TOOL_PREFIX = "mcp__"
 _SEPARATOR = "__"

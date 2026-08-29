@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-29 | Targeted | `real-work-` | Anthropic | **What Chat and Build actually do**: a scheduled task, a project, a dashboard that renders, and a program Build wrote that this round executed |
 | 2026-08-29 | Targeted | `fixed-306-` | Anthropic | Owner-guided compaction: a summarised range, and a transcript that kept every turn |
 | 2026-08-28 | Targeted | `fixed-305-` | Anthropic, OpenAI, OpenRouter, Ollama — every key entered through the interface | The last three lifecycle hook events, on a real tool-using turn and across four providers |
 | 2026-08-28 | Full sweep + targeted | `pages/`, `fixed-299-`, `bug-225-` | Anthropic, OpenAI, OpenRouter, Ollama — existing credentials managed through the Raiker interface | All 26 route/tab states at mobile, 1080p, 4K and 8K in both themes; channel routing and approval-relay controls; owner skill commands in Chat and Build; four-provider readiness from the Models UI |
@@ -52,6 +53,77 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-29 — what Chat and Build actually do
+
+**Tier: Targeted, and a different kind of targeted.** Chromium via Playwright at
+1440 × 1000, light. **Provider:** Anthropic (`claude-haiku-4-5-20251001`). The
+key was supplied to the runner as an environment variable for the length of the
+round and entered through the product's own Connect dialog; none was placed in
+source, a test fixture, or this document. **Prefix:** `real-work-`.
+
+Every earlier round proves a *control* works: a rule loaded, an event fired, a
+card rendered. This one asks whether the product can be used to get work done,
+and every scenario ends at a fact outside the transcript.
+
+### What it proved
+
+* **The fail-closed default is real.** On a fresh workspace the first attempt to
+  create a task was refused with `disabled_by_capability_gate` — the model called
+  `create_task` correctly, `auto` granted it correctly, and the capability gate
+  stopped it. The round now turns the capability on through Permissions first,
+  the way an owner does, which is a better test than assuming it was on.
+* **Chat created and scheduled a task.** "Rotate the staging credentials" exists
+  with `recurrence: weekly`, read back from the owner's own Tasks page
+  (`real-work-chat-scheduled-task.png`).
+* **Chat created a project**, through the Projects surface, and Build then worked
+  inside it (`real-work-project-created.png`).
+* **Chat built a dashboard that renders.** `status-dashboard.html` — 6.4 KB, no
+  external requests — was written to the workspace, and the round opened it in a
+  browser and asserted its three headings are visible
+  (`real-work-chat-dashboard-renders.png`). A file that parses is not a page.
+* **Build wrote a program, and the program runs.** `fizz/fizzbuzz.py` appeared in
+  the workspace folder, and the round *executed it* and asserted its output line
+  by line — `1 2 Fizz 4 Buzz Fizz 7 8 Fizz Buzz 11 Fizz 13 14 FizzBuzz`. This is
+  the assertion the whole round exists for: a written file that does not work is
+  the failure a transcript cannot show.
+
+### What it found
+
+**[BUG-242](TO_BE_FIXED.md#bug-242--build-opens-an-empty-conversation-after-a-reload)
+— Build opens an empty conversation after a reload.** A seventh scenario was
+written to assert that Build's record survives a reload, and it does not:
+`sessionId` in `BuildView` is only ever set from the streaming response and is
+never restored from the URL. Nothing is lost — the session and its tool rows are
+stored and Search chats finds them — but the page the owner was working on does
+not come back. Chat restores; Build does not. The scenario was removed rather
+than weakened, and the defect raised.
+
+Four harness defects were fixed in the same pass, each of which had been quietly
+making a scenario test the wrong thing:
+
+* **A hash-only `page.goto` does not re-render this app.** A scenario that ran a
+  turn in Chat and then "navigated" to Tasks was still looking at the Chat
+  transcript — it failed for the right reason and the wrong cause, while the task
+  had in fact been created correctly. Navigation now goes through the rail, which
+  is also the path an owner takes.
+* **Sign-in waited for a first-run heading**, so a workspace the round had
+  already configured could never be signed into a second time. That is
+  [BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace)
+  behaving as recorded; the helper now waits for the navigation rail, which is
+  what "there is a session here" actually means.
+* **Two locators matched hidden elements** — a project name inside a `<select>`
+  option, and Chat's textarea sitting behind Build's. Both had passed a
+  visibility assertion on `.first()` and then failed on use.
+* **Build refuses to send without a project selected**, which is correct and was
+  a silent failure in the round: the composer's project picker is now part of the
+  scenario.
+
+The workspace was also destroyed while a server still had it open, which left an
+unopenable store and a login form disabled by `store_open_failed`. The product
+reported it accurately; the round's own setup order was wrong.
 
 ---
 

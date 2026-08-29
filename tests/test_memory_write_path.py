@@ -79,7 +79,15 @@ class TestToolSurface:
                     ToolCallProposal(call_id="call_1", tool_name=tool, arguments=args)
                 )
 
-    def test_a_valid_call_is_high_risk_and_approval_bound(self) -> None:
+    def test_a_valid_call_is_medium_risk_and_still_approval_bound(self) -> None:
+        """Medium, and approval-bound anyway.
+
+        A stored memory is the owner's own record on this machine, nobody else
+        can see it, and `memory_forget` reverses it — `medium` by the definitions
+        in `raiker.policy.risk`. It parks for the owner all the same, because
+        parking is `approval_required_actions` and not the band. The sibling
+        `memory_forget` is the one that is not covered by a checkpoint.
+        """
         action = validate_tool_call(
             ToolCallProposal(
                 call_id="call_1",
@@ -87,7 +95,7 @@ class TestToolSurface:
                 arguments={"text": "The owner prefers metric units."},
             )
         )
-        assert action.risk_level == "high"
+        assert action.risk_level == "medium"
         assert action.requires_approval is True
 
 

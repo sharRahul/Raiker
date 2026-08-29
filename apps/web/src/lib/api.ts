@@ -20,6 +20,7 @@ import type {
   ContextUsage,
   ConversationBranch,
   ConversationCompaction,
+  OwnerQuestionAnswered,
   ConversationBranchOrigin,
   ConversationBranchPlan,
   Checkpoint,
@@ -1272,6 +1273,14 @@ export const api = {
     postJson<ConversationBranch>(
       `/api/checkpoints/${encodeURIComponent(checkpointId)}/branch`,
       { title },
+    ),
+  answerOwnerQuestion: (
+    approvalId: string,
+    body: { answers?: Record<string, string | string[]>; response?: string },
+  ) =>
+    postJson<OwnerQuestionAnswered>(
+      `/api/approvals/${encodeURIComponent(approvalId)}/answer`,
+      body,
     ),
   compactConversation: (sessionId: string, throughTurnId: string) =>
     postJson<ConversationCompaction>(

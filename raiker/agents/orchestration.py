@@ -9,6 +9,7 @@ from typing import Any
 
 from raiker.contracts.ids import new_id, utc_now
 from raiker.contracts.models import SubagentContract, TeamLedger, ToolAction
+from raiker.models.tool_call_validation import risk_for_tool
 from raiker.models.tool_registry import DELEGABLE_TOOL_NAMES
 from raiker.policy.config import StaticPolicyConfig
 from raiker.policy.engine import PolicyEngine
@@ -353,7 +354,13 @@ class SubagentRunner:
                 action_id=new_id("act_"),
                 tool_name=step.tool_name,
                 arguments=step.arguments,
-                risk_level="low",
+                # Every delegable tool is `low` today, so writing `low` here was
+                # right — and right by coincidence, which is the part that would
+                # not have survived somebody marking a tool delegable. Reading
+                # the band the tool declares makes the coincidence a guarantee,
+                # and a subagent can no longer launder a tool into a milder band
+                # than it carries.
+                risk_level=risk_for_tool(step.tool_name),
                 requires_approval=step.tool_name in MUTATION_PROPOSAL_TOOLS,
                 proposed_by=subagent_id,
             )

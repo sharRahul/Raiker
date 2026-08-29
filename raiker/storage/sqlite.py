@@ -216,6 +216,8 @@ from raiker.storage.migrations import (
     OWNED_CONTEXT_DATA_SQL,
     OWNED_MEMORY_METADATA_MIGRATION_ID,
     OWNED_MEMORY_METADATA_SQL,
+    OWNER_QUESTION_ANSWER_MIGRATION_ID,
+    OWNER_QUESTION_ANSWER_SQL,
     PHASE_1_MIGRATION_ID,
     PHASE_1_SQL,
     PHASE_2_MIGRATION_ID,
@@ -1486,6 +1488,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             )
             self._apply_migration(
                 SKILL_COMMANDS_MIGRATION_ID, SKILL_COMMANDS_SQL, connection
+            )
+            self._apply_migration(
+                OWNER_QUESTION_ANSWER_MIGRATION_ID, OWNER_QUESTION_ANSWER_SQL, connection
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
             self._apply_migration(
@@ -7523,6 +7528,25 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "UPDATE approvals SET status = ?, approved_by = ?, resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
                 (status, resolved_by, resolved_at, approval_id),
             )
+
+    def answer_owner_question(
+        self, approval_id: str, *, answers_json: str, answered_by: str, answered_at: str
+    ) -> bool:
+        """Record the owner's answer to a mid-turn question (ADD-22).
+
+        Resolves the row to ``answered`` rather than ``approved``: nothing was
+        permitted, so a status that says it was would make the audit trail read
+        as an approval nobody granted. Returns False when the row was not
+        pending, which is how a second answer to the same question is refused
+        rather than silently overwriting the first.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE approvals SET status = 'answered', answer_json = ?, approved_by = ?, "
+                "resolved_at = ? WHERE approval_id = ? AND status = 'pending'",
+                (answers_json, answered_by, answered_at, approval_id),
+            )
+            return cursor.rowcount > 0
 
     def update_task_status(self, task_id: str, status: str) -> None:
         self._update_task(task_id, status=status)

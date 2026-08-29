@@ -85,6 +85,20 @@ class SessionCommandGrantRequest(BaseModel):
     ttl_minutes: int = 120
 
 
+class AnswerOwnerQuestionRequest(BaseModel):
+    """The owner's answer to a mid-turn question (ADD-22).
+
+    `answers` is keyed by the exact question text and each value is the chosen
+    option label, or a list of them for a multi-select. `response` is the owner
+    replying in their own words instead of picking; when it is set the answers
+    map is ignored, because they said something the options did not offer.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    answers: dict[str, Any] = {}
+    response: str | None = None
+
+
 class CompactConversationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     through_turn_id: str

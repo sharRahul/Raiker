@@ -130,6 +130,12 @@ class TestToolSurface:
         assert set(spec.parameters["properties"]) == {"remote", "branch"}
 
     def test_a_valid_call_is_high_risk_and_approval_bound(self) -> None:
+        """High because it leaves the machine and others can see it.
+
+        `git_commit` next door is medium and parks for the same reason this
+        does; the bands differ because the actions do. That contrast is what
+        makes the vocabulary worth having.
+        """
         action = validate_tool_call(
             ToolCallProposal(call_id="call_1", tool_name="git_push", arguments={})
         )

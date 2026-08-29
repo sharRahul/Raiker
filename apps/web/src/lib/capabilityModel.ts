@@ -615,7 +615,12 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
   },
 };
 
-export function capabilityLabel(capability: string): string {
+export function capabilityLabel(capability: string | null | undefined): string {
+  // An action can legitimately answer to no capability gate: ADD-22's question
+  // grants nothing, so there is nothing to gate and the field is null. This used
+  // to throw on `.match`, which took the whole approval detail down rather than
+  // rendering the one row it could not label.
+  if (!capability) return "None — this action answers to no capability gate";
   const copy = CAPABILITY_COPY[capability];
   if (copy) return copy.label;
   // Per-connector runtime capabilities are registered dynamically

@@ -90,6 +90,7 @@ names.
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
 | [BUG-240](#bug-240--a-semantic-space-can-be-built-and-a-question-is-not-embedded-into-it) | Medium → Low | Memory / retrieval | Provider-memory half fixed 2026-08-26 as FIXED-292. Managed knowledge files still lack write-time vector projections |
 | [BUG-241](#bug-241--fullpage-screenshots-do-not-reach-past-the-app-shells-scroll-container) | Low | Live test harness / evidence | Open — raised 2026-08-28 while capturing FIXED-305 evidence |
+| [BUG-242](#bug-242--build-opens-an-empty-conversation-after-a-reload) | Medium | Build / web UI | Open — raised 2026-08-29 by the real-work live round |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (13 complete, 2 partial, 5 open; 7 items remain) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (12 complete, 6 open; C9 skill commands closed as FIXED-299 and C14 branch-from-here as FIXED-227) |
 
@@ -720,3 +721,36 @@ page scroll so `fullPage` means what it says everywhere.
 **Not a product defect.** Nothing an owner uses is wrong: the page scrolls
 correctly in a browser. What is wrong is what the evidence files contain, which
 is why this is filed against the harness rather than the web UI.
+
+---
+
+## BUG-242 — Build opens an empty conversation after a reload
+
+**Severity: Medium. Area: Build / web UI. Status: Open — raised 2026-08-29.**
+
+**Observed.** Ask Build to write a file, watch it do the work, then reload the
+page. Build comes back with an empty conversation. The turn is not lost — the
+session, its transcript and its tool rows are all still stored, and Search chats
+finds them — but the page the owner was working on a second ago does not come
+back, and nothing on screen says where the work went.
+
+**Why.** `sessionId` in `apps/web/src/lib/views/BuildView.svelte` is only ever
+assigned from the streaming response (and cleared on a new conversation). It is
+never read from the URL and never restored, so `#/build` always mounts a fresh
+one. Chat does restore, which is what makes this a gap rather than a design
+choice: the same interruption costs an owner their place in one surface and not
+the other.
+
+**Why it matters more in Build than it would in Chat.** A Build conversation is
+where the approvals for a change live. An owner who reloads mid-change loses the
+thread that raised them, and has to find the session again to see what was
+already decided — at exactly the moment they are most likely to reload, which is
+when something looked wrong.
+
+**Found by** the real-work live round, which is the point of that round: a
+scenario that only asks Build to answer a question never reloads, and a scenario
+that asks it to do a job does.
+
+**Not a data-loss defect.** Nothing is deleted and the audit trail is complete.
+The fix is navigational: carry the session in the URL as Chat does, and restore
+it on mount.

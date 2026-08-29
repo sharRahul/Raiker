@@ -170,9 +170,11 @@ class TestValidationAcceptsProjectedTools:
             )
         )
         assert action.tool_name == "mcp__echo__echo"
-        # Reaching a registered server is not low-risk, and it is not a
-        # broker-approval action either: the decision mode is the owner control.
-        assert action.risk_level == "medium"
+        # Reaching a registered server runs code Raiker does not own, over the
+        # network, under the owner's credential — `high` by the definitions in
+        # `raiker.policy.risk`. It is still not a broker-approval action: the
+        # decision mode is the owner control, and the band is not what parks it.
+        assert action.risk_level == "high"
         assert action.requires_approval is False
 
     def test_a_malformed_mcp_name_is_still_an_unknown_tool(self) -> None:

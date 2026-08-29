@@ -804,7 +804,10 @@ and says why.
 
 ## ADD-22 — A structured question to the owner, mid-turn
 
-**Status: proposed. Tier 1 (safe autonomy). Effort: medium.**
+**Status: DONE 2026-08-29 — [FIXED-308](FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant).**
+Its prerequisite closed first as [FIXED-307](FIXED_ITEMS.md#fixed-307--four-risk-bands-no-definitions-and-two-of-them-unreachable):
+the approval transport could not carry a question honestly while everything
+that parked was labelled `high`. Tier 1 (safe autonomy). Effort: medium.
 
 **What exists today.** Raiker's only mid-turn interruption is an **approval**.
 An approval asks *may I do this*. There is no way for a model to ask *which of

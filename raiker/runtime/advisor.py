@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
 
@@ -14,9 +15,10 @@ if TYPE_CHECKING:
 _CAP = "advisor_model_runtime"
 MAX_QUESTION_CHARS = 8_000
 MAX_ANSWER_CHARS = 16_000
-# Sending prompt content off-machine is never low-risk, so `auto` withholds
-# exactly like `ask` (auto only runs low-risk actions unprompted).
-_CONSULT_RISK = "medium"
+# Sending prompt content off-machine under the owner's credential is `high`
+# by the definitions in `raiker.policy.risk`, so `auto` withholds it exactly
+# like `ask` (auto only runs low-risk actions unprompted).
+_CONSULT_RISK = tool_risk_band("consult_advisor")
 
 # (provider, model, question) -> answer text. Injectable so tests exercise the
 # governed path without a live provider or credentials.

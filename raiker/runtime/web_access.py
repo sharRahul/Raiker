@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote, urlparse
 from urllib.request import HTTPRedirectHandler
 
+from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode
 from raiker.runtime.executors.sandbox import SandboxError
@@ -55,8 +56,9 @@ if TYPE_CHECKING:
 _CAP = "web_fetch"
 
 # Reaching the open internet carries the owner's IP and the request itself
-# off-machine → not low-risk, exactly like the connector reads.
-_READ_RISK = "medium"
+# off-machine, which is `high` by the definitions in `raiker.policy.risk`,
+# exactly like the connector reads.
+_READ_RISK = tool_risk_band("web_fetch")
 
 MAX_FETCH_BYTES = 400_000
 MAX_CONTENT_CHARS = 20_000

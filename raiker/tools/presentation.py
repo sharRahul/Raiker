@@ -118,6 +118,9 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     "consult_advisor": FAMILY_SUBAGENT,
     # The turn's own spine.
     "update_plan": FAMILY_PLAN,
+    # ADD-22 — asking the owner is planning work, not doing it: the turn is
+    # deciding what to do next, which is the family the plan row already means.
+    "ask_owner_question": FAMILY_PLAN,
     "create_task": FAMILY_PLAN,
     "assign_session_project": FAMILY_PLAN,
 }
@@ -167,6 +170,7 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "spawn_subagent": "Delegate to a subagent",
     "consult_advisor": "Consult the advisor model",
     "update_plan": "Update the plan",
+    "ask_owner_question": "Ask you a question",
     "create_task": "Create task",
     "assign_session_project": "Assign to project",
 }

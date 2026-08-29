@@ -1141,6 +1141,22 @@ export interface ConversationBranch {
  * an earlier boundary has nothing behind it to summarise, and the reason code
  * says which case it was.
  */
+/** One question the model asked the owner mid-turn (ADD-22). */
+export interface OwnerQuestion {
+  question: string;
+  header: string;
+  options: { label: string; description: string }[];
+  multiSelect?: boolean;
+}
+
+/** The result of answering one. Nothing was granted, so nothing was executed. */
+export interface OwnerQuestionAnswered {
+  approval_id: string;
+  status: string;
+  answered: number;
+  resume?: { resumable?: boolean; session_id?: string | null; turn_id?: string | null };
+}
+
 export interface ConversationCompaction {
   session_id: string;
   compacted: boolean;

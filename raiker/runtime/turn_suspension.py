@@ -196,6 +196,46 @@ def queued_denial_outcome(*, tool_name: str, reasons: list[str]) -> dict[str, An
     }
 
 
+def owner_answer_outcome(
+    *,
+    answers: dict[str, Any],
+    response: str | None = None,
+) -> dict[str, Any]:
+    """The tool result the model is handed when the owner answers a question (ADD-22).
+
+    Deliberately shaped nothing like :func:`approval_outcome`. An approval's
+    outcome tells the model whether it may act; this one tells it what the owner
+    meant, and the two must not be confusable — a model that read an answer as a
+    permission would treat "Postgres" as consent to do whatever it had proposed.
+
+    `answers` is keyed by the exact question text, as the reference contract does
+    it, so a multi-question ask comes back unambiguously. `response` is the
+    owner replying in their own words instead of picking, which is the case the
+    options could not cover and the one worth carrying verbatim.
+    """
+    if response is not None:
+        return {
+            "status": "answered",
+            "executed": False,
+            "response": response,
+            "note": (
+                "The owner answered in their own words instead of choosing an option. "
+                "This is an answer, not permission: continue the work it describes, and "
+                "ask for approval separately for anything that needs it."
+            ),
+        }
+    return {
+        "status": "answered",
+        "executed": False,
+        "answers": answers,
+        "note": (
+            "The owner answered your question. This is an answer, not permission: "
+            "continue with what they chose, and ask for approval separately for "
+            "anything that needs it. Do not ask the same question again."
+        ),
+    }
+
+
 def approval_outcome(
     *,
     approved: bool,

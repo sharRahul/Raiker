@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.models.tool_registry import READ_SHAPED_TOOL_NAMES
 
 
@@ -36,6 +37,12 @@ class StaticPolicyConfig:
     approval_required_actions: frozenset[str] = field(
         default_factory=lambda: frozenset({
             "shell", "write_file", "edit_file", "apply_patch",
+            # ADD-22 — a question parks the turn through the same transport an
+            # approval uses, which is the only thing it borrows. It grants
+            # nothing, so it carries no capability and stays in the `low` band;
+            # what comes back is an answer, and the routes keep the two kinds
+            # from ever resolving each other.
+            OWNER_QUESTION_TOOL,
             # B11 — the git write path. A commit rewrites history a file
             # checkpoint does not cover and a pull request leaves the machine,
             # so both wait for the owner. `git_write_execution` is the

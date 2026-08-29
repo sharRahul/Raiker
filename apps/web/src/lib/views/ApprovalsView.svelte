@@ -8,7 +8,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import { api, auth, getToken, setToken, ApiError } from "../api";
   import { alreadyResumedElsewhere, publishApprovalResolved } from "../approvalResume";
-  import type { ApprovalDetailView, ApprovalView } from "../apiTypes";
+  import type { ApprovalDetailView, ApprovalView, OwnerQuestion } from "../apiTypes";
   import { approvalBadge } from "../statusMaps";
   import { capabilityLabel } from "../capabilityModel";
   import { formatTimestamp, humanize, relativeTime } from "../format";
@@ -91,6 +91,91 @@
     } catch (e) {
       selected = null;
       detailError = e instanceof ApiError ? `Could not load approval (${e.status}).` : "Could not load approval.";
+    }
+  }
+
+  // ADD-22 — a question, not an approval.
+  //
+  // Rendered from its own branch and answered through its own route, because
+  // the one thing this surface must never do is let the two blur: an owner who
+  // learns that some entries in the approval queue are harmless multiple-choice
+  // questions is an owner who has been taught to click through the queue. The
+  // model wrote this text, so it is rendered as data — Svelte escapes it — and
+  // the server refuses any label it did not offer.
+  const OWNER_QUESTION_TOOL = "ask_owner_question";
+  const isQuestion = $derived(selected?.approval.tool_name === OWNER_QUESTION_TOOL);
+  const questions = $derived<OwnerQuestion[]>(
+    isQuestion && Array.isArray((selected?.arguments as Record<string, unknown>)?.questions)
+      ? (((selected?.arguments as Record<string, unknown>).questions as OwnerQuestion[]) ?? [])
+      : [],
+  );
+  let picked = $state<Record<string, string[]>>({});
+  let ownWords = $state("");
+
+  function toggle(question: OwnerQuestion, label: string) {
+    const current = picked[question.question] ?? [];
+    if (question.multiSelect) {
+      picked = {
+        ...picked,
+        [question.question]: current.includes(label)
+          ? current.filter((entry) => entry !== label)
+          : [...current, label],
+      };
+    } else {
+      picked = { ...picked, [question.question]: [label] };
+    }
+  }
+
+  const everyQuestionAnswered = $derived(
+    questions.length > 0 &&
+      questions.every((question) => (picked[question.question] ?? []).length > 0),
+  );
+
+  async function answer(useOwnWords: boolean) {
+    if (selected === null || busy) return;
+    busy = true;
+    notice = null;
+    try {
+      const body = useOwnWords
+        ? { response: ownWords.trim() }
+        : {
+            answers: Object.fromEntries(
+              Object.entries(picked)
+                .filter(([, labels]) => labels.length > 0)
+                .map(([question, labels]) => [question, labels.length > 1 ? labels : labels[0]]),
+            ),
+          };
+      const result = await api.answerOwnerQuestion(selected.approval.approval_id, body);
+      notice = {
+        kind: "ok",
+        text: "Answer sent. The turn continues with what you chose — nothing was approved.",
+      };
+      resumable =
+        result.resume?.resumable && result.resume.session_id
+          ? {
+              approval_id: result.approval_id,
+              session_id: result.resume.session_id,
+              queued_calls: 0,
+            }
+          : null;
+      publishApprovalResolved({
+        approvalId: result.approval_id,
+        sessionId: result.resume?.session_id ?? selected.approval.session_id ?? null,
+        turnId: result.resume?.turn_id ?? null,
+        approved: true,
+      });
+      picked = {};
+      ownWords = "";
+      selected = null;
+      await load();
+    } catch (e) {
+      const explained = e instanceof ApiError ? explainReasonCode(e.reasonCode) : null;
+      notice = {
+        kind: "error",
+        text: explained ? `${explained.plain} ${explained.remediation ?? ""}` : "That answer was not accepted.",
+      };
+    } finally {
+      busy = false;
     }
   }
 
@@ -360,7 +445,7 @@
             <td title={a.created_at}>{relativeTime(a.created_at)}</td>
             <td>
               <button type="button" class="btn btn-sm" onclick={() => openDetail(a.approval_id)}>
-                Review
+                {a.tool_name === OWNER_QUESTION_TOOL ? "Answer" : "Review"}
               </button>
             </td>
           </tr>
@@ -378,7 +463,7 @@
   <section class="card detail" aria-labelledby="approval-detail-h">
     <div class="detail-head">
       <h2 id="approval-detail-h">
-        Review {humanize(selected.approval.tool_name)}
+        {isQuestion ? "Answer a question" : `Review ${humanize(selected.approval.tool_name)}`}
       </h2>
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selected = null)}>
         <Icon name="x" size={14} />
@@ -468,12 +553,64 @@
         <p class="diff-path mono">{selected.diff_path}</p>
       {/if}
       <pre class="diff">{selected.diff ?? "{}"}</pre>
-    {:else}
+    {:else if !isQuestion}
       <h3>Proposed arguments (redacted)</h3>
       <pre class="diff">{JSON.stringify(selected.arguments, null, 2)}</pre>
     {/if}
 
-    {#if selected.approval.status === "pending" && !selected.approval.is_expired && selected.approval.critical}
+    {#if isQuestion && selected.approval.status === "pending" && !selected.approval.is_expired}
+      <div class="question-block">
+        <p class="notice">
+          This is a <strong>question</strong>, not an approval. Answering it grants nothing and
+          runs nothing — it tells the turn what you meant so it can carry on.
+        </p>
+        {#each questions as question (question.question)}
+          <fieldset class="question">
+            <legend>{question.header}</legend>
+            <p class="question-text">{question.question}</p>
+            {#each question.options as option (option.label)}
+              <label class="option">
+                <input
+                  type={question.multiSelect ? "checkbox" : "radio"}
+                  name={`q-${question.question}`}
+                  checked={(picked[question.question] ?? []).includes(option.label)}
+                  onchange={() => toggle(question, option.label)}
+                  disabled={busy}
+                />
+                <span><strong>{option.label}</strong> — {option.description}</span>
+              </label>
+            {/each}
+          </fieldset>
+        {/each}
+        <label class="field-label" for="own-words">Or answer in your own words</label>
+        <textarea
+          id="own-words"
+          class="textarea"
+          rows="2"
+          bind:value={ownWords}
+          placeholder="Say something the options do not cover."
+          disabled={busy}
+        ></textarea>
+        <div class="decision-actions">
+          <button
+            type="button"
+            class="btn"
+            onclick={() => answer(true)}
+            disabled={busy || ownWords.trim() === ""}
+          >
+            Send my own answer
+          </button>
+          <button
+            type="button"
+            class="btn btn-primary"
+            onclick={() => answer(false)}
+            disabled={busy || !everyQuestionAnswered}
+          >
+            {busy ? "Sending…" : "Send answer"}
+          </button>
+        </div>
+      </div>
+    {:else if selected.approval.status === "pending" && !selected.approval.is_expired && selected.approval.critical}
       <p class="notice notice-danger">This is a critical action. Re-authenticate before the server can resolve it through the human-only critical lifecycle.</p>
       <div class="decision-actions">
         <button type="button" class="btn btn-danger" onclick={() => beginCriticalDecision("deny")} disabled={busy || criticalBusy}>
@@ -541,6 +678,29 @@
 {/if}
 
 <style>
+  /* ADD-22 — a question reads as a question, not as a softer approval. */
+  .question {
+    border: 1px solid var(--border);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.75rem;
+    margin: 0.5rem 0;
+  }
+  .question legend {
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.7;
+  }
+  .question-text {
+    margin: 0 0 0.5rem;
+    font-weight: 600;
+  }
+  .option {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    padding: 0.25rem 0;
+  }
   /* ADD-02 — a batched turn's approvals sit next to unbatched ones in the same
      list, so the position has to read at a glance without shouting: this is
      context for the decision, not a second risk signal. */

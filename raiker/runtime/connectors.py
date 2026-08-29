@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
+from raiker.models.tool_registry import tool_risk_band
 from raiker.runtime.authority.admission import CapabilityAdmission, capability_admission
 from raiker.runtime.authority.decision_modes import DecisionMode, auto_requires_approval
 from raiker.runtime.executors.sandbox import (
@@ -41,8 +42,11 @@ GITHUB_HOST = "api.github.com"
 MAX_BODY_CHARS = 20_000
 _MAX_FETCH_BYTES = 200_000
 
-# Reading carries the token's repo scope off-machine → not low-risk (like advisor).
-_READ_RISK = "medium"
+# Reading carries the token's repo scope off-machine and spends the owner's
+# credential somewhere else, which is `high` by the definitions in
+# `raiker.policy.risk`. Read from the tool's own declaration rather than
+# restated here, so the band and the reasons for it stay the same fact.
+_READ_RISK = tool_risk_band("connector_read")
 
 _RESOURCE_PATHS = {"issue": "issues", "pull_request": "pulls"}
 _REPO_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")

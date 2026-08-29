@@ -37,6 +37,12 @@ PLANNING_MODES = {"auto", "always", "never_safe_only"}
 #: as declining. It adds no enforcement — `deny` is a decision the runtime
 #: already honours — and it can never widen a gate.
 APPROVAL_MODES = {"manual", "auto", "skip", "dont_ask"}
+
+#: ADD-22 — the tool that asks the owner a question rather than for permission.
+#: Named once here because several modules have to recognise it and none of them
+#: should recognise it by a string of its own: the whole point of the surface is
+#: that a question is never mistaken for an approval, in either direction.
+OWNER_QUESTION_TOOL = "ask_owner_question"
 VOICE_INPUT_MODES = {"typed", "dictated", "mixed"}
 #: Which conversation surface produced a prompt. It selects the operating
 #: protocol the turn is run under and nothing else: a surface can never widen
@@ -121,6 +127,11 @@ EVENT_TYPES = {
     "action_validated",
     "policy_decision",
     "approval_requested",
+    # ADD-22 — the owner answered a mid-turn question. Counts only: how many
+    # questions were asked, how many were answered, and whether they used the
+    # options or their own words. The answer itself goes to the model and the
+    # log does not keep a second copy of it.
+    "owner_question_answered",
     "approval_received",
     "approval_denied",
     # Composer-selected unattended approval policies. These attest that an

@@ -319,6 +319,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-304](#fixed-304--owner-setting-changes-had-no-hookable-governance-boundary) | Medium | Hooks / Settings / web UI | Fixed (was backlog #14, first half; closed 2026-08-28) |
 | [FIXED-305](#fixed-305--the-three-remaining-worth-adding-hook-events-had-no-call-site) | Medium | Hooks / runtime / notifications / web UI | Fixed (closed backlog #14; closed 2026-08-28) |
 | [FIXED-306](#fixed-306--compaction-was-the-thresholds-decision-and-the-owner-had-no-say) | Medium | Chat / context / web UI | Fixed (closed backlog #9; closed 2026-08-29) |
+| [FIXED-307](#fixed-307--four-risk-bands-no-definitions-and-two-of-them-unreachable) | High | Policy / risk classification / governance | Fixed (closed 2026-08-29) |
+| [FIXED-308](#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant) | Medium | Chat / approvals / web UI | Fixed (closed ADD-22 and backlog #17; closed 2026-08-29) |
 
 ---
 
@@ -13153,3 +13155,162 @@ would have written and deletes no turn, another principal's conversation is not
 found, and a `PreCompact` refusal stops the owner's compaction too.
 `apps/web/src/lib/components/MessageActions.test.ts` — the action is absent when
 it cannot work, carries the "removes nothing" claim, and cannot be pressed twice.
+
+---
+
+## FIXED-307 — Four risk bands, no definitions, and two of them unreachable
+
+**Severity: High. Area: Policy / risk classification / governance. Closed
+2026-08-29.**
+
+**Observed.** `RISK_LEVELS` accepted `low`, `medium`, `high` and `critical`, and
+Raiker defined none of them. A band was whatever the literal at each call site
+decided: `PolicyEngine.decide` asserted `high` for every tool that parked, the
+broker asserted `high` in three more places including the `approval_requested`
+event every approval card is built from, four modules held their own
+`_READ_RISK = "medium"` constant, and two more stamped a fixed band on any tool
+that reached them.
+
+Measured across the 46 registered tools, the declared band was exactly
+`read_shaped ? medium : high`. **Four names carried one bit.** Nothing was `low`
+and nothing was `critical` — and both have real behaviour behind them:
+`auto_requires_approval` runs only `low` unprompted, and the router floors
+`critical` to a human-only decision. `DECISION_MODES_SPEC.md` already described
+`auto` as "low runs, medium/high ask, critical floored", which was a document
+running ahead of code that could not reach two of the three outcomes.
+
+The defect an owner feels is the other one. "High risk" meant *this parked*
+rather than *this is dangerous*, so an ordinary workspace write and a force push
+arrived on the queue wearing the same word.
+
+**Fixed.** The bands are defined once, as data, in
+[`raiker/policy/risk.py`](../../raiker/policy/risk.py): each carries what puts an
+action in it, what undoes an action in it, and what the runtime does with one.
+Ten named signals — checkable properties of the action, never of the tool name —
+raise an action's floor, and `describe_risk_model()` renders the whole thing for
+the surface that shows it and the reviewer who checks it. See
+[`RISK_MODEL.md`](../architecture/RISK_MODEL.md).
+
+A tool now declares `risk_signals`, and its `risk` must equal what they produce:
+a `ToolDefinition` whose two halves disagree **does not construct**. The band
+stopped being a word somebody chose and became the consequence of a claim about
+what the tool does.
+
+All 46 tools were reclassified against the definitions. 18 local reads became
+`low`, which is the first time anything could reach `auto`'s unprompted path; 10
+outward-reaching tools became `high` — `gmail_read`, `gcal_read`, `slack_read`,
+`github_read`, `connector_read`, `web_fetch`, `web_search`, `consult_advisor`,
+`run_command` and `background_run` were banded like local file reads while
+spending the owner's credential off-machine; and 8 workspace mutations became
+`medium`, which changes no behaviour at all — they still park — and stops the
+queue calling a checkpointed file write the same thing it calls a push.
+
+Every hardcoded band was removed. The four `_READ_RISK` / `_CALL_RISK` /
+`_CONSULT_RISK` constants now read the tool's own declaration; the policy engine
+and broker carry the action's band instead of asserting `high`; and the subagent
+runner and plugin runtime resolve it through one shared `risk_for_tool`.
+
+**Two latent holes closed by that last change.** The subagent runner wrote `low`
+for every step whatever the tool was — true of every delegable tool *by
+coincidence*, and `low` is the band `auto` runs unprompted, so marking any tool
+delegable would have laundered it silently. The plugin runtime wrote a flat
+`medium` for whatever tool a plugin reached. Both now read the declaration, and
+`tests/test_risk_model.py` asserts the coincidence as a rule.
+
+**Found while doing it.** `risk_for_tool` initially read `TOOL_RISK`, which is
+model-exposed only — and `vector_get` is delegable *and* deliberately absent from
+the model's catalogue, so a subagent step would have crashed on it. The band map
+now covers every registered tool. The conformance test caught this, which is what
+it was written for.
+
+**A safety device that proved itself.** Appending the assessment's reasons to the
+policy decision silently stopped `auto` from recognising an ordinary file write:
+`ToolBroker._is_ordinary_approval_decision` matches the reasons list *exactly*, on
+purpose, so that a composer mode can tell an ordinary action-bound pause from a
+hook request or a managed refusal. The reasons were left alone and only the band
+is carried; the signals behind it are in the tool's own declaration, so the
+assessment is still recomputable without widening that list.
+
+**User-interface outcome.** The approvals queue reports the action's real band.
+`capabilityLabel` no longer throws on an action that answers to no capability
+gate — it said "None" was unrenderable by crashing the whole detail pane.
+
+**Beyond-reference assessment: YES — meaningful improvement.** Claude Code
+publishes its rule lists as data (`claude auto-mode defaults`) and Codex splits
+boundary from approval policy; Raiker takes both — including Codex's
+`crosses_sandbox_boundary`, which it can answer more honestly because its OS
+boundary is measured rather than asserted. What goes beyond either is that a band
+is **derived and recorded with the signals that produced it**, so an assessment is
+recomputable from the audit trail rather than trusted, and a declaration that
+disagrees with itself cannot be committed.
+
+**Evidence.** `tests/test_risk_model.py` — 21 tests covering the definitions, the
+raise-only asymmetry, the derivation invariant, the reachability of every band a
+consumer branches on, and the conformance rules. Four stale assertions that had
+run "is high risk" and "is approval bound" together as one claim were rewritten to
+assert them separately, which is the distinction this entry restores.
+
+---
+
+## FIXED-308 — Raiker could ask permission and could not ask what you meant
+
+**Severity: Medium. Area: Chat / approvals / web UI. Closed 2026-08-29.**
+
+**Observed.** Raiker's only mid-turn interruption was an approval, which asks
+*may I do this*. A turn facing two readings of an instruction had no way to ask
+*which of these did you mean*, so it picked one and the owner found out
+afterwards. Claude Code has `AskUserQuestion` and MCP has `elicitation` for this
+reason. Raised as [ADD-22](TO_BE_ADDED.md#add-22--a-structured-question-to-the-owner-mid-turn).
+
+**The prerequisite, and why it came first.** Scoping this on 2026-08-28 found
+that the approval transport ADD-22 proposed reusing could not carry a question
+honestly: every tool that parked was labelled `high`, so a question would have
+reached the owner as a high-risk approval. That is worse than not shipping it —
+an approval queue works because its entries mean something. FIXED-307 fixed the
+band first; this was built on top of it, and the question is `low`.
+
+**Fixed.** `ask_owner_question` asks 1–4 questions with 2–4 options each,
+matching the reference contract so a skill an owner writes ports. It declares no
+risk signal, holds no capability, and is not delegable — a subagent that could
+interrupt the owner would compete for their attention with none of the turn's
+context, which is why the reference refuses it too.
+
+What makes it safe is that a question and an approval can never be mistaken for
+each other, in either direction:
+
+* the **band is honest** — `low`, and the queue says so;
+* the **routes refuse each other's kind** — `/resolve` returns
+  `approval_is_a_question` and `/answer` returns `approval_is_not_a_question`;
+* no composer mode answers one. `auto` and `skip` are the owner saying "grant the
+  permissions I would have granted", not "decide what I meant";
+* the **answer is bounded by what was asked**. Only a question the model asked and
+  an option it offered comes back, because the answer is handed to the model in a
+  field it already trusts. An owner who wants to say something else has a
+  free-text reply, carried as their own words and labelled that way;
+* the row resolves to `answered`, not `approved`, so the audit trail never
+  describes a grant nobody gave. The log records that a question was answered and
+  how many — never the answer, which goes to the model and nowhere else.
+
+**User-interface outcome.** A question renders as a question: its own card with
+the options as controls, a heading that says **Answer a question**, an **Answer**
+button on the queue row rather than **Review**, and no approve or deny control
+anywhere on it. The raw argument dump is suppressed, because the questions are
+already rendered. The card states plainly that answering grants nothing and runs
+nothing.
+
+**Beyond-reference assessment: YES — meaningful improvement.** The capability is
+parity with Claude Code's `AskUserQuestion`. Doing it with **no authority
+attached in a product where every other interruption carries authority** is not:
+the band is honest rather than borrowed, the two kinds cannot resolve each
+other's rows, and the answer channel accepts only what was offered. The reviewed
+documentation for Cowork, ChatGPT Work, Codex, OpenClaw, DeepSeek Harness and
+Hermes did not establish that separation. It also gives MCP `elicitation` and the
+`Elicitation` / `ElicitationResult` hook events a surface to land on when
+[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks)
+closes.
+
+**Evidence.** `tests/test_owner_question.py` — 22 tests covering the band, the
+shape bounds, the two routes refusing each other, the answer being bounded by
+what was asked, single-answer enforcement, and an audit row that records the
+answering without the answer. `apps/web/src/lib/views/ApprovalsView.test.ts` — the
+card offers no way to approve a question and answers through the question route.

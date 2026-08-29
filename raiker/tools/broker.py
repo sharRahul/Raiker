@@ -10,7 +10,13 @@ from typing import TYPE_CHECKING, Any
 
 from raiker.context.redaction import redact_text
 from raiker.contracts.ids import new_id, utc_now
-from raiker.contracts.models import ClientMetadata, PolicyDecision, ToolAction, ToolResult
+from raiker.contracts.models import (
+    OWNER_QUESTION_TOOL,
+    ClientMetadata,
+    PolicyDecision,
+    ToolAction,
+    ToolResult,
+)
 from raiker.contracts.streaming import TOOL, StreamEvent
 from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
@@ -1312,7 +1318,10 @@ class ToolBroker:
             decision="needs_approval",
             reasons=["turn_posture_requires_approval", *base.reasons],
             requires_user_approval=True,
-            risk_level="high",
+            # The posture is why this parks. It is not a claim about how
+            # dangerous the action is, so the action's own band is carried
+            # through rather than overwritten with "high".
+            risk_level=action.risk_level,
             timestamp=utc_now(),
         )
 
@@ -1349,7 +1358,10 @@ class ToolBroker:
             decision="needs_approval",
             reasons=["hook_requested_approval", *base.reasons],
             requires_user_approval=True,
-            risk_level="high",
+            # A hook asked for a decision. That says nothing about the action's
+            # band, and a hook cannot raise one: hooks make an action stricter
+            # by requiring a decision, never by relabelling it.
+            risk_level=action.risk_level,
             timestamp=utc_now(),
         )
 
@@ -1419,6 +1431,13 @@ class ToolBroker:
         ``None`` intentionally falls back to the normal paused workflow.
         """
         if approval_mode not in {"auto", "skip"} or not self._is_ordinary_approval_decision(action, decision):
+            return None
+        # ADD-22 — a question is not an approval, and no composer mode may answer
+        # one. `auto` and `skip` are the owner saying "grant the permissions I
+        # would have granted"; neither is them saying "and decide what I meant".
+        # An unattended run has nobody to ask, so the question waits — which is
+        # the honest outcome, and the one `dont_ask` already refuses outright.
+        if action.tool_name == OWNER_QUESTION_TOOL:
             return None
         if self.store is None:
             return None
@@ -1836,7 +1855,11 @@ class ToolBroker:
                     "tool_name": action.tool_name,
                     "arguments_preview": self._event_safe_arguments(action),
                     "proposal_preview": proposal_preview,
-                    "risk_level": "high",
+                    # The action's own band. This said "high" for every approval
+                    # ever raised, which is how the word came to mean "this
+                    # parked" rather than "this is dangerous" on the one surface
+                    # where the difference decides what an owner does next.
+                    "risk_level": action.risk_level,
                     "policy_reasons": decision.reasons,
                     "expected_effect": expected_effect,
                     # BUG-218 — present only when Auto withheld this action. It

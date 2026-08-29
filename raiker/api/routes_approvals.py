@@ -10,12 +10,18 @@ from fastapi.responses import StreamingResponse
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.routes_prompts import _record_generated_file_attachments_for_turn, _sse
-from raiker.api.schemas import ResolveApprovalRequest, serialize_dto
+from raiker.api.schemas import (
+    AnswerOwnerQuestionRequest,
+    ResolveApprovalRequest,
+    serialize_dto,
+)
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
 from raiker.approvals.execution import ApprovalExecutionBridge, executable_capability
 from raiker.contracts.ids import utc_now
+from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.control.dashboard import DashboardService
+from raiker.events.types import make_event
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
 from raiker.runtime.authority.models import Principal
@@ -25,6 +31,7 @@ from raiker.runtime.turn_suspension import (
     TurnSuspensionError,
     approval_outcome,
     deserialize_pending_calls,
+    owner_answer_outcome,
 )
 from raiker.storage.sqlite import SQLiteStore
 
@@ -227,6 +234,159 @@ async def get_approval(
     return serialize_dto(view)
 
 
+#: An owner writing their own answer instead of choosing one. Bounded for the
+#: same reason every other free text is: it reaches a model.
+MAX_FREE_TEXT_ANSWER_CHARS = 2_000
+
+
+def _parked_questions(approval_row: dict[str, Any]) -> list[dict[str, Any]]:
+    """The questions this approval parked on, as they were validated and stored."""
+    raw = approval_row.get("arguments_json") or approval_row.get("arguments") or "{}"
+    try:
+        arguments = json.loads(raw) if isinstance(raw, str) else dict(raw)
+    except (TypeError, ValueError):
+        arguments = {}
+    questions = arguments.get("questions")
+    return [item for item in questions if isinstance(item, dict)] if isinstance(questions, list) else []
+
+
+def _checked_answers(
+    questions: list[dict[str, Any]], submitted: dict[str, Any]
+) -> dict[str, Any]:
+    """Every answer must name a question that was asked and an option that was offered.
+
+    The model wrote the questions and the options; the owner picked among them.
+    Accepting a label nobody offered would let whatever posted the answer put
+    text of its own into the model's next turn through a field the model already
+    trusts — so an unrecognised question or label is refused rather than passed
+    through. An owner who wants to say something else has `response`.
+    """
+    by_text = {str(entry.get("question", "")): entry for entry in questions}
+    answers: dict[str, Any] = {}
+    for asked, chosen in submitted.items():
+        question = by_text.get(str(asked))
+        if question is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "unknown_question"},
+            )
+        offered = {
+            str(option.get("label", ""))
+            for option in question.get("options", [])
+            if isinstance(option, dict)
+        }
+        picked = chosen if isinstance(chosen, list) else [chosen]
+        if not picked:
+            continue
+        if len(picked) > 1 and not question.get("multiSelect"):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "single_select_question"},
+            )
+        for label in picked:
+            if str(label) not in offered:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail={"ok": False, "reason_code": "unknown_option"},
+                )
+        answers[str(asked)] = [str(label) for label in picked] if len(picked) > 1 else str(picked[0])
+    if not answers:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={"ok": False, "reason_code": "no_answer_given"},
+        )
+    return answers
+
+
+@router.post("/api/approvals/{approval_id}/answer")
+async def answer_owner_question(
+    approval_id: str,
+    body: AnswerOwnerQuestionRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Answer a mid-turn question and let the turn continue (ADD-22).
+
+    The question parked the turn through the approval transport, and this is the
+    half that is not an approval: nothing is granted, nothing is executed, and
+    the outcome handed back to the model is what the owner chose. An ordinary
+    approval cannot be answered here for the mirror of the reason a question
+    cannot be approved next door — the two kinds resolve through different doors
+    so neither can be mistaken for the other.
+    """
+    session, _principal = _auth_data
+    store = SQLiteStore(_ws(request))
+    user_id = store.principal_user_id(session.principal_id)
+    approval_row = store.load_approval(approval_id, user_id=user_id)
+    if approval_row is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"ok": False, "reason_code": "approval_not_found"},
+        )
+    if str(approval_row.get("tool_name", "")) != OWNER_QUESTION_TOOL:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "approval_is_not_a_question"},
+        )
+
+    questions = _parked_questions(approval_row)
+    response = (body.response or "").strip() or None
+    if response is None:
+        answers = _checked_answers(questions, body.answers)
+    else:
+        if len(response) > MAX_FREE_TEXT_ANSWER_CHARS:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail={"ok": False, "reason_code": "answer_too_long"},
+            )
+        answers = {}
+
+    recorded = store.answer_owner_question(
+        approval_id,
+        answers_json=json.dumps(
+            {"answers": answers, "response": response}, ensure_ascii=False, sort_keys=True
+        ),
+        answered_by=session.principal_id,
+        answered_at=utc_now(),
+    )
+    if not recorded:
+        # Already answered. Refused rather than overwritten: the first answer is
+        # the one the turn resumed on.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "question_already_answered"},
+        )
+    EventLogWriter(store).append(
+        make_event(
+            session_id=str(approval_row.get("session_id") or f"question_{session.principal_id}"),
+            turn_id=str(approval_row.get("turn_id") or "") or None,
+            event_type="owner_question_answered",
+            actor="owner",
+            payload={
+                "approval_id": approval_id,
+                # Which questions were answered and whether the owner used the
+                # options or their own words. Never the answer text: it is the
+                # owner's, and the model receives it without the audit log
+                # keeping a second copy.
+                "question_count": len(questions),
+                "answered_count": len(answers),
+                "free_text": response is not None,
+            },
+        )
+    )
+    return {
+        "approval_id": approval_id,
+        "status": "answered",
+        "answered": len(answers),
+        "resume": _record_resume_outcome(
+            request,
+            store,
+            approval_id,
+            owner_answer_outcome(answers=answers, response=response),
+        ),
+    }
+
+
 @router.post("/api/approvals/{approval_id}/resolve")
 async def resolve_approval(
     approval_id: str,
@@ -255,6 +415,16 @@ async def resolve_approval(
     approval_row = store.load_approval(approval_id, user_id=owner_user_id)
     if approval_row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"ok": False, "reason_code": "approval_not_found"})
+    # ADD-22 — a question is not an approval and cannot be approved. Refused
+    # here rather than tolerated, because "approve" on a question would have to
+    # mean something, and every meaning it could have is wrong: it grants
+    # nothing, so approving it is empty, and answering it with a yes/no would
+    # put words in the owner's mouth that they did not choose.
+    if str(approval_row.get("tool_name", "")) == OWNER_QUESTION_TOOL:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "approval_is_a_question"},
+        )
 
     # BUG-06 — an approved file mutation is actually performed. The relay needs
     # the approval still `pending` (it claims it atomically), so this runs

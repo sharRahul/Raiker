@@ -84,7 +84,7 @@ names.
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
-| [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open — raised 2026-08-22 |
+| [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open remainder — reduced 2026-08-29: the shared `signInAsOwner` exists and accepts either greeting; the other live specs still inline their own |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
@@ -94,6 +94,7 @@ names.
 | [BUG-243](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | **Closed 2026-08-29 (FIXED-314)** — raised while verifying FIXED-311: a question was being used as a filter |
 | [BUG-244](#bug-244--importing-the-same-memory-twice-stores-it-twice) | Low | Memory / import | Open — raised 2026-08-29 while seeding a memory for the FIXED-311 round |
 | [BUG-245](#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one) | Low | Memory / citations | Open — raised 2026-08-29 while closing MEM-08 as FIXED-316 |
+| [BUG-246](#bug-246--the-authority-matrix-is-a-scrollable-table-on-a-phone-and-truncates-its-own-verdicts) | Low | Permissions / web UI | Open — raised 2026-08-29 during the four-width audit |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (15 complete, 3 partial, 2 open; B18 closed 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
@@ -562,6 +563,15 @@ to hold the steps every live spec must take — and sign-in is not in it.
 and have every live spec call it. The four specs added on 2026-08-22 already
 accept both, which is the shape to lift.
 
+**Half of it landed 2026-08-29**, and it landed because the defect bit again in
+exactly the documented way: the B18/MEM-08 round's first run created work in the
+workspace, and its own second run then failed at sign-in on the empty-workspace
+heading. `signInAsOwner(page, base, {user, password})` is now in
+`e2e/hosted-provider.ts`, creates the account when there is none, unlocks when
+there is, and accepts either greeting. **The remainder is the migration**: the
+other live specs still carry their own copy, so each is still one workspace state
+away from failing on its first step.
+
 Not urgent, and deliberately not done in bulk this round: each older spec is the
 evidence behind a closed FIXED entry, and re-running one is how that evidence is
 refreshed — a sweeping edit across thirty of them is a change to thirty pieces of
@@ -710,3 +720,35 @@ text from being able to say more than it is.
 **Required user-interface outcome.** A cited past conversation lists the
 exchanges it returned, and each one opens at that exchange, with the same mark a
 search hit gets.
+
+---
+
+## BUG-246 — The authority matrix is a scrollable table on a phone, and truncates its own verdicts
+
+**Severity: Low. Area: Permissions / web UI. Status: Open — raised 2026-08-29
+during the four-width audit that produced
+[FIXED-318](FIXED_ITEMS.md#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places).**
+
+**Observed.** At 390 px, Permissions → *Delegated authority* renders as a
+four-column table inside a horizontal scroller. The first two columns fit; the
+third is cut mid-word, so the page reads *"Unavail"* under **Raiker agent** for
+every row. Nothing is lost — the container scrolls, the page itself does not, and
+the audit confirmed the responsive contract holds — but the column that carries
+the *verdict* is the one off screen, and a matrix whose answers are the part you
+have to scroll for is not doing its job on that width.
+
+**Why it is Low rather than a defect of the contract.** The information is
+reachable and correct; this is a layout that was designed for a wide screen and
+degraded honestly rather than one that lies. It is filed because "reachable by
+scrolling" and "legible" are different bars, and this table is the one place in
+the app where the difference is visible.
+
+**Proposed fix.** Below the shell's own 1024 px breakpoint, stack each capability
+as a card — the capability name as the heading, owner control and agent verdict
+as a two-item definition list — rather than as a row. `AuthorityMatrix.svelte`
+already receives the whole row per capability, so this is a second rendering of
+the same data and needs no new read.
+
+**Required user-interface outcome.** At a phone width, each capability's owner
+control and agent verdict are readable without a sideways scroll, and the words
+are whole.

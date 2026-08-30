@@ -409,9 +409,12 @@ export function runtimeBlock(gate: CapabilityGate | undefined, label: string): R
     return {
       kind: "gate_off",
       reason: `${label} is not enabled in this runtime.`,
-      action: "Open Permissions to review the capability.",
+      // The link is the instruction. Saying "Open Permissions to review the
+      // capability." above a link labelled "Open Permissions" names the same
+      // destination twice in a row, which reads as two steps.
+      action: "",
       href: "#/capabilities",
-      linkLabel: "Open Permissions",
+      linkLabel: "Review it in Permissions",
     };
   }
   if (isDeferred(gate)) {
@@ -427,17 +430,17 @@ export function runtimeBlock(gate: CapabilityGate | undefined, label: string): R
     return {
       kind: "below_runtime",
       reason: `${label} is enabled, but only at “${humanize(gate.state)}” — this surface needs runtime level.`,
-      action: "Set the capability to “enabled runtime” in Permissions.",
+      action: "",
       href: "#/capabilities",
-      linkLabel: "Open Permissions",
+      linkLabel: "Set it to “enabled runtime” in Permissions",
     };
   }
   return {
     kind: "gate_off",
     reason: `${label} is turned off.`,
-    action: "Turn it on in Permissions.",
+    action: "",
     href: "#/capabilities",
-    linkLabel: "Open Permissions",
+    linkLabel: "Turn it on in Permissions",
   };
 }
 

@@ -16,7 +16,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const CREDENTIALS = { user: "owner", password: "Survey-password-1!" };
 
 test("an untouched gate says which of the three things it means", async ({ page }) => {
   test.setTimeout(180_000);
@@ -25,7 +24,7 @@ test("an untouched gate says which of the three things it means", async ({ page 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/capabilities`);
 
   const webFetch = page.locator(".cap.card", { hasText: "Web fetch" }).first();

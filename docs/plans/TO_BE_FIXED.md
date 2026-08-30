@@ -659,15 +659,18 @@ and thirty-seven different ones mean the suite can only ever be run one spec per
 workspace — which is why every FIXED entry's evidence had to be re-seeded from
 scratch.
 
-**Proposed fix.** One owner credential in `e2e/hosted-provider.ts`, read from
-`RAIKER_LIVE_OWNER` / `RAIKER_LIVE_PASSWORD` with a shipped default, and
-`signInAsOwner(page, base)` with the credentials argument made optional. Each
-spec then names no credential at all, which is the honest amount for a spec that
-is not about sign-in.
+**The fix exists and is used by the specs written for it.**
+`OWNER_CREDENTIALS` in `e2e/hosted-provider.ts` reads `RAIKER_LIVE_OWNER` /
+`RAIKER_LIVE_PASSWORD` with a shipped default, and `signInAsOwner(page, base)`
+takes no credential at all. The four specs added on 2026-08-30 use it, and the
+round that verified them ran all six of their cases against one clean workspace
+in a single pass — which is the property this entry is about.
 
-**Why it is not done here.** It changes the fixture thirty-seven closed FIXED
-entries were verified against, and re-verifying them needs a round of its own —
-the same reason BUG-229's own note gave for not doing the migration in bulk.
+**What is left is the migration of the other thirty-three.** It changes the
+fixture their closed FIXED entries were verified against, and re-verifying them
+needs a round of its own — the same reason BUG-229's own note gave for not doing
+its migration in bulk. Each spec's own password is the only edit; the sign-in
+call above it is already shared.
 
 **Required user-interface outcome.** None; this is harness-only.
 

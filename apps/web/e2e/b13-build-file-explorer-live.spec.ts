@@ -16,7 +16,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const OUT = "../../docs/plans/screenshots/working";
-const CREDENTIALS = { user: "owner", password: "Survey-password-1!" };
 
 test("Build shows the connected repository and reads a file from it", async ({ page }) => {
   test.setTimeout(180_000);
@@ -25,7 +24,7 @@ test("Build shows the connected repository and reads a file from it", async ({ p
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/build`);
 
   // Connect the workspace-contained demo folder, unless a previous run did.

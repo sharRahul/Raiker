@@ -19,7 +19,6 @@ import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const CREDENTIALS = { user: "owner", password: "Survey-password-1!" };
 const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const MARKER = "peregrine falcon deployment window";
@@ -33,7 +32,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
     colorScheme: "light",
   });
   page = await context.newPage();
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
 });
 
 test.afterAll(async () => {

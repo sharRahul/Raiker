@@ -25,7 +25,6 @@ import { expect, test } from "@playwright/test";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const CREDENTIALS = { user: "owner", password: "Guide-accuracy-1!" };
 
 const ROUTES = [
   "workbench", "new-chat", "build", "search-chat", "tasks", "projects", "memory",
@@ -75,7 +74,7 @@ test("no route clips its own content at any of the three widths", async ({ page 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
 
   const found: string[] = [];
   for (const [label, width, height] of WIDTHS) {
@@ -96,7 +95,7 @@ test("the knowledge map fits itself into a phone rather than starting off screen
   page,
 }) => {
   test.setTimeout(300_000);
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${BASE}/#/brain`);
   await expect(page.getByRole("application")).toBeVisible({ timeout: 60_000 });
@@ -136,7 +135,7 @@ test("the graph's two bottom bars do not sit on top of each other on a phone", a
   page,
 }) => {
   test.setTimeout(180_000);
-  await signInAsOwner(page, BASE, CREDENTIALS);
+  await signInAsOwner(page, BASE);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${BASE}/#/brain`);
   const status = page.getByText("Live workspace graph");

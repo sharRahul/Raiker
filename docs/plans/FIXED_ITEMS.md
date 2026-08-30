@@ -14141,9 +14141,13 @@ all.
 sidebar link named *Search Chat*; the rail says **Search chats**. The four guide
 pages that used the old name are corrected too.
 
-**What is left, and it is a different defect.** Each spec still hardcodes its own
-owner password, so two specs cannot share one workspace — the next layer of the
-same problem, recorded as [BUG-247](TO_BE_FIXED.md). Twenty-seven specs sign in
+**What is left, and it is a different defect.** Thirty-three specs still hardcode
+their own owner password, so two of them cannot share one workspace — the next
+layer of the same problem, recorded as [BUG-247](TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password).
+`OWNER_CREDENTIALS` is the answer to it and already ships: `signInAsOwner(page,
+base)` now takes no credential, reading `RAIKER_LIVE_OWNER` /
+`RAIKER_LIVE_PASSWORD` with a default, and the four specs added in this round
+use it. Twenty-seven specs sign in
 *inline* in a test body rather than through a function; three of those
 (`review-first-run-honesty`, `wizard-workbench-composer`, `workbench-live`) sign
 in **as the thing under test** and must keep their own.

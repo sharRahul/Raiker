@@ -1,11 +1,11 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard } from "./hosted-provider";
+import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Add-01-live-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
 
@@ -56,7 +56,7 @@ test.beforeAll(async ({ browser }) => {
   page = await context.newPage();
   await page.goto(`${BASE}/#/models`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible()) {

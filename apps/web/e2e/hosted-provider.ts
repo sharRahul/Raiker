@@ -24,81 +24,106 @@ import { expect, type Locator, type Page } from "@playwright/test";
  * The owner every live spec signs in as, unless it is *about* signing in.
  *
  * BUG-229 shared the sign-in *steps*; this is the fixture half of the same
- * problem. Thirty-seven specs each declare their own password, so two of them
- * cannot be run against one workspace — which is why every FIXED entry's
- * evidence has to be re-seeded from scratch. A password is not evidence about
- * anything a spec asserts.
+ * problem, and BUG-247 closed it. Every live spec used to declare its own
+ * password, so two of them could not be run against one workspace — which is
+ * why every FIXED entry's evidence had to be re-seeded from scratch. A password
+ * is not evidence about anything a spec asserts, so there is one.
  *
  * The environment override exists so a round can point the whole suite at an
- * instance it did not create. Specs still landing on their own credential are
- * tracked as [BUG-247](../../../docs/plans/TO_BE_FIXED.md).
+ * instance it did not create; `RAIKER_LIVE_USER` is accepted alongside
+ * `RAIKER_LIVE_OWNER` because two specs already used that name.
+ *
+ * The three specs that are *about* signing in still bring their own, because
+ * sharing the fixture there would hide the behaviour they exist to check.
  */
 export const OWNER_CREDENTIALS = {
-  user: process.env.RAIKER_LIVE_OWNER ?? "owner",
-  password: process.env.RAIKER_LIVE_PASSWORD ?? "Raiker-live-owner-1!",
+  user: process.env.RAIKER_LIVE_OWNER ?? process.env.RAIKER_LIVE_USER ?? "Rahul",
+  password: process.env.RAIKER_LIVE_PASSWORD ?? "Ithink@10",
 };
 
 /**
- * Complete the first-run model/privacy/backup wizard if it is up.
+ * Complete the first-run setup wizard if it is up, from whichever stage it is on.
  *
  * A brand-new instance opens it over the workbench (FIXED-133), and it is
  * modal: a spec that signs in and goes straight to Models is talking to a page
- * it cannot reach. Skipping is the same choice the sheet offers a person who
- * already knows which provider they are about to connect.
+ * it cannot reach.
+ *
+ * **It is a five-stage wizard, and only `finish` closes it.** The old helper
+ * knew one stage. It clicked "Skip for now" — a control that no longer exists
+ * anywhere in the app — and otherwise clicked "Decide later" and then assumed
+ * the next three stages in a fixed order. A workspace whose setup was *left*
+ * part-way, which is exactly what a previous spec run produces, resumes on the
+ * stage it stopped at: `privacy` offers "Local-first"/"Balanced"/"Back" and
+ * none of the three names the helper waited for. Every spec run against that
+ * workspace then failed at sign-in, which is the property BUG-247 and BUG-248
+ * exist to remove.
+ *
+ * So the wizard is driven by *reading which stage is on screen* and answering
+ * that stage, until the wizard is gone. That works from any entry stage, and it
+ * finishes setup rather than deferring it — a deferred wizard is the state that
+ * traps the next run.
  */
 export async function dismissFirstRunModelSetup(page: Page): Promise<boolean> {
-  const skip = page.getByRole("button", { name: "Skip for now" });
-  if (await skip.isVisible().catch(() => false)) {
-    await skip.click();
-    await expect(skip).toBeHidden({ timeout: 30_000 });
-    return true;
-  }
-
-  // FIXED-172 replaced the old one-click sheet with the five-stage setup
-  // wizard. Live provider scenarios deliberately defer model selection here,
-  // choose the hosted-compatible privacy posture, and defer backup; the model
-  // itself is still connected through Models in the next step.
-  //
-  // The model stage's own controls arrive with `GET /api/setup`, and the stage
-  // now carries a provider row per backend which it populates afterwards. A
-  // sampled `isVisible()` therefore returned false on a wizard that was simply
-  // still loading, and the caller went on to assert against a screen it had not
-  // actually left. The wizard is *waited for* rather than sampled, and a run that
-  // was never on it says so by the wait expiring.
-  //
-  // "Continue" is the same button once a model has been pinned on this screen,
-  // which a spec that connects a provider in the wizard will have done.
-  const advance = page.getByRole("button", { name: /^(Decide later|Continue)$/ });
-  const onWizard = await advance
+  const title = page.locator("#setup-title");
+  // Waited for rather than sampled: the wizard mounts only once the bootstrap
+  // reads resolve, which is after the navigation that showed this page
+  // returned. A run that was never on it says so by the wait expiring.
+  const onWizard = await title
     .waitFor({ state: "visible", timeout: 20_000 })
     .then(() => true)
     .catch(() => false);
   if (!onWizard) return false;
-  await advance.click();
-  await page.getByRole("button", { name: "Balanced" }).click();
-  await page.getByRole("button", { name: "Set up later" }).click();
-  await page.getByRole("button", { name: "Open Workbench" }).click();
-  await expect(page).toHaveURL(/#\/home$/, { timeout: 30_000 });
-  await expect(advance).toBeHidden({ timeout: 30_000 });
-  return true;
+
+  // Five stages, and `Back` on three of them, so a loop that could revisit one
+  // is bounded rather than trusted.
+  for (let step = 0; step < 8; step += 1) {
+    if (!(await title.isVisible().catch(() => false))) return true;
+    const heading = ((await title.textContent()) ?? "").trim();
+    if (heading.startsWith("Preparing")) {
+      await page.waitForTimeout(500);
+      continue;
+    }
+    if (heading.startsWith("Choose where Raiker thinks")) {
+      // "Decide later" and "Continue" are the same button; which one it is
+      // depends on whether a model was pinned on this screen, and either
+      // advances. The model itself is connected through Models afterwards.
+      await page.getByRole("button", { name: /^(Decide later|Continue)$/ }).click();
+    } else if (heading.startsWith("Choose your privacy boundary")) {
+      // Balanced, because a live round connects a hosted provider and
+      // local-first would leave it refused for a reason the spec is not about.
+      await page.getByRole("button", { name: "Balanced" }).click();
+    } else if (heading.startsWith("Create your first backup")) {
+      await page.getByRole("button", { name: "Set up later" }).click();
+    } else if (heading.startsWith("Your Raiker is ready")) {
+      await page.getByRole("button", { name: "Open Workbench" }).click();
+      await expect(title).toBeHidden({ timeout: 30_000 });
+      return true;
+    } else {
+      // An unknown stage is a wizard change, not something to guess at.
+      throw new Error(`Unrecognised setup stage: ${heading}`);
+    }
+    await expect(title).not.toHaveText(heading, { timeout: 30_000 });
+  }
+  throw new Error("The setup wizard did not reach its final stage");
 }
 
 /**
  * The Models page, on the tab that actually holds the hosted provider cards.
  *
- * The sheet is re-asserted on every *load*, and skipping it during sign-in does
- * not survive one — so the first real navigation meets it again. Waiting for
- * "either the tab or the sheet" rather than polling for the sheet immediately
- * is what makes this deterministic: the sheet appears only once the bootstrap
- * reads have resolved, which is after `goto` returns.
+ * The wizard is re-asserted on every *load* until setup is finished, so the
+ * first real navigation meets it again. Waiting for "either the tab or the
+ * wizard" rather than polling for the wizard immediately is what makes this
+ * deterministic: the wizard mounts only once the bootstrap reads have resolved,
+ * which is after `goto` returns. It is identified by its own heading rather
+ * than by a control on one of its stages, because a workspace resumed part-way
+ * shows a stage that has neither of the buttons this used to wait for.
  */
 export async function openHostedProviders(page: Page, base: string): Promise<void> {
   const hosted = page.getByRole("tab", { name: "Hosted" });
-  const skip = page.getByRole("button", { name: "Skip for now" });
-  const decideLater = page.getByRole("button", { name: "Decide later" });
+  const wizard = page.locator("#setup-title");
   for (let attempt = 0; attempt < 3; attempt += 1) {
     await page.goto(`${base}/#/models?tab=hosted`);
-    await expect(hosted.or(skip).or(decideLater).first()).toBeVisible({ timeout: 30_000 });
+    await expect(hosted.or(wizard).first()).toBeVisible({ timeout: 30_000 });
     if (!(await dismissFirstRunModelSetup(page))) break;
   }
   await expect(hosted).toBeVisible({ timeout: 30_000 });
@@ -324,8 +349,11 @@ export async function signInAsOwner(
   const workbench = page.getByRole("heading", {
     name: /Welcome (back|to your Work Dashboard)/,
   });
+  // The wizard is identified by its own heading rather than by a button on one
+  // of its five stages: a workspace that left setup part-way resumes on the
+  // stage it stopped at, and "Decide later" lives on only one of them.
   await expect(
-    page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
+    page.locator("#setup-title").or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
   await dismissFirstRunModelSetup(page);
   // Signed in, rather than *on the workbench*. A workspace with a saved startup

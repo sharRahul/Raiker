@@ -5,15 +5,11 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture } from "./capture";
-import {
-  dismissFirstRunModelSetup,
-  refreshHostedReadiness,
-  useHostedModel,
-} from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, refreshHostedReadiness, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Ithink@10";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 test.describe.configure({ mode: "serial" });
 
@@ -94,7 +90,7 @@ test("BUG-242 — Build comes back to the conversation after a reload", async ()
   // again — and the URL survives it, which is what carries the owner back to
   // the conversation they were in rather than to an empty one.
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("Rahul");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
   await dismissFirstRunModelSetup(page);

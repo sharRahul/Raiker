@@ -1,11 +1,11 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard } from "./hosted-provider";
+import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Bug-review-password-C1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
 
@@ -19,12 +19,12 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.goto(`${BASE}/#/models`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 20_000 });
   if (await page.getByLabel("Confirm password").isVisible()) {
-    await page.getByLabel("Username").fill("owner");
+    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("Confirm password").fill(PASSWORD);
     await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
   } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill("owner");
+    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: /Unlock Raiker/i }).click();
   }
@@ -77,7 +77,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.getByRole("button", { name: "Graph settings" }).click();
   await page.getByLabel("Graph settings").getByText("Always alive").click();
   await page.reload();
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: /Unlock Raiker/i }).click();
   await expect(page.getByRole("application", { name: /knowledge graph/i })).toBeVisible({ timeout: 20_000 });
@@ -122,7 +122,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   );
   await page.getByRole("button", { name: "Send", exact: true }).click();
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 180_000 });
-  const login = await request.post(`${BASE}/api/auth/login`, { data: { username: "owner", password: PASSWORD } });
+  const login = await request.post(`${BASE}/api/auth/login`, { data: { username: OWNER_CREDENTIALS.user, password: PASSWORD } });
   expect(login.ok()).toBeTruthy();
   const token = (await login.json()).token as string;
   const sessionResponse = await request.get(`${BASE}/api/sessions`, { headers: { Authorization: `Bearer ${token}` } });
@@ -133,7 +133,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
   await page.goto(`${BASE}/#/new-chat?session=${parked.session_id}`);
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 20_000 });
   await page.reload();
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: /Unlock Raiker/i }).click();
   await expect(page.getByText("Waiting for approval", { exact: true })).toBeVisible({ timeout: 20_000 });

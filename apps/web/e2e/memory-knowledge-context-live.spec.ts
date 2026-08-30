@@ -1,31 +1,19 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
+import { signInAsOwner } from "./hosted-provider";
 
 test("live Memory, Knowledge Map, and context usage review", async ({ page }) => {
-  await page.goto("http://127.0.0.1:8765/#/memory");
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
-  if (await page.getByLabel("Confirm password").isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
-    await page.getByLabel("Confirm password").fill("Live-review-password-C1!");
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible({ timeout: 15_000 });
-  } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
-    await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-    await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible({ timeout: 15_000 });
-  }
+  await signInAsOwner(page, "http://127.0.0.1:8765");
 
   await page.goto("http://127.0.0.1:8765/#/memory");
-  await expect(page.getByRole("heading", { name: "Memory", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Memory", level: 1 })).toBeVisible();
   await expect(page.getByRole("switch", { name: "Incognito session" })).toBeVisible();
   await expect(page.getByText("No approved memories yet")).toBeVisible();
   await expect(page.getByText("Advanced memory management")).toBeVisible();
   await capture(page, "../../docs/plans/screenshots/working/memory-redesign-live.png");
 
   await page.goto("http://127.0.0.1:8765/#/brain");
-  await expect(page.getByRole("heading", { name: "Knowledge Map", level: 2 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Knowledge Map", level: 1 })).toBeVisible();
   await expect(page.getByRole("application", { name: /Interactive force-directed knowledge graph/i })).toBeVisible();
   await expect(page.getByRole("button", { name: "Global" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Local" })).toBeVisible();

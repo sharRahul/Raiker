@@ -18,7 +18,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Single-runtime-review-password-1!";
 
 // A 1×1 PNG, built here rather than read from disk so the spec carries its own
 // fixture and cannot fail on a missing file.
@@ -34,7 +33,7 @@ const PNG_BASE64 =
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(page: Page) {
-  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(page, BASE);
 }
 
 test.describe.configure({ mode: "serial" });

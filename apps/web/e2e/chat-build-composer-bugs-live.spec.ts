@@ -11,13 +11,13 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner } from "./hosted-provider";
+import { OWNER_CREDENTIALS, signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 // Anchored to this file rather than to the working directory, so evidence lands
 // in the repository whether the runner is started from apps/web or the root.
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Composer-bugs-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 /** Create (or reuse) the owner account and land on the workbench. */
 /**
@@ -29,7 +29,7 @@ const PASSWORD = "Composer-bugs-review-password-1!";
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(page: Page) {
-  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(page, BASE);
 }
 
 // One sign-in for the whole file. The runtime rate-limits authentication (a
@@ -178,7 +178,7 @@ test("BUG-24 — the resumable-turn channel is live and account-scoped", async (
   // has unblocked — ids and the decision only, never conversation state. This
   // is what a Chat tab that did not record the decision reads to continue.
   const login = await request.post(`${BASE}/api/auth/login`, {
-    data: { username: "owner", password: PASSWORD },
+    data: { username: OWNER_CREDENTIALS.user, password: PASSWORD },
   });
   expect(login.ok()).toBeTruthy();
   const token = (await login.json()).token as string;

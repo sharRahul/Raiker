@@ -1,6 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 /**
  * BUG-69's live evidence, runnable with **one** provider key (BUG-84).
@@ -33,7 +34,7 @@ const SHOTS = join(
   "output",
   "playwright",
 );
-const PASSWORD = "Bug-69-live-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 interface ProviderLeg {
   provider: string;
@@ -206,7 +207,7 @@ test("BUG-69 first-run gate and readiness state machine, per available provider"
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({
     timeout: 30_000,
   });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirmPassword = page.getByLabel("Confirm password");
   if (await confirmPassword.isVisible()) {

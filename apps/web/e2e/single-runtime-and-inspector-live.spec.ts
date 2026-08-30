@@ -19,7 +19,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Single-runtime-review-password-1!";
 
 /**
  * BUG-229 — sign in through the one shared helper.
@@ -30,7 +29,7 @@ const PASSWORD = "Single-runtime-review-password-1!";
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(page: Page) {
-  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(page, BASE);
 }
 
 // One sign-in for the whole file: the runtime rate-limits authentication (a

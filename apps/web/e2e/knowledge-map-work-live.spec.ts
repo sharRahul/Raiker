@@ -16,11 +16,11 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup } from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = "Knowledge-map-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 test("the Knowledge Map shows chats, build, projects, context and files", async ({ page }) => {
   test.setTimeout(180_000);
@@ -31,7 +31,7 @@ test("the Knowledge Map shows chats, build, projects, context and files", async 
 
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

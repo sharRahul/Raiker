@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 /**
  * The containment surface, against a workspace that really has a contained
@@ -28,14 +29,14 @@ import { join } from "node:path";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Round-0810-live-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 test("a contained subject is visible, explained, and revocable", async ({ page }) => {
   test.setTimeout(180_000);
 
   await page.goto(`${BASE}/#/home`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Unlock Raiker" }).click();
   await expect(page.getByRole("navigation", { name: /navigation/i })).toBeVisible({

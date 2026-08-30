@@ -26,7 +26,6 @@ import { checkModelReady, hostedProviderCard, signInAsOwner } from "./hosted-pro
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Batched-approval-queue-1!";
 const STUB_ENDPOINT = process.env.RAIKER_LIVE_STUB_ENDPOINT ?? "http://127.0.0.1:8811/v1";
 const MODEL = "raiker-batch-stub";
 
@@ -44,7 +43,7 @@ let page: Page;
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(target: Page) {
-  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, BASE);
 }
 
 /** The pending approval the batch is currently stopped on. */

@@ -6,11 +6,11 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
 import { capture, captureElement } from "./capture";
-import { dismissFirstRunModelSetup, refreshHostedReadiness } from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, refreshHostedReadiness } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Ithink@10";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 test.describe.configure({ mode: "serial" });
 
@@ -20,7 +20,7 @@ let page: Page;
 async function signIn() {
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("Rahul");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   await page.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
   await dismissFirstRunModelSetup(page);

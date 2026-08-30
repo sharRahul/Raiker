@@ -97,6 +97,7 @@ names.
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) | Low | Live test harness | Open — raised 2026-08-30 while closing BUG-229. Thirty-seven specs share the steps and not the fixture |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open — raised 2026-08-30 while closing BUG-229. Three of them must keep their own |
+| [BUG-249](#bug-249--a-fixed_items-link-points-at-a-heading-that-does-not-exist) | Low | Documentation / CI | Open — raised 2026-08-30. One line, and `test_docs_consistency` is red on it |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (16 complete, 3 partial, 1 open; B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
@@ -701,3 +702,44 @@ test*; sharing the helper there would hide the behaviour they exist to check.
 how the evidence behind its FIXED entry is refreshed rather than invalidated.
 
 **Required user-interface outcome.** None; this is harness-only.
+
+---
+
+## BUG-249 — A FIXED_ITEMS link points at a heading that does not exist
+
+**Severity: Low. Area: documentation / CI. Status: Open — raised 2026-08-30
+while closing [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things)'s
+live half.**
+
+**Observed.** `tests/test_docs_consistency.py::test_documentation_links_and_anchors_resolve`
+fails, and it is the only Python check that does:
+
+```
+docs/plans/FIXED_ITEMS.md -> #fixed-288--three-defects-found-while-exercising-the-closed-items-live (no such heading)
+```
+
+**Root cause.** FIXED-322's entry cites FIXED-288, and the citation was written
+from memory of that entry's title rather than from the heading. The heading is
+"Three interface defects found while exercising the four above"; the link says
+"Three defects found while exercising the closed items live". Both ends live in
+`FIXED_ITEMS.md`, so nothing outside that file can resolve it.
+
+**The fix is one line**, at `docs/plans/FIXED_ITEMS.md:14023`:
+
+```sh
+sed -i 's|#fixed-288--three-defects-found-while-exercising-the-closed-items-live|#fixed-288--three-interface-defects-found-while-exercising-the-four-above|' docs/plans/FIXED_ITEMS.md
+```
+
+**Why it is open rather than closed.** The session that raised it lost its git
+push credential and pushed the rest of its work through the GitHub API, which
+requires a file's whole content in one call. `FIXED_ITEMS.md` is 818,574 bytes —
+past what a single call can carry — and there is no smaller edit elsewhere,
+because the link and the heading it misses are both inside it.
+
+**What this says about the guard, which is the part worth keeping.** The check
+did its job: an anchor written from memory is exactly the drift it exists to
+catch, and it caught it on the first run after the entry was added. The entry
+that broke it is itself about a surface describing a gate from memory instead of
+from the enforcing path, which is the same mistake one level up.
+
+**Required user-interface outcome.** None; this is documentation-only.

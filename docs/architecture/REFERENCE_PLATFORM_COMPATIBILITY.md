@@ -877,8 +877,18 @@ carries every round it went through stops describing the product as it is and
 becomes a record of how it got there; both are worth having, and they answer
 different questions. **Where a review and Part 2 disagree, Part 2 is current.**
 
-**The most recent round is 2026-08-30** — what a coding surface must show, what
-a permission surface must say, and what a citation must open. Its finding, stated
+**The most recent round is 2026-08-30 (second pass)** — what happens to a turn
+when the person reading it leaves, what a compact layout may take away, and
+whether an observability surface describes the thing it links to. Its finding,
+stated plainly because it is not flattering either: a turn that was destroyed by
+the owner navigating away is **parity work**, not a differentiator — every
+compared platform persists a reply regardless of the client. What goes beyond
+the set is the half around it: keeping the runtime detachable *without* losing
+the guarantee that a stop issued between two events lands before the next one is
+produced, and deriving the change digest from the transcript's own phase map
+rather than from a curated list of important event names. The round before it
+covered what a coding surface must show, what a permission surface must say, and
+what a citation must open. Its finding, stated
 plainly because it is not flattering: the file explorer Build gained is
 **parity**, and it was overdue. What goes beyond the reference set is what was
 done *around* it — the viewer having no write path at all, so a change is a

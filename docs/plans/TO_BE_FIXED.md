@@ -98,6 +98,7 @@ names.
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced 2026-08-30 to twenty; seven converted and re-run, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
+| [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — raised 2026-08-30, the first thing found by actually running a round against one workspace |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (16 complete, 3 partial, 1 open; B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
@@ -698,3 +699,57 @@ how the evidence behind its FIXED entry is refreshed rather than invalidated.
 [FIXED-326](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist).**
 One line, and `test_docs_consistency` is green. The guard did its job: an anchor
 written from memory is exactly the drift it exists to catch.
+
+---
+
+## BUG-250 — A shared live workspace carries state between specs
+
+**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-30, and
+it is the first thing found by actually running a round against one workspace
+rather than re-seeding one per spec.**
+
+**Observed.** With
+[FIXED-327](FIXED_ITEMS.md#fixed-327--the-setup-wizard-trapped-every-live-spec-after-the-first-one)
+and [FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)
+in, a round finally *can* share a workspace — and three specs then failed for a
+reason none of them is about. Every one is a spec asserting the state a first
+run leaves rather than the behaviour it is named for:
+
+* `bug-74-84-known-limits-live` asserted the readiness window still reads `5`,
+  the shipped default, in a spec that sets it to `30`. Fixed here: it asserts
+  the bound the control states and round-trips a value that differs from the
+  stored one, the same re-runnable shape the readiness chip beside it already
+  used.
+* `bug-74-84-known-limits-live` also clicked **Connect**/**Reconnect** on the
+  provider card. Reconnect moved into Details (BUG-208 slice E), so a card that
+  is already connected offers neither and the spec hung for its full ten-minute
+  timeout. Fixed here by going through `connectHostedProvider`, which knows both
+  routes.
+* `bug-58-known-limits-live` needs three seeded marker files and, in its own
+  preamble, a fresh workspace: two of its claims are about what a gate does
+  *before the owner has touched it*, and the run itself turns `web_fetch` on.
+  That one is correct as written and simply cannot share a workspace.
+
+**And one that is the product working as designed.** `read_file` was contained
+after three consecutive `not_found` failures from an earlier spec's turns, so a
+later spec's read batch met a paused tool. Containment is owner-visible,
+persistent and exactly what it should be; what is missing is that the harness
+has no notion of *resetting the workspace's earned state* between specs that
+need a clean one.
+
+**Proposed fix.** Not one flag. Two separate things, in this order:
+
+1. Mark the specs that genuinely require a first-run workspace, so a round can
+   run them in their own instance rather than discovering it by failing.
+   `bug-58-known-limits-live`, `default-ollama-live` and the three sign-in specs
+   BUG-248 names are the known set.
+2. For the rest, make each assertion re-runnable the way the two above now are:
+   assert the behaviour and the stated bounds, not the value a fresh install
+   happens to hold.
+
+**Why this is not a defect in the product.** Nothing here is Raiker behaving
+wrongly. It is the suite having been written, spec by spec, against a workspace
+that was always new — which is the assumption BUG-229, BUG-247 and BUG-248 have
+been peeling away one layer at a time, and this is the layer under them.
+
+**Required user-interface outcome.** None; harness-only.

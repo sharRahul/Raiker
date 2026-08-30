@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner } from "./hosted-provider";
+import { connectHostedProvider, signInAsOwner } from "./hosted-provider";
 
 /**
  * Live evidence for the 2026-08-10 round: FIXED-161 through FIXED-170.
@@ -85,7 +85,20 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await expect(containment.getByRole("heading", { name: "Monitored capabilities" })).toBeVisible({
     timeout: 30_000,
   });
-  await expect(containment.getByText(/Connectors, plugins, subagents/)).toBeVisible();
+  // What FIXED-163/164 requires is that the section states which subjects are
+  // watched and offers the control — not that the workspace happens to be
+  // empty, and not the three kinds ("Connectors, plugins, subagents") the copy
+  // named several rounds ago. A spec pinned to copy nobody re-ran against is
+  // the drift BUG-247 and BUG-248 exist to expose; corrected 2026-08-30.
+  const subjects = containment.locator("li");
+  if ((await subjects.count()) === 0) {
+    await expect(containment.getByText(/Nothing is contained/i)).toBeVisible();
+  } else {
+    await expect(subjects.first()).toContainText(/paused|contained|active/i);
+    await expect(
+      containment.getByRole("button", { name: /Resume|Pause/ }).first(),
+    ).toBeVisible();
+  }
   await containment.scrollIntoViewIfNeeded();
   await capture(page, join(SHOTS, "round0810-04-capability-containment.png"));
 
@@ -93,8 +106,14 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await visit(page, "settings?tab=runtime");
   const ttl = page.getByRole("spinbutton", { name: /Re-confirm after/ });
   await expect(ttl).toBeVisible({ timeout: 30_000 });
-  await expect(ttl).toHaveValue("5");
-  await ttl.fill("30");
+  // Re-runnable, like the readiness chip below. What FIXED-169 requires is that
+  // the window is the *owner's* and that its bounds are stated — both of which
+  // the control's own accessible name carries. Asserting the value is 5 asserts
+  // that nobody has ever changed it, which stops being true the first time this
+  // spec runs, and this spec sets it.
+  await expect(ttl).toHaveAccessibleName(/Between 1 and 120 minutes\. The default is 5\./);
+  const chosen = (await ttl.inputValue()) === "30" ? "45" : "30";
+  await ttl.fill(chosen);
   await ttl.blur();
   // Settings stages edits and saves them explicitly, so the round trip has to go
   // through Save changes — otherwise this would only prove the input remembers
@@ -106,7 +125,7 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await visit(page, "settings?tab=general");
   await expect(page.getByRole("heading", { name: "General" })).toBeVisible();
   await visit(page, "settings?tab=runtime");
-  await expect(page.getByRole("spinbutton", { name: /Re-confirm after/ })).toHaveValue("30");
+  await expect(page.getByRole("spinbutton", { name: /Re-confirm after/ })).toHaveValue(chosen);
   await page.getByRole("heading", { name: /How long a model check stays good/ })
     .scrollIntoViewIfNeeded();
   await capture(page, join(SHOTS, "round0810-05-readiness-window-setting.png"));
@@ -119,12 +138,19 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   await capture(page, join(SHOTS, "round0810-06-model-activity.png"));
 
   // FIXED-133 — a real provider, connected through the UI, answering a turn.
-  await visit(page, "models?tab=hosted");
-  const card = page.locator("article.provider-card").filter({ hasText: "Anthropic" });
-  await card.getByRole("button", { name: /^(Connect|Reconnect)$/ }).click();
-  await page.getByLabel("Anthropic API key").fill(ANTHROPIC_KEY);
-  await page.locator(".signin-connect").click();
-  await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
+  //
+  // Through the shared helper rather than its own copy: **Reconnect** moved
+  // into Details (BUG-208 slice E), so a card that is already connected offers
+  // neither of the two buttons this used to click, and the spec hung for ten
+  // minutes on a workspace any earlier spec had touched. The helper knows both
+  // routes and closes the details sheet behind itself.
+  const card = await connectHostedProvider(
+    page,
+    BASE,
+    "Anthropic",
+    "Anthropic API key",
+    ANTHROPIC_KEY,
+  );
   await capture(page, join(SHOTS, "round0810-07-anthropic-connected.png"));
 
   await card.getByRole("button", { name: /Choose model|Change model/ }).click();

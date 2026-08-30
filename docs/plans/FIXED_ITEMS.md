@@ -14020,7 +14020,7 @@ The page then says it. A row whose stored state is off and whose enforcing path
 says yes reads **On by default** instead of **Off**, its card names which rule
 applies, and its only action is **Turn off** — which is the one thing such a
 capability can actually do, and it writes the row that wins from then on.
-Offering **Turn on** beside "on by default" is [FIXED-288](#fixed-288--three-defects-found-while-exercising-the-closed-items-live)'s
+Offering **Turn on** beside "on by default" is [FIXED-288](#fixed-288--three-interface-defects-found-while-exercising-the-four-above)'s
 defect the other way round.
 
 **Two sentences, because they are two different facts.** For `shipped_default`

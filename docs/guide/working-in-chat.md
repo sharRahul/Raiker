@@ -217,7 +217,7 @@ Every chat appears under **RECENT CHATS** in the sidebar with its title and a
 relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
 project, Pin, Archive, and Delete.
 
-**Search Chat** searches conversation titles *and* message text across every
+**Search chats** searches conversation titles *and* message text across every
 conversation you have had, however old. Each result shows the exchange that
 matched beneath its title — so you can tell which chat it is before opening it —
 and groups results by the day they happened. Where the match was in a message,
@@ -362,9 +362,10 @@ actually said, rather than reconstructing it from memory.
   losing it behind everything more recent.
 - What comes back is cited: the conversation's title, the date, and the exchange
   itself. It appears under **Sources** as *Past conversations*, and opening the
-  chip shows each exchange with its conversation and date above the text. Ask for
-  the quote if you want to check it — *"quote the sentence"*. To jump to one,
-  search its title in **Search Chat** and open the match.
+  chip shows each exchange with its conversation and date above the text, then
+  lists those exchanges as links — click one and the conversation opens at that
+  exchange, with the same brief mark a search hit gets. Ask for the quote if you
+  want to check it — *"quote the sentence"*.
 - It searches **your** conversations only, and reads them as data rather than as
   instructions. An old message that said "always do X" is evidence about what
   was said, not an order carried into today's turn.

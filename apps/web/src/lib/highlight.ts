@@ -269,3 +269,39 @@ export function highlight(source: string, language: string): string {
   out += escapeHtml(source.slice(cursor));
   return out;
 }
+
+/**
+ * Filenames whose language is in the name rather than the extension.
+ *
+ * Kept separate from the extension map because these are whole names: a file
+ * called `Dockerfile.bak` is not a Dockerfile, and matching on a prefix would
+ * say it was.
+ */
+const FILENAME_LANGUAGES: Record<string, string> = {
+  dockerfile: "dockerfile",
+  makefile: "makefile",
+  ".gitignore": "text",
+  ".dockerignore": "text",
+  ".env": "shell",
+};
+
+/**
+ * The language token to highlight a file as, from its name alone (B13).
+ *
+ * Returns `""` when nothing in the name says what the file is — the viewer then
+ * renders plain escaped text with no label, which is the same refusal to guess
+ * `highlight()` makes for an unknown fence. Mis-highlighting reads as a claim
+ * about what the file is, and a wrong claim is worse than none.
+ */
+export function languageForFilename(filename: string): string {
+  const name = filename.split("/").pop()?.toLowerCase() ?? "";
+  if (name === "") return "";
+  const whole = FILENAME_LANGUAGES[name];
+  if (whole !== undefined) return whole;
+  const dot = name.lastIndexOf(".");
+  if (dot <= 0 || dot === name.length - 1) return "";
+  const extension = name.slice(dot + 1);
+  if (Object.hasOwn(GRAMMARS, extension)) return extension;
+  if (Object.hasOwn(LABELS_ONLY, extension)) return extension;
+  return "";
+}

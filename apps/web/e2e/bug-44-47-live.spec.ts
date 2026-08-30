@@ -51,7 +51,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const SOURCE = "http://127.0.0.1:8765";
 const PACKAGED = "http://127.0.0.1:8766";
@@ -68,19 +68,9 @@ test.describe.configure({ mode: "serial" });
 let context: BrowserContext;
 let page: Page;
 
+/** BUG-229 — the one shared sign-in; this spec drives two instances. */
 async function signIn(target: Page, base: string) {
-  await target.goto(`${base}/#/workbench`);
-  await expect(target.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  const confirm = target.getByLabel("Confirm password");
-  await target.getByLabel("Username").fill("owner");
-  await target.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await target.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await target.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  await expect(target.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 30_000 });
+  await signInAsOwner(target, base, { user: "owner", password: PASSWORD });
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

@@ -333,6 +333,11 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-318](#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places) | Low | Web UI / accessibility | Fixed (raised and closed 2026-08-29) |
 | [FIXED-319](#fixed-319--importing-the-same-memory-twice-stored-it-twice) | Low | Memory / import | Fixed (was BUG-244; closed 2026-08-29) |
 | [FIXED-320](#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | Fixed (was BUG-246, raised and closed 2026-08-29) |
+| [FIXED-321](#fixed-321--build-could-change-a-repository-and-never-show-it) | Medium | Build / web UI | Fixed (was GAP-BUILD B13; closed 2026-08-30) |
+| [FIXED-322](#fixed-322--permissions-said-off-about-a-capability-that-would-have-run) | Low | Capability gates / web UI | Fixed (was BUG-239's live half; closed 2026-08-30) |
+| [FIXED-323](#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | Fixed (was BUG-245; closed 2026-08-30) |
+| [FIXED-324](#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | Fixed (was BUG-229's remainder; closed 2026-08-30) |
+| [FIXED-325](#fixed-325--a-phone-was-clipping-the-models-page-and-the-knowledge-map-never-resized) | Medium | Web UI / responsive | Fixed (raised and closed 2026-08-30) |
 
 ---
 
@@ -13904,3 +13909,305 @@ agent verdict are readable without a sideways scroll, and the words are whole.
 
 **Evidence.** [`bug-246-01-authority-at-phone-width.png`](screenshots/working/bug-246-01-authority-at-phone-width.png).
 `apps/web/src/lib/components/AuthorityMatrix.test.ts` and the live spec above.
+
+---
+
+## FIXED-321 — Build could change a repository and never show it
+
+**Severity: Medium. Area: Build / web UI. Closed 2026-08-30 (was GAP-BUILD B13).**
+
+**Observed.** Build ran a governed coding turn against a connected repository and
+offered no way to *look* at it. `ProjectTreeNode.svelte` existed, `ProjectExplorer`
+existed and was mounted on Projects, and Build mounted neither — so seeing what
+the agent was working in, or reading the file it had just changed, meant leaving
+the app for a terminal or an editor. The one thing a coding session does
+constantly was the one thing the workspace could not do.
+
+**Why.** The explorer was built for a *project* root and reached its files
+through `/api/projects/{id}/browse`. Build's boundary is a **repository** — a
+workspace-contained folder or a GitHub coordinate recorded in `code_repos` — and
+there was no read for that at all, not even a directory listing. There was also
+no route that returned a file's *contents* anywhere in the product: the
+attachment reader serves stored attachments, and a repository file is neither.
+
+**Fixed — two reads and one panel, and nothing else.**
+
+`raiker/api/routes_code_files.py` adds
+`GET /api/code/repos/{repo_id}/browse` (one directory, the same shape the project
+explorer already consumes) and `GET /api/code/repos/{repo_id}/file` (one bounded
+text file). `apps/web/src/lib/components/CodeExplorer.svelte` is the panel, and
+Build mounts it as a resizable first column with a dismissible-sheet form below
+the split, mirroring the background-work rail on the opposite edge.
+
+Four properties, each load-bearing:
+
+* **It is a read, structurally.** There is no write path in the module. Every
+  path resolves through the very `PathAuthority` a turn writes through and is
+  then re-checked against the repository's own root, so a repository reference
+  cannot become a workspace-wide file browser — two independent checks, because
+  the authority alone would happily serve anything inside the workspace.
+  Contents come back through `raiker.tools.filesystem.read_file`, the same
+  bounded read the agent's own `read_file` performs, so a binary, missing or
+  oversize file gets the answer it already gets there rather than a second
+  opinion written for the browser.
+* **It is lazy.** One directory is read when it is opened and cached. Pointing
+  Build at a monorepo costs nothing until the owner looks.
+* **It never guesses.** `languageForFilename` maps a name to a language only
+  when the name says so — `Dockerfile.bak` is not a Dockerfile — and an unknown
+  language renders as plain escaped text with no label. Mis-highlighting is a
+  claim about what a file is, and a wrong claim is worse than none. Highlighting
+  is the transcript's own locally-shipped allowlisted scanner: escaped at emit
+  time, a closed tag set, no CDN grammar.
+* **It says which absence applies.** A GitHub coordinate has no checkout and
+  says so; a local folder that has moved says that instead. An empty tree would
+  read as "no files", which is a different and much more alarming claim.
+
+**Found while building it, and fixed here.** Connecting the *first* repository
+did not select it, so Build sat on **No repository** afterwards and the connect
+read as having failed. It is adopted now — and deliberately only the first: an
+existing active repository is a choice, and adding a second must never silently
+move the work onto it. Both header toggles also carried their label only in a
+`<span>` the narrow layout hides, so below the split each button had no
+accessible name at all; both now carry an `aria-label` that does not depend on
+the width.
+
+**User-interface outcome.** **Files** on the Build header opens the connected
+repository beside the conversation: expand a folder, open a file, read it
+highlighted, drag or key the divider to resize, and press **@** to put the open
+file's path into the composer as the same mention the completion menu writes.
+
+**Evidence.**
+[`b13-build-file-explorer.png`](screenshots/working/b13-build-file-explorer.png)
+and
+[`b13-build-file-explorer-narrow.png`](screenshots/working/b13-build-file-explorer-narrow.png),
+captured live. `apps/web/e2e/b13-build-file-explorer-live.spec.ts`,
+`tests/test_code_repo_files_api.py`,
+`apps/web/src/lib/components/CodeExplorer.test.ts`,
+`apps/web/src/lib/buildExplorer.test.ts`, and the `languageForFilename` cases in
+`apps/web/src/lib/highlight.test.ts`.
+
+---
+
+## FIXED-322 — Permissions said Off about a capability that would have run
+
+**Severity: Low → the live half of it was not. Area: capability gates / web UI.
+Closed 2026-08-30 (was the remainder of [BUG-239](TO_BE_FIXED.md)).**
+
+**Observed.** On a fresh account, **Permissions** showed *Web fetch* as **Off**
+while `WebAccessService` would have fetched. Nothing on the page explained why
+`web_fetch` and `shell_execution` behave differently on an untouched install, and
+the card's only action was **Turn on** — for a capability that was already on.
+
+**Why.** Three resolutions exist for "nothing is persisted for this capability",
+and each is individually justified: `off` for almost everything, `shipped_default`
+for `web_fetch` (RAIKER-2021 — an owner who turns web access off writes a row;
+an empty table on a fresh install is not a refusal), and
+`shipped_default_unscoped` for the code map and delegation. FIXED-279 made that
+fork a named table, `CAPABILITY_UNSET_RESOLUTION`, and made the enforcing paths
+and the model's context bundle read it. It did **not** reach
+`get_effective_capability_gate`, which is what the gate *view* is built from — so
+the one surface an owner actually decides from was still reading an empty table
+its own way.
+
+**Fixed — described, not changed.** BUG-239's open half is an owner decision
+about behaviour, and none of it is taken here. `CapabilityGateView` gains two
+reported fields: `unset_resolution` (which rule this capability's enforcing path
+uses, read from the shared table) and `enforced_enabled` (what the shared
+admission read answers for this principal right now). `state` is untouched, so
+nothing that consumes it changes meaning.
+
+The page then says it. A row whose stored state is off and whose enforcing path
+says yes reads **On by default** instead of **Off**, its card names which rule
+applies, and its only action is **Turn off** — which is the one thing such a
+capability can actually do, and it writes the row that wins from then on.
+Offering **Turn on** beside "on by default" is [FIXED-288](#fixed-288--three-defects-found-while-exercising-the-closed-items-live)'s
+defect the other way round.
+
+**Two sentences, because they are two different facts.** For `shipped_default`
+the note is about *this* account: the capability is on and would run. For
+`shipped_default_unscoped` it is about a caller this page cannot show — the
+single-user terminal client, which has no account row and gets the shipped table
+where the browser is fail-closed. Saying only the first would leave the second
+invisible.
+
+**Found in the same pass.** *Delegated authority* at the top of the page showed
+eight rows out of sixty-seven and showed the **alphabetically first** eight —
+`admin_mutation` through `cloud_execution_cap`, none of which an owner has ever
+thought about. On a fresh account that is eight rows of "Off / Unavailable": a
+summary that says nothing, above a list that says everything. It is ranked by
+authority now — acting alone, then asking, then refused, then off — and states
+that it is eight of sixty-seven with all of them listed below. Ranked, never
+filtered: a table with nothing in it is still the truth about an account where
+nothing is on.
+
+**User-interface outcome.** *Web fetch* reads **On by default**, its card
+explains that an empty table on a new install is not a refusal, and it offers
+**Turn off**. *Shell commands* still reads **Off** and still offers **Turn on**.
+
+**Evidence.**
+[`bug-239-unset-gate-honesty.png`](screenshots/working/bug-239-unset-gate-honesty.png),
+captured live. `apps/web/e2e/bug-239-unset-gate-honesty-live.spec.ts`, the
+gate-view cases at the end of `tests/test_capability_admission.py`, and the
+"what an untouched switch means" and "delegated-authority summary" cases in
+`apps/web/src/lib/capabilityModel.test.ts`.
+
+---
+
+## FIXED-323 — A cited past conversation named its exchanges and could not open one
+
+**Severity: Low. Area: memory / citations. Closed 2026-08-30 (was BUG-245).**
+
+**Observed.** [FIXED-317](#fixed-317--three-tools-declared-a-source-and-produced-none)
+made `conversation_search` a citable source and
+[FIXED-316](#fixed-316--every-turn-coordinate-was-a-dead-end) made a turn
+coordinate openable. The two did not meet. Opening a **Past conversations** chip
+showed each exchange's conversation title and date above its text — which is what
+made it checkable at all — and the exchanges were text, so verifying one meant
+retyping the title into chat search.
+
+**Why.** The ledger's rule is *one source per executed call*: a call is the unit
+the runtime governed and audited, so it is the unit whose provenance can be
+stated honestly. A search that returned ten exchanges is one row in
+`turn_sources` with one `locator`, and the coordinates of the ten lived only in
+the tool result the runtime read.
+
+**Fixed.** One nullable `anchors_json` column on `turn_sources`
+(`RAIKER-1039-turn-source-anchors`, the ordinary path — the table already has a
+migration of its own), holding a JSON list of
+`{session_id, turn_id, title, created_at, origin}` built by
+`anchors_from_tool_result` from the tool result **the runtime read**, never from
+anything the model wrote. The rule survives: the ledger still holds one source
+per call, and the anchors are that source's own contents rather than ten sources.
+
+Four decisions:
+
+* **A hit with no `turn_id` is not offered.** A link that lands at the top of a
+  conversation is a worse answer than no link: it looks like it went to the
+  exchange and did not.
+* **`origin` rides along**, so a Build conversation opens in Build. The right
+  coordinate in the wrong room is still the wrong answer.
+* **Twenty at most.** A search that matched two hundred is a wall of links, not
+  a citation anybody checks.
+* **They are served with the passage, not with the chip.** Only an opened source
+  needs coordinates; putting them in `to_view()` would carry every search's hits
+  into every history load.
+
+**Deliberately not half-built.** The alternative — writing the links into the
+stored `passage` as markup — would put runtime-authored markup into a field the
+inspector renders escape-first, which is the one property that keeps a source's
+text from being able to say more than it is.
+
+**Found while verifying it.** The new link list is `white-space: nowrap` with an
+ellipsis, and a nowrap label with no width cap contributes its *whole* text to
+the min-content width of whatever contains it — which pushed the Chat inspector's
+grid column wider than the pane and clipped the passage beside it. Every box in
+`SourceAnchorLinks` is capped, and the inspector's source rows are capped too.
+
+**User-interface outcome.** A cited past conversation lists the exchanges it
+returned, and each one opens the conversation at that exchange with the same
+brief mark a search hit gets.
+
+**Evidence.**
+[`bug-245-cited-exchanges.png`](screenshots/working/bug-245-cited-exchanges.png),
+captured live against a real Anthropic turn.
+`apps/web/e2e/bug-245-cited-exchanges-live.spec.ts`, the
+`TestCitedExchangesOpen` cases in `tests/test_turn_sources.py`, and
+`apps/web/src/lib/components/SourceAnchorLinks.test.ts`.
+
+---
+
+## FIXED-324 — Thirty-seven live specs each carried their own sign-in
+
+**Severity: Low. Area: live test harness. Closed 2026-08-30 (was the remainder of
+[BUG-229](TO_BE_FIXED.md)).**
+
+**Observed.** `signInAsOwner` landed in `e2e/hosted-provider.ts` on 2026-08-29 and
+two specs used it. The other live specs still carried their own copy, and each
+copy encoded an assumption about the *state* of the instance — usually the
+empty-workspace greeting — that had nothing to do with what the spec asserts. A
+suite passed on a fresh instance and failed at sign-in on a used one, reporting a
+missing heading rather than the thing under test.
+
+**Fixed.** Every live spec with a sign-in *function* now delegates to the shared
+helper: thirty-seven files, `-592/+377` lines. Two robustness steps that only one
+spec had were lifted into the helper so all of them get them — waiting for the
+username field to become **enabled** (it mounts disabled while the bootstrap
+reads resolve, so on a just-started server the first attempt lands before the
+form is usable), and accepting the navigation rail as proof of a session, because
+a workspace with a saved startup route lands somewhere that has no greeting at
+all.
+
+**Found in the same pass.** `bug-61-guide-accuracy-live.spec.ts` asserted a
+sidebar link named *Search Chat*; the rail says **Search chats**. The four guide
+pages that used the old name are corrected too.
+
+**What is left, and it is a different defect.** Each spec still hardcodes its own
+owner password, so two specs cannot share one workspace — the next layer of the
+same problem, recorded as [BUG-247](TO_BE_FIXED.md). Twenty-seven specs sign in
+*inline* in a test body rather than through a function; three of those
+(`review-first-run-honesty`, `wizard-workbench-composer`, `workbench-live`) sign
+in **as the thing under test** and must keep their own.
+
+**Evidence.** `bug-61-guide-accuracy-live.spec.ts` — all eight cases — run twice
+in succession against the same instance: once on an empty workspace, and again on
+the workspace its own first run had filled. That second run is precisely what
+BUG-229 said would fail.
+
+---
+
+## FIXED-325 — A phone was clipping the Models page, and the Knowledge Map never resized
+
+**Severity: Medium. Area: web UI / responsive. Closed 2026-08-30.**
+
+**Observed.** A measured sweep of all twenty-six routes at 390, 1024 and 1440
+found body text on **Models** clipped mid-sentence at 390 — *"Simple local model
+service for Windows, macO…"* — with buttons cut off beside it, and the
+**Knowledge Map** drawing most of its graph off screen at every width below
+desktop.
+
+**Why, and they are three separate causes.**
+
+* **Models.** `.panel` is a grid whose single column was left at `auto`. An
+  `auto` track is sized by the widest min-content inside it, so one unwrappable
+  descendant sized the track to 416px inside a 366px page — and because grid
+  items stretch, *every sibling* was stretched to 416 too, including plain
+  paragraphs, which the page then clipped. The column is bound to the container
+  with `minmax(0, 1fr)`.
+* **The Knowledge Map canvas.** Its `ResizeObserver` attached in `onMount` to
+  whatever `graphElement` happened to be, and the graph lives on the `{:else}`
+  branch of a load state — so on any render where that branch was not up yet the
+  observer attached to nothing and never ran again. `graphWidth` stayed at its
+  900px default on every window: the canvas was more than twice a phone's
+  viewport, and the centring force was aiming at a point 450px from a 390px
+  edge. It is an effect keyed on the element now, which cannot silently do
+  nothing.
+* **"Fit" did not fit.** It reset the transform to the identity, which is not a
+  fit — and then called `alpha().restart()`, re-agitating the very layout it had
+  just measured. It now measures the laid-out nodes and scales to them, capped
+  at 1 so a two-node graph is not blown up to fill a monitor, and it moves
+  nothing. The first settled layout fits itself, triggered by the simulation's
+  own `end` rather than by a timer, and never when the owner has a stored view.
+
+**Found in the same pass.** The graph's status bar and its zoom controls are
+pinned bottom-left and bottom-right and are wider together than a phone, so each
+hid half of the other; below 34rem they stack. The *Workspace intelligence*
+eyebrow wrapped to two lines above a heading that already said Knowledge Map,
+and is dropped at that width.
+
+**The sweep is now a measurement rather than a set of screenshots to look at.**
+Looking is how all three survived several rounds.
+`apps/web/e2e/ui-sweep-clipping-live.spec.ts` walks every route at three widths
+and fails on anything reaching past the window that nothing scrolls or clips on
+purpose, asserts the canvas matches the box it is drawn in, asserts most of the
+graph is on screen after the auto-fit, and asserts the two bottom bars do not
+overlap. It also requires zero uncaught console errors across all seventy-eight
+loads.
+
+**User-interface outcome.** Every route reads end to end at 390, 1024 and 1440
+with nothing clipped, and the Knowledge Map opens with its graph centred and on
+screen at all three.
+
+**Evidence.**
+[`ui-sweep-models-phone.png`](screenshots/working/ui-sweep-models-phone.png) and
+[`ui-sweep-knowledge-map-phone.png`](screenshots/working/ui-sweep-knowledge-map-phone.png),
+captured live. `apps/web/e2e/ui-sweep-clipping-live.spec.ts`.

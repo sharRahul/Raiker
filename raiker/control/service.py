@@ -26,6 +26,7 @@ from raiker.runtime.authority.activation import (
     has_executor,
     has_threat_model_ack,
 )
+from raiker.runtime.authority.admission import capability_admission, unset_resolution_for
 from raiker.runtime.authority.entry_paths import OWN_GATE, entry_for
 from raiker.runtime.authority.models import (
     RAIKER_RUNTIME,
@@ -176,7 +177,27 @@ class RuntimeControlService:
             threat_model_ack_recorded=has_threat_model_ack(capability, self._store),
             gate_reality=entry.reality if entry is not None else OWN_GATE,
             governance_note=entry.note if entry is not None else "",
+            unset_resolution=unset_resolution_for(capability),
+            # BUG-239 — asked of the shared admission read, which is the read the
+            # enforcing paths perform. Reporting it beside `state` is what stops
+            # Permissions saying Off about a capability that would run.
+            enforced_enabled=self._enforced_enabled(
+                capability, principal.principal_id if principal else None
+            ),
         )
+
+    def _enforced_enabled(self, capability: str, principal_id: str | None) -> bool:
+        """What the enforcing path answers for this capability, right now.
+
+        Swallows a storage failure rather than propagating it: this is one extra
+        column on a page that lists sixty-seven rows, and a gate list that will
+        not render is worse than one row that falls back to the fail-closed
+        answer the rest of the view already carries.
+        """
+        try:
+            return capability_admission(self._store, principal_id, capability).gate_enabled
+        except Exception:  # noqa: BLE001 — an unreadable row is a missing column, not a stop
+            return False
 
     # -- read methods -------------------------------------------------------
 

@@ -137,6 +137,20 @@ kept out of the interactive list and reported in Diagnostics instead.
 
 Expand a row for its description and current decision mode, then **Turn on**.
 
+### Off, and on by default
+
+Most rows read **Off** until you turn them on: this account is fail-closed, and
+nothing decided is not consent. A few read **On by default** instead. Those are
+the capabilities whose enforcing path reads an *empty* gate table as the shipped
+default rather than as a refusal — turning web access off is a decision you make,
+and an untouched install is not that decision.
+
+The badge is what the runtime would actually answer, not what the table happens
+to hold, so the page cannot say a capability is off while the tool would run. The
+row's card names which rule applies, and the only action such a row offers is
+**Turn off** — that writes the refusal, and a written refusal always wins from
+then on.
+
 Two things worth knowing about how these rows behave elsewhere:
 
 - **Memory store and Memory forget are reachable from Chat and Build.** With the

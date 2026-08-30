@@ -32,6 +32,13 @@ export interface CapabilityGate {
   // The sentence naming what really governs the work, for anything that is not
   // "own_gate". Empty otherwise.
   governance_note?: string;
+  // BUG-239 — how the *enforcing* path reads a gate table with nothing
+  // persisted in it, and what it would therefore answer right now. On a fresh
+  // account these disagree with `state` for `web_fetch`: nothing is stored, the
+  // per-principal reading is fail-closed, and the tool would nevertheless
+  // fetch. Optional so older payloads and fixtures stay valid.
+  unset_resolution?: "off" | "shipped_default" | "shipped_default_unscoped";
+  enforced_enabled?: boolean;
 }
 
 export interface ComposerApprovalModeSettings {
@@ -1882,6 +1889,23 @@ export interface SourceExcerptView {
     | "recorded_passage"
     | "whole_source"
     | "";
+  // BUG-245 — the exchanges this one call returned, as openable coordinates.
+  // Built by the runtime from the tool result it read, never from anything the
+  // model wrote, and served with the passage rather than with the chip: only an
+  // opened source needs them. Absent for every source that is not a set of
+  // conversation hits, and optional so older payloads stay valid.
+  anchors?: SourceAnchorView[];
+}
+
+// One exchange a cited search returned. Four coordinates and no text: the
+// passage already carries what was read, and this carries only where from.
+export interface SourceAnchorView {
+  session_id: string;
+  turn_id: string;
+  title: string;
+  created_at: string;
+  /** Which surface it happened on, so the link opens where the work is. */
+  origin: string;
 }
 
 // C6/C4 — raiker/runtime/turn_sources.py TurnSource.to_view(). One thing a turn
@@ -2657,6 +2681,35 @@ export interface ProjectBrowseView {
   /** The grant was revoked, the project detached, or the folder moved. The
    *  explorer must say so; an empty tree would read as "no files". */
   root_missing: boolean;
+}
+
+// B13 — the repository Build is pointed at, browsed one directory at a time.
+// Deliberately the same entry shape as a project's tree so one explorer serves
+// both roots; `index_state` is always null here because a repository is files on
+// disk rather than a catalogue of managed documents.
+export interface CodeRepoBrowseView {
+  path: string;
+  parent: string | null;
+  entries: ProjectBrowseEntry[];
+  truncated: boolean;
+  root_kind: "local" | "github";
+  root_label: string;
+  /** A GitHub coordinate with no checkout, or a local folder that has moved. */
+  root_missing: boolean;
+  /** Which of those two, so the interface can say which; "" when present. */
+  reason_code?: string;
+}
+
+// B13 — one bounded text file for the read-only viewer. A file that cannot be
+// shown says why rather than rendering as empty: `readable` false with the
+// reason the server gave (`binary_file`, `file_too_large`, `not_found`).
+export interface CodeRepoFileView {
+  path: string;
+  text: string;
+  truncated: boolean;
+  size_bytes: number;
+  readable: boolean;
+  reason_code: string;
 }
 
 export interface ProjectRootStatus {

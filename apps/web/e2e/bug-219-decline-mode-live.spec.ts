@@ -11,34 +11,21 @@
  * carry, and *Skip* and *Decline* mean opposite things.
  */
 import { expect, test } from "@playwright/test";
-import { dismissFirstRunModelSetup } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(page: import("@playwright/test").Page) {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
-  await page.getByLabel("Username").fill("Rahul");
-  await page.getByLabel("Password", { exact: true }).fill("Ithink@10");
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill("Ithink@10");
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
-  }
-  // The Workbench greets a fresh instance and a returning owner differently
-  // ("Welcome to your Work Dashboard" vs "Welcome back"), and a workspace turns
-  // from the first into the second the moment it holds any work. Keying sign-in
-  // to one of them makes a spec pass or fail on how much history the instance
-  // happens to have, which is not what any of these tests are about.
-  const workbench = page.getByRole("heading", { name: /Welcome (to your Work Dashboard|back)/ });
-  await expect(
-    page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(page);
-  await expect(workbench.first()).toBeVisible({ timeout: 30_000 });
+  await signInAsOwner(page, BASE, { user: "Rahul", password: "Ithink@10" });
 }
 
 /**

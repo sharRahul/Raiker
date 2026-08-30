@@ -15,24 +15,22 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 const PASSWORD = "Single-runtime-review-password-1!";
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(page: Page) {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill("owner");
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
+  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
 }
 
 // One sign-in for the whole file: the runtime rate-limits authentication (a

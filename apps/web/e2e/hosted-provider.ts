@@ -290,7 +290,12 @@ export async function signInAsOwner(
   await page.goto(`${base}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
   const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill(credentials.user);
+  // The field mounts disabled while the bootstrap reads resolve. Waited for
+  // rather than filled optimistically: on a server that has only just started,
+  // the first attempt lands before the form is usable.
+  const username = page.getByLabel("Username");
+  await expect(username).toBeEnabled({ timeout: 60_000 });
+  await username.fill(credentials.user);
   await page.getByLabel("Password", { exact: true }).fill(credentials.password);
   if (await confirm.isVisible().catch(() => false)) {
     await confirm.fill(credentials.password);
@@ -305,5 +310,11 @@ export async function signInAsOwner(
     page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
   await dismissFirstRunModelSetup(page);
-  await expect(workbench).toBeVisible({ timeout: 30_000 });
+  // Signed in, rather than *on the workbench*. A workspace with a saved startup
+  // route lands somewhere else entirely, and waiting for a greeting there is
+  // BUG-229 behaving exactly as recorded. The navigation rail is the thing that
+  // means "there is a session here", which is what every caller actually needs.
+  await expect(
+    page.getByRole("navigation", { name: "All navigation" }).or(workbench).first(),
+  ).toBeVisible({ timeout: 60_000 });
 }

@@ -16,7 +16,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -63,28 +63,16 @@ function writeStopHook() {
   );
 }
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(target: Page) {
-  await target.goto(`${BASE}/#/workbench`);
-  await expect(target.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  const confirm = target.getByLabel("Confirm password");
-  await target.getByLabel("Username").fill("owner");
-  await target.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await target.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await target.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  // The first-run setup wizard is modal on a brand-new instance, so a spec that
-  // signs in and navigates straight to Extensions is talking to a page it cannot
-  // reach. Waited for rather than sampled: the sheet mounts once the bootstrap
-  // reads resolve, which is after account creation returns.
-  const workbench = target.getByRole("heading", { name: /Welcome to your Work Dashboard/ });
-  await expect(
-    target.getByRole("button", { name: "Decide later" }).or(workbench).first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(target);
-  await expect(workbench).toBeVisible({ timeout: 30_000 });
+  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

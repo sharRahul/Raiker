@@ -1876,9 +1876,18 @@
 <style>
   /* Each panel keeps the vertical rhythm the page had as one scroll, so moving
      a section into a tab changed where it lives, not how it reads. */
+  /* A grid column left at `auto` is sized by the widest thing inside it, so one
+     unwrappable descendant made every sibling — including plain paragraphs —
+     416px wide inside a 366px page, and a phone got clipped body text. The
+     column is bound to the container instead; anything genuinely wide now
+     overflows on its own and can be given its own scroll. */
   .panel {
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-4);
+  }
+  .panel > :global(*) {
+    min-width: 0;
   }
   .tab-lead {
     margin: 0;

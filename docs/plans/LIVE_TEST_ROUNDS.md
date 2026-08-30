@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-30 | Targeted + measured responsive sweep | `b13-`, `bug-239-`, `bug-245-`, `ui-sweep-` | Anthropic (`claude-haiku-4-5-20251001`), key entered through the interface | The repository on screen in Build, Permissions telling the truth about an untouched gate, a cited exchange that opens — and every route *measured* at three widths rather than photographed |
 | 2026-08-29 | Targeted | `bug-244-`, `bug-246-` | — (no model needed) | An import that says what is already stored before it writes, and the authority matrix readable at a phone width |
 | 2026-08-29 | Targeted + full responsive audit | `b18-`, `mem08-` | Anthropic | Rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, and every route measured at four widths |
 | 2026-08-29 | Targeted + responsive | `fixed-309-` … `fixed-312-`, `r0829-` | Anthropic | Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build — and a question that could not recall the memory answering it |
@@ -606,6 +607,67 @@ spec that asserts an impossible state is worse than no spec.
   `tests/test_model_tool_call_loop.py::test_auto_withholds_a_write_to_an_existing_file_the_turn_never_looked_at`.
 * **The other providers.** Only Anthropic was connected on this host.
 * This was a **targeted** round. The last full sweep remains 2026-08-08.
+
+---
+
+## 2026-08-30 — the repository on screen, an honest gate, a citation that opens
+
+**Tier: targeted, plus the first *measured* responsive sweep.**
+Anthropic `claude-haiku-4-5-20251001`, connected through Models in the running
+app. Workspace: a fresh instance, then the same instance again with the work its
+own first run had created.
+
+### What it verified
+
+* **Build shows the repository it is changing.** **Files** on the Build header
+  opens the connected `demo-repo` beside the conversation. `src` is not walked
+  until it is expanded — asserted by counting the browse calls, not by looking —
+  and opening `src/main.py` renders it highlighted with **PYTHON** on the header.
+  **@** put `@src/main.py` into the composer. `logo.png` answered *"This file is
+  not text, so there is nothing to show here."* rather than an empty pane. At
+  390px the same panel arrived as a dialog from the left
+  (`b13-build-file-explorer`, `b13-build-file-explorer-narrow`).
+* **Permissions stopped saying Off about a capability that would have run.**
+  *Web fetch* reads **ON BY DEFAULT** on a fresh account, its card explains that
+  an empty table on a new install is not a refusal, and its only action is
+  **Turn off**. *Shell commands* still reads **OFF** and still offers **Turn
+  on** — the ordinary case is untouched (`bug-239-unset-gate-honesty`).
+* **A cited past conversation opens the exchange it names.** On a real Haiku
+  turn: a first chat recorded a fact, a second chat searched for it, and the
+  **Past conversations** chip listed the exchanges it returned as links. Each
+  `href` carried `session=` *and* `turn=`; following one landed on that exchange
+  with the anchor mark (`bug-245-cited-exchanges`).
+* **Every route, at three widths, measured.** All 26 routes at 390, 1024 and
+  1440, asserting that nothing reaches past the window that nothing scrolls or
+  clips on purpose — and zero uncaught console errors across all 78 loads.
+
+### What it found
+
+**Three responsive defects that several previous rounds photographed and did not
+see**, all closed in the round as
+[FIXED-325](FIXED_ITEMS.md#fixed-325--a-phone-was-clipping-the-models-page-and-the-knowledge-map-never-resized):
+
+* **Models clipped its own body text at 390.** *"Simple local model service for
+  Windows, macO…"* — a grid column left at `auto` was sized by one unwrappable
+  descendant to 416px inside a 366px page, and every sibling stretched to match.
+* **The Knowledge Map canvas never resized.** Its `ResizeObserver` attached in
+  `onMount` to an element that only exists on the `{:else}` branch of a load
+  state, so it observed nothing and never ran again. The canvas stayed 900px
+  wide on every window.
+* **"Fit" did not fit.** It reset the transform to the identity and then
+  re-agitated the layout it had just measured.
+
+**And two more found while verifying the work above.** Connecting the first
+repository did not select it, so Build sat on *No repository* afterwards; and the
+Build header's two toggles carried their label only in a `<span>` the narrow
+layout hides, so below the split neither button had an accessible name. Both are
+recorded in
+[FIXED-321](FIXED_ITEMS.md#fixed-321--build-could-change-a-repository-and-never-show-it).
+
+**The lesson.** The sweep that missed all three was a set of screenshots somebody
+had to look at. It is a measurement now
+(`apps/web/e2e/ui-sweep-clipping-live.spec.ts`), and the three defects are its
+first three assertions.
 
 ---
 

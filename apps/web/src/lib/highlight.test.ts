@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { highlight, isHighlightable, languageLabel, TOKEN_KINDS } from "./highlight";
+import {
+  highlight,
+  isHighlightable,
+  languageForFilename,
+  languageLabel,
+  TOKEN_KINDS,
+} from "./highlight";
 
 describe("highlight — BUG-23 local grammar path", () => {
   it("emits only span tags carrying an allowlisted token class", () => {
@@ -68,5 +74,32 @@ describe("highlight — BUG-23 local grammar path", () => {
     ]) {
       expect(() => highlight("a 'b' 1 # c\n-x\n+y\n", language)).not.toThrow();
     }
+  });
+});
+
+// B13 — the file viewer has no fence to read a language off, only a name.
+describe("languageForFilename", () => {
+  it("reads a language off an extension the highlighter ships", () => {
+    expect(languageForFilename("src/main.py")).toBe("py");
+    expect(languageForFilename("apps/web/src/lib/api.ts")).toBe("ts");
+    expect(languageForFilename("STYLE.CSS")).toBe("css");
+  });
+
+  it("keeps a language it only labels, so the header still names the file", () => {
+    expect(languageForFilename("main.go")).toBe("go");
+    expect(languageForFilename("notes.md")).toBe("md");
+  });
+
+  it("reads the whole name where the name is the language", () => {
+    expect(languageForFilename("Dockerfile")).toBe("dockerfile");
+    expect(languageForFilename("Makefile")).toBe("makefile");
+  });
+
+  it("refuses to guess rather than making a wrong claim about a file", () => {
+    // A prefix match would call this a Dockerfile, which it is not.
+    expect(languageForFilename("Dockerfile.bak")).toBe("");
+    expect(languageForFilename("LICENSE")).toBe("");
+    expect(languageForFilename("archive.")).toBe("");
+    expect(languageForFilename("")).toBe("");
   });
 });

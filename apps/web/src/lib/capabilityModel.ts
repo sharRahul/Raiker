@@ -45,14 +45,25 @@ export function canEnable(gate: CapabilityGate): boolean {
   return (
     gate.can_current_principal_change
     && isDisabled(gate)
+    // BUG-239 — a capability that is already on by default has nothing to turn
+    // on. Offering it is the FIXED-288 defect again: a control whose label
+    // contradicts the state beside it.
+    && !isOnByDefault(gate)
     && !isDeferred(gate)
     && enableableTargets(gate).length > 0
   );
 }
 
-/** True when an authorised principal can turn the (currently enabled) gate off. */
+/**
+ * True when an authorised principal can turn the gate off.
+ *
+ * Includes the on-by-default case, which is the only action that capability
+ * actually has: turning it off is what stores a row, and a stored row wins from
+ * then on. Without this the one capability an owner most likely wants to close
+ * had no control to close it with.
+ */
 export function canDisable(gate: CapabilityGate): boolean {
-  return gate.can_current_principal_change && !isDisabled(gate);
+  return gate.can_current_principal_change && (!isDisabled(gate) || isOnByDefault(gate));
 }
 
 // Tier-2 capabilities the backend gates behind a human confirmation token + threat-model ack
@@ -114,6 +125,90 @@ export function realityLabel(gate: CapabilityGate): string {
  */
 export function realityNote(gate: CapabilityGate): string {
   return governsItsOwnCapability(gate) ? "" : (gate.governance_note ?? "").trim();
+}
+
+// ── What an untouched switch means (BUG-239) ─────────────────────────────────
+// Three capabilities read an empty gate table as something other than "off":
+// `web_fetch` falls back to the shipped table for any caller, and the code map
+// and delegation do so for a caller with no account. So on a fresh account the
+// page said **Off** about `web_fetch` while the tool would have fetched. That is
+// the same defect FIXED-279 closed for the model's context bundle — and this is
+// the surface the owner actually decides from, so it mattered more here.
+//
+// Nothing is loosened or tightened to fix it. The backend now reports what the
+// *enforcing* path answers, and the page says it.
+
+/** True when the owner has never decided this gate either way. */
+export function isUnset(gate: CapabilityGate): boolean {
+  return gate.source !== "persisted";
+}
+
+/** True when nothing is stored for this gate and it nevertheless resolves on. */
+export function isOnByDefault(gate: CapabilityGate): boolean {
+  return gate.enforced_enabled === true && !ENABLED_STATES.has(gate.state);
+}
+
+/**
+ * What an untouched switch really means, in the owner's words. Empty when the
+ * owner has decided, or when "nothing stored" simply means off.
+ *
+ * Two different sentences, because they are two different facts. One is about
+ * *this* account: the capability is on and would run. The other is about a
+ * caller this page cannot show — the single-user terminal client, which has no
+ * account row and therefore gets the shipped table where the browser is
+ * fail-closed. Saying only the first would leave the second invisible.
+ */
+export function unsetResolutionNote(gate: CapabilityGate): string {
+  if (!isUnset(gate)) return "";
+  if (gate.unset_resolution === "shipped_default") {
+    return (
+      "Nothing is stored for this capability, and it ships on — an empty table " +
+      "on a new install is not a refusal, so it is on and would run. Turning it " +
+      "off stores that choice, and a stored choice always wins."
+    );
+  }
+  if (gate.unset_resolution === "shipped_default_unscoped") {
+    return (
+      "Nothing is stored for this capability. This account is fail-closed, so " +
+      "it is off here — but a caller with no account of its own, such as the " +
+      "terminal client, gets the shipped default instead."
+    );
+  }
+  return "";
+}
+
+// ── The delegated-authority summary ──────────────────────────────────────────
+// The matrix at the top of Permissions shows eight rows out of sixty-seven, and
+// it used to show the *alphabetically first* eight — `admin_mutation` through
+// `cloud_execution_cap`, none of which an owner has ever thought about. On a
+// fresh account that is eight rows of "Off / Unavailable": a summary that says
+// nothing, above a list that says everything.
+//
+// The summary is worth having, so it shows the eight rows that carry the most
+// authority instead. Ranked, never filtered: a table with nothing in it is
+// still the truth about an account where nothing is on.
+
+/** How many rows the delegated-authority summary shows. */
+export const AUTHORITY_MATRIX_ROWS = 8;
+
+/** Most authority first: acting alone, then asking, then refused, then off. */
+function authorityRank(gate: CapabilityGate): number {
+  if (gate.state === "enabled_runtime") {
+    if (gate.decision_mode === "auto" || gate.decision_mode === "allow") return 0;
+    if (gate.decision_mode === "ask") return 1;
+    return 2;
+  }
+  return isOnByDefault(gate) ? 3 : 4;
+}
+
+/** The rows the summary shows, most authority first then alphabetical. */
+export function authorityMatrixGates(gates: CapabilityGate[]): CapabilityGate[] {
+  return [...gates]
+    .sort(
+      (a, b) =>
+        authorityRank(a) - authorityRank(b) || a.capability.localeCompare(b.capability),
+    )
+    .slice(0, AUTHORITY_MATRIX_ROWS);
 }
 
 /** Group gates by backend phase (a real backend field) for the matrix. */

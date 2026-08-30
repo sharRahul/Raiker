@@ -1,18 +1,20 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(page: Page) {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("Rahul");
-  await page.getByLabel("Password", { exact: true }).fill("Ithink@10");
-  await page.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
-  await dismissFirstRunModelSetup(page);
-  await expect(page.getByRole("heading", { name: /Welcome (to your Work Dashboard|back)/ }).first()).toBeVisible({ timeout: 60_000 });
+  await signInAsOwner(page, BASE, { user: "Rahul", password: "Ithink@10" });
 }
 
 async function testCard(card: Locator, provider: string, requiresConnection = true) {

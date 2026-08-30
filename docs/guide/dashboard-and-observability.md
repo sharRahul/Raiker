@@ -11,7 +11,7 @@ tablets, and a full sidebar on wider screens.
 | Home | **Workbench** | Live view of running work, agents, schedules, and decisions that need you |
 | Work | **Chat** | Conversations, attachments, sources, memory, and approvals |
 | Work | **Build** | Repository-aware planning, edits, commands, commits, and pushes |
-| Work | **Search Chat** | Full-text conversation search with the matched exchange and turn |
+| Work | **Search chats** | Full-text conversation search with the matched exchange and turn |
 | Work | **Tasks** and **Projects** | One-off, scheduled, repeating, and organized work |
 | Knowledge | **Memory** | Review durable facts Raiker may recall, and approve additions or removals |
 | Knowledge | **Knowledge Map** | Explore indexed sources and the citations connecting them |

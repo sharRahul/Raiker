@@ -362,6 +362,8 @@ from raiker.storage.migrations import (
     TURN_REASONING_SQL,
     TURN_RECALL_MIGRATION_ID,
     TURN_RECALL_SQL,
+    TURN_SOURCE_ANCHORS_MIGRATION_ID,
+    TURN_SOURCE_ANCHORS_SQL,
     TURN_SOURCE_LOCATOR_INDEX_MIGRATION_ID,
     TURN_SOURCE_LOCATOR_INDEX_SQL,
     TURN_SOURCES_MIGRATION_ID,
@@ -1420,6 +1422,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(AGENT_PLANS_MIGRATION_ID, AGENT_PLANS_SQL, connection)
             self._apply_migration(TURN_CONTROLS_MIGRATION_ID, TURN_CONTROLS_SQL, connection)
             self._apply_migration(TURN_SOURCES_MIGRATION_ID, TURN_SOURCES_SQL, connection)
+            self._apply_migration(
+                TURN_SOURCE_ANCHORS_MIGRATION_ID, TURN_SOURCE_ANCHORS_SQL, connection
+            )
             self._apply_migration(TURN_RECALL_MIGRATION_ID, TURN_RECALL_SQL, connection)
             self._apply_migration(
                 MACHINE_IDENTITIES_MIGRATION_ID, MACHINE_IDENTITIES_SQL, connection
@@ -6302,8 +6307,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.executemany(
                 """INSERT OR IGNORE INTO turn_sources
                    (session_id, turn_id, source_id, principal_id, ordinal, kind, title,
-                    locator, tool_name, detail, attachment_id, passage, created_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    locator, tool_name, detail, attachment_id, passage, anchors_json,
+                    created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 [
                     (
                         session_id,
@@ -6318,6 +6324,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                         str(row.get("detail", "")),
                         str(row.get("attachment_id", "")),
                         str(row.get("passage", "")),
+                        str(row.get("anchors_json", "")),
                         now,
                     )
                     for row in rows

@@ -84,18 +84,20 @@ names.
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
 | [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
-| [BUG-229](#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace) | Low | Live test harness | Open remainder — reduced 2026-08-29: the shared `signInAsOwner` exists and accepts either greeting; the other live specs still inline their own |
+| [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
-| [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open — raised 2026-08-24 while closing GEP-01. **An owner decision**: unifying it either loosens seven paths or tightens one |
+| [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
 | [BUG-241](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | **Closed 2026-08-29 (FIXED-313)** — one shared capture helper; all 56 live specs go through it |
 | [BUG-242](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload) | Medium | Build / web UI | **Closed 2026-08-29 (FIXED-309)** — the conversation rides in the URL and Build restores it |
 | [BUG-243](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | **Closed 2026-08-29 (FIXED-314)** — raised while verifying FIXED-311: a question was being used as a filter |
 | [BUG-244](FIXED_ITEMS.md#fixed-319--importing-the-same-memory-twice-stored-it-twice) | Low | Memory / import | **Closed 2026-08-29 (FIXED-319)** — the review step says what is new before anything is written, and the import reports what it changed |
-| [BUG-245](#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one) | Low | Memory / citations | Open — raised 2026-08-29 while closing MEM-08 as FIXED-316 |
+| [BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | **Closed 2026-08-30 (FIXED-323)** — one `anchors` column, built from the tool result the runtime read, and a link per exchange |
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
-| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (15 complete, 3 partial, 2 open; B18 closed 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
+| [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) | Low | Live test harness | Open — raised 2026-08-30 while closing BUG-229. Thirty-seven specs share the steps and not the fixture |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open — raised 2026-08-30 while closing BUG-229. Three of them must keep their own |
+| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (16 complete, 3 partial, 1 open; B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
 The memory audit of **2026-08-11** has its own document,
@@ -322,20 +324,26 @@ refactor:
 
 Both are owner-visible behaviour changes, and neither is an implementer's call.
 
-**What did ship (FIXED-279).** The fork is a named table,
+**What shipped first (FIXED-279).** The fork is a named table,
 `CAPABILITY_UNSET_RESOLUTION` in
 [`raiker/runtime/authority/admission.py`](../../raiker/runtime/authority/admission.py),
-read by the enforcing path *and* by every surface that describes a gate. That
-closed the live half of this: the context bundle used to tell the model
-`web_fetch: disabled` on an install where the tool would have fetched. What is
-left is the inconsistency itself, which is now visible in one place instead of
-spread across eight.
+read by the enforcing paths and by the model's context bundle — which used to be
+told `web_fetch: disabled` on an install where the tool would have fetched.
 
-**Proposed work, once the question is answered.** Pick one resolution, change the
-table, and say on the Capabilities page what an untouched gate means — a single
-sentence, in the same place the gate's state is shown. The **user-interface
-outcome** is the point: an owner should never have to know which of three rules
-a capability uses to predict what happens before they touch it.
+**What shipped on 2026-08-30
+([FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)).**
+The table had not reached `get_effective_capability_gate`, which is what the gate
+*view* is built from — so **Permissions**, the one surface an owner decides from,
+still said *Web fetch* was **Off** while the tool would have run. The view now
+reports `unset_resolution` and `enforced_enabled` beside `state`, the page reads
+**On by default** where they disagree, the card names which rule applies, and the
+only action such a row offers is **Turn off**. Nothing was loosened or tightened;
+the behaviour is described rather than changed.
+
+**What is left, and it is the whole of the owner's question.** Whether the three
+resolutions should be one. Collapsing them is not a refactor — the two paragraphs
+above this say what each direction costs — and it stays an owner decision. It is
+no longer *invisible*, which was the part an implementer could fix.
 
 ---
 
@@ -535,47 +543,17 @@ states it is unavailable rather than offering a control that does nothing.
 
 ## BUG-229 — Most live specs sign in only on an empty workspace
 
-**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-22 while
-running the round's own specs.**
+**Closed 2026-08-30 as
+[FIXED-324](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in).**
+Every live spec that had a sign-in *function* delegates to
+`signInAsOwner`, and two robustness steps only one spec carried — waiting for the
+username field to become enabled, and accepting the navigation rail as proof of a
+session — are now the helper's, so all of them get them.
 
-**Observed.** The Workbench greets a fresh instance with *"Welcome to your Work
-Dashboard"* and a returning owner with *"Welcome back"*, and a workspace turns
-from the first into the second the moment it holds any work. Almost every live
-spec's `signIn` waits for the first string. So a suite passes on an empty
-instance and fails on a used one — **at sign-in**, before it reaches anything it
-was written to test, and reporting a missing heading rather than the thing under
-test.
-
-**Reproduction.** Run any live spec against a workspace that has one
-conversation in it. It fails at `signIn` with
-`waiting for getByRole('heading', { name: 'Welcome to your Work Dashboard' })`.
-
-It surfaced mid-round exactly this way: the plugin specs passed, the provider
-spec then created a chat session, and the next spec could not sign in.
-
-**Root cause.** `signIn` is copy-pasted into each spec rather than shared, and
-each copy encodes an assumption about the *state* of the instance that has
-nothing to do with what the spec asserts. `hosted-provider.ts` exists precisely
-to hold the steps every live spec must take — and sign-in is not in it.
-
-**Proposed fix.** Move `signIn` into `e2e/hosted-provider.ts` beside
-`dismissFirstRunModelSetup` and `openHostedProviders`, accepting either greeting,
-and have every live spec call it. The four specs added on 2026-08-22 already
-accept both, which is the shape to lift.
-
-**Half of it landed 2026-08-29**, and it landed because the defect bit again in
-exactly the documented way: the B18/MEM-08 round's first run created work in the
-workspace, and its own second run then failed at sign-in on the empty-workspace
-heading. `signInAsOwner(page, base, {user, password})` is now in
-`e2e/hosted-provider.ts`, creates the account when there is none, unlocks when
-there is, and accepts either greeting. **The remainder is the migration**: the
-other live specs still carry their own copy, so each is still one workspace state
-away from failing on its first step.
-
-Not urgent, and deliberately not done in bulk this round: each older spec is the
-evidence behind a closed FIXED entry, and re-running one is how that evidence is
-refreshed — a sweeping edit across thirty of them is a change to thirty pieces of
-evidence, which deserves its own pass rather than being smuggled into another.
+The record stays here rather than moving, because what is left is a *different*
+defect and reads best against the one it came out of: each spec still hardcodes
+its own owner password, so two specs cannot share one workspace. That is
+[BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password).
 
 ---
 
@@ -650,37 +628,73 @@ outcome that had to be true before each could be called closed — are in
 
 ## BUG-245 — A cited conversation names its exchanges and cannot open one
 
-**Severity: Low. Area: memory / citations. Status: Open — raised 2026-08-29
-while closing [MEM-08](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end).**
+**Closed 2026-08-30 as
+[FIXED-323](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one).**
+One nullable `anchors_json` column on `turn_sources`, built from the tool result
+the runtime read and never from anything the model wrote, and a link per exchange
+in both source panels. The ledger's rule survives: one source per executed call,
+with the anchors as that source's own contents rather than as ten sources.
 
-**Observed.** [FIXED-317](FIXED_ITEMS.md#fixed-317--three-tools-declared-a-source-and-produced-none)
-made `conversation_search` a citable source, and
-[FIXED-316](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end) made a
-turn coordinate openable. The two do not meet. Opening a **Past conversations**
-chip shows the passage with each exchange's conversation title and date above its
-text — which is what makes it checkable at all — but the exchanges are text, not
-links, so verifying one still means retyping the title into chat search.
+---
 
-**Why.** The ledger's rule is *one source per executed call*: a call is the unit
-the runtime governed and audited, so it is the unit whose provenance can be
-stated honestly. A search that returned ten exchanges is therefore one row in
-`turn_sources`, and that row has one `locator`. The coordinates of the ten are in
-the tool result the runtime saw and are not carried into the ledger.
+## BUG-247 — Every live spec brings its own owner password
 
-**Proposed fix.** One nullable `anchors` column on `turn_sources` — a JSON list
-of `{session_id, turn_id, title, created_at}` built from the tool result the
-runtime read, never from anything the model wrote — and a source panel that
-renders each as a link through `conversationLink`. The rule survives: the ledger
-still holds one source per call, and the anchors are that source's own contents
-rather than ten sources. `turn_sources` already has a migration of its own
-(`RAIKER-1038-turn-sources`), so a second is the ordinary path rather than a new
-mechanism.
+**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-30 while
+closing [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in).**
 
-**Deliberately not half-built.** The alternative — writing the links into the
-stored `passage` as markup — would put runtime-authored markup into a field the
-inspector renders escape-first, which is the one property that keeps a source's
-text from being able to say more than it is.
+**Observed.** BUG-229's copies are gone: every live spec with a sign-in function
+now goes through `signInAsOwner`, which creates the account when there is none,
+unlocks when there is, and accepts any post-sign-in landing. Running two
+different live specs against the *same* workspace still fails at sign-in — the
+second one waits out its unlock and reports a missing heading — because each
+spec declares its own `PASSWORD`.
 
-**Required user-interface outcome.** A cited past conversation lists the
-exchanges it returned, and each one opens at that exchange, with the same mark a
-search hit gets.
+**Reproduction.** Run `bug-61-guide-accuracy-live.spec.ts` (password
+`Guide-accuracy-1!`) against a fresh workspace, then `bug-58-known-limits-live.spec.ts`
+(`Known-limits-1!`) against the same one. The second cannot unlock.
+
+**Root cause.** The same shape as BUG-229 one level in. The *steps* were shared;
+the *fixture* was not. A password is not evidence about anything a spec asserts,
+and thirty-seven different ones mean the suite can only ever be run one spec per
+workspace — which is why every FIXED entry's evidence had to be re-seeded from
+scratch.
+
+**Proposed fix.** One owner credential in `e2e/hosted-provider.ts`, read from
+`RAIKER_LIVE_OWNER` / `RAIKER_LIVE_PASSWORD` with a shipped default, and
+`signInAsOwner(page, base)` with the credentials argument made optional. Each
+spec then names no credential at all, which is the honest amount for a spec that
+is not about sign-in.
+
+**Why it is not done here.** It changes the fixture thirty-seven closed FIXED
+entries were verified against, and re-verifying them needs a round of its own —
+the same reason BUG-229's own note gave for not doing the migration in bulk.
+
+**Required user-interface outcome.** None; this is harness-only.
+
+---
+
+## BUG-248 — Twenty-seven live specs still sign in inside a test body
+
+**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-30 while
+closing [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in).**
+
+**Observed.** Thirty-seven live specs delegate to `signInAsOwner`. Twenty-seven
+others sign in *inline* in a test body, and those copies are the ones BUG-229
+described: several still key on the empty-workspace greeting.
+
+**Why they were left.** They vary in a way the function-shaped ones did not —
+different bases, different landing routes, some navigating to the route under
+test *before* signing in. And `page.goto` with only the hash changed does not
+re-render this app (recorded in `real-work-chat-build-live.spec.ts`), so
+replacing "go to Models, sign in there" with "sign in on the workbench, then go
+to Models" is a behaviour change per spec rather than a substitution. A blind
+bulk edit would replace twenty-seven verified sign-ins with unverified ones.
+
+**Three of them must keep their own.** `review-first-run-honesty-live`,
+`wizard-workbench-composer-live` and `workbench-live` sign in *as the thing under
+test*; sharing the helper there would hide the behaviour they exist to check.
+
+**Proposed fix.** One spec at a time, each re-run as it is converted — which is
+how the evidence behind its FIXED entry is refreshed rather than invalidated.
+
+**Required user-interface outcome.** None; this is harness-only.

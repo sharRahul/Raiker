@@ -1,21 +1,26 @@
 import { describe, expect, it } from "vitest";
 import type { CapabilityGate } from "./apiTypes";
 import {
+  AUTHORITY_MATRIX_ROWS,
+  authorityMatrixGates,
   canDisable,
   canEnable,
   enableableTargets,
   explainCapability,
   gateBadge,
   governsItsOwnCapability,
-  runtimeBlock,
   groupByPhase,
   hasNoRoute,
   isDeferred,
   isDisabled,
   isGovernedElsewhere,
+  isOnByDefault,
+  isUnset,
   realityLabel,
   realityNote,
   requiresStepUpToken,
+  runtimeBlock,
+  unsetResolutionNote,
 } from "./capabilityModel";
 
 function gate(partial: Partial<CapabilityGate>): CapabilityGate {
@@ -223,5 +228,120 @@ describe("gate reality", () => {
     // that has none, so the model drops it rather than rendering it.
     const g = gate({ gate_reality: "own_gate", governance_note: "stray" });
     expect(realityNote(g)).toBe("");
+  });
+});
+
+// BUG-239 — three capabilities read an empty gate table as something other than
+// "off", and on a fresh account the page said Off about one that would have run.
+describe("what an untouched switch means", () => {
+  it("says a capability is on by default when the enforcing path says yes", () => {
+    const g = gate({
+      capability: "web_fetch",
+      state: "disabled",
+      source: "principal_fail_closed",
+      unset_resolution: "shipped_default",
+      enforced_enabled: true,
+    });
+    expect(isOnByDefault(g)).toBe(true);
+    expect(unsetResolutionNote(g)).toContain("ships on");
+  });
+
+  it("says nothing extra once the owner has actually decided", () => {
+    const g = gate({
+      capability: "web_fetch",
+      state: "disabled",
+      source: "persisted",
+      unset_resolution: "shipped_default",
+      enforced_enabled: false,
+    });
+    expect(isUnset(g)).toBe(false);
+    expect(isOnByDefault(g)).toBe(false);
+    expect(unsetResolutionNote(g)).toBe("");
+  });
+
+  it("names the caller this page cannot show for an unscoped fallback", () => {
+    const g = gate({
+      capability: "code_map_indexing",
+      state: "disabled",
+      source: "principal_fail_closed",
+      unset_resolution: "shipped_default_unscoped",
+      enforced_enabled: false,
+    });
+    // Off here, and the note is the only place the terminal client's different
+    // answer is stated at all.
+    expect(isOnByDefault(g)).toBe(false);
+    expect(unsetResolutionNote(g)).toContain("terminal client");
+  });
+
+  it("offers Turn off, not Turn on, for a capability that is already running", () => {
+    const g = gate({
+      capability: "web_fetch",
+      state: "disabled",
+      source: "principal_fail_closed",
+      unset_resolution: "shipped_default",
+      enforced_enabled: true,
+      can_current_principal_change: true,
+      allowed_transitions: ["enabled_runtime"],
+    });
+    // FIXED-288 found the mirror image of this; offering "Turn on" beside "on
+    // by default" is the same contradiction the other way round.
+    expect(canEnable(g)).toBe(false);
+    expect(canDisable(g)).toBe(true);
+  });
+
+  it("leaves an ordinary capability alone: nothing stored means off", () => {
+    const g = gate({ capability: "shell_execution", source: "principal_fail_closed" });
+    expect(isOnByDefault(g)).toBe(false);
+    expect(unsetResolutionNote(g)).toBe("");
+  });
+
+  it("reads a payload with neither field as an ordinary off gate", () => {
+    const g = gate({ capability: "shell_execution" });
+    expect(isOnByDefault(g)).toBe(false);
+    expect(unsetResolutionNote(g)).toBe("");
+  });
+});
+
+// The summary at the top of Permissions showed the alphabetically first eight
+// rows, which on a fresh account is eight rows of "Off / Unavailable" — a
+// summary that says nothing, above a list that says everything.
+describe("the delegated-authority summary", () => {
+  const acting = gate({
+    capability: "zzz_acting",
+    state: "enabled_runtime",
+    decision_mode: "auto",
+    readiness: { policy_ready: true },
+  });
+  const asking = gate({
+    capability: "yyy_asking",
+    state: "enabled_runtime",
+    decision_mode: "ask",
+    readiness: { policy_ready: true },
+  });
+  const off = Array.from({ length: 10 }, (_, i) =>
+    gate({ capability: `aaa_off_${i}`, state: "disabled" }),
+  );
+
+  it("shows the rows that carry authority, not the alphabetically first ones", () => {
+    const rows = authorityMatrixGates([...off, asking, acting]);
+    expect(rows.slice(0, 2).map((g) => g.capability)).toEqual(["zzz_acting", "yyy_asking"]);
+  });
+
+  it("still fills the summary when nothing is on, rather than showing nothing", () => {
+    const rows = authorityMatrixGates(off);
+    expect(rows).toHaveLength(AUTHORITY_MATRIX_ROWS);
+  });
+
+  it("never shows more rows than it promises", () => {
+    expect(authorityMatrixGates([...off, asking, acting])).toHaveLength(
+      AUTHORITY_MATRIX_ROWS,
+    );
+    expect(authorityMatrixGates([acting])).toHaveLength(1);
+  });
+
+  it("does not reorder the caller's array", () => {
+    const input = [...off, acting];
+    authorityMatrixGates(input);
+    expect(input.at(-1)).toBe(acting);
   });
 });

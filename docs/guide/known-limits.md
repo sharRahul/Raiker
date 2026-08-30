@@ -54,11 +54,15 @@ human resolves.
 
 ## Recall and citations
 
-A recalled past conversation appears under **Sources** as *Past conversations*,
-and opening it shows each exchange with its conversation title and date. Those
-exchanges are text, not links: to open one, search its title in **Search Chat**
-and use *Open the match*. A chat-search hit, a checkpoint's **Turn** field, and a
-turn opened from Observability → Sessions all open the exchange directly.
+A recalled past conversation appears under **Sources** as *Past conversations*.
+Opening it shows each exchange with its conversation title and date, and lists
+those exchanges as links — each one opens the conversation at that exchange, in
+Chat or in Build depending on where it happened. A chat-search hit, a
+checkpoint's **Turn** field, and a turn opened from Observability → Sessions open
+the exchange the same way.
+
+A search names at most twenty exchanges here. Beyond that the list is a wall of
+links rather than a citation anybody checks; use **Search chats** for the rest.
 
 ## Approvals and execution
 

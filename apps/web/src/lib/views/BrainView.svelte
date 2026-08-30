@@ -132,13 +132,32 @@
     void loadPreferences();
     void load();
     const timer = window.setInterval(() => void load(), 15_000);
-    const resize = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(([entry]) => {
+    return () => { window.clearInterval(timer); simulation?.stop(); };
+  });
+
+  /**
+   * Keep the canvas the size of the box it is drawn in.
+   *
+   * This used to attach in `onMount`, once, to whatever `graphElement` happened
+   * to be — and the graph lives on the `{:else}` branch of a load state, so on
+   * any render where that branch was not up yet the observer attached to
+   * nothing and never ran again. `graphWidth` then stayed at its 900px default
+   * on every window: on a phone the canvas was more than twice the viewport,
+   * two-thirds of the graph was off screen, and the centring force was aiming at
+   * a point 450px from a 390px-wide edge. An effect re-attaches whenever the
+   * element appears, which is the only version of this that cannot silently
+   * do nothing.
+   */
+  $effect(() => {
+    const element = graphElement;
+    if (element === undefined || typeof ResizeObserver === "undefined") return;
+    const resize = new ResizeObserver(([entry]) => {
       graphWidth = Math.max(320, entry.contentRect.width);
       graphHeight = Math.max(420, entry.contentRect.height);
       simulation?.force("center", forceCenter(graphWidth / 2, graphHeight / 2).strength(centerStrength)).alpha(0.2).restart();
     });
-    if (graphElement) resize?.observe(graphElement);
-    return () => { window.clearInterval(timer); resize?.disconnect(); simulation?.stop(); };
+    resize.observe(element);
+    return () => resize.disconnect();
   });
 
   $effect(() => {
@@ -253,7 +272,10 @@
       .force("charge", forceManyBody<GraphNode>().strength(chargeStrength))
       .force("link", forceLink<GraphNode, GraphLink>(links).id((node) => node.node_id).distance(linkDistance).strength(linkStrength))
       .force("collision", forceCollide<GraphNode>().radius((node) => radius(node) + collisionPadding))
-      .on("tick", () => { nodes.forEach((node) => positionCache.set(node.node_id, node)); renderedNodes = [...nodes]; renderedLinks = [...links]; });
+      .on("tick", () => { nodes.forEach((node) => positionCache.set(node.node_id, node)); renderedNodes = [...nodes]; renderedLinks = [...links]; })
+      // The layout has stopped moving, which is the only moment a fit means
+      // anything. `alive` motion never reaches it; the timer covers that.
+      .on("end", () => autoFit());
     if (motion === "paused") simulation.stop();
     else if (motion === "alive") simulation.alphaTarget(0.015).restart();
     else simulation.alphaTarget(0).restart();
@@ -315,7 +337,77 @@
       node.removeEventListener("click", clearGraphSelection);
     } };
   }
-  function fitGraph() { transform = { x: 0, y: 0, k: 1 }; simulation?.alpha(0.18).restart(); }
+  /**
+   * Bring every node on screen — which is what "Fit" has to mean.
+   *
+   * It used to reset the transform to the identity, which is not a fit: on a
+   * phone-width window the graph's own extent is several times the viewport, so
+   * pressing **Fit** left most of the nodes off screen and the control read as
+   * broken. It now measures what is actually laid out and scales to it.
+   *
+   * Zooming *in* is capped at 1: a two-node graph blown up to fill a monitor is
+   * a worse picture than a small one in the middle, and it would make Fit feel
+   * like a different control on a sparse graph than on a dense one.
+   */
+  function fitGraph() {
+    const placed = renderedNodes.filter(
+      (node) => Number.isFinite(node.x) && Number.isFinite(node.y),
+    );
+    if (placed.length === 0) {
+      transform = { x: 0, y: 0, k: 1 };
+      return;
+    }
+    const margin = 48;
+    const pad = Math.max(...placed.map((node) => radius(node))) + 18;
+    const minX = Math.min(...placed.map((node) => (node.x ?? 0))) - pad;
+    const maxX = Math.max(...placed.map((node) => (node.x ?? 0))) + pad;
+    const minY = Math.min(...placed.map((node) => (node.y ?? 0))) - pad;
+    const maxY = Math.max(...placed.map((node) => (node.y ?? 0))) + pad;
+    const width = Math.max(1, maxX - minX);
+    const height = Math.max(1, maxY - minY);
+    const k = Math.max(
+      0.35,
+      Math.min(1, (graphWidth - margin) / width, (graphHeight - margin) / height),
+    );
+    transform = {
+      k,
+      x: graphWidth / 2 - ((minX + maxX) / 2) * k,
+      y: graphHeight / 2 - ((minY + maxY) / 2) * k,
+    };
+    // Deliberately no `alpha().restart()`. Re-agitating the layout is what the
+    // old implementation did, and it moved the very nodes the fit had just
+    // measured — so the graph drifted back off screen a second later.
+  }
+
+  /**
+   * Fit once, when the first layout settles, unless the owner has a saved view.
+   *
+   * A stored transform is a choice; the identity transform on a first visit is
+   * not, and on a narrow window it put the graph off screen before the owner had
+   * any reason to look for a **Fit** button.
+   *
+   * Triggered by the simulation's own `end`, not by a timer: a graph fitted
+   * while it is still spreading is fitted to where it was, not to where it
+   * lands. The timer below is only the fallback for `alive` motion, which never
+   * ends by design.
+   */
+  let autoFitted = false;
+  function autoFit() {
+    if (autoFitted || renderedNodes.length === 0) return;
+    autoFitted = true;
+    fitGraph();
+  }
+
+  $effect(() => {
+    if (autoFitted || !preferencesLoaded) return;
+    // A stored view is the owner's; leave it exactly as they left it.
+    if (transform.x !== 0 || transform.y !== 0 || transform.k !== 1) {
+      autoFitted = true;
+      return;
+    }
+    const timer = window.setTimeout(autoFit, 4_000);
+    return () => window.clearTimeout(timer);
+  });
   async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
   // The picker opens on the *boundary*, never on a listing. Browsing starts
@@ -544,7 +636,7 @@
   :global(.content:has(.knowledge-shell)) { padding:0 !important; overflow:hidden; }
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:#17181c; color:#eef0f6; }
   .graph-toolbar { display:grid; grid-template-columns:auto minmax(220px, 620px) auto auto auto auto; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid rgba(180,188,205,.12); background:rgba(23,24,28,.96); z-index:20; }
-  .title-block { min-width:190px; } .title-block h2 { margin:1px 0 0; color:#eef0f6; font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:#9da7bd; font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; }
+  .title-block { min-width:190px; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:#eef0f6; font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:#9da7bd; font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; }
   .search { display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid rgba(180,188,205,.15); border-radius:7px; background:rgba(255,255,255,.045); color:#8f98ad; } .search:focus-within { border-color:#708db8; box-shadow:0 0 0 2px rgba(112,141,184,.15); } .search input { width:100%; border:0; outline:0; background:transparent; color:#eef0f6; font:inherit; font-size:.78rem; }
   .mode-switch { display:flex; padding:3px; border:1px solid rgba(180,188,205,.14); border-radius:7px; background:#111216; } .mode-switch button,.icon-button { border:0; color:#9ba4b8; background:transparent; cursor:pointer; } .mode-switch button { padding:6px 10px; border-radius:5px; font:inherit; font-size:.72rem; } .mode-switch button.active { background:#30333b; color:#f3f5fa; box-shadow:0 1px 3px #0008; } .mode-switch button:disabled { opacity:.38; cursor:not-allowed; }
   .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid rgba(180,188,205,.13); border-radius:7px; font-size:1.25rem; } .icon-button:hover { color:white; border-color:rgba(180,188,205,.3); background:rgba(255,255,255,.05); }
@@ -562,6 +654,18 @@
   .viewport-controls { right:16px; bottom:16px; border-radius:8px; overflow:hidden; } .viewport-controls button { height:32px; min-width:34px; border:0; border-right:1px solid #ffffff12; background:transparent; color:#bac1cf; cursor:pointer; } .viewport-controls button:first-child { padding:0 11px; font-size:.68rem; } .viewport-controls span { min-width:46px; text-align:center; font-size:.65rem; }
   .graph-meta { left:16px; bottom:16px; gap:7px; padding:7px 10px; border-radius:7px; font-size:.65rem; } .graph-meta button { border:0; background:transparent; color:#8ab4f8; font:inherit; cursor:pointer; } .live-dot { width:6px; height:6px; border-radius:50%; background:#58d68d; box-shadow:0 0 7px #58d68d; }
   .depth-control { left:50%; bottom:16px; transform:translateX(-50%); gap:10px; padding:8px 12px; border-radius:8px; font-size:.68rem; } .depth-control input { width:130px; accent-color:#8ab4f8; }
+  /* Below this the bottom-left status and the bottom-right zoom controls are
+     wider together than the window, so they overlapped and each hid half of the
+     other. Stacked rather than shrunk: both are already at their smallest. */
+  @media (max-width: 34rem) {
+    /* The page header already says "Knowledge Map"; the eyebrow above it wrapped
+       to two lines here and said the same thing a second time. */
+    .eyebrow { display:none; }
+    .title-block { min-width:0; }
+    .graph-meta { bottom:60px; }
+    .depth-control { left:16px; right:16px; bottom:104px; transform:none; justify-content:space-between; }
+    .depth-control input { width:auto; flex:1; }
+  }
   .settings-panel,.inspector { position:absolute; z-index:10; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid rgba(180,188,205,.16); border-radius:11px; background:rgba(24,26,32,.96); backdrop-filter:blur(18px); box-shadow:0 18px 50px #0009; cursor:default; }
   .panel-title { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:15px 16px 12px; border-bottom:1px solid #ffffff12; background:#191b20; text-transform:uppercase; letter-spacing:.1em; font-size:.68rem; } .panel-title small { display:block; margin-top:4px; color:#6f788b; text-transform:none; letter-spacing:0; } .panel-title button,.close { border:0; background:transparent; color:#8c95a7; cursor:pointer; font-size:1.3rem; }
   details { border-bottom:1px solid #ffffff10; padding:12px 16px; } summary { color:#d9dde7; cursor:pointer; font-size:.72rem; font-weight:650; letter-spacing:.04em; } details > :not(summary) { margin-top:10px; }

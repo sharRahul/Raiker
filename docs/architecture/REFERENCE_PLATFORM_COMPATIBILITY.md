@@ -844,7 +844,7 @@ had to be true first:
 | # | Capability | Proposed action | Governance effect | Beyond? |
 |---|---|---|---|---|
 | ~~25~~ | ~~Tool rows do not survive a reload~~ | **Done 2026-08-25 — [FIXED-287](../plans/FIXED_ITEMS.md).** Rebuilt from `tool_actions` through the same presentation function the live stream uses, so a reloaded row carries exactly what the live one did and cannot carry more | A transcript that lost half its record on reload was a weaker record | PARITY |
-| 26 | Live-spec sign-in (BUG-229) | Let the live specs sign in against a non-empty workspace | A test harness that only works on an empty workspace tests an empty workspace | NO — little advantage |
+| ~~26~~ | ~~Live-spec sign-in (BUG-229)~~ | **Done 2026-08-30 — [FIXED-324](../plans/FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in).** Thirty-seven live specs delegate to one `signInAsOwner`, which creates or unlocks and accepts any landing. The per-spec password ([BUG-247](../plans/TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password)) and the twenty-seven inline sign-ins ([BUG-248](../plans/TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)) are what is left | A test harness that only works on an empty workspace tests an empty workspace | NO — little advantage |
 
 ### Low priority, medium effort
 

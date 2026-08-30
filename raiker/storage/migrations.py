@@ -2506,6 +2506,30 @@ CREATE INDEX IF NOT EXISTS idx_turn_sources_turn
 """
 
 
+# BUG-245 — the exchanges one cited call returned, as coordinates.
+#
+# The ledger's rule is *one source per executed call*: a call is the unit the
+# runtime governed and audited, so it is the unit whose provenance can be stated
+# honestly. A `conversation_search` that returned ten exchanges is therefore one
+# row with one `locator`, and the coordinates of the ten lived only in the tool
+# result the runtime read. Opening the chip showed each exchange's title and
+# date above its text — which is what made it checkable at all — and none of
+# them was a link, so verifying one meant retyping the title into chat search.
+#
+# `anchors_json` is a JSON list of `{session_id, turn_id, title, created_at}`
+# built from the tool result the runtime read, never from anything the model
+# wrote. The rule survives: the ledger still holds one source per call, and the
+# anchors are that source's own contents rather than ten sources.
+#
+# Deliberately *not* written into `passage` as markup. That field is rendered
+# escape-first, and keeping it so is the one property that stops a source's text
+# from being able to say more than it is.
+TURN_SOURCE_ANCHORS_MIGRATION_ID = "RAIKER-1039-turn-source-anchors"
+TURN_SOURCE_ANCHORS_SQL = """
+ALTER TABLE turn_sources ADD COLUMN anchors_json TEXT NOT NULL DEFAULT '';
+"""
+
+
 # C17 — which approved memories a turn was actually given.
 #
 # Recall is *ambient*: memories reach a turn through the context bundle, not

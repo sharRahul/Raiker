@@ -21,8 +21,11 @@
     isDeferred,
     isInherent,
     isDisabled,
+    authorityMatrixGates,
+    isOnByDefault,
     realityLabel,
     realityNote,
+    unsetResolutionNote,
     requiresStepUpToken,
     type DecisionMode,
   } from "../capabilityModel";
@@ -148,9 +151,14 @@
       : actionable;
     return groupByDomain(matches);
   });
-  const authorityGates = $derived(
-    (gates ?? []).filter((gate) => !isDeferred(gate) && !isInherent(gate)).slice(0, 8),
+  // A summary of eight, and which eight matters: the alphabetically first eight
+  // are capabilities nobody has an opinion about, so on a fresh account the
+  // summary said nothing at all. Ranked by authority instead — see
+  // `authorityMatrixGates`.
+  const governedGates = $derived(
+    (gates ?? []).filter((gate) => !isDeferred(gate) && !isInherent(gate)),
   );
+  const authorityGates = $derived(authorityMatrixGates(governedGates));
 
   function toggleExpand(capability: string) {
     expanded = expanded === capability ? null : capability;
@@ -297,16 +305,18 @@
 {/if}
 
 {#if gates !== null && authorityGates.length > 0}
-  <AuthorityMatrix gates={authorityGates} />
+  <AuthorityMatrix gates={authorityGates} total={governedGates.length} />
 {/if}
 
 {#if integratedButOff > 0}
   <div class="runtime-note" role="note">
     <Icon name="info" size={16} />
     <span>
-      Capabilities with a real executor ship enabled in the Raiker runtime, but the web dashboard
-      fails closed per account — they start <strong>off</strong> here until you turn them on. Raiker
-      runs one runtime, so nothing has to be selected first; the only runtime-level switch is
+      Capabilities with a real executor ship enabled in the Raiker runtime, but this account fails
+      closed — they start <strong>off</strong> here until you turn them on. A few say
+      <strong>On by default</strong> instead; those read the shipped table when nothing is stored,
+      and each one says so on its card. Raiker runs one runtime, so nothing has to be selected
+      first; the only runtime-level switch is
       <a href="#/settings">Settings → Runtime configuration</a>, which stops work entirely.
     </span>
   </div>
@@ -386,7 +396,12 @@
                      the decision mode beside it showed on every row on or off.
                      A permission list that cannot be scanned for what is on is
                      not a permission list. -->
-                {#if isDisabled(gate)}
+                {#if isOnByDefault(gate)}
+                  <!-- BUG-239 — nothing is stored and the enforcing path still
+                       says yes. Saying "Off" here was the page contradicting
+                       the tool it describes. -->
+                  <span class="cap-reality cap-default-on">On by default</span>
+                {:else if isDisabled(gate)}
                   <span class="cap-reality">Off</span>
                 {/if}
                 {#if realityLabel(gate)}
@@ -418,6 +433,13 @@
                   <strong>{realityLabel(gate)}.</strong>
                   {realityNote(gate)}
                 </p>
+              {/if}
+              {#if unsetResolutionNote(gate)}
+                <!-- BUG-239 — three capabilities read an empty gate table as
+                     something other than "off", and which one applies is not
+                     guessable from the switch. The card says it rather than
+                     leaving an owner to discover it from behaviour. -->
+                <p class="cap-reality-note">{unsetResolutionNote(gate)}</p>
               {/if}
               {#if isDecisionMode(mode)}
                 <p class="mode-hint">{DECISION_MODE_COPY[mode].hint}</p>
@@ -577,6 +599,13 @@
     border-radius: var(--r-sm);
     padding: 0.05rem 0.35rem;
     white-space: nowrap;
+  }
+  /* On by default is not the same claim as Off, so it must not look like it:
+     the accent border carries the difference and the words carry it alone if
+     colour is unavailable. */
+  .cap-default-on {
+    color: var(--accent);
+    border-color: var(--accent-border, var(--accent));
   }
   .cap-reality-note {
     font-size: 0.82rem;

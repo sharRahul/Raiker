@@ -2,10 +2,11 @@
   /**
    * C4 — one cited source, opened at the passage the turn used, inline.
    *
-   * Chat opens a source in the file inspector because Chat has one. Build does
-   * not (B13/B14 are the panes it is still missing), and a chip that opens
-   * nothing would be a dead control — so Build gets the passage where the
-   * citation is, under the answer that cited it.
+   * Chat opens a source in the file inspector because Chat has one. Build has
+   * a file explorer of its own now (B13), but it is a view of the repository
+   * rather than of a cited passage, and a chip that opens nothing would be a
+   * dead control — so Build still gets the passage where the citation is, under
+   * the answer that cited it.
    *
    * The same two rules the inspector follows apply here and are the reason this
    * is safe: the excerpt is bounded plain text, and the highlight is applied by
@@ -14,6 +15,7 @@
    * empty box.
    */
   import Icon from "./Icon.svelte";
+  import SourceAnchorLinks from "./SourceAnchorLinks.svelte";
   import { splitExcerpt } from "../citations";
   import type { TurnSourceExcerptView } from "../apiTypes";
 
@@ -52,6 +54,7 @@
       ? null
       : splitExcerpt(source.excerpt, source.highlight_start, source.highlight_length),
   );
+
 </script>
 
 {#if loading || source !== null}
@@ -83,6 +86,11 @@
           <p class="muted truncation">Showing the passage and the text around it only.</p>
         {/if}
       {/if}
+      <!-- BUG-245 — the passage above names each exchange it returned, which
+           is what made the citation checkable; these are the same names as
+           links, so checking one stops meaning retyping its title into chat
+           search. -->
+      <SourceAnchorLinks anchors={source.anchors ?? []} />
     {/if}
   </section>
 {/if}

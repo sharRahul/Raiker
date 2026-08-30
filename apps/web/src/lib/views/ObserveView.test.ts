@@ -34,7 +34,10 @@ function gate(partial: Record<string, unknown> = {}) {
     default_state: "disabled",
     source: "principal_fail_closed",
     runtime_enabled: false,
-    allowed_transitions: [],
+    // A gate an owner can open offers an enable target. A disabled gate with
+    // none is a capability with no executor, which Permissions does not list
+    // and this tile therefore does not count.
+    allowed_transitions: ["enabled_runtime"],
     can_current_principal_change: true,
     blocked_reason_code: null,
     readiness: {},
@@ -64,6 +67,28 @@ describe("ObserveView", () => {
     const tile = (await screen.findByText("Closed capability gates")).closest("article.tile");
     expect(tile).not.toBeNull();
     expect(tile?.querySelector(".value")).toHaveTextContent("1");
+  });
+
+  // The tile links to Permissions, and Permissions lists only capabilities that
+  // have an executor. Counting the ones it omits made the tile say 65 under a
+  // link to a page with 48 rows on it.
+  it("counts only the closed gates the page it links to can open", async () => {
+    stubFetch(
+      routes({
+        "GET /api/runtime-readiness": {
+          ...READINESS,
+          gates: [
+            gate(),
+            gate({ capability: "admin_mutation", allowed_transitions: [] }),
+            gate({ capability: "calendar_runtime", allowed_transitions: [] }),
+          ],
+        },
+      }),
+    );
+    render(ObserveView, { props: { tab: "overview" } });
+    const tile = (await screen.findByText("Closed capability gates")).closest("article.tile");
+    expect(tile?.querySelector(".value")).toHaveTextContent("1");
+    expect(tile).toHaveTextContent("2 more have no executor and stay closed.");
   });
 
   it("shows a loading state while the runtime status is read", async () => {
@@ -198,6 +223,72 @@ describe("ObserveView", () => {
       "href",
       "#/sessions?session=sess_alpha",
     );
+  });
+
+  // An authorization resolution has no conversation, so it carries the scope
+  // name `authz` where a session id goes. That is a real string, so the
+  // redaction guard did not catch it and the timeline offered
+  // `#/sessions?session=authz` — a link to a session that does not exist.
+  it("offers no session link for an event scoped to authorization", async () => {
+    stubFetch(
+      routes({
+        "GET /api/events": [
+          {
+            event_id: "ev_1",
+            session_id: "authz",
+            turn_id: null,
+            event_type: "principal_resolution_failed",
+            actor: "system",
+            timestamp: "2026-07-24T00:00:00Z",
+            risk_level: "high",
+            summary: "No owner principal is configured.",
+          },
+        ],
+      }),
+    );
+    render(ObserveView, { props: { tab: "overview" } });
+    await waitFor(() =>
+      expect(screen.getByText("No owner principal is configured.")).toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("link", { name: /session/i })).toBeNull();
+    expect(screen.queryByText("session withheld")).toBeNull();
+  });
+
+  // Every governed read resolves the acting principal first and records it, so
+  // the newest twelve events on a quiet workspace were twelve identical
+  // lookups under a heading asking what changed.
+  it("answers What changed with changes, not with every authorization lookup", async () => {
+    stubFetch(
+      routes({
+        "GET /api/events": [
+          ...Array.from({ length: 12 }, (_unused, index) => ({
+            event_id: `ev_authz_${index}`,
+            session_id: "authz",
+            turn_id: null,
+            event_type: "principal_resolved",
+            actor: "system",
+            timestamp: "2026-07-24T00:00:00Z",
+            risk_level: null,
+            summary: null,
+          })),
+          {
+            event_id: "ev_real",
+            session_id: "sess_alpha",
+            turn_id: "turn_1",
+            event_type: "capability_enabled",
+            actor: "owner",
+            timestamp: "2026-07-23T00:00:00Z",
+            risk_level: "medium",
+            summary: "Web fetch was turned on.",
+          },
+        ],
+      }),
+    );
+    render(ObserveView, { props: { tab: "overview" } });
+    await waitFor(() =>
+      expect(screen.getByText("Web fetch was turned on.")).toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Principal resolved")).toBeNull();
   });
 
   it("offers no dead link when the server redacted the session id", async () => {

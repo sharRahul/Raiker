@@ -19,6 +19,7 @@
   import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { api, ApiError } from "../api";
+  import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
     Diagnostics,
@@ -28,7 +29,7 @@
     RuntimeReadiness,
     TaskView,
   } from "../apiTypes";
-  import { humanize, isRedacted, relativeTime, shortId } from "../format";
+  import { humanize, isAddressableSession, isRedacted, relativeTime, shortId } from "../format";
   import { HUB_TABS } from "../nav";
   import { isActiveTask } from "../statusMaps";
 
@@ -80,13 +81,37 @@
   // BUG-239 — a gate the enforcing path would run is not a closed gate. Counting
   // `!runtime_enabled` alone made this tile say "66 closed" on a workspace where
   // `web_fetch` would have fetched, which is the same defect Permissions had.
-  const blockedGates = $derived(
+  const closedGates = $derived(
     (readiness?.gates ?? []).filter(
       (gate) => !gate.runtime_enabled && gate.enforced_enabled !== true,
     ),
   );
+  // …and a gate the owner cannot open is not something to send them to
+  // Permissions about. This tile said "65 closed" under a link to a page that
+  // lists 48, because Permissions deliberately omits capabilities with no
+  // executor and the contract surfaces that are not tools. The number is now
+  // the number of rows on the page the link opens; the rest are named as what
+  // they are rather than being counted as work.
+  const openableGates = $derived(
+    closedGates.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
+  );
+  const gatesWithNoExecutor = $derived(closedGates.length - openableGates.length);
   const ready = $derived(
     diagnostics?.production_ready_local_single_user_runtime === true,
+  );
+  /**
+   * "What changed?" answers with changes.
+   *
+   * Every governed read resolves the acting principal first and records that it
+   * did, so on a workspace that has done nothing else the twelve most recent
+   * events were twelve identical `principal_resolved` rows — an authorization
+   * lookup, with no summary, under a heading asking what changed, pushing any
+   * real change off the list. The lookups stay in the audit log, which is the
+   * record; they are not news. A resolution that *failed* is, so only the
+   * successful one is dropped.
+   */
+  const changes = $derived(
+    (events ?? []).filter((event) => event.event_type !== "principal_resolved").slice(0, 12),
   );
 
   function selectTab(next: string) {
@@ -101,7 +126,9 @@
         api.runtimeReadiness(),
         api.approvals(),
         api.tasks(),
-        api.events({ limit: 12 }),
+        // Over-fetched because the digest filters: a page of routine
+        // authorization lookups must not be able to empty it.
+        api.events({ limit: 60 }),
         api.notifications(),
       ]);
       offline = false;
@@ -184,11 +211,15 @@
           />
           <StatTile
             label="Closed capability gates"
-            value={blockedGates.length}
-            detail={blockedGates.length === 0
-              ? "Every gate the runtime knows about is enabled."
-              : "Requests needing these capabilities fail closed until you open them."}
-            tone={blockedGates.length === 0 ? "ok" : "neutral"}
+            value={openableGates.length}
+            detail={openableGates.length === 0
+              ? "Every capability you can open is open."
+              : `Requests needing these fail closed until you open them.${
+                  gatesWithNoExecutor > 0
+                    ? ` ${gatesWithNoExecutor} more have no executor and stay closed.`
+                    : ""
+                }`}
+            tone={openableGates.length === 0 ? "ok" : "neutral"}
             href="#/capabilities"
             linkLabel="Review capabilities"
           />
@@ -249,11 +280,11 @@
 
       <section aria-labelledby="changed-h">
         <h2 id="changed-h" class="section-h">What changed?</h2>
-        {#if (events ?? []).length === 0}
-          <p class="quiet">No events recorded yet.</p>
+        {#if changes.length === 0}
+          <p class="quiet">Nothing has changed yet.</p>
         {:else}
           <ol class="timeline">
-            {#each events ?? [] as event (event.event_id)}
+            {#each changes as event (event.event_id)}
               <li>
                 <span class="dot" data-risk={event.risk_level} aria-hidden="true"></span>
                 <div class="entry">
@@ -261,12 +292,12 @@
                   <p class="entry-detail">{event.summary}</p>
                   <p class="entry-meta">
                     <time title={event.timestamp}>{relativeTime(event.timestamp)}</time>
-                    {#if event.session_id && !isRedacted(event.session_id)}
+                    {#if isAddressableSession(event.session_id)}
                       ·
-                      <a href={`#/sessions?session=${encodeURIComponent(event.session_id)}`}>
+                      <a href={`#/sessions?session=${encodeURIComponent(event.session_id!)}`}>
                         session {shortId(event.session_id)}
                       </a>
-                    {:else if event.session_id}
+                    {:else if isRedacted(event.session_id)}
                       <!-- The server redacted this id, so it cannot address a
                            session. Say so rather than offering a dead link. -->
                       · <span title="The server redacted this identifier.">session withheld</span>

@@ -77,8 +77,13 @@
     (tasks ?? []).filter((task) => isActiveTask(task.status)),
   );
   const expiredApprovals = $derived((approvals ?? []).filter((a) => a.is_expired));
+  // BUG-239 — a gate the enforcing path would run is not a closed gate. Counting
+  // `!runtime_enabled` alone made this tile say "66 closed" on a workspace where
+  // `web_fetch` would have fetched, which is the same defect Permissions had.
   const blockedGates = $derived(
-    (readiness?.gates ?? []).filter((gate) => !gate.runtime_enabled),
+    (readiness?.gates ?? []).filter(
+      (gate) => !gate.runtime_enabled && gate.enforced_enabled !== true,
+    ),
   );
   const ready = $derived(
     diagnostics?.production_ready_local_single_user_runtime === true,
@@ -272,8 +277,12 @@
               </li>
             {/each}
           </ol>
-          <a class="more" href="#/observe?tab=activity">Open the full audit log</a>
-          <a class="more" href="#/observe?tab=checkpoints">See the rewind timeline</a>
+          <!-- Two links, deliberately in a row of their own: inline they ran
+               together into one unreadable sentence at a phone width. -->
+          <p class="more-row">
+            <a class="more" href="#/observe?tab=activity">Open the full audit log</a>
+            <a class="more" href="#/observe?tab=checkpoints">See the rewind timeline</a>
+          </p>
         {/if}
       </section>
 
@@ -403,6 +412,7 @@
   .entry-detail { margin: 0; color: var(--text-2); font-size: 0.84rem; overflow-wrap: anywhere; }
   .entry-meta { margin: 0; color: var(--text-3); font-size: 0.75rem; }
   .more { font-size: 0.82rem; font-weight: 600; }
+  .more-row { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: var(--space-2) 0 0; }
   .quiet { color: var(--text-3); }
   .support p { color: var(--text-2); max-width: 68ch; }
   .support-actions { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }

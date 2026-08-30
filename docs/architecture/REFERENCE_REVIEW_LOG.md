@@ -21,6 +21,39 @@ Rounds are newest-first within each group, as they were written.
 
 ---
 
+## 2026-08-30 review (second pass) — what a governed record must survive
+
+Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,
+DeepSeek Harness and Hermes Agent. Scope: what happens to a turn when the person
+reading it leaves; what a compact layout may take away; and whether an
+observability surface describes the thing it links to.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| A turn that finishes and is recorded when the reader walks away ([FIXED-331](../plans/FIXED_ITEMS.md#fixed-331--a-turn-the-reader-walked-away-from-was-never-recorded)) | **No — parity, and it was a defect rather than a gap.** Every compared platform persists a turn server-side regardless of the client: Cowork and ChatGPT keep the reply if the tab closes, and Codex and Claude Code are not tied to a browser at all | This is the bar, and Raiker was under it: navigating away after the answer rendered destroyed both the reply and the truthful record of the turn. Nothing here should be claimed as a differentiator. What is worth stating is the second half — the *audit* consequence. A record that says `failed | stream ended` about a turn that succeeded is worse than no record, and the products that persist correctly do not have a per-turn governance task that could have been wrong in the first place. |
+| An attached reader still pacing the turn | **Yes — improvement, and it is why the fix is narrow** | Detaching the runtime from the response is the easy half; keeping it detachable *without* losing the stop-between-events guarantee is the part that matters for a governed product. The queue holds one item, so a stop the owner issues between two events still lands before the next one is produced — the property `test_gateway_stream_stops_when_its_tracked_task_is_cancelled` measures. None of the compared platforms documents an interrupt boundary this precise. |
+| A compact layout that may drop information and not authority ([FIXED-329](../plans/FIXED_ITEMS.md#fixed-329--three-controls-a-narrow-window-silently-removed)) | **No — parity** | Every compared assistant is usable on a phone, and each keeps its model selector there. Raiker's was a blank circle below 1024px and Build's project gate was absent while the composer still demanded it. This is catching up. |
+| A stat tile that counts what the page it links to can act on ([FIXED-330](../plans/FIXED_ITEMS.md#fixed-330--the-overview-counted-one-set-of-gates-and-linked-to-another)) | **Yes — improvement** | The references' status surfaces are dashboards; a count that does not reconcile with its own destination is a familiar dashboard failure and none of them promises otherwise. Raiker's whole observability claim is that no status is a number without a record behind it, so a tile that counted eighteen gates its link cannot open was breaking the product's own rule, and the fix restates it: the number is the number of rows the link opens. |
+| A change digest derived from the transcript's own phase map | **Yes — improvement** | Deciding what is "important" with a hand-written list of event names is how such a list rots. The discriminator here is `turnPhases.ts` — the map the transcript already uses to render a turn's gather → plan → act → verify timeline — so "an event the transcript shows inside a turn is that turn's trace" is derived rather than curated, and a new lifecycle event joins the right side automatically. |
+| One owner and a stage-driven wizard for the live suite ([FIXED-327](../plans/FIXED_ITEMS.md#fixed-327--the-setup-wizard-trapped-every-live-spec-after-the-first-one), [FIXED-328](../plans/FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)) | **Not comparable — internal** | A harness property, recorded for the same reason FIXED-325 was: running a round against one workspace immediately found three specs asserting first-run state and one spec still driving a dev server on port 5174. A suite that only ever ran on a new workspace was testing a new workspace. |
+
+### Gaps this round identified and did **not** close
+
+| Gap | Reference | Raiker today | Compatibility requirement to close it |
+|---|---|---|---|
+| **A turn that survives the server, not just the reader** | Cowork and Codex run work that outlives any client *process*; a restart resumes or reports it | A detached turn survives the client. It does not survive `raiker-web` stopping mid-turn | This is durable execution, not stream handling: the turn's position would have to be a record the runtime can resume from. Worth stating separately from FIXED-331 so the smaller fix is not mistaken for the larger property. |
+| **A workspace the harness can reset** ([BUG-250](../plans/TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs)) | Not a product question | Containment, settings and connections all persist between specs, correctly | Two things, in order: mark the specs that genuinely need a first run, and make the rest assert behaviour rather than a fresh install's values. |
+
+### Recommended improvements, in the order they are worth doing
+
+Unchanged from the first pass — **MCP tool search and deferred schemas**
+(backlog #16), then **OpenTelemetry export** (#18), then **per-hunk decisions**
+(B14's remainder). The live-spec item that was fourth is closed.
+
+---
+
 ## 2026-08-30 review — the repository on screen, and three self-descriptions that were wrong
 
 Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,

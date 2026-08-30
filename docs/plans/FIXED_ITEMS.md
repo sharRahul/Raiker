@@ -13704,6 +13704,13 @@ from the address so a reload opens the conversation as it is rather than
 replaying a highlight. A coordinate this conversation does not hold says so,
 because landing silently at the top is indistinguishable from the defect.
 
+**A second link into the same conversation.** Landing from the history load
+alone would have honoured only the first one: opening one search result and then
+another *in the same conversation* reloads nothing, because the session id has
+not changed. The anchor is honoured whenever it changes and the transcript is
+ready, with a guard so a still-set anchor does not re-mark the exchange every
+time a new turn arrives.
+
 **What is not claimed.** A model that *writes* a date in prose still writes
 prose. What is now clickable is a coordinate the ledger recorded, which is the
 same rule citations follow: the ledger is the fact, the sentence is the claim.

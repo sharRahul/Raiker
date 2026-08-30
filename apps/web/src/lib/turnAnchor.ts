@@ -59,9 +59,16 @@ export function revealTurn(
   turnId: string,
 ): boolean {
   if (root === undefined || turnId === "") return false;
-  const target = root.querySelector<HTMLElement>(
-    `[data-turn-id="${CSS.escape ? CSS.escape(turnId) : turnId}"]`,
-  );
+  // `CSS` is absent in some non-browser DOM implementations, and a coordinate
+  // that cannot be escaped is one that must not be spliced into a selector —
+  // so an environment without it looks the id up by comparison instead.
+  const escape = typeof CSS !== "undefined" && typeof CSS.escape === "function" ? CSS.escape : null;
+  const target =
+    escape === null
+      ? [...root.querySelectorAll<HTMLElement>("[data-turn-id]")].find(
+          (node) => node.dataset.turnId === turnId,
+        ) ?? null
+      : root.querySelector<HTMLElement>(`[data-turn-id="${escape(turnId)}"]`);
   if (target === null) return false;
   // jsdom implements neither, and a missing scroll must not cost the mark.
   target.scrollIntoView?.({ block: "center" });

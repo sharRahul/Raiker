@@ -326,6 +326,7 @@
     // B18 — a preflight belongs to one conversation. Left open across a load
     // it would describe a checkpoint from a conversation no longer on screen.
     rewindCheckpointId = null;
+    landedAnchor = null;
     try {
       const detail = await api.session(id);
       const parked = parkedByTurn(detail);
@@ -334,9 +335,10 @@
       await restoreAttachmentChips(id);
       await refreshTurnSources(id);
       await loadApprovals();
-      // MEM-08 — a link that named an exchange lands on it.
-      if (anchoredTurnId !== null && anchoredTurnId !== "") void landOnAnchor(anchoredTurnId);
-      else void scrollToEnd();
+      // MEM-08 — a link that named an exchange lands on it, through the effect
+      // below rather than here, so a second link into the same conversation is
+      // honoured too.
+      if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd();
     } catch (e) {
       historyError =
         e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
@@ -1173,6 +1175,22 @@
     if (anchorNotice !== null) void scrollToEnd();
   }
 
+  // The anchor is honoured whenever it changes and the transcript is ready to
+  // receive it — not only on the load that first opened the conversation.
+  // Opening one search result and then a second one *in the same conversation*
+  // never reloads anything, so landing from `loadHistory` alone would silently
+  // ignore the second link. `landedAnchor` is what keeps a still-set anchor
+  // from re-marking the exchange every time a new turn arrives.
+  let landedAnchor: string | null = null;
+
+  $effect(() => {
+    const anchor = anchoredTurnId;
+    const ready = !historyLoading && turns.length > 0;
+    if (anchor === null || anchor === "" || anchor === landedAnchor || !ready) return;
+    landedAnchor = anchor;
+    untrack(() => void landOnAnchor(anchor));
+  });
+
   function newConversation() {
     if (streaming) return;
     audioSessionCoordinator.stopAll("route");
@@ -1184,6 +1202,7 @@
     plan = null;
     rewindCheckpointId = null;
     anchorNotice = null;
+    landedAnchor = null;
     promptEl?.focus();
   }
 

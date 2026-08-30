@@ -92,4 +92,26 @@ describe("landing on an anchored exchange", () => {
     expect(container.querySelector(".turn-anchored")).toBeNull();
     expect(screen.queryByText("That exchange is not in this conversation.")).toBeNull();
   });
+
+  // Two search results in the *same* conversation. Nothing reloads — the
+  // session id has not changed — so landing only from the history load would
+  // have silently ignored the second link and left the reader on the first
+  // exchange, which is the bug this whole entry is about.
+  it("honours a second link into a conversation that is already open", async () => {
+    stubFetch(routes());
+    window.history.replaceState(null, "", "#/new-chat?session=sess_1&turn=turn_2");
+    const { container, rerender } = render(ChatView, {
+      sessionId: "sess_1",
+      anchoredTurnId: "turn_2",
+    });
+
+    await waitFor(() =>
+      expect(container.querySelector('[data-turn-id="turn_2"].turn-anchored')).not.toBeNull(),
+    );
+
+    await rerender({ sessionId: "sess_1", anchoredTurnId: "turn_1" });
+    await waitFor(() =>
+      expect(container.querySelector('[data-turn-id="turn_1"].turn-anchored')).not.toBeNull(),
+    );
+  });
 });

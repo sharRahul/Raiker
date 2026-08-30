@@ -879,14 +879,42 @@ code,
   outline-offset: 1px;
 }
 
+/* The one control the element floor above deliberately excludes, and the one
+   that was therefore left at the user agent's own 13x13 box: a checkbox.
+   Measured across the app at four widths, every checkbox on Permissions,
+   Memory, Sessions, Connectors and Hooks came out under WCAG 2.2's 24px
+   minimum target — and they came out at three different sizes, because a
+   couple of views had set their own. Sizing the element rather than naming the
+   views fixes both, exactly as the button and input floors above do.
+
+   Kept at zero specificity so a component that genuinely needs a smaller box
+   still wins without anything being unpicked. */
+:where(input[type="checkbox"], input[type="radio"]) {
+  inline-size: 1.05rem;
+  block-size: 1.05rem;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+:where(input[type="checkbox"]:disabled, input[type="radio"]:disabled) {
+  cursor: not-allowed;
+}
+
 /* Touch targets: on narrow (touch-first) screens shared shell controls meet
-   the WCAG-aligned 44px minimum without changing desktop density. */
+   the WCAG-aligned 44px minimum without changing desktop density. A pointer
+   that cannot be precise gets the same treatment whatever the window is: a
+   1024px-wide tablet is not a mouse. */
 @media (max-width: 1023px) {
   .btn,
   .input,
   .select,
   .stop-btn {
     min-height: 44px;
+  }
+}
+@media (max-width: 1023px), (pointer: coarse) {
+  :where(input[type="checkbox"], input[type="radio"]) {
+    inline-size: 1.5rem;
+    block-size: 1.5rem;
   }
 }
 

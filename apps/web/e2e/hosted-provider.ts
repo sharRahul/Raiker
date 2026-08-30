@@ -268,3 +268,42 @@ export async function pickAnyThinkingLevel(
   await page.keyboard.press("Escape");
   return chosen;
 }
+
+/**
+ * Sign in, on an empty workspace **or** one that already holds work (BUG-229).
+ *
+ * Every live spec used to inline this, and every one of them asserted the
+ * empty-workspace heading — "Welcome to your Work Dashboard". The Workbench
+ * says "Welcome back" once anything has run, so a spec re-run against the
+ * workspace its own first run created failed on its first step, and the
+ * failure looked like a product defect rather than a harness one. Accepting
+ * either heading is what makes a round repeatable.
+ *
+ * It creates the account when there is none and unlocks when there is, so the
+ * same call works on a fresh instance and on the fifth run against it.
+ */
+export async function signInAsOwner(
+  page: Page,
+  base: string,
+  credentials: { user: string; password: string },
+): Promise<void> {
+  await page.goto(`${base}/#/workbench`);
+  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  const confirm = page.getByLabel("Confirm password");
+  await page.getByLabel("Username").fill(credentials.user);
+  await page.getByLabel("Password", { exact: true }).fill(credentials.password);
+  if (await confirm.isVisible().catch(() => false)) {
+    await confirm.fill(credentials.password);
+    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
+  } else {
+    await page.getByRole("button", { name: /unlock|sign in/i }).click();
+  }
+  const workbench = page.getByRole("heading", {
+    name: /Welcome (back|to your Work Dashboard)/,
+  });
+  await expect(
+    page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
+  ).toBeVisible({ timeout: 60_000 });
+  await dismissFirstRunModelSetup(page);
+  await expect(workbench).toBeVisible({ timeout: 30_000 });
+}

@@ -3,6 +3,7 @@
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type { AuditExportView, EventEntry } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
@@ -90,12 +91,11 @@
 <div class="head-row">
   <!-- BUG-87 — the scope is stated, because the page used to claim "every
        governed step" while showing only conversation events, so connecting a
-       credential or pinning a model appeared nowhere. -->
+       credential or pinning a model appeared nowhere. It is stated in one line
+       now: what it *includes* is read once and belongs in the guide, and four
+       sentences above the filters filled a phone screen before the first row. -->
   <p class="page-lead">
-    The append-only audit record — every governed step in this account, in full detail: your own
-    conversations, and the runtime steps taken outside them, such as connecting a provider or
-    pinning a model. Other people's conversations are never shown here. This is deliberately the
-    deep-dive view; day-to-day work lives in Chat, Approvals, and Tasks.
+    Every governed step in this account, append-only. <GuideLink route="activity" />
   </p>
   <div class="head-actions">
     <button

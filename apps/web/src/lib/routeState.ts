@@ -6,12 +6,19 @@
 export interface RouteState {
   projectId: string | null;
   sessionId: string | null;
+  /**
+   * MEM-08 — the exchange inside `sessionId` a link is pointing at. A
+   * coordinate, exactly like the session id beside it: it names a turn the
+   * reader may already open, and grants nothing that opening the conversation
+   * did not already grant.
+   */
+  turnId: string | null;
   recordId: string | null;
   filter: string | null;
   tab: string | null;
 }
 
-const ROUTE_STATE_KEYS = ["project", "session", "record", "filter", "tab"] as const;
+const ROUTE_STATE_KEYS = ["project", "session", "turn", "record", "filter", "tab"] as const;
 
 function safeValue(value: string | null): string | null {
   if (value === null || value.length === 0 || value.length > 256) return null;
@@ -27,6 +34,7 @@ export function routeStateFromHash(hash: string): RouteState {
   return {
     projectId: values.project,
     sessionId: values.session,
+    turnId: values.turn,
     recordId: values.record,
     filter: values.filter,
     tab: values.tab,

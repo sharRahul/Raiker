@@ -2,11 +2,12 @@
   import Icon from "../components/Icon.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
-  import SidePanel from "../components/SidePanel.svelte";
+  import RewindPanel from "../components/RewindPanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
-  import type { Checkpoint, RestorePlan, RestoreRequestResult } from "../apiTypes";
+  import type { Checkpoint } from "../apiTypes";
   import { humanize, relativeTime, shortId } from "../format";
+  import { conversationLink } from "../turnAnchor";
 
   // When a project is active (topbar switcher) the list is scoped to it.
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
@@ -41,79 +42,12 @@
     checkpoints === null ? [] : [...new Set(checkpoints.map((cp) => cp.checkpoint_type))].sort(),
   );
 
-  // ── Restore preflight ────────────────────────────────────────────────
-  // Restoring to a checkpoint is deliberately a funnel, not a button. Step one
-  // reads a server-computed, metadata-only plan: which files would be rewritten,
-  // deleted, or skipped, and whether any of them were last changed by another
-  // principal. Reading the plan performs no restore, and this view never claims
-  // one happened — execution belongs to the governed approval path.
+  // ── Rewind preflight ─────────────────────────────────────────────────
+  // B18 — the funnel itself now lives in `RewindPanel`, because the same ask is
+  // made from Chat and Build, at the turn that caused the change. This page
+  // chooses the checkpoint; the panel states the impact and raises the
+  // approval. Nothing here performs a restore.
   let planFor = $state<Checkpoint | null>(null);
-  let plan = $state<RestorePlan | null>(null);
-  let planError = $state<string | null>(null);
-  let planBusy = $state(false);
-  let acknowledged = $state(false);
-  // BUG-230 — asking for the restore. This never performs one: the server
-  // recomputes the plan, raises a governed approval and returns its id, and the
-  // workspace changes only when a human approves it in Approvals.
-  let requestBusy = $state(false);
-  let requested = $state<RestoreRequestResult | null>(null);
-  let requestError = $state<string | null>(null);
-
-  const escalates = $derived(plan?.touches_other_principal === true);
-  const nothingToRestore = $derived(
-    plan !== null && plan.restore_content_count + plan.delete_count === 0,
-  );
-
-  async function openPreflight(checkpoint: Checkpoint) {
-    planFor = checkpoint;
-    plan = null;
-    planError = null;
-    acknowledged = false;
-    requested = null;
-    requestError = null;
-    planBusy = true;
-    try {
-      plan = await api.checkpointRestorePlan(checkpoint.checkpoint_id);
-    } catch (e) {
-      planError =
-        e instanceof ApiError
-          ? `Could not compute the restore plan (${e.status}).`
-          : "Could not compute the restore plan.";
-    } finally {
-      planBusy = false;
-    }
-  }
-
-  async function requestRestore() {
-    if (planFor === null || requestBusy) return;
-    requestBusy = true;
-    requestError = null;
-    try {
-      requested = await api.requestCheckpointRestore(planFor.checkpoint_id);
-    } catch (e) {
-      requestError =
-        e instanceof ApiError
-          ? `Could not raise the approval (${e.status}).`
-          : "Could not raise the approval.";
-    } finally {
-      requestBusy = false;
-    }
-  }
-
-  function closePreflight() {
-    planFor = null;
-    plan = null;
-    planError = null;
-    acknowledged = false;
-    requested = null;
-    requestError = null;
-  }
-
-  function opLabel(op: string): string {
-    if (op === "restore_content") return "Rewrite to its checkpoint state";
-    if (op === "delete") return "Delete — it did not exist at the checkpoint";
-    return "Skipped — too large to have been captured, so it cannot be rewound";
-  }
 
   async function load() {
     loadError = null;
@@ -198,7 +132,9 @@
               </div>
               {#if cp.summary}<p class="summary">{cp.summary}</p>{/if}
               <dl class="context">
-                {#if cp.turn_id}<div><dt>Turn</dt><dd class="mono">{shortId(cp.turn_id)}</dd></div>{/if}
+                <!-- MEM-08 — a snapshot names the turn that produced it, so
+                     the turn is where it links. -->
+                {#if cp.turn_id}<div><dt>Turn</dt><dd><a class="mono" href={conversationLink("new-chat", cp.session_id, cp.turn_id)}>{shortId(cp.turn_id)}</a></dd></div>{/if}
                 {#if cp.task_id}<div><dt>Task</dt><dd class="mono">{shortId(cp.task_id)}</dd></div>{/if}
                 {#if cp.last_event_id}<div><dt>Last event</dt><dd class="mono">{shortId(cp.last_event_id)}</dd></div>{/if}
                 <div>
@@ -211,10 +147,10 @@
               <button
                 type="button"
                 class="btn btn-sm preflight-btn"
-                onclick={() => openPreflight(cp)}
-                aria-label={`Preview what restoring to checkpoint ${shortId(cp.checkpoint_id)} would change`}
+                onclick={() => (planFor = cp)}
+                aria-label={`Preview what rewinding to checkpoint ${shortId(cp.checkpoint_id)} would change`}
               >
-                Preview restore impact
+                Preview rewind
               </button>
             </div>
           </li>
@@ -224,114 +160,12 @@
   {/each}
 {/if}
 
-<SidePanel
-  open={planFor !== null}
-  title="Restore preflight"
+<RewindPanel
+  checkpointId={planFor?.checkpoint_id ?? null}
   subtitle={planFor ? `Checkpoint ${shortId(planFor.checkpoint_id)}` : null}
-  onclose={closePreflight}
+  onclose={() => (planFor = null)}
   scrollIntoViewOnOpen
->
-  {#if planBusy}
-    <PageState state="loading" title="Computing what a restore would change…" />
-  {:else if planError}
-    <PageState state="error" title="Preflight unavailable" detail={planError} />
-  {:else if plan}
-    <p class="preflight-lead">
-      Restoring rewinds every workspace file changed after this checkpoint back to the state it had
-      then. Reading this plan changed nothing — it is a preview computed from stored metadata.
-    </p>
-    <div class="impact">
-      <span><strong>{plan.restore_content_count}</strong> to rewrite</span>
-      <span><strong>{plan.delete_count}</strong> to delete</span>
-      <span><strong>{plan.skip_count}</strong> skipped</span>
-      <span><strong>{plan.changed_count}</strong> changed since</span>
-    </div>
-
-    {#if plan.files.length === 0}
-      <p class="quiet">
-        No captured file changes after this checkpoint, so a restore would rewind nothing.
-      </p>
-    {:else}
-      <ul class="affected">
-        {#each plan.files as file (file.workspace_path)}
-          <li class:changed={file.changed}>
-            <span class="path mono">{file.workspace_path}</span>
-            <span class="op">{opLabel(file.op)}</span>
-            {#if file.changed_by_other_principal}
-              <span class="escalation">Last changed by a different principal</span>
-            {/if}
-          </li>
-        {/each}
-      </ul>
-    {/if}
-
-    {#if escalates}
-      <div class="notice notice-danger" role="alert">
-        <Icon name="warning" size={16} />
-        <span>
-          This restore would overwrite work last changed by a different principal. That is a
-          cross-principal escalation and the runtime requires an explicit approval for it.
-        </span>
-      </div>
-    {/if}
-
-    <div class="undo-facts">
-      <h3>Before you ask for this</h3>
-      <ul>
-        <li>The restore itself is captured, so it can be rewound the same way.</li>
-        <li>Skipped files are left exactly as they are — they were never captured.</li>
-        <li>
-          Every step is written to the append-only record.
-          <a href={`#/observe?tab=activity&session=${encodeURIComponent(plan.session_id)}`}>
-            Open this session's audit log
-          </a>
-        </li>
-      </ul>
-    </div>
-
-    <label class="ack">
-      <input type="checkbox" bind:checked={acknowledged} />
-      I have read what this would change.
-    </label>
-
-    {#if requested}
-      <div class="notice notice-ok" role="status">
-        <Icon name="check" size={16} />
-        <span>
-          Raised as approval <span class="mono">{shortId(requested.approval_id)}</span>. Nothing has
-          changed yet.
-          {#if requested.critical}
-            It is a critical action, so only a live human can resolve it and you will be asked to
-            re-authenticate.
-          {/if}
-          <a href="#/approvals">Open Approvals</a>
-        </span>
-      </div>
-    {:else}
-      {#if requestError}
-        <p class="notice notice-danger" role="alert">{requestError}</p>
-      {/if}
-      <button
-        type="button"
-        class="btn btn-primary"
-        onclick={requestRestore}
-        disabled={!acknowledged || requestBusy || nothingToRestore}
-      >
-        {requestBusy ? "Raising approval…" : "Request this restore"}
-      </button>
-      <p class="handoff" class:ready={acknowledged}>
-        {nothingToRestore
-          ? "There is nothing to rewind, so there is nothing to approve."
-          : acknowledged
-            ? "This raises a governed approval. The rewind runs only once you approve it, and it re-passes its capability gate, policy review and posture check then."
-            : "Confirm you have read the impact above before requesting the restore."}
-      </p>
-    {/if}
-    <p class="quiet">
-      This panel never performs a restore. It asks for one, and a human decision executes it.
-    </p>
-  {/if}
-</SidePanel>
+/>
 
 <style>
   .head-row {
@@ -448,84 +282,6 @@
   }
   .preflight-btn {
     margin-top: var(--space-3);
-  }
-  .preflight-lead {
-    margin: 0;
-    color: var(--text-2);
-  }
-  .impact {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--space-3);
-    font-size: 0.8rem;
-    color: var(--text-2);
-  }
-  .impact strong {
-    font-size: 1.05rem;
-    font-variant-numeric: tabular-nums;
-  }
-  .affected {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-    display: grid;
-    gap: 0.35rem;
-    max-height: 16rem;
-    overflow: auto;
-  }
-  .affected li {
-    display: grid;
-    gap: 0.1rem;
-    border-left: 2px solid var(--border);
-    padding: 0.2rem 0 0.2rem 0.55rem;
-  }
-  .affected li.changed {
-    border-left-color: var(--warn);
-  }
-  .path {
-    overflow-wrap: anywhere;
-    font-size: 0.78rem;
-  }
-  .op {
-    color: var(--text-3);
-    font-size: 0.75rem;
-  }
-  .escalation {
-    color: var(--danger);
-    font-size: 0.75rem;
-    font-weight: 650;
-  }
-  .undo-facts h3 {
-    margin: 0 0 0.3rem;
-    font-size: 0.82rem;
-  }
-  .undo-facts ul {
-    margin: 0;
-    padding-left: 1.1rem;
-    color: var(--text-2);
-    font-size: 0.8rem;
-    display: grid;
-    gap: 0.2rem;
-  }
-  .ack {
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-size: 0.84rem;
-    font-weight: 600;
-  }
-  .handoff {
-    margin: 0;
-    color: var(--text-3);
-    font-size: 0.8rem;
-  }
-  .handoff.ready {
-    color: var(--text-1);
-  }
-  .quiet {
-    color: var(--text-3);
-    font-size: 0.78rem;
-    margin: 0;
   }
   @media (max-width: 720px) {
     .head-row {

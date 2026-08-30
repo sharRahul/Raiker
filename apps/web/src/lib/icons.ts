@@ -93,6 +93,10 @@ export type IconName =
   | "globe"
   | "memory"
   | "agent"
+  // B18 — the overflow handle. Three dots is the one glyph a reader already
+  // knows means "the rest of the actions", and it earns its place because the
+  // alternative was six labelled buttons under every message.
+  | "more"
   // The neutral fallback. A tool with no family still renders as a tool, which
   // is the difference between "Raiker did something you cannot name" and the
   // silence BUG-206 was filed about.
@@ -273,6 +277,7 @@ export const ICON_PATHS: Record<IconName, string[]> = {
   ],
   // The neutral fallback: a spanner. Not a gear — `settings` is a gear, and an
   // unnamed tool row is not a settings row.
+  more: ["M6 12h.01", "M12 12h.01", "M18 12h.01"],
   tool: [
     "M14.8 3.6a5 5 0 0 0-6 6.6l-5.2 5.2a2 2 0 0 0 0 2.8l2.2 2.2a2 2 0 0 0 2.8 0l5.2-5.2a5 5 0 0 0 6.6-6l-3.1 3.1-3-.6-.6-3 3.1-3.1Z",
   ],

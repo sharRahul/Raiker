@@ -73,8 +73,14 @@ async function sendOneTurn() {
   });
   await fireEvent.click(screen.getByRole("button", { name: "Send" }));
   await waitFor(() =>
-    expect(screen.getByRole("button", { name: /branch a second conversation/i })).toBeInTheDocument(),
+    expect(screen.getByRole("button", { name: "More actions for this message" })).toBeInTheDocument(),
   );
+}
+
+/** B18 — Branch now lives behind the per-message overflow handle. */
+async function openBranch() {
+  await fireEvent.click(screen.getByRole("button", { name: "More actions for this message" }));
+  await fireEvent.click(screen.getByRole("menuitem", { name: /^Branch/ }));
 }
 
 describe("branch from here", () => {
@@ -122,7 +128,7 @@ describe("branch from here", () => {
     render(ChatView, { projects: null });
     await sendOneTurn();
 
-    await fireEvent.click(screen.getByRole("button", { name: /branch a second conversation/i }));
+    await openBranch();
 
     // The branch is taken from this turn's own checkpoint, not the latest one.
     await waitFor(() =>
@@ -147,7 +153,7 @@ describe("branch from here", () => {
     render(ChatView, { projects: null });
     await sendOneTurn();
 
-    await fireEvent.click(screen.getByRole("button", { name: /branch a second conversation/i }));
+    await openBranch();
 
     expect(
       await screen.findByText(/No checkpoint was written for that turn/),

@@ -47,7 +47,18 @@ approval warns that this particular change cannot be rewound. Git commits and
 pushes are not undone by file checkpoints; use Git and the remote repository.
 
 Checkpoint restore itself is governed. It requires the checkpoint-restore and
-approval-relay capabilities and is re-checked when it runs.
+approval-relay capabilities and is re-checked when it runs. **Rewind to before
+this** on your own message and *Preview rewind* on Observability → Checkpoints
+open the same preflight; neither restores anything, and both raise an approval a
+human resolves.
+
+## Recall and citations
+
+A recalled past conversation appears under **Sources** as *Past conversations*,
+and opening it shows each exchange with its conversation title and date. Those
+exchanges are text, not links: to open one, search its title in **Search Chat**
+and use *Open the match*. A chat-search hit, a checkpoint's **Turn** field, and a
+turn opened from Observability → Sessions all open the exchange directly.
 
 ## Approvals and execution
 

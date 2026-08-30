@@ -202,7 +202,7 @@ unblocks*.
 | Order | Item | Unblocks | Why here |
 |---|---|---|---|
 | 1 | **Trace the fifteen** ([FIXED-280](FIXED_ITEMS.md#fixed-280--fifteen-capability-switches-that-governed-nothing-and-one-that-should-have)) | P2 | **Done 2026-08-24.** Cheap, and it did reclassify: the finding was not an ungoverned action but fifteen inert switches, which is a different defect and a worse one for this product |
-| 2 | **Checkpoint rewind** ([#1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists |
+| 2 | **Checkpoint rewind** ([#1](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | **P2 + P3** | The only item that blocks two pillars, and the executor already exists. **Fully closed 2026-08-29**: the route landed first, and [FIXED-315](FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route) put the ask on the turn that caused the change, which is the half P3 actually needed |
 | 3 | **Audit export** ([#2](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Same shape: built, never routed |
 | 4 | **Remove the second egress path** ([#3](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 | Deleting code, and it removes a live liability |
 | 5 | **Oversize checkpoint honesty** ([#4](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort)) | P2 + P3 | Makes an approval stop promising what it cannot deliver |
@@ -219,6 +219,17 @@ Items 2–5 were all **High priority, Low effort**, and together they closed the
 gap between what Raiker's documentation says it is and what an owner can
 actually reach. Items 1 and 8 closed the gap between what an owner is *shown*
 they control and what they do.
+
+**A sixth, on 2026-08-29.** The rewind route that closed item 2 was reachable
+from the Checkpoints page and nowhere else, so undoing the turn that broke
+something still meant leaving the conversation — a route to the capability, but
+not from where the capability is needed. Closed as
+[FIXED-315](FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route),
+with the same finding one level in: **a route is not the same as a route from
+the place the owner is standing.** The turn-coordinate work beside it
+([FIXED-316](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end)) was
+the same shape a third time — three surfaces already carried the coordinate, one
+of them all the way into the web app's own types, and nothing accepted one.
 
 **The lesson to carry forward.** Five of these were built code with no route to
 it. That is not a coincidence and it is not laziness: a capability with an

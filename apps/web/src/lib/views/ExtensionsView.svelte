@@ -1176,12 +1176,6 @@
     color: var(--text-1);
     cursor: pointer;
   }
-  .hooks-switch input {
-    width: 1rem;
-    height: 1rem;
-    accent-color: var(--accent);
-    cursor: pointer;
-  }
   .hooks-switch input:disabled {
     cursor: wait;
   }

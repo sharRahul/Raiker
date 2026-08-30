@@ -14,6 +14,11 @@
  * 3. **A control off its own screen.** The hub tab strips scroll, so the
  *    selected tab can be scrolled out of view — the page then shows one panel
  *    under a strip that appears to have another selected (FIXED-257).
+ * 4. **A control too small to hit.** Every checkbox in the app was the user
+ *    agent's own 13x13 box, on five routes, and the Hooks tab had set its own
+ *    16px — so they were under WCAG 2.2's 24px minimum target and not even the
+ *    same size as each other (FIXED-318). Nothing looked wrong; it had to be
+ *    measured.
  *
  * Signed in as the owner rather than creating a fresh account, because the
  * pages worth checking are the populated ones.
@@ -145,6 +150,7 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
     const overflowing: string[] = [];
     const iconless: string[] = [];
     const offscreenTab: string[] = [];
+    const undersized: string[] = [];
     const consoleErrors: string[] = [];
     page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
 
@@ -169,6 +175,37 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
           }).length,
       );
       if (empty > 0) iconless.push(`${name} (${empty})`);
+
+      // FIXED-318 — the fourth page-level property, and the one that was
+      // invisible to every other check here: a control too small to hit.
+      // Checkboxes were the user agent's own 13x13 box on five routes, under
+      // WCAG 2.2 SC 2.5.8's 24px minimum, and the Hooks tab had set its own
+      // 16px — so they were not even the same size as each other.
+      //
+      // The floor is width-aware for the same reason the 44px shell-control
+      // floor is: a precise pointer meets SC 2.5.8's spacing exception, a
+      // finger does not. Below the shell's own 1024px breakpoint the minimum
+      // is the full 24px; above it the requirement is that they are one size
+      // rather than three, which is what the Hooks divergence actually was.
+      const minTarget = viewport.width < 1024 ? 24 : 16;
+      const sizes = await page.evaluate(
+        () =>
+          [
+            ...new Set(
+              [...document.querySelectorAll<HTMLElement>(
+                'main#main input[type="checkbox"], main#main input[type="radio"]',
+              )]
+                .map((node) => node.getBoundingClientRect())
+                .filter((box) => box.width > 0)
+                .map((box) => `${Math.round(box.width)}x${Math.round(box.height)}`),
+            ),
+          ],
+      );
+      const tooSmall = sizes.filter(
+        (size) => Math.min(...size.split("x").map(Number)) < minTarget,
+      );
+      if (tooSmall.length > 0) undersized.push(`${name} under ${minTarget}px (${tooSmall.join(", ")})`);
+      if (sizes.length > 1) undersized.push(`${name} has ${sizes.length} sizes (${sizes.join(", ")})`);
 
       const selected = page.locator('[role="tab"][aria-selected="true"]');
       if ((await selected.count()) > 0) {
@@ -220,6 +257,7 @@ for (const [label, viewport] of ACTIVE_CAPTURES) {
     expect(overflowing, `pages overflowing horizontally at ${label}`).toEqual([]);
     expect(iconless, `pages rendering an icon with no glyph at ${label}`).toEqual([]);
     expect(offscreenTab, `pages whose selected tab is off screen at ${label}`).toEqual([]);
+    expect(undersized, `pages with an undersized checkbox or radio at ${label}`).toEqual([]);
     expect(consoleErrors, `console errors at ${label}/${theme}`).toEqual([]);
   });
   }

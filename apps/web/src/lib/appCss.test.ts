@@ -50,6 +50,20 @@ describe("global mobile accessibility styles", () => {
     );
   });
 
+  // Measured across every route at four widths: each of these came back as the
+  // user agent's own 13x13 box, under WCAG 2.2's 24px minimum target and at
+  // three different sizes across the app because a couple of views had set
+  // their own. The floor is on the element, so a view added tomorrow inherits
+  // it without having to know it exists.
+  it("gives checkboxes and radios one size, and a touch size when the pointer is coarse", () => {
+    expect(stylesheet).toMatch(
+      /:where\(input\[type="checkbox"\], input\[type="radio"\]\)\s*\{[^}]*inline-size: 1\.05rem;[^}]*block-size: 1\.05rem;/s,
+    );
+    expect(stylesheet).toMatch(
+      /@media \(max-width: 1023px\), \(pointer: coarse\)\s*\{\s*:where\(input\[type="checkbox"\], input\[type="radio"\]\)\s*\{\s*inline-size: 1\.5rem;\s*block-size: 1\.5rem;/s,
+    );
+  });
+
   it("disables animated scrolling when reduced motion is requested", () => {
     expect(stylesheet).toMatch(
       /@media \(prefers-reduced-motion: reduce\)\s*\{\s*html\s*\{\s*scroll-behavior: auto;/s,

@@ -32,7 +32,6 @@ import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Web-access-turn-control-1!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = "claude-haiku-4-5-20251001";
 // A page on the owner egress allowlist the host was started with, whose content
@@ -57,7 +56,7 @@ let page: Page;
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(target: Page) {
-  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, BASE);
 }
 
 /** Open one capability's card on the Permissions page. */

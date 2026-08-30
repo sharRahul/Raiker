@@ -1,31 +1,21 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
+import { signInAsOwner } from "./hosted-provider";
+
+// This spec used to drive `127.0.0.1:5174` — a Vite dev server, not the
+// `raiker-web` every other live spec runs against. It had drifted with nothing
+// to catch it, because its own sign-in was one of the twenty-seven copies
+// BUG-248 is about: a spec that carries its own base and its own credential is
+// a spec nobody re-reads.
+const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 
 test("live Observability and Sessions visual review", async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
-  await page.goto("http://127.0.0.1:5174/#/observe");
-  const firstRun = page.getByRole("button", { name: "Create a User Account", exact: true });
-  const register = page.getByRole("button", { name: /Create account and open Raiker/i });
-  if (await page.getByLabel("Confirm password").isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-19!");
-    await page.getByLabel("Confirm password").fill("Live-review-password-19!");
-    await firstRun.click();
-  } else if (await register.isVisible()) {
-    await page.getByLabel("Instance name").fill("Raiker live review");
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-19!");
-    await page.getByLabel("Confirm password").fill("Live-review-password-19!");
-    await register.click();
-  } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-19!");
-    await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-  }
-  await page.goto("http://127.0.0.1:5174/#/observe");
+  await signInAsOwner(page, BASE);
+  await page.goto(`${BASE}/#/observe`);
   await expect(page.getByRole("tab", { name: "Overview" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "Sessions" })).toBeVisible();
   await expect(page.getByText("Reading runtime status…")).toBeHidden({ timeout: 15_000 });

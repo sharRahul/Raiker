@@ -33,7 +33,6 @@ import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Git-push-path-1!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const MODEL = "claude-haiku-4-5-20251001";
@@ -66,7 +65,7 @@ function remoteHead(): string {
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(target: Page) {
-  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, BASE);
 }
 
 async function openCapability(label: string) {

@@ -169,6 +169,49 @@ def test_gateway_stream_stops_when_its_tracked_task_is_cancelled(
     assert gateway.store.list_tasks(session_id=env.session_id)[0].status == "cancelled"
 
 
+def test_a_turn_finishes_when_the_reader_walks_away(
+    mark_model_ready: Callable[..., None],
+) -> None:
+    """A client that stops reading must not undo a turn that already answered.
+
+    The browser closes the response body when the owner navigates to another
+    page, and that is what an owner does the moment the answer has finished
+    rendering. Both streaming entry points used to consume the runtime inside
+    the generator the client was reading, so closing it tore the turn down
+    before it was finalised: the turn stayed ``running`` with no summary — the
+    answer the owner had just read was not in the conversation on the next load
+    — and the governance task was recorded ``failed`` with the reason "stream
+    ended". Nothing had failed.
+    """
+    tmp = Path(tempfile.mkdtemp())
+    mark_model_ready(tmp, "local_user")
+    gateway = AgentGateway(tmp)
+    gateway.runtime.model_router = StreamingRouter(["walk", "-away"])  # type: ignore[assignment]
+    env = build_prompt_envelope("hello")
+
+    async def main() -> None:
+        stream = gateway.astream_prompt(env).__aiter__()
+        # Read one event, exactly as a reader that has seen enough does, then
+        # close the response.
+        await anext(stream)
+        await stream.aclose()
+        # The turn is running detached; give it the loop to finish on.
+        for _ in range(200):
+            await asyncio.sleep(0.01)
+            tasks = gateway.store.list_tasks(session_id=env.session_id)
+            if tasks and tasks[0].status != "running":
+                return
+
+    asyncio.run(main())
+
+    task = gateway.store.list_tasks(session_id=env.session_id)[0]
+    assert task.status == "completed", task.summary
+    turns = gateway.store.list_turns(env.session_id)
+    assert turns, "the abandoned turn was never recorded"
+    assert turns[-1]["status"] == "completed"
+    assert turns[-1]["summary"] == "walk-away"
+
+
 async def _last_final(gateway: AgentGateway, text: str) -> StreamEvent | None:
     final: StreamEvent | None = None
     async for ev in gateway.astream_prompt(build_prompt_envelope(text)):

@@ -71,6 +71,23 @@ export function isRedacted(value: string | null | undefined): boolean {
   return value.startsWith("[REDACTED") || value.startsWith("***REDACTED");
 }
 
+/**
+ * Governed events that happened outside any conversation carry a scope name in
+ * `session_id` rather than a session — `authz` for an authorization resolution,
+ * which is what every CLI and dashboard read performs first.
+ *
+ * It is a real value, so a redaction check does not catch it, and the audit
+ * timeline was rendering it as `#/sessions?session=authz`: a link to a session
+ * that does not exist, under the word "session".
+ */
+const SESSION_SCOPE_MARKERS = new Set(["authz"]);
+
+/** Whether `session_id` addresses a session a reader can actually open. */
+export function isAddressableSession(value: string | null | undefined): boolean {
+  if (!value) return false;
+  return !isRedacted(value) && !SESSION_SCOPE_MARKERS.has(value);
+}
+
 /** "shell_execution" → "Shell execution". */
 export function humanize(name: string | null | undefined): string {
   if (!name) return "—";

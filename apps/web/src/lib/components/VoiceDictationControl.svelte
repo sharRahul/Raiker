@@ -4,6 +4,30 @@
     cancel(): boolean;
     active(): boolean;
   }
+
+  /**
+   * Keep the privacy note inside the window when it opens.
+   *
+   * The note is anchored to the info control, which sits a couple of buttons
+   * into the composer. At 390px a 19rem panel starting there ends past the
+   * right edge, so the sentence an owner opened the control to read was partly
+   * off-screen. The width was already clamped to the viewport; what was missing
+   * is that its *left* edge is not the viewport's. Measured on open rather than
+   * guessed at, so it holds for both composers and at any width.
+   */
+  function keepDisclosureOnScreen(event: Event) {
+    const details = event.currentTarget as HTMLDetailsElement;
+    for (const note of details.querySelectorAll("p")) {
+      note.style.transform = "";
+      if (!details.open) continue;
+      const box = note.getBoundingClientRect();
+      const margin = 8;
+      const past = box.right - (window.innerWidth - margin);
+      const before = margin - box.left;
+      const shift = past > 0 ? -past : before > 0 ? before : 0;
+      if (shift !== 0) note.style.transform = `translateX(${Math.round(shift)}px)`;
+    }
+  }
 </script>
 
 <script lang="ts">
@@ -206,7 +230,7 @@
     </button>
   {/if}
 
-  <details class="voice-info">
+  <details class="voice-info" ontoggle={keepDisclosureOnScreen}>
     <summary aria-label="About dictation privacy"><Icon name="info" size={14} /></summary>
     <p id={disclosureId}>Raiker does not retain audio. Your browser's speech service may process audio externally.</p>
     {#if !supported}

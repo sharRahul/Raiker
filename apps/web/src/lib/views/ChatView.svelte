@@ -2668,7 +2668,9 @@
       box-shadow: none;
     }
     .prompt-input { min-height: 2.25rem; resize: none; }
-    .composer-bar { flex-wrap: nowrap; gap: .25rem; padding-top: .4rem; }
+    /* Wraps rather than drops, the same grammar as Build: a control that gates
+       or steers a turn moves to a second row instead of leaving the screen. */
+    .composer-bar { flex-wrap: wrap; gap: .25rem; padding-top: .4rem; }
     .bar-left, .bar-right { flex-wrap: nowrap; gap: .2rem; }
     .bar-right { margin-left: auto; width: auto; justify-content: flex-end; }
     .composer-scope, .context-control, .shortcut-hint { display: none; }
@@ -2688,7 +2690,11 @@
       padding: 0;
       justify-content: center;
     }
-    :global(.composer-card .model-trigger > span),
+    /* `> span` hid the provider logo along with the label, because the logo is
+       a span and not an svg — so below 1024px the model control was an empty
+       circle and no window narrower than a laptop said which model would
+       answer. The label and the effort chip go; the logo is the control. */
+    :global(.composer-card .model-trigger > span:not(.provider-logo)),
     :global(.composer-card .model-trigger > svg:last-child),
     :global(.composer-card .approval-trigger > span),
     :global(.composer-card .approval-trigger > svg:last-child) { display: none; }

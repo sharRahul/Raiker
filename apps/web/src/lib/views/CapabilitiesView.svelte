@@ -311,13 +311,13 @@
 {#if integratedButOff > 0}
   <div class="runtime-note" role="note">
     <Icon name="info" size={16} />
+    <!-- Five lines teaching the fail-closed model, on a page that already links
+         to the guide section that teaches it. What is left is the one fact this
+         page must state about its own rows, and the one route it is not. -->
     <span>
-      Capabilities with a real executor ship enabled in the Raiker runtime, but this account fails
-      closed — they start <strong>off</strong> here until you turn them on. A few say
-      <strong>On by default</strong> instead; those read the shipped table when nothing is stored,
-      and each one says so on its card. Raiker runs one runtime, so nothing has to be selected
-      first; the only runtime-level switch is
-      <a href="#/settings">Settings → Runtime configuration</a>, which stops work entirely.
+      Capabilities with a real executor start <strong>off</strong> on this account until you turn
+      them on. To stop all work instead, use
+      <a href="#/settings">Settings → Runtime configuration</a>.
     </span>
   </div>
 {/if}

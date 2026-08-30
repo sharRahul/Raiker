@@ -19,11 +19,11 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup } from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = "Reference-graph-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 
 test("a cited file that no longer exists is drawn as Missing", async ({ page }) => {
@@ -36,7 +36,7 @@ test("a cited file that no longer exists is drawn as Missing", async ({ page }) 
 
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

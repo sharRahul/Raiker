@@ -45,7 +45,6 @@ import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Round-0810-1!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -63,7 +62,7 @@ let page: Page;
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(target: Page) {
-  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, BASE);
 }
 
 /** Send one prompt in Chat and wait for *this* turn to finish. */

@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Composer-bugs-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 test.describe.configure({ mode: "serial" });
 let page: Page;
@@ -14,7 +15,7 @@ test.beforeAll(async ({ browser }) => {
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
   const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   if (await confirm.isVisible().catch(() => false)) {
     await confirm.fill(PASSWORD);

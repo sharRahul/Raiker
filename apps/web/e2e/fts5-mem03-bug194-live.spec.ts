@@ -17,11 +17,11 @@
  */
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = "Round-2026-08-17-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
@@ -32,7 +32,7 @@ async function signIn(page: import("@playwright/test").Page): Promise<void> {
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
   const username = page.getByLabel("Username");
   await expect(username).toBeVisible({ timeout: 20_000 });
-  await username.fill("owner");
+  await username.fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

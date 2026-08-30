@@ -2,11 +2,11 @@ import AxeBuilder from "@axe-core/playwright";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard } from "./hosted-provider";
+import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Bug-36-43-live-password-C1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const OPENROUTER_KEY = process.env.RAIKER_LIVE_OPENROUTER_KEY ?? "";
 
@@ -20,12 +20,12 @@ test("BUG-36, BUG-38, BUG-42, BUG-43 and cross-surface attachments", async ({ pa
   await page.goto(`${BASE}/#/models`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 20_000 });
   if (await page.getByLabel("Confirm password").isVisible()) {
-    await page.getByLabel("Username").fill("owner");
+    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByLabel("Confirm password").fill(PASSWORD);
     await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
   } else {
-    await page.getByLabel("Username").fill("owner");
+    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: /Unlock Raiker/i }).click();
   }

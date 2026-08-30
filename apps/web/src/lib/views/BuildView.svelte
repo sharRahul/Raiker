@@ -2809,10 +2809,18 @@
       box-shadow: none;
     }
     .composer-card textarea { min-height: 2.25rem; resize: none; }
-    .composer-bar { flex-wrap: nowrap; gap: .25rem; padding-top: .4rem; }
-    .bar-left, .bar-right { flex-wrap: nowrap; gap: .2rem; }
-    .bar-right { margin-left: auto; }
-    .project-picker, .context-wrap, .shortcut-hint, :global(.composer-card .environment-badge) { display: none; }
+    /* Wraps rather than drops. The bar used to hide the project picker below
+       this width while still printing "Select a project to start." underneath
+       and keeping Send disabled — an instruction pointing at a control that was
+       not on the screen, with no other route to it in Build. What a narrow
+       window may lose is information (the context ring, the environment badge,
+       the shortcut line); what gates sending stays. */
+    .composer-bar { flex-wrap: wrap; gap: .25rem; padding-top: .4rem; }
+    .bar-left { flex-wrap: wrap; gap: .2rem; }
+    .bar-right { flex-wrap: nowrap; gap: .2rem; margin-left: auto; }
+    .project-picker { max-width: 10rem; }
+    .project-picker .bar-select { min-width: 0; }
+    .context-wrap, .shortcut-hint, :global(.composer-card .environment-badge) { display: none; }
     .standing-wide { display: none; }
     .standing-compact { display: inline; }
     .send {
@@ -2827,7 +2835,11 @@
     :global(.composer-card .approval-trigger),
     :global(.composer-card .mode-trigger) { width: 2.75rem; height: 2.75rem; padding: 0; justify-content: center; }
     :global(.composer-card .model-trigger) { min-width: 2.75rem; }
-    :global(.composer-card .model-trigger > span),
+    /* `> span` hid the provider logo along with the label, because the logo is
+       a span and not an svg — so below 1024px the model control was an empty
+       circle and no window narrower than a laptop said which model would
+       answer. The label and the effort chip go; the logo is the control. */
+    :global(.composer-card .model-trigger > span:not(.provider-logo)),
     :global(.composer-card .model-trigger > svg:last-child),
     :global(.composer-card .approval-trigger > span),
     :global(.composer-card .approval-trigger > svg:last-child),

@@ -13,16 +13,11 @@
  */
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { join } from "node:path";
-import {
-  dismissFirstRunModelSetup,
-  pickAnyThinkingLevel,
-  setThinkingEffort,
-  useHostedModel,
-} from "./hosted-provider";
+import { dismissFirstRunModelSetup, OWNER_CREDENTIALS, pickAnyThinkingLevel, setThinkingEffort, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Composer-parity-live-2026-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 
@@ -34,7 +29,7 @@ let page: Page;
 async function signIn(): Promise<void> {
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

@@ -28,8 +28,6 @@ import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const USER = process.env.RAIKER_LIVE_USER ?? "Rahul";
-const PASSWORD = process.env.RAIKER_LIVE_PASSWORD ?? "Ithink@10";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = "claude-haiku-4-5-20251001";
 
@@ -60,7 +58,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
     colorScheme: "light",
   });
   page = await context.newPage();
-  await signInAsOwner(page, BASE, { user: USER, password: PASSWORD });
+  await signInAsOwner(page, BASE);
   test.skip(ANTHROPIC_KEY === "", "RAIKER_LIVE_ANTHROPIC_KEY is required for this round.");
   await useHostedModel(page, BASE, {
     provider: "Anthropic",

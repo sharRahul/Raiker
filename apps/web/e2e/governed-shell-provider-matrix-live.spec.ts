@@ -12,15 +12,11 @@
  */
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
-import {
-  dismissFirstRunModelSetup,
-  hostedProviderCard,
-  useHostedModel,
-} from "./hosted-provider";
+import { dismissFirstRunModelSetup, hostedProviderCard, OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Governed-shell-provider-matrix-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 
 interface ProviderLeg {
   provider: string;
@@ -62,7 +58,7 @@ let page: Page;
 async function signIn(): Promise<void> {
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

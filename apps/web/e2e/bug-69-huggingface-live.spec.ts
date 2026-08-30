@@ -2,9 +2,10 @@ import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync } from "node:fs";
+import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const PASSWORD = "Bug-69-live-review-password-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const SHOT = join(
   import.meta.dirname,
   "..",
@@ -26,7 +27,7 @@ const DOWNLOAD_ROOT = join(
 
 async function unlock(page: Page) {
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill("owner");
+    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
     await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
     await page.getByRole("button", { name: /Unlock Raiker/i }).click();
   }

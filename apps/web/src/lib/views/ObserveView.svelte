@@ -19,6 +19,8 @@
   import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { api, ApiError } from "../api";
+  import { digestEvents } from "../auditDigest";
+  import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
     Diagnostics,
@@ -28,7 +30,7 @@
     RuntimeReadiness,
     TaskView,
   } from "../apiTypes";
-  import { humanize, isRedacted, relativeTime, shortId } from "../format";
+  import { humanize, isAddressableSession, isRedacted, relativeTime, shortId } from "../format";
   import { HUB_TABS } from "../nav";
   import { isActiveTask } from "../statusMaps";
 
@@ -80,14 +82,26 @@
   // BUG-239 — a gate the enforcing path would run is not a closed gate. Counting
   // `!runtime_enabled` alone made this tile say "66 closed" on a workspace where
   // `web_fetch` would have fetched, which is the same defect Permissions had.
-  const blockedGates = $derived(
+  const closedGates = $derived(
     (readiness?.gates ?? []).filter(
       (gate) => !gate.runtime_enabled && gate.enforced_enabled !== true,
     ),
   );
+  // …and a gate the owner cannot open is not something to send them to
+  // Permissions about. This tile said "65 closed" under a link to a page that
+  // lists 48, because Permissions deliberately omits capabilities with no
+  // executor and the contract surfaces that are not tools. The number is now
+  // the number of rows on the page the link opens; the rest are named as what
+  // they are rather than being counted as work.
+  const openableGates = $derived(
+    closedGates.filter((gate) => !isDeferred(gate) && !isInherent(gate)),
+  );
+  const gatesWithNoExecutor = $derived(closedGates.length - openableGates.length);
   const ready = $derived(
     diagnostics?.production_ready_local_single_user_runtime === true,
   );
+  /** "What changed?" answers with changes — see `auditDigest.ts`. */
+  const changes = $derived(digestEvents(events ?? []));
 
   function selectTab(next: string) {
     window.location.hash = `#/observe?tab=${encodeURIComponent(next)}`;
@@ -101,7 +115,9 @@
         api.runtimeReadiness(),
         api.approvals(),
         api.tasks(),
-        api.events({ limit: 12 }),
+        // Over-fetched because the digest filters: a page of routine
+        // authorization lookups must not be able to empty it.
+        api.events({ limit: 60 }),
         api.notifications(),
       ]);
       offline = false;
@@ -151,10 +167,10 @@
 {#if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="overview">
     <div class="head">
-      <p class="page-lead">
-        A read-first record of what the runtime is doing. Every card below links to the evidence it
-        is derived from — status here is never a colour without a record behind it.
-      </p>
+      <!-- One promise, not a paragraph explaining the page to itself. What a
+           read-first surface is, and why nothing here is a colour without a
+           record behind it, is in the guide. -->
+      <p class="page-lead">Every card links to the record it is derived from.</p>
       <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
         <Icon name="refresh" size={15} /> Refresh
       </button>
@@ -184,11 +200,15 @@
           />
           <StatTile
             label="Closed capability gates"
-            value={blockedGates.length}
-            detail={blockedGates.length === 0
-              ? "Every gate the runtime knows about is enabled."
-              : "Requests needing these capabilities fail closed until you open them."}
-            tone={blockedGates.length === 0 ? "ok" : "neutral"}
+            value={openableGates.length}
+            detail={openableGates.length === 0
+              ? "Every capability you can open is open."
+              : `Requests needing these fail closed until you open them.${
+                  gatesWithNoExecutor > 0
+                    ? ` ${gatesWithNoExecutor} more have no executor and stay closed.`
+                    : ""
+                }`}
+            tone={openableGates.length === 0 ? "ok" : "neutral"}
             href="#/capabilities"
             linkLabel="Review capabilities"
           />
@@ -249,24 +269,26 @@
 
       <section aria-labelledby="changed-h">
         <h2 id="changed-h" class="section-h">What changed?</h2>
-        {#if (events ?? []).length === 0}
-          <p class="quiet">No events recorded yet.</p>
+        {#if changes.length === 0}
+          <p class="quiet">Nothing has changed yet.</p>
         {:else}
           <ol class="timeline">
-            {#each events ?? [] as event (event.event_id)}
+            {#each changes as event (event.event_id)}
               <li>
                 <span class="dot" data-risk={event.risk_level} aria-hidden="true"></span>
                 <div class="entry">
                   <p class="entry-title">{humanize(event.event_type)}</p>
-                  <p class="entry-detail">{event.summary}</p>
+                  <!-- Not every governed event carries a summary; an empty
+                       line under the title is a row that looks broken. -->
+                  {#if event.summary}<p class="entry-detail">{event.summary}</p>{/if}
                   <p class="entry-meta">
                     <time title={event.timestamp}>{relativeTime(event.timestamp)}</time>
-                    {#if event.session_id && !isRedacted(event.session_id)}
+                    {#if isAddressableSession(event.session_id)}
                       ·
-                      <a href={`#/sessions?session=${encodeURIComponent(event.session_id)}`}>
+                      <a href={`#/sessions?session=${encodeURIComponent(event.session_id!)}`}>
                         session {shortId(event.session_id)}
                       </a>
-                    {:else if event.session_id}
+                    {:else if isRedacted(event.session_id)}
                       <!-- The server redacted this id, so it cannot address a
                            session. Say so rather than offering a dead link. -->
                       · <span title="The server redacted this identifier.">session withheld</span>

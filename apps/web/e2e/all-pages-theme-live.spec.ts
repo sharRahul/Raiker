@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { signInAsOwner } from "./hosted-provider";
 
 const routes = [
   "home", "new-chat", "build", "search-chat", "tasks", "projects", "memory", "brain",
@@ -18,18 +19,7 @@ test("every application page renders in explicit light and dark themes", async (
   page.on("console", (message) => { if (message.type() === "error") errors.push(message.text()); });
   page.on("pageerror", (error) => errors.push(error.message));
 
-  await page.goto("http://127.0.0.1:8765/#/home");
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
-  if (await page.getByLabel("Confirm password").isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
-    await page.getByLabel("Confirm password").fill("Live-review-password-C1!");
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill("Live-review-password-C1!");
-    await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-  }
+  await signInAsOwner(page, "http://127.0.0.1:8765");
   await expect(page.locator("main#main")).toBeVisible({ timeout: 15_000 });
 
   const observed = new Map<string, { light: string; dark: string }>();

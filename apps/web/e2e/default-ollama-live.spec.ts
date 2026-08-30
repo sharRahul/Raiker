@@ -1,17 +1,13 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 
 test("a fresh workspace visibly defaults to Ollama gemma4:31b-cloud", async ({ page }) => {
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  await page.getByLabel("Username").fill("owner");
-  await page.getByLabel("Password", { exact: true }).fill("Default-ollama-review-password-1!");
-  await page.getByLabel("Confirm password").fill("Default-ollama-review-password-1!");
-  await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
+  await signInAsOwner(page, BASE);
   await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
 
   await page.goto(`${BASE}/#/models`);

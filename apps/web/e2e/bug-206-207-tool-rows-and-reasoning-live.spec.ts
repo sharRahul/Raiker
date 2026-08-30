@@ -25,7 +25,6 @@ import { setThinkingEffort, signInAsOwner, useHostedModel } from "./hosted-provi
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = "Tool-rows-and-reasoning-1!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 // Haiku 4.5 refuses `thinking.type.adaptive` and names the budgeted spelling in
 // the refusal, so this model is also what proves the negotiation in BUG-207
@@ -46,7 +45,7 @@ let page: Page;
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(target: Page) {
-  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, BASE);
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

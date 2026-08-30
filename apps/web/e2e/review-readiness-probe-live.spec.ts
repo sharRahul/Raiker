@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 /**
  * What the **Test** control on a hosted provider card actually does.
@@ -14,7 +15,7 @@ import { join } from "node:path";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Review-provider-matrix-1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
 test("Test on a connected provider card resolves the pinned model's readiness", async ({
@@ -33,7 +34,7 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
 
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   const confirm = page.getByLabel("Confirm password");
   if (await confirm.isVisible().catch(() => false)) {

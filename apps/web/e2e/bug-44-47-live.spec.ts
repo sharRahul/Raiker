@@ -57,7 +57,6 @@ const SOURCE = "http://127.0.0.1:8765";
 const PACKAGED = "http://127.0.0.1:8766";
 const REPO = join(import.meta.dirname, "..", "..", "..");
 const SHOTS = join(REPO, "docs", "plans", "screenshots", "working");
-const PASSWORD = "Bug-44-47-live-password-D2!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
 const RELEASE_DIR = process.env.RAIKER_LIVE_RELEASE_DIR ?? "";
@@ -70,7 +69,7 @@ let page: Page;
 
 /** BUG-229 — the one shared sign-in; this spec drives two instances. */
 async function signIn(target: Page, base: string) {
-  await signInAsOwner(target, base, { user: "owner", password: PASSWORD });
+  await signInAsOwner(target, base);
 }
 
 test.beforeAll(async ({ browser }: { browser: Browser }) => {

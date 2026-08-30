@@ -590,6 +590,91 @@ class AgentGateway:
             if response is None or response.status != "needs_approval":
                 self.machine_identities.finish(identity)
 
+    async def _astream_detached(  # type: ignore[no-untyped-def]
+        self,
+        source,
+        finish,
+        settle,
+    ):
+        """Stream a turn that finishes whether or not the client keeps reading.
+
+        **The defect this exists for.** Both streaming entry points used to
+        consume the runtime *inside the generator the client is reading*, and
+        settle the turn in that generator's ``finally``. A browser that closed
+        the response — which is what navigating to another page does, and what
+        an owner does the moment the answer has finished rendering — raised
+        ``GeneratorExit`` at the ``yield`` the runtime was suspended on. The
+        turn was torn down before ``_afinalize_turn`` ran, so **the answer the
+        owner had just read was never persisted** and was gone on the next
+        load, and the governance task was recorded ``failed`` with the reason
+        "stream ended". Both halves were wrong in the same direction: the turn
+        succeeded, the record said it failed, and the record of what was said
+        did not exist at all.
+
+        So the runtime is driven by a task of its own. The generator the client
+        reads is a queue over that task's output. When the client goes away the
+        queue stops being filled and the turn carries on to its own end: the
+        model call has already been made and paid for, the finalisation still
+        runs, and the task still settles on what actually happened.
+
+        * ``source`` yields the turn's :class:`StreamEvent`s. A ``FINAL`` with a
+          response is captured rather than forwarded, exactly as before.
+        * ``finish`` is awaited with that response and returns the finalised one
+          to emit. It may raise, and the caller sees the raise if it is still
+          attached.
+        * ``settle`` records the outcome. It runs exactly once, attached or not.
+        """
+        # One slot, so an attached reader still paces the turn exactly as the old
+        # in-line loop did. A stop that arrives between two events must land
+        # before the next one is produced, and an unbounded queue would let the
+        # turn run to its end before the reader had taken its first event.
+        queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue(maxsize=1)
+        listening = True
+
+        async def pump() -> None:
+            final: AgentResponse | None = None
+            try:
+                async for event in source:
+                    if event.kind == FINAL and event.response is not None:
+                        final = event.response
+                        continue
+                    if listening:
+                        await queue.put(event)
+                finalized = await finish(final)
+                final = finalized
+                if listening:
+                    await queue.put(StreamEvent(kind=FINAL, response=finalized))
+            finally:
+                settle(final)
+                await queue.put(None)
+
+        async def drain() -> None:
+            """Empty the queue for a turn nobody is reading any more."""
+            while await queue.get() is not None:
+                pass
+
+        worker = asyncio.create_task(pump())
+        # A detached turn's failure has nowhere to be raised. Reading the result
+        # keeps asyncio from reporting it as never-retrieved; `settle` has
+        # already recorded what happened.
+        worker.add_done_callback(lambda done: done.cancelled() or done.exception())
+        try:
+            while True:
+                item = await queue.get()
+                if item is None:
+                    break
+                yield item
+            # Attached to the end: the turn's own exception is the caller's.
+            await worker
+        finally:
+            listening = False
+            # The reader is gone. `listening` stops new events being queued, but
+            # the pump may already be blocked on the one slot, and its `finally`
+            # has a sentinel to place — so the turn needs somebody to keep
+            # taking from the queue until it is done.
+            if not worker.done():
+                asyncio.get_running_loop().create_task(drain())
+
     async def astream_prompt(self, envelope: PromptEnvelope | dict[str, object]):  # type: ignore[no-untyped-def]
         """Yield :class:`StreamEvent`s for one turn (text deltas, lifecycle, final).
 
@@ -619,32 +704,35 @@ class AgentGateway:
             objective="Governed chat turn",
             parent_turn_id=prompt_envelope.turn_id,
         )
-        final: AgentResponse | None = None
-        try:
+
+        async def source():  # type: ignore[no-untyped-def]
             async for event in self.runtime.astream_handle(prompt_envelope, identity=identity):
                 current = tasks.get_task(task.task_id)
                 if current is not None and current.status == "cancelled":
-                    final = AgentResponse(
-                        request_id=prompt_envelope.request_id,
-                        session_id=prompt_envelope.session_id,
-                        turn_id=prompt_envelope.turn_id,
-                        # B17/C13 — a turn the owner stopped is `stopped`, not
-                        # `failed`. The runtime did what it was told; saying it
-                        # failed put the blame in the wrong place and made Chat
-                        # render the owner's own decision as an error.
-                        status="stopped",
-                        message="Stopped by user at a safe boundary.",
-                        client=prompt_envelope.client,
+                    yield StreamEvent(
+                        kind=FINAL,
+                        response=AgentResponse(
+                            request_id=prompt_envelope.request_id,
+                            session_id=prompt_envelope.session_id,
+                            turn_id=prompt_envelope.turn_id,
+                            # B17/C13 — a turn the owner stopped is `stopped`,
+                            # not `failed`. The runtime did what it was told;
+                            # saying it failed put the blame in the wrong place
+                            # and made Chat render the owner's own decision as
+                            # an error.
+                            status="stopped",
+                            message="Stopped by user at a safe boundary.",
+                            client=prompt_envelope.client,
+                        ),
                     )
-                    break
-                if event.kind == FINAL and event.response is not None:
-                    final = event.response
-                    continue
+                    return
                 yield event
+
+        async def finish(final: AgentResponse | None) -> AgentResponse:
             assert final is not None
-            enriched = await self._afinalize_turn(prompt_envelope, final)
-            yield StreamEvent(kind=FINAL, response=enriched)
-        finally:
+            return await self._afinalize_turn(prompt_envelope, final)
+
+        def settle(final: AgentResponse | None) -> None:
             if final is None or final.status != "needs_approval":
                 self.machine_identities.finish(identity)
             current = tasks.get_task(task.task_id)
@@ -653,6 +741,9 @@ class AgentGateway:
                     tasks.fail_task(task.task_id, final.message if final is not None else "stream ended")
                 else:
                     tasks.complete_task(task.task_id, final.message)
+
+        async for event in self._astream_detached(source(), finish, settle):
+            yield event
 
     # ── B2: resume a turn that was parked for an approval ────────────────────
 
@@ -797,32 +888,34 @@ class AgentGateway:
         if not self.store.claim_suspended_turn(approval_id):
             raise TurnSuspensionError("suspended_turn_already_resumed")
         identity = self._rotate_identity_for_resume(envelope)
-        final: AgentResponse | None = None
-        try:
-            async for event in self.runtime.aresume_events(
-                envelope,
-                messages,
-                stream=True,
-                tool_calls_made=tool_calls_made,
-                approval_id=approval_id,
-                pending_calls=pending_calls,
-                queue_total=queue_total,
-                identity=identity,
-                resolved_call=resolved_call,
-            ):
-                if event.kind == FINAL and event.response is not None:
-                    final = event.response
-                    continue
-                yield event
+
+        source = self.runtime.aresume_events(
+            envelope,
+            messages,
+            stream=True,
+            tool_calls_made=tool_calls_made,
+            approval_id=approval_id,
+            pending_calls=pending_calls,
+            queue_total=queue_total,
+            identity=identity,
+            resolved_call=resolved_call,
+        )
+
+        async def finish(final: AgentResponse | None) -> AgentResponse:
             assert final is not None
-            finalized = await self._afinalize_turn(envelope, final)
-            yield StreamEvent(kind=FINAL, response=finalized)
-        finally:
+            return await self._afinalize_turn(envelope, final)
+
+        def settle(final: AgentResponse | None) -> None:
             if final is None or final.status != "needs_approval":
                 self.machine_identities.finish(identity)
             self.store.finalize_suspended_turn(
                 approval_id, status="resumed" if final is not None else "resume_failed"
             )
+
+        # A resumed turn is the continuation of work the owner already approved,
+        # so it has even less business ending because a browser tab moved on.
+        async for event in self._astream_detached(source, finish, settle):
+            yield event
 
     def submit_prompt(self, envelope: PromptEnvelope | dict[str, object]) -> AgentResponse:
         import asyncio

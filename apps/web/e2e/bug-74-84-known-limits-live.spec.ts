@@ -13,7 +13,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = "Round-0810-live-review-password-1!";
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 
 /**
@@ -38,7 +37,7 @@ async function visit(page: Page, hash: string) {
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(page: Page) {
-  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(page, BASE);
 }
 
 test("the 2026-08-10 round's surfaces, live", async ({ page }) => {

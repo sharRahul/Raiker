@@ -14,7 +14,6 @@ import type { Page } from "@playwright/test";
 import { signInAsOwner } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8799";
-const PASSWORD = "Live-review-password-C1!";
 const SHOTS = "../../docs/plans/screenshots/working";
 
 // The provider under test. `gemma4:31b-cloud` is an Ollama cloud model, so a
@@ -30,7 +29,7 @@ const MODEL = "gemma4:31b-cloud";
  * fresh instance and failed at its first step on a used one.
  */
 async function signIn(page: Page) {
-  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
+  await signInAsOwner(page, BASE);
 }
 
 test.describe.configure({ mode: "serial" });

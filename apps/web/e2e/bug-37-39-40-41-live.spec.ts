@@ -48,12 +48,12 @@ import { execFileSync } from "node:child_process";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { useHostedModel } from "./hosted-provider";
+import { OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
 const REPO = join(import.meta.dirname, "..", "..", "..");
-const PASSWORD = "Bug-37-41-live-password-C1!";
+const PASSWORD = OWNER_CREDENTIALS.password;
 const ANTHROPIC_KEY = process.env.RAIKER_LIVE_ANTHROPIC_KEY ?? "";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 const MODEL = process.env.RAIKER_LIVE_ANTHROPIC_MODEL ?? "claude-haiku-4-5-20251001";
@@ -80,7 +80,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
   const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill("owner");
+  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
   if (await confirm.isVisible().catch(() => false)) {
     await confirm.fill(PASSWORD);

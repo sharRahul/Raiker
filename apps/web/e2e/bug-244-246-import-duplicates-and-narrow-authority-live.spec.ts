@@ -23,8 +23,6 @@ import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const USER = process.env.RAIKER_LIVE_USER ?? "Rahul";
-const PASSWORD = process.env.RAIKER_LIVE_PASSWORD ?? "Ithink@10";
 
 test.describe.configure({ mode: "serial" });
 
@@ -53,7 +51,7 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
     colorScheme: "light",
   });
   page = await context.newPage();
-  await signInAsOwner(page, BASE, { user: USER, password: PASSWORD });
+  await signInAsOwner(page, BASE);
 });
 
 test.afterAll(async () => {

@@ -7,6 +7,7 @@
   import ContextRing from "../components/ContextRing.svelte";
   import Markdown from "../components/Markdown.svelte";
   import FileInspector from "../components/FileInspector.svelte";
+  import RewindPanel from "../components/RewindPanel.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
@@ -70,6 +71,7 @@
     type ParkedApproval,
   } from "../conversationRestore";
   import { rememberSessionInRoute } from "../sessionRoute";
+  import { forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { collectReasoning, hasRunningTool, toolActivity } from "../chatPresentation";
   import {
@@ -112,6 +114,8 @@
 
   let {
     sessionId: continuedSessionId = null,
+    // MEM-08 — the exchange this link is pointing at inside that conversation.
+    anchoredTurnId = null,
     projects = null,
     onProjectsChanged,
     // Chat keeps its transcript and its unsent draft when the owner navigates
@@ -122,6 +126,7 @@
     visible = true,
   }: {
     sessionId?: string | null;
+    anchoredTurnId?: string | null;
     projects?: ProjectsList | null;
     onProjectsChanged?: () => void;
     visible?: boolean;
@@ -318,6 +323,8 @@
   async function openInspector(attachmentId: string, filename: string) {
     if (sessionId === null) return;
     const openedSession = sessionId;
+    // One detail panel at a time — they share the right-hand column (B18).
+    rewindCheckpointId = null;
     releaseObjectUrl();
     inspecting = { attachmentId, filename };
     preview = null;
@@ -453,6 +460,7 @@
     if (source.attachment_id !== "") {
       await openInspector(source.attachment_id, source.title);
     } else {
+      rewindCheckpointId = null;
       releaseObjectUrl();
       inspecting = { attachmentId: "", filename: source.title };
       preview = null;
@@ -638,6 +646,10 @@
   async function loadHistory(id: string) {
     historyLoading = true;
     closeInspector();
+    // B18 — a preflight belongs to one conversation. Left open across a load
+    // it would describe a checkpoint from a conversation no longer on screen.
+    rewindCheckpointId = null;
+    landedAnchor = null;
     try {
       const detail = await api.session(id);
       const parked = parkedByTurn(detail);
@@ -646,7 +658,12 @@
       await restoreAttachmentChips(id);
       await refreshTurnSources(id);
       await refreshRecall(id);
-      void scrollToEnd();
+      // MEM-08 — a link that named an exchange lands on it; everything else
+      // opens where the conversation left off. The landing itself belongs to
+      // the effect below, so a *second* link into the same conversation is
+      // honoured too — that reload never happens, because the session id has
+      // not changed.
+      if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd();
     } catch (e) {
       historyError =
         e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
@@ -815,6 +832,40 @@
       scrollEl.scrollTo({ top: scrollEl.scrollHeight });
     }
   }
+
+  // MEM-08 — land on the exchange the link named.
+  //
+  // The anchor is spent on arrival: it is dropped from the address bar so a
+  // later reload opens the conversation as it is rather than replaying a
+  // highlight, and the notice says plainly when the coordinate is not in this
+  // conversation instead of leaving the reader at the top wondering.
+  let anchorNotice = $state<string | null>(null);
+
+  async function landOnAnchor(turnId: string) {
+    await tick();
+    anchorNotice = revealTurn(scrollEl, turnId)
+      ? null
+      : "That exchange is not in this conversation.";
+    forgetTurnInRoute();
+    if (anchorNotice === null) return;
+    void scrollToEnd();
+  }
+
+  // The anchor is honoured whenever it changes and the transcript is ready to
+  // receive it — not only on the load that first opened the conversation.
+  // Opening one search result and then a second one *in the same conversation*
+  // never reloads anything, so landing from `loadHistory` alone would silently
+  // ignore the second link. `landedAnchor` is what keeps a still-set anchor
+  // from re-marking the exchange every time a new turn arrives.
+  let landedAnchor: string | null = null;
+
+  $effect(() => {
+    const anchor = anchoredTurnId;
+    const ready = !historyLoading && turns.length > 0;
+    if (anchor === null || anchor === "" || anchor === landedAnchor || !ready) return;
+    landedAnchor = anchor;
+    untrack(() => void landOnAnchor(anchor));
+  });
 
   // ── C14/B19 — composer ergonomics: slash commands, `@` mentions, auto-grow ──
   //
@@ -1080,6 +1131,39 @@
     }
   }
 
+  // ── B18 — rewind to before this turn ─────────────────────────────────
+  // Checkpoints have been restorable through a governed approval since
+  // BUG-230, and the control lived in the Checkpoints route: to undo the turn
+  // that broke something the owner had to leave the conversation, find the
+  // right snapshot by id, and come back. The checkpoint the turn wrote is
+  // already addressable from the turn, so the ask belongs here. This resolves
+  // the coordinate and opens the shared funnel; it performs nothing.
+  let rewindCheckpointId = $state<string | null>(null);
+  let rewindingTurn = $state<string | null>(null);
+
+  async function rewindFromTurn(turnId: string) {
+    if (sessionId === null || streaming) return;
+    rewindingTurn = turnId;
+    projectNotice = null;
+    try {
+      const checkpoints = await api.checkpoints(sessionId);
+      const point = checkpoints.find((checkpoint) => checkpoint.turn_id === turnId);
+      if (point === undefined) {
+        projectNotice = "No checkpoint was written for that turn, so there is nothing to rewind to.";
+        return;
+      }
+      closeInspector();
+      rewindCheckpointId = point.checkpoint_id;
+    } catch (error) {
+      projectNotice =
+        error instanceof ApiError
+          ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
+          : "Could not read this conversation's checkpoints.";
+    } finally {
+      rewindingTurn = null;
+    }
+  }
+
   // ── Backlog #9 — summarise up to here ────────────────────────────────
   // Compaction was the threshold's decision: a conversation crossed 90% of the
   // window and Raiker summarised the oldest exchanges it was allowed to. The
@@ -1178,6 +1262,9 @@
     turns = [];
     sessionId = null;
     plan = null;
+    rewindCheckpointId = null;
+    anchorNotice = null;
+    landedAnchor = null;
     recalled = [];
     recallNotice = null;
   }
@@ -1437,7 +1524,14 @@
 <!-- Split shell: the conversation, plus the file inspector when one is open.
      The chat column keeps its own indentation so opening a file stays a
      wrapper, not a reflow of the whole transcript's markup. -->
-<div class="chat-layout" class:with-inspector={inspecting !== null} class:with-rail={backgroundWorkOpen}>
+<!-- One detail panel at a time: the inspector and the rewind preflight share
+     the right-hand column, so opening either never stacks a second panel under
+     the composer where nobody looks for it. -->
+<div
+  class="chat-layout"
+  class:with-inspector={inspecting !== null || rewindCheckpointId !== null}
+  class:with-rail={backgroundWorkOpen}
+>
 <div class="chat">
   <header class="chat-header">
     <div class="header-actions">
@@ -1491,6 +1585,9 @@
     </div>
   </header>
   {#if exportNotice}<span class="export-notice" role="status" aria-live="polite">{exportNotice}</span>{/if}
+  <!-- MEM-08 — said only when a link named an exchange this conversation does
+       not hold. Landing successfully is shown by the highlight, not by text. -->
+  {#if anchorNotice}<span class="export-notice" role="status">{anchorNotice}</span>{/if}
   <!-- C17 — the result of a correction or a forget made from the transcript,
        said once, where the other turn-level outcomes are said. -->
   {#if recallNotice}<span class="export-notice" role="status" aria-live="polite">{recallNotice}</span>{/if}
@@ -1541,7 +1638,9 @@
       {@const uploadedAttachments = turn.attachments.filter((a) => a.source !== "generated")}
       {@const generatedFiles = turn.attachments.filter((a) => a.source === "generated")}
       {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
-      <div class="turn">
+      <!-- MEM-08 — the coordinate a link can name. Present on every settled
+           turn, so a search result, a citation or a checkpoint can land here. -->
+      <div class="turn" data-turn-id={turn.response?.turn_id ?? undefined}>
         <div class="message-group message-group-user">
           <div class="message-bubble message-bubble-user">
           <p class="bubble-text">{turn.prompt}</p>
@@ -1563,6 +1662,10 @@
                 ? () => void compactThroughTurn(turn.response?.turn_id ?? "")
                 : undefined}
               compacting={compactingTurn === turn.response?.turn_id}
+              onrewind={turn.response?.turn_id
+                ? () => void rewindFromTurn(turn.response?.turn_id ?? "")
+                : undefined}
+              rewinding={rewindingTurn === turn.response?.turn_id}
             />
           {/if}
           <!-- BUG-208 slice F. An emoji used to be appended here, to the
@@ -1992,6 +2095,9 @@
     onprint={printConversation}
   />
 {/if}
+
+<!-- B18 — the same rewind funnel Checkpoints opens, asked for at the turn. -->
+<RewindPanel checkpointId={rewindCheckpointId} onclose={() => (rewindCheckpointId = null)} />
 
 {#if inspecting !== null}
   <FileInspector
@@ -2607,5 +2713,17 @@
       width: auto;
       justify-content: flex-end;
     }
+  }
+  /* MEM-08 — the exchange a link landed on. A brief mark, not a state: a
+     shared coordinate says "look here", and the conversation is otherwise
+     exactly as it always was. */
+  :global(.turn.turn-anchored) {
+    border-radius: var(--r-md);
+    box-shadow: 0 0 0 2px var(--accent-border);
+    background: var(--accent-soft);
+    transition: box-shadow 0.4s ease, background 0.4s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.turn.turn-anchored) { transition: none; }
   }
 </style>

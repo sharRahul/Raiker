@@ -114,6 +114,101 @@ class TestSourceDerivation:
         assert draft is not None
         assert (draft.kind, draft.title, draft.locator) == ("email", "Renewal", "m1")
 
+    # MEM-08 — three tools declared a source kind and produced no source, so an
+    # answer drawn from them cited nothing at all. The failure mode this
+    # codebase keeps finding: two lists that have to agree, with nothing holding
+    # them together. The invariant below is the thing holding them.
+    def test_every_tool_that_declares_a_source_kind_can_produce_one(self) -> None:
+        from raiker.models.tool_registry import TOOL_SOURCE_KIND_BY_TOOL
+
+        # One minimally successful result per declared tool: whatever the shape,
+        # a tool that says it produces material must produce a draft.
+        outputs: dict[str, tuple[dict[str, object], dict[str, object]]] = {
+            "read_file": ({"path": "a.md"}, {"path": "a.md", "text": "x"}),
+            "list_directory": ({"path": "."}, {"path": ".", "entries": ["a.md"]}),
+            "grep": ({"query": "x"}, {"count": 1, "matches": ["a.md:1"]}),
+            "glob": ({"pattern": "*.md"}, {"count": 1, "paths": ["a.md"]}),
+            "diff_files": ({"before_path": "a", "after_path": "b"}, {"text": "@@"}),
+            "git_status": ({}, {"text": "clean"}),
+            "git_diff": ({}, {"text": "@@"}),
+            "git_log": ({}, {"text": "commit"}),
+            "code_map_search": ({"query": "f"}, {"count": 1, "repository": "repo"}),
+            "code_map_references": (
+                {"name": "f"},
+                {"count": 1, "repository": "repo", "results": [{"path": "a.py", "line": 2, "text": "f()"}]},
+            ),
+            "memory_search": ({"query": "keys"}, {"count": 1, "results": [{"text": "x"}]}),
+            "memory_list": ({}, {"count": 1, "results": [{"text": "x"}]}),
+            "memory_get": ({}, {"memory_id": "mem_1", "text": "x"}),
+            "knowledge_graph": (
+                {"action": "neighbors", "query": "Ada"},
+                {"action": "neighbors", "count": 1, "edges": [{"subject": "Ada", "predicate": "knows", "object": "Bo"}]},
+            ),
+            "conversation_search": (
+                {"query": "rotation"},
+                {"count": 1, "results": [{"title": "Keys", "created_at": "2026-03-12T00:00:00Z", "text": "monthly"}]},
+            ),
+            "skill_load": ({"name": "brief"}, {"content": "steps"}),
+            "github_read": ({"repo": "o/r", "number": "1"}, {"title": "Issue", "content": "body"}),
+            "gmail_read": ({}, {"subject": "Renewal", "message_id": "m1", "content": "text"}),
+            "gcal_read": ({}, {"title": "Standup", "event_id": "e1", "content": "text"}),
+            "slack_read": ({"channel": "#eng"}, {"content": "text"}),
+            "connector_read": ({"connector_id": "c", "operation_id": "o"}, {"content": "text"}),
+            "web_fetch": ({"url": "https://e.test"}, {"final_url": "https://e.test", "content": "body"}),
+            "web_search": ({"query": "x"}, {"result_count": 2, "results": [{"title": "a"}]}),
+            "spawn_subagent": ({"name": "reader"}, {"name": "reader", "steps_executed": 2, "content": "found"}),
+        }
+        undeclared = sorted(set(TOOL_SOURCE_KIND_BY_TOOL) - set(outputs))
+        assert undeclared == [], f"no sample result for declared source tools: {undeclared}"
+        for tool, kind in sorted(TOOL_SOURCE_KIND_BY_TOOL.items()):
+            args, output = outputs[tool]
+            draft = source_from_tool_result(tool, args, {"status": "success", **output})
+            assert draft is not None, f"{tool} declares source_kind={kind} and produces no source"
+            assert draft.kind == kind
+            assert draft.title != ""
+
+    def test_a_recalled_exchange_names_its_conversation_and_its_date(self) -> None:
+        # Without the heading, a recalled passage is a paragraph the owner
+        # cannot place — which is the whole reason the recall was cited.
+        draft = source_from_tool_result(
+            "conversation_search",
+            {"query": "key rotation"},
+            {
+                "status": "success",
+                "count": 2,
+                "results": [
+                    {
+                        "title": "Key rotation",
+                        "created_at": "2026-03-12T09:00:00Z",
+                        "session_id": "sess_a",
+                        "turn_id": "turn_9",
+                        "text": "We settled on monthly.",
+                    },
+                    {
+                        "title": "Ops review",
+                        "created_at": "2026-05-01T09:00:00Z",
+                        "session_id": "sess_b",
+                        "turn_id": "turn_2",
+                        "text": "Confirmed monthly.",
+                    },
+                ],
+            },
+        )
+        assert draft is not None
+        assert draft.kind == "conversation"
+        assert draft.detail == "2 exchanges"
+        assert "Key rotation · 2026-03-12" in draft.passage
+        assert "We settled on monthly." in draft.passage
+
+    def test_a_conversation_scoped_recall_names_the_conversation_it_stayed_in(self) -> None:
+        draft = source_from_tool_result(
+            "conversation_search",
+            {"query": "rotation", "session_id": "sess_a"},
+            {"status": "success", "count": 1, "results": [{"title": "Key rotation", "text": "x"}]},
+        )
+        assert draft is not None
+        assert draft.locator == "sess_a"
+
     def test_a_failed_call_produces_no_source(self) -> None:
         # A citation pointing at a call that produced nothing is worse than none.
         assert (

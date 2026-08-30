@@ -69,6 +69,8 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `bug-244-`, `bug-246-` | **2026-08-29**, an import that says what is already stored before it writes, and the delegated-authority verdicts readable at 390 px | none — neither scenario needs a model |
+| `b18-`, `mem08-` | **2026-08-29**, the rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, both at 1440 and 390 px — plus a measured audit of all thirty route and tab states at four widths | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-309-` … `fixed-312-`, `r0829-` | **2026-08-29**, Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build, and a responsive sweep at 375/768/1024/1440 with zero console errors | Anthropic (`claude-haiku-4-5-20251001`) |
 | `real-work-` | **2026-08-29**, the first round that ends at facts outside the transcript: a scheduled task, a created project, a dashboard opened in a browser, and a program Build wrote that the round ran | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-306-` | **2026-08-29**, the owner summarising a range through a chosen turn, with every turn still in the transcript afterwards | Anthropic (`claude-haiku-4-5-20251001`) |

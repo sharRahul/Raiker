@@ -327,6 +327,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-312](#fixed-312--the-core-act-of-code-review-was-a-route-change-away) | Medium | Build / approvals / web UI | Fixed (was B14's review half; closed 2026-08-29) |
 | [FIXED-313](#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | Fixed (was BUG-241; closed 2026-08-29) |
 | [FIXED-314](#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | Fixed (was BUG-243, raised and closed 2026-08-29) |
+| [FIXED-315](#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route) | Medium | Build / Chat / checkpoints / web UI | Fixed (was B18; closed 2026-08-29) |
+| [FIXED-316](#fixed-316--every-turn-coordinate-was-a-dead-end) | Medium | Chat / Build / memory / web UI | Fixed (was MEM-08; closed 2026-08-29) |
+| [FIXED-317](#fixed-317--three-tools-declared-a-source-and-produced-none) | Medium | Runtime / citations / provenance | Fixed (raised and closed 2026-08-29) |
+| [FIXED-318](#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places) | Low | Web UI / accessibility | Fixed (raised and closed 2026-08-29) |
+| [FIXED-319](#fixed-319--importing-the-same-memory-twice-stored-it-twice) | Low | Memory / import | Fixed (was BUG-244; closed 2026-08-29) |
+| [FIXED-320](#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | Fixed (was BUG-246, raised and closed 2026-08-29) |
 
 ---
 
@@ -13597,3 +13603,304 @@ that query lexically and say so.
 `test_a_question_recalls_the_memory_that_answers_it` asserts all three legs: the
 question recalls the answer, an unrelated question still recalls nothing, and a
 function-word-only query still searches literally.
+
+---
+
+## FIXED-315 — The one control that makes an agent safe to leave running was in another route
+
+**Severity: Medium. Area: Build / Chat / checkpoints / web UI. Closed 2026-08-29
+(was [B18](GAP_BUILD_CHAT.md#b18--no-checkpoint-or-rewind-control-where-the-work-happens)).**
+
+**Observed.** Every part of the governed rewind already existed.
+`CheckpointRestoreExecutor` has been implemented, registered and classified
+since Workstream B; `checkpoint_restore_execution` is the thirteenth member of
+`EXECUTABLE_ON_APPROVAL`; `GET|POST /api/checkpoints/{id}/restore-plan|restore`
+have had a caller since BUG-230; and a cross-principal restore is classified
+critical and takes the human-only lifecycle. All of it was reachable from
+exactly one place: the **Checkpoints** route. Undoing the turn that broke
+something meant leaving the conversation, recognising the right snapshot by its
+id in a list of snapshots, and coming back.
+
+**Why it mattered.** This is the fifth time this codebase has found the same
+shape — a capability with an executor, a gate, a threat model and a passing
+acceptance suite, and no route to it — and
+[`PILLAR_MAP.md`](PILLAR_MAP.md) ranks checkpoint rewind as the single item that
+blocks two pillars. "Undo that turn" is not a convenience: it is the control
+that makes leaving an autonomous agent running a reasonable thing to do, and an
+owner who cannot find it does not have it.
+
+**Fixed.** The funnel moved into one component,
+`apps/web/src/lib/components/RewindPanel.svelte`, and Chat, Build and Checkpoints
+all open the same one — so a rewind reads identically wherever it is asked for,
+exactly as a diff does since [FIXED-312](#fixed-312--the-core-act-of-code-review-was-a-route-change-away).
+Chat and Build resolve the checkpoint **this turn** wrote (never the latest) and
+open the panel beside the transcript, in the column the file inspector uses; a
+turn with no checkpoint says so rather than offering a control that would fail.
+
+`MessageActions.svelte` had grown to five labelled buttons under every message
+and would have been six. Copy, Edit and Retry stay in the row; **Branch**,
+**Summarise up to here** and **Rewind to before this** moved behind one **More**
+handle, each with the sentence that says what it means. The row under a message
+is now three short words at every window width instead of six long ones.
+
+**What did not change, deliberately.** Nothing about the decision moves. The
+panel performs no restore: it reads a metadata-only plan, and the ask goes
+through `POST /api/checkpoints/{id}/restore`, which recomputes its own plan — a
+caller cannot name the files — records the proposal and returns an approval id.
+The workspace changes only when a human approves it, and the action re-passes
+its capability gate, policy review and posture check at that point.
+
+**Also fixed while verifying it live.** The preflight rendered the whole funnel —
+the reminders, the acknowledgement and a permanently disabled button — around a
+change that did not exist, which is what a chat turn always produces. An empty
+plan now answers in one sentence. And a panel left open across a conversation
+load described a checkpoint from a conversation no longer on screen; it closes
+with the transcript it belongs to.
+
+**User-interface outcome.** Undoing a turn starts at the turn. The preflight
+states what would be rewritten, deleted and skipped, names a cross-principal
+escalation before the ask rather than after it, and says in words that it asks
+for a rewind rather than performing one.
+
+**Evidence.** [`b18-01-message-menu.png`](screenshots/working/b18-01-message-menu.png),
+[`b18-02-rewind-preflight.png`](screenshots/working/b18-02-rewind-preflight.png),
+[`b18-03-message-menu-mobile.png`](screenshots/working/b18-03-message-menu-mobile.png),
+[`b18-04-rewind-preflight-mobile.png`](screenshots/working/b18-04-rewind-preflight-mobile.png)
+and [`b18-05-build-rewind-preflight.png`](screenshots/working/b18-05-build-rewind-preflight.png) —
+Build's workspace grid is a different layout from Chat's, which is where a
+shared panel goes wrong — all captured live against Anthropic
+`claude-haiku-4-5-20251001`.
+`apps/web/e2e/b18-mem08-rewind-and-turn-anchor-live.spec.ts`,
+`apps/web/src/lib/views/ChatView.rewind.test.ts`,
+`apps/web/src/lib/components/MessageActions.test.ts` and
+`apps/web/src/lib/views/CheckpointsView.test.ts`.
+
+---
+
+## FIXED-316 — Every turn coordinate was a dead end
+
+**Severity: Medium. Area: Chat / Build / memory / web UI. Closed 2026-08-29 (was
+[MEM-08](MEMORY_RELIABILITY_PLAN.md#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from)).**
+
+**Observed.** Three surfaces already held the coordinate of an exact exchange and
+not one of them was a link. `conversation_search` returns `session_id` and
+`turn_id`; chat search has returned `match_turn_id` alongside its snippet since
+RAIKER-2020, and it reached `SessionView` and `apiTypes.ts` unused; every
+checkpoint names the turn it was taken at. Opening any of them opened the
+conversation at the top. Verifying a recalled claim — "we settled this in March"
+— was a manual scroll through a conversation somebody else's answer had already
+located.
+
+**Fixed.** `apps/web/src/lib/turnAnchor.ts` is the accepting half: a link
+builder, a lander that scrolls to the exchange and marks it briefly, and the
+step that spends the anchor. `turn` joins `session` in `routeState.ts` under the
+same rule the file has always enforced — a coordinate the reader may already
+open, never a payload, a credential or a decision — and the shell passes it to
+the two surfaces that render a transcript.
+
+Three surfaces now build one: a chat-search hit opens **the match** rather than
+the conversation, a checkpoint's Turn field links to the exchange it was taken
+at, and a turn opened from the Sessions audit view offers **Open in the
+conversation**. Chat and Build land on it, mark it for a moment, and drop `turn=`
+from the address so a reload opens the conversation as it is rather than
+replaying a highlight. A coordinate this conversation does not hold says so,
+because landing silently at the top is indistinguishable from the defect.
+
+**A second link into the same conversation.** Landing from the history load
+alone would have honoured only the first one: opening one search result and then
+another *in the same conversation* reloads nothing, because the session id has
+not changed. The anchor is honoured whenever it changes and the transcript is
+ready, with a guard so a still-set anchor does not re-mark the exchange every
+time a new turn arrives.
+
+**What is not claimed.** A model that *writes* a date in prose still writes
+prose. What is now clickable is a coordinate the ledger recorded, which is the
+same rule citations follow: the ledger is the fact, the sentence is the claim.
+Rendering an exchange named inside a citation as its own link needs a per-result
+row in `turn_sources`, and is recorded as
+[BUG-245](TO_BE_FIXED.md#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one)
+rather than half-built.
+
+**User-interface outcome.** A search hit lands on the exchange that matched, with
+that exchange marked. Checking what was said is one click, from search, from a
+checkpoint, and from the audit record of a turn.
+
+**Evidence.** [`mem08-01-search-result.png`](screenshots/working/mem08-01-search-result.png),
+[`mem08-02-landed-on-the-exchange.png`](screenshots/working/mem08-02-landed-on-the-exchange.png)
+and [`mem08-03-checkpoint-links-to-its-turn.png`](screenshots/working/mem08-03-checkpoint-links-to-its-turn.png).
+`apps/web/src/lib/turnAnchor.test.ts`,
+`apps/web/src/lib/views/ChatView.anchor.test.ts`,
+`apps/web/src/lib/routeState.test.ts`, `apps/web/src/lib/views/SearchChatView.test.ts`
+and the live spec above.
+
+---
+
+## FIXED-317 — Three tools declared a source and produced none
+
+**Severity: Medium. Area: runtime / citations / provenance. Raised and closed
+2026-08-29, while closing MEM-08.**
+
+**Observed.** `raiker/models/tool_registry.py` declares a `source_kind` for
+twenty-four tools — the tools whose results are *material a turn read*, as
+opposed to a tool that changes something or answers about the runtime.
+`source_from_tool_result` in `raiker/runtime/turn_sources.py` has a branch per
+tool and returned `None` for anything it did not name. Three declared tools had
+no branch: `conversation_search`, `code_map_references` and `knowledge_graph`.
+An answer drawn from any of them cited nothing at all, and the transcript's
+Sources strip was silent about material the turn had really read.
+
+**The pattern, again.** This is the same failure the B4/B8 work already
+documented twice — two lists that have to agree, with nothing holding them
+together: schema and policy (FIXED-98), emitted events and declared events
+(FIXED-97), and now declared source kinds and derived sources. The graph read is
+the least defensible of the three: every edge it returns names the approved
+memory it came from, which makes it the *most* citable read in the set.
+
+**Fixed.** All three have a branch, and `_passage_for` learned the two shapes it
+did not know — the graph carries its material under `edges`/`entities` rather
+than `results`, so its source had been recording a passage of nothing. A recalled
+exchange's passage now carries the conversation title and date above the text,
+because a paragraph the owner cannot place is not something they can check.
+
+**Held together by a test rather than by care.** A new invariant in
+`tests/test_turn_sources.py` walks `TOOL_SOURCE_KIND_BY_TOOL`, feeds each tool a
+minimally successful result, and fails if any declared tool produces no source —
+and fails just as loudly if a tool is added to the registry without a sample, so
+the check cannot rot into a list of the tools somebody remembered.
+
+**User-interface outcome.** An answer that searched past conversations, looked up
+where a name is used, or read the memory graph names that under **Sources**, and
+opening the chip shows the passage the turn was given.
+
+---
+
+## FIXED-318 — A checkbox was thirteen pixels, in five places
+
+**Severity: Low. Area: web UI / accessibility. Raised and closed 2026-08-29,
+while reviewing every page at four window widths.**
+
+**Observed.** Sweeping all thirty route and tab states at 390, 834, 1440 and
+2560 px found the responsive contract intact — no page scrolled horizontally at
+any width, nothing bled outside its own scroller, and no route logged a console
+or page error. It found one real class of defect: every checkbox in the app was
+the user agent's own 13x13 box, under WCAG 2.2's 24 px minimum target
+(SC 2.5.8), on Permissions, Memory, Sessions, Connectors and Hooks — and the
+Hooks tab had set its own 16 px size, so they were not even consistent with each
+other. Sessions' tag-add button was 23x20 at every width.
+
+**Fixed.** `app.css` already floors buttons, inputs and selects on the element
+rather than by class, precisely so a view added tomorrow inherits the floor
+without knowing it exists; the checkbox was the one control that floor
+deliberately excluded and nothing replaced it. `:where(input[type="checkbox"],
+input[type="radio"])` now sizes both at 1.05 rem with the accent colour, and
+grows them to 1.5 rem where the pointer is coarse or the window is narrow —
+the same rule the 44 px shell-control floor already uses, extended to
+`(pointer: coarse)` so a precise-pointer tablet is not treated as a mouse. The
+Hooks tab's local override is gone, and the tag-add button is a 24 px square.
+
+**User-interface outcome.** Every checkbox in Raiker is the same size, is the
+accent colour when checked, and is large enough to hit on a touch screen.
+
+**Evidence.** Re-measured live across the same routes and widths: 24x24 on a
+phone, 17x17 on a laptop, everywhere. `apps/web/src/lib/appCss.test.ts`.
+
+---
+
+## FIXED-319 — Importing the same memory twice stored it twice
+
+**Severity: Low. Area: memory / import. Closed 2026-08-29 (was BUG-244).**
+
+**Observed.** Memory → *Advanced memory management* → **Review import** was used
+four times with the same one-record file while seeding the FIXED-311 round. The
+result was four approved memories with identical text, identical scope and
+identical provenance, and the recall strip under the next answer named all four.
+Nothing warned, and nothing offered to reconcile them. The review step reported
+the number of records **in the file** and the import reported the same number
+again, whatever it had actually written.
+
+**Why it mattered more than a tidy list.** Recall is budgeted. Four copies of one
+sentence occupy four of the slots a turn has for remembering anything, and
+[FIXED-311](#fixed-311--recall-was-invisible-at-the-moment-it-was-used)'s strip
+now shows that cost to the owner rather than hiding it — which is how this was
+noticed at all. It was also the *only* way to produce a contradiction-free
+duplicate: every other correction path has an answer for the same sentence
+arriving twice, because an edit records a correction and a supersession link
+lets retrieval prefer the valid record over its predecessor. Import had neither
+and simply wrote again.
+
+**Fixed.** `SQLiteStore.stored_memory_checksums` reads `(content_checksum,
+scope) → memory_id` for the acting owner — the checksum is already written on
+every insert and update, so nothing new is stored for this. `POST
+/api/memory/import/preview` answers with what an import would change *before*
+anything is written, and `import_memories` skips what the workspace already
+holds and reports `imported` and `skipped_duplicates` rather than a count of
+what it was handed.
+
+Four decisions worth stating, because each is the difference between a check
+that helps and one that gets in the way:
+
+* **Scope is part of the key.** The same sentence at `project` and at `global`
+  is two records an owner may genuinely want.
+* **A deleted memory does not count; an archived one does.** Re-importing a
+  forgotten memory is how you bring it back. An archived one is still stored,
+  and a second copy of it is still a duplicate.
+* **A file that repeats a record inside itself is deduplicated too** — the same
+  defect arriving by a different route.
+* **The skip is the default, not the only behaviour.** The preview names the
+  record a duplicate would be a copy of, so **Import anyway** is an informed
+  choice rather than a way around a rule.
+
+**Owner-scoped, like every other memory read.** A duplicate check that saw across
+accounts would let one account learn what another holds by being refused; the
+scoping is on the query rather than on a check somebody has to remember.
+
+**User-interface outcome.** The review step says **“1 new of 4 · 3 already
+stored, and will be skipped”** before anything is written, and the button names
+what it will do. A file whose every record is already stored says so and offers
+only the deliberate second copy. Afterwards the notice states what changed —
+*“Imported 1 record; skipped 3 already stored.”*
+
+**Evidence.** [`bug-244-01-first-import-two-new.png`](screenshots/working/bug-244-01-first-import-two-new.png)
+and [`bug-244-02-re-import-already-stored.png`](screenshots/working/bug-244-02-re-import-already-stored.png),
+captured live against a running instance.
+`apps/web/e2e/bug-244-246-import-duplicates-and-narrow-authority-live.spec.ts`,
+the `TestImportDoesNotDuplicateWhatIsAlreadyStored` cases in
+`tests/test_memory_controls.py`, and the import-review cases in
+`apps/web/src/lib/views/MemoryView.test.ts`.
+
+---
+
+## FIXED-320 — The authority matrix hid its own verdicts on a phone
+
+**Severity: Low. Area: Permissions / web UI. Raised and closed 2026-08-29 (was
+BUG-246), during the four-width audit that produced
+[FIXED-318](#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places).**
+
+**Observed.** At 390 px, Permissions → *Delegated authority* rendered as a
+three-column table inside a horizontal scroller. The first two columns fitted;
+the third was cut mid-word, so the page read **“Unavail”** under *Raiker agent*
+for every row.
+
+**Why it is worth a number.** Nothing was lost and nothing lied — the container
+scrolled, the page did not, and the responsive audit confirmed the contract held.
+But the column carrying the *verdict* was the one off screen, and a matrix whose
+answers are the part you have to scroll for is not doing its job at that width.
+“Reachable by scrolling” and “legible” are different bars.
+
+**Fixed.** Below the shell's own narrow breakpoint the same list renders as
+stacked cards: the capability as the heading, owner control and agent verdict as
+a labelled pair. The table keeps the wide layout.
+
+**Why two renderings rather than one restyled table.** Turning a table's own
+parts into blocks with `display: block` is the usual trick and it silently
+removes the table semantics a screen reader relies on. Two presentations, with
+exactly one displayed at a time, keeps both readings correct — and because
+`display: none` removes a subtree from the accessibility tree as well as from
+the page, nothing ever announces the same capability twice. That property is
+what the test asserts, on the declaration itself, since only `display` has it.
+
+**User-interface outcome.** At a phone width every capability's owner control and
+agent verdict are readable without a sideways scroll, and the words are whole.
+
+**Evidence.** [`bug-246-01-authority-at-phone-width.png`](screenshots/working/bug-246-01-authority-at-phone-width.png).
+`apps/web/src/lib/components/AuthorityMatrix.test.ts` and the live spec above.

@@ -34,6 +34,7 @@
   import PlanChecklist from "../components/PlanChecklist.svelte";
   import ReasoningBlock from "../components/ReasoningBlock.svelte";
   import ToolActivity from "../components/ToolActivity.svelte";
+  import RewindPanel from "../components/RewindPanel.svelte";
   import ExportConversationDialog from "../components/ExportConversationDialog.svelte";
   import DiffView from "../components/DiffView.svelte";
   import SourceChips from "../components/SourceChips.svelte";
@@ -77,6 +78,7 @@
     type ParkedApproval,
   } from "../conversationRestore";
   import { rememberSessionInRoute } from "../sessionRoute";
+  import { forgetTurnInRoute, revealTurn } from "../turnAnchor";
   import { hasSteps, planFromEvent } from "../agentPlan";
   import { approvalBadge } from "../statusMaps";
   import AttachmentCard from "../components/AttachmentCard.svelte";
@@ -127,6 +129,8 @@
     // conversation over a session that was still stored, still findable, and
     // still holding the approvals for that change.
     sessionId: continuedSessionId = null,
+    // MEM-08 — the exchange this link is pointing at inside that conversation.
+    anchoredTurnId = null,
     projects = null,
     onProjectsChanged,
     // Build keeps its transcript when the owner navigates away — the view is
@@ -137,6 +141,7 @@
     visible = true,
   }: {
     sessionId?: string | null;
+    anchoredTurnId?: string | null;
     projects?: ProjectsList | null;
     onProjectsChanged?: () => void;
     visible?: boolean;
@@ -318,6 +323,10 @@
   async function loadHistory(id: string) {
     historyLoading = true;
     closeSource();
+    // B18 — a preflight belongs to one conversation. Left open across a load
+    // it would describe a checkpoint from a conversation no longer on screen.
+    rewindCheckpointId = null;
+    landedAnchor = null;
     try {
       const detail = await api.session(id);
       const parked = parkedByTurn(detail);
@@ -326,7 +335,10 @@
       await restoreAttachmentChips(id);
       await refreshTurnSources(id);
       await loadApprovals();
-      void scrollToEnd();
+      // MEM-08 — a link that named an exchange lands on it, through the effect
+      // below rather than here, so a second link into the same conversation is
+      // honoured too.
+      if (anchoredTurnId === null || anchoredTurnId === "") void scrollToEnd();
     } catch (e) {
       historyError =
         e instanceof ApiError ? `Could not load history (${e.status}).` : "Could not load history.";
@@ -1115,11 +1127,69 @@
     setTimeout(() => window.print?.(), 0);
   }
 
+  // ── B18 — rewind to before this turn ─────────────────────────────────
+  // The governed restore has had an executor, a capability and a route since
+  // BUG-230, reachable only from the Checkpoints page. Build is where the files
+  // actually change, so this resolves the checkpoint the turn wrote and opens
+  // the shared funnel. Nothing here restores anything: the funnel raises an
+  // approval and a human decision runs it.
+  let rewindCheckpointId = $state<string | null>(null);
+  let rewindingTurn = $state<string | null>(null);
+
+  async function rewindFromTurn(turnId: string) {
+    if (sessionId === null || streaming) return;
+    rewindingTurn = turnId;
+    projectNotice = null;
+    try {
+      const checkpoints = await api.checkpoints(sessionId);
+      const point = checkpoints.find((checkpoint) => checkpoint.turn_id === turnId);
+      if (point === undefined) {
+        projectNotice = "No checkpoint was written for that turn, so there is nothing to rewind to.";
+        return;
+      }
+      rewindCheckpointId = point.checkpoint_id;
+    } catch (error) {
+      projectNotice =
+        error instanceof ApiError
+          ? `Could not read this conversation's checkpoints (${error.reasonCode ?? error.status}).`
+          : "Could not read this conversation's checkpoints.";
+    } finally {
+      rewindingTurn = null;
+    }
+  }
+
   async function scrollToEnd() {
     await tick();
     // Guarded: jsdom has no scrollTo implementation.
     if (typeof scrollEl?.scrollTo === "function") scrollEl.scrollTo({ top: scrollEl.scrollHeight });
   }
+
+  // MEM-08 — land on the exchange the link named, as Chat does. The anchor is
+  // spent on arrival so a reload opens the conversation as it is.
+  let anchorNotice = $state<string | null>(null);
+
+  async function landOnAnchor(turnId: string) {
+    await tick();
+    anchorNotice = revealTurn(scrollEl, turnId) ? null : "That exchange is not in this conversation.";
+    forgetTurnInRoute();
+    if (anchorNotice !== null) void scrollToEnd();
+  }
+
+  // The anchor is honoured whenever it changes and the transcript is ready to
+  // receive it — not only on the load that first opened the conversation.
+  // Opening one search result and then a second one *in the same conversation*
+  // never reloads anything, so landing from `loadHistory` alone would silently
+  // ignore the second link. `landedAnchor` is what keeps a still-set anchor
+  // from re-marking the exchange every time a new turn arrives.
+  let landedAnchor: string | null = null;
+
+  $effect(() => {
+    const anchor = anchoredTurnId;
+    const ready = !historyLoading && turns.length > 0;
+    if (anchor === null || anchor === "" || anchor === landedAnchor || !ready) return;
+    landedAnchor = anchor;
+    untrack(() => void landOnAnchor(anchor));
+  });
 
   function newConversation() {
     if (streaming) return;
@@ -1130,6 +1200,9 @@
     approvals = [];
     approvalDiffs = {};
     plan = null;
+    rewindCheckpointId = null;
+    anchorNotice = null;
+    landedAnchor = null;
     promptEl?.focus();
   }
 
@@ -1313,7 +1386,11 @@
 
 <svelte:window onclick={onWindowClick} />
 
-<div class="build" class:with-rail={railOpen && !compactRail}>
+<div
+  class="build"
+  class:with-rail={railOpen && !compactRail}
+  class:with-panel={rewindCheckpointId !== null}
+>
   <div class="main" bind:this={buildMainElement}>
     <header class="build-header">
       <div class="repo-slot">
@@ -1381,6 +1458,9 @@
     </header>
 
     {#if projectNotice}<p class="line-notice" role="status">{projectNotice}</p>{/if}
+    <!-- MEM-08 — said only when a link named an exchange this conversation
+         does not hold; landing is shown by the highlight, not by text. -->
+    {#if anchorNotice}<p class="line-notice" role="status">{anchorNotice}</p>{/if}
 
     {#if reposOpen}
       <RepoConnector
@@ -1422,21 +1502,32 @@
         {@const toolRows = toolActivity(turn.events)}
         {@const reasoning = collectReasoning(turn.events) || (turn.retainedReasoning ?? "")}
         {@const turnSourceList = sourcesForTurn(turnSources, turn.response?.turn_id)}
-        <article class="turn">
+        <!-- MEM-08 — the coordinate a link can name. -->
+        <article class="turn" data-turn-id={turn.response?.turn_id ?? undefined}>
           <div class="user-message">
             <div class="from-you">
               <span class="mode-tag">{buildMode(turn.mode).label}</span>
               <p class="bubble-text">{turn.prompt}</p>
             </div>
-            <!-- C14/B19 — the same three actions Chat carries. A retried prompt
-                 is a new turn under the current mode, never a replay of the
-                 governed actions the first one took. -->
+            <!-- C14/B19 — the same actions Chat carries. A retried prompt is a
+                 new turn under the current mode, never a replay of the governed
+                 actions the first one took.
+
+                 B18 — and Rewind, which is why this control matters more here
+                 than anywhere else: Build is the surface whose turns change
+                 files, so "undo that turn" is the control that makes leaving it
+                 running reasonable. It opens the preflight for the checkpoint
+                 this turn wrote and restores nothing on its own. -->
             {#if turn.prompt !== ""}
               <MessageActions
                 text={turn.prompt}
                 disabled={streaming}
                 onedit={editPrompt}
                 onretry={retryPrompt}
+                onrewind={turn.response?.turn_id
+                  ? () => void rewindFromTurn(turn.response?.turn_id ?? "")
+                  : undefined}
+                rewinding={rewindingTurn === turn.response?.turn_id}
               />
             {/if}
             {#if turn.attachments.length > 0}
@@ -1843,9 +1934,29 @@
       />
     </div>
   {/if}
+
+  <!-- B18 — the same rewind funnel Checkpoints opens, asked for at the turn.
+       Inside the workspace grid so it takes the right-hand column beside the
+       transcript, rather than stacking under the composer. -->
+  <RewindPanel checkpointId={rewindCheckpointId} onclose={() => (rewindCheckpointId = null)} />
 </div>
 
 <style>
+  /* MEM-08 — the exchange a link landed on. A brief mark, not a state. */
+  :global(.turn.turn-anchored) {
+    border-radius: var(--r-md);
+    box-shadow: 0 0 0 2px var(--accent-border);
+    background: var(--accent-soft);
+    transition:
+      box-shadow 0.4s ease,
+      background 0.4s ease;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.turn.turn-anchored) {
+      transition: none;
+    }
+  }
+
   /* BUG-22 — the print layout, matching Chat's. Save as PDF produces the
      transcript as a document: no chrome, no controls, no split turns. */
   @media print {
@@ -1870,6 +1981,16 @@
   }
   .build.with-rail {
     grid-template-columns: minmax(0, 1fr) 21rem;
+  }
+  /* B18 — the rewind preflight takes a column of its own, so the transcript it
+     is about stays on screen behind it. */
+  @media (min-width: 64rem) {
+    .build.with-panel {
+      grid-template-columns: minmax(0, 1fr) minmax(20rem, 26rem);
+    }
+    .build.with-rail.with-panel {
+      grid-template-columns: minmax(0, 1fr) 21rem minmax(20rem, 26rem);
+    }
   }
   .main {
     display: flex;

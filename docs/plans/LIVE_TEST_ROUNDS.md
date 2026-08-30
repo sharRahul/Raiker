@@ -33,6 +33,8 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-29 | Targeted | `bug-244-`, `bug-246-` | — (no model needed) | An import that says what is already stored before it writes, and the authority matrix readable at a phone width |
+| 2026-08-29 | Targeted + full responsive audit | `b18-`, `mem08-` | Anthropic | Rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, and every route measured at four widths |
 | 2026-08-29 | Targeted + responsive | `fixed-309-` … `fixed-312-`, `r0829-` | Anthropic | Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build — and a question that could not recall the memory answering it |
 | 2026-08-29 | Targeted | `real-work-` | Anthropic | **What Chat and Build actually do**: a scheduled task, a project, a dashboard that renders, and a program Build wrote that this round executed |
 | 2026-08-29 | Targeted | `fixed-306-` | Anthropic | Owner-guided compaction: a summarised range, and a transcript that kept every turn |
@@ -54,6 +56,107 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-29 — An import that counts what it changes, and a matrix that fits a phone
+
+**Tier: Targeted. Build: production `npm run build`. Providers: none — neither
+scenario needs a model, which is the honest reason this round has no key
+recorded against it. Prefixes: `bug-244-`, `bug-246-`.**
+
+Spec: `apps/web/e2e/bug-244-246-import-duplicates-and-narrow-authority-live.spec.ts`.
+
+1. Memory → *Advanced memory management* → **Review import** with a two-record
+   file the workspace has never seen. Confirm the review step says **2 new**
+   before anything is written, import them, and confirm the notice reports
+   *"Imported 2 records."* *(FIXED-319.)*
+2. Choose **the same file again**. Confirm it says all 2 records are already
+   stored, that the ordinary import button is **absent** rather than disabled,
+   and that **Import anyway** is still offered — an owner who means to hold the
+   same sentence at a second scope is doing something legitimate. *(FIXED-319.)*
+3. Permissions at 390 px. Confirm every capability's owner control and agent
+   verdict are readable as labelled pairs, that no row is cut mid-word (the
+   literal string `Unavail` appears nowhere), and that the page does not scroll
+   sideways. *(FIXED-320.)*
+
+**Result: ✅ two entries closed** — FIXED-319 and FIXED-320.
+
+**What this round did not need, and why that is the point.** Neither scenario
+sends a turn. BUG-244 was found *because* [FIXED-311](FIXED_ITEMS.md#fixed-311--recall-was-invisible-at-the-moment-it-was-used)
+made recall visible and four identical sentences showed up under one answer —
+but proving the fix needs only the import path, and pretending otherwise would
+have made the round slower without making it stronger.
+
+---
+
+## 2026-08-29 — Rewind at the turn, an openable turn coordinate, and a four-width audit of every page
+
+**Tier: Targeted + full responsive audit. Build: production `npm run build`.
+Providers: Anthropic `claude-haiku-4-5-20251001`, key entered through Models.
+Prefixes: `b18-`, `mem08-`.**
+
+Spec: `apps/web/e2e/b18-mem08-rewind-and-turn-anchor-live.spec.ts`.
+
+1. Sign in and connect Anthropic through Models, pinning an exact model. This
+   round signed in on a workspace that **already held work**, which is where it
+   started: the shared helper asserted the empty-workspace heading, so a round
+   re-run against the workspace its own first run created failed on step one and
+   the failure looked like a product defect. `signInAsOwner` now accepts either
+   heading — the first repair BUG-229 has had.
+2. Send a real Chat turn, open the per-message overflow, and confirm **Rewind to
+   before this** is offered. Open it: the preflight names *this turn's*
+   checkpoint, states what would be rewritten, deleted and skipped, and says in
+   words that it asks for a rewind rather than performing one. Confirm no
+   `POST …/restore` was made by opening it. *(FIXED-315.)*
+3. Send two turns with distinct markers, search chat history for one, and
+   confirm the result links to `…?session=…&turn=…`, lands on that exchange with
+   it marked, marks **only** that one, and drops `turn=` from the address after
+   landing. *(FIXED-316.)*
+4. Repeat step 2 at 390 px. Confirm the overflow menu and the preflight both
+   work, and that the page does not scroll sideways.
+5. Repeat step 2 in **Build**, which has a different workspace grid and is the
+   surface whose turns actually change files. Confirm the panel takes a column
+   of its own rather than stacking under the composer.
+6. Observability → Checkpoints: confirm a snapshot's **Turn** field links back to
+   the exchange it was taken at. *(FIXED-316.)*
+7. **Every route and tab state — thirty of them — at 390, 834, 1440 and 2560 px,
+   measured rather than eyeballed**: page-level horizontal overflow, elements
+   escaping their own scroller, control hit sizes, and console and page errors.
+
+**Result: ✅ two entries closed** — FIXED-315 and FIXED-316 — **and two raised
+and closed in the same round.**
+
+Step 7 is the reason the round is worth more than the two it set out to prove.
+The responsive contract held completely: **no route scrolled the page
+horizontally at any of the four widths, nothing escaped its own scroll
+container, and not one route logged a console or page error.** What it did find
+was measurable and invisible to the eye: every checkbox in the app was the user
+agent's own 13x13 box — under WCAG 2.2's 24 px minimum target — on five
+different routes, and the Hooks tab had set its own 16 px size, so they were not
+even consistent with each other. That is
+[FIXED-318](FIXED_ITEMS.md#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places).
+
+The second was found in the code while closing MEM-08: three tools declare a
+`source_kind` and produced no source at all, so an answer drawn from a past
+conversation, a code-map reference lookup or the memory graph cited nothing.
+That is [FIXED-317](FIXED_ITEMS.md#fixed-317--three-tools-declared-a-source-and-produced-none),
+and it is the third instance of the same failure mode — two lists that have to
+agree with nothing holding them together — so it is now held by an invariant
+test rather than by care.
+
+Two smaller defects were found by looking at the evidence rather than at the
+assertions, and both are fixed in FIXED-315: the preflight rendered its whole
+funnel around a change that did not exist (a chat turn writes no workspace file,
+so the honest answer is one sentence), and a preflight left open across a
+conversation load described a checkpoint from a conversation no longer on
+screen.
+
+**What this round did not prove.** Nothing was actually restored: every scenario
+stops at the raised approval, because a chat turn's checkpoint has no file
+changes to rewind. The execution half is the same governed path
+[the 2026-08-23 round](#2026-08-23--the-rewind-the-audit-export-and-two-defects-the-rewind-exposed)
+drove end to end.
 
 ---
 

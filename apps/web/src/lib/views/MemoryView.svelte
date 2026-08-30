@@ -3,7 +3,7 @@
   import PageState from "../components/PageState.svelte";
   import { api, ApiError } from "../api";
   import FileInspector from "../components/FileInspector.svelte";
-  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
+  import type { CapabilityGate, MemoryControlView, MemoryHistoryEvent, MemoryImportPreview, MemoryProposal, MemoryRelationshipProposal, MemorySettingsView, ObservationsView, SourceExcerptView } from "../apiTypes";
   import { relativeTime } from "../format";
   import { memoryWritePosture } from "../memoryPosture";
   import GuideLink from "../components/GuideLink.svelte";
@@ -26,6 +26,10 @@
   let editingId = $state<string | null>(null);
   let editDraft = $state("");
   let importPreview = $state<MemoryImport | null>(null);
+  // BUG-244 — how many of the reviewed records the workspace already holds.
+  let importAlready = $state<MemoryImportPreview | null>(null);
+  let importBusy = $state(false);
+  let importNotice = $state<string | null>(null);
   let importFileName = $state("");
   let proposalEditingId = $state<string | null>(null);
   let proposalDraft = $state("");
@@ -212,12 +216,28 @@
       const values = Array.isArray(parsed) ? parsed : typeof parsed === "object" && parsed !== null && Array.isArray((parsed as { memories?: unknown }).memories) ? (parsed as { memories: unknown[] }).memories : [];
       if (!values.every((value) => typeof value === "object" && value !== null && typeof (value as { text?: unknown }).text === "string")) throw new Error("schema");
       importPreview = values as MemoryImport; importFileName = file.name; actionError = null;
-    } catch { importPreview = null; actionError = "This file is not a valid Raiker memory export."; }
+      importNotice = null;
+      // BUG-244 — ask what this would actually change before offering to do it.
+      // A read: it writes nothing, so it is safe on every file chosen.
+      importAlready = null;
+      try { importAlready = await api.previewMemoryImport(importPreview); }
+      catch { importAlready = null; }
+    } catch { importPreview = null; importAlready = null; actionError = "This file is not a valid Raiker memory export."; }
   }
-  async function applyImport() {
+  async function applyImport(skipDuplicates = true) {
     if (!importPreview) return;
-    try { await api.importMemories(importPreview); importPreview = null; importFileName = ""; await load(); }
+    importBusy = true;
+    try {
+      const result = await api.importMemories(importPreview, skipDuplicates);
+      // BUG-244 — say what changed, not how many records were offered.
+      importNotice = result.skipped_duplicates > 0
+        ? `Imported ${result.imported} record${result.imported === 1 ? "" : "s"}; skipped ${result.skipped_duplicates} already stored.`
+        : `Imported ${result.imported} record${result.imported === 1 ? "" : "s"}.`;
+      importPreview = null; importAlready = null; importFileName = "";
+      await load();
+    }
     catch { actionError = "Could not import memories."; }
+    finally { importBusy = false; }
   }
   // BUG-27 — opening the passage a memory was drawn from. Provenance that
   // cannot be checked is indistinguishable, from where the owner sits, from
@@ -577,7 +597,36 @@
     {/if}
   </section>
 
-  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size={16} /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}<div class="import-review" role="status"><strong>{importFileName}</strong><span>{importPreview.length} valid record{importPreview.length === 1 ? "" : "s"} ready for governed import.</span><button class="btn btn-primary btn-sm" onclick={() => void applyImport()}>Import reviewed records</button></div>{/if}</div></details>
+  <details class="advanced"><summary><span><strong>Advanced memory management</strong><small>Import or export governed memory records.</small></span><Icon name="chevron-down" size={16} /></summary><div class="advanced-body"><button class="btn btn-ghost" onclick={() => void exportMemories()}>Export memories</button><label class="btn btn-ghost file-button">Review import<input type="file" accept="application/json,.json" onchange={(e) => void reviewImport(e)} /></label>{#if importPreview}
+      <!-- BUG-244 — what this would change, before it changes anything. An
+           import used to report the number of records in the file and write
+           every one of them, so re-importing the same file made a second copy
+           of every sentence and said "4 records" both times. Recall is
+           budgeted: four copies of one sentence occupy four of the slots a
+           turn has for remembering anything. -->
+      <div class="import-review" role="status">
+        <strong>{importFileName}</strong>
+        {#if importAlready === null}
+          <span>{importPreview.length} valid record{importPreview.length === 1 ? "" : "s"} ready for governed import.</span>
+          <button class="btn btn-primary btn-sm" disabled={importBusy} onclick={() => void applyImport()}>Import reviewed records</button>
+        {:else if importAlready.new_count === 0}
+          <span>All {importAlready.total} record{importAlready.total === 1 ? " is" : "s are"} already stored. Importing again would only make copies.</span>
+          <button class="btn btn-ghost btn-sm" disabled={importBusy} onclick={() => void applyImport(false)}>Import anyway</button>
+        {:else}
+          <span>
+            <strong>{importAlready.new_count} new</strong> of {importAlready.total}
+            {#if importAlready.duplicate_count > 0}· {importAlready.duplicate_count} already stored, and will be skipped{/if}
+          </span>
+          <button class="btn btn-primary btn-sm" disabled={importBusy} onclick={() => void applyImport()}>
+            {importBusy ? "Importing…" : `Import ${importAlready.new_count} new record${importAlready.new_count === 1 ? "" : "s"}`}
+          </button>
+          {#if importAlready.duplicate_count > 0}
+            <button class="btn btn-ghost btn-sm" disabled={importBusy} onclick={() => void applyImport(false)}>Import all {importAlready.total} anyway</button>
+          {/if}
+        {/if}
+      </div>
+    {/if}
+    {#if importNotice}<p class="import-notice" role="status">{importNotice}</p>{/if}</div></details>
 {/if}
 
 {#if sourceFor !== null}
@@ -645,7 +694,7 @@
   .gist-note { display:flex; align-items:baseline; gap:.4rem; }
   .gist-note :global(svg) { flex:none; align-self:center; color:var(--accent); }
   .empty { padding:var(--space-7); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
-  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); }
+  .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:.84rem; }
   @media (max-width:45rem) {
     .summary { grid-template-columns:repeat(2,1fr); }
     dl { grid-template-columns:1fr; }

@@ -233,6 +233,55 @@ def source_from_tool_result(
             detail=_count_detail(output.get("count", 0), "declarations"),
             passage=passage,
         )
+    # MEM-08 — the owner's own past conversations. `conversation_search` has
+    # declared `source_kind="conversation"` since RAIKER-2020 and produced no
+    # source at all, so an answer drawn from a chat three years old cited
+    # nothing: the one class of material whose provenance the owner can check
+    # for themselves was the one the ledger did not record. The locator is the
+    # conversation when the call stayed inside one, which is the case where a
+    # coordinate names something exact.
+    if tool_name == "conversation_search":
+        results = output.get("results", []) or []
+        query = _text(args.get("query"))
+        scoped = _text(args.get("session_id"), 120)
+        return SourceDraft(
+            kind=kind,
+            title=f"Past conversations: {query}" if query else "Past conversations",
+            locator=scoped,
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", len(results)), "exchanges"),
+            passage=passage,
+        )
+    # The other half of the code map. `code_map_search` says where a name is
+    # declared and has always been citable; this says where it is *used*, and
+    # was declared alongside it and dropped in the same silence.
+    if tool_name == "code_map_references":
+        name = _text(args.get("name"), 200)
+        return SourceDraft(
+            kind=kind,
+            title=f"Used by: {name}" if name else "Code map references",
+            locator=_text(output.get("repository")),
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", 0), "references"),
+            passage=passage,
+        )
+    # The governed graph read. Every edge it returns names the approved memory
+    # it came from, which makes it the *most* citable read in the set and made
+    # its absence from the ledger the least defensible.
+    if tool_name == "knowledge_graph":
+        action = _text(args.get("action"), 40) or _text(output.get("action"), 40)
+        anchor = _text(args.get("query") or args.get("entity_id") or args.get("locator"), 200)
+        return SourceDraft(
+            kind=kind,
+            title=f"Memory graph: {anchor}" if anchor else "Memory graph",
+            locator=_text(output.get("resolved_from") or args.get("locator"), 200),
+            tool_name=tool_name,
+            detail=_count_detail(
+                output.get("count", 0),
+                "entities" if action == "entities" else "passages" if action == "passages" else "edges",
+            ),
+            passage=passage,
+        )
     if tool_name in ("memory_search", "memory_list"):
         results = output.get("results", []) or []
         query = _text(args.get("query"))
@@ -324,6 +373,52 @@ def _passage_for(tool_name: str, output: dict[str, Any]) -> str:
     if tool_name == "list_directory":
         entries = [str(entry) for entry in (output.get("entries", []) or [])]
         return "\n".join(entries)[:MAX_PASSAGE_CHARS]
+    # MEM-08 — a recalled exchange without its conversation and its date is not
+    # something the owner can check. The heading is built from the ledger's own
+    # result row, so it can only ever name a conversation the call really
+    # returned.
+    if tool_name == "conversation_search":
+        blocks: list[str] = []
+        for item in output.get("results", []) or []:
+            if not isinstance(item, dict):
+                continue
+            heading = " · ".join(
+                part
+                for part in (
+                    str(item.get("title") or "").strip(),
+                    str(item.get("created_at") or "")[:10],
+                )
+                if part
+            )
+            body = str(item.get("text") or item.get("matched") or "").strip()
+            blocks.append(f"{heading}\n{body}".strip() if heading else body)
+        joined = "\n\n".join(block for block in blocks if block)
+        if joined:
+            return joined[:MAX_PASSAGE_CHARS]
+    # The graph read carries its material under `edges` or `entities` rather
+    # than `results`, so without this its source recorded a passage of nothing.
+    if tool_name == "knowledge_graph":
+        graph_lines: list[str] = []
+        for edge in output.get("edges", []) or []:
+            if isinstance(edge, dict):
+                graph_lines.append(
+                    f"{edge.get('subject', '')} {edge.get('predicate', '')} {edge.get('object', '')}".strip()
+                )
+        for entity in output.get("entities", []) or []:
+            if isinstance(entity, dict):
+                graph_lines.append(f"{entity.get('name', '')} ({entity.get('type', '')})".strip())
+        joined = "\n".join(line for line in graph_lines if line)
+        if joined:
+            return joined[:MAX_PASSAGE_CHARS]
+    if tool_name == "code_map_references":
+        reference_lines = [
+            f"{item.get('path', '')}:{item.get('line', '')}  {item.get('text', '')}".strip()
+            for item in (output.get("results", []) or [])
+            if isinstance(item, dict)
+        ]
+        joined = "\n".join(line for line in reference_lines if line)
+        if joined:
+            return joined[:MAX_PASSAGE_CHARS]
     results = output.get("results")
     if isinstance(results, list) and results:
         lines: list[str] = []

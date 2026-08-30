@@ -5,6 +5,7 @@
   import { api, ApiError } from "../api";
   import type { SessionSummary } from "../apiTypes";
   import { groupByDay, relativeTime } from "../format";
+  import { conversationLink } from "../turnAnchor";
 
   let sessions = $state<SessionSummary[] | null>(null);
   let loadError = $state<string | null>(null);
@@ -57,9 +58,13 @@
         <h3>{group.label}</h3>
         <ul>
           {#each group.items as session (session.session_id)}
-            <li><a href={`#/new-chat?session=${encodeURIComponent(session.session_id)}`}>
+            <!-- MEM-08 — a result that knows which exchange matched opens on
+                 it. The coordinate was already returned as `match_turn_id`; it
+                 had nowhere to go, so verifying a recalled claim meant opening
+                 the conversation at the top and scrolling. -->
+            <li><a href={conversationLink("new-chat", session.session_id, session.match_turn_id)}>
               <span class="title">{session.title?.trim() || "Untitled chat"}</span>
-              <span class="meta">{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · {relativeTime(session.updated_at)} · Open conversation →</span>
+              <span class="meta">{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · {relativeTime(session.updated_at)} · {session.match_turn_id ? "Open the match" : "Open"} →</span>
               {#if session.match_snippet}<span class="matched">“{session.match_snippet}”</span>{/if}
             </a></li>
           {/each}

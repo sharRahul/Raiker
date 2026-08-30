@@ -51,7 +51,8 @@ describe("SearchChatView", () => {
     });
     render(SearchChatView);
     expect(await screen.findByText("Newest chat")).toBeInTheDocument();
-    const links = screen.getAllByRole("link", { name: /open conversation/i });
+    // No search ran, so no exchange matched: the link opens the conversation.
+    const links = screen.getAllByRole("link", { name: /newest chat/i });
     expect(links[0]).toHaveAttribute("href", "#/new-chat?session=sess_newest");
     expect(fetchMock.mock.calls.some(([url]) => String(url).includes("origin=chat"))).toBe(true);
   });
@@ -72,6 +73,22 @@ describe("SearchChatView", () => {
     await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
     const link = screen.getByRole("link", { name: /release planning/i });
     expect(link).toHaveAttribute("href", "#/new-chat?session=sess_hit1");
+  });
+
+  // MEM-08 — the coordinate the search already knew. Before this, a hit in turn
+  // 180 of a long conversation opened at turn 1 and the reader scrolled.
+  it("opens the exchange that matched when the search names one", async () => {
+    stubFetch({ "GET /api/chat-search": [{ ...MATCH, match_turn_id: "turn_180" }] });
+    render(SearchChatView);
+    await fireEvent.input(screen.getByLabelText("Search chat history"), {
+      target: { value: "release" },
+    });
+    await waitFor(() => expect(screen.getByText("Release planning")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: /release planning/i })).toHaveAttribute(
+      "href",
+      "#/new-chat?session=sess_hit1&turn=turn_180",
+    );
+    expect(screen.getByText(/Open the match/)).toBeInTheDocument();
   });
 
   it("shows a route-level error state when search fails", async () => {

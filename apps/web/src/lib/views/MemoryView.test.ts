@@ -287,6 +287,125 @@ describe("MemoryView", () => {
   });
 });
 
+// BUG-244 — an import used to report the number of records in the file and
+// write every one of them, so re-importing the same file made a second copy of
+// every sentence and said "4 records" both times. Recall is budgeted: four
+// copies of one sentence occupy four of the slots a turn has for remembering
+// anything, which is how this was noticed at all.
+describe("MemoryView import review (BUG-244)", () => {
+  const base = {
+    "GET /api/memory": [],
+    "GET /api/memory/settings": { incognito: false },
+  };
+
+  /**
+   * Choose a file in the Review import control.
+   *
+   * jsdom's `File` has no `Blob.prototype.text()`, which every browser Raiker
+   * runs in has had since 2019 — so the shim is the harness catching up to the
+   * platform, not the product working around it.
+   */
+  async function chooseFile(records: Array<{ text: string }>) {
+    // Scoped to Advanced management: the document library on the same page has
+    // file inputs of its own, and the first one on the page is one of those.
+    const input = document.querySelector<HTMLInputElement>('.file-button input[type="file"]');
+    expect(input).not.toBeNull();
+    const body = JSON.stringify({ memories: records });
+    const file = new File([body], "memories.json", { type: "application/json" });
+    Object.defineProperty(file, "text", { value: async () => body, configurable: true });
+    Object.defineProperty(input!, "files", { value: [file], configurable: true });
+    await fireEvent.change(input!);
+  }
+
+  it("says how many records are new before anything is written", async () => {
+    const fetchMock = stubFetch({
+      ...base,
+      "POST /api/memory/import/preview": {
+        ok: true,
+        total: 4,
+        new_count: 1,
+        duplicate_count: 3,
+        duplicates: [{ index: 1, text: "already", scope: "project", memory_id: "mem_9" }],
+      },
+    });
+    render(MemoryView);
+    await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
+
+    await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
+
+    // The count that matters is stated before the button that acts on it.
+    expect(await screen.findByText("1 new", { selector: "strong" })).toBeInTheDocument();
+    expect(screen.getByText(/3 already stored, and will be skipped/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Import 1 new record$/ })).toBeInTheDocument();
+    // Asking is a read. Nothing was written by choosing the file.
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url) === "/api/memory/import"),
+    ).toBe(false);
+  });
+
+  it("offers no ordinary import when every record is already stored", async () => {
+    stubFetch({
+      ...base,
+      "POST /api/memory/import/preview": {
+        ok: true,
+        total: 2,
+        new_count: 0,
+        duplicate_count: 2,
+        duplicates: [],
+      },
+    });
+    render(MemoryView);
+    await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
+
+    await chooseFile([{ text: "a" }, { text: "b" }]);
+
+    expect(
+      await screen.findByText(/All 2 records are already stored/),
+    ).toBeInTheDocument();
+    // The deliberate second copy stays available — an owner who means to hold
+    // the same sentence at a second scope is doing something legitimate.
+    expect(screen.getByRole("button", { name: /Import anyway/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Import \d+ new record/ })).toBeNull();
+  });
+
+  it("reports what the import changed, not how many records were offered", async () => {
+    const fetchMock = stubFetch({
+      ...base,
+      "POST /api/memory/import/preview": {
+        ok: true,
+        total: 4,
+        new_count: 1,
+        duplicate_count: 3,
+        duplicates: [],
+      },
+      "POST /api/memory/import": {
+        ok: true,
+        count: 1,
+        reviewed: 4,
+        imported: 1,
+        skipped_duplicates: 3,
+        relationship_proposals: 0,
+      },
+    });
+    render(MemoryView);
+    await waitFor(() => expect(screen.getByText(/advanced memory management/i)).toBeInTheDocument());
+
+    await chooseFile([{ text: "a" }, { text: "b" }, { text: "c" }, { text: "d" }]);
+    await fireEvent.click(await screen.findByRole("button", { name: /Import 1 new record$/ }));
+
+    expect(
+      await screen.findByText("Imported 1 record; skipped 3 already stored."),
+    ).toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.some(
+        ([url, init]) =>
+          String(url) === "/api/memory/import" &&
+          String((init as RequestInit | undefined)?.body).includes('"skip_duplicates":true'),
+      ),
+    ).toBe(true);
+  });
+});
+
 // MEM-04 — the Observations section. The assertions worth having are the three
 // that make an empty list readable: a refusal that says so, a failed read that
 // is told apart from "nothing captured", and a delete that reaches the server.

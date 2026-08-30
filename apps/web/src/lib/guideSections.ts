@@ -28,6 +28,11 @@ const SECTIONS: Record<string, GuideTarget> = {
   "search-chat": { slug: "working-in-chat", label: "How chat history works" },
   checkpoints: { slug: "permissions-and-runtime-modes", label: "How checkpoints work" },
   observe: { slug: "troubleshooting", label: "How to read the record" },
+  // The audit log carried four sentences of standing explanation above its own
+  // controls — read once, in the way on every later visit, and worst on a phone
+  // where it filled the screen before the first row. The scope statement it
+  // existed for is the guide's job.
+  activity: { slug: "dashboard-and-observability", label: "What the audit log holds" },
   diagnostics: { slug: "troubleshooting", label: "How diagnostics work" },
   settings: { slug: "permissions-and-runtime-modes", label: "How the runtime works" },
   // Two surfaces that carried standing explanation on the page itself. The

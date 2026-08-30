@@ -98,6 +98,14 @@
       ? null
       : routeStateFromHash(window.location.hash).sessionId,
   );
+  // MEM-08 — the exchange a link is pointing at inside that conversation. It
+  // travels with the session id and nothing else reads it: only Chat and Build
+  // render a transcript to land in.
+  let anchoredTurnId = $state<string | null>(
+    typeof window === "undefined"
+      ? null
+      : routeStateFromHash(window.location.hash).turnId,
+  );
 
   onMount(() => {
     desktopNavigationOpen = localStorage.getItem("raiker.navigation.desktop") !== "false";
@@ -116,6 +124,7 @@
       currentTab = tabFromHash(window.location.hash);
       currentSection = sectionFromHash(window.location.hash);
       continuedSessionId = routeStateFromHash(window.location.hash).sessionId;
+      anchoredTurnId = routeStateFromHash(window.location.hash).turnId;
       // Route changes move focus to the main landmark so keyboard and screen
       //-reader users land on the new page content, not mid-shell.
       document.getElementById("main")?.focus();
@@ -224,6 +233,7 @@
             <div hidden={current !== "new-chat"}>
               <ChatView
                 sessionId={current === "new-chat" ? continuedSessionId : null}
+                anchoredTurnId={current === "new-chat" ? anchoredTurnId : null}
                 {projects}
                 onProjectsChanged={refreshProjects}
                 visible={current === "new-chat"}
@@ -234,6 +244,7 @@
             <div hidden={current !== "build"}>
               <BuildView
                 sessionId={current === "build" ? continuedSessionId : null}
+                anchoredTurnId={current === "build" ? anchoredTurnId : null}
                 {projects}
                 onProjectsChanged={refreshProjects}
                 visible={current === "build"}

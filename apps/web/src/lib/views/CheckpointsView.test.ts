@@ -132,7 +132,7 @@ describe("CheckpointsView", () => {
   });
 });
 
-// ── Restore preflight ─────────────────────────────────────────────────────
+// ── Rewind preflight (B18: the funnel is now `RewindPanel`) ─────────────────────────────────────────────────────
 // Restoring is a funnel, not a button. The preflight reads a server-computed,
 // metadata-only plan; this view must never perform or claim a restore.
 describe("CheckpointsView restore preflight", () => {
@@ -172,9 +172,9 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
 
     expect(await screen.findByText("notes/brief.md")).toBeInTheDocument();
-    expect(screen.getByText(/rewinds every workspace file changed after this checkpoint/i)).toBeInTheDocument();
-    expect(screen.getByText(/it is a preview computed from stored metadata/i)).toBeInTheDocument();
-    expect(screen.getByText(/this panel never performs a restore/i)).toBeInTheDocument();
+    expect(screen.getByText(/puts every workspace file changed after this point back as it was/i)).toBeInTheDocument();
+    expect(screen.getByText(/computed from stored metadata and changed nothing/i)).toBeInTheDocument();
+    expect(screen.getByText(/this panel never performs a rewind/i)).toBeInTheDocument();
   });
 
   it("names a cross-principal escalation before anything is requested", async () => {
@@ -205,7 +205,7 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
 
     expect(await screen.findByText(/confirm you have read the impact/i)).toBeInTheDocument();
-    const request = screen.getByRole("button", { name: /request this restore/i });
+    const request = screen.getByRole("button", { name: /request this rewind/i });
     expect(request).toBeDisabled();
     await fireEvent.click(screen.getByRole("checkbox"));
     expect(request).toBeEnabled();
@@ -235,7 +235,7 @@ describe("CheckpointsView restore preflight", () => {
     await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
     await screen.findByText(/confirm you have read the impact/i);
     await fireEvent.click(screen.getByRole("checkbox"));
-    await fireEvent.click(screen.getByRole("button", { name: /request this restore/i }));
+    await fireEvent.click(screen.getByRole("button", { name: /request this rewind/i }));
 
     const status = await screen.findByRole("status");
     expect(status).toHaveTextContent(/raised as approval/i);
@@ -250,5 +250,31 @@ describe("CheckpointsView restore preflight", () => {
 
     expect(await screen.findByText(/preflight unavailable/i)).toBeInTheDocument();
     expect(screen.queryByText(/to rewrite/i)).not.toBeInTheDocument();
+  });
+
+  // B18 — "nothing to rewind" is an answer, not a form to fill in. Before this
+  // the panel rendered the whole funnel — the reminders, the acknowledgement
+  // and a permanently disabled button — around a change that did not exist.
+  it("answers an empty plan instead of rendering a funnel nobody can finish", async () => {
+    stubFetch({
+      "GET /api/checkpoints": CHECKPOINTS,
+      "GET /api/checkpoints/cp_1/restore-plan": {
+        ...PLAN,
+        files: [],
+        restore_content_count: 0,
+        delete_count: 0,
+        skip_count: 0,
+        changed_count: 0,
+      },
+    });
+    render(CheckpointsView);
+    await waitFor(() =>
+      expect(screen.getByLabelText(/checkpoint cp_1 would change/i)).toBeInTheDocument(),
+    );
+    await fireEvent.click(screen.getByLabelText(/checkpoint cp_1 would change/i));
+
+    expect(await screen.findByText(/a rewind would change nothing/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /request this rewind/i })).toBeNull();
+    expect(screen.queryByText(/before you ask for this/i)).toBeNull();
   });
 });

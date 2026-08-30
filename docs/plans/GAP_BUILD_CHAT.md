@@ -77,9 +77,9 @@ that proves it, what is missing, and the concrete work.
 | [B13](#b13--no-file-tree-and-no-editor) | BUILD | TIER 3 | Open |
 | [B14](#b14--no-diff-review-surface-in-build) | BUILD | TIER 3 | Partial |
 | [B15](#b15--terminaloutput-pane) | BUILD | TIER 3 | Partial |
-| [B16](#b16--tool-activity-is-buried) | BUILD | TIER 3 | Open |
+| [B16](#b16--tool-activity-is-buried) | BUILD | TIER 3 | Done |
 | [B17](#b17--no-way-to-stop-or-steer-a-running-turn) | BUILD | TIER 3 | Done |
-| [B18](#b18--no-checkpoint-or-rewind-control-where-the-work-happens) | BUILD | TIER 3 | Open |
+| [B18](#b18--no-checkpoint-or-rewind-control-where-the-work-happens) | BUILD | TIER 3 | Done |
 | [B19](#b19--composer-ergonomics) | BUILD | TIER 3 | Done |
 | [B20](#b20--sandboxed-execution-environment) | BUILD | TIER 3 | Partial |
 | [C1](#c1--first-class-document-output) | CHAT | TIER 0 | Done |
@@ -377,11 +377,16 @@ compatibility matrix and `TO_BE_FIXED.md`; the UI does not advertise them.
 
 #### B16 — Tool activity is buried
 
-Tool events render inside a collapsed
-governance `details`, so during a long turn the transcript looks idle.
-**Work:** promote tool calls to first-class transcript rows — file read, files
-matched, command started — with a progress affordance, keeping the full
-governed record in the disclosure.
+✅ **Done — closed by BUG-206 slice D, recorded here 2026-08-29.** This entry was
+still marked Open after the work that closes it had shipped, which is the same
+defect the entries themselves are about: a claim about the product that the
+product had outgrown. `ToolActivity.svelte` renders every call a turn made as a
+first-class transcript row — a family glyph, the owner's word for the tool, and
+the object it acted on — outside any disclosure, in call order, in **both** Chat
+and Build. A running call carries the composer's own pulse; a refused one is the
+same row in a refused state, in the place it was refused, with the route that
+would change it. Every field is resolved in `raiker/tools/presentation.py` and
+arrives already redacted, so a row cannot say more than the audit log does.
 
 #### B17 — No way to stop or steer a running turn
 
@@ -395,11 +400,21 @@ before the model is asked anything else. Both go through the same governed
 
 #### B18 — No checkpoint or rewind control where the work happens
 
-Checkpoints are
-recorded and browsable in their own route, but Build offers no "rewind to before
-this turn" — the one control that makes an autonomous agent safe to let run.
-**Work:** a per-turn rewind in the transcript, restoring workspace and
-conversation state from the existing checkpoint manifest.
+✅ **Done — see [FIXED-315](FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route), 2026-08-29.**
+Every part of the governed rewind already existed and was reachable from exactly
+one route, so undoing the turn that broke something meant leaving the
+conversation and recognising a snapshot by its id. **Rewind to before this** now
+sits on the turn in Chat and Build, resolves *that turn's* checkpoint rather than
+the latest, and opens the same preflight the Checkpoints page opens — one
+component, so a rewind reads identically wherever it is asked for. It restores
+nothing: the panel reads a metadata-only plan and the ask goes through
+`POST /api/checkpoints/{id}/restore`, which recomputes its own plan, records the
+proposal and returns an approval id; a cross-principal rewind is named as an
+escalation before the ask.
+
+Branch, Summarise and Rewind moved behind one **More** handle in the same change,
+so the row under a message is three short words rather than six long ones at
+every window width.
 
 #### B19 — Composer ergonomics
 
@@ -491,8 +506,9 @@ follows the code as the agent changes it. B10 is the natural next step in the
 same tier — a code map says where a declaration *is*, an LSP says what refers to
 it. **B19 has landed**, which is the tier-3 item that changes daily use most: the
 composer has commands, `@`-mention completion over the code map, a keyboard map,
-and per-message edit and retry. B13–B16 make the result reviewable and are the
-remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
+and per-message edit and retry. **B16 was already closed** by BUG-206 slice D and is recorded as such above; **B18 has
+now landed**, which is the tier-3 item that changes what an owner dares leave
+running. B13 and B14's remainder are the remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---

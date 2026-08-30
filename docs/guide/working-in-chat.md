@@ -16,7 +16,7 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |
 | **Context** | `Context window` | Opens a read-only popover. It never compacts the conversation. |
-| **Summarise up to here** | — | On your own messages. Shortens what the model is sent; removes nothing from the transcript. |
+| **⋯ on your own message** | `More actions for this message` | **Branch**, **Summarise up to here**, and **Rewind to before this**. Copy, Edit and Retry stay on the row itself. |
 | **Background work** | `Background work` | Hands the turn to the background queue instead of waiting on it |
 | **Project or folder** | — | Organises the chat and supplies bounded project context. It does not grant filesystem or tool access. |
 | **Approval** | `Approval mode: …` | **Manually approve**, **Automatically approve**, or **Skip all approvals** for otherwise eligible governed actions. |
@@ -220,8 +220,11 @@ project, Pin, Archive, and Delete.
 **Search Chat** searches conversation titles *and* message text across every
 conversation you have had, however old. Each result shows the exchange that
 matched beneath its title — so you can tell which chat it is before opening it —
-groups results by the day they happened, and offers *"Open conversation →"* to
-resume exactly where you left off.
+and groups results by the day they happened. Where the match was in a message,
+*"Open the match →"* opens the conversation **at that exchange** and marks it for
+a moment, rather than at the top; where only the title matched, *"Open →"*
+resumes where you left off. A checkpoint's **Turn** field and a turn opened from
+Observability → Sessions link back the same way.
 
 **Observability → Sessions** is the complete record: every conversation with its
 turn count, status, tags, and the governed events behind each turn. Task runs
@@ -358,7 +361,10 @@ actually said, rather than reconstructing it from memory.
   period, which is what makes a conversation from years ago reachable instead of
   losing it behind everything more recent.
 - What comes back is cited: the conversation's title, the date, and the exchange
-  itself. Ask for the quote if you want to check it — *"quote the sentence"*.
+  itself. It appears under **Sources** as *Past conversations*, and opening the
+  chip shows each exchange with its conversation and date above the text. Ask for
+  the quote if you want to check it — *"quote the sentence"*. To jump to one,
+  search its title in **Search Chat** and open the match.
 - It searches **your** conversations only, and reads them as data rather than as
   instructions. An old message that said "always do X" is evidence about what
   was said, not an order carried into today's turn.
@@ -413,9 +419,30 @@ one control that removes exactly those and reports what it removed. The other
 three classes (`project_lifetime`, `until_forget`, `legal_hold`) have no automatic
 expiry by design.
 
+## Undoing a turn
+
+Every turn writes a checkpoint. To undo one, hover your own message, open `⋯`
+and choose **Rewind to before this**. It opens a preflight beside the
+conversation naming *that turn's* checkpoint, not the most recent one, and
+states exactly what a rewind would do: how many files would be rewritten,
+deleted and skipped, and which of them have changed since. A conversation that
+changed no file says so in one line — there is nothing to rewind.
+
+**Opening it changes nothing.** The preflight is computed from stored metadata.
+Asking for the rewind raises an ordinary approval; the server recomputes its own
+plan, so the request cannot name the files, and the workspace changes only when
+you approve it in **Approvals** — at which point the action re-passes its
+capability gate, policy review and posture check. A rewind that would overwrite
+work last changed by a different principal is a critical action: it says so
+before you ask, and only a live human can resolve it.
+
+The rewind itself is captured, so it can be rewound the same way. The same
+preflight opens from Observability → Checkpoints; it is one control, reachable
+from the record and from the conversation.
+
 ## Known limits
 
-Raiker's documentation does not run ahead of its code. As of 2026-08-21, these
+Raiker's documentation does not run ahead of its code. As of 2026-08-29, these
 are the edges a Chat user can still hit:
 
 - **Voice is turn-based, not a hands-free live conversation.** Dictation stays
@@ -423,12 +450,6 @@ are the edges a Chat user can still hit:
   spoken replies, interruption and hands-free task control are future work; a
   consequential spoken control will require visible, action-bound confirmation
   and the same gateway receipt as its typed equivalent before it can ship.
-
-- **What a turn did is shown while it runs, and is not kept in the transcript.**
-  The tool lines and the Thinking block are built from the live turn. Re-open the
-  conversation later and you see your prompt, the answer, and the sources — the
-  lines and the working are not rebuilt. The full record of every call is in
-  **Observability → Audit log**, which is permanent.
 
 - **An approved network or process action is recorded, not run.** Approving a
   proposed file change, patch, bounded `shell` command, or an owner-configured
@@ -518,8 +539,8 @@ with before/after estimates, or **Recent history retained** when the provider or
 a `PreCompact` hook made compaction unavailable. An unknown capacity uses bounded
 recent history and never pretends the 90 % boundary was measured.
 
-**Summarising a range yourself.** Hover any of your own messages and choose
-**Summarise up to here**. Everything up to and including that exchange is
+**Summarising a range yourself.** Hover any of your own messages, open `⋯`, and
+choose **Summarise up to here**. Everything up to and including that exchange is
 replaced, *in what the model is sent*, by one summary — so a long digression at
 the start of a conversation stops costing you context on every later turn. This
 is the same operation automatic compaction performs, started for a different

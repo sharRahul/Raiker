@@ -29,6 +29,14 @@
     </div>
     <span class="delegation-rail" aria-hidden="true"><b>Owner</b><i></i><b>Signed turn</b></span>
   </div>
+  <!-- BUG-246 — two presentations of one list, and exactly one of them is in
+       the accessibility tree at a time, because `display: none` removes the
+       other from it. A three-column table at 390px scrolled its *verdict*
+       column off screen, so every row read "Unavail" under Raiker agent: the
+       information was reachable, and the answer was the part you had to scroll
+       for. Turning the table's own parts into blocks would have kept one DOM
+       and lost the table semantics for a screen reader; this keeps both
+       readings correct for the width each is offered at. -->
   <div class="matrix-scroll">
     <table>
       <thead><tr><th>Capability</th><th>Owner control</th><th>Raiker agent</th></tr></thead>
@@ -43,6 +51,26 @@
       </tbody>
     </table>
   </div>
+  <ul class="matrix-cards">
+    {#each gates as gate (gate.capability)}
+      <li>
+        <code>{gate.capability}</code>
+        <dl>
+          <div><dt>Owner control</dt><dd>{ownerControl(gate)}</dd></div>
+          <div>
+            <dt>Raiker agent</dt>
+            <dd>
+              <span
+                class:ask={agentAuthority(gate) === "Ask"}
+                class:blocked={["Denied", "Unavailable"].includes(agentAuthority(gate))}
+                class="authority-state">{agentAuthority(gate)}</span
+              >
+            </dd>
+          </div>
+        </dl>
+      </li>
+    {/each}
+  </ul>
 </section>
 
 <style>
@@ -63,5 +91,19 @@
   .authority-state { font-weight:700; color:var(--ok); }
   .authority-state.ask { color:var(--warn); }
   .authority-state.blocked { color:var(--text-2); }
-  @media (max-width:640px) { .matrix-intro { align-items:flex-start; flex-direction:column; } }
+  /* The stacked reading. Hidden above the breakpoint, and hidden means gone
+     from the accessibility tree as well as from the page — so a screen reader
+     never meets the same capability twice. */
+  .matrix-cards { display:none; }
+  @media (max-width:640px) {
+    .matrix-intro { align-items:flex-start; flex-direction:column; }
+    .matrix-scroll { display:none; }
+    .matrix-cards { display:grid; list-style:none; margin:0; padding:0; }
+    .matrix-cards li { display:grid; gap:.35rem; padding:var(--space-3) var(--space-4); border-bottom:1px solid var(--border); }
+    .matrix-cards li:last-child { border-bottom:0; }
+    .matrix-cards dl { display:grid; grid-template-columns:auto minmax(0,1fr); gap:.15rem var(--space-3); margin:0; }
+    .matrix-cards dl > div { display:contents; }
+    .matrix-cards dt { color:var(--text-2); font-size:.65rem; letter-spacing:.06em; text-transform:uppercase; align-self:baseline; }
+    .matrix-cards dd { margin:0; font-size:.78rem; }
+  }
 </style>

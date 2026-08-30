@@ -157,6 +157,30 @@ cover the primary record, text index, vectors, graph edges, artifacts, exports,
 and known backups. A completed purge can still report a backup as pending its
 own retention/erasure process; Raiker must not claim that copy vanished early.
 
+## Exporting and importing
+
+**Memory → Advanced memory management** exports every approved memory as JSON and
+takes one back.
+
+An import is not a second way into the store: each record goes through the same
+governed write path a proposal does, and is recorded as a lifecycle event with
+`source: user_import`. What it will not do is store the same sentence twice.
+Choosing a file asks the workspace what it already holds and says so before
+anything is written — *"1 new of 4 · 3 already stored, and will be skipped"* —
+and the button names what it is about to do. Afterwards the notice reports what
+actually changed, not how many records the file had.
+
+Two details worth knowing:
+
+- **Scope is part of the comparison.** The same sentence at project scope and at
+  global scope is two records, and importing the second is not a duplicate.
+- **The skip is a default, not a rule.** The review step names the record a
+  duplicate would copy, and **Import anyway** stores the second copy when that
+  is what you meant.
+
+A memory you have forgotten is gone, so re-importing it is how you bring it
+back — it does not count as something the workspace already holds.
+
 ## Retention and observations
 
 Observation retention classes are visible under **Observations**:

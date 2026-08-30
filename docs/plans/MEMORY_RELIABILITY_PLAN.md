@@ -62,8 +62,8 @@ their evidence. `MEM-03` and `MEM-05` are closed by the 2026-08-17 change
 | [MEM-05](#mem-05--lexical-ranking-is-recency-order-so-the-oldest-exact-answer-is-the-first-one-dropped) | High | Retrieval quality | Fixed 2026-08-17 |
 | [MEM-06](#mem-06--the-entity-graph-has-no-extractor-so-nothing-ever-populates-it) | Medium | Graph projection | **Fixed 2026-08-21** |
 | [MEM-07](#mem-07--nothing-expires-because-no-retention-sweep-is-ever-started) | Medium | Retention | Fixed 2026-08-25 (FIXED-284) |
-| [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | Open |
-| [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | Open |
+| [MEM-08](#mem-08--a-recalled-answer-cannot-be-opened-at-the-turn-it-came-from) | Medium | Chat / Observability | **Fixed 2026-08-29** ([FIXED-316](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end)) |
+| [MEM-09](#mem-09--conversation-index-integrity-is-not-covered-by-the-integrity-report) | Low | Reliability | **Fixed 2026-08-29** ([FIXED-310](FIXED_ITEMS.md#fixed-310--the-memory-integrity-report-existed-and-nothing-could-reach-it)) |
 | [MEM-10](#mem-10--semantic-recall-is-selectable-but-a-default-install-has-nothing-to-select) | Medium → Low | Retrieval quality | **Fixed 2026-08-26** (FIXED-283, FIXED-292, FIXED-293, FIXED-294). Linear scaling is tracked separately as backlog #5 |
 | [MEM-11](#mem-11--the-agents-own-memory-search-and-the-runtimes-recall-disagreed) | High | Retrieval consistency | Fixed 2026-08-17 |
 | [MEM-12](#mem-12--the-graph-leg-was-gated-on-an-anchor-no-caller-ever-supplied) | High | Retrieval quality | Fixed 2026-08-17 |
@@ -438,7 +438,8 @@ and reports exactly what it removed.
 
 ## MEM-08 — A recalled answer cannot be opened at the turn it came from
 
-**Severity: Medium. Area: Chat / Observability.**
+**Severity: Medium. Area: Chat / Observability. Fixed 2026-08-29 —
+[FIXED-316](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end).**
 
 **Observed.** `conversation_search` returns `session_id` and `turn_id`, and the
 model can cite both. Neither is a link: nothing in the web app accepts a turn
@@ -446,12 +447,25 @@ coordinate and opens that conversation scrolled to that exchange.
 
 **Root cause.** New surface — the coordinates did not exist before MEM-01.
 
-**Proposed fix.** Accept a turn anchor on the Chat route and scroll the
-transcript to it, and render a cited coordinate in an answer as a link.
+**What closing it found.** Three surfaces already held the coordinate, not one.
+Chat search had returned `match_turn_id` alongside its snippet since RAIKER-2020
+and it reached `SessionView` and the web app's own types unused; every checkpoint
+names the turn it was taken at. The missing piece was never the coordinate — it
+was anything that would accept one.
 
-**Required user-interface outcome.** "We settled this on 12 March 2023" is
-clickable, and lands on the exchange itself. Verifying a recalled claim is one
-click rather than a manual search.
+**Fixed.** `turn` joins `session` in the shell's route state, `turnAnchor.ts`
+builds the link and lands on it, and Chat and Build mark the exchange briefly
+before spending the anchor so a reload opens the conversation rather than
+replaying a highlight. A chat-search hit, a checkpoint's Turn field, and a turn
+opened from the Sessions audit view all build one.
+
+**Not claimed.** A model writing a date in prose still writes prose. Making an
+exchange named *inside a citation* openable needs a per-result row in
+`turn_sources`, and is [BUG-245](TO_BE_FIXED.md#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one).
+
+**User-interface outcome.** A search hit lands on the exchange that matched, with
+that exchange marked. Verifying a recalled claim is one click rather than a
+manual search.
 
 ---
 

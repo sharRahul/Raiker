@@ -1964,6 +1964,32 @@ export interface InterruptRequestBody {
 
 // Reliable memory controls (backlog item 3): user-facing view of one approved
 // memory entry — provenance, scope, sensitivity, confidence, retention, pin.
+/**
+ * BUG-244 — what an import would change, read before anything is written.
+ *
+ * A record is a duplicate when the workspace already holds the same sentence
+ * *at the same scope*: the same sentence at `project` and at `global` is two
+ * records an owner may genuinely want. `memory_id` names the record a duplicate
+ * would be a copy of, and is empty when the repeat is inside the file itself.
+ */
+export interface MemoryImportPreview {
+  ok: boolean;
+  total: number;
+  new_count: number;
+  duplicate_count: number;
+  duplicates: Array<{ index: number; text: string; scope: string; memory_id: string }>;
+}
+
+/** What the import actually did. `count` is what changed, not what was offered. */
+export interface MemoryImportResult {
+  ok: boolean;
+  count: number;
+  reviewed: number;
+  imported: number;
+  skipped_duplicates: number;
+  relationship_proposals: number;
+}
+
 export interface MemoryControlView {
   memory_id: string;
   text: string;

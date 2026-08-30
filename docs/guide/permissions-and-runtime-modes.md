@@ -114,7 +114,10 @@ first time it is contained or fails often enough to be watched.
 The Permissions page separates what you control from what the current Raiker
 agent can derive from it. **Owner** is the gate and decision-mode control;
 **Raiker agent** is a read-only result: `Direct`, `Ask`, `Denied`, or
-`Unavailable`. The agent cannot change its own authority. Each agentic turn uses
+`Unavailable`. The agent cannot change its own authority. *Delegated authority*
+at the top of the page shows both for every capability at once — as a table on a
+wide window, and as one labelled card per capability on a narrow one, so the
+verdict is never the part you have to scroll for. Each agentic turn uses
 its own short-lived signed machine identity, so Activity and Approvals can name
 the machine actor separately from you, the owner.
 

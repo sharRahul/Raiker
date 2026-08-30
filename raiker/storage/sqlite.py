@@ -5440,6 +5440,49 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             rows = connection.execute(sql, params).fetchall()
         return [dict(row) for row in rows]
 
+    def stored_memory_checksums(
+        self, *, owner_principal_id: str | None = None
+    ) -> dict[tuple[str, str], str]:
+        """``(content_checksum, scope)`` → ``memory_id`` for what this owner holds.
+
+        BUG-244 — an import used to be the one way to create a
+        contradiction-free duplicate: every other correction path records a
+        correction or a supersession link, and import simply wrote again. This
+        is the read that lets it ask first.
+
+        Two deliberate choices:
+
+        * **Scope is part of the key.** The same sentence at ``project`` scope
+          and at ``global`` scope is two records an owner may genuinely want;
+          the same sentence twice at the same scope is not.
+        * **Deleted memories do not count, archived ones do.** A forgotten
+          memory is gone and re-importing it is how you bring it back. An
+          archived one is still stored, still occupies the store, and a second
+          copy of it is still a duplicate.
+
+        ``content_checksum`` is written on every insert and update, so nothing
+        new has to be stored for this — and a row that predates the column is
+        backfilled by the same migration that added it.
+        """
+        sql = (
+            "SELECT content_checksum, scope, memory_id FROM approved_memory "
+            "WHERE deleted_at IS NULL AND content_checksum IS NOT NULL"
+        )
+        params: list[Any] = []
+        if owner_principal_id:
+            sql += " AND owner_principal_id = ?"
+            params.append(owner_principal_id)
+        # Oldest first, so the id reported for a checksum is the record the
+        # duplicate would be a copy *of*.
+        sql += " ORDER BY created_at ASC, memory_id ASC"
+        with self.connect() as connection:
+            rows = connection.execute(sql, params).fetchall()
+        stored: dict[tuple[str, str], str] = {}
+        for row in rows:
+            key = (str(row["content_checksum"]), str(row["scope"] or ""))
+            stored.setdefault(key, str(row["memory_id"]))
+        return stored
+
     def list_memory_embedding_spaces(
         self, *, owner_principal_id: str | None = None
     ) -> list[dict[str, Any]]:

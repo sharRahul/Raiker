@@ -8,6 +8,7 @@
   import type { ProjectView, SessionDetail, SessionSummary, TurnDetail } from "../apiTypes";
   import { responseBadge } from "../statusMaps";
   import { humanize, relativeTime, shortId } from "../format";
+  import { conversationLink } from "../turnAnchor";
 
   // When a project is active (topbar switcher) the list is scoped to it.
   let { projectId = null, sessionId = null }: { projectId?: string | null; sessionId?: string | null } = $props();
@@ -478,6 +479,22 @@
         <section class="card" aria-labelledby="turn-detail-h">
           <div class="turn-head">
             <h3 id="turn-detail-h">Turn {shortId(turnDetail.turn.turn_id)}</h3>
+            <!-- MEM-08 — the audit record of a turn and the exchange itself are
+                 the same turn seen twice. This is the way back to it. -->
+            <a
+              class="btn btn-ghost btn-sm"
+              href={conversationLink(
+                turnDetail.turn.session_id === detail?.session.session_id &&
+                  detail?.session.origin === "build"
+                  ? "build"
+                  : "new-chat",
+                turnDetail.turn.session_id,
+                turnDetail.turn.turn_id,
+              )}
+            >
+              <Icon name="chat" size={14} />
+              Open in the conversation
+            </a>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => (turnDetail = null)}>
               <Icon name="x" size={14} />
               Close
@@ -663,7 +680,13 @@
     color: var(--text-1);
     width: 8rem;
   }
+  /* A square control, so it is sized like one: 23x20 was under the 24px
+     minimum target at every window width, not only on touch. */
   .tag-add-btn {
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.5rem;
+    min-height: 1.5rem;
     border: 1px solid var(--border);
     background: var(--neutral-soft);
     color: var(--text-2);

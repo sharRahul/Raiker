@@ -768,7 +768,14 @@ had to be true first:
   `/checkpoints restore <id> --confirm` raise an ordinary approval for
   `checkpoint_restore_execution`, now the thirteenth member of
   `EXECUTABLE_ON_APPROVAL`. A cross-principal restore is classified critical and
-  takes the human-only lifecycle instead.
+  takes the human-only lifecycle instead. **Extended 2026-08-29**
+  ([FIXED-315](../plans/FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route)):
+  the ask now sits on the turn that caused the change, in Chat and Build, through
+  the same preflight the Checkpoints page opens — reachable, but only from one
+  route, was still a route away from where the owner is standing. **YES —
+  improvement**: Claude Code's `/rewind` and Codex's undo both restore on the
+  spot; Raiker states the file-level impact, names a cross-principal escalation
+  before the ask, and puts a human decision between the preview and the write.
 * **Audit export has a route.** `audit_export` has an executor and `POST
   /api/audit/export` behind it, plus a listing and a download; the export is
   redacted as the on-screen record is, scoped to the acting principal's own
@@ -846,7 +853,7 @@ had to be true first:
 | 27 | Plugin panels (BUG-228) | If built, declarative only, so "no plugin code runs in this browser" stays literally true | A gap against Raiker's own spec. **Reassessed this pass:** the row below is the better answer to the same need, and building both would be two contradictory UI-contribution models | NO — little advantage |
 | 28 ★ | **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp))** | Once the protocol revision above lands, render a connected server's pre-declared `ui://` resource in a sandboxed iframe under its own capability gate and a per-app owner permission | This is the shape Raiker would have had to invent for panels, already specified and already reviewed by someone else: the resource is declared ahead of time so the host can fetch and inspect it before anything runs, the iframe sandbox is mandatory rather than advisory, and every message between the UI and the host is MCP JSON-RPC — auditable in the record Raiker already keeps. It also arrives with the property Raiker's plugin model insists on: the UI belongs to a server the owner already added, not to a plugin that added itself | **YES — improvement** |
 | 29 | Path-scoped project rules | Scope project instructions to path patterns | Smaller standing context is a real benefit; the authority question is already settled | NO — little advantage |
-| 30 | Conversation rewind in place | Restore a conversation to a chosen turn, as `/rewind` does | Branching already covers the safe half; in-place rewind discards a record | NO — little advantage |
+| 30 | Conversation rewind in place | Restore a conversation to a chosen turn, as `/rewind` does | Branching already covers the safe half; in-place rewind discards a record. **Reassessed 2026-08-29:** [FIXED-315](../plans/FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route) gives the *workspace* half of `/rewind` at the turn, which is the half that changes files; the conversation half is the half that would discard a record, and it stays refused | NO — little advantage |
 
 ### Low priority, high effort
 

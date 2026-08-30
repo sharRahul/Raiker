@@ -44,10 +44,20 @@ recall and durable transcript use for that conversation.
 Use **Observability** when you need evidence rather than a summary:
 
 - **Overview** reports runtime and model readiness.
-- **Sessions** contains conversations and task runs.
+- **Sessions** contains conversations and task runs. Opening a turn offers
+  **Open in the conversation**, which lands on that exchange.
 - **Activity / Audit log** records governed steps and can be filtered and
   exported when the audit-export capability is enabled.
+
+  It holds **every governed step in this account, in full detail**: your own
+  conversations, and the runtime steps taken outside them — connecting a
+  provider, pinning a model, changing a permission. Other people's conversations
+  are never shown here. It is deliberately the deep-dive view; day-to-day work
+  lives in Chat, Approvals, and Tasks.
 - **Checkpoints** lists recoverable pre-change state and offers governed rewind.
+  Each snapshot's **Turn** links back to the exchange it was taken at, and
+  *Preview rewind* opens the same preflight **Rewind to before this** opens from
+  a message in Chat or Build.
 - **Diagnostics** names configuration gaps, unavailable executors, and reason
   codes.
 - **Work** shows live background activity.

@@ -38,7 +38,17 @@ describe("App shell", () => {
     });
     render(App);
     await signIn();
-    expect(await screen.findByRole("heading", { name: "Choose where Raiker thinks" })).toBeInTheDocument();
+    // The setup route is a lazily imported chunk, so this waits on a dynamic
+    // import rather than on a render. Testing Library's one-second default is
+    // enough on an idle machine and not under a full-suite run, which made this
+    // the only intermittently failing assertion in the suite.
+    expect(
+      await screen.findByRole(
+        "heading",
+        { name: "Choose where Raiker thinks" },
+        { timeout: 10_000 },
+      ),
+    ).toBeInTheDocument();
     expect(window.location.hash).toBe("#/model-setup");
   });
   it("signs in, then shows the runtime status and grouped navigation", async () => {

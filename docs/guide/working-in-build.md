@@ -93,8 +93,9 @@ it; if the gate is off it says `code_map_gate_disabled` and links to Permissions
 "Nothing matched" and "nothing could match" send you to different places on
 purpose.
 
-Your own messages carry **Copy**, **Edit** and **Retry**. An edit **adds a new
-turn** rather than rewriting what you asked, because the transcript is a record.
+Your own messages carry **Copy**, **Edit** and **Retry**, plus a `⋯` handle for
+**Rewind to before this**. An edit **adds a new turn** rather than rewriting what
+you asked, because the transcript is a record.
 
 ## Making changes
 
@@ -124,26 +125,33 @@ the same file twice is rejected before anything is written.
 
 **Nothing writes into `.raiker/` or `.git/`.** Ever, by any path.
 
-**Every approved mutation is checkpointed first, and you can rewind it.** The
-previous contents are captured before the write, and a restore is a governed
-request rather than a button:
+**Every approved mutation is checkpointed first, and you can rewind it from the
+turn that made it.** The previous contents are captured before the write, and a
+rewind is a governed request rather than a button:
 
-1. **Observability → Checkpoints** → *Preview restore impact*. The preflight
-   names every file a restore would rewrite, delete, or skip, and whether any of
-   them was last changed by a different principal. Reading it changes nothing.
-2. Tick the acknowledgement and press **Request this restore**. That raises an
-   ordinary approval and still changes nothing.
-3. Approve it in **Approvals**. The workspace goes back, and the restore itself
-   is captured — so it can be rewound the same way.
+1. Hover your own message, open `⋯`, and choose **Rewind to before this** — or
+   start from **Observability → Checkpoints** → *Preview rewind*. It is the same
+   panel either way. From the turn it resolves *that turn's* checkpoint, not the
+   most recent one; a turn that wrote none says so rather than offering a
+   control that would fail.
+2. The preflight names every file a rewind would rewrite, delete, or skip, and
+   whether any of them was last changed by a different principal. Reading it
+   changes nothing.
+3. Tick the acknowledgement and press **Request this rewind**. That raises an
+   ordinary approval and still changes nothing — the server recomputes its own
+   plan, so the request cannot name the files.
+4. Approve it in **Approvals**. The workspace goes back, the action re-passes its
+   capability gate, policy review and posture check as it runs, and the rewind
+   itself is captured — so it can be rewound the same way.
 
 `/checkpoints restore <id>` prints the same preflight from the terminal;
 `--confirm` raises the approval.
 
 Two honest limits. A file over 8 MiB has no pre-image (`MAX_PRE_IMAGE_BYTES`), so
 it is marked *not restorable* in the preflight and the approval that wrote it
-told you so before you approved. And a restore that would overwrite work last
-changed by a different principal is **critical**: only a live human can resolve
-it, and you will be asked to re-authenticate.
+told you so before you approved. And a rewind that would overwrite work last
+changed by a different principal is **critical**: it says so before you ask, only
+a live human can resolve it, and you will be asked to re-authenticate.
 
 ## Running commands
 

@@ -58,6 +58,8 @@ import type {
   McpFinding,
   Notification,
   MemoryControlView,
+  MemoryImportPreview,
+  MemoryImportResult,
   MemoryProposal,
   MemoryRelationshipProposal,
   MemoryHistoryEvent,
@@ -1576,13 +1578,23 @@ export const api = {
     request<{ ok: boolean; memories: MemoryControlView[] }>(
       "/api/memory/export",
     ),
-  importMemories: (
+  // BUG-244 — what an import would actually change, before it changes anything.
+  previewMemoryImport: (
     memories: Array<Partial<MemoryControlView> & { text: string }>,
   ) =>
-    request<{ ok: boolean; count: number }>("/api/memory/import", {
+    request<MemoryImportPreview>("/api/memory/import/preview", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ memories }),
+    }),
+  importMemories: (
+    memories: Array<Partial<MemoryControlView> & { text: string }>,
+    skipDuplicates = true,
+  ) =>
+    request<MemoryImportResult>("/api/memory/import", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ memories, skip_duplicates: skipDuplicates }),
     }),
   forgetMemory: (id: string) =>
     request<{ ok: boolean; memory_id: string }>(

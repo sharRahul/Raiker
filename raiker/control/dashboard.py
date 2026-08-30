@@ -4877,19 +4877,102 @@ class DashboardService:
         )
         return ControlResult(ok=True, data={"memories": memories})
 
-    def import_memories(
+    @staticmethod
+    def _import_scope(item: dict[str, Any]) -> str:
+        """The scope an imported record would be written at, resolved once.
+
+        ``write_memory``'s own default is ``project``; reading it here rather
+        than in two places is what keeps the preview's answer and the import's
+        behaviour from being able to disagree about which record is a duplicate.
+        """
+        return str(item.get("scope", "project"))
+
+    def preview_memory_import(
         self, memories: list[dict[str, Any]], acting_principal_id: str | None
     ) -> ControlResult:
+        """BUG-244 — how many of these records the workspace already holds.
+
+        A read, and only a read: it writes nothing, proposes nothing, and is
+        safe to call as often as a file is chosen. The owner sees the answer
+        *before* deciding, which is the difference between an import that says
+        "4 records" and one that says "1 new, 3 already stored".
+        """
+        if not self._is_human(acting_principal_id):
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        stored = self.store.stored_memory_checksums(owner_principal_id=acting_principal_id)
+        duplicates: list[dict[str, Any]] = []
+        # A file that repeats a record inside itself is the same defect arriving
+        # by a different route, so the run is deduplicated against itself too.
+        seen: set[tuple[str, str]] = set()
+        new_count = 0
+        for index, item in enumerate(memories):
+            text = str(item.get("text", "")).strip()
+            if not text:
+                continue
+            key = (hashlib.sha256(text.encode()).hexdigest(), self._import_scope(item))
+            existing = stored.get(key)
+            if existing is not None or key in seen:
+                duplicates.append(
+                    {
+                        "index": index,
+                        "text": text[:200],
+                        "scope": key[1],
+                        # Absent when the duplicate is inside the file itself,
+                        # which is a different thing from one already stored.
+                        "memory_id": existing or "",
+                    }
+                )
+                continue
+            seen.add(key)
+            new_count += 1
+        return ControlResult(
+            ok=True,
+            data={
+                "total": len(memories),
+                "new_count": new_count,
+                "duplicate_count": len(duplicates),
+                "duplicates": duplicates[:50],
+            },
+        )
+
+    def import_memories(
+        self,
+        memories: list[dict[str, Any]],
+        acting_principal_id: str | None,
+        *,
+        skip_duplicates: bool = True,
+    ) -> ControlResult:
+        """Write reviewed records, skipping ones the workspace already holds.
+
+        BUG-244 — the skip is the default rather than the only behaviour. An
+        owner who means to store the same sentence at a second scope is doing
+        something legitimate, and the record they would be duplicating is named
+        in the preview, so ``skip_duplicates=False`` is an informed choice
+        rather than a way around a rule.
+        """
         if not self._is_human(acting_principal_id):
             return ControlResult(ok=False, reason_code="not_authorized_human")
         from raiker.memory.entity_extraction import propose_memory_relationships
         from raiker.memory.store import MemoryGovernance, update_memory, write_memory
 
+        stored = (
+            self.store.stored_memory_checksums(owner_principal_id=acting_principal_id)
+            if skip_duplicates
+            else {}
+        )
+        written: set[tuple[str, str]] = set()
         relationship_proposals = 0
+        imported = 0
+        skipped = 0
         for item in memories:
             text = str(item.get("text", "")).strip()
             if not text:
                 return ControlResult(ok=False, reason_code="empty_memory_text")
+            key = (hashlib.sha256(text.encode()).hexdigest(), self._import_scope(item))
+            if skip_duplicates and (key in stored or key in written):
+                skipped += 1
+                continue
+            written.add(key)
             entry = write_memory(
                 text,
                 workspace_root=self.workspace_root,
@@ -4923,10 +5006,17 @@ class DashboardService:
             relationship_proposals += propose_memory_relationships(
                 self.store, entry.memory_id, acting_principal_id or ""
             ).proposed
+            imported += 1
         return ControlResult(
             ok=True,
             data={
-                "count": len(memories),
+                # `count` is what actually changed, not how many records were
+                # offered. An import that reported four and wrote one was the
+                # half of BUG-244 a reader could not see.
+                "count": imported,
+                "reviewed": len(memories),
+                "imported": imported,
+                "skipped_duplicates": skipped,
                 "relationship_proposals": relationship_proposals,
             },
         )

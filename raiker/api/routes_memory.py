@@ -190,6 +190,28 @@ async def export_memories(
     return {"ok": True, **result.data}
 
 
+@router.post("/api/memory/import/preview")
+async def preview_memory_import(
+    request: Request,
+    body: dict[str, Any],
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BUG-244 — how many of these records the workspace already holds.
+
+    A read. It writes nothing and proposes nothing, so the review step can say
+    what an import would actually change before the owner decides.
+    """
+    raw_memories = body.get("memories", [])
+    memories = raw_memories if isinstance(raw_memories, list) else []
+    result = _service(request).preview_memory_import(memories, auth_data[0].principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"ok": False, "reason_code": result.reason_code},
+        )
+    return {"ok": True, **result.data}
+
+
 @router.post("/api/memory/import")
 async def import_memories(
     request: Request,
@@ -198,7 +220,12 @@ async def import_memories(
 ) -> dict[str, Any]:
     raw_memories = body.get("memories", [])
     memories = raw_memories if isinstance(raw_memories, list) else []
-    result = _service(request).import_memories(memories, auth_data[0].principal_id)
+    # Skipping what is already stored is the default; the owner can ask for a
+    # second copy deliberately, having been shown which record it copies.
+    skip_duplicates = body.get("skip_duplicates", True) is not False
+    result = _service(request).import_memories(
+        memories, auth_data[0].principal_id, skip_duplicates=skip_duplicates
+    )
     if not result.ok:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

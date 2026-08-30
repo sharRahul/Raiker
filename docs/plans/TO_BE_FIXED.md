@@ -92,9 +92,9 @@ names.
 | [BUG-241](FIXED_ITEMS.md#fixed-313--fullpage-evidence-captures-stopped-at-the-first-viewport) | Low | Live test harness / evidence | **Closed 2026-08-29 (FIXED-313)** — one shared capture helper; all 56 live specs go through it |
 | [BUG-242](FIXED_ITEMS.md#fixed-309--build-opened-an-empty-conversation-after-a-reload) | Medium | Build / web UI | **Closed 2026-08-29 (FIXED-309)** — the conversation rides in the URL and Build restores it |
 | [BUG-243](FIXED_ITEMS.md#fixed-314--a-question-could-not-recall-the-memory-that-answered-it) | High | Memory / retrieval | **Closed 2026-08-29 (FIXED-314)** — raised while verifying FIXED-311: a question was being used as a filter |
-| [BUG-244](#bug-244--importing-the-same-memory-twice-stores-it-twice) | Low | Memory / import | Open — raised 2026-08-29 while seeding a memory for the FIXED-311 round |
+| [BUG-244](FIXED_ITEMS.md#fixed-319--importing-the-same-memory-twice-stored-it-twice) | Low | Memory / import | **Closed 2026-08-29 (FIXED-319)** — the review step says what is new before anything is written, and the import reports what it changed |
 | [BUG-245](#bug-245--a-cited-conversation-names-its-exchanges-and-cannot-open-one) | Low | Memory / citations | Open — raised 2026-08-29 while closing MEM-08 as FIXED-316 |
-| [BUG-246](#bug-246--the-authority-matrix-is-a-scrollable-table-on-a-phone-and-truncates-its-own-verdicts) | Low | Permissions / web UI | Open — raised 2026-08-29 during the four-width audit |
+| [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (15 complete, 3 partial, 2 open; B18 closed 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
@@ -648,42 +648,6 @@ outcome that had to be true before each could be called closed — are in
 
 ---
 
-## BUG-244 — Importing the same memory twice stores it twice
-
-**Severity: Low. Area: memory / import. Status: Open — raised 2026-08-29.**
-
-**Observed.** Memory → *Advanced memory management* → **Review import** was used
-four times with the same one-record file while seeding the FIXED-311 round. The
-result was four approved memories with identical text, identical scope and
-identical provenance, and the recall strip under the next answer named all four.
-Nothing warned, and nothing offered to reconcile them.
-
-**Why.** `import_memories` writes each reviewed record through the ordinary
-governed write path, which is right — an import must not be a second way into
-the store. What it does not do is ask whether the workspace already holds that
-sentence. Every other correction path in memory has an answer for this: editing
-records a correction, and supersession links let retrieval prefer the valid
-record over its predecessor. Import has neither, so a re-import is the one way to
-create a contradiction-free duplicate.
-
-**Why it matters more than a tidy list.** Recall is budgeted. Four copies of one
-sentence occupy four of the slots a turn has for remembering anything, and the
-[FIXED-311](FIXED_ITEMS.md#fixed-311--recall-was-invisible-at-the-moment-it-was-used)
-strip now shows that cost to the owner rather than hiding it — which is how this
-was noticed at all.
-
-**Proposed fix.** Compare each reviewed record's `content_checksum` against the
-owner's live memories before writing. A match is reported in the review step —
-"3 of 4 records are already stored" — and skipped rather than written, with the
-owner able to import anyway if they intend a second scope. The checksum already
-exists and is already computed on write; nothing new has to be stored.
-
-**Required user-interface outcome.** The review step states how many of the
-records are new before anything is written, and the import count afterwards
-matches what actually changed.
-
----
-
 ## BUG-245 — A cited conversation names its exchanges and cannot open one
 
 **Severity: Low. Area: memory / citations. Status: Open — raised 2026-08-29
@@ -720,35 +684,3 @@ text from being able to say more than it is.
 **Required user-interface outcome.** A cited past conversation lists the
 exchanges it returned, and each one opens at that exchange, with the same mark a
 search hit gets.
-
----
-
-## BUG-246 — The authority matrix is a scrollable table on a phone, and truncates its own verdicts
-
-**Severity: Low. Area: Permissions / web UI. Status: Open — raised 2026-08-29
-during the four-width audit that produced
-[FIXED-318](FIXED_ITEMS.md#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places).**
-
-**Observed.** At 390 px, Permissions → *Delegated authority* renders as a
-four-column table inside a horizontal scroller. The first two columns fit; the
-third is cut mid-word, so the page reads *"Unavail"* under **Raiker agent** for
-every row. Nothing is lost — the container scrolls, the page itself does not, and
-the audit confirmed the responsive contract holds — but the column that carries
-the *verdict* is the one off screen, and a matrix whose answers are the part you
-have to scroll for is not doing its job on that width.
-
-**Why it is Low rather than a defect of the contract.** The information is
-reachable and correct; this is a layout that was designed for a wide screen and
-degraded honestly rather than one that lies. It is filed because "reachable by
-scrolling" and "legible" are different bars, and this table is the one place in
-the app where the difference is visible.
-
-**Proposed fix.** Below the shell's own 1024 px breakpoint, stack each capability
-as a card — the capability name as the heading, owner control and agent verdict
-as a two-item definition list — rather than as a row. `AuthorityMatrix.svelte`
-already receives the whole row per capability, so this is a second rendering of
-the same data and needs no new read.
-
-**Required user-interface outcome.** At a phone width, each capability's owner
-control and agent verdict are readable without a sideways scroll, and the words
-are whole.

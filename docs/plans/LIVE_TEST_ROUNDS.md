@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-08-29 | Targeted | `bug-244-`, `bug-246-` | — (no model needed) | An import that says what is already stored before it writes, and the authority matrix readable at a phone width |
 | 2026-08-29 | Targeted + full responsive audit | `b18-`, `mem08-` | Anthropic | Rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, and every route measured at four widths |
 | 2026-08-29 | Targeted + responsive | `fixed-309-` … `fixed-312-`, `r0829-` | Anthropic | Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build — and a question that could not recall the memory answering it |
 | 2026-08-29 | Targeted | `real-work-` | Anthropic | **What Chat and Build actually do**: a scheduled task, a project, a dashboard that renders, and a program Build wrote that this round executed |
@@ -55,6 +56,37 @@ process environment, for the duration of the round only.
 **The last full sweep was 2026-08-08.** Everything since has been targeted at a
 specific change. That is the honest state of coverage, and it is why the plan now
 carries a tier that says which one a round ran.
+
+---
+
+## 2026-08-29 — An import that counts what it changes, and a matrix that fits a phone
+
+**Tier: Targeted. Build: production `npm run build`. Providers: none — neither
+scenario needs a model, which is the honest reason this round has no key
+recorded against it. Prefixes: `bug-244-`, `bug-246-`.**
+
+Spec: `apps/web/e2e/bug-244-246-import-duplicates-and-narrow-authority-live.spec.ts`.
+
+1. Memory → *Advanced memory management* → **Review import** with a two-record
+   file the workspace has never seen. Confirm the review step says **2 new**
+   before anything is written, import them, and confirm the notice reports
+   *"Imported 2 records."* *(FIXED-319.)*
+2. Choose **the same file again**. Confirm it says all 2 records are already
+   stored, that the ordinary import button is **absent** rather than disabled,
+   and that **Import anyway** is still offered — an owner who means to hold the
+   same sentence at a second scope is doing something legitimate. *(FIXED-319.)*
+3. Permissions at 390 px. Confirm every capability's owner control and agent
+   verdict are readable as labelled pairs, that no row is cut mid-word (the
+   literal string `Unavail` appears nowhere), and that the page does not scroll
+   sideways. *(FIXED-320.)*
+
+**Result: ✅ two entries closed** — FIXED-319 and FIXED-320.
+
+**What this round did not need, and why that is the point.** Neither scenario
+sends a turn. BUG-244 was found *because* [FIXED-311](FIXED_ITEMS.md#fixed-311--recall-was-invisible-at-the-moment-it-was-used)
+made recall visible and four identical sentences showed up under one answer —
+but proving the fix needs only the import path, and pretending otherwise would
+have made the round slower without making it stronger.
 
 ---
 

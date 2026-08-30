@@ -331,6 +331,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-316](#fixed-316--every-turn-coordinate-was-a-dead-end) | Medium | Chat / Build / memory / web UI | Fixed (was MEM-08; closed 2026-08-29) |
 | [FIXED-317](#fixed-317--three-tools-declared-a-source-and-produced-none) | Medium | Runtime / citations / provenance | Fixed (raised and closed 2026-08-29) |
 | [FIXED-318](#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places) | Low | Web UI / accessibility | Fixed (raised and closed 2026-08-29) |
+| [FIXED-319](#fixed-319--importing-the-same-memory-twice-stored-it-twice) | Low | Memory / import | Fixed (was BUG-244; closed 2026-08-29) |
+| [FIXED-320](#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | Fixed (was BUG-246, raised and closed 2026-08-29) |
 
 ---
 
@@ -13801,3 +13803,104 @@ accent colour when checked, and is large enough to hit on a touch screen.
 
 **Evidence.** Re-measured live across the same routes and widths: 24x24 on a
 phone, 17x17 on a laptop, everywhere. `apps/web/src/lib/appCss.test.ts`.
+
+---
+
+## FIXED-319 — Importing the same memory twice stored it twice
+
+**Severity: Low. Area: memory / import. Closed 2026-08-29 (was BUG-244).**
+
+**Observed.** Memory → *Advanced memory management* → **Review import** was used
+four times with the same one-record file while seeding the FIXED-311 round. The
+result was four approved memories with identical text, identical scope and
+identical provenance, and the recall strip under the next answer named all four.
+Nothing warned, and nothing offered to reconcile them. The review step reported
+the number of records **in the file** and the import reported the same number
+again, whatever it had actually written.
+
+**Why it mattered more than a tidy list.** Recall is budgeted. Four copies of one
+sentence occupy four of the slots a turn has for remembering anything, and
+[FIXED-311](#fixed-311--recall-was-invisible-at-the-moment-it-was-used)'s strip
+now shows that cost to the owner rather than hiding it — which is how this was
+noticed at all. It was also the *only* way to produce a contradiction-free
+duplicate: every other correction path has an answer for the same sentence
+arriving twice, because an edit records a correction and a supersession link
+lets retrieval prefer the valid record over its predecessor. Import had neither
+and simply wrote again.
+
+**Fixed.** `SQLiteStore.stored_memory_checksums` reads `(content_checksum,
+scope) → memory_id` for the acting owner — the checksum is already written on
+every insert and update, so nothing new is stored for this. `POST
+/api/memory/import/preview` answers with what an import would change *before*
+anything is written, and `import_memories` skips what the workspace already
+holds and reports `imported` and `skipped_duplicates` rather than a count of
+what it was handed.
+
+Four decisions worth stating, because each is the difference between a check
+that helps and one that gets in the way:
+
+* **Scope is part of the key.** The same sentence at `project` and at `global`
+  is two records an owner may genuinely want.
+* **A deleted memory does not count; an archived one does.** Re-importing a
+  forgotten memory is how you bring it back. An archived one is still stored,
+  and a second copy of it is still a duplicate.
+* **A file that repeats a record inside itself is deduplicated too** — the same
+  defect arriving by a different route.
+* **The skip is the default, not the only behaviour.** The preview names the
+  record a duplicate would be a copy of, so **Import anyway** is an informed
+  choice rather than a way around a rule.
+
+**Owner-scoped, like every other memory read.** A duplicate check that saw across
+accounts would let one account learn what another holds by being refused; the
+scoping is on the query rather than on a check somebody has to remember.
+
+**User-interface outcome.** The review step says **“1 new of 4 · 3 already
+stored, and will be skipped”** before anything is written, and the button names
+what it will do. A file whose every record is already stored says so and offers
+only the deliberate second copy. Afterwards the notice states what changed —
+*“Imported 1 record; skipped 3 already stored.”*
+
+**Evidence.** [`bug-244-01-first-import-two-new.png`](screenshots/working/bug-244-01-first-import-two-new.png)
+and [`bug-244-02-re-import-already-stored.png`](screenshots/working/bug-244-02-re-import-already-stored.png),
+captured live against a running instance.
+`apps/web/e2e/bug-244-246-import-duplicates-and-narrow-authority-live.spec.ts`,
+the `TestImportDoesNotDuplicateWhatIsAlreadyStored` cases in
+`tests/test_memory_controls.py`, and the import-review cases in
+`apps/web/src/lib/views/MemoryView.test.ts`.
+
+---
+
+## FIXED-320 — The authority matrix hid its own verdicts on a phone
+
+**Severity: Low. Area: Permissions / web UI. Raised and closed 2026-08-29 (was
+BUG-246), during the four-width audit that produced
+[FIXED-318](#fixed-318--a-checkbox-was-thirteen-pixels-in-five-places).**
+
+**Observed.** At 390 px, Permissions → *Delegated authority* rendered as a
+three-column table inside a horizontal scroller. The first two columns fitted;
+the third was cut mid-word, so the page read **“Unavail”** under *Raiker agent*
+for every row.
+
+**Why it is worth a number.** Nothing was lost and nothing lied — the container
+scrolled, the page did not, and the responsive audit confirmed the contract held.
+But the column carrying the *verdict* was the one off screen, and a matrix whose
+answers are the part you have to scroll for is not doing its job at that width.
+“Reachable by scrolling” and “legible” are different bars.
+
+**Fixed.** Below the shell's own narrow breakpoint the same list renders as
+stacked cards: the capability as the heading, owner control and agent verdict as
+a labelled pair. The table keeps the wide layout.
+
+**Why two renderings rather than one restyled table.** Turning a table's own
+parts into blocks with `display: block` is the usual trick and it silently
+removes the table semantics a screen reader relies on. Two presentations, with
+exactly one displayed at a time, keeps both readings correct — and because
+`display: none` removes a subtree from the accessibility tree as well as from
+the page, nothing ever announces the same capability twice. That property is
+what the test asserts, on the declaration itself, since only `display` has it.
+
+**User-interface outcome.** At a phone width every capability's owner control and
+agent verdict are readable without a sideways scroll, and the words are whole.
+
+**Evidence.** [`bug-246-01-authority-at-phone-width.png`](screenshots/working/bug-246-01-authority-at-phone-width.png).
+`apps/web/src/lib/components/AuthorityMatrix.test.ts` and the live spec above.

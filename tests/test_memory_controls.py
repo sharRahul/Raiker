@@ -318,6 +318,115 @@ class TestMemoryEditAndSearchParticipation:
         assert "export" in actions and "import" in actions
 
 
+class TestImportDoesNotDuplicateWhatIsAlreadyStored:
+    """BUG-244 — an import was the one way to make a contradiction-free duplicate.
+
+    Every other correction path in memory has an answer for the same sentence
+    arriving twice: an edit records a correction, and a supersession link lets
+    retrieval prefer the valid record over its predecessor. Import had neither
+    and simply wrote again, so re-importing one file four times produced four
+    identical approved memories — and recall is budgeted, so those are four of
+    the slots a turn has for remembering anything.
+    """
+
+    def test_the_preview_counts_what_is_new_without_writing_anything(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        assert service.import_memories([{"text": "Keys rotate monthly."}], OWNER).ok
+        before = len(service.list_memories())
+
+        preview = service.preview_memory_import(
+            [{"text": "Keys rotate monthly."}, {"text": "Backups go to the NAS."}], OWNER
+        )
+        assert preview.ok
+        assert preview.data["total"] == 2
+        assert preview.data["new_count"] == 1
+        assert preview.data["duplicate_count"] == 1
+        # It names the record the duplicate would be a copy of, so the owner is
+        # deciding about something specific rather than about a count.
+        assert preview.data["duplicates"][0]["memory_id"] != ""
+        # And it is a read: nothing was written by asking.
+        assert len(service.list_memories()) == before
+
+    def test_a_re_import_of_the_same_file_writes_nothing_and_says_so(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        records = [{"text": "Keys rotate monthly."}, {"text": "Backups go to the NAS."}]
+        first = service.import_memories(records, OWNER)
+        assert first.ok and first.data["imported"] == 2 and first.data["skipped_duplicates"] == 0
+
+        second = service.import_memories(records, OWNER)
+        assert second.ok
+        assert second.data["imported"] == 0
+        assert second.data["skipped_duplicates"] == 2
+        # `count` reports what changed, not how many records were offered.
+        assert second.data["count"] == 0
+        assert second.data["reviewed"] == 2
+        assert len(service.list_memories()) == 2
+
+    def test_a_file_that_repeats_itself_is_deduplicated_too(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        # The same defect arriving by a different route.
+        result = service.import_memories(
+            [{"text": "One sentence."}, {"text": "One sentence."}], OWNER
+        )
+        assert result.ok and result.data["imported"] == 1
+        assert result.data["skipped_duplicates"] == 1
+        assert len(service.list_memories()) == 1
+
+    def test_the_same_sentence_at_a_second_scope_is_not_a_duplicate(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        # An owner who means to hold the same fact at a second scope is doing
+        # something legitimate, and the check must not stand in the way of it.
+        assert service.import_memories(
+            [{"text": "Shared fact.", "scope": "project:alpha"}], OWNER
+        ).data["imported"] == 1
+        second = service.import_memories(
+            [{"text": "Shared fact.", "scope": "global"}], OWNER
+        )
+        assert second.data["imported"] == 1
+        assert second.data["skipped_duplicates"] == 0
+        assert len(service.list_memories()) == 2
+
+    def test_the_owner_can_ask_for_a_second_copy_deliberately(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        # The skip is the default, not the only behaviour: the preview names the
+        # record that would be copied, so this is an informed choice rather than
+        # a way around a rule.
+        assert service.import_memories([{"text": "Repeated."}], OWNER).data["imported"] == 1
+        again = service.import_memories([{"text": "Repeated."}], OWNER, skip_duplicates=False)
+        assert again.data["imported"] == 1
+        assert again.data["skipped_duplicates"] == 0
+        assert len(service.list_memories()) == 2
+
+    def test_a_forgotten_memory_can_be_brought_back_by_importing_it(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        # A deleted memory is gone; re-importing it is how you restore it, so it
+        # must not count as something the workspace already holds.
+        first = service.import_memories([{"text": "Came back."}], OWNER)
+        assert first.ok
+        memory_id = service.list_memories()[0].memory_id
+        assert service.forget_memory_controlled(memory_id, OWNER).ok
+
+        again = service.import_memories([{"text": "Came back."}], OWNER)
+        assert again.data["imported"] == 1
+        assert [m.text for m in service.list_memories()] == ["Came back."]
+
+    def test_the_check_is_owner_scoped_like_every_other_memory_read(
+        self, service: DashboardService, workspace: Path
+    ) -> None:
+        # A duplicate check that saw across accounts would let one account learn
+        # what another holds by being refused. The scoping is on the read, so it
+        # is asserted on the read.
+        assert service.import_memories([{"text": "Mine."}], OWNER).data["imported"] == 1
+        assert service.store.stored_memory_checksums(owner_principal_id=OWNER)
+        assert service.store.stored_memory_checksums(owner_principal_id="principal_stranger") == {}
+
+
 class TestGovernedMemoryProposalsAndHistory:
     def test_human_can_edit_and_approve_a_proposal_once(
         self, service: DashboardService, workspace: Path

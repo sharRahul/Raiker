@@ -49,7 +49,11 @@ describe("stacked conversation layout", () => {
     for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
       const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
       expect(source).toMatch(/\.composer-card \{[\s\S]*?padding: \.55rem \.6rem;/);
-      expect(source).toMatch(/\.composer-bar \{ flex-wrap: nowrap;/);
+      // Wrap, not nowrap. `nowrap` plus a `display: none` per control is how
+      // Build came to print "Select a project to start." under a bar with no
+      // project picker in it, and how the model control became an empty circle
+      // in both composers below 1024px.
+      expect(source).toMatch(/\.composer-bar \{ flex-wrap: wrap;/);
       expect(source).toMatch(/\.send \{[\s\S]*?width: 2\.75rem;/);
       expect(source).toMatch(/\.send-label \{ display: none; \}/);
       expect(source).toMatch(/\.shortcut-hint/);
@@ -61,5 +65,17 @@ describe("stacked conversation layout", () => {
     expect(source).toMatch(/:global\(\.command-pane:not\(\.expanded\)\) \{ display: none; \}/);
     expect(source).toMatch(/\.standing-wide \{ display: none; \}/);
     expect(source).toContain("Auto follows your Permissions.");
+    // What gates sending is not secondary chrome. The project picker stays.
+    expect(source).not.toMatch(/\.project-picker,[^\n]*display: none/);
+  });
+
+  it("keeps the provider logo on the compact model control in both composers", () => {
+    for (const view of ["ChatView.svelte", "BuildView.svelte"]) {
+      const source = readFileSync(resolve(process.cwd(), "src", "lib", "views", view), "utf8");
+      expect(source).toMatch(
+        /:global\(\.composer-card \.model-trigger > span:not\(\.provider-logo\)\)/,
+      );
+      expect(source).not.toMatch(/:global\(\.composer-card \.model-trigger > span\),/);
+    }
   });
 });

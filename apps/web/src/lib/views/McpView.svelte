@@ -64,10 +64,21 @@
     ].filter((block) => block.kind !== "none"),
   );
 
-  /** Plain English for the exact runtime reason MCP tools are not reachable. */
+  /**
+   * Plain English for the exact runtime reason MCP tools are not reachable.
+   *
+   * Returns nothing when the connector's own block above already says it. A
+   * closed connector gate used to produce two amber notices one under the other,
+   * saying the same fact in different words and naming the same page by two
+   * different names — which reads as two problems rather than one.
+   */
+  const connectorBlocked = $derived(
+    blocks.some((block) => block.reason.startsWith("The MCP connector")),
+  );
   const accessBlock = $derived.by(() => {
     if (agentAccess === null || agentAccess.callable) return null;
     if (agentAccess.reason_code === "mcp_gate_disabled") {
+      if (connectorBlocked) return null;
       return {
         text: "Raiker cannot call any MCP tool: the MCP connector capability is not enabled at runtime level.",
         action: "Enable it in",
@@ -92,7 +103,7 @@
   function reason(e: unknown): string {
     if (e instanceof ApiError) {
       if (e.reasonCode === "disabled_by_capability_gate")
-        return "The MCP capability is disabled. Enable it in Capabilities to continue.";
+        return "The MCP capability is disabled. Enable it in Permissions to continue.";
       return e.reasonCode ?? `Request failed (${e.status})`;
     }
     return "Request failed";
@@ -288,7 +299,9 @@
     <span>
       {accessBlock.text}
       {accessBlock.action}
-      <a href="#/capabilities">Capabilities</a>.
+      <!-- The route is `#/capabilities`; the page is called Permissions
+           everywhere an owner sees it, and so is this link. -->
+      <a href="#/capabilities">Permissions</a>.
     </span>
   </div>
 {:else if agentAccess?.callable && agentAccess.projected_tools > 0}

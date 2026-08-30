@@ -21,6 +21,45 @@ Rounds are newest-first within each group, as they were written.
 
 ---
 
+## 2026-08-30 review — the repository on screen, and three self-descriptions that were wrong
+
+Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,
+DeepSeek Harness and Hermes Agent. Scope: what a coding surface must show, what a
+permission surface must say, and what a citation must open.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| A file explorer and read-only viewer in the coding surface ([FIXED-321](../plans/FIXED_ITEMS.md#fixed-321--build-could-change-a-repository-and-never-show-it)) | **No — parity, and it was overdue.** Claude Code, Codex, OpenClaw and Hermes all let an operator see the tree they are working in | This is the bar. Raiker had none of it, which made every other Build control harder to trust: an owner cannot judge a proposed change against a repository they cannot look at. Nothing here is a differentiator and it should not be claimed as one. |
+| That explorer being **read-only by construction** | **Yes — improvement** | Every compared coding product ships an editor beside its agent, so a file can be changed by hand without passing the approval path the agent's own changes pass. Raiker's viewer has no write path at all — a change is a proposal the owner accepts, whoever proposed it. That is a narrower product and a stronger claim, and it is the only reason the panel is worth shipping without the editor. |
+| Its second containment check | **Yes — improvement** | The panel resolves through the same `PathAuthority` a turn writes through *and then* re-checks the result against the repository's own root. The references confine an agent to a workspace; Raiker additionally confines a *repository reference* to that repository, so connecting one folder does not hand the browser the workspace. |
+| A permission surface that reports what the runtime would answer, not what its table holds ([FIXED-322](../plans/FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)) | **Yes — differentiator** | Every compared platform ships a permission surface. None of them has a rule under which "nothing is stored" means something other than off, so none of them has this defect — and none of them states, per switch, what an untouched one resolves to. Raiker has three such rules for good reasons, and the surface now names which applies. A permission list that can disagree with the runtime is worse than no list; one that proves it cannot is the control. |
+| A citation whose exchanges open at the exchange ([FIXED-323](../plans/FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one)) | **Yes — improvement** | ChatGPT's memory sources expose recalled inputs and Cowork cites connector reads; both open the *document*. Raiker opens the **turn**, with the coordinate built by the runtime from the tool result it executed rather than from anything the model wrote — so a citation cannot name an exchange that was not returned. |
+| A responsive sweep that is a measurement ([FIXED-325](../plans/FIXED_ITEMS.md#fixed-325--a-phone-was-clipping-the-models-page-and-the-knowledge-map-never-resized)) | **Not comparable — internal** | No reference platform publishes one, and this is a harness property rather than a product control. Recorded because three defects survived several rounds of a sweep that produced screenshots for a person to look at, and none survived the first round of one that asserts. |
+
+### Gaps this round identified and did **not** close
+
+| Gap | Reference | Raiker today | Compatibility requirement to close it |
+|---|---|---|---|
+| **An editor in the coding surface** | Claude Code, Codex, OpenClaw and Hermes all offer one | A read-only viewer, deliberately | The question is not effort, it is authority: an editor is a write path to the repository that does not pass through a proposal the owner accepts. Closing it means deciding whether a hand edit in Raiker's own browser is a governed action, and answering that is a prerequisite, not a detail. |
+| **Per-hunk accept/reject** (GAP-BUILD B14's remainder) | Codex and Claude Code both stage part of a change | An approval governs the whole change set | The runtime has to be able to *record* a partial decision. Offering the control before it can is worse than not offering it. |
+| **Three of the three unset-gate rules unified** (BUG-239's remainder) | No reference has the question | Three rules, each justified, now each stated | An owner decision. Collapsing them either loosens seven paths or tightens one, and neither is an implementer's call. |
+
+### Recommended improvements, in the order they are worth doing
+
+1. **MCP tool search and deferred schemas** (backlog #16). A connected server
+   should not cost every turn its whole schema, and neither should the 45
+   built-ins. It is the largest remaining *cost* item and it is bounded work.
+2. **OpenTelemetry export** (backlog #18). Raiker already records strictly more
+   per action than the six events Cowork exports; what it lacks is the wire.
+3. **Per-hunk decisions** (B14's remainder), once the runtime can record one.
+4. **The remaining live-spec passwords** ([BUG-247](../plans/TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password)),
+   one spec per re-run, so each closed entry's evidence is refreshed rather than
+   invalidated.
+
+---
+
 ## 2026-08-21 implementation and reference review
 
 Status is strict: **at parity** means both sides are evidenced; **beyond**

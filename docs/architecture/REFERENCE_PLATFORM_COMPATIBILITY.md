@@ -877,6 +877,16 @@ carries every round it went through stops describing the product as it is and
 becomes a record of how it got there; both are worth having, and they answer
 different questions. **Where a review and Part 2 disagree, Part 2 is current.**
 
+**The most recent round is 2026-08-30** — what a coding surface must show, what
+a permission surface must say, and what a citation must open. Its finding, stated
+plainly because it is not flattering: the file explorer Build gained is
+**parity**, and it was overdue. What goes beyond the reference set is what was
+done *around* it — the viewer having no write path at all, so a change is a
+proposal whoever proposed it; the second containment check that confines a
+repository reference to its repository rather than to the workspace; a permission
+surface that reports what the runtime would answer rather than what its table
+holds; and a citation that opens the *turn* rather than the document.
+
 The log also holds the concept-to-specification maps — Claude Code concept
 coverage and its per-page documentation mapping, Cowork delegated tasks and
 schedule, OpenClaw-style personal agent, Hermes-style agent framework, eidetic

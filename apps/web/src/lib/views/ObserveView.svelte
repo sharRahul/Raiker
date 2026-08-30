@@ -19,6 +19,7 @@
   import StatTile from "../components/StatTile.svelte";
   import TabStrip from "../components/TabStrip.svelte";
   import { api, ApiError } from "../api";
+  import { digestEvents } from "../auditDigest";
   import { isDeferred, isInherent } from "../capabilityModel";
   import type {
     ApprovalView,
@@ -99,20 +100,8 @@
   const ready = $derived(
     diagnostics?.production_ready_local_single_user_runtime === true,
   );
-  /**
-   * "What changed?" answers with changes.
-   *
-   * Every governed read resolves the acting principal first and records that it
-   * did, so on a workspace that has done nothing else the twelve most recent
-   * events were twelve identical `principal_resolved` rows — an authorization
-   * lookup, with no summary, under a heading asking what changed, pushing any
-   * real change off the list. The lookups stay in the audit log, which is the
-   * record; they are not news. A resolution that *failed* is, so only the
-   * successful one is dropped.
-   */
-  const changes = $derived(
-    (events ?? []).filter((event) => event.event_type !== "principal_resolved").slice(0, 12),
-  );
+  /** "What changed?" answers with changes — see `auditDigest.ts`. */
+  const changes = $derived(digestEvents(events ?? []));
 
   function selectTab(next: string) {
     window.location.hash = `#/observe?tab=${encodeURIComponent(next)}`;
@@ -178,10 +167,10 @@
 {#if tab === "overview"}
   <div id="panel-overview" role="tabpanel" aria-labelledby="tab-overview" class="overview">
     <div class="head">
-      <p class="page-lead">
-        A read-first record of what the runtime is doing. Every card below links to the evidence it
-        is derived from — status here is never a colour without a record behind it.
-      </p>
+      <!-- One promise, not a paragraph explaining the page to itself. What a
+           read-first surface is, and why nothing here is a colour without a
+           record behind it, is in the guide. -->
+      <p class="page-lead">Every card links to the record it is derived from.</p>
       <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
         <Icon name="refresh" size={15} /> Refresh
       </button>
@@ -289,7 +278,9 @@
                 <span class="dot" data-risk={event.risk_level} aria-hidden="true"></span>
                 <div class="entry">
                   <p class="entry-title">{humanize(event.event_type)}</p>
-                  <p class="entry-detail">{event.summary}</p>
+                  <!-- Not every governed event carries a summary; an empty
+                       line under the title is a row that looks broken. -->
+                  {#if event.summary}<p class="entry-detail">{event.summary}</p>{/if}
                   <p class="entry-meta">
                     <time title={event.timestamp}>{relativeTime(event.timestamp)}</time>
                     {#if isAddressableSession(event.session_id)}

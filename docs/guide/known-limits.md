@@ -97,9 +97,9 @@ Voice is turn-based dictation and manual playback. Continuous listening,
 hands-free control, and full-duplex conversation are not available. Dictated
 text remains editable, and only pressing **Send** creates a turn.
 
-The agent cannot ask a structured clarification question in the middle of a
-tool-running turn. If an instruction is ambiguous, clarify it before starting
-high-impact work.
+Raiker can ask a structured clarification question mid-turn: it parks the turn,
+offers the options it wrote, and continues on the one you pick. A question
+grants nothing, so answering it is not an approval and cannot stand in for one.
 
 ## Execution environments
 

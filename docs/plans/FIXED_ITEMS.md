@@ -338,6 +338,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-323](#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | Fixed (was BUG-245; closed 2026-08-30) |
 | [FIXED-324](#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | Fixed (was BUG-229's remainder; closed 2026-08-30) |
 | [FIXED-325](#fixed-325--a-phone-was-clipping-the-models-page-and-the-knowledge-map-never-resized) | Medium | Web UI / responsive | Fixed (raised and closed 2026-08-30) |
+| [FIXED-326](#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | Fixed (was BUG-249; closed 2026-08-30) |
+| [FIXED-327](#fixed-327--the-setup-wizard-trapped-every-live-spec-after-the-first-one) | Medium | Live test harness | Fixed (raised and closed 2026-08-30) |
+| [FIXED-328](#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | Fixed (was BUG-247, and seven of BUG-248's twenty-seven; closed 2026-08-30) |
+| [FIXED-329](#fixed-329--three-controls-a-narrow-window-silently-removed) | Medium | Chat / Build / web UI | Fixed (raised and closed 2026-08-30) |
+| [FIXED-330](#fixed-330--the-overview-counted-one-set-of-gates-and-linked-to-another) | Low | Observability / web UI | Fixed (raised and closed 2026-08-30) |
+| [FIXED-331](#fixed-331--a-turn-the-reader-walked-away-from-was-never-recorded) | High | Runtime / gateway / durability | Fixed (raised and closed 2026-08-30) |
 
 ---
 
@@ -14219,3 +14225,248 @@ screen at all three.
 [`ui-sweep-models-phone.png`](screenshots/working/ui-sweep-models-phone.png) and
 [`ui-sweep-knowledge-map-phone.png`](screenshots/working/ui-sweep-knowledge-map-phone.png),
 captured live. `apps/web/e2e/ui-sweep-clipping-live.spec.ts`.
+
+
+---
+
+## FIXED-326 — A FIXED_ITEMS link pointed at a heading that does not exist
+
+**Severity: Low. Area: documentation / CI. Closed 2026-08-30 (was
+[BUG-249](TO_BE_FIXED.md)).**
+
+**Observed.** `tests/test_docs_consistency.py::test_documentation_links_and_anchors_resolve`
+failed, and it was the only Python check that did: FIXED-322's entry cited
+FIXED-288 by a title written from memory rather than from the heading.
+
+**Why it stayed open for a session.** The session that raised it had lost its
+git push credential and was writing files through the GitHub API, which needs a
+file's whole content in one call. `FIXED_ITEMS.md` is past what one call can
+carry, and both ends of the link live inside it.
+
+**Fixed.** One line, and the check is green.
+
+**What is worth keeping.** The guard did its job: an anchor written from memory
+is exactly the drift it exists to catch, and it caught it on the first run after
+the entry was added. The entry that broke it is itself about a surface
+describing a gate from memory instead of from the enforcing path.
+
+**User-interface outcome.** None; documentation only.
+
+---
+
+## FIXED-327 — The setup wizard trapped every live spec after the first one
+
+**Severity: Medium. Area: live test harness. Raised and closed 2026-08-30 while
+closing BUG-247.**
+
+**Observed.** A live spec run against a workspace that another live spec had
+already signed into failed at sign-in, waiting sixty seconds for a control that
+was not on the screen. The workspace was on the setup wizard's **privacy** stage,
+which offers *Local-first*, *Balanced* and *Back* — and none of those is what the
+shared helper waited for.
+
+**Reproduction.** Sign in once through `signInAsOwner` and let the run end.
+Setup is finished only by its last stage, so the wizard is re-asserted on the
+next load and resumes where it stopped. Run any live spec against that
+workspace.
+
+**Root cause.** `dismissFirstRunModelSetup` knew one of five stages. Its first
+branch waited for a button named **Skip for now**, which does not exist anywhere
+in the app any more; its second clicked **Decide later** and then assumed the
+next three stages in a fixed order. Entering anywhere but the model stage was
+unhandled, and `signInAsOwner` and `openHostedProviders` both identified the
+wizard by a button on one of its stages rather than by the wizard.
+
+**Fixed.** The helper reads which stage is on screen and answers that stage until
+the wizard is gone, from any entry point, and it *finishes* setup rather than
+deferring it — a deferred wizard is the state that traps the next run. An
+unrecognised stage raises rather than being guessed at. Both callers now wait for
+the wizard's own heading.
+
+**Why it matters beyond the harness.** This was the thing standing between
+BUG-247's shipped fixture and the property it exists for: a whole live round
+against one workspace. Every FIXED entry's evidence had been re-seeded from
+scratch, and this is half the reason.
+
+**User-interface outcome.** None; harness only.
+
+**Evidence.** The whole of this round's live work — provider connection, six
+converted specs, eleven UI-sweep cases and three real model turns — ran against a
+single workspace in one pass.
+
+---
+
+## FIXED-328 — One owner for the whole live suite
+
+**Severity: Low. Area: live test harness. Closed 2026-08-30 (was
+[BUG-247](TO_BE_FIXED.md), and seven of BUG-248's twenty-seven).**
+
+**Observed.** BUG-229 shared the sign-in *steps*; every live spec still declared
+its own `PASSWORD`. Two specs could therefore never be run against one workspace:
+the second waited out its unlock and reported a missing heading.
+
+**Fixed.** `OWNER_CREDENTIALS` in `e2e/hosted-provider.ts` is the only owner
+credential in the suite. Thirty specs stopped passing an explicit credential to
+`signInAsOwner`; the twenty-two that still sign in inline point their own
+constants at it, so the migration of *how* they sign in (BUG-248) stayed a
+separate change from *who* they sign in as. Its shipped default is the owner a
+live round actually uses, and `RAIKER_LIVE_USER` is accepted alongside
+`RAIKER_LIVE_OWNER` because two specs already used that name. The three specs
+that are *about* signing in keep their own, for the reason BUG-248 gives.
+
+**Seven of BUG-248's twenty-seven, each re-run as it was converted.**
+`all-pages`, `all-pages-theme`, `observability`, `default-ollama`,
+`memory-knowledge-context`, `memory-semantic` and `memory-vector-index` now
+delegate to `signInAsOwner`. Converting them found three pieces of drift that
+nothing else would have, because a spec carrying its own base and its own
+credential is a spec nobody re-reads:
+
+* `observability-live.spec.ts` was driving `127.0.0.1:5174` — a Vite dev server,
+  not the `raiker-web` every other live spec runs against.
+* Memory and Knowledge Map are level-1 headings; the spec still asked for level 2.
+* The curated embedding row is a labelled region with a lead line, not a heading.
+
+**What is left.** Twenty of BUG-248's inline sign-ins, which stay open at that
+entry: they vary by base and by landing route, and each needs its own run.
+
+**User-interface outcome.** None; harness only.
+
+---
+
+## FIXED-329 — Three controls a narrow window silently removed
+
+**Severity: Medium. Area: Chat / Build / web UI. Raised and closed 2026-08-30
+while sweeping every page at 390, 834, 1280 and 1440 against a live instance.**
+
+**Observed, and all three are the same mistake.** A compact layout may drop
+*information*. It may not drop what a turn is steered by.
+
+* **The model control was an empty circle below 1024px.** Both composers collapse
+  the model chip to an icon by hiding `.model-trigger > span` — but the icon *is*
+  a span, because `ProviderLogo` renders one. The rule hid the label and the logo
+  together, so every window narrower than a laptop showed a blank circle where
+  the model is chosen and nothing said which model would answer.
+* **Build told you to pick a project and hid the picker.** The same breakpoint
+  dropped `.project-picker` while the composer kept printing *Select a project to
+  start.* underneath and kept **Send** disabled — an instruction pointing at a
+  control that was not on the screen, with no other route to it in Build.
+* **A tab strip with seven tabs looked like a strip with four.** The hubs scroll
+  horizontally with `scrollbar-width: none`, so at 390px Observability showed
+  Overview, Sessions, Audit log and a clipped Checkpoints, and nothing said
+  Diagnostics, Work in action and Notifications existed.
+
+**Fixed.** The logo survives (`> span:not(.provider-logo)`). Both composer bars
+**wrap** rather than dropping controls, so the two surfaces keep one grammar and
+a narrow window loses only the context ring, the environment badge and the
+shortcut line. The strip fades at whichever end is scrolled away from — a mask,
+so it works on the sunken background in either theme and cannot swallow a tab's
+click, and it is absent entirely when everything fits. No new control, no new
+words.
+
+**Found in the same pass.** The dictation privacy note is anchored to a control
+two buttons into the composer, so at 390px a 19rem panel starting there ended
+past the right edge; its width was clamped to the viewport, its left edge was
+not. It is measured when it opens.
+
+**Guarded.** `ConversationLayout.test.ts` asserts both composers wrap, that the
+provider logo is exempt from the label rule, and that Build's compact block does
+not hide the project picker — the three exact regressions.
+
+**User-interface outcome.** At every width from 390px up, the composer says which
+model will answer, Build offers the project that gates **Send**, and a scrollable
+tab strip shows that it scrolls.
+
+---
+
+## FIXED-330 — The overview counted one set of gates and linked to another
+
+**Severity: Low. Area: Observability / web UI. Raised and closed 2026-08-30.**
+
+**Observed.** Three things on one card set, all the shape
+[FIXED-322](#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)
+named: a surface describing something other than what it points at.
+
+* **Closed capability gates said 65 under a link to a page listing 48.**
+  Permissions deliberately omits capabilities with no executor and the contract
+  surfaces that are not tools, because there is no control to offer for either.
+  The tile counted them anyway.
+* **"What changed?" answered with lookups.** Every governed read resolves the
+  acting principal first and records that it did, so on a quiet workspace the
+  twelve most recent events were twelve identical `principal_resolved` rows with
+  null summaries. After one chat turn they were replaced by twelve rows of that
+  turn's own pipeline — *Prompt normalised*, *Risk classified*, four *Turn state
+  changed*. Either way a real change was pushed off the list.
+* **And it linked them to a session that does not exist.** An event outside any
+  conversation carries a scope name where a session id goes — `authz`. That is a
+  real string, so the redaction guard did not catch it, and the timeline rendered
+  `#/sessions?session=authz` under the word "session".
+
+**Fixed.** The tile counts what the page it links to can open, and names the rest
+in a clause rather than counting them as work. The digest filters through
+`auditDigest.ts`, whose discriminator is not a new hand-written list of
+"important" events but the one the transcript already uses: `turnPhases.ts` maps
+the lifecycle events the runtime streams into a turn's own gather → plan → act →
+verify timeline, so an event the transcript already shows inside a turn is that
+turn's trace. Three turn-internal events that never reach a phase row are named
+explicitly, and a resolution that *failed* is deliberately not one of them.
+`isAddressableSession` decides the link; a scope gets no link and no "withheld"
+note, because nothing was withheld.
+
+**User-interface outcome.** The number under *Review capabilities* is the number
+of rows on the page it opens. *What changed?* lists changes — a task created, a
+tool that ran, a capability the owner altered — and the audit log, one click
+below, still holds everything.
+
+---
+
+## FIXED-331 — A turn the reader walked away from was never recorded
+
+**Severity: High. Area: runtime / gateway / durability. Raised and closed
+2026-08-30 while reading the audit trail after a live round.**
+
+**Observed.** The Observability overview showed *Task failed* for a chat turn
+that had answered correctly. Reading the store: `Chat turn | failed | stream
+ended`, and the turn itself still `status: running`, `summary: null`,
+`completed_at: null`. **The answer the owner had just read was not in the
+conversation, and reloading it never brought it back.**
+
+**Reproduction.** Send a prompt in Chat. The moment the answer has finished
+rendering — text deltas arrive before the turn is finalised — navigate to another
+page. Come back to the conversation: the prompt is there and the reply is not.
+Consuming the same stream to its end from a script completes the turn normally,
+which is what made this invisible to every test.
+
+**Root cause.** Both streaming entry points consumed the runtime *inside the
+generator the client is reading*, and settled the turn in that generator's
+`finally`. Closing the response body — which is what navigating away does —
+raises `GeneratorExit` at the `yield` the runtime is suspended on, so the turn
+was torn down before `_afinalize_turn` ran. `final` was then `None`, and the
+`finally` read that as a failure and wrote the reason "stream ended". Both halves
+were wrong in the same direction: the turn had succeeded, the record said it
+failed, and the record of what was said did not exist at all.
+
+**Fixed.** `_astream_detached` drives the runtime on a task of its own and gives
+the client a queue over its output. When the client goes away the queue stops
+being filled and the turn carries on to its own end: the model call has already
+been made and paid for, the finalisation still runs, and the task still settles
+on what actually happened. The queue holds one item, so an attached reader still
+paces the turn exactly as the in-line loop did — a stop that arrives between two
+events must still land before the next one is produced — and a detached one
+leaves a drainer behind so the pump is never blocked on a slot nobody is taking.
+Both `astream_prompt` and `astream_resume_after_approval` go through it; a
+resumed turn is the continuation of work the owner already approved, so it has
+even less business ending because a browser tab moved on.
+
+**Guarded.**
+`tests/test_phase_3_slice_q3_streaming.py::test_a_turn_finishes_when_the_reader_walks_away`
+reads one event, closes the stream, and asserts the task completes and the turn
+is recorded with its answer. It fails on the previous code with
+`AssertionError: stream ended`.
+
+**User-interface outcome.** An answer stays in the conversation whether or not the
+owner was still looking at it when the turn finished, and the audit log says a
+turn failed only when one did.
+
+**Evidence.** Live, against Anthropic `claude-haiku-4-5-20251001`: before the fix
+the abandoned turn is `running`/`null`; after it, `completed` with its answer as
+the summary, and the task `completed` rather than `failed`.

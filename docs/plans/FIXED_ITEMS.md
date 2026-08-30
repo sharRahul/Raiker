@@ -14196,7 +14196,11 @@ desktop.
 pinned bottom-left and bottom-right and are wider together than a phone, so each
 hid half of the other; below 34rem they stack. The *Workspace intelligence*
 eyebrow wrapped to two lines above a heading that already said Knowledge Map,
-and is dropped at that width.
+and is dropped at that width. And two of Memory's section headings squeezed
+their trailing control into a narrow column instead of letting it wrap — *Scan
+approved memories* came out as three stacked words beside its heading, and so did
+the observations count. The trailing control keeps its width and takes a line of
+its own now; a short count still sits inline.
 
 **The sweep is now a measurement rather than a set of screenshots to look at.**
 Looking is how all three survived several rounds.

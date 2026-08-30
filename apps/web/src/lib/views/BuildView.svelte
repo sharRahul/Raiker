@@ -18,12 +18,23 @@
   import { onMount, tick, untrack } from "svelte";
   import { rememberSurfaceModel, surfaceModel } from "../surfaceModel.svelte";
   import { readBuildProject, rememberBuildProject } from "../buildProject";
+  import {
+    clampExplorerWidth,
+    DEFAULT_EXPLORER_WIDTH,
+    MAX_EXPLORER_WIDTH,
+    MIN_EXPLORER_WIDTH,
+    readExplorerOpen,
+    readExplorerWidth,
+    rememberExplorerOpen,
+    rememberExplorerWidth,
+  } from "../buildExplorer";
   import Badge from "../components/Badge.svelte";
   import ApprovalModeControl from "../components/ApprovalModeControl.svelte";
   import ModelPicker from "../components/ModelPicker.svelte";
   import ModelReadinessStrip from "../components/ModelReadinessStrip.svelte";
   import ExecutionEnvironmentBadge from "../components/ExecutionEnvironmentBadge.svelte";
   import BuildSidePanel from "../components/BuildSidePanel.svelte";
+  import CodeExplorer from "../components/CodeExplorer.svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import PageState from "../components/PageState.svelte";
   import Icon from "../components/Icon.svelte";
@@ -407,6 +418,92 @@
     repos?.repos.find((repo) => repo.repo_id === repos?.selected_repo_id) ?? null,
   );
 
+  // ── File explorer (B13) ───────────────────────────────────────────────
+  // Only a local folder has files on this machine. A GitHub repository is a
+  // coordinate, so the control is offered and says why it is empty rather than
+  // being hidden — a missing button reads as a missing feature.
+  let filesOpen = $state(false);
+  let filesWidth = $state(DEFAULT_EXPLORER_WIDTH);
+  let filesElement = $state<HTMLElement>();
+  let filesTrigger = $state<HTMLElement | null>(null);
+  let deactivateFiles: DeactivateModalDrawer | null = null;
+  let resizing = $state(false);
+
+  function closeFiles(restoreFocus = true) {
+    deactivateFiles?.(restoreFocus);
+    deactivateFiles = null;
+    filesOpen = false;
+    rememberExplorerOpen(false);
+  }
+
+  function toggleFiles(event: MouseEvent) {
+    filesTrigger = event.currentTarget as HTMLElement;
+    if (filesOpen) closeFiles(true);
+    else {
+      filesOpen = true;
+      rememberExplorerOpen(true);
+    }
+  }
+
+  /** Drag the divider. Pointer capture keeps the drag alive over the transcript. */
+  function startResize(event: PointerEvent) {
+    if (compactRail) return;
+    const handle = event.currentTarget as HTMLElement;
+    handle.setPointerCapture(event.pointerId);
+    resizing = true;
+    const origin = event.clientX;
+    const start = filesWidth;
+    const move = (moved: PointerEvent) => {
+      filesWidth = clampExplorerWidth(start + (moved.clientX - origin));
+    };
+    const done = () => {
+      resizing = false;
+      handle.releasePointerCapture(event.pointerId);
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", done);
+      handle.removeEventListener("pointercancel", done);
+      rememberExplorerWidth(filesWidth);
+    };
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", done);
+    handle.addEventListener("pointercancel", done);
+  }
+
+  /** The keyboard's half of the same control, so resizing is not pointer-only. */
+  function resizeByKey(event: KeyboardEvent) {
+    const step = event.shiftKey ? 48 : 16;
+    if (event.key === "ArrowLeft") filesWidth = clampExplorerWidth(filesWidth - step);
+    else if (event.key === "ArrowRight") filesWidth = clampExplorerWidth(filesWidth + step);
+    else if (event.key === "Home") filesWidth = MIN_EXPLORER_WIDTH;
+    else if (event.key === "End") filesWidth = MAX_EXPLORER_WIDTH;
+    else return;
+    event.preventDefault();
+    rememberExplorerWidth(filesWidth);
+  }
+
+  $effect(() => {
+    if (!visible && filesOpen) closeFiles(false);
+  });
+
+  $effect(() => {
+    if (!compactRail || !filesOpen || filesElement === undefined) return;
+    const shellBackground = Array.from(document.querySelectorAll<HTMLElement>(".topbar, .sidebar"));
+    deactivateFiles = activateModalDrawer({
+      id: "build-files",
+      container: filesElement,
+      returnFocusTo: filesTrigger,
+      backgroundElements:
+        buildMainElement === undefined
+          ? shellBackground
+          : [buildMainElement, ...shellBackground],
+      onDismiss: () => closeFiles(true),
+    });
+    return () => {
+      deactivateFiles?.(false);
+      deactivateFiles = null;
+    };
+  });
+
   // ── Side rail ────────────────────────────────────────────────────────
   let railOpen = $state(false);
   let compactRail = $state(false);
@@ -538,6 +635,10 @@
     const updateRailMode = () => { compactRail = railQuery?.matches ?? false; };
     updateRailMode();
     railQuery?.addEventListener("change", updateRailMode);
+    // B13 — the explorer opens where it was left, at the width it was left,
+    // but never as a drawer over a narrow window nobody asked to open.
+    filesWidth = readExplorerWidth();
+    filesOpen = readExplorerOpen() && !compactRail;
     void loadRepos();
     void refreshModels();
     // Build keeps its own model. Coding work and conversation rarely want the
@@ -761,6 +862,26 @@
     queueMicrotask(() => {
       promptEl?.focus();
       promptEl?.setSelectionRange(applied.caret, applied.caret);
+      autoGrow(promptEl ?? null);
+    });
+  }
+
+  /**
+   * B13 — carry the open file into the composer as a mention.
+   *
+   * Reading a file and asking about it are the same act a second apart, and
+   * retyping the path between them is the friction that stops the second one
+   * happening. It writes the same `@path ` token the completion menu writes, so
+   * the turn sees no difference between the two ways of naming a file.
+   */
+  function mentionPath(path: string) {
+    if (path === "") return;
+    const separator = promptText === "" || promptText.endsWith(" ") ? "" : " ";
+    promptText = `${promptText}${separator}@${path} `;
+    const caretAt = promptText.length;
+    queueMicrotask(() => {
+      promptEl?.focus();
+      promptEl?.setSelectionRange(caretAt, caretAt);
       autoGrow(promptEl ?? null);
     });
   }
@@ -1388,9 +1509,62 @@
 
 <div
   class="build"
+  class:with-files={filesOpen && !compactRail}
   class:with-rail={railOpen && !compactRail}
   class:with-panel={rewindCheckpointId !== null}
+  style={`--explorer-w:${filesWidth}px`}
 >
+  <!-- B13 — the repository, beside the conversation about it. First column on
+       a wide window; a dismissible sheet below the split, exactly as the
+       background-work rail is, so neither panel invents a second pattern. -->
+  {#if filesOpen}
+    {#if compactRail}
+      <button
+        type="button"
+        class="rail-scrim"
+        aria-label="Close files"
+        onclick={() => closeFiles(true)}
+      ></button>
+    {/if}
+    <div
+      id="build-files"
+      class="files-slot"
+      class:drawer={compactRail}
+      role={compactRail ? "dialog" : undefined}
+      aria-modal={compactRail ? "true" : undefined}
+      aria-label={compactRail ? "Repository files" : undefined}
+      bind:this={filesElement}
+    >
+      <CodeExplorer
+        repoId={activeRepo?.repo_id ?? ""}
+        repoLabel={activeRepo?.label ?? ""}
+        onclose={() => closeFiles(true)}
+        onmention={mentionPath}
+      />
+      {#if !compactRail}
+        <!-- Separator, not decoration: it carries the value it sets, so the
+             keyboard can resize what the pointer can drag. This is the ARIA
+             window-splitter pattern — a focusable `separator` with a value —
+             which the two rules below do not model. -->
+        <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <div
+          class="files-resize"
+          class:active={resizing}
+          role="separator"
+          aria-label="Resize the file explorer"
+          aria-orientation="vertical"
+          aria-valuemin={MIN_EXPLORER_WIDTH}
+          aria-valuemax={MAX_EXPLORER_WIDTH}
+          aria-valuenow={filesWidth}
+          tabindex="0"
+          onpointerdown={startResize}
+          onkeydown={resizeByKey}
+        ></div>
+      {/if}
+    </div>
+  {/if}
+
   <div class="main" bind:this={buildMainElement}>
     <header class="build-header">
       <div class="repo-slot">
@@ -1444,12 +1618,35 @@
             </div>
           {/if}
         </div>
+        <!-- Both toggles carry an `aria-label`, because their visible words are
+             the first thing a narrow window drops. A button that loses its name
+             below the split is unreachable by voice and unreadable by a screen
+             reader on exactly the device that needs it most. -->
+        <button
+          type="button"
+          class="btn btn-ghost btn-sm files-toggle"
+          onclick={toggleFiles}
+          aria-expanded={filesOpen}
+          aria-controls="build-files"
+          aria-label={filesOpen ? "Hide repository files" : "Show repository files"}
+          disabled={activeRepo === null}
+          title={activeRepo === null
+            ? "Connect a repository to browse its files"
+            : filesOpen
+              ? "Hide files"
+              : "Show files"}
+        >
+          <Icon name="folder" size={15} />
+          <span class="rail-label">{filesOpen ? "Hide files" : "Files"}</span>
+        </button>
         <button
           type="button"
           class="btn btn-ghost btn-sm rail-toggle"
           onclick={toggleRail}
           aria-expanded={railOpen}
           aria-controls="build-rail"
+          aria-label={railOpen ? "Hide background work" : "Show background work"}
+          title={railOpen ? "Hide background work" : "Background work"}
         >
           <Icon name="panel" size={15} />
           <span class="rail-label">{railOpen ? "Hide background work" : "Background work"}</span>
@@ -1982,6 +2179,15 @@
   .build.with-rail {
     grid-template-columns: minmax(0, 1fr) 21rem;
   }
+  /* B13 — the explorer takes the first column, at the width the owner dragged
+     it to. Every combination is spelled out rather than left to the cascade,
+     because a grid that silently loses a column drops a panel off screen. */
+  .build.with-files {
+    grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr);
+  }
+  .build.with-files.with-rail {
+    grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr) 21rem;
+  }
   /* B18 — the rewind preflight takes a column of its own, so the transcript it
      is about stays on screen behind it. */
   @media (min-width: 64rem) {
@@ -1990,6 +2196,59 @@
     }
     .build.with-rail.with-panel {
       grid-template-columns: minmax(0, 1fr) 21rem minmax(20rem, 26rem);
+    }
+    .build.with-files.with-panel {
+      grid-template-columns: var(--explorer-w, 17.5rem) minmax(0, 1fr) minmax(18rem, 24rem);
+    }
+    .build.with-files.with-rail.with-panel {
+      grid-template-columns:
+        var(--explorer-w, 17.5rem) minmax(0, 1fr) 21rem minmax(18rem, 24rem);
+    }
+  }
+  .files-slot {
+    position: relative;
+    min-height: 0;
+    min-width: 0;
+    display: flex;
+  }
+  .files-slot > :global(.code-explorer) {
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+  }
+  /* The divider is the full height of the column and sits *between* the two,
+     so the hit area is the gap rather than a sliver of the panel. */
+  .files-resize {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    right: calc(var(--space-4) / -2 - 2px);
+    width: 9px;
+    cursor: col-resize;
+    background: none;
+    border: 0;
+    border-radius: 999px;
+  }
+  .files-resize::after {
+    content: "";
+    position: absolute;
+    inset: 0 4px;
+    border-radius: 999px;
+    background: transparent;
+    transition: background 0.12s ease;
+  }
+  .files-resize:hover::after,
+  .files-resize:focus-visible::after,
+  .files-resize.active::after {
+    background: var(--accent-border, var(--border));
+  }
+  .files-resize:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .files-resize::after {
+      transition: none;
     }
   }
   .main {
@@ -2500,10 +2759,26 @@
      an isolated right-side drawer. */
   @media (max-width: 63.9rem) {
     .build,
-    .build.with-rail {
+    .build.with-rail,
+    .build.with-files,
+    .build.with-files.with-rail {
       grid-template-columns: minmax(0, 1fr);
       height: var(--content-h);
       min-height: 32rem;
+    }
+    /* B13 — below the split the explorer is a sheet from the left, mirroring
+       the background-work drawer on the right. Same pattern, opposite edge, so
+       neither can be mistaken for the other. */
+    .files-slot.drawer {
+      position: fixed;
+      inset: 0 auto 0 0;
+      z-index: 100;
+      width: min(20rem, 88vw);
+      padding: var(--space-3);
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      box-shadow: var(--shadow-2);
+      transition: transform var(--motion-shell) var(--ease-shell);
     }
     .rail-slot.drawer {
       position: fixed;

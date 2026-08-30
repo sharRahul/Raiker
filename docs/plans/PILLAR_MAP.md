@@ -231,6 +231,21 @@ the place the owner is standing.** The turn-coordinate work beside it
 the same shape a third time — three surfaces already carried the coordinate, one
 of them all the way into the web app's own types, and nothing accepted one.
 
+**A seventh, on 2026-08-30, and it is the same shape a fourth time.**
+[FIXED-321](FIXED_ITEMS.md#fixed-321--build-could-change-a-repository-and-never-show-it)
+— the file explorer Build never mounted — was one component away from existing:
+`ProjectExplorer` was built, tested, and rendered on Projects, and Build showed
+its owner nothing of the repository it was changing. What was genuinely missing
+was two reads, not a panel.
+
+[FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)
+is the *inverse* of the lesson and worth stating separately: not a capability
+with no route, but a **route that described the capability wrongly**. FIXED-279
+had already put the one rule in one place; it just had not reached the read the
+Permissions page is built from, so the page an owner decides from said **Off**
+about a capability the runtime would have run. Looking for the executor would not
+have caught it. Only using the page would.
+
 **The lesson to carry forward.** Five of these were built code with no route to
 it. That is not a coincidence and it is not laziness: a capability with an
 executor, a gate, a threat model and a passing acceptance suite reads as *done*

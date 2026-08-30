@@ -124,6 +124,12 @@ class TestCapabilityGateView:
             # that governs its capability, and for fifteen of them it did not.
             "gate_reality": "own_gate",
             "governance_note": "",
+            # BUG-239 — how the *enforcing* path reads an empty gate table, and
+            # what it would answer for this principal right now. Reported beside
+            # `state` so a surface cannot describe a capability as off when the
+            # runtime would run it.
+            "unset_resolution": "off",
+            "enforced_enabled": False,
         }
 
     def test_to_dict_no_secrets(self) -> None:
@@ -259,6 +265,8 @@ class TestRuntimeReadinessView:
                     "threat_model_ack_recorded": False,
                     "gate_reality": "own_gate",
                     "governance_note": "",
+                    "unset_resolution": "off",
+                    "enforced_enabled": False,
                 },
             ],
             "summary": {"owner_bootstrapped": True, "dangerous_caps_disabled": True},

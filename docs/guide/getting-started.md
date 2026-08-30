@@ -223,7 +223,7 @@ The sidebar groups every destination:
 | Group | Destinations |
 |---|---|
 | Home | Workbench — the live board: what is running, which agents are standing, what is scheduled, and what needs a decision |
-| Work | Chat, Build, Search Chat, Tasks, Projects |
+| Work | Chat, Build, Search chats, Tasks, Projects |
 | Knowledge | Memory, Knowledge Map |
 | Control | Approvals, Permissions, Models, Extensions |
 | Observe | Observability — overview, sessions, activity, checkpoints, diagnostics, live work, notifications |

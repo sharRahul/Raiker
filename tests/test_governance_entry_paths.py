@@ -68,6 +68,13 @@ LOCAL_GATE_CHECK_MODULES = {
     # MEM-10 reads admission first so Ask can degrade a passive read without
     # parking it, then routes allowed/auto execution through chokepoint B.
     "raiker/memory/query_embedding.py",
+    # BUG-239 — the same shape as `context/gatherer.py` above, for the owner
+    # rather than for the model. The gate *view* is a description, and it used
+    # to resolve an empty gate table its own way: Permissions said `web_fetch`
+    # was Off on a fresh account while `web_access.py` would have fetched.
+    # Reading the enforcing path's own answer is the only way a description of
+    # a gate can be held to the gate. It decides nothing.
+    "raiker/control/service.py",
 }
 
 #: Capabilities with a real executor that no product path constructs. Each is

@@ -21,6 +21,24 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
+ * The owner every live spec signs in as, unless it is *about* signing in.
+ *
+ * BUG-229 shared the sign-in *steps*; this is the fixture half of the same
+ * problem. Thirty-seven specs each declare their own password, so two of them
+ * cannot be run against one workspace — which is why every FIXED entry's
+ * evidence has to be re-seeded from scratch. A password is not evidence about
+ * anything a spec asserts.
+ *
+ * The environment override exists so a round can point the whole suite at an
+ * instance it did not create. Specs still landing on their own credential are
+ * tracked as [BUG-247](../../../docs/plans/TO_BE_FIXED.md).
+ */
+export const OWNER_CREDENTIALS = {
+  user: process.env.RAIKER_LIVE_OWNER ?? "owner",
+  password: process.env.RAIKER_LIVE_PASSWORD ?? "Raiker-live-owner-1!",
+};
+
+/**
  * Complete the first-run model/privacy/backup wizard if it is up.
  *
  * A brand-new instance opens it over the workbench (FIXED-133), and it is
@@ -285,12 +303,17 @@ export async function pickAnyThinkingLevel(
 export async function signInAsOwner(
   page: Page,
   base: string,
-  credentials: { user: string; password: string },
+  credentials: { user: string; password: string } = OWNER_CREDENTIALS,
 ): Promise<void> {
   await page.goto(`${base}/#/workbench`);
   await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
   const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill(credentials.user);
+  // The field mounts disabled while the bootstrap reads resolve. Waited for
+  // rather than filled optimistically: on a server that has only just started,
+  // the first attempt lands before the form is usable.
+  const username = page.getByLabel("Username");
+  await expect(username).toBeEnabled({ timeout: 60_000 });
+  await username.fill(credentials.user);
   await page.getByLabel("Password", { exact: true }).fill(credentials.password);
   if (await confirm.isVisible().catch(() => false)) {
     await confirm.fill(credentials.password);
@@ -305,5 +328,11 @@ export async function signInAsOwner(
     page.getByRole("button", { name: "Decide later" }).or(workbench).first(),
   ).toBeVisible({ timeout: 60_000 });
   await dismissFirstRunModelSetup(page);
-  await expect(workbench).toBeVisible({ timeout: 30_000 });
+  // Signed in, rather than *on the workbench*. A workspace with a saved startup
+  // route lands somewhere else entirely, and waiting for a greeting there is
+  // BUG-229 behaving exactly as recorded. The navigation rail is the thing that
+  // means "there is a session here", which is what every caller actually needs.
+  await expect(
+    page.getByRole("navigation", { name: "All navigation" }).or(workbench).first(),
+  ).toBeVisible({ timeout: 60_000 });
 }

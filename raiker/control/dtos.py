@@ -82,6 +82,18 @@ class CapabilityGateView:
     # For anything other than `own_gate`: the sentence naming what really
     # governs the work, or why nothing runs. Empty for `own_gate`.
     governance_note: str = ""
+    # BUG-239 — how this capability's *enforcing* path reads a gate table with
+    # nothing persisted in it: `off`, `shipped_default_unscoped`, or
+    # `shipped_default`. Read from `CAPABILITY_UNSET_RESOLUTION`, so the page
+    # describing a gate and the path enforcing it quote the same table.
+    unset_resolution: str = "off"
+    # What that path would answer *right now* for this principal. On a fresh
+    # account these two disagree for `web_fetch`: `state` is the fail-closed
+    # per-principal reading and this is the shipped default the tool actually
+    # gets. A page that shows only the first says Off about a capability that
+    # would run, which is the defect FIXED-279 closed for the model's context
+    # bundle and left standing on the screen the owner decides from.
+    enforced_enabled: bool = False
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -101,6 +113,8 @@ class CapabilityGateView:
             "threat_model_ack_recorded": self.threat_model_ack_recorded,
             "gate_reality": self.gate_reality,
             "governance_note": self.governance_note,
+            "unset_resolution": self.unset_resolution,
+            "enforced_enabled": self.enforced_enabled,
         }
 
 

@@ -1,7 +1,14 @@
 <script lang="ts">
   import type { CapabilityGate } from "../apiTypes";
 
-  let { gates }: { gates: CapabilityGate[] } = $props();
+  let {
+    gates,
+    total = gates.length,
+  }: {
+    gates: CapabilityGate[];
+    /** Every governed capability, so the summary can say what it is a summary of. */
+    total?: number;
+  } = $props();
 
   function isReady(gate: CapabilityGate): boolean {
     return Object.values(gate.readiness).every(Boolean);
@@ -29,6 +36,15 @@
     </div>
     <span class="delegation-rail" aria-hidden="true"><b>Owner</b><i></i><b>Signed turn</b></span>
   </div>
+  {#if total > gates.length}
+    <!-- A table that stops after eight rows without saying so reads as the whole
+         list. It is a summary, and the summary says which eight: the ones that
+         carry the most authority right now. -->
+    <p class="matrix-note">
+      The {gates.length} of {total} capabilities the agent currently carries the most authority
+      for. All {total} are listed below.
+    </p>
+  {/if}
   <!-- BUG-246 — two presentations of one list, and exactly one of them is in
        the accessibility tree at a time, because `display: none` removes the
        other from it. A three-column table at 390px scrolled its *verdict*
@@ -82,6 +98,7 @@
   .delegation-rail i { width:2.4rem; height:1px; background:var(--accent); position:relative; }
   .delegation-rail i::after { content:""; position:absolute; right:-1px; top:-3px; border-left:5px solid var(--accent); border-top:3px solid transparent; border-bottom:3px solid transparent; }
   .matrix-scroll { overflow-x:auto; }
+  .matrix-note { margin:0 var(--space-4) var(--space-3); color:var(--text-3); font-size:.78rem; }
   table { width:100%; border-collapse:collapse; font-size:.76rem; }
   th, td { padding:.58rem var(--space-4); text-align:left; border-bottom:1px solid var(--border); }
   tbody tr:last-child th, tbody tr:last-child td { border-bottom:0; }

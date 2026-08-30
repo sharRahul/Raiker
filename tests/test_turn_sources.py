@@ -576,3 +576,158 @@ class TestRetention:
 
         assert store.delete_session(_SESSION) is True
         assert store.load_agent_plan(_SESSION, _OWNER) is None
+
+
+class TestCitedExchangesOpen:
+    """BUG-245 — a cited past conversation names its exchanges and opens one.
+
+    FIXED-317 made `conversation_search` citable and FIXED-316 made a turn
+    coordinate openable; the two did not meet. The panel showed each exchange's
+    title and date above its text — which is what made the citation checkable —
+    and the exchanges were text, so verifying one meant retyping the title into
+    chat search.
+
+    The ledger's rule survives: one source per executed call. The anchors are
+    that source's own contents rather than ten sources, they are built from the
+    tool result the runtime read, and they are never taken from anything the
+    model wrote.
+    """
+
+    def test_a_search_carries_a_coordinate_for_every_exchange_it_returned(self) -> None:
+        draft = source_from_tool_result(
+            "conversation_search",
+            {"query": "key rotation"},
+            {
+                "status": "success",
+                "count": 2,
+                "results": [
+                    {
+                        "title": "Key rotation",
+                        "created_at": "2026-03-12T09:00:00Z",
+                        "session_id": "sess_a",
+                        "turn_id": "turn_9",
+                        "origin": "chat",
+                        "text": "We settled on monthly.",
+                    },
+                    {
+                        "title": "Refactor",
+                        "created_at": "2026-05-01T09:00:00Z",
+                        "session_id": "sess_b",
+                        "turn_id": "turn_2",
+                        "origin": "build",
+                        "text": "Confirmed monthly.",
+                    },
+                ],
+            },
+        )
+        assert draft is not None
+        assert [(a.session_id, a.turn_id, a.origin) for a in draft.anchors] == [
+            ("sess_a", "turn_9", "chat"),
+            ("sess_b", "turn_2", "build"),
+        ]
+
+    def test_a_hit_with_no_turn_is_not_offered_as_a_link(self) -> None:
+        # A link that lands at the top of a conversation is a worse answer than
+        # no link: it looks like it went to the exchange and did not.
+        draft = source_from_tool_result(
+            "conversation_search",
+            {"query": "x"},
+            {
+                "status": "success",
+                "count": 2,
+                "results": [
+                    {"title": "No coordinate", "session_id": "sess_a", "text": "a"},
+                    {"title": "Whole", "session_id": "sess_b", "turn_id": "t", "text": "b"},
+                ],
+            },
+        )
+        assert draft is not None
+        assert [a.session_id for a in draft.anchors] == ["sess_b"]
+
+    def test_only_conversation_recall_produces_anchors(self) -> None:
+        draft = source_from_tool_result(
+            "web_search",
+            {"query": "x"},
+            {"status": "success", "result_count": 1, "results": [{"title": "a"}]},
+        )
+        assert draft is not None
+        assert draft.anchors == ()
+
+    def test_anchors_survive_a_round_trip_through_storage(self, tmp_path: Path) -> None:
+        bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+        store = SQLiteStore(tmp_path)
+        draft = source_from_tool_result(
+            "conversation_search",
+            {"query": "rotation"},
+            {
+                "status": "success",
+                "count": 1,
+                "results": [
+                    {
+                        "title": "Key rotation",
+                        "created_at": "2026-03-12T09:00:00Z",
+                        "session_id": "sess_a",
+                        "turn_id": "turn_9",
+                        "text": "monthly",
+                    }
+                ],
+            },
+        )
+        assert draft is not None
+        record_sources(
+            store,
+            session_id="sess_now",
+            turn_id="turn_now",
+            principal_id="principal_owner",
+            drafts=[draft],
+            starting_ordinal=0,
+        )
+        [loaded] = load_sources(store, "sess_now", "principal_owner")
+        assert [(a.session_id, a.turn_id) for a in loaded.anchors] == [("sess_a", "turn_9")]
+
+    def test_a_malformed_stored_value_costs_the_links_and_not_the_source(self) -> None:
+        from raiker.runtime.turn_sources import anchors_from_json, source_from_row
+
+        assert anchors_from_json("not json") == ()
+        assert anchors_from_json('{"not": "a list"}') == ()
+        assert anchors_from_json("") == ()
+        row = source_from_row({"source_id": "s1", "title": "T", "anchors_json": "["})
+        assert row.title == "T"
+        assert row.anchors == ()
+
+    def test_the_open_panel_carries_the_coordinates_and_the_chip_does_not(
+        self, tmp_path: Path
+    ) -> None:
+        """A history load must not carry every search's hits.
+
+        The chip needs a label; only an opened source needs the coordinates, so
+        they ride with the passage rather than with `to_view`.
+        """
+        from raiker.runtime.turn_sources import SourceAnchor
+
+        source = TurnSource(
+            source_id="s1",
+            ordinal=1,
+            kind="conversation",
+            title="Past conversations: rotation",
+            passage="Key rotation · 2026-03-12\nmonthly",
+            anchors=(SourceAnchor("sess_a", "turn_9", "Key rotation", "2026-03-12"),),
+            turn_id="turn_now",
+        )
+        assert "anchors" not in source.to_view()
+        excerpt = resolve_source_excerpt(
+            SQLiteStore(tmp_path),
+            workspace_root=tmp_path,
+            source=source,
+            session_id="sess_now",
+            owner_principal_id="principal_owner",
+        )
+        assert excerpt["anchors"] == [
+            {
+                "session_id": "sess_a",
+                "turn_id": "turn_9",
+                "title": "Key rotation",
+                "created_at": "2026-03-12",
+                "origin": "chat",
+            }
+        ]

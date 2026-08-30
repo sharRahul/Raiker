@@ -193,6 +193,33 @@ and removed from every log, error and captured output for as long as the loan
 lasts. Only HTTPS GitHub remotes are pushable. Raiker never forces and never
 deletes a branch.
 
+## Reading the repository
+
+**Files** on the Build header opens the connected repository beside the
+conversation: a tree you expand one folder at a time, and a read-only viewer with
+syntax highlighting for the file you open. Drag the divider to resize it, or use
+the keyboard on it — arrow keys move it, `Home` and `End` take it to its limits.
+Below a narrow window it becomes a sheet from the left instead of a column.
+
+Three things it deliberately does not do:
+
+- **It never writes.** The two calls behind it are a directory listing and one
+  bounded file read, both resolved through the same path authority a turn writes
+  through and then re-checked against the repository's own root. A change to a
+  file is still a proposal you accept.
+- **It never walks the whole tree.** One directory is read when you open it, so
+  pointing Build at a large repository costs nothing until you look.
+- **It never guesses.** A file that is not text, is larger than the viewer's
+  limit, or has gone says which of those applies. A language the highlighter does
+  not ship a grammar for renders as plain text with no label rather than a wrong
+  one.
+
+**@** on the open file puts its path into the composer as the same mention the
+completion menu writes, so reading a file leads straight to asking about it.
+
+A GitHub repository is a coordinate, not a checkout: there are no files on this
+machine to browse, and the panel says so rather than showing an empty tree.
+
 ## Finding your way around code
 
 Turning on **Code map** lets Raiker index the repository Build points at, so the

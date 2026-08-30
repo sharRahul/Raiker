@@ -1,5 +1,5 @@
 export interface ModalDrawerOptions {
-  id: "navigation" | "build-background";
+  id: "navigation" | "build-background" | "build-files";
   container: HTMLElement;
   returnFocusTo: HTMLElement | null;
   backgroundElements: HTMLElement[];

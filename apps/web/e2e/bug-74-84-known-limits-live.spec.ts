@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { signInAsOwner } from "./hosted-provider";
 
 /**
  * Live evidence for the 2026-08-10 round: FIXED-161 through FIXED-170.
@@ -28,28 +29,16 @@ async function visit(page: Page, hash: string) {
   await page.waitForTimeout(400);
 }
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(page: Page) {
-  await page.goto(`${BASE}/#/home`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 30_000 });
-  await page.getByLabel("Username").fill("owner");
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirmPassword = page.getByLabel("Confirm password");
-  if (await confirmPassword.isVisible()) {
-    await confirmPassword.fill(PASSWORD);
-    await page
-      .getByRole("button", { name: "Create a User Account", exact: true })
-      .click();
-    await expect(
-      page.getByRole("heading", { name: "Choose how to run models" }),
-    ).toBeVisible({ timeout: 30_000 });
-    await capture(page, join(SHOTS, "round0810-01-first-run-model-setup.png"));
-    await page.getByRole("button", { name: "Skip for now" }).click();
-  } else {
-    await page.getByRole("button", { name: "Unlock Raiker" }).click();
-  }
-  await expect(page.getByRole("navigation", { name: /navigation/i })).toBeVisible({
-    timeout: 30_000,
-  });
+  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
 }
 
 test("the 2026-08-10 round's surfaces, live", async ({ page }) => {

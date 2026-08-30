@@ -52,7 +52,10 @@ function mount(partial: Partial<CodeReposView> = {}) {
 
 describe("RepoConnector", () => {
   it("connects a workspace folder", async () => {
-    const fetchMock = stubFetch({ "POST /api/code/repos": { ok: true, repo_id: "repo_1" } });
+    const fetchMock = stubFetch({
+      "POST /api/code/repos": { ok: true, repo_id: "repo_1" },
+      "PUT /api/code/repos/selection": { ok: true, selected_repo_id: "repo_1" },
+    });
     const onchanged = mount();
 
     await fireEvent.input(screen.getByLabelText(/folder inside this workspace/i), {
@@ -61,8 +64,68 @@ describe("RepoConnector", () => {
     await fireEvent.click(screen.getByRole("button", { name: /connect repository/i }));
 
     await waitFor(() => expect(onchanged).toHaveBeenCalled());
-    const body = JSON.parse(String(fetchMock.mock.calls.at(-1)?.[1]?.body));
-    expect(body).toEqual({ kind: "local", path: "projects/my-app" });
+    const connect = fetchMock.mock.calls.find(([u]) => String(u).endsWith("/api/code/repos"));
+    expect(JSON.parse(String(connect?.[1]?.body))).toEqual({
+      kind: "local",
+      path: "projects/my-app",
+    });
+  });
+
+  // Connecting the first repository is the owner saying which one this is. Build
+  // sitting on "No repository" afterwards reads as the connect having failed.
+  it("makes the first connected repository the active one", async () => {
+    const fetchMock = stubFetch({
+      "POST /api/code/repos": { ok: true, repo_id: "repo_1" },
+      "PUT /api/code/repos/selection": { ok: true, selected_repo_id: "repo_1" },
+    });
+    mount();
+
+    await fireEvent.input(screen.getByLabelText(/folder inside this workspace/i), {
+      target: { value: "projects/my-app" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /connect repository/i }));
+
+    await waitFor(() =>
+      expect(
+        fetchMock.mock.calls.some(([u]) => String(u).includes("/api/code/repos/selection")),
+      ).toBe(true),
+    );
+  });
+
+  // ...and never a second one. An active repository is a choice, and adding
+  // another must not silently move the work onto it.
+  it("leaves an already-active repository alone when a second is connected", async () => {
+    const fetchMock = stubFetch({
+      "POST /api/code/repos": { ok: true, repo_id: "repo_2" },
+      "PUT /api/code/repos/selection": { ok: true, selected_repo_id: "repo_2" },
+    });
+    const onchanged = mount({
+      repos: [
+        {
+          repo_id: "repo_1",
+          kind: "local",
+          label: "my-app",
+          selected: true,
+          created_at: "2026-08-08T09:00:00Z",
+          local_subpath: "projects/my-app",
+          local_exists: true,
+          github_owner: null,
+          github_repo: null,
+          branch: null,
+        },
+      ],
+      selected_repo_id: "repo_1",
+    });
+
+    await fireEvent.input(screen.getByLabelText(/folder inside this workspace/i), {
+      target: { value: "projects/other" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /connect repository/i }));
+
+    await waitFor(() => expect(onchanged).toHaveBeenCalled());
+    expect(
+      fetchMock.mock.calls.some(([u]) => String(u).includes("/api/code/repos/selection")),
+    ).toBe(false);
   });
 
   it("explains a path the runtime refused instead of showing a status code", async () => {

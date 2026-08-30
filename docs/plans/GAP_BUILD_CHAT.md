@@ -343,11 +343,22 @@ needs a workbench.
 
 #### B13 — No file tree and no editor
 
-`ProjectTreeNode.svelte` exists but Build
-mounts no explorer, so a user cannot see the repository the agent is working in,
-open a file, or read the result of a change without leaving the app.
-**Work:** a resizable left explorer over the connected repository plus a
-read-only viewer with syntax highlighting, promoted to an editor once B1 lands.
+✅ **Complete — see
+[FIXED-321](FIXED_ITEMS.md#fixed-321--build-could-change-a-repository-and-never-show-it)
+(2026-08-30).** **Files** on the Build header opens the connected repository
+beside the conversation: a resizable, lazily-expanded tree and a read-only viewer
+with the transcript's own locally-shipped highlighter. Two new reads sit behind
+it, `GET /api/code/repos/{id}/browse` and `.../file`, both resolved through the
+same `PathAuthority` a turn writes through and then re-checked against the
+repository's own root, so a repository reference cannot become a workspace-wide
+file browser. Below the split it is a sheet from the left, mirroring the
+background-work rail on the opposite edge; **@** puts the open file's path into
+the composer.
+
+**Deliberately still read-only.** Promoting it to an editor would give the
+browser a write path to the repository that does not pass through a proposal the
+owner accepts, which is the one property Build's whole approval story rests on.
+A change to a file is still a change the owner decides.
 
 #### B14 — No diff review surface in Build
 
@@ -508,7 +519,9 @@ it. **B19 has landed**, which is the tier-3 item that changes daily use most: th
 composer has commands, `@`-mention completion over the code map, a keyboard map,
 and per-message edit and retry. **B16 was already closed** by BUG-206 slice D and is recorded as such above; **B18 has
 now landed**, which is the tier-3 item that changes what an owner dares leave
-running. B13 and B14's remainder are the remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
+running. **B13 landed 2026-08-30** — the repository is on screen beside the
+conversation about it, which is the tier-3 item an owner meets on every turn.
+B14's remainder is the remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---

@@ -26,7 +26,46 @@ function routes(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function gate(partial: Record<string, unknown> = {}) {
+  return {
+    capability: "shell_execution",
+    phase: 1,
+    state: "disabled",
+    default_state: "disabled",
+    source: "principal_fail_closed",
+    runtime_enabled: false,
+    allowed_transitions: [],
+    can_current_principal_change: true,
+    blocked_reason_code: null,
+    readiness: {},
+    decision_mode: "ask",
+    ...partial,
+  };
+}
+
 describe("ObserveView", () => {
+  // BUG-239 — a gate the enforcing path would run is not a closed gate.
+  // Counting `!runtime_enabled` alone said "2 closed" on a workspace where one
+  // of the two would have run, which is the defect Permissions had one surface
+  // over.
+  it("counts as closed only the gates that would actually fail closed", async () => {
+    stubFetch(
+      routes({
+        "GET /api/runtime-readiness": {
+          ...READINESS,
+          gates: [
+            gate(),
+            gate({ capability: "web_fetch", enforced_enabled: true }),
+          ],
+        },
+      }),
+    );
+    render(ObserveView, { props: { tab: "overview" } });
+    const tile = (await screen.findByText("Closed capability gates")).closest("article.tile");
+    expect(tile).not.toBeNull();
+    expect(tile?.querySelector(".value")).toHaveTextContent("1");
+  });
+
   it("shows a loading state while the runtime status is read", async () => {
     stubFetchPending();
     render(ObserveView, { props: { tab: "overview" } });

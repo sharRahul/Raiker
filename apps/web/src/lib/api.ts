@@ -31,6 +31,8 @@ import type {
   ComposerApprovalModeSettings,
   CodeMapPaths,
   CodeMapStatus,
+  CodeRepoBrowseView,
+  CodeRepoFileView,
   CodeReposView,
   CredentialLifecycle,
   ConnectionsView,
@@ -1659,6 +1661,18 @@ export const api = {
   // and performs no network call — its content still reaches a turn through the
   // brokered `github_read` tool under the connector_github_runtime gate.
   codeRepos: () => request<CodeReposView>("/api/code/repos"),
+  // B13 — the connected repository, one directory at a time and one bounded
+  // file at a time. Both are reads through the same path authority a turn
+  // writes through, so the explorer can never reach further than the agent can.
+  browseCodeRepo: (repoId: string, path = "") =>
+    request<CodeRepoBrowseView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/browse` +
+        (path === "" ? "" : `?path=${encodeURIComponent(path)}`),
+    ),
+  readCodeRepoFile: (repoId: string, path: string) =>
+    request<CodeRepoFileView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
+    ),
   connectLocalRepo: (path: string) =>
     postJson<{ ok: boolean; repo_id: string; local_subpath: string }>(
       "/api/code/repos",

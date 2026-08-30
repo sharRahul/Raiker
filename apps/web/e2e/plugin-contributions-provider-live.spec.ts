@@ -15,7 +15,7 @@ import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, useHostedModel } from "./hosted-provider";
+import { signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? process.cwd();
@@ -58,27 +58,16 @@ function removeContributions() {
 let context: BrowserContext;
 let page: Page;
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(target: Page) {
-  await target.goto(`${BASE}/#/workbench`);
-  await expect(target.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });
-  await target.getByLabel("Username").fill("Rahul");
-  await target.getByLabel("Password", { exact: true }).fill("Ithink@10");
-  const confirm = target.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill("Ithink@10");
-    await target.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await target.getByRole("button", { name: "Unlock Raiker", exact: true }).click();
-  }
-  // Fresh instance and returning owner are greeted differently, and a workspace
-  // becomes the second the moment it holds any work — so sign-in must accept
-  // either rather than depending on how much history this instance has.
-  const workbench = target.getByRole("heading", { name: /Welcome (to your Work Dashboard|back)/ });
-  await expect(
-    target.getByRole("button", { name: "Decide later" }).or(workbench).first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(target);
-  await expect(workbench.first()).toBeVisible({ timeout: 30_000 });
+  await signInAsOwner(target, BASE, { user: "Rahul", password: "Ithink@10" });
 }
 
 test.describe.configure({ mode: "serial" });

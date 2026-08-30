@@ -91,6 +91,22 @@ Connecting and disconnecting append `code_repo_connected` /
 `code_repo_disconnected` audit events. Every route is account-scoped: one
 account cannot read, select, or delete another's references.
 
+`GET /api/code/repos/{repo_id}/browse` lists one directory of a connected local
+repository, and `GET /api/code/repos/{repo_id}/file` returns one bounded text
+file. Both are **reads only** — there is no write path in
+`raiker/api/routes_code_files.py` — and both resolve through the same
+`PathAuthority` a turn writes through, then re-check the result against the
+repository's own root, so a repository reference cannot become a workspace-wide
+file browser. Contents come back through `raiker.tools.filesystem.read_file`, the
+bounded read the agent's own `read_file` tool performs, so a binary
+(`binary_file`), missing (`file_not_found`) or oversize (`file_too_large`) file
+answers with the same reason rather than a second opinion written for the
+browser. Browse answers at most `MAX_BROWSE_ENTRIES` children with `truncated`;
+the viewer's cap is `MAX_VIEW_BYTES`. A GitHub coordinate has no checkout, so it
+answers `root_missing` with `reason_code: "repo_not_checked_out"` — never an
+empty tree, which would read as "no files". Both are account-scoped: another
+account's repository answers `repo_not_found`.
+
 `POST /api/tasks` accepts a `recurrence` of `background`, `continuous`,
 `hourly`, `daily`, or `weekly`. An unrecognised cadence is refused with
 `invalid_recurrence:<value>` rather than stored as a one-shot. Recurring

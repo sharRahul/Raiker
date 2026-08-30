@@ -11,6 +11,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import type { Page } from "@playwright/test";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8799";
 const PASSWORD = "Live-review-password-C1!";
@@ -20,20 +21,16 @@ const SHOTS = "../../docs/plans/screenshots/working";
 // turn really leaves the box through the owner's own Ollama host.
 const MODEL = "gemma4:31b-cloud";
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * Every spec used to carry its own copy, and each copy encoded an assumption
+ * about the *state* of the instance — usually the empty-workspace greeting —
+ * that had nothing to do with what the spec asserts. A suite then passed on a
+ * fresh instance and failed at its first step on a used one.
+ */
 async function signIn(page: Page) {
-  await page.goto(`${BASE}/#/home`);
-  if (await page.getByLabel("Confirm password").isVisible().catch(() => false)) {
-    await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-    await page.getByLabel("Confirm password").fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible().catch(() => false)) {
-    await page.getByLabel("Username").fill("owner");
-    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-    await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-  }
-  await expect(page.getByRole("heading", { name: /Work Dashboard/ })).toBeVisible({ timeout: 25_000 });
+  await signInAsOwner(page, BASE, { user: "owner", password: PASSWORD });
 }
 
 test.describe.configure({ mode: "serial" });

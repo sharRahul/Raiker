@@ -33,6 +33,7 @@
   import Icon from "./Icon.svelte";
   import ImageViewport from "./ImageViewport.svelte";
   import Markdown from "./Markdown.svelte";
+  import SourceAnchorLinks from "./SourceAnchorLinks.svelte";
   import { splitExcerpt } from "../citations";
   import type { AttachmentPreview, SourceExcerptView } from "../apiTypes";
 
@@ -276,7 +277,12 @@
             <p class="muted truncation">Showing the passage and the text around it only.</p>
           {/if}
         {/if}
-        {#if sourceHref !== null}
+        <!-- BUG-245 — a search that returned ten exchanges now names all ten
+             as links. The single "Open conversation" below lands at the top of
+             a conversation and is kept only for a source that has no exchange
+             coordinates of its own to offer. -->
+        <SourceAnchorLinks anchors={source.anchors ?? []} />
+        {#if sourceHref !== null && (source.anchors ?? []).length === 0}
           <a class="btn btn-ghost btn-sm" href={sourceHref}>Open conversation</a>
         {/if}
       </section>
@@ -352,7 +358,17 @@
     padding-top: var(--space-3);
     border-top: 1px solid var(--border);
   }
-  .source-head { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+  /* `justify-items: start` sizes each row to its content, so a child that
+     cannot wrap widens the whole pane. Every row is capped instead. */
+  .source > :global(*) { max-width: 100%; min-width: 0; }
+  .source-head {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+  .source-head strong { overflow-wrap: anywhere; }
   .source-eyebrow {
     display: inline-flex;
     align-items: center;

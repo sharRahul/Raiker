@@ -175,3 +175,90 @@ def test_the_runtime_status_is_carried_and_not_acted_on(store: SQLiteStore) -> N
     assert admission.runtime_active is True
     # And the gate answer does not consult it either way.
     assert admission.admitted is True
+
+
+# ── What the Permissions page is told (BUG-239) ─────────────────────────────
+# FIXED-279 made the enforcing paths and the model's context bundle read the
+# same table. It left the surface an owner actually decides from reading its
+# own: on a fresh account Permissions said `web_fetch` was **Off** while the
+# tool would have fetched. The gate view now carries both answers, so the page
+# cannot describe a capability as off when the enforcing path would run it.
+
+
+def test_a_gate_view_reports_the_resolution_its_enforcing_path_uses(
+    tmp_path: Path,
+) -> None:
+    from raiker.cli.principal_resolver import bootstrap_owner
+    from raiker.control.service import RuntimeControlService
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    gates = {
+        gate.capability: gate
+        for gate in RuntimeControlService(tmp_path).list_capability_gates("principal_owner")
+    }
+
+    assert gates["web_fetch"].unset_resolution == UNSET_SHIPPED_DEFAULT
+    assert gates["code_map_indexing"].unset_resolution == UNSET_SHIPPED_DEFAULT_UNSCOPED
+    assert gates["shell_execution"].unset_resolution == UNSET_OFF
+
+
+def test_the_view_says_a_capability_is_on_when_the_enforcing_path_would_run_it(
+    tmp_path: Path,
+) -> None:
+    """The defect, stated as an assertion.
+
+    An *account* is what makes the per-principal reading fail-closed, so it is
+    the account case that used to disagree with itself: nothing is persisted,
+    `state` reads disabled, and the tool would nevertheless fetch.
+    """
+    from raiker.cli.principal_resolver import bootstrap_owner
+    from raiker.control.service import RuntimeControlService
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    now = utc_now()
+    SQLiteStore(tmp_path).upsert_account(
+        "principal_owner", "owner", "x", "argon2id", now, now
+    )
+    gates = {
+        gate.capability: gate
+        for gate in RuntimeControlService(tmp_path).list_capability_gates("principal_owner")
+    }
+
+    assert gates["web_fetch"].state == "disabled"
+    assert gates["web_fetch"].enforced_enabled is True
+    # And the ordinary case is unchanged — off means off.
+    assert gates["shell_execution"].state == "disabled"
+    assert gates["shell_execution"].enforced_enabled is False
+
+
+def test_every_gate_view_quotes_the_enforcing_paths_own_answer(tmp_path: Path) -> None:
+    """The invariant, not the instance: one row disagreeing is the whole defect."""
+    from raiker.cli.principal_resolver import bootstrap_owner
+    from raiker.control.service import RuntimeControlService
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    now = utc_now()
+    store = SQLiteStore(tmp_path)
+    store.upsert_account("principal_owner", "owner", "x", "argon2id", now, now)
+    for gate in RuntimeControlService(tmp_path).list_capability_gates("principal_owner"):
+        assert gate.enforced_enabled == gate_enabled(
+            store, "principal_owner", gate.capability
+        ), gate.capability
+        assert gate.unset_resolution == unset_resolution_for(gate.capability)
+
+
+def test_an_owners_stored_refusal_wins_in_the_view_as_it_does_in_the_path(
+    tmp_path: Path,
+) -> None:
+    from raiker.cli.principal_resolver import bootstrap_owner
+    from raiker.control.service import RuntimeControlService
+
+    bootstrap_owner("owner", "Owner", workspace_root=tmp_path)
+    store = SQLiteStore(tmp_path)
+    store.upsert_capability_gate_state(_row("web_fetch", "disabled"))
+    gate = next(
+        g
+        for g in RuntimeControlService(tmp_path).list_capability_gates("principal_owner")
+        if g.capability == "web_fetch"
+    )
+    assert gate.enforced_enabled is False

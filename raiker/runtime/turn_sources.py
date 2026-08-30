@@ -38,6 +38,7 @@ as the markers the model wrote: the ledger is a fact, the marker is a claim.
 
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -88,6 +89,110 @@ STATUS_UNSUPPORTED_SOURCE = "unsupported_source"
 STATUS_NOT_AUTHORIZED = "not_authorized"
 
 
+#: Most exchanges one cited search is allowed to name. A search that matched two
+#: hundred is not a citation the owner is going to check; it is a wall of links.
+MAX_SOURCE_ANCHORS = 20
+
+
+@dataclass(frozen=True)
+class SourceAnchor:
+    """One exchange a cited call returned, as a coordinate that opens (BUG-245).
+
+    Deliberately four fields and no text. The passage already carries what was
+    read; this carries only where it was read *from*, so a chip can offer the
+    link the panel's own heading was already describing in words.
+    """
+
+    session_id: str
+    turn_id: str
+    title: str = ""
+    created_at: str = ""
+    #: Which surface the exchange happened on, so the link opens where the work
+    #: is. A Build conversation opened in Chat is the right coordinate and the
+    #: wrong room.
+    origin: str = "chat"
+
+    def to_view(self) -> dict[str, str]:
+        return {
+            "session_id": self.session_id,
+            "turn_id": self.turn_id,
+            "title": self.title,
+            "created_at": self.created_at,
+            "origin": self.origin,
+        }
+
+
+def anchors_from_tool_result(
+    tool_name: str, output: dict[str, Any] | None
+) -> tuple[SourceAnchor, ...]:
+    """The exchanges a cited call returned, read off the runtime's own result.
+
+    Only `conversation_search` produces these today, and only for rows that
+    carry both halves of a coordinate: a hit without a `turn_id` cannot be
+    opened at the exchange, and offering a link that lands at the top of a
+    conversation would be a worse answer than offering none.
+
+    Pure and total. Anything unexpected — a non-dict row, a missing field, a
+    result that is not a list — contributes nothing rather than raising: this
+    runs inside recording a turn, and a malformed result must cost a link, never
+    the turn.
+    """
+    if tool_name != "conversation_search" or not isinstance(output, dict):
+        return ()
+    anchors: list[SourceAnchor] = []
+    seen: set[tuple[str, str]] = set()
+    for item in output.get("results", []) or []:
+        if not isinstance(item, dict):
+            continue
+        session_id = _text(item.get("session_id"), 120)
+        turn_id = _text(item.get("turn_id") or item.get("match_turn_id"), 120)
+        if not session_id or not turn_id or (session_id, turn_id) in seen:
+            continue
+        seen.add((session_id, turn_id))
+        anchors.append(
+            SourceAnchor(
+                session_id=session_id,
+                turn_id=turn_id,
+                title=_text(item.get("title"), 200),
+                created_at=_text(item.get("created_at"), 40),
+                origin=_text(item.get("origin"), 20) or "chat",
+            )
+        )
+        if len(anchors) >= MAX_SOURCE_ANCHORS:
+            break
+    return tuple(anchors)
+
+
+def anchors_from_json(raw: str) -> tuple[SourceAnchor, ...]:
+    """Read anchors back out of storage, tolerating anything but a valid list."""
+    if not raw:
+        return ()
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return ()
+    if not isinstance(parsed, list):
+        return ()
+    anchors: list[SourceAnchor] = []
+    for item in parsed[:MAX_SOURCE_ANCHORS]:
+        if not isinstance(item, dict):
+            continue
+        session_id = str(item.get("session_id") or "")
+        turn_id = str(item.get("turn_id") or "")
+        if not session_id or not turn_id:
+            continue
+        anchors.append(
+            SourceAnchor(
+                session_id=session_id,
+                turn_id=turn_id,
+                title=str(item.get("title") or ""),
+                created_at=str(item.get("created_at") or ""),
+                origin=str(item.get("origin") or "chat"),
+            )
+        )
+    return tuple(anchors)
+
+
 @dataclass(frozen=True)
 class TurnSource:
     """One thing a turn read, as the transcript and the model both see it."""
@@ -101,6 +206,10 @@ class TurnSource:
     detail: str = ""
     attachment_id: str = ""
     passage: str = ""
+    #: BUG-245 — the exchanges this one call returned, as openable coordinates.
+    #: Built from the tool result the runtime read, never from anything the model
+    #: wrote. Empty for every source that is not a set of conversation hits.
+    anchors: tuple[SourceAnchor, ...] = ()
     #: Set when the source is read back; the writer supplies it out of band.
     turn_id: str = ""
 
@@ -140,6 +249,11 @@ class TurnSource:
             "detail": self.detail,
             "attachment_id": self.attachment_id,
             "passage": self.passage,
+            "anchors_json": (
+                json.dumps([anchor.to_view() for anchor in self.anchors])
+                if self.anchors
+                else ""
+            ),
         }
 
 
@@ -154,6 +268,7 @@ class SourceDraft:
     detail: str = ""
     attachment_id: str = ""
     passage: str = ""
+    anchors: tuple[SourceAnchor, ...] = ()
 
 
 def _text(value: Any, limit: int = 400) -> str:
@@ -251,6 +366,9 @@ def source_from_tool_result(
             tool_name=tool_name,
             detail=_count_detail(output.get("count", len(results)), "exchanges"),
             passage=passage,
+            # BUG-245 — the passage names each exchange; these make each one
+            # openable at that exchange rather than only readable as a heading.
+            anchors=anchors_from_tool_result(tool_name, output),
         )
     # The other half of the code map. `code_map_search` says where a name is
     # declared and has always been citable; this says where it is *used*, and
@@ -504,6 +622,7 @@ def record_sources(
                 detail=draft.detail,
                 attachment_id=draft.attachment_id,
                 passage=draft.passage,
+                anchors=draft.anchors,
             )
         )
     if recorded:
@@ -545,6 +664,7 @@ def source_from_row(row: dict[str, Any]) -> TurnSource:
         detail=str(row.get("detail", "")),
         attachment_id=str(row.get("attachment_id", "")),
         passage=str(row.get("passage", "")),
+        anchors=anchors_from_json(str(row.get("anchors_json", "") or "")),
         turn_id=str(row.get("turn_id", "")),
     )
 
@@ -656,6 +776,11 @@ def resolve_source_excerpt(
             "attachment_id": source.attachment_id,
             "truncated": False,
             "resolution_method": "",
+            # BUG-245 — served with the passage rather than with the chip. The
+            # strip needs a label; only the open panel needs the coordinates,
+            # and putting them in `to_view` would carry every search's hits into
+            # every history load.
+            "anchors": [anchor.to_view() for anchor in source.anchors],
         }
         payload.update(fields)
         return payload

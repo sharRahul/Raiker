@@ -27,7 +27,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, refreshHostedReadiness, useHostedModel } from "./hosted-provider";
+import { refreshHostedReadiness, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -42,36 +42,15 @@ test.describe.configure({ mode: "serial" });
 let context: BrowserContext;
 let page: Page;
 
+/**
+ * BUG-229 — sign in through the one shared helper.
+ *
+ * The waits this used to carry — for the username field to become enabled, and
+ * for "signed in" rather than "on the workbench" — are now the helper's, so
+ * every live spec gets them instead of this one.
+ */
 async function signIn(target: Page) {
-  await target.goto(`${BASE}/#/workbench`);
-  await expect(target.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
-  const confirm = target.getByLabel("Confirm password");
-  // The field mounts disabled while the bootstrap reads resolve. Waited for
-  // rather than filled optimistically: on a server that has only just started,
-  // the first attempt lands before the form is usable.
-  const username = target.getByLabel("Username");
-  await expect(username).toBeEnabled({ timeout: 60_000 });
-  await username.fill("owner");
-  await target.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await target.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await target.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  const workbench = target.getByRole("heading", { name: /Welcome to your Work Dashboard/ });
-  await expect(
-    target.getByRole("button", { name: "Decide later" }).or(workbench).first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(target);
-  // Signed in, rather than *first-run* signed in. A workspace this spec has
-  // already configured lands past the welcome heading, and waiting for that
-  // heading is [BUG-229](../../../docs/plans/TO_BE_FIXED.md) behaving exactly as
-  // recorded. The navigation rail is the thing that means "there is a session
-  // here", which is what the rest of the spec actually needs.
-  await expect(
-    target.getByRole("navigation", { name: "All navigation" }).or(workbench).first(),
-  ).toBeVisible({ timeout: 60_000 });
+  await signInAsOwner(target, BASE, { user: "owner", password: PASSWORD });
 }
 
 /**

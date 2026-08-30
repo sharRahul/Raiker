@@ -125,15 +125,26 @@
     busy = true;
     error = null;
     try {
+      // Connecting the *first* repository also makes it the active one. An
+      // owner who has just named the folder they want to work in has already
+      // said which repository this is, and leaving Build on "No repository"
+      // until they find a second button reads as the connect having failed.
+      // It is deliberately only the first: an existing active repository is a
+      // choice, and adding a second one must never silently move the work.
+      const adopt = (view?.repos.length ?? 0) === 0;
+      let connected: string | null = null;
       if (source === "local") {
-        await api.connectLocalRepo(localPath.trim());
+        connected = (await api.connectLocalRepo(localPath.trim())).repo_id;
         localPath = "";
       } else {
-        await api.connectGithubRepo(owner.trim(), repo.trim(), branch.trim() || undefined);
+        connected = (
+          await api.connectGithubRepo(owner.trim(), repo.trim(), branch.trim() || undefined)
+        ).repo_id;
         owner = "";
         repo = "";
         branch = "";
       }
+      if (adopt && connected !== null) await api.selectCodeRepo(connected);
       await onchanged();
     } catch (e) {
       error = connectError(e);

@@ -288,7 +288,7 @@ does.
 
 ---
 
-## 4. The eleven modules that check the gate themselves
+## 4. The twelve modules that check the gate themselves
 
 These read the capability gate directly rather than calling
 `RuntimeAuthority.check_capability_gate` through `route_action`. **Since
@@ -310,11 +310,25 @@ which is GEP-01 closed.
 | `raiker/tools/subagent_tools.py` | `subagents` | Local delegation (GEP-04) |
 | `raiker/context/gatherer.py` | every gate it reports | **Describes rather than enforces** |
 | `raiker/memory/query_embedding.py` | `model_provider_runtime` | **Egress admission precheck, followed by chokepoint B** |
+| `raiker/control/service.py` | every gate it reports | **Describes rather than enforces** (BUG-239) |
 
 **This is defensible and it is not free.** The design intent is stated in
 `raiker/policy/engine.py:132–138`: a projected MCP tool is *read-shaped at the
 policy layer* because what actually governs it is enforced inside the tool. The
 same argument covers the others.
+
+**The two describing modules are here for the opposite reason to the rest.**
+`context/gatherer.py` and, since 2026-08-30, `control/service.py` decide nothing
+at all — they *report* a gate, to the model and to the owner respectively. They
+read `capability_admission` precisely because a description that resolves an
+empty gate table its own way is a description that can contradict the thing it
+describes, and both of them once did: the gatherer told the model
+`web_fetch: disabled` on an install where the tool would have fetched, and the
+gate view told the owner the same thing on the Permissions page
+([FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run)).
+Holding a description to the enforcing path's own answer is the only way to
+close that, and it is why a *read* belongs in a list of modules that skip
+chokepoint B.
 
 **Two drifts were live in the original eight copies, and neither was visible from any one
 of them.** Both are closed by the shared helper:

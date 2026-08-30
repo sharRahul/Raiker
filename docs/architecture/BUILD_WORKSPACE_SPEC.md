@@ -132,6 +132,42 @@ another's. Disconnecting forgets the reference and never touches the folder or
 the remote. Both transitions append `code_repo_connected` /
 `code_repo_disconnected` audit events.
 
+Connecting the **first** repository also selects it. An owner who has just named
+the folder they want to work in has said which repository this is, and leaving
+Build on *No repository* until they find a second control reads as the connect
+having failed. It is deliberately only the first: an existing active repository
+is a choice, and adding a second must never silently move the work onto it.
+
+### Reading it (B13)
+
+**Files** on the Build header opens the connected repository beside the
+conversation: a resizable, lazily-expanded tree over
+`GET /api/code/repos/{id}/browse`, and a read-only viewer over
+`GET /api/code/repos/{id}/file`. Below the split it becomes a dismissible sheet
+from the left, mirroring the background-work rail on the opposite edge.
+
+Four properties define it, and each is a boundary rather than a rendering
+choice:
+
+- **Read-only, structurally.** There is no write path in the module behind it. A
+  change to a file is still a proposal the owner accepts, which is what Build's
+  whole approval story rests on. Promoting the viewer to an editor would give the
+  browser a write path that does not pass through that decision.
+- **Confined twice.** Every path resolves through the same `PathAuthority` a turn
+  writes through, and is then re-checked against the repository's own root. The
+  authority alone would serve anything inside the workspace; the second check is
+  what keeps a *repository* reference from becoming a workspace file browser.
+- **Lazy.** One directory is read when it is opened. Pointing Build at a large
+  repository costs nothing until the owner looks.
+- **It states which absence applies.** A GitHub coordinate has no checkout; a
+  local folder may have moved. Both are said in words, because an empty tree
+  reads as "no files".
+
+Highlighting is the transcript's own locally-shipped, allowlisted scanner: no
+CDN grammar, escaped at emit time, a closed tag set. A language the scanner does
+not ship renders as plain text with no label — mis-highlighting is a claim about
+what a file is, and a wrong claim is worse than none.
+
 ## Background work and scheduled agents
 
 The right rail shows what is running and is collapsible, because background work

@@ -408,8 +408,9 @@ would widen egress says so in the diff.
 
 **Today.** `raiker/events/` writes an append-only, hash-chained log and
 `raiker/checkpoints/` records restorable state. FIXED-94 makes the turn plan a
-recovery point rather than a progress bar, and B18 (`GAP_BUILD_CHAT.md`) asks for
-a per-turn rewind in Build.
+recovery point rather than a progress bar, and B18's per-turn rewind landed on
+2026-08-29 as [FIXED-315](FIXED_ITEMS.md#fixed-315--the-one-control-that-makes-an-agent-safe-to-leave-running-was-in-another-route)
+— so "rewind to before this turn" is a control an owner has, from the turn.
 
 **Missing.** Checkpoints restore *state*. They do not let anyone re-run the
 decision. Raiker can show what changed and cannot prove why the model chose it,

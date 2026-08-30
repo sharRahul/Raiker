@@ -68,6 +68,47 @@ describe("McpView", () => {
     expect(screen.getByText(/python .raiker\/mcp\/servers\/echo.py/)).toBeInTheDocument();
   });
 
+  // A closed connector gate produced two amber notices one under the other,
+  // saying the same fact in different words and naming the same page by two
+  // different names — which reads as two problems rather than one.
+  it("says a closed connector gate once, not twice", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/capability-gates": [
+        makeGate({ capability: "mcp_builder_runtime", runtime_enabled: true }),
+        makeGate({
+          capability: "mcp_connector_runtime",
+          state: "disabled",
+          runtime_enabled: false,
+          allowed_transitions: ["enabled_policy_gated", "enabled_runtime"],
+        }),
+      ],
+      ...monitorRoutes(access({ callable: false, reason_code: "mcp_gate_disabled" })),
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getByText(/The MCP connector is turned off/)).toBeInTheDocument(),
+    );
+    expect(screen.queryByText(/cannot call any MCP tool/)).not.toBeInTheDocument();
+    // And the page an owner is sent to is called by the name the rail gives it.
+    expect(screen.queryByRole("link", { name: "Capabilities" })).not.toBeInTheDocument();
+  });
+
+  // The other reasons are not duplicates of anything, so they still show.
+  it("still explains a decision mode that withholds every MCP tool", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(
+        access({ callable: false, reason_code: "mcp_denied_by_decision_mode", decision_mode: "deny" }),
+      ),
+    });
+    render(McpView);
+    await waitFor(() =>
+      expect(screen.getByText(/set to Deny/)).toBeInTheDocument(),
+    );
+  });
+
   it("warns and points to Permissions when the gate is off", async () => {
     stubFetch({
       "GET /api/mcp/servers": [],
@@ -88,7 +129,7 @@ describe("McpView", () => {
     });
     render(McpView);
     await waitFor(() => expect(screen.getAllByText(/is turned off/i).length).toBe(2));
-    expect(screen.getAllByRole("link", { name: "Open Permissions" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /in Permissions$/ })[0]).toHaveAttribute(
       "href",
       "#/capabilities",
     );
@@ -122,7 +163,7 @@ describe("McpView", () => {
     expect(screen.queryByText(/is turned off/i)).not.toBeInTheDocument();
     // One runtime: raising a capability to runtime level is a Permissions
     // action, so the link goes there rather than to a mode picker.
-    expect(screen.getAllByRole("link", { name: "Open Permissions" })[0]).toHaveAttribute(
+    expect(screen.getAllByRole("link", { name: /in Permissions$/ })[0]).toHaveAttribute(
       "href",
       "#/capabilities",
     );

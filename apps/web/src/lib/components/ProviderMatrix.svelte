@@ -29,6 +29,7 @@
    * against the exact model before any work, and a key's value is never read
    * back — the row can only report that one is stored.
    */
+  import { onDestroy } from "svelte";
   import { api, ApiError } from "../api";
   import type { ModelProfile, ProviderModelList } from "../apiTypes";
   import { providerName } from "../format";
@@ -74,7 +75,7 @@
     provider: string;
     label: string;
     /** How this row finds models. */
-    kind: "gguf" | "detect" | "key" | "endpoint";
+    kind: "gguf" | "detect" | "key" | "endpoint" | "subscription";
     source: string;
     /** True once a credential is stored for this profile. */
     connected: boolean;
@@ -92,7 +93,9 @@
       if (seen.has(profile.provider)) continue;
       seen.add(profile.provider);
       const kind: Row["kind"] =
-        profile.provider === "llama.cpp"
+        profile.provider === "chatgpt-codex"
+          ? "subscription"
+          : profile.provider === "llama.cpp"
           ? "gguf"
           : profile.provider === "openai-compatible"
             ? "endpoint"
@@ -105,7 +108,9 @@
         label: providerName(profile.provider),
         kind,
         source:
-          kind === "key"
+          kind === "subscription"
+            ? "Uses the ChatGPT subscription already signed in to the local Codex client. Raiker never receives its token."
+            : kind === "key"
             ? (KEY_SOURCE[profile.provider] ?? "the provider's own console")
             : (LOCAL_SOURCE[profile.provider] ?? "this device"),
         connected: profile.connection_configured === true,
@@ -121,7 +126,7 @@
     }
     // On this machine first: it needs no account, so it is the cheapest answer to
     // the question the screen is asking.
-    const order: Row["kind"][] = ["gguf", "detect", "endpoint", "key"];
+    const order: Row["kind"][] = ["gguf", "detect", "endpoint", "subscription", "key"];
     return built.sort((left, right) => order.indexOf(left.kind) - order.indexOf(right.kind));
   });
 
@@ -143,6 +148,7 @@
    */
   let stored = $state<Record<string, boolean>>({});
   const isConnected = (row: Row) => stored[row.profileId] ?? row.connected;
+  let loginPolling: ReturnType<typeof setTimeout> | null = null;
 
   function set<T>(map: Record<string, T>, key: string, value: T): Record<string, T> {
     return { ...map, [key]: value };
@@ -253,6 +259,45 @@
           (error instanceof ApiError && error.reasonCode
             ? `${row.label} refused the credential (${error.reasonCode}).`
             : `${row.label} would not accept that credential.`),
+      );
+    } finally {
+      busy = drop(busy, row.profileId);
+    }
+  }
+
+  async function readSubscriptionStatus(row: Row, poll = false) {
+    try {
+      const status = await api.codexSubscriptionStatus();
+      const connected = status.connection_status === "connected";
+      stored = set(stored, row.profileId, connected);
+      if (connected) {
+        note = set(note, row.profileId, "ChatGPT subscription connected. Reading available models…");
+        await detect(row);
+      } else if (poll) {
+        note = set(note, row.profileId, "Finish sign-in in the browser. Raiker will check again shortly.");
+        loginPolling = setTimeout(() => void readSubscriptionStatus(row, true), 2000);
+      }
+    } catch {
+      failure = set(failure, row.profileId, "The local Codex client could not report ChatGPT sign-in status.");
+    }
+  }
+
+  async function startSubscriptionLogin(row: Row) {
+    busy = set(busy, row.profileId, "saving");
+    failure = drop(failure, row.profileId);
+    note = drop(note, row.profileId);
+    try {
+      await api.startCodexSubscriptionLogin();
+      note = set(note, row.profileId, "Finish sign-in in the browser. Raiker will check again shortly.");
+      if (loginPolling !== null) clearTimeout(loginPolling);
+      loginPolling = setTimeout(() => void readSubscriptionStatus(row, true), 2000);
+    } catch (error) {
+      failure = set(
+        failure,
+        row.profileId,
+        error instanceof ApiError && error.reasonCode
+          ? `ChatGPT sign-in could not start (${error.reasonCode}).`
+          : "ChatGPT sign-in could not start. Check that Codex is installed on this device.",
       );
     } finally {
       busy = drop(busy, row.profileId);
@@ -412,7 +457,12 @@
     void loadGguf();
     for (const row of rows) {
       if (row.kind === "detect" || (row.kind === "key" && isConnected(row))) void detect(row);
+      if (row.kind === "subscription") void readSubscriptionStatus(row);
     }
+  });
+
+  onDestroy(() => {
+    if (loginPolling !== null) clearTimeout(loginPolling);
   });
 </script>
 
@@ -551,6 +601,44 @@
         {:else if note[row.profileId]}<span role="status">{note[row.profileId]}</span>
         {:else if row.kind === "gguf" && ggufError}<span class="failed" role="alert">{ggufError}</span>
         {:else if catalogue[row.profileId]}<span>{catalogueNote(row, catalogue[row.profileId])}</span>{/if}
+      </p>
+    </article>
+  {/each}
+
+  <div class="group-head">
+    <h3>With your ChatGPT subscription</h3>
+    <p>Sign in through the local Codex client. Raiker never asks for or stores your ChatGPT token.</p>
+  </div>
+
+  {#each rows.filter((row) => row.kind === "subscription") as row (row.profileId)}
+    <article class="row" role="group" aria-label={rowTitle(row)} data-provider={row.provider}>
+      <div class="identity">
+        <ProviderLogo provider={row.provider} />
+        <div><strong>{rowTitle(row)}</strong><small>{row.source}</small></div>
+      </div>
+      <div class="controls">
+        {#if isConnected(row)}
+          <span class="stored"><Icon name="lock" size={13} /> Subscription connected</span>
+          <label class="field">
+            <span class="sr-only">{row.label} model</span>
+            <select class="select" aria-label={`${row.label} model`} bind:value={choice[row.profileId]} disabled={visibleModels(row).length === 0}>
+              {#if busy[row.profileId] === "detecting"}<option value="">Asking {row.label}…</option>
+              {:else if (catalogue[row.profileId]?.models.length ?? 0) === 0}<option value="">No model listed</option>
+              {:else}{#each visibleModels(row) as model (model)}<option value={model}>{modelName(model)}</option>{/each}{/if}
+            </select>
+          </label>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void detect(row)}><Icon name="refresh" size={14} /> Refresh</button>
+          <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined || !(choice[row.profileId] ?? "")} onclick={() => void pin(row)}>{busy[row.profileId] === "pinning" ? "Selecting…" : "Use this model"}</button>
+        {:else}
+          <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>{busy[row.profileId] === "saving" ? "Opening sign-in…" : "Sign in with ChatGPT"}</button>
+        {/if}
+      </div>
+      <p class="state">
+        {#if row.pinned}<span class="pinned">Selected: {modelName(row.pinned)}</span>{/if}
+        {#if failure[row.profileId]}<span class="failed" role="alert">{failure[row.profileId]}</span>
+        {:else if note[row.profileId]}<span role="status">{note[row.profileId]}</span>
+        {:else if catalogue[row.profileId]}<span>{catalogueNote(row, catalogue[row.profileId])}</span>
+        {:else if !isConnected(row)}<span>Sign in with the ChatGPT subscription on this device.</span>{/if}
       </p>
     </article>
   {/each}

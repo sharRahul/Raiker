@@ -47,6 +47,8 @@ from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import TASK_RECURRENCES, AuthSessionView, DashboardService
 from raiker.control.web_read_models import WebReadModels
 from raiker.models.connections import clear_model_connection, put_model_connection
+from raiker.models.codex_app_server import CodexSubscriptionSessions
+from raiker.models.exceptions import ModelProviderError, safe_error
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.provider_usage import ProviderUsageService
@@ -76,6 +78,14 @@ def _auth(request: Request) -> tuple[ApiSession, Principal]:
 def _ws(request: Request) -> str | Path:
     ws: str | Path = request.app.state.workspace_root  # type: ignore[attr-defined]
     return ws
+
+
+def _codex_sessions(request: Request) -> CodexSubscriptionSessions:
+    sessions = getattr(request.app.state, "codex_subscription_sessions", None)
+    if sessions is None:
+        sessions = CodexSubscriptionSessions()
+        request.app.state.codex_subscription_sessions = sessions
+    return sessions
 
 
 @router.put("/api/sessions/{session_id}/command-grant")
@@ -1790,6 +1800,54 @@ async def list_provider_models(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
         )
     return serialize_dto(view)
+
+
+@router.get("/api/models/chatgpt-codex/status")
+async def get_chatgpt_codex_status(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    try:
+        account = await _codex_sessions(request).status(session.principal_id)
+    except ModelProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason_code": safe_error(str(exc))},
+        ) from exc
+    return {
+        "connection_status": "connected" if account.signed_in else "signed_out",
+        "plan_type": account.plan_type,
+    }
+
+
+@router.post("/api/models/chatgpt-codex/login")
+async def start_chatgpt_codex_login(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    try:
+        await _codex_sessions(request).start_login(session.principal_id)
+    except ModelProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason_code": safe_error(str(exc))},
+        ) from exc
+    return {"ok": True, "connection_status": "login_pending"}
+
+
+@router.delete("/api/models/chatgpt-codex/connection")
+async def disconnect_chatgpt_codex(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    session, _principal = auth_data
+    await _codex_sessions(request).disconnect(session.principal_id)
+    SQLiteStore(request.app.state.workspace_root).invalidate_model_readiness(
+        session.principal_id, "chatgpt-codex-subscription", reason_code="connection_changed"
+    )
+    return {"ok": True, "connection_configured": False}
 
 
 @router.post("/api/models/catalogues/refresh")

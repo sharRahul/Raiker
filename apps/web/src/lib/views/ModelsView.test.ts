@@ -102,6 +102,37 @@ describe("ModelsView state grammar", () => {
     });
   });
 
+  it("offers ChatGPT subscription sign-in in Models without an API-key dialog", async () => {
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "chatgpt-codex-subscription",
+            provider: "chatgpt-codex",
+            model: "<model>",
+            local_only: false,
+            requires_network: true,
+            endpoint_kind: "remote_hosted",
+            off_machine: true,
+          }),
+        ],
+      }),
+      "GET /api/models/chatgpt-codex/status": { connection_status: "signed_out", plan_type: null },
+      "POST /api/models/chatgpt-codex/login": { connection_status: "login_pending", plan_type: null },
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Sign in with ChatGPT" }));
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/models/chatgpt-codex/login",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(await screen.findByText(/Finish sign-in in the browser/)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
+  });
+
   it("consolidates four llama.cpp slots and adds one four-slot MLX row below it", async () => {
     const localProfiles = [1, 2, 3, 4].flatMap((slot) => [
       profile({

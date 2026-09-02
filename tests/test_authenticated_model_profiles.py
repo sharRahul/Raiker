@@ -6,6 +6,7 @@ import pytest
 
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.factory import ModelProviderFactory, ProviderRuntimePolicy
+from raiker.models.providers.codex_app_server import AsyncCodexAppServerProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 from raiker.models.registry import ModelProfileRegistry, profile_with_model
 
@@ -31,6 +32,13 @@ def test_authenticated_provider_profiles_are_registered() -> None:
     assert huggingface.raw["endpoint"] == "https://router.huggingface.co/v1"
     assert huggingface.raw["api_key_env"] == "HF_TOKEN"
     assert huggingface.raw["supports_embeddings"] is False
+
+    codex = registry.resolve_profile_id("chatgpt-codex-subscription")
+    assert codex.provider == "chatgpt-codex"
+    assert codex.model == "<model>"
+    assert codex.raw["backend"] == "codex_app_server"
+    assert codex.raw.get("requires_api_key") is not True
+    assert codex.raw["supports_embeddings"] is False
 
 
 def test_local_lm_studio_sends_optional_api_token(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -95,4 +103,23 @@ def test_huggingface_uses_router_and_hf_token(monkeypatch: pytest.MonkeyPatch) -
     assert provider.endpoint == "https://router.huggingface.co/v1"
     assert provider.model == "openai/gpt-oss-120b:cheapest"
     assert provider._headers["Authorization"] == "Bearer hf-secret"
+    run(provider.aclose())
+
+
+def test_chatgpt_subscription_uses_codex_without_an_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = ModelProfileRegistry.load()
+    profile = profile_with_model(
+        registry.resolve_profile_id("chatgpt-codex-subscription"), "gpt-5.6"
+    )
+    policy = ProviderRuntimePolicy(
+        allow_policy_gated_provider=True,
+        allow_hosted_provider=True,
+    )
+    monkeypatch.setenv("RAIKER_MODEL_EGRESS_ALLOWLIST", "chatgpt.com")
+
+    provider = ModelProviderFactory(policy=policy).create(profile)
+
+    assert isinstance(provider, AsyncCodexAppServerProvider)
     run(provider.aclose())

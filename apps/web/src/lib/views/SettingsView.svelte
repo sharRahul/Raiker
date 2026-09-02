@@ -12,6 +12,7 @@
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import GitCredential from "./settings/GitCredential.svelte";
+  import Updates from "./settings/Updates.svelte";
   import Icon from "../components/Icon.svelte";
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
@@ -29,6 +30,7 @@
     { id: "web-access", label: "Web access", icon: "connections", group: "System" },
     { id: "git-credential", label: "Git credential", icon: "branch", group: "System" },
     { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
+    { id: "updates", label: "Updates", icon: "refresh", group: "System" },
   ] as const;
 
   let active = $derived<string>(SECTIONS.some((section) => section.id === tab) ? tab : "general");
@@ -176,6 +178,8 @@
       <WebAccess />
     {:else if active === "git-credential"}
       <GitCredential />
+    {:else if active === "updates"}
+      <Updates />
     {:else}
       <Runtime {principal} {settings} {save} />
     {/if}

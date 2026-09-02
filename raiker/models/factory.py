@@ -16,6 +16,7 @@ from raiker.models.endpoint_policy import (
 )
 from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyError
 from raiker.models.providers.anthropic_messages import AsyncAnthropicMessagesProvider
+from raiker.models.providers.codex_app_server import AsyncCodexAppServerProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
 
 
@@ -108,6 +109,7 @@ class ModelProviderFactory:
             "openai",
             "gemini",
             "anthropic",
+            "chatgpt-codex",
         }
         if provider not in aliases:
             raise ProviderConfigurationError(f"unknown_provider:{profile.provider}")
@@ -190,8 +192,15 @@ class ModelProviderFactory:
             endpoint_kind == "remote_hosted"
             and self.require_api_key_for_hosted
             and not api_key
+            and provider != "chatgpt-codex"
         ):
             raise ProviderConfigurationError("hosted_api_key_missing")
+        if provider == "chatgpt-codex":
+            return AsyncCodexAppServerProvider(
+                profile_id=profile.profile_id,
+                model=str(raw.get("served_model_name", profile.model)),
+                capabilities=capabilities_from_profile(profile),
+            )
         if provider == "anthropic":
             if api_key:
                 headers["x-api-key"] = api_key

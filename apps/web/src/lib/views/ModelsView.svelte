@@ -83,6 +83,14 @@
   let capacityRefreshAttempted = false;
   let catalogueRefreshing = $state(false);
   let catalogueNotice = $state<string | null>(null);
+  let codexSubscriptionStatus = $state<"connected" | "signed_out" | "login_pending">("signed_out");
+  let codexSubscriptionBusy = $state(false);
+  let codexSubscriptionNotice = $state<string | null>(null);
+
+  const isCodexSubscription = (profile: ModelProfile) => profile.provider === "chatgpt-codex";
+  const isConnected = (profile: ModelProfile) =>
+    profile.connection_configured ||
+    (isCodexSubscription(profile) && codexSubscriptionStatus === "connected");
 
   // Editable copy of the user-owned fallback sequence (ordered profile ids).
   let sequence = $state<string[]>([]);
@@ -95,6 +103,13 @@
     loadError = null;
     try {
       models = await api.models();
+      if (models.profiles.some(isCodexSubscription)) {
+        try {
+          codexSubscriptionStatus = (await api.codexSubscriptionStatus()).connection_status;
+        } catch {
+          codexSubscriptionStatus = "signed_out";
+        }
+      }
       try {
         capacities = await api.modelCapacities();
         if (capacities.refresh_due && !capacityRefreshAttempted) {
@@ -145,6 +160,24 @@
       catalogueNotice = "Could not refresh connected provider catalogues.";
     } finally {
       catalogueRefreshing = false;
+    }
+  }
+
+  async function startCodexSubscriptionLogin() {
+    if (codexSubscriptionBusy) return;
+    codexSubscriptionBusy = true;
+    codexSubscriptionNotice = null;
+    try {
+      const status = await api.startCodexSubscriptionLogin();
+      codexSubscriptionStatus = status.connection_status;
+      codexSubscriptionNotice = "Finish sign-in in the browser, then refresh this page to list your available models.";
+    } catch (error) {
+      codexSubscriptionNotice =
+        error instanceof ApiError && error.reasonCode
+          ? `ChatGPT sign-in could not start (${error.reasonCode}).`
+          : "ChatGPT sign-in could not start. Check that Codex is installed on this device.";
+    } finally {
+      codexSubscriptionBusy = false;
     }
   }
 
@@ -1198,7 +1231,7 @@
                     <article
                       class="provider-card"
                       class:selected={p.selected}
-                      class:connected={p.connection_configured}
+                      class:connected={isConnected(p)}
                     >
                       <div class="pc-head">
                         <span class="pc-logo"
@@ -1222,7 +1255,7 @@
                              a card could read "Connected" directly above
                              "Provider unreachable". Reachability is the
                              readiness chip below, and only it may claim it. -->
-                        {#if p.connection_configured}
+                        {#if isConnected(p)}
                           <span class="status-dot ok" aria-hidden="true"></span>
                           Connection saved
                         {:else}
@@ -1295,7 +1328,18 @@
                       {/if}
 
                       <div class="pc-actions">
-                        {#if !p.connection_configured}
+                        {#if isCodexSubscription(p)}
+                          <button
+                            type="button"
+                            class="btn btn-primary btn-sm pc-connect"
+                            onclick={() => void startCodexSubscriptionLogin()}
+                            disabled={codexSubscriptionBusy}
+                            style={`--brand:${b.tint}`}
+                            >{codexSubscriptionBusy
+                              ? "Opening sign-in…"
+                              : "Sign in with ChatGPT"}</button
+                          >
+                        {:else if !p.connection_configured}
                           <button
                             type="button"
                             class="btn btn-primary btn-sm pc-connect"
@@ -1348,6 +1392,9 @@
                         >
                           {testResults[p.profile_id]}
                         </p>
+                      {/if}
+                      {#if isCodexSubscription(p) && codexSubscriptionNotice}
+                        <p class="test-result" role="status">{codexSubscriptionNotice}</p>
                       {/if}
 
                       {#if pickerFor === p.profile_id}

@@ -109,6 +109,7 @@ const PROVIDER_NAMES: Record<string, string> = {
   openrouter: "OpenRouter",
   anthropic: "Anthropic",
   openai: "OpenAI",
+  "chatgpt-codex": "ChatGPT subscription",
   gemini: "Gemini",
   huggingface: "Hugging Face",
 };

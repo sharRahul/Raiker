@@ -21,10 +21,12 @@ running host, and the panel says so.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel
 
 from raiker.api.auth import AuthMiddleware
 from raiker.api.sessions import ApiSession
@@ -36,9 +38,14 @@ from raiker.app.installation import (
 )
 from raiker.app.release import TARGETS
 from raiker.app.updater import check_for_update
+from raiker.app.update_handoff import start_update_handoff
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()
+
+
+class ApplyUpdateRequest(BaseModel):
+    confirm: bool = False
 
 
 def _ws(request: Request) -> str | Path:
@@ -83,3 +90,67 @@ async def check_update(
     if status.checked_at is not None:
         record_check(workspace, status)
     return _view({"ok": status.state != "unreachable", **status.to_dict()}, workspace)
+
+
+@router.post("/api/host/update/apply")
+async def apply_update(
+    body: ApplyUpdateRequest,
+    request: Request,
+    _auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Hand a verified update to a detached helper, then stop this host.
+
+    The helper waits for this process to exit before it re-checks the signed
+    channel and changes the installation.  This response is deliberately sent
+    before scheduling the stop so the browser can state why its connection is
+    about to close.
+    """
+    from raiker.api.routes_host import _schedule_stop
+    from raiker.app.host import HostControl
+
+    workspace = _ws(request)
+    running = HostControl(workspace).status(running=True).to_dict()
+    if running["waiting"] and not body.confirm:
+        return {
+            "ok": False,
+            "updating": False,
+            "reason_code": "waiting_work",
+            "message": "Update would interrupt work in progress. Confirm to continue.",
+            **running,
+        }
+    checked = check_for_update(workspace)
+    if checked.checked_at is not None:
+        record_check(workspace, checked)
+    if checked.state != "available" or checked.available is None:
+        return _view(
+            {
+                "ok": False,
+                "updating": False,
+                "reason_code": f"update_{checked.state}",
+                **checked.to_dict(),
+            },
+            workspace,
+        )
+    try:
+        start_update_handoff(workspace, parent_pid=os.getpid())
+    except OSError:
+        return _view(
+            {
+                "ok": False,
+                "updating": False,
+                "reason_code": "update_handoff_unavailable",
+                "message": "Raiker could not start the verified update helper.",
+                **checked.to_dict(),
+            },
+            workspace,
+        )
+    _schedule_stop(request, 0)
+    return _view(
+        {
+            "ok": True,
+            "updating": True,
+            "version": checked.available.version,
+            **checked.to_dict(),
+        },
+        workspace,
+    )

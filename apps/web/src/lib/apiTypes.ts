@@ -1000,6 +1000,13 @@ export interface ProviderCatalogueRefresh {
   }>;
 }
 
+/** Status of the locally installed Codex client session. No account identifier,
+ * token, or login URL is exposed to the browser UI. */
+export interface CodexSubscriptionStatus {
+  connection_status: "connected" | "signed_out" | "login_pending";
+  plan_type: string | null;
+}
+
 /** A project is an organizing scope (workspace-contained subpath + its
  * sessions/checkpoints), never an authority — selecting one grants nothing. */
 export interface ProjectView {
@@ -2557,6 +2564,13 @@ export interface UpdateStatusView {
 
 export interface UpdateCheckResult extends UpdateStatusView {
   ok: boolean;
+}
+
+export interface UpdateApplyResult extends UpdateStatusView {
+  ok: boolean;
+  updating: boolean;
+  version?: string;
+  reason_code?: string;
 }
 
 

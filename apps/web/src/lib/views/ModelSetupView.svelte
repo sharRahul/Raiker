@@ -129,7 +129,7 @@
       <header>
         <p class="eyebrow">02 · Model connection</p>
         <h2 id="setup-title">Choose where Raiker thinks</h2>
-        <p>One row per provider. The three on this device are asked what they are serving; the rest take an API key and then answer with their own catalogue. Nothing is contacted until you ask a row to, and Raiker still runs a readiness check against the exact model before any model-backed work.</p>
+        <p>One row per provider. The three on this device are asked what they are serving; hosted providers use either their API key or, for Codex, your ChatGPT subscription. Nothing is contacted until you ask a row to, and Raiker still runs a readiness check against the exact model before any model-backed work.</p>
       </header>
       <ProviderMatrix
         {profiles}

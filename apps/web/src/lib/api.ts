@@ -40,6 +40,7 @@ import type {
   HostActionResult,
   HostStatusView,
   UpdateCheckResult,
+  UpdateApplyResult,
   UpdateStatusView,
   Diagnostics,
   MemoryIntegrity,
@@ -95,6 +96,7 @@ import type {
   PromptRequestBody,
   ProviderModelList,
   ProviderCatalogueRefresh,
+  CodexSubscriptionStatus,
   ProviderWeeklyUsageView,
   ResolveApprovalResult,
   ResumableTurnsView,
@@ -468,6 +470,8 @@ export const api = {
   hostUpdate: () => request<UpdateStatusView>("/api/host/update"),
   checkHostUpdate: () =>
     postJson<UpdateCheckResult>("/api/host/update/check", {}),
+  applyHostUpdate: (confirm = false) =>
+    postJson<UpdateApplyResult>("/api/host/update/apply", { confirm }),
   runtimeReadiness: () => request<RuntimeReadiness>("/api/runtime-readiness"),
   diagnostics: () => request<Diagnostics>("/api/diagnostics"),
   // MEM-09 — the memory integrity report, and its one stated repair. The scan
@@ -916,6 +920,15 @@ export const api = {
     postJson<ProviderCatalogueRefresh>("/api/models/catalogues/refresh", {
       ...(profile_ids ? { profile_ids } : {}),
     }),
+  codexSubscriptionStatus: () =>
+    request<CodexSubscriptionStatus>("/api/models/chatgpt-codex/status"),
+  startCodexSubscriptionLogin: () =>
+    postJson<CodexSubscriptionStatus>("/api/models/chatgpt-codex/login", {}),
+  disconnectCodexSubscription: () =>
+    request<{ ok: boolean; connection_configured: boolean }>(
+      "/api/models/chatgpt-codex/connection",
+      { method: "DELETE" },
+    ),
   // Persist (or clear, with null) the user-owned advisor model profile — the
   // model a local model may consult through the governed consult_advisor tool.
   // Gate-manager only, enforced server-side; selecting an advisor grants nothing.

@@ -37,6 +37,11 @@ function stubApi(options: { failPut?: boolean } = {}) {
         allowed_modes: ["raiker_runtime"],
       },
       "/api/diagnostics": { counts: { sessions: 0, events: 0, tasks: 0, checkpoints: 0 } },
+      "/api/host/update": {
+        state: "source_checkout", message: "Running from a source checkout.",
+        installation: { version: "0.0.0", target: null, packaged: false, signed: false, channel: null, commit: null, built_at: null, installer_formats: [], install_root: "/tmp/raiker", note: "" },
+        channel: null, available: null, recovery_points: [], checked_at: null, targets: [], last_check: null,
+      },
     };
     if (path in bodies) return { ok: true, status: 200, json: async () => bodies[path] } as Response;
     return { ok: false, status: 404, json: async () => ({ detail: {} }) } as Response;
@@ -62,7 +67,7 @@ describe("supported-preferences settings", () => {
     ["general", "General"], ["notification", "Notifications"],
     ["personalisation", "Personalisation"], ["security", "Security & sign-in"],
     ["privacy", "Privacy"], ["account", "Account"], ["web-access", "Web access"],
-    ["git-credential", "Git credential"], ["runtime", "Runtime configuration"],
+    ["git-credential", "Git credential"], ["runtime", "Runtime configuration"], ["updates", "Updates"],
   ])("renders the %s deep link with its named heading", async (tab, heading) => {
     stubApi();
     render(SettingsView, { props: { principal: "alice", tab } });
@@ -87,6 +92,14 @@ describe("supported-preferences settings", () => {
       "aria-current",
       "page",
     );
+  });
+
+  it("offers a signed-update status page in Settings", async () => {
+    stubApi();
+    render(SettingsView, { props: { principal: "alice", tab: "updates" } });
+    expect(await screen.findByRole("heading", { name: "Updates" })).toBeInTheDocument();
+    expect(screen.getByText("Signed updates")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Check for updates" })).toBeInTheDocument();
   });
 
   it("renders only sections the runtime actually backs", async () => {

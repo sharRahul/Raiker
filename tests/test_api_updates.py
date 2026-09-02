@@ -86,6 +86,22 @@ def test_checking_from_a_source_checkout_refuses_locally_without_fetching(
     assert body["last_check"] is None
 
 
+def test_apply_refuses_a_source_checkout_without_starting_a_handoff(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import raiker.api.routes_updates as routes
+
+    def forbidden(*_args: object, **_kwargs: object) -> None:  # pragma: no cover - must not run
+        raise AssertionError("a source checkout must not start an update helper")
+
+    monkeypatch.setattr(routes, "start_update_handoff", forbidden)
+    response = client.post("/api/host/update/apply", headers=_headers(client), json={"confirm": True})
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["ok"] is False
+    assert body["reason_code"] == "update_source_checkout"
+
+
 def test_a_pinned_channel_is_reported_without_its_key(
     client: TestClient, workspace: Path
 ) -> None:

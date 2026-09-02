@@ -63,6 +63,14 @@ const REGISTRY = [
     endpoint_kind: "remote_hosted",
     off_machine: true,
   }),
+  profile({
+    profile_id: "chatgpt-codex-subscription",
+    provider: "chatgpt-codex",
+    local_only: false,
+    requires_network: true,
+    endpoint_kind: "remote_hosted",
+    off_machine: true,
+  }),
 ];
 
 describe("first-run setup", () => {
@@ -179,6 +187,35 @@ describe("first-run setup", () => {
       ).toBe(true),
     );
     expect(await screen.findByText(/Opus 4.5 is selected/)).toBeInTheDocument();
+  });
+
+  it("signs in to the ChatGPT subscription without asking for an API key", async () => {
+    const fetchMock = stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/ollama-local/provider-models": {
+        profile_id: "ollama-local", provider: "ollama", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/lm-studio-local/provider-models": {
+        profile_id: "lm-studio-local", provider: "lm-studio", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/chatgpt-codex/status": { connection_status: "signed_out", plan_type: null },
+      "POST /api/models/chatgpt-codex/login": { ok: true, connection_status: "login_pending" },
+    });
+    render(ModelSetupView);
+
+    const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
+    expect(within(row).queryByLabelText(/API key/i)).not.toBeInTheDocument();
+    await fireEvent.click(within(row).getByRole("button", { name: "Sign in with ChatGPT" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/models/chatgpt-codex/login",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    expect(await within(row).findByText(/Finish sign-in in the browser/)).toBeInTheDocument();
   });
 
   it("puts a filter over a catalogue too long to scroll", async () => {

@@ -61,6 +61,47 @@ function models(partial: Partial<ModelsData>): ModelsData {
 }
 
 describe("ModelsView state grammar", () => {
+  it("refreshes connected provider catalogues before reloading model choices", async () => {
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "qwen3",
+          }),
+        ],
+      }),
+      "POST /api/models/catalogues/refresh": {
+        providers: [
+          {
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            status: "available",
+            reason_code: null,
+            model_count: 1,
+          },
+        ],
+      },
+    });
+    render(ModelsView, { tab: "local" });
+
+    await fireEvent.click(
+      await screen.findByRole("button", { name: "Refresh connected providers" }),
+    );
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/models/catalogues/refresh",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    await waitFor(() => {
+      const reads = mock.mock.calls.filter(([url]) => url === "/api/models");
+      expect(reads.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
   it("consolidates four llama.cpp slots and adds one four-slot MLX row below it", async () => {
     const localProfiles = [1, 2, 3, 4].flatMap((slot) => [
       profile({

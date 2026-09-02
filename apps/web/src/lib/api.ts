@@ -94,6 +94,7 @@ import type {
   PromptAttachment,
   PromptRequestBody,
   ProviderModelList,
+  ProviderCatalogueRefresh,
   ProviderWeeklyUsageView,
   ResolveApprovalResult,
   ResumableTurnsView,
@@ -911,6 +912,10 @@ export const api = {
     request<ProviderModelList>(
       `/api/models/${encodeURIComponent(profileId)}/provider-models`,
     ),
+  refreshProviderCatalogues: (profile_ids?: string[]) =>
+    postJson<ProviderCatalogueRefresh>("/api/models/catalogues/refresh", {
+      ...(profile_ids ? { profile_ids } : {}),
+    }),
   // Persist (or clear, with null) the user-owned advisor model profile — the
   // model a local model may consult through the governed consult_advisor tool.
   // Gate-manager only, enforced server-side; selecting an advisor grants nothing.

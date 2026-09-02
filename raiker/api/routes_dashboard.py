@@ -23,6 +23,7 @@ from raiker.api.schemas import (
     CreateRemoteMcpServerRequest,
     ExportSessionRequest,
     ModelConnectionRequest,
+    ModelCatalogueRefreshRequest,
     ModelPriceRequest,
     ModelWeeklyBudgetRequest,
     MoveProjectRequest,
@@ -1789,6 +1790,26 @@ async def list_provider_models(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Unknown model profile: {profile_id}"
         )
     return serialize_dto(view)
+
+
+@router.post("/api/models/catalogues/refresh")
+async def refresh_connected_provider_catalogues(
+    body: ModelCatalogueRefreshRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Refresh only local or owner-connected model providers on explicit demand."""
+    session, _principal = auth_data
+    try:
+        providers = await _service(request).refresh_connected_provider_catalogues(
+            session.principal_id, body.profile_ids
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"reason_code": str(exc)},
+        ) from exc
+    return {"providers": [provider.to_dict() for provider in providers]}
 
 
 @router.get("/api/sessions/{session_id}/context-usage")

@@ -50,4 +50,31 @@ describe("ProvidersPanel local runtime setup", () => {
       ),
     );
   });
+
+  it("refreshes the Ollama catalogue after its pull completes", async () => {
+    vi.stubGlobal("confirm", vi.fn(() => true));
+    const onCatalogueChanged = vi.fn();
+    stubFetch({
+      "POST /api/ollama/pull": { operation_id: "mop_1", state: "queued" },
+      "GET /api/model-operations": {
+        items: [
+          {
+            operation_id: "mop_1",
+            kind: "pull",
+            target: "qwen3",
+            state: "complete",
+          },
+        ],
+      },
+    });
+    render(ProvidersPanel, { props: { onCatalogueChanged } });
+
+    await fireEvent.click(screen.getByRole("button", { name: "Pull model" }));
+
+    await waitFor(() =>
+      expect(onCatalogueChanged).toHaveBeenCalledWith([
+        "ollama-local-openai-compatible",
+      ]),
+    );
+  });
 });

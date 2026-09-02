@@ -1503,6 +1503,20 @@ class ProviderModelListView:
 
 
 @dataclass(frozen=True)
+class ProviderCatalogueRefreshView:
+    """Safe outcome for one provider in an explicit catalogue refresh."""
+
+    profile_id: str
+    provider: str
+    status: str
+    reason_code: str | None
+    model_count: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class ModelsView:
     profiles: tuple[ModelProfileView, ...]
     # Profiles with a concrete configured model are the only choices surfaced
@@ -7318,6 +7332,45 @@ class DashboardService:
             reason_code=None,
             models=tuple(m.id for m in models),
         )
+
+    async def refresh_connected_provider_catalogues(
+        self, acting_principal_id: str, profile_ids: list[str] | None = None
+    ) -> tuple[ProviderCatalogueRefreshView, ...]:
+        """Refresh local and vault-connected providers through normal policy gates.
+
+        This is deliberately owner-triggered.  Local runtimes have no credential
+        marker, so they are eligible alongside profiles whose connection values
+        are stored in the vault; every actual listing still passes through
+        :meth:`list_provider_models` and therefore cannot bypass policy.
+        """
+        from raiker.models.connections import list_model_connections
+
+        registry = ModelProfileRegistry.load()
+        eligible = {
+            profile.profile_id
+            for profile in registry.list_profiles()
+            if profile.local_only and not bool(profile.raw.get("test_only", False))
+        }
+        eligible.update(list_model_connections(self.store, acting_principal_id))
+        requested = list(dict.fromkeys(profile_ids or sorted(eligible)))
+        if any(profile_id not in eligible for profile_id in requested):
+            raise ValueError("model_catalogue_profile_not_connected")
+
+        outcomes: list[ProviderCatalogueRefreshView] = []
+        for profile_id in requested:
+            listed = await self.list_provider_models(profile_id, acting_principal_id)
+            if listed is None:  # defensive: registry and eligibility came from one snapshot
+                continue
+            outcomes.append(
+                ProviderCatalogueRefreshView(
+                    profile_id=listed.profile_id,
+                    provider=listed.provider,
+                    status=listed.status,
+                    reason_code=listed.reason_code,
+                    model_count=len(listed.models),
+                )
+            )
+        return tuple(outcomes)
 
     async def set_model_selection(
         self, profile_id: str, model: str | None, acting_principal_id: str | None

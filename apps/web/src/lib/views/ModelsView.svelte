@@ -81,6 +81,8 @@
   let loadError = $state<string | null>(null);
   let capacities = $state<ModelCapacitiesView | null>(null);
   let capacityRefreshAttempted = false;
+  let catalogueRefreshing = $state(false);
+  let catalogueNotice = $state<string | null>(null);
 
   // Editable copy of the user-owned fallback sequence (ordered profile ids).
   let sequence = $state<string[]>([]);
@@ -123,6 +125,26 @@
           : e instanceof ApiError
             ? `Unavailable (${e.status})`
             : "Unavailable";
+    }
+  }
+
+  async function refreshProviderCatalogues(profileIds?: string[]) {
+    if (catalogueRefreshing) return;
+    catalogueRefreshing = true;
+    catalogueNotice = null;
+    try {
+      const refreshed = await api.refreshProviderCatalogues(profileIds);
+      const unavailable = refreshed.providers.filter((provider) => provider.status !== "available");
+      catalogueNotice =
+        unavailable.length === 0
+          ? "Connected provider catalogues refreshed."
+          : `Refreshed ${refreshed.providers.length - unavailable.length} provider${refreshed.providers.length - unavailable.length === 1 ? "" : "s"}; ${unavailable.length} could not be refreshed.`;
+      await load();
+      onchanged?.();
+    } catch {
+      catalogueNotice = "Could not refresh connected provider catalogues.";
+    } finally {
+      catalogueRefreshing = false;
     }
   }
 
@@ -823,13 +845,15 @@
   <button
     type="button"
     class="btn btn-ghost btn-sm"
-    onclick={load}
-    aria-label="Refresh models"
+    onclick={() => void refreshProviderCatalogues()}
+    disabled={catalogueRefreshing}
+    aria-label="Refresh connected providers"
   >
     <Icon name="refresh" size={15} />
-    Refresh
+    {catalogueRefreshing ? "Refreshing…" : "Refresh connected providers"}
   </button>
 </div>
+{#if catalogueNotice}<p class="catalogue-notice" role="status">{catalogueNotice}</p>{/if}
 
 <!-- Readiness and the global default describe the page, not one panel, so
      they sit above the strip: an owner on Pricing or Posture can still see
@@ -934,7 +958,7 @@
           in the terminal client (<code>/model use …</code>).
         {/if}
       </p>
-      {#if tab === "local"}<ProvidersPanel />{/if}
+      {#if tab === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
           <EmptyState

@@ -1,10 +1,49 @@
 <script lang="ts">
+  import { onDestroy } from "svelte";
   import { api } from "../../api";
   import type { RuntimeInstallPlan } from "../../apiTypes";
+  let {
+    onCatalogueChanged,
+  }: {
+    /** A completed pull changed a runtime catalogue outside the current snapshot. */
+    onCatalogueChanged?: (profileIds: string[]) => void;
+  } = $props();
   let model = $state("gemma4:31b-cloud");
   let busy = $state<string | null>(null);
   let message = $state<string | null>(null);
   let error = $state<string | null>(null);
+  let watching = true;
+
+  onDestroy(() => {
+    watching = false;
+  });
+
+  const terminal = (state: string) =>
+    ["complete", "failed", "cancelled"].includes(state);
+
+  async function watchPull(operationId: string) {
+    // Ask once immediately so a fast/local pull updates the picker without a
+    // needless two-second wait, then only poll while the operation is active.
+    while (watching) {
+      try {
+        const operation = (await api.modelOperations()).items.find(
+          (item) => item.operation_id === operationId,
+        );
+        if (!operation) return;
+        if (operation.state === "complete") {
+          onCatalogueChanged?.(["ollama-local-openai-compatible"]);
+          message = "Ollama model pulled. Refreshing available models…";
+          return;
+        }
+        if (terminal(operation.state)) return;
+      } catch {
+        // Activity still carries the durable operation state and can retry the
+        // refresh; a transient read failure must not claim that a model exists.
+        return;
+      }
+      await new Promise<void>((resolve) => window.setTimeout(resolve, 2_000));
+    }
+  }
   async function openInstaller(runtime: string) {
     busy = runtime;
     error = null;
@@ -34,8 +73,9 @@
     busy = "pull";
     error = null;
     try {
-      await api.pullOllamaModel(model.trim());
+      const operation = await api.pullOllamaModel(model.trim());
       message = "Ollama pull started. Follow it in Activity.";
+      void watchPull(operation.operation_id);
     } catch {
       error = "Could not start the Ollama pull. Check that Ollama is running.";
     } finally {

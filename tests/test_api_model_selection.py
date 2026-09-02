@@ -89,6 +89,44 @@ class TestProviderModelListing:
         assert body["models"] == []
         assert body["reason_code"]
 
+    def test_owner_can_refresh_selected_connected_provider_catalogues(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """A refresh is owner-driven and reports each requested provider honestly."""
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        put_model_connection(
+            SQLiteStore(workspace),
+            "principal_owner",
+            "generic-openai-compatible",
+            {"endpoint": "http://127.0.0.1:9000/v1"},
+        )
+
+        response = client.post(
+            "/api/models/catalogues/refresh",
+            headers=_auth(owner_token),
+            json={
+                "profile_ids": [
+                    "ollama-local-openai-compatible",
+                    "generic-openai-compatible",
+                ]
+            },
+        )
+
+        assert response.status_code == 200, response.text
+        rows = response.json()["providers"]
+        assert [row["profile_id"] for row in rows] == [
+            "ollama-local-openai-compatible",
+            "generic-openai-compatible",
+        ]
+        assert all(row["status"] in {"available", "unavailable", "policy_denied"} for row in rows)
+        # This test machine may have a real Ollama daemon. The contract is the
+        # honest count from the provider, not a fabricated empty catalogue.
+        assert all(isinstance(row["model_count"], int) and row["model_count"] >= 0 for row in rows)
+
+    def test_catalogue_refresh_requires_auth(self, client: TestClient) -> None:
+        response = client.post("/api/models/catalogues/refresh", json={})
+        assert response.status_code == 401
+
 
 class TestSetModelSelection:
     def test_fresh_workspace_reports_ollama_as_the_default_selection(

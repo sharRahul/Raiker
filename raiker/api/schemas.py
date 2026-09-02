@@ -355,6 +355,14 @@ class ModelConnectionRequest(BaseModel):
     admin_api_key: str | None = None
 
 
+class ModelCatalogueRefreshRequest(BaseModel):
+    """An owner-requested refresh of known, connected provider catalogues."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    profile_ids: list[str] | None = None
+
+
 class ModelWeeklyBudgetRequest(BaseModel):
     """Owner-defined advisory budget; null clears it."""
 

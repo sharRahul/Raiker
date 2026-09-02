@@ -989,6 +989,17 @@ export interface ProviderModelList {
   models: string[];
 }
 
+/** Outcome for one provider in an explicit connected-catalogue refresh. */
+export interface ProviderCatalogueRefresh {
+  providers: Array<{
+    profile_id: string;
+    provider: string;
+    status: "available" | "policy_denied" | "unsupported" | "unavailable";
+    reason_code: string | null;
+    model_count: number;
+  }>;
+}
+
 /** A project is an organizing scope (workspace-contained subpath + its
  * sessions/checkpoints), never an authority — selecting one grants nothing. */
 export interface ProjectView {

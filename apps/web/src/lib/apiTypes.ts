@@ -893,6 +893,27 @@ export interface NativeUsageMetric {
   source: "provider";
 }
 
+/**
+ * One limit window a subscription volunteered as part of a turn (BUG-254).
+ *
+ * Never polled and never inferred: this is what the provider itself said, and a
+ * provider that says nothing produces no window at all rather than a zero.
+ */
+export interface SubscriptionLimitWindow {
+  label: string;
+  used_percent: number;
+  window_minutes: number | null;
+  resets_at: string | null;
+}
+
+export interface SubscriptionLimits {
+  windows: SubscriptionLimitWindow[];
+  observed_at: string;
+  /** The reading is old enough that it should not be read as current. */
+  stale: boolean;
+  source: "provider_turn";
+}
+
 export interface ProviderWeeklyUsage {
   profile_id: string;
   provider: string;
@@ -920,6 +941,12 @@ export interface ProviderWeeklyUsage {
     expires_at: string | null;
     metrics: NativeUsageMetric[];
   };
+  /**
+   * Null when this provider has never volunteered a limit window, and absent
+   * altogether from a host that predates BUG-254. Both mean the same thing to a
+   * reader — nothing was reported — so every use site tests for truth, not null.
+   */
+  subscription?: SubscriptionLimits | null;
 }
 
 export interface ProviderWeeklyUsageView {
@@ -1003,7 +1030,18 @@ export interface ProviderCatalogueRefresh {
 /** Status of the locally installed Codex client session. No account identifier,
  * token, or login URL is exposed to the browser UI. */
 export interface CodexSubscriptionStatus {
-  connection_status: "connected" | "signed_out" | "login_pending" | "codex_missing";
+  /**
+   * `available` is the state BUG-259 added: the local Codex client is signed in
+   * to ChatGPT, and *this owner has not said to use it*. Reading the status no
+   * longer adopts the account, so the two facts are reported separately and the
+   * row offers to connect rather than announcing that it already did.
+   */
+  connection_status:
+    | "connected"
+    | "available"
+    | "signed_out"
+    | "login_pending"
+    | "codex_missing";
   plan_type: string | null;
 }
 
@@ -2760,4 +2798,28 @@ export interface ProjectRootIndexResult {
   skipped: number;
   truncated: boolean;
   scanned_at: string;
+}
+
+/** One entry the host path browser offers (BUG-251). */
+export interface HostPathEntry {
+  name: string;
+  /** The absolute path, which is the whole point: the browser cannot make one. */
+  path: string;
+  is_directory: boolean;
+}
+
+/** One directory listing from the host, for the Browse… dialog (BUG-251). */
+export interface HostPathListing {
+  /** Empty means the top of the machine: drives, home, and the usual folders. */
+  path: string;
+  /** Null at the top, "" when the listing is already a root. */
+  parent: string | null;
+  /** "\\" or "/", so the dialog can show a path the way the host writes it. */
+  separator: string;
+  /** Where the workspace lives, so a field wanting a relative path can make one. */
+  workspace_root: string;
+  entries: HostPathEntry[];
+  truncated: boolean;
+  /** The location is gone or cannot be read — not the same as empty. */
+  missing: boolean;
 }

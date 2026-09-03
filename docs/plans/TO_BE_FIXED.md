@@ -99,6 +99,21 @@ names.
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced 2026-08-30 to twenty; seven converted and re-run, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — raised 2026-08-30, the first thing found by actually running a round against one workspace |
+| [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
+| [BUG-252](FIXED_ITEMS.md#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four) | Low | Web UI / attachments | **Closed 2026-09-03 (FIXED-350)** — one drop target, on every surface that already accepted an upload |
+| [BUG-253](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-353)** — an HttpOnly session cookie with a double-submit CSRF token and an origin check |
+| [BUG-254](FIXED_ITEMS.md#fixed-354--a-subscriptions-own-usage-and-limits-were-not-shown) | Medium | Models / Observability | **Closed 2026-09-03 (FIXED-354)** — the limit windows a provider volunteers with a turn, and nothing when it volunteers none |
+| [BUG-255](FIXED_ITEMS.md#fixed-351--a-decision-raised-while-raiker-was-in-the-background-reached-nobody) | Low | Approvals / notifications | **Closed 2026-09-03 (FIXED-351)** — the already-permissioned browser notification, only while Raiker is not the visible window |
+| [BUG-256](#bug-256--dictation-sends-audio-to-the-browsers-speech-service) | Medium | Voice / privacy posture | Open — raised 2026-09-03. The one surface that is not local by default; needs a local speech runtime treated like any other local runtime |
+| [BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it) | Low | Live test harness / host lifecycle | Open — raised 2026-09-03; a reset that fails silently produces evidence about the wrong state |
+| [BUG-267](#bug-267--the-boot-session-probe-logs-a-401-to-the-console-on-every-locked-load) | Low | Authentication / web UI | Open — raised 2026-09-03 alongside FIXED-353 |
+| [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
+| [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
+| [BUG-258](FIXED_ITEMS.md#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | **Closed 2026-09-03 (FIXED-356)** — the default was `text-embedding-ada-002` |
+| [BUG-259](FIXED_ITEMS.md#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to) | High | Models / ChatGPT subscription | **Closed 2026-09-03 (FIXED-357)** — a status *read* was performing a connection |
+| [BUG-260, BUG-263, BUG-264](FIXED_ITEMS.md#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | **Closed 2026-09-03 (FIXED-358)** — no dropdown; one picker with a search, on both surfaces |
+| [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
+| [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
 | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (16 complete, 3 partial, 1 open; B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
 | [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
 
@@ -758,122 +773,47 @@ been peeling away one layer at a time, and this is the layer under them.
 
 ## BUG-251 — Every path an owner types is a path they have to know
 
-**Severity: Medium. Area: web UI / file and folder selection. Status: Open —
-raised 2026-09-03.**
-
-**Observed.** Four surfaces ask for a filesystem location by making the owner
-type it: **Projects → Attach existing folder** ("Full path to the folder…"),
-**Models → Approved folders** ("Absolute folder path"), the task composer
-("Workspace file or folder path…"), and the Build repository picker. There is no
-way to browse to one.
-
-**Why the obvious fix is not the fix.** A browser cannot hand a web page an
-absolute filesystem path. `<input type="file">` yields file *contents*;
-`webkitdirectory` yields a directory's contents with relative names; the File
-System Access API yields a handle and is Chromium-only. None of them can produce
-`D:\Models`, which is what these fields need, because the path is resolved by
-the Raiker host and not by the browser.
-
-**Proposed fix.** A host-side browser, which is what a local application in this
-position actually needs: an authenticated, loopback-only
-`GET /api/host/paths?path=…` that lists drives and directory entries under the
-same containment rules the rest of the product uses, and one `PathPicker`
-dialog that every field opens. It is a read of directory *names*, never
-contents, and it changes nothing on its own — the existing approval path still
-governs what may be read or written afterwards.
-
-**Required user-interface outcome.** Every field that wants a path offers
-**Browse…** beside it, and the owner never has to know how to spell a directory.
+**Closed 2026-09-03 as
+[FIXED-352](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know).**
+A host-side `GET /api/host/paths` lists directory names, and one `PathPicker`
+dialog serves all four fields. The record — including why a browser cannot
+answer this on its own — is in `FIXED_ITEMS.md`.
 
 ---
 
 ## BUG-252 — Attaching by drag and drop works in one place only
 
-**Severity: Low. Area: web UI / attachments. Status: Open — raised 2026-09-03,
-partially closed the same day.**
-
-**Observed.** Files can be dropped onto the document library
-(`FileLibrary.svelte`, closed here), but not onto the Chat or Build composer,
-the task composer's attachment row, or the project file list — all of which are
-places an owner would reasonably drop something.
-
-**Proposed fix.** Lift the drop handling out of `FileLibrary` into one small
-action or component and use it on every surface that already accepts an upload,
-so the drop target and the button are always the same import.
-
-**Required user-interface outcome.** Anywhere Raiker accepts a file, dropping
-one works and the surface says so while a file is over it.
+**Closed 2026-09-03 as
+[FIXED-350](FIXED_ITEMS.md#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four).**
+One drop target, used by every surface that already accepted an upload.
 
 ---
 
 ## BUG-253 — Reloading the page signs the owner out
 
-**Severity: Medium. Area: authentication / web UI. Status: Open — raised
-2026-09-03.**
-
-**Observed.** The bearer token is held in a module variable and deliberately
-never written to `localStorage` or `sessionStorage`, so refreshing the tab —
-which is what applying a UI change asks an owner to do — returns them to the
-unlock screen.
-
-**Why it is not simply a bug.** Keeping the token out of storage is a real
-posture: nothing on disk in the browser can be read back later.
-
-**Proposed fix, and its cost.** An `HttpOnly`, `SameSite=Strict`,
-loopback-scoped session cookie is not weaker than a memory token — script cannot
-read either, and script on the page can *use* either — and it survives a reload.
-It brings a CSRF surface that a bearer header does not, so it needs the usual
-double-submit or origin check on every state-changing route. That is the whole
-change, and it should not be made casually or partially.
-
-**Required user-interface outcome.** Refreshing Raiker keeps the session, and
-every state-changing request still proves it came from Raiker's own page.
+**Closed 2026-09-03 as
+[FIXED-353](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out).**
+An `HttpOnly`, `SameSite=Strict` session cookie, paired with a double-submit
+CSRF token and an origin check on every state-changing request. The bearer
+header path is unchanged and exempt.
 
 ---
 
 ## BUG-254 — A subscription's own usage and limits are not shown
 
-**Severity: Medium. Area: Models / Observability. Status: Open — raised
-2026-09-03.**
-
-**Observed.** ChatGPT reports a five-hour limit, a weekly limit, and how much of
-each is left; Ollama Cloud reports session and weekly usage and the models a
-plan covers. Raiker shows neither, so an owner discovers a limit by hitting it
-mid-turn.
-
-**What is already available.** The Codex App Server reports rate-limit windows
-alongside a turn, and Raiker already speaks that protocol
-(`raiker/models/codex_app_server.py`). Ollama Cloud publishes the same shape
-through the account it is connected with.
-
-**Proposed fix.** Read the limit windows that a provider volunteers as part of a
-turn — never by polling a portal, and never inferred — store them beside the
-existing per-provider usage, and show them on the provider card and in
-Observability → Activity for the providers currently selected. A provider that
-reports nothing must show nothing rather than an estimate.
-
-**Required user-interface outcome.** A connected subscription says how much of
-its window is left, sourced from the provider, or says nothing at all.
+**Closed 2026-09-03 as
+[FIXED-354](FIXED_ITEMS.md#fixed-354--a-subscriptions-own-usage-and-limits-were-not-shown).**
+Raiker records the limit windows a provider volunteers as part of a turn, and
+shows nothing at all for a provider that volunteers none.
 
 ---
 
 ## BUG-255 — Nothing announces an approval outside the browser
 
-**Severity: Low. Area: Approvals / notifications. Status: Open — raised
-2026-09-03.**
-
-**Observed.**
-[FIXED-344](FIXED_ITEMS.md#fixed-344--an-approval-raised-anywhere-had-to-be-hunted-down-in-the-inbox)
-puts a pending decision in front of the owner wherever they are in Raiker. It
-cannot reach them when Raiker is not the window they are looking at, which is
-exactly when a background task raises one.
-
-**Proposed fix.** Raise the existing notification record through the
-already-permissioned browser notification path when the tab is hidden, and
-nothing more: no email, no third-party push, no new egress.
-
-**Required user-interface outcome.** A decision raised while Raiker is in the
-background is noticed without watching for it.
+**Closed 2026-09-03 as
+[FIXED-351](FIXED_ITEMS.md#fixed-351--a-decision-raised-while-raiker-was-in-the-background-reached-nobody).**
+The already-permissioned browser notification, raised only while Raiker is not
+the window the owner is looking at.
 
 ---
 
@@ -910,3 +850,55 @@ model runtime rather than as a special case:
 **Required user-interface outcome.** The microphone can be made to work entirely
 on this machine, the setting says which of the two is in use, and the
 disclosure under the button matches the choice rather than assuming the browser.
+
+---
+
+## BUG-266 — A live workspace directory cannot be deleted while the host holds it
+
+**Severity: Low. Area: live test harness / host lifecycle. Status: Open — raised
+2026-09-03.**
+
+**Observed.** Resetting a live round by stopping `raiker-web` and removing its
+workspace directory left the directory in place on Windows: the SQLCipher file
+handle survives long enough that an immediate `rm -rf` silently fails, and the
+next run signs in against the *previous* round's account. The round then reports
+a first run that is not one — which is exactly how
+[FIXED-357](FIXED_ITEMS.md#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)
+nearly went unnoticed a second time.
+
+**Why it is a defect and not just an operator error.** A test harness whose reset
+can fail silently produces evidence about the wrong state, and every
+`FIXED_ITEMS` entry proved on a "fresh" workspace inherits that doubt.
+
+**Proposed fix.** The reset path should wait for the host to release the store —
+the process exit, not the HTTP response — and then verify the directory is gone
+rather than assuming it. A reset that cannot complete must fail loudly instead of
+leaving the previous round's data behind.
+
+**Required user-interface outcome.** None; this is harness behaviour. The
+outcome is that a live round either starts on a genuinely empty workspace or
+refuses to start.
+
+---
+
+## BUG-267 — The boot session probe logs a 401 to the console on every locked load
+
+**Severity: Low. Area: authentication / web UI. Status: Open — raised
+2026-09-03, alongside
+[FIXED-353](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out).**
+
+**Observed.** `restoreSession` asks `GET /api/auth/whoami` on boot. When nobody
+is signed in the answer is `401`, which is correct and is handled — but the
+browser writes it to the console as a failed resource on every locked load.
+
+**Why it is worth closing.** The console is where a real fault is supposed to
+stand out. A 401 that is an expected answer, printed on every load, is the kind
+of routine noise that trains a reader to ignore the console.
+
+**Proposed fix.** Ask only when there is something to ask with — the readable
+CSRF cookie already tells the page whether a session plausibly exists, and
+`hasToken()` already consults it. The remaining case is a cookie that has
+expired server-side, which is the one time a 401 is genuinely informative.
+
+**Required user-interface outcome.** None visible. A locked load leaves a clean
+console.

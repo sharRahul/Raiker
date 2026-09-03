@@ -57,7 +57,9 @@ from raiker.tasks.wakeup import SchedulerWakeup
 
 # Paths whose responses must not be buffered/redacted by RedactionMiddleware:
 # - /api/auth/session returns the owner's bearer token (must reach the client intact);
-# - /api/prompts/stream is an SSE stream (buffering would break streaming; it is redacted per-chunk).
+# - /api/prompts/stream is an SSE stream (buffering would break streaming; it is redacted per-chunk);
+# - /api/host/paths returns filesystem paths, which the redactor cannot tell from
+#   credentials (BUG-268).
 _REDACTION_EXEMPT_PATHS = frozenset(
     {
         "/api/auth/session",
@@ -68,6 +70,21 @@ _REDACTION_EXEMPT_PATHS = frozenset(
         "/api/auth/elevate",
         "/api/prompts/stream",
         "/api/tray/session",
+        # BUG-268 — the folder picker's listing. A path segment is a
+        # high-entropy string with no structure the redactor can distinguish
+        # from a token, so a perfectly ordinary directory came back as
+        # `/[REDACTED_SECRET]` and the picker handed that to the field. Linux CI
+        # found it because its temporary directories look exactly like this;
+        # every owner with a hashed or GUID-named folder would have found it too.
+        #
+        # Exempting is right rather than merely convenient. The route returns
+        # directory *names* the owner explicitly asked to browse, on a
+        # loopback-only, owner-authenticated read — the same information their
+        # file manager shows them. It reads no file content, so there is nothing
+        # here for the redactor to protect: its job is to stop a credential
+        # leaking out of a payload, not to censor the owner's own directory
+        # tree back to them.
+        "/api/host/paths",
     }
 )
 

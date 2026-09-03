@@ -13,10 +13,17 @@ local instance. There is no Raiker cloud account. Each request resolves an
 acting principal, and agentic work uses a short-lived machine identity so the
 audit record can distinguish you from the agent acting for you.
 
-The browser session token is held in memory and not in `localStorage`; reloading
-the page returns to the lock screen. Changing the owner password signs out other
-devices. Individual sessions can also be revoked under **Settings → Security &
-sign-in**.
+The browser session rides in an `HttpOnly`, `SameSite=Strict` cookie scoped to
+this host, so reloading the page keeps you signed in. Nothing on the page can
+read it — that is what `HttpOnly` means — and it is never written to
+`localStorage`. Because a browser attaches a cookie automatically, every
+state-changing request must also echo a CSRF token from a second, readable
+cookie, and a request stating an origin that is not this host is refused before
+that token is even compared. A caller using an `Authorization: Bearer` header
+instead — the CLI and the tray — is exempt, because a header the browser never
+attaches on its own cannot be forged by another site. Changing the owner
+password signs out other devices. Individual sessions can also be revoked under
+**Settings → Security & sign-in**.
 
 ## How authority is decided
 

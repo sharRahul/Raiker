@@ -4,6 +4,7 @@
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
+  import PathPicker from "../components/PathPicker.svelte";
   import ProjectTreeNode from "../components/ProjectTreeNode.svelte";
   import SidePanel from "../components/SidePanel.svelte";
   import GuideLink from "../components/GuideLink.svelte";
@@ -58,6 +59,9 @@
 
   let archiving = $state<string | null>(null);
   let archiveError = $state<string | null>(null);
+  // BUG-251 — the folder can be browsed to. Typing an absolute path is still
+  // allowed; it is no longer the only way.
+  let browsing = $state(false);
 
   // Drag-and-drop: a recent chat from the sidebar can be dropped onto a
   // project card to move that chat into the project. The session id travels in
@@ -393,13 +397,18 @@
       aria-label="Attached project name"
       maxlength={100}
     />
-    <input
-      class="input"
-      type="text"
-      placeholder="Full path to the folder…"
-      bind:value={attachPath}
-      aria-label="Folder path"
-    />
+    <div class="path-field">
+      <input
+        class="input"
+        type="text"
+        placeholder="Full path to the folder…"
+        bind:value={attachPath}
+        aria-label="Folder path"
+      />
+      <button type="button" class="btn btn-sm" onclick={() => (browsing = true)}>
+        <Icon name="folder" size={14} /> Browse
+      </button>
+    </div>
     <label class="check-row">
       <input type="checkbox" bind:checked={attachWritable} />
       Let Raiker write into this folder (still subject to your approvals)
@@ -714,7 +723,18 @@
   </div>
 {/if}
 
+{#if browsing}
+  <PathPicker
+    title="Choose a folder to attach"
+    start={attachPath}
+    onchoose={(path) => { attachPath = path; browsing = false; }}
+    onclose={() => (browsing = false)}
+  />
+{/if}
+
 <style>
+  .path-field { display: flex; gap: var(--space-2); align-items: center; }
+  .path-field .input { flex: 1; min-width: 0; }
   .head-row {
     display: flex;
     align-items: flex-start;

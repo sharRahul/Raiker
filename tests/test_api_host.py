@@ -160,3 +160,94 @@ def test_quit_and_pause_both_need_an_owner_session(client: TestClient) -> None:
     assert client.post("/api/host/pause", json={}).status_code == 401
     assert client.post("/api/host/quit", json={"confirm": True}).status_code == 401
     assert client.post("/api/host/restart", json={"confirm": True}).status_code == 401
+
+
+# --- BUG-251: browsing for a folder instead of typing one ---------------------
+
+
+def test_the_top_level_offers_somewhere_to_start(client: TestClient) -> None:
+    """An empty path is the machine's top: its drives, and where things are kept."""
+    response = client.get("/api/host/paths", headers=_headers(client))
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["path"] == ""
+    assert body["parent"] is None
+    assert body["missing"] is False
+    assert body["entries"], "the picker has to open somewhere"
+    assert all(entry["is_directory"] for entry in body["entries"])
+    # The workspace is first because it answers more of these fields than
+    # anything else on the machine.
+    assert body["entries"][0]["name"] == "Raiker workspace"
+    assert body["workspace_root"] == body["entries"][0]["path"]
+
+
+def test_a_directory_lists_its_folders_and_its_way_back(client: TestClient, tmp_path: Path) -> None:
+    root = tmp_path / "browse"
+    (root / "src").mkdir(parents=True)
+    (root / "docs").mkdir()
+    (root / "notes.md").write_text("x", encoding="utf-8")
+
+    response = client.get(
+        "/api/host/paths", params={"path": str(root)}, headers=_headers(client)
+    )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert [entry["name"] for entry in body["entries"]] == ["docs", "src"]
+    # Folders only unless a file is what the field wants: a folder picker that
+    # lists files makes the owner scroll past everything they cannot choose.
+    assert body["parent"] == str(root.parent)
+    assert body["missing"] is False
+
+
+def test_files_are_listed_only_when_the_field_wants_one(client: TestClient, tmp_path: Path) -> None:
+    root = tmp_path / "withfiles"
+    (root / "src").mkdir(parents=True)
+    (root / "notes.md").write_text("x", encoding="utf-8")
+
+    body = client.get(
+        "/api/host/paths",
+        params={"path": str(root), "files": "true"},
+        headers=_headers(client),
+    ).json()
+    assert [entry["name"] for entry in body["entries"]] == ["src", "notes.md"]
+    assert body["entries"][1]["is_directory"] is False
+
+
+def test_a_location_that_is_gone_says_so_rather_than_looking_empty(
+    client: TestClient, tmp_path: Path
+) -> None:
+    body = client.get(
+        "/api/host/paths",
+        params={"path": str(tmp_path / "never-existed")},
+        headers=_headers(client),
+    ).json()
+    assert body["missing"] is True
+    assert body["entries"] == []
+
+
+def test_a_secret_shaped_directory_name_survives_the_listing(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """BUG-268 — the redactor cannot tell a path segment from a credential.
+
+    A directory name is a high-entropy string with no structure, so the response
+    redactor rewrote ordinary folders as ``/[REDACTED_SECRET]`` and the picker
+    handed that to the field. Linux CI found it first because its temporary
+    directories look exactly like this; an owner with a hashed or GUID-named
+    folder would have hit it on their own machine.
+    """
+    root = tmp_path / "sk-live-51H8cQ2vBnZmXpLwRtYuIoPaSdFgHjKl"
+    (root / "checkpoints-a3f9c1d4e5b60789").mkdir(parents=True)
+
+    body = client.get(
+        "/api/host/paths", params={"path": str(root)}, headers=_headers(client)
+    ).json()
+    assert body["path"] == str(root), "the path the owner is looking at must come back intact"
+    assert body["entries"][0]["name"] == "checkpoints-a3f9c1d4e5b60789"
+    assert body["entries"][0]["path"] == str(root / "checkpoints-a3f9c1d4e5b60789")
+    assert "REDACTED" not in body["path"]
+    assert "REDACTED" not in body["entries"][0]["path"]
+
+
+def test_browsing_needs_the_owner_session_like_everything_else(client: TestClient) -> None:
+    assert client.get("/api/host/paths").status_code == 401

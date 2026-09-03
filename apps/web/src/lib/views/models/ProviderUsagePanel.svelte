@@ -3,6 +3,7 @@
   import { api } from "../../api";
   import type { ProviderWeeklyUsage, ProviderWeeklyUsageView } from "../../apiTypes";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
+  import SubscriptionLimitStrip from "../../components/SubscriptionLimitStrip.svelte";
   import { providerName } from "../../format";
 
   let usage = $state<ProviderWeeklyUsageView | null>(null);
@@ -170,6 +171,13 @@
               {/if}
             </section>
           </div>
+
+          {#if row.subscription}
+            <!-- BUG-254 — the subscription's own windows, stated by the
+                 provider during a turn. Rendered only when there is a reading:
+                 a provider that reports nothing shows nothing. -->
+            <SubscriptionLimitStrip limits={row.subscription} label="Subscription limits" />
+          {/if}
 
           <div class="budget-row">
             <div class="budget-copy">

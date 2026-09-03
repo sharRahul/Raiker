@@ -30,6 +30,7 @@ from raiker.models.factory import (
 )
 from raiker.models.health import ProviderHealth
 from raiker.models.registry import ModelProfileRegistry, RegistryError
+from raiker.models.subscription_limits import LimitWindowSink
 
 
 @dataclass(frozen=True)
@@ -56,9 +57,14 @@ class ModelRouter:
         *,
         runtime_policy: ProviderRuntimePolicy | None = None,
         connection_resolver: Callable[[str], dict[str, str] | None] | None = None,
+        limit_window_sink: LimitWindowSink | None = None,
     ) -> None:
         self.registry = registry
         self.writer = writer
+        # BUG-254 — handed to every provider this router builds, so a
+        # subscription that states its remaining window has somewhere to state
+        # it. A router built without one still runs every turn.
+        self.limit_window_sink = limit_window_sink
         if runtime_policy is None and writer is not None:
             from raiker.models.policy_state import provider_runtime_policy_from_gates
 
@@ -72,7 +78,11 @@ class ModelRouter:
         connection = (
             self.connection_resolver(profile.profile_id) if self.connection_resolver else None
         )
-        return ModelProviderFactory(policy=self.runtime_policy, connection=connection)
+        return ModelProviderFactory(
+            policy=self.runtime_policy,
+            connection=connection,
+            limit_window_sink=self.limit_window_sink,
+        )
 
     def _profile(self, provider: str, model: str) -> ModelProfile:
         return self.registry.resolve(provider, model)

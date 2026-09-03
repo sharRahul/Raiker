@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator, Callable
+from contextlib import suppress
 
 from raiker.models.codex_app_server import CodexAppServerClient
 from raiker.models.contracts import (
@@ -16,6 +17,7 @@ from raiker.models.contracts import (
 )
 from raiker.models.exceptions import ProviderUnsupportedCapabilityError
 from raiker.models.health import ProviderHealth
+from raiker.models.subscription_limits import LimitWindowSink
 
 
 class AsyncCodexAppServerProvider:
@@ -30,11 +32,16 @@ class AsyncCodexAppServerProvider:
         model: str,
         capabilities: ModelCapabilities,
         client_factory: Callable[[], CodexAppServerClient] = CodexAppServerClient,
+        on_limit_windows: LimitWindowSink | None = None,
     ) -> None:
         self.profile_id = profile_id
         self.model = model
         self.capabilities = capabilities
         self._client_factory = client_factory
+        # BUG-254 — where the limit windows the subscription volunteers with a
+        # turn are handed on. Optional: a provider built without one still runs
+        # turns, it just has nowhere to report what the subscription said.
+        self._on_limit_windows = on_limit_windows
         self._clients: list[CodexAppServerClient] = []
 
     def _client(self) -> CodexAppServerClient:
@@ -66,11 +73,17 @@ class AsyncCodexAppServerProvider:
         return "\n\n".join(f"{message.role}: {message.content}" for message in request.messages)
 
     async def chat(self, request: ModelRequest) -> ModelResponse:
-        text = await self._client().complete_chat(
+        client = self._client()
+        text = await client.complete_chat(
             model=request.model,
             prompt=self._prompt(request),
             effort=(request.reasoning.effort if request.reasoning and request.reasoning.enabled else None),
         )
+        # Reporting what the subscription said must never be able to fail the
+        # turn it rode in on: the answer is already in hand.
+        if self._on_limit_windows is not None and client.last_limit_windows:
+            with suppress(Exception):
+                self._on_limit_windows(self.profile_id, client.last_limit_windows)
         return ModelResponse(text=text)
 
     async def stream_chat(self, request: ModelRequest) -> AsyncIterator[ModelStreamEvent]:

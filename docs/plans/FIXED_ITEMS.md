@@ -362,6 +362,18 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-347](#fixed-347--choosing-a-model-was-an-accordion-inside-a-provider-card) | Medium | Models / web UI | Fixed (raised and closed 2026-09-03) |
 | [FIXED-348](#fixed-348--an-attachment-button-that-could-do-nothing-still-looked-like-a-button) | Low | Chat / Build / attachments | Fixed (raised and closed 2026-09-03) |
 | [FIXED-349](#fixed-349--three-provider-marks-were-drawn-as-letters-beside-the-real-ones) | Low | Models / web UI | Fixed (raised and closed 2026-09-03) |
+| [FIXED-350](#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four) | Low | Web UI / attachments | Fixed 2026-09-03 (BUG-252) |
+| [FIXED-351](#fixed-351--a-decision-raised-while-raiker-was-in-the-background-reached-nobody) | Low | Approvals / notifications | Fixed 2026-09-03 (BUG-255) |
+| [FIXED-352](#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | Fixed 2026-09-03 (BUG-251) |
+| [FIXED-353](#fixed-353--reloading-the-page-signed-the-owner-out) | Medium | Authentication / web UI | Fixed 2026-09-03 (BUG-253) |
+| [FIXED-354](#fixed-354--a-subscriptions-own-usage-and-limits-were-not-shown) | Medium | Models / Observability | Fixed 2026-09-03 (BUG-254) |
+| [FIXED-355](#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | Fixed 2026-09-03 (BUG-257) |
+| [FIXED-356](#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | Fixed 2026-09-03 (BUG-258) |
+| [FIXED-357](#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to) | High | Models / ChatGPT subscription | Fixed 2026-09-03 (BUG-259) |
+| [FIXED-358](#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | Fixed 2026-09-03 (BUG-260, BUG-263, BUG-264) |
+| [FIXED-359](#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | Fixed 2026-09-03 (BUG-261, BUG-262) |
+| [FIXED-360](#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | Fixed 2026-09-03 (BUG-265) |
+| [FIXED-361](#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | Fixed 2026-09-03 (BUG-268) |
 
 ---
 
@@ -14912,3 +14924,405 @@ provider looks like everywhere.
 
 **User-interface outcome.** A provider looks the same on every surface that
 names it.
+
+---
+
+## FIXED-350 — Dropping a file worked in one place and was ignored in four
+
+**Severity: Low. Area: web UI / attachments. Status: Fixed 2026-09-03
+(BUG-252).**
+
+**Observed.** Files could be dropped onto the document library. Dropping the
+same file onto the Chat composer, the Build composer, the task composer or a
+project's file list did nothing at all — not refused, not explained, ignored.
+
+**Root cause.** The drop handling lived inside `FileLibrary.svelte` and nowhere
+else. Nothing was shared, so every other surface that accepted an upload
+accepted it only through its button.
+
+**Fixed.** One drop target, `apps/web/src/lib/fileDrop.svelte.ts`, used by the
+document library, the project file list (through `FileLibrary`), and the Chat,
+Build and task composers. It owns the three things that are easy to get wrong
+once and impossible to get right five times: `preventDefault` on `dragover`
+(without it the browser navigates to the dropped file), counted enter and leave
+so the highlight does not flicker as the pointer crosses the target's own
+children, and ignoring a drag that carries no file so a chat being dragged onto
+a project card still reaches the handler that wants it. Dropped files go through
+`acceptFiles`, which routes each one to the same validator its button would have
+used — allowlist, size cap, magic-byte sniff, and the server's re-validation.
+
+**Guarded.** `apps/web/src/lib/fileDrop.test.ts`,
+`apps/web/src/lib/composerAttachments.test.ts`.
+
+**User-interface outcome.** Anywhere Raiker accepts a file, dropping one works,
+and the surface says "Drop to attach" while a file is over it.
+
+---
+
+## FIXED-351 — A decision raised while Raiker was in the background reached nobody
+
+**Severity: Low. Area: Approvals / notifications. Status: Fixed 2026-09-03
+(BUG-255).**
+
+**Observed.**
+[FIXED-344](#fixed-344--an-approval-raised-anywhere-had-to-be-hunted-down-in-the-inbox)
+puts a pending decision in front of the owner wherever they are in Raiker. It
+could not reach them when Raiker was not the window they were looking at, which
+is exactly when a background task raises one.
+
+**Root cause.** Two halves. The approval prompt deliberately skipped its poll
+while the document was hidden, so a decision raised while the tab was in the
+background was not even known about; and the desktop-notification path existed
+only inside `NotificationCenter`, for notification records.
+
+**Fixed.** The prompt polls while hidden too, at a slower cadence, and returns
+to the fast one the moment the tab is visible again. A pending decision the
+owner cannot see is announced once through the browser notification they have
+already permitted — `apps/web/src/lib/desktopNotice.ts`, now the single path
+`NotificationCenter` uses as well. Three rules hold: the owner's
+`notification.desktop` preference decides, nothing is raised while Raiker is
+visible, and the in-app record stays the source of truth. Deferring a decision
+with "Later" marks it announced, so it never taps the owner again. No email, no
+third-party push, no new egress.
+
+**Guarded.** `apps/web/src/lib/components/ApprovalPrompt.test.ts`.
+
+**User-interface outcome.** A decision raised while Raiker is in the background
+is noticed without watching for it, and clicking the notice opens the inbox.
+
+---
+
+## FIXED-352 — Every path an owner typed was a path they had to know
+
+**Severity: Medium. Area: web UI / file and folder selection. Status: Fixed
+2026-09-03 (BUG-251).**
+
+**Observed.** Four surfaces asked for a filesystem location by making the owner
+type it: **Projects → Attach existing folder**, **Models → Approved folders**,
+the task composer's path field, and the Build repository picker. There was no
+way to browse to one.
+
+**Root cause.** Not an oversight — a browser genuinely cannot produce an
+absolute host path. A file input yields file *contents*, `webkitdirectory`
+yields relative names, and the File System Access API yields an opaque handle
+and only in Chromium. The path is resolved by the Raiker host, so only the host
+can offer one.
+
+**Fixed.** `GET /api/host/paths` lists directory **names** — never contents —
+under the same loopback and owner authentication as every other route, and
+changes nothing on its own; the existing approval path still governs what may be
+read or written afterwards. One `PathPicker` dialog reads it, and every field
+opens the same dialog. It opens on the workspace, the owner's home and the
+machine's drives rather than at a drive root. A field that wants a location
+*inside* the workspace (Build's repository, the composer's path) opens confined
+to it and answers with a workspace-relative path, because an absolute one is
+exactly what those fields refuse. A folder that cannot be read is reported as
+gone rather than as empty, and cannot be chosen.
+
+**Guarded.** `tests/test_api_host.py`,
+`apps/web/src/lib/components/PathPicker.test.ts`.
+
+**User-interface outcome.** Every field that wants a path offers **Browse**
+beside it, and the owner never has to know how to spell a directory. Typing one
+still works.
+
+---
+
+## FIXED-353 — Reloading the page signed the owner out
+
+**Severity: Medium. Area: authentication / web UI. Status: Fixed 2026-09-03
+(BUG-253).**
+
+**Observed.** The bearer token was held in a module variable and deliberately
+never written to browser storage, so refreshing the tab — which is what applying
+a UI change asks an owner to do — returned them to the unlock screen.
+
+**Root cause.** Keeping the token out of browser storage is a real posture, not
+a bug: nothing on disk in the browser can be read back later. The cost was that
+nothing survived a reload.
+
+**Fixed.** An `HttpOnly`, `SameSite=Strict`, path-scoped session cookie, which
+is not weaker than a memory token — script can read neither, and script on the
+page can *use* either. What it does add is a CSRF surface, because a browser
+attaches a cookie by itself and never attaches an `Authorization` header by
+itself, so the cookie never ships alone (`raiker/api/session_cookie.py`):
+`SameSite=Strict` is the primary defence, a second deliberately-readable cookie
+carries a CSRF token that every state-changing cookie-authenticated request must
+echo in a header, and a stated `Origin` that is not this host is refused before
+the token is even compared. A request authenticating with a bearer header is
+unchanged and exempt — the CLI, the tray and the tests keep working — because a
+header the browser never attaches on its own cannot be forged cross-site.
+`GET /api/auth/whoami` is the safe read the reload uses to ask who it is; a 401
+is the answer "nobody" and puts the lock screen up. Signing out clears both
+cookies.
+
+**Guarded.** `tests/test_routes_auth.py`.
+
+**User-interface outcome.** Refreshing Raiker keeps the session, and every
+state-changing request still proves it came from Raiker's own page.
+
+---
+
+## FIXED-354 — A subscription's own usage and limits were not shown
+
+**Severity: Medium. Area: Models / Observability. Status: Fixed 2026-09-03
+(BUG-254).**
+
+**Observed.** ChatGPT reports a five-hour limit, a weekly limit, and how much of
+each is left. Raiker showed neither, so an owner discovered a limit by hitting
+it mid-turn.
+
+**Root cause.** Nothing read the limit windows a provider states alongside a
+turn. The existing provider-usage path reads a provider's usage *API* on
+request, which is a different thing and explicitly a network call the owner asks
+for.
+
+**Fixed.** `raiker/models/subscription_limits.py` records the windows a provider
+volunteers as part of a turn — never by polling a portal, and never inferred.
+The Codex App Server states them on `turn/completed`; they are parsed
+defensively (both key spellings, a mapping or a list, each malformed field
+dropped on its own so one cannot take a whole reading with it), stored per owner
+and profile beside the existing usage, and shown on the provider card and in
+Observability → Activity. A provider that reports nothing shows nothing — not a
+zero, not an estimate — and a reading older than a day says it is from an
+earlier turn rather than passing as current.
+
+**Guarded.** `tests/test_subscription_limits.py`,
+`apps/web/src/lib/components/SubscriptionLimitStrip.test.ts`.
+
+**User-interface outcome.** A connected subscription says how much of its window
+is left, sourced from the provider, or says nothing at all.
+
+---
+
+## FIXED-355 — A rejected key was reported as a network failure
+
+**Severity: Medium. Area: Models / provider errors. Status: Fixed — raised and
+closed 2026-09-03 while verifying FIXED-352 against live providers.**
+
+**Observed.** Pasting an Anthropic key the provider rejects produced "Anthropic
+could not be reached. Check the credential and this device's network access."
+The provider had been reached perfectly well; it answered 401.
+
+**Root cause.** The model-listing path flattened *every* `ModelProviderError` to
+`provider_unreachable` unless the message contained "unsupported" — discarding a
+distinction the error classes already carry.
+
+**Fixed.** The listing reports what actually happened, through the existing
+`provider_error_code` classifier, and the Models and setup screens name the
+cause: a rejected key, a rate limit, an exhausted quota, a timeout, or a genuine
+network failure. Reason codes carry the provider's own detail after a colon
+(`provider_auth_failed:http_401`), so the surface matches on the family — a
+whole-string match would have fallen through to the network sentence, which is
+the exact wrong instruction this closes.
+
+**User-interface outcome.** A refusal names the thing to fix. An owner with a
+bad key is not sent to check their network.
+
+---
+
+## FIXED-356 — A picker offered, and defaulted to, a model that cannot answer
+
+**Severity: High. Area: Models / every picker. Status: Fixed — raised and closed
+2026-09-03 while verifying against live providers.**
+
+**Observed.** With an OpenAI key stored, "Choose where Raiker thinks" listed all
+124 catalogue entries and *defaulted* to `text-embedding-ada-002`. An owner who
+accepted the default pinned a model that cannot answer anything and found out at
+their first turn.
+
+**Root cause.** The catalogue was offered raw, in the provider's own order, and
+the first entry won.
+
+**Fixed.** `chatCandidates` leaves out the endpoint families a provider names
+for a different purpose — embeddings, speech, images, moderation, reranking.
+This is not a capability guess: every pattern is the provider's own naming, and
+anything named outside those families is left in, so a chat model released
+tomorrow is never hidden by a rule written today. A model the owner already
+keeps available is always shown whatever it is, and if the rule would empty a
+list the unfiltered list is returned instead — a picker that offers nothing is
+worse than one that offers too much. The picker states how many were set aside.
+
+**Guarded.** `apps/web/src/lib/modelPresentation.test.ts`.
+
+**User-interface outcome.** A screen asking where Raiker should think offers
+only models that could answer, and says how many it set aside.
+
+---
+
+## FIXED-357 — A fresh Raiker adopted whichever ChatGPT account Codex was signed in to
+
+**Severity: High. Area: Models / ChatGPT subscription. Status: Fixed — raised
+and closed 2026-09-03.**
+
+**Observed.** "I see ChatGPT auto logs in using previous login for the first
+run." On a brand-new workspace, opening the setup page reported a ChatGPT
+subscription as connected and listed its models. Nobody had connected it.
+
+**Root cause.** `GET /api/models/chatgpt-codex/status` called
+`_record_codex_connection` — a read performed a connection. If the local Codex
+client happened to hold a session, merely looking at the page adopted that
+account.
+
+**Why it matters more than it looks.** Raiker's posture is that nothing is
+contacted until the owner asks. Silently adopting somebody's *identity* is worse
+than contacting a host, and on a shared machine the account adopted may not even
+be theirs.
+
+**Fixed.** The read reports and never adopts. It answers three states rather
+than two, because "Codex is signed in" and "this owner chose to use it" are
+different facts and collapsing them is what caused this: `connected`,
+`available`, `signed_out`. `POST /api/models/chatgpt-codex/connection` is the
+explicit act, and it refuses when Codex has no session. A recorded connection
+whose Codex session has since gone away is cleared, so nothing keeps offering
+models that cannot be served. The row offers **Use this subscription** beside
+**Use a different account**, and says plainly that an account is signed in to
+Codex on this device and Raiker will not use it until told to.
+
+**Guarded.** `tests/test_api_codex_subscription.py`.
+
+**Evidence.**
+[`screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png`](screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png)
+— a genuinely fresh workspace, on a machine whose Codex client holds a ChatGPT
+Plus session.
+
+**User-interface outcome.** A first run offers the subscription. It never takes
+it.
+
+---
+
+## FIXED-358 — Choosing among four hundred models was a dropdown with no search
+
+**Severity: High. Area: Models / web UI. Status: Fixed — raised and closed
+2026-09-03.**
+
+**Observed.** "The model selection pop-up window should have a search to find
+and select the models… There is no need of drop down if we are able to select
+models." OpenRouter publishes 424 models; the setup row offered them in a
+`select`. Opening a *different* provider's picker also inherited the previous
+provider's search text, so a provider could read as serving 53 models.
+
+**Root cause.** Two controls asked about the same list — a dropdown choosing the
+*default* and a dialog choosing which models are *kept available* — and only one
+of them had a search. The search text survived because the component is reused
+when only its props change, and because the browser restores a same-named field
+across a navigation.
+
+**Fixed.** There is no dropdown. The picker is the single place a model is
+chosen: it has a search over the whole catalogue, a switch per model for what
+stays offered, and a **Use** action that makes one the default, with the current
+default marked rather than offered again. Opening a different provider starts a
+new search, and the field carries `autocomplete="off"` so a filter the owner
+cannot see the origin of is never restored. The row states the selected model
+once instead of naming it twice.
+
+**The search was invisible before it was wrong.** It shipped present in the DOM,
+typable, filtering correctly — and 26 pixels wide at zero opacity, because
+`AvailableModels` styled the switch's hidden checkbox with a bare `input`
+selector that matched the new search box too. Every DOM assertion passed
+throughout; it was a screenshot that caught it. The rule now says
+`input[type="checkbox"]`, which is what it always meant, and the guard asserts
+the search is *visible* rather than merely present.
+
+**Guarded.** `apps/web/src/lib/views/ModelSetupView.test.ts`,
+`apps/web/src/lib/views/models/AvailableModels.test.ts`.
+
+**Evidence.**
+[`screenshots/working/2026-09-03-fixed-358-model-picker-search.png`](screenshots/working/2026-09-03-fixed-358-model-picker-search.png).
+
+**User-interface outcome.** One control, with a search, on both the Models page
+and the first-run screen.
+
+---
+
+## FIXED-359 — First run could detect a missing runtime and not offer to install it
+
+**Severity: Medium. Area: Models / first run. Status: Fixed — raised and closed
+2026-09-03.**
+
+**Observed.** "The first run should give option to install Ollama and LM Studio
+with click of a button." Setup detected both, and when neither was present said
+so and stopped — leaving an owner on the one screen whose whole job is choosing
+where Raiker thinks with nothing to choose and nowhere to go. The install
+buttons existed, on the Models page, which is not where a first run is.
+
+**Root cause.** The first-run matrix and the Models page grew their controls
+separately.
+
+**Fixed.** A local runtime that answered with nothing to serve offers
+**Install** in place of a "Use this model" button that could never work. The
+download is still the vendor's own, opened over HTTPS, and Raiker still bundles
+nothing and accepts nobody's terms. The picker dialog is on the first-run screen
+too, so the screen where an owner meets a catalogue for the first time is no
+longer the one with the weaker control.
+
+**User-interface outcome.** First run can install a runtime, then choose a model
+from it, without leaving the page.
+
+---
+
+## FIXED-360 — A policy refusal was reported as a wrong password
+
+**Severity: Medium. Area: authentication / web UI. Status: Fixed — raised and
+closed 2026-09-03.**
+
+**Observed.** Registering on an instance that already has an owner is refused by
+design — Raiker is one owner per instance, and the server says so: "Create new
+user and separate Raiker instance instead". The lock screen reported
+"Authentication failed." and left the registration form up.
+
+**Root cause.** `messageFor` deliberately genericises an `ApiError` so sign-in
+never confirms whether a username exists. That reasoning does not apply to a 409
+on *registration*, which is a policy answer the server states plainly and which
+reveals nothing.
+
+**Fixed.** A refused registration says what was refused and what to do: "This
+Raiker already has its owner. Unlock it below, or create a separate instance for
+another person." The screen re-reads the bootstrap status and returns to unlock,
+so a form that cannot succeed is not left standing. Sign-in failures stay
+generic, unchanged.
+
+**Guarded.** `apps/web/src/lib/views/LoginView.test.ts`.
+
+**User-interface outcome.** An owner who typed the right password is not sent
+looking for a wrong one.
+
+---
+
+## FIXED-361 — The folder picker handed back `[REDACTED_SECRET]` instead of a path
+
+**Severity: High. Area: web UI / redaction. Status: Fixed — raised and closed
+2026-09-03, by Linux CI, hours after
+[FIXED-352](#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know)
+shipped.**
+
+**Observed.** `GET /api/host/paths` answered with `/[REDACTED_SECRET]` in place
+of the directory it was asked about. The picker then filled the field with that
+string, so **Browse** produced a path that names nothing.
+
+**Root cause.** `RedactionMiddleware` scans every response for
+credential-shaped values, and a filesystem path segment is a high-entropy string
+with no structure distinguishing it from a token. FIXED-352 added a route whose
+entire payload is such strings and did not consider the redactor.
+
+**Why the local run missed it.** Windows temporary directories are short and
+word-shaped; Linux runners use `pytest-of-runner/pytest-0/test_…`, which trips
+the detector. The full suite passed on the author's machine and failed in CI —
+and the same failure was waiting for any owner with a hashed, GUID-named or
+key-named folder.
+
+**Fixed.** `/api/host/paths` joins the redaction exemptions. This is right
+rather than merely convenient: the route returns directory *names* the owner
+explicitly asked to browse, over a loopback-only owner-authenticated read — the
+same information their file manager shows them — and it reads no file content,
+so there is nothing in the payload for the redactor to protect. Its job is to
+stop a credential leaking out of a response, not to censor the owner's own
+directory tree back to them.
+
+**Guarded.** `tests/test_api_host.py` browses a directory deliberately named
+like an API key and asserts the path comes back intact. The guard was checked
+against the un-exempted middleware first, so it fails when the fix is removed.
+
+**User-interface outcome.** **Browse** returns the folder that was chosen,
+whatever it is called.
+

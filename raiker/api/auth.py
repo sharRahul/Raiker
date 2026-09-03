@@ -5,6 +5,7 @@ from pathlib import Path
 from fastapi import HTTPException, Request, status
 from fastapi.responses import JSONResponse
 
+from raiker.api.session_cookie import cookie_token, csrf_failure
 from raiker.api.sessions import ApiSession, ApiSessionStore
 from raiker.runtime.authority.models import RAIKER_RUNTIME, Principal, PrincipalType
 from raiker.storage.sqlite import SQLiteStore
@@ -29,18 +30,38 @@ class AuthMiddleware:
     def authenticate(
         self, request: Request, required_scope: str = "control"
     ) -> tuple[ApiSession, Principal]:
+        # Two ways in, and the difference decides whether CSRF applies (BUG-253).
+        # A bearer header is never attached by a browser on its own, so a
+        # cross-site page cannot produce one and the header path needs no further
+        # proof. A cookie *is* attached automatically, which is what makes it
+        # survive a reload and what makes the double-submit check below
+        # mandatory for anything that changes state.
         auth_header = request.headers.get("Authorization", "")
-        if not auth_header.startswith("Bearer "):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing or malformed Authorization header",
-            )
-        raw_token = auth_header[len("Bearer "):]
-        if not raw_token.strip():
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Empty token",
-            )
+        raw_token: str
+        from_cookie = False
+        if auth_header.startswith("Bearer "):
+            raw_token = auth_header[len("Bearer "):]
+            if not raw_token.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Empty token",
+                )
+        else:
+            cookie = cookie_token(request)
+            if cookie is None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Missing or malformed Authorization header",
+                )
+            raw_token = cookie
+            from_cookie = True
+        if from_cookie:
+            failure = csrf_failure(request)
+            if failure is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={"ok": False, "reason_code": failure},
+                )
         session = self._session_store.get_by_token(raw_token)
         if session is None:
             raise HTTPException(

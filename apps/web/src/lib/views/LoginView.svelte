@@ -129,6 +129,14 @@
 
   function messageFor(e: unknown): string {
     if (e instanceof ApiError) {
+      // BUG-265 — registration refused because this instance already has its
+      // owner is not an authentication failure, and saying so sent an owner
+      // hunting for a wrong password. The genericness below exists to avoid
+      // confirming whether a *username* exists during sign-in; it was never
+      // meant to cover a policy answer the server states plainly.
+      if (registerIntent && e.status === 409) {
+        return "This Raiker already has its owner. Unlock it below, or create a separate instance for another person.";
+      }
       // Generic by design: never confirm whether the username exists.
       return e.message.includes("Request failed") ? "Authentication failed." : e.message;
     }
@@ -205,6 +213,15 @@
       }
     } catch (e) {
       error = messageFor(e);
+      // BUG-265 — the answer that refused this also settles whether registering
+      // was ever possible. Re-reading it puts the screen back into the state it
+      // should have been in, instead of leaving a form up that cannot succeed.
+      if (e instanceof ApiError && e.status === 409 && registerIntent) {
+        await loadBootstrapStatus();
+        mode = "login";
+        password = "";
+        confirmPassword = "";
+      }
     } finally {
       busy = false;
     }

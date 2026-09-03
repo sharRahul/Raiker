@@ -9,6 +9,7 @@
    * tool under the `connector_github_runtime` gate. This panel therefore states
    * the gate's real posture instead of implying that connecting granted reads.
    */
+  import PathPicker from "./PathPicker.svelte";
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import type { CodeMapStatus, CodeRepo, CodeReposView } from "../apiTypes";
@@ -33,6 +34,10 @@
 
   let source = $state<"local" | "github">("local");
   let localPath = $state("");
+  // BUG-251 — the folder can be browsed to. The picker is confined to the
+  // workspace and answers with a workspace-relative path, because that is the
+  // only shape this field accepts.
+  let browsing = $state(false);
   let owner = $state("");
   let repo = $state("");
   let branch = $state("");
@@ -308,13 +313,18 @@
     {#if source === "local"}
       <label class="field">
         Folder inside this workspace
-        <input
-          class="input"
-          bind:value={localPath}
-          placeholder="projects/my-app"
-          disabled={busy}
-          required
-        />
+        <span class="path-field">
+          <input
+            class="input"
+            bind:value={localPath}
+            placeholder="projects/my-app"
+            disabled={busy}
+            required
+          />
+          <button type="button" class="btn btn-sm" disabled={busy} onclick={() => (browsing = true)}>
+            Browse…
+          </button>
+        </span>
       </label>
       <p class="hint">
         Paths are resolved inside the workspace root. Anything that resolves outside it is refused by the runtime.
@@ -368,7 +378,18 @@
   </form>
 </section>
 
+{#if browsing}
+  <PathPicker
+    title="Choose a folder in the workspace"
+    insideWorkspace
+    onchoose={(path) => { localPath = path; browsing = false; }}
+    onclose={() => (browsing = false)}
+  />
+{/if}
+
 <style>
+  .path-field { display: flex; gap: var(--space-2); align-items: center; }
+  .path-field .input { flex: 1; min-width: 0; }
   .connector {
     display: grid;
     gap: var(--space-3);

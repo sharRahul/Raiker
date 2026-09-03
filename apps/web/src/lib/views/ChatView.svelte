@@ -46,6 +46,7 @@
   import RecallStrip from "../components/RecallStrip.svelte";
   import TurnControl from "../components/TurnControl.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { createFileDrop } from "../fileDrop.svelte";
   import ComposerMenu, { type MenuItem } from "../components/ComposerMenu.svelte";
   import MessageActions from "../components/MessageActions.svelte";
   import VoiceDictationControl, { type VoiceDictationHandle } from "../components/VoiceDictationControl.svelte";
@@ -258,6 +259,12 @@
   // are shared with Build (`composerAttachments.svelte.ts`) so a file behaves
   // identically in both conversations rather than only working in this one.
   const attachStore = createAttachmentStore();
+  // A file dropped on the composer is attached to the next turn, exactly as if
+  // it had been picked from the attach panel (BUG-252).
+  const composerDrop = createFileDrop({
+    onFiles: (files) => void attachStore.acceptFiles(files),
+    enabled: () => !(streaming) && !attachStore.full,
+  });
   let attachControl = $state<ComposerAttach | undefined>();
   let attachOpen = $state(false);
 
@@ -1931,7 +1938,13 @@
       void submit();
     }}
   >
-    <div class="composer-card">
+    <div class="composer-card" role="group" aria-label="Message composer"
+      class:drop-active={composerDrop.over}
+      ondragenter={composerDrop.ondragenter}
+      ondragover={composerDrop.ondragover}
+      ondragleave={composerDrop.ondragleave}
+      ondrop={composerDrop.ondrop}
+    >
       <ComposerChips store={attachStore} disabled={streaming} />
       <ModelReadinessStrip readiness={modelReadiness} draftPreserved={promptText.trim() !== ""} />
       <SkillLinkNotice text={promptText} />
@@ -1949,6 +1962,7 @@
         />
       {/if}
 
+      {#if composerDrop.over}<p class="drop-note" role="status">Drop to attach</p>{/if}
       <label for="prompt-input" class="sr-only">Prompt</label>
       <div class="composer-upper">
         <textarea

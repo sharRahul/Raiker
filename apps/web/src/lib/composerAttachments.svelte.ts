@@ -154,6 +154,12 @@ export interface AttachmentStore {
   take(): ComposerAttachment[];
   uploadImage(file: File): Promise<void>;
   uploadDocument(file: File): Promise<void>;
+  /**
+   * Take files the owner dropped rather than picked (BUG-252). Each one goes to
+   * the same validator its button would have used; a drop is a shortcut past
+   * the button, never past a check.
+   */
+  acceptFiles(files: Iterable<File>): Promise<void>;
 }
 
 /** One composer's attachments. Each composer owns its own instance. */
@@ -198,6 +204,36 @@ export function createAttachmentStore(): AttachmentStore {
     }
   }
 
+  async function uploadImage(file: File): Promise<void> {
+    if (items.length >= MAX_ATTACHMENTS) return;
+    error = null;
+    if (!IMAGE_MEDIA_TYPES.includes(file.type)) {
+      error = "Only PNG, JPEG, WebP, or GIF images can be attached.";
+      return;
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      error = "Image is too large (5 MB max).";
+      return;
+    }
+    await upload(file, "image", file.type);
+  }
+
+  async function uploadDocument(file: File): Promise<void> {
+    if (items.length >= MAX_ATTACHMENTS) return;
+    error = null;
+    const mediaType = documentMediaType(file);
+    if (mediaType === null) {
+      error =
+        "Only plain-text, Markdown, CSV, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
+      return;
+    }
+    if (file.size > MAX_DOCUMENT_BYTES) {
+      error = "Document is too large (32 MB max).";
+      return;
+    }
+    await upload(file, "document", mediaType);
+  }
+
   return {
     get items() { return items; },
     get full() { return items.length >= MAX_ATTACHMENTS; },
@@ -231,33 +267,27 @@ export function createAttachmentStore(): AttachmentStore {
     take(): ComposerAttachment[] {
       return [...items];
     },
-    async uploadImage(file: File) {
-      if (items.length >= MAX_ATTACHMENTS) return;
-      error = null;
-      if (!IMAGE_MEDIA_TYPES.includes(file.type)) {
-        error = "Only PNG, JPEG, WebP, or GIF images can be attached.";
-        return;
+    uploadImage,
+    uploadDocument,
+    async acceptFiles(files: Iterable<File>) {
+      for (const file of files) {
+        if (items.length >= MAX_ATTACHMENTS) {
+          // Say why the rest were left rather than dropping them in silence.
+          error = `Only ${MAX_ATTACHMENTS} attachments fit in one prompt; the rest were not added.`;
+          return;
+        }
+        // The picker splits images from documents by which button was pressed.
+        // A drop has no button, so the file's own type decides, and anything
+        // that is neither is refused by name instead of ignored.
+        if (IMAGE_MEDIA_TYPES.includes(file.type)) {
+          await uploadImage(file);
+        } else {
+          await uploadDocument(file);
+        }
+        // One rejected file stops the batch: the message names that file, and
+        // continuing would overwrite it with the next one's.
+        if (error !== null) return;
       }
-      if (file.size > MAX_IMAGE_BYTES) {
-        error = "Image is too large (5 MB max).";
-        return;
-      }
-      await upload(file, "image", file.type);
-    },
-    async uploadDocument(file: File) {
-      if (items.length >= MAX_ATTACHMENTS) return;
-      error = null;
-      const mediaType = documentMediaType(file);
-      if (mediaType === null) {
-        error =
-          "Only plain-text, Markdown, CSV, PDF, Word (.docx), or Excel (.xlsx) documents can be attached.";
-        return;
-      }
-      if (file.size > MAX_DOCUMENT_BYTES) {
-        error = "Document is too large (32 MB max).";
-        return;
-      }
-      await upload(file, "document", mediaType);
     },
   };
 }

@@ -22,6 +22,7 @@ from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.registry import ModelProfileRegistry, RegistryError, profile_with_model
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID
+from raiker.models.subscription_limits import SubscriptionLimitStore
 from raiker.storage.sqlite import SQLiteStore
 
 
@@ -46,6 +47,12 @@ def owner_model_runtime(
         runtime_policy=provider_runtime_policy_from_gates(store, owner_principal_id),
         connection_resolver=lambda profile_id: get_model_connection(
             store, owner_principal_id, profile_id
+        ),
+        # BUG-254 — a subscription states how much of its window is left as part
+        # of a turn. This is the one place that knows both the owner and the
+        # store, so it is where that statement is recorded.
+        limit_window_sink=lambda profile_id, windows: SubscriptionLimitStore(store).record(
+            owner_principal_id, profile_id, windows
         ),
     )
     selected = router.default_provider()

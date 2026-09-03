@@ -298,11 +298,26 @@ class TestExportApi:
             == 404
         )
 
-    def test_export_requires_a_bearer_token(self, client: TestClient, workspace: Path) -> None:
+    def test_export_requires_a_session(self, client: TestClient, workspace: Path) -> None:
+        """A caller holding nothing is refused, and a cookie alone cannot export.
+
+        BUG-253 gave the browser an ``HttpOnly`` session cookie, so "no
+        Authorization header" and "no credentials" stopped being the same
+        sentence: a client that has signed in still holds a live session, and
+        authenticating it is the whole point. What must still hold is stated
+        directly here — a caller with nothing gets nothing, and a cookie without
+        the CSRF proof cannot perform the *export*, which writes.
+        """
         _headers, principal = _session(client)
         session_id = _seed_conversation(workspace, principal, "a", "b")
+
+        # Signed in by cookie, but a write still needs the double-submit token.
         assert client.post(f"/api/sessions/{session_id}/export").status_code in (401, 403)
+
+        # And a caller holding no credential at all reads nothing.
+        client.cookies.clear()
         assert client.get(f"/api/sessions/{session_id}/export/manifest").status_code in (401, 403)
+        assert client.post(f"/api/sessions/{session_id}/export").status_code in (401, 403)
 
     def test_a_successful_export_is_audited_without_the_transcript(
         self, client: TestClient, workspace: Path

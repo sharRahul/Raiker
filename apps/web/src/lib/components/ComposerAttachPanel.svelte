@@ -12,6 +12,7 @@
    * and re-validated on every read. The limits stated in the tooltips are the
    * server's, repeated here so a refusal is predictable rather than surprising.
    */
+  import PathPicker from "./PathPicker.svelte";
   import {
     DOCUMENT_EXTENSIONS,
     DOCUMENT_MEDIA_TYPES,
@@ -27,6 +28,9 @@
   }: { store: AttachmentStore; disabled?: boolean; idPrefix?: string } = $props();
 
   let pathDraft = $state("");
+  // BUG-251 — the workspace path can be browsed to. It is resolved inside the
+  // workspace either way; the picker only removes the need to know how to spell it.
+  let browsing = $state(false);
 
   // The visible control is a <label>, and a label whose input is disabled does
   // nothing at all when clicked — while still looking exactly like a button
@@ -68,6 +72,14 @@
     disabled={disabled || store.full}
     aria-label="Attachment path"
   />
+  <button
+    type="button"
+    class="btn btn-sm"
+    onclick={() => (browsing = true)}
+    disabled={disabled || store.full}
+  >
+    Browse…
+  </button>
   <button
     type="button"
     class="btn btn-sm"
@@ -116,6 +128,16 @@
     <span class="attach-limit">Attachment limit reached for this prompt.</span>
   {/if}
 </div>
+
+{#if browsing}
+  <PathPicker
+    title="Choose a workspace file or folder"
+    mode="file"
+    insideWorkspace
+    onchoose={(path) => { browsing = false; if (store.addPath(path)) pathDraft = ""; }}
+    onclose={() => (browsing = false)}
+  />
+{/if}
 
 <style>
   .is-disabled {

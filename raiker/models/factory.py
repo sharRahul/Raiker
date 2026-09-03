@@ -18,6 +18,7 @@ from raiker.models.exceptions import ProviderConfigurationError, ProviderPolicyE
 from raiker.models.providers.anthropic_messages import AsyncAnthropicMessagesProvider
 from raiker.models.providers.codex_app_server import AsyncCodexAppServerProvider
 from raiker.models.providers.openai_compatible import AsyncOpenAICompatibleProvider
+from raiker.models.subscription_limits import LimitWindowSink
 
 
 def capabilities_from_profile(profile: ModelProfile) -> ModelCapabilities:
@@ -54,16 +55,23 @@ class ModelProviderFactory:
     require_api_key_for_hosted: bool = True
     client: httpx.AsyncClient | None = None
     connection: dict[str, str] | None = None
+    # BUG-254 — where a provider hands on the limit windows it volunteers with a
+    # turn. Optional throughout: a factory built without one produces providers
+    # that run turns exactly as before and report nothing, which is the honest
+    # state for a caller that has no owner to record against.
+    limit_window_sink: LimitWindowSink | None = None
 
     def __init__(
         self,
         client: httpx.AsyncClient | None = None,
         policy: ProviderRuntimePolicy | None = None,
         connection: dict[str, str] | None = None,
+        limit_window_sink: LimitWindowSink | None = None,
         **kwargs: Any,
     ) -> None:
         object.__setattr__(self, "client", client)
         object.__setattr__(self, "connection", connection)
+        object.__setattr__(self, "limit_window_sink", limit_window_sink)
         if policy is None:
             policy = ProviderRuntimePolicy(**kwargs)
         object.__setattr__(self, "allow_policy_gated_provider", policy.allow_policy_gated_provider)
@@ -200,6 +208,7 @@ class ModelProviderFactory:
                 profile_id=profile.profile_id,
                 model=str(raw.get("served_model_name", profile.model)),
                 capabilities=capabilities_from_profile(profile),
+                on_limit_windows=self.limit_window_sink,
             )
         if provider == "anthropic":
             if api_key:

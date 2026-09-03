@@ -24,6 +24,7 @@ from raiker.models.exceptions import (
     ProviderResponseValidationError,
     ProviderTimeoutError,
 )
+from raiker.models.subscription_limits import LimitWindow, parse_windows
 
 _REQUEST_TIMEOUT_SECONDS = 15.0
 
@@ -56,6 +57,10 @@ class CodexAppServerClient:
         self._next_id = 1
         self._lock = asyncio.Lock()
         self._initialized = False
+        # BUG-254 — the last limit windows this subscription volunteered with a
+        # turn. Empty until a turn has actually run, which is the honest state:
+        # a provider that has not spoken has said nothing.
+        self.last_limit_windows: tuple[LimitWindow, ...] = ()
 
     @staticmethod
     def _default_command() -> tuple[str, ...]:
@@ -284,6 +289,15 @@ class CodexAppServerClient:
                         if isinstance(delta, str):
                             text.append(delta)
                     if method == "turn/completed" and params.get("threadId") == thread_id:
+                        # BUG-254 — the subscription states how much of its
+                        # five-hour and weekly windows is left, as part of the
+                        # turn. Reading it here costs nothing and reaches
+                        # nowhere; the alternative is an owner discovering a
+                        # limit by hitting it. Anything unreadable leaves the
+                        # last good reading alone rather than replacing it.
+                        self.last_limit_windows = parse_windows(
+                            params.get("rateLimits", params.get("rate_limits"))
+                        )
                         return "".join(text)
             except TimeoutError as exc:
                 raise ProviderTimeoutError("codex_app_server_timeout") from exc

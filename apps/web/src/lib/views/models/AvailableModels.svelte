@@ -218,8 +218,14 @@
   }
   /* Transparent rather than absent: the real control keeps the size of the
      switch it is drawn as, so it is a pointer target and an assertable element
-     in its own right instead of a zero-by-zero box behind a picture. */
-  input {
+     in its own right instead of a zero-by-zero box behind a picture.
+
+     Typed, not a bare `input`. As a bare element selector this also hid the
+     search box added above — 26px wide at zero opacity, present in the DOM and
+     invisible on screen, which is exactly how it was reported: "there is no
+     search in the pop-up windows yet". A rule that means "the switch's
+     checkbox" has to say so. */
+  input[type="checkbox"] {
     position: absolute;
     left: 0.1rem;
     opacity: 0;

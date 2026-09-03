@@ -15180,6 +15180,11 @@ Codex on this device and Raiker will not use it until told to.
 
 **Guarded.** `tests/test_api_codex_subscription.py`.
 
+**Evidence.**
+[`screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png`](screenshots/working/2026-09-03-fixed-357-subscription-offered-not-adopted.png)
+— a genuinely fresh workspace, on a machine whose Codex client holds a ChatGPT
+Plus session.
+
 **User-interface outcome.** A first run offers the subscription. It never takes
 it.
 
@@ -15210,7 +15215,19 @@ new search, and the field carries `autocomplete="off"` so a filter the owner
 cannot see the origin of is never restored. The row states the selected model
 once instead of naming it twice.
 
-**Guarded.** `apps/web/src/lib/views/ModelSetupView.test.ts`.
+**The search was invisible before it was wrong.** It shipped present in the DOM,
+typable, filtering correctly — and 26 pixels wide at zero opacity, because
+`AvailableModels` styled the switch's hidden checkbox with a bare `input`
+selector that matched the new search box too. Every DOM assertion passed
+throughout; it was a screenshot that caught it. The rule now says
+`input[type="checkbox"]`, which is what it always meant, and the guard asserts
+the search is *visible* rather than merely present.
+
+**Guarded.** `apps/web/src/lib/views/ModelSetupView.test.ts`,
+`apps/web/src/lib/views/models/AvailableModels.test.ts`.
+
+**Evidence.**
+[`screenshots/working/2026-09-03-fixed-358-model-picker-search.png`](screenshots/working/2026-09-03-fixed-358-model-picker-search.png).
 
 **User-interface outcome.** One control, with a search, on both the Models page
 and the first-run screen.

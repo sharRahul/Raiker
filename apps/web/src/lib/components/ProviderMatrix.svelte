@@ -147,6 +147,9 @@
    * what left a just-connected provider still showing an empty key box.
    */
   let stored = $state<Record<string, boolean>>({});
+  /** Which ChatGPT plan Codex reports, so the row can name it rather than
+      leaving an owner with several subscriptions guessing which is in use. */
+  let subscriptionPlan = $state<string | null>(null);
   const isConnected = (row: Row) => stored[row.profileId] ?? row.connected;
   let loginPolling: ReturnType<typeof setTimeout> | null = null;
 
@@ -270,15 +273,36 @@
       const status = await api.codexSubscriptionStatus();
       const connected = status.connection_status === "connected";
       stored = set(stored, row.profileId, connected);
+      subscriptionPlan = status.plan_type;
       if (connected) {
-        note = set(note, row.profileId, "ChatGPT subscription connected. Reading available models…");
+        note = set(note, row.profileId, "Reading available models…");
         await detect(row);
+      } else if (status.connection_status === "codex_missing") {
+        failure = set(failure, row.profileId, "Codex is not installed on this device.");
       } else if (poll) {
         note = set(note, row.profileId, "Finish sign-in in the browser. Raiker will check again shortly.");
         loginPolling = setTimeout(() => void readSubscriptionStatus(row, true), 2000);
       }
     } catch {
       failure = set(failure, row.profileId, "The local Codex client could not report ChatGPT sign-in status.");
+    }
+  }
+
+  /** Forget the subscription here; the Codex client keeps its own session. */
+  async function disconnectSubscription(row: Row) {
+    busy = set(busy, row.profileId, "saving");
+    failure = drop(failure, row.profileId);
+    note = drop(note, row.profileId);
+    try {
+      await api.disconnectCodexSubscription();
+      stored = set(stored, row.profileId, false);
+      subscriptionPlan = null;
+      catalogue = drop(catalogue, row.profileId);
+      onchanged?.();
+    } catch {
+      failure = set(failure, row.profileId, "The ChatGPT subscription could not be disconnected.");
+    } finally {
+      busy = drop(busy, row.profileId);
     }
   }
 
@@ -525,10 +549,14 @@
                  exactly as it is everywhere else. -->
             <label class="field key-field">
               <span class="sr-only">{row.label} endpoint</span>
+              <!-- The browser will otherwise offer the credential the owner
+                   just typed into Raiker's own sign-in form, and drop their
+                   username into a provider address. -->
               <input
                 class="input"
                 type="url"
                 spellcheck="false"
+                autocomplete="off"
                 placeholder="http://127.0.0.1:8000/v1"
                 aria-label={`${row.label} endpoint`}
                 bind:value={endpoint[row.profileId]}
@@ -618,7 +646,12 @@
       </div>
       <div class="controls">
         {#if isConnected(row)}
-          <span class="stored"><Icon name="lock" size={13} /> Subscription connected</span>
+          <span class="stored">
+            <Icon name="lock" size={13} />
+            {subscriptionPlan
+              ? `${subscriptionPlan.charAt(0).toUpperCase()}${subscriptionPlan.slice(1)} connected`
+              : "Connected"}
+          </span>
           <label class="field">
             <span class="sr-only">{row.label} model</span>
             <select class="select" aria-label={`${row.label} model`} bind:value={choice[row.profileId]} disabled={visibleModels(row).length === 0}>
@@ -629,6 +662,10 @@
           </label>
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void detect(row)}><Icon name="refresh" size={14} /> Refresh</button>
           <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined || !(choice[row.profileId] ?? "")} onclick={() => void pin(row)}>{busy[row.profileId] === "pinning" ? "Selecting…" : "Use this model"}</button>
+          <!-- Reachable while connected: an owner holding more than one ChatGPT
+               plan has no other way to move Raiker between them. -->
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Switch account</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void disconnectSubscription(row)}>Sign out</button>
         {:else}
           <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>{busy[row.profileId] === "saving" ? "Opening sign-in…" : "Sign in with ChatGPT"}</button>
         {/if}
@@ -720,7 +757,7 @@
             <input
               class="input"
               type="password"
-              autocomplete="off"
+              autocomplete="new-password"
               spellcheck="false"
               placeholder={`${row.label} API key`}
               aria-label={`${row.label} API key`}

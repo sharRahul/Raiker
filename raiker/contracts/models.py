@@ -224,6 +224,9 @@ EVENT_TYPES = {
     # because the first attempt never reached the provider".
     "model_request_retried",
     "model_profile_selected",
+    # Which of a provider's models the owner keeps offered in every picker. A
+    # separate decision from selecting the default, and separately audited.
+    "model_available_set_changed",
     "model_capabilities_inspected",
     "reasoning_setting_changed",
     "reasoning_setting_rejected",

@@ -2004,6 +2004,17 @@ export const api = {
     request<ApprovalView[]>(
       withQuery("/api/approvals", { status_filter: statusFilter }),
     ),
+  // Which of a provider's models stay offered in every picker. The default
+  // model is a different decision, made by `setModelSelection`.
+  setAvailableModels: (profileId: string, models: string[]) =>
+    request<{ ok: boolean; profile_id: string; models: string[] }>(
+      `/api/models/${encodeURIComponent(profileId)}/available-models`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ models }),
+      },
+    ),
   approval: (id: string) =>
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
   resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>

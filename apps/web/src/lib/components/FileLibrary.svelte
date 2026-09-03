@@ -181,6 +181,19 @@
     }
   }
 
+  // Dropping files on the library is the same import the buttons run; a
+  // library with an obvious place to drop things does not need to be told
+  // where the button is.
+  let dragging = $state(false);
+
+  function onDrop(event: DragEvent) {
+    event.preventDefault();
+    dragging = false;
+    if (!ready || importing) return;
+    const dropped = event.dataTransfer?.files;
+    if (dropped && dropped.length > 0) void importFiles(dropped);
+  }
+
   const failures = $derived(
     lastResults.filter((result): result is Extract<ManagedFileImportResult, { ok: false }> => !result.ok),
   );
@@ -191,7 +204,17 @@
   );
 </script>
 
-<section class="file-library" aria-labelledby="file-library-heading">
+<section
+  class="file-library"
+  class:dragging
+  aria-labelledby="file-library-heading"
+  ondragover={(event) => {
+    event.preventDefault();
+    dragging = true;
+  }}
+  ondragleave={() => (dragging = false)}
+  ondrop={onDrop}
+>
   <header class="library-head">
     <div>
       <h3 id="file-library-heading">{heading}</h3>
@@ -246,7 +269,7 @@
   />
 
   <p class="import-status" role="status" aria-live="polite">
-    {#if importing}Importing…{:else if importSummary}{importSummary}{/if}
+    {#if importing}Importing…{:else if dragging}Drop to add{:else if importSummary}{importSummary}{/if}
   </p>
 
   {#if !ready}
@@ -311,6 +334,11 @@
 </section>
 
 <style>
+  .file-library.dragging {
+    outline: 2px dashed var(--accent-border);
+    outline-offset: 4px;
+  }
+
   .file-library { display: grid; gap: var(--space-3); }
   .library-head {
     display: flex;

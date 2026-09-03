@@ -344,6 +344,24 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-329](#fixed-329--three-controls-a-narrow-window-silently-removed) | Medium | Chat / Build / web UI | Fixed (raised and closed 2026-08-30) |
 | [FIXED-330](#fixed-330--the-overview-counted-one-set-of-gates-and-linked-to-another) | Low | Observability / web UI | Fixed (raised and closed 2026-08-30) |
 | [FIXED-331](#fixed-331--a-turn-the-reader-walked-away-from-was-never-recorded) | High | Runtime / gateway / durability | Fixed (raised and closed 2026-08-30) |
+| [FIXED-332](#fixed-332--main-was-red-on-ruff-and-mypy) | Medium | CI / repository hygiene | Fixed (raised and closed 2026-09-03) |
+| [FIXED-333](#fixed-333--a-repository-file-test-asserted-bytes-its-own-fixture-could-not-write-on-windows) | Low | Tests / portability | Fixed (raised and closed 2026-09-03) |
+| [FIXED-334](#fixed-334--a-signed-in-chatgpt-subscription-was-refused-by-the-policy-gate-it-had-already-satisfied) | High | Models / ChatGPT subscription | Fixed (raised and closed 2026-09-03) |
+| [FIXED-335](#fixed-335--the-subscription-row-hid-every-account-control-the-moment-it-connected) | High | Models / ChatGPT subscription | Fixed (raised and closed 2026-09-03) |
+| [FIXED-336](#fixed-336--a-device-without-codex-reported-a-failed-status-read-rather-than-a-missing-program) | Low | Models / ChatGPT subscription | Fixed (raised and closed 2026-09-03) |
+| [FIXED-337](#fixed-337--five-providers-shared-one-anonymous-square) | Low | Models / web UI | Fixed (raised and closed 2026-09-03) |
+| [FIXED-338](#fixed-338--the-browser-filled-the-owner-raiker-password-into-provider-credential-boxes) | High | Models / credential handling | Fixed (raised and closed 2026-09-03) |
+| [FIXED-339](#fixed-339--mlx-was-offered-on-machines-that-cannot-run-it) | Medium | Models / platform honesty | Fixed (raised and closed 2026-09-03) |
+| [FIXED-340](#fixed-340--pickers-offered-models-that-could-not-answer) | High | Models / every picker | Fixed (raised and closed 2026-09-03) |
+| [FIXED-341](#fixed-341--a-model-that-was-set-up-and-selected-was-refused-for-never-having-been-checked) | High | Models / readiness | Fixed (raised and closed 2026-09-03) |
+| [FIXED-342](#fixed-342--the-model-menu-opened-in-the-corner-of-whatever-column-it-was-dropped-into) | Medium | Web UI / model picker | Fixed (raised and closed 2026-09-03) |
+| [FIXED-343](#fixed-343--one-model-per-provider-was-the-only-thing-a-picker-could-offer) | High | Models / selection | Fixed (raised and closed 2026-09-03) |
+| [FIXED-344](#fixed-344--an-approval-raised-anywhere-had-to-be-hunted-down-in-the-inbox) | High | Approvals / web UI | Fixed (raised and closed 2026-09-03) |
+| [FIXED-345](#fixed-345--the-host-panel-pointed-at-a-command-line-for-an-update-settings-can-apply) | Low | Host control / updates | Fixed (raised and closed 2026-09-03) |
+| [FIXED-346](#fixed-346--the-models-page-said-no-models-were-ready-on-an-instance-with-models-set-up) | Medium | Models / web UI | Fixed (raised and closed 2026-09-03) |
+| [FIXED-347](#fixed-347--choosing-a-model-was-an-accordion-inside-a-provider-card) | Medium | Models / web UI | Fixed (raised and closed 2026-09-03) |
+| [FIXED-348](#fixed-348--an-attachment-button-that-could-do-nothing-still-looked-like-a-button) | Low | Chat / Build / attachments | Fixed (raised and closed 2026-09-03) |
+| [FIXED-349](#fixed-349--three-provider-marks-were-drawn-as-letters-beside-the-real-ones) | Low | Models / web UI | Fixed (raised and closed 2026-09-03) |
 
 ---
 
@@ -14470,3 +14488,427 @@ turn failed only when one did.
 **Evidence.** Live, against Anthropic `claude-haiku-4-5-20251001`: before the fix
 the abandoned turn is `running`/`null`; after it, `completed` with its answer as
 the summary, and the task `completed` rather than `failed`.
+
+---
+
+## FIXED-332 — Main was red on ruff and mypy
+
+**Severity: Medium. Area: CI / repository hygiene. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** `python -m ruff check .` reported five errors and `python -m mypy
+raiker apps tests` reported six on `main` at `accca249`, so the Python job of CI
+was failing on the branch every later change would be measured against.
+
+**Root cause.** The commit that added the Codex provider and the update handoff
+landed unsorted import blocks in two modules, a `Callable`/`Sequence` import from
+`typing`, two nested `if` statements, an `Any | None` passed where a `str` was
+required, a `Popen` keyword bag typed as `dict[str, object]`, and three test
+functions with unannotated parameters.
+
+**Fixed.** Every one of them, in place. The `Popen` call now spells out the two
+platform-specific detachment mechanisms rather than merging them into an untyped
+dictionary, and the login handler narrows `authUrl` to `str` before opening it
+rather than after.
+
+**Guarded.** `ruff check .` and `mypy raiker apps tests` are both steps of the CI
+Python job, and both pass.
+
+**User-interface outcome.** None directly. This is the gate that has to be green
+before any of the rest of this round can be believed.
+
+---
+
+## FIXED-333 — A repository-file test asserted bytes its own fixture could not write on Windows
+
+**Severity: Low. Area: Tests / portability. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** `tests/test_code_repo_files_api.py::TestReadFile::test_a_text_file_comes_back_whole`
+failed locally comparing `print('hello')\r\n` with `print('hello')\n`.
+
+**Root cause.** The fixture wrote its files with `Path.write_text` in text mode,
+which translates `\n` to `\r\n` on Windows. The product returned the bytes that
+were on disk, correctly, and the assertion compared them with the bytes the
+author had in mind.
+
+**Fixed.** The fixture writes with `newline=""`, so the bytes on disk are the
+bytes asserted on every platform.
+
+**Guarded.** The test itself, which now passes on Windows and on Linux.
+
+**User-interface outcome.** None. The product was already right.
+
+---
+
+## FIXED-334 — A signed-in ChatGPT subscription was refused by the policy gate it had already satisfied
+
+**Severity: High. Area: Models / ChatGPT subscription. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** With Codex installed and signed in to a ChatGPT Plus account, the
+subscription row read **Subscription connected** and, directly beneath it,
+"ChatGPT subscription is blocked by provider policy. Enable its gate in
+Permissions first." No model could be listed, so nothing could be selected in
+Chat or Build.
+
+**Root cause.** The plan's Task 3 called for a safe connection marker to be
+persisted once `account/read` confirms a signed-in account, and it was never
+written. Nothing else in Raiker knew the owner had connected anything: the
+profile reported `connection_configured: false`, so
+`provider_runtime_policy_from_gates` saw no configured provider, so "consent by
+configuration" — the rule that stops an owner being sent to Permissions after
+they have already connected a provider — never applied to it.
+
+**Fixed.** `GET /api/models/chatgpt-codex/status` mirrors Codex's own answer into
+the connector vault: a marker recording that the connection exists, and nothing
+else. No access token, refresh token, verifier, device code or authorization URL
+has a path into Raiker's storage; those stay inside the Codex process. Signing
+out clears the marker, and either transition invalidates readiness for the
+profile.
+
+**Guarded.** `tests/test_api_codex_subscription.py`.
+
+**User-interface outcome.** Signing in to ChatGPT once is the whole setup. The
+card names the plan, lists the models that subscription actually grants, and both
+Chat and Build offer them.
+
+---
+
+## FIXED-335 — The subscription row hid every account control the moment it connected
+
+**Severity: High. Area: Models / ChatGPT subscription. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "There is no option to sign in at all in ChatGPT subscription to
+user Plus, Pro or Max subscriptions." Once Codex reported a session the row
+replaced its sign-in button with a model picker, so an owner holding more than
+one ChatGPT plan had no way to move Raiker between them, and no way to
+disconnect.
+
+**Root cause.** Signing in was modelled as a step that finishes rather than as an
+account relationship that can change.
+
+**Fixed.** A connected subscription keeps **Test**, **Switch account** and **Sign
+out** on the card and in first-run setup, and names the plan it is using.
+
+**Guarded.** `apps/web/src/lib/views/ModelsView.test.ts` and
+`apps/web/src/lib/views/ModelSetupView.test.ts`.
+
+**User-interface outcome.** The subscription behaves like an account: which one
+is in use is on the card, and changing or leaving it is one click.
+
+---
+
+## FIXED-336 — A device without Codex reported a failed status read rather than a missing program
+
+**Severity: Low. Area: Models / ChatGPT subscription. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** On a machine with no Codex installed the row said "The local Codex
+client could not report ChatGPT sign-in status" — true, and useless.
+
+**Root cause.** Every `ModelProviderError` from the status route became a 503, so
+the one state with an obvious remedy was indistinguishable from a real failure.
+
+**Fixed.** `codex_app_server_not_installed` is answered as a state rather than an
+error: `connection_status: "codex_missing"`, which the card and the setup row
+render as "Codex not installed" beside a sign-in button that still explains what
+to do.
+
+**Guarded.** `apps/web/src/lib/views/ModelsView.test.ts` and
+`apps/web/src/lib/views/ModelSetupView.test.ts`.
+
+**User-interface outcome.** A missing program is named as one.
+
+---
+
+## FIXED-337 — Five providers shared one anonymous square
+
+**Severity: Low. Area: Models / web UI. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** llama.cpp, MLX, LM Studio, the OpenAI-compatible endpoint and the
+ChatGPT subscription all rendered the same neutral glyph, so five rows on the
+model screen were identified by the same picture.
+
+**Root cause.** The fallback mark is deliberate — those runtimes publish no
+redistributable logo — but one fallback for five providers is the same as no mark
+at all, in the space of one.
+
+**Fixed.** Each neutral provider has its own drawn glyph: a chip for llama.cpp,
+stacked arrays for MLX, a desktop window for LM Studio, a connector for any
+OpenAI-compatible endpoint. The ChatGPT subscription carries the OpenAI mark
+already bundled, because that is the account it is.
+`apps/web/public/provider-logos/README.md` records both decisions.
+
+**User-interface outcome.** Rows are told apart at a glance.
+
+---
+
+## FIXED-338 — The browser filled the owner Raiker password into provider credential boxes
+
+**Severity: High. Area: Models / credential handling. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** After creating an account, the first-run model screen held the
+owner's username in the **OpenAI-compatible endpoint** field and their Raiker
+password in the **Ollama Cloud API key** field, both put there by the browser.
+
+**Root cause.** The endpoint input carried no `autocomplete` at all, and the key
+inputs carried `autocomplete="off"`, which Chrome ignores for password fields by
+design.
+
+**Fixed.** The endpoint input is `autocomplete="off"`; every provider key input
+is `autocomplete="new-password"`, which browsers do honour.
+
+**User-interface outcome.** A provider connection form is never pre-filled with
+the credential that unlocks Raiker.
+
+---
+
+## FIXED-339 — MLX was offered on machines that cannot run it
+
+**Severity: Medium. Area: Models / platform honesty. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** On Windows, four MLX slot profiles appeared on the Models page, in
+first-run setup and in every model picker, for a framework that only runs on
+Apple silicon.
+
+**Root cause.** Nothing in the profile registry said where a runtime can exist,
+so every profile was published everywhere and the impossibility surfaced only
+when a deployment failed with `mlx_requires_apple_silicon`.
+
+**Fixed.** A profile may declare `requires_platform`, and `get_models` publishes
+it only where it matches. The four MLX profiles declare `["darwin"]`. llama.cpp
+declares nothing, because GGUF files run on macOS as happily as anywhere.
+
+**User-interface outcome.** Windows and Linux instances stop offering four things
+that could never serve a model.
+
+---
+
+## FIXED-340 — Pickers offered models that could not answer
+
+**Severity: High. Area: Models / every picker. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "All the dropdowns should only list the models that are actually
+available." A fresh instance offered "Local GGUF", "Local GGUF 2", "Local GGUF 3"
+and "Local GGUF 4" — four rows for one runtime with nothing served — alongside
+hosted models for providers with no credential saved.
+
+**Root cause.** Two separate leaks. `chat_profiles` seeded itself from the
+registry profile's `model`, and for a runtime slot that field is the alias the
+slot *would* serve under, not a model anybody has. And the browser's own filter
+excluded only `ready === false`, which is also false for a model nobody has
+checked yet, so it caught the wrong set.
+
+**Fixed.** A slot alias earns a place only by being deployed, which is what
+records its configured model. `isChoosableModel` is one rule shared by every
+picker: a measured failure disqualifies a model, an unmeasured one does not, and
+a hosted provider must have a connection saved.
+
+**Guarded.** `apps/web/src/lib/components/ModelPicker.test.ts` and
+`apps/web/src/lib/views/ModelsView.test.ts`.
+
+**User-interface outcome.** Every dropdown lists models that can answer, grouped
+under the provider that serves them.
+
+---
+
+## FIXED-341 — A model that was set up and selected was refused for never having been checked
+
+**Severity: High. Area: Models / readiness. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "No readiness check exists for this exact model. Set up or check
+this model before sending" — on a provider the owner had just connected and a
+model they had just selected. The composer disabled **Send** until they pressed
+**Test** by hand.
+
+**Root cause.** BUG-238 established that an observation which has merely aged out
+is not a job for the owner: the server re-takes it before admitting the turn. A
+model nobody has *ever* checked is the same shape of state — nothing is known to
+be wrong — and it was still being refused.
+
+**Fixed.** `require_ready_async` takes that first check itself, exactly as it does
+for an expired one, and only a check that fails refuses the turn. A profile still
+carrying the `<model>` placeholder is excluded, because there is no exact model to
+look at. The composer stops blocking on it and the strip reads "Checking this
+model — you can still send". An aged-out check now reads "Re-checks on use"
+rather than "Check expired".
+
+**Guarded.** `apps/web/src/lib/modelReadinessGating.test.ts` and
+`apps/web/src/lib/components/ModelReadinessStrip.test.ts`.
+
+**User-interface outcome.** Connecting a provider and choosing a model is the
+whole setup.
+
+---
+
+## FIXED-342 — The model menu opened in the corner of whatever column it was dropped into
+
+**Severity: Medium. Area: Web UI / model picker. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** On the task form the model menu appeared at the top right of the
+panel, far from the button that opened it.
+
+**Root cause.** The menu is positioned against its wrapper, and the wrapper was a
+plain block that stretched to the width of whatever grid cell it was placed in.
+`right: 0; bottom: 100%` then resolved against that cell rather than the trigger.
+
+**Fixed.** The wrapper is `inline-flex` with `width: fit-content`, so it is the
+trigger's size wherever it is used.
+
+**User-interface outcome.** The menu opens above its button, on every surface.
+
+---
+
+## FIXED-343 — One model per provider was the only thing a picker could offer
+
+**Severity: High. Area: Models / selection. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "There should be a slider to select multiple always available
+models for each provider." Selecting a default was the only act that put a model
+into a picker, so a provider serving six could offer one, and changing which one
+meant returning to the Models page.
+
+**Root cause.** `principal_configured_models` already stored a *set* per profile,
+but nothing ever wrote more than one entry: its only writer was the code that
+records a default selection.
+
+**Fixed.** `PUT /api/models/{profile_id}/available-models` writes that set
+directly, bounded at 24 per provider and always keeping the model the owner has
+selected. **Select models…** opens a dialog of switches, one per model the
+provider published, and each switch is the whole decision.
+
+**Guarded.** `tests/test_available_models.py` and
+`apps/web/src/lib/views/ModelsView.test.ts`.
+
+**User-interface outcome.** An owner keeps as many of a provider's models on hand
+as they work with, and every picker shows them grouped under that provider.
+
+---
+
+## FIXED-344 — An approval raised anywhere had to be hunted down in the inbox
+
+**Severity: High. Area: Approvals / web UI. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "If any approval is requested it should give a pop-up on screen to
+approve or deny." A decision raised by a background task, a standing agent, or a
+conversation the owner had navigated away from was announced by nothing: work sat
+parked until somebody thought to open Approvals.
+
+**Root cause.** An approval could only be answered where it was raised — inline in
+its Chat turn — or in the inbox. Both require already being there.
+
+**Fixed.** A prompt mounted in the app shell polls for pending decisions and
+announces one wherever the owner is standing, with **Approve**, **Deny** and
+**Details**. It is deliberately not modal, and **Decide later** is a first-class
+answer that leaves the approval in the inbox. A critical approval needs the
+owner's password or a code, so the prompt links to the inbox and says why rather
+than pretending it can take that decision. Resolving broadcasts on the channel
+the inbox already uses, so a Chat tab showing the parked turn continues without
+being visited.
+
+**Guarded.** `apps/web/src/lib/components/ApprovalPrompt.test.ts`.
+
+**User-interface outcome.** A decision finds the owner. The inbox is where a
+missed one waits, not the only place a decision exists.
+
+---
+
+## FIXED-345 — The host panel pointed at a command line for an update Settings can apply
+
+**Severity: Low. Area: Host control / updates. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** With an update available, the host panel told the owner to run
+`raiker-app update --apply` in a terminal.
+
+**Root cause.** The advice predates the Settings update flow, which applies a
+verified update through an external helper and restarts the registered service.
+
+**Fixed.** The panel links to `#/settings?tab=updates`. Applying is still not done
+from the panel — replacing the tree a process is running from, from that process,
+remains wrong — but the owner is sent to the thing that can do it.
+
+**Guarded.** `apps/web/src/lib/components/HostControl.test.ts`, and the new
+`apps/web/src/lib/views/settings/Updates.test.ts` covers the Settings page the
+link leads to: source checkouts offer no apply path, a signed package names its
+version and recovery point, and interrupting work needs a second confirmation.
+
+---
+
+## FIXED-346 — The Models page said no models were ready on an instance with models set up
+
+**Severity: Medium. Area: Models / web UI. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** "0 models ready — 3 of 14 connected", on an instance with three
+providers connected and a model selected.
+
+**Root cause.** "Ready" means an observation proved it, which is the rule BUG-69
+exists to keep. Every observation had aged out, so the count was honestly zero —
+and read as "nothing here works".
+
+**Fixed.** The line still never says "ready" about something unproven. When the
+proven count is zero it names what is true instead: "3 models set up".
+
+**Guarded.** `apps/web/src/lib/views/ModelsView.test.ts`.
+
+**User-interface outcome.** The headline is both honest and recognisable.
+
+---
+
+## FIXED-347 — Choosing a model was an accordion inside a provider card
+
+**Severity: Medium. Area: Models / web UI. Status: Fixed — raised and closed 2026-09-03.**
+
+**Observed.** Opening a provider's model list pushed every card below it down the
+page and put a scrolling list inside a scrolling page.
+
+**Root cause.** The picker was rendered inline, twice — once for local rows and
+once for hosted cards.
+
+**Fixed.** One dialog, rendered once, opened by **Select models…**. It carries the
+provider's mark, its switches, and nothing else. The duplicated inline markup is
+gone, and the GGUF row is named for the file the owner has rather than for the
+server Raiker runs over it.
+
+**User-interface outcome.** Choosing models is a focused decision that leaves the
+page where it was.
+
+---
+
+## FIXED-348 — An attachment button that could do nothing still looked like a button
+
+**Severity: Low. Area: Chat / Build / attachments. Status: Fixed — raised and
+closed 2026-09-03.**
+
+**Observed.** "Image and Document does not open any file explorer to attach
+anything."
+
+**Root cause.** The visible control is a `<label>` over a visually hidden
+`<input type="file">`, which is the right construction — but the input carries
+`disabled` while a prior upload is in flight, while the composer is disabled, or
+once the per-prompt attachment limit is reached. A label whose input is disabled
+does nothing when clicked, and the label had no disabled appearance of its own,
+so a control that could not act looked exactly like one that could.
+
+**Fixed.** Whatever disables the input now disables the label's appearance with
+it, and the label carries `aria-disabled` so it reads the same way.
+
+**User-interface outcome.** A control that cannot open a file chooser says so
+before it is clicked.
+
+---
+
+## FIXED-349 — Three provider marks were drawn as letters beside the real ones
+
+**Severity: Low. Area: Models / web UI. Status: Fixed — raised and closed
+2026-09-03.**
+
+**Observed.** The install panel drew Ollama as a black square with an `O`, LM
+Studio as a teal square with `LM`, and the Hugging Face hero as a yellow square
+with `HF` — on the same page where the provider cards render those three
+providers' actual marks.
+
+**Root cause.** Those panels predate `ProviderLogo` and were never moved onto
+it.
+
+**Fixed.** All three use `ProviderLogo`, so one component decides what a
+provider looks like everywhere.
+
+**User-interface outcome.** A provider looks the same on every surface that
+names it.

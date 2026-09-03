@@ -55,12 +55,47 @@ describe("model readiness gating", () => {
       "model_missing",
       "policy_blocked",
       "unreachable",
-      "not_configured",
     ] as const) {
       const view = readiness({ state, ready: false, reason_code: state });
       expect(blocksSending(view), state).toBe(true);
       expect(isRevalidating(view), state).toBe(false);
     }
+  });
+
+  it("does not block a send on a connected provider nobody has checked yet", () => {
+    // The server takes that first check before it admits the turn, so demanding
+    // it by hand asked the owner to press Test on a provider they had just
+    // connected and a model they had just selected.
+    const unmeasured = readiness({
+      state: "not_configured",
+      ready: false,
+      reason_code: "model_not_checked",
+      evidence: { connection_configured: true },
+    });
+    expect(blocksSending(unmeasured)).toBe(false);
+  });
+
+  it("still blocks a send on a provider the owner has not connected", () => {
+    // Raiker never reaches a provider on its own initiative, so an unchecked
+    // model there is still the owner's to set up.
+    const unconnected = readiness({
+      state: "not_configured",
+      ready: false,
+      reason_code: "model_not_checked",
+      evidence: { connection_configured: false },
+    });
+    expect(blocksSending(unconnected)).toBe(true);
+  });
+
+  it("blocks a send when no model is named at all", () => {
+    const nothing = readiness({
+      state: "not_configured",
+      ready: false,
+      profile_id: "",
+      model: "",
+      reason_code: "model_not_configured",
+    });
+    expect(blocksSending(nothing)).toBe(true);
   });
 
   it("never blocks a ready model", () => {

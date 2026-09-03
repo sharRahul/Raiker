@@ -2,6 +2,7 @@
   import { onDestroy } from "svelte";
   import { api } from "../../api";
   import type { RuntimeInstallPlan } from "../../apiTypes";
+  import ProviderLogo from "../../components/ProviderLogo.svelte";
   let {
     onCatalogueChanged,
   }: {
@@ -98,7 +99,7 @@
   <div class="runtime-grid">
     <article>
       <div class="runtime-head">
-        <span class="runtime-logo">O</span>
+        <ProviderLogo provider="ollama" size={30} />
         <div>
           <h3>Ollama</h3>
           <p>Simple local model service for Windows, macOS, and Linux.</p>
@@ -134,7 +135,7 @@
     </article>
     <article>
       <div class="runtime-head">
-        <span class="runtime-logo lm">LM</span>
+        <ProviderLogo provider="lm-studio" size={30} />
         <div>
           <h3>LM Studio</h3>
           <p>Desktop model browser with a local OpenAI-compatible server.</p>
@@ -207,19 +208,8 @@
     color: var(--text-muted);
     margin-top: 4px;
   }
-  .runtime-logo {
-    display: grid;
-    place-items: center;
-    width: 38px;
-    height: 38px;
+  .runtime-head :global(.provider-logo) {
     border-radius: 9px;
-    background: #171717;
-    color: white;
-    font-weight: 850;
-  }
-  .runtime-logo.lm {
-    background: #164e63;
-    font-size: 0.72rem;
   }
   .pull-row {
     display: grid;

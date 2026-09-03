@@ -123,6 +123,27 @@ this up front so it is not discovered through a 401.
 
 Anthropic issues API keys only — there is no account sign-in to connect.
 
+### Using a ChatGPT subscription instead of a key
+
+The **ChatGPT subscription** card is a different path from the OpenAI card, and
+it is not an API key. It talks to a compatible **Codex** client installed on
+this machine, over that client's local process interface. Codex opens the
+browser sign-in, holds the tokens, and knows what your plan includes; Raiker
+receives the signed-in state, the plan name, and the model identifiers — nothing
+else. No token, refresh token, device code or sign-in URL is ever stored by
+Raiker.
+
+* **Sign in with ChatGPT** starts the flow in Codex. If Codex is not installed,
+  the card says so; Raiker does not download or install it for you.
+* Once connected the card names the plan — "ChatGPT Plus connected" — and keeps
+  **Switch account** and **Sign out** available, so an owner with more than one
+  plan can move between them.
+* **Select models…** lists what that subscription actually grants. Turn on as
+  many as you work with; each one appears in every model picker under **ChatGPT
+  subscription**.
+* Raiker does not read your plan's remaining usage. A limit is reported by the
+  provider when you reach it.
+
 ---
 
 ## What each provider has cost you
@@ -188,6 +209,13 @@ provider is enough to work** — nothing requires you to connect more than one.
 **Default model** is what serves any surface that does not choose its own,
 including every scheduled run at the moment it begins. Chat and Build can pick
 per prompt; Tasks and Schedule cannot, so the default is what they use.
+
+**Which models are offered is a separate choice.** **Select models…** on a
+provider card opens a list of everything that provider publishes, with a switch
+against each. The ones you switch on stay in every picker, grouped under that
+provider; the default is one of them. A provider you have not connected offers
+nothing, and a model Raiker has measured as unavailable is not offered until it
+answers again.
 
 ---
 

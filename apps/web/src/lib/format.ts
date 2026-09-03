@@ -97,8 +97,13 @@ export function humanize(name: string | null | undefined): string {
 
 // Brand names for the model providers Raiker ships profiles for. Unknown
 // providers render verbatim rather than guessing.
+//
+// llama.cpp is named for what the owner has rather than for the server that
+// reads it: they chose a GGUF file, and Raiker runs the llama.cpp server over
+// it on their behalf. The provider rows and the guide say so; a picker only
+// needs the format.
 const PROVIDER_NAMES: Record<string, string> = {
-  "llama.cpp": "llama.cpp",
+  "llama.cpp": "GGUF",
   mlx: "MLX",
   ollama: "Ollama",
   "ollama-cloud": "Ollama Cloud",

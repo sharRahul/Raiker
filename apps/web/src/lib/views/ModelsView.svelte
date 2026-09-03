@@ -9,6 +9,7 @@
   import GuideLink from "../components/GuideLink.svelte";
   import { api, ApiError } from "../api";
   import type {
+    CodexSubscriptionStatus,
     ModelCapacitiesView,
     ModelProfile,
     ModelsView as ModelsData,
@@ -23,10 +24,12 @@
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
   import { readinessLabel } from "../modelReadinessLabels";
+  import { isChoosableModel } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
   import DownloadsPanel from "./models/DownloadsPanel.svelte";
+  import AvailableModels from "./models/AvailableModels.svelte";
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
   import LocalFrameworkRow from "./models/LocalFrameworkRow.svelte";
@@ -83,9 +86,18 @@
   let capacityRefreshAttempted = false;
   let catalogueRefreshing = $state(false);
   let catalogueNotice = $state<string | null>(null);
-  let codexSubscriptionStatus = $state<"connected" | "signed_out" | "login_pending">("signed_out");
+  let codexSubscriptionStatus = $state<CodexSubscriptionStatus["connection_status"]>("signed_out");
+  let codexSubscriptionPlan = $state<string | null>(null);
   let codexSubscriptionBusy = $state(false);
   let codexSubscriptionNotice = $state<string | null>(null);
+
+  // "ChatGPT Plus connected" says which subscription is in use in three words;
+  // the generic line is the fallback when Codex does not name a plan.
+  const codexPlanLabel = $derived(
+    codexSubscriptionPlan
+      ? `ChatGPT ${codexSubscriptionPlan.charAt(0).toUpperCase()}${codexSubscriptionPlan.slice(1)} connected`
+      : "ChatGPT subscription connected",
+  );
 
   const isCodexSubscription = (profile: ModelProfile) => profile.provider === "chatgpt-codex";
   const isConnected = (profile: ModelProfile) =>
@@ -105,9 +117,12 @@
       models = await api.models();
       if (models.profiles.some(isCodexSubscription)) {
         try {
-          codexSubscriptionStatus = (await api.codexSubscriptionStatus()).connection_status;
+          const subscription = await api.codexSubscriptionStatus();
+          codexSubscriptionStatus = subscription.connection_status;
+          codexSubscriptionPlan = subscription.plan_type;
         } catch {
           codexSubscriptionStatus = "signed_out";
+          codexSubscriptionPlan = null;
         }
       }
       try {
@@ -181,6 +196,23 @@
     }
   }
 
+  /** Sign the ChatGPT subscription out of Raiker; Codex keeps its own session. */
+  async function disconnectCodexSubscription() {
+    if (codexSubscriptionBusy) return;
+    codexSubscriptionBusy = true;
+    codexSubscriptionNotice = null;
+    try {
+      await api.disconnectCodexSubscription();
+      codexSubscriptionStatus = "signed_out";
+      codexSubscriptionPlan = null;
+      await load();
+    } catch {
+      codexSubscriptionNotice = "The ChatGPT subscription could not be disconnected.";
+    } finally {
+      codexSubscriptionBusy = false;
+    }
+  }
+
   // ── Model selection (per provider) ──────────────────────────────────
   // One picker open at a time. The model list comes from the provider itself,
   // on demand; when the catalogue is unavailable the user can type a model id.
@@ -190,10 +222,37 @@
   let pickerChoice = $state("");
   let selecting = $state(false);
   let selectError = $state<string | null>(null);
+  // Only models this machine could actually run. A profile whose readiness
+  // check has failed — a llama.cpp slot with nothing served, an Ollama model
+  // that is no longer pulled — is not a default anyone can choose, so listing
+  // it only offered a selection that would be refused at the next turn. A
+  // profile that has never been checked is not known to be unavailable and
+  // stays; so does the current selection, which must never vanish from the
+  // control that shows it.
   const globalChoices = $derived(
-    models?.chat_profiles ??
-      (models?.profiles ?? []).filter((profile) => profile.configured),
+    (
+      models?.chat_profiles ??
+      (models?.profiles ?? []).filter((profile) => profile.configured)
+    ).filter((profile) => isChoosableModel(profile) || profile.selected),
   );
+  /** The provider card whose model dialog is open, or null. */
+  const pickerProfile = $derived(
+    (models?.profiles ?? []).find((profile) => profile.profile_id === pickerFor) ?? null,
+  );
+
+  /** The models this owner keeps offered for one profile, from the snapshot. */
+  const availableModelsFor = (profileId: string) =>
+    (models?.chat_profiles ?? [])
+      .filter((profile) => profile.profile_id === profileId)
+      .map((profile) => profile.model);
+
+  const globalGroups = $derived.by(() => {
+    const groups = new Map<string, ModelProfile[]>();
+    for (const profile of globalChoices) {
+      groups.set(profile.provider, [...(groups.get(profile.provider) ?? []), profile]);
+    }
+    return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
+  });
   const globalChoice = $derived.by(() => {
     const selected = globalChoices.find((profile) => profile.selected);
     return selected
@@ -685,6 +744,14 @@
     models?.ready_provider_count ??
       (models?.profiles ?? []).filter((p) => p.ready === true).length,
   );
+  // Set up and usable, whether or not the last observation is still inside its
+  // window. This is what an owner means by "I have models"; `readyCount` is
+  // what Raiker has actually proven.
+  const usableCount = $derived(
+    (models?.profiles ?? []).filter(
+      (p) => p.model !== "<model>" && isChoosableModel(p) && (p.connection_configured || !p.off_machine),
+    ).length,
+  );
 
   // Each provider's bar is its share of total spend across every provider, so
   // it needs no configured budget to mean something. Providers with no cost
@@ -901,7 +968,17 @@
       <h2 id="model-setup-title">Choose where Raiker thinks</h2>
     </div>
     <div class="setup-meter" aria-live="polite">
-      <strong>{readyCount} {readyCount === 1 ? "model" : "models"} ready</strong>
+      <!-- "Ready" still means an observation proved it (BUG-69). When every
+           observation has merely aged out that number is honestly zero, which
+           read as "nothing works" on an instance where models were set up and
+           selected — so the line names what is true instead. -->
+      <strong
+        >{readyCount > 0
+          ? `${readyCount} ${readyCount === 1 ? "model" : "models"} ready`
+          : usableCount > 0
+            ? `${usableCount} ${usableCount === 1 ? "model" : "models"} set up`
+            : "No model ready"}</strong
+      >
       <span class="of"
         >{configuredProfiles.length} of {models.profiles.length} connected</span
       >
@@ -922,7 +999,9 @@
       <h2 id="global-model-title">Global model</h2>
     </div>
     <label class="global-model-field">
-      <span>Global model</span>
+      <!-- The card heading beside this already says "Global model", and the
+           select carries the same name for assistive technology, so printing it
+           a third time only made the card longer. -->
       <small>Choose any configured provider and exact model.</small>
       <select
         aria-label="Global model"
@@ -931,13 +1010,16 @@
         disabled={selecting}
       >
         <option value="" disabled>Choose a global model</option>
-        {#each globalChoices as profile (`${profile.profile_id}\u0000${profile.model}`)}
-          <option
-            value={JSON.stringify([profile.profile_id, profile.model])}
-            >{providerName(profile.provider)} — {modelName(
-              profile.model,
-            )}</option
-          >
+        <!-- Grouped by provider, so a provider names itself once as the
+             group it is rather than in front of every one of its models. -->
+        {#each globalGroups as group (group.provider)}
+          <optgroup label={providerName(group.provider)}>
+            {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
+              <option value={JSON.stringify([profile.profile_id, profile.model])}
+                >{modelName(profile.model)}</option
+              >
+            {/each}
+          </optgroup>
         {/each}
       </select>
     </label>
@@ -1068,7 +1150,7 @@
                           {#if readinessChip(p)}<span
                               class="chip"
                               class:chip-ok={p.ready === true}
-                              class:chip-warn={p.ready !== true}
+                              class:chip-warn={!isChoosableModel(p)}
                               title={p.readiness_summary ?? undefined}
                               >{readinessChip(p)}</span
                             >{/if}
@@ -1100,9 +1182,7 @@
                           class="btn btn-ghost btn-sm"
                           onclick={() => void openPicker(p.profile_id)}
                           aria-expanded={pickerFor === p.profile_id}
-                          >{p.model === "<model>"
-                            ? "Choose model…"
-                            : "Change model…"}</button
+                          >Select models…</button
                         >
                         {#if !p.selected && p.model !== "<model>"}
                           <button
@@ -1125,79 +1205,15 @@
                           {testResults[p.profile_id]}
                         </p>
                       {/if}
-                      {#if pickerFor === p.profile_id}
-                        <div class="picker local-picker-inline">
-                          {#if pickerLoading}
-                            <p class="picker-note" role="status">
-                              Loading models from {providerName(p.provider)}…
-                            </p>
-                          {:else}
-                            {#if pickerList !== null && pickerList.status === "available" && pickerList.models.length > 0}
-                              <select
-                                class="picker-select"
-                                bind:value={pickerChoice}
-                                aria-label="Available models"
-                              >
-                                <option value="">Pick a model…</option>
-                                {#each pickerList.models as m (m)}
-                                  <option value={m}>{modelName(m)}</option>
-                                {/each}
-                              </select>
-                            {:else}
-                              {#if pickerList !== null}
-                                <p class="picker-note">
-                                  {pickerNote(pickerList)}
-                                </p>
-                              {:else}
-                                <p class="picker-note">
-                                  Model list unavailable — enter a custom model
-                                  name.
-                                </p>
-                              {/if}
-                              <input
-                                class="picker-input"
-                                type="text"
-                                placeholder="Custom model name"
-                                bind:value={pickerChoice}
-                                aria-label="Custom model name"
-                              />
-                            {/if}
-                            <div class="picker-actions">
-                              <button
-                                type="button"
-                                class="btn btn-primary btn-sm"
-                                onclick={() =>
-                                  void select(p.profile_id, pickerChoice)}
-                                disabled={selecting ||
-                                  pickerChoice.trim() === ""}
-                                >{selecting
-                                  ? "Selecting…"
-                                  : "Use model"}</button
-                              >
-                              <button
-                                type="button"
-                                class="btn btn-ghost btn-sm"
-                                onclick={closePicker}>Cancel</button
-                              >
-                            </div>
-                            {#if selectError}<p
-                                class="error picker-error"
-                                role="alert"
-                              >
-                                {selectError}
-                              </p>{/if}
-                          {/if}
-                        </div>
-                      {/if}
                     </div>
                   {/each}
                   {#if frameworkProfiles("llama.cpp").length > 0}
                     <LocalFrameworkRow
                       provider="llama.cpp"
-                      title="llama.cpp GGUF"
+                      title="GGUF"
                       format="gguf"
                       profiles={frameworkProfiles("llama.cpp")}
-                      description="Choose up to four different detected GGUF models to serve in separate local slots."
+                      description="Up to four detected GGUF models, each served in its own slot by the llama.cpp server Raiker runs for you."
                       onchanged={() => void load()}
                       ontest={(profile) => void testConnection(profile)}
                       ondetails={(profile) => (detailsFor = profile)}
@@ -1255,7 +1271,13 @@
                              a card could read "Connected" directly above
                              "Provider unreachable". Reachability is the
                              readiness chip below, and only it may claim it. -->
-                        {#if isConnected(p)}
+                        {#if isCodexSubscription(p) && isConnected(p)}
+                          <span class="status-dot ok" aria-hidden="true"></span>
+                          {codexPlanLabel}
+                        {:else if isCodexSubscription(p) && codexSubscriptionStatus === "codex_missing"}
+                          <span class="status-dot" aria-hidden="true"></span> Codex
+                          not installed
+                        {:else if isConnected(p)}
                           <span class="status-dot ok" aria-hidden="true"></span>
                           Connection saved
                         {:else}
@@ -1267,7 +1289,7 @@
                         {#if readinessChip(p)}<span
                             class="chip"
                             class:chip-ok={p.ready === true}
-                            class:chip-warn={p.ready !== true}
+                            class:chip-warn={!isChoosableModel(p)}
                             title={p.readiness_summary ?? undefined}
                             >{readinessChip(p)}</span
                           >{/if}
@@ -1328,7 +1350,35 @@
                       {/if}
 
                       <div class="pc-actions">
-                        {#if isCodexSubscription(p)}
+                        {#if isCodexSubscription(p) && isConnected(p)}
+                          <!-- The readiness check is what lets a pinned model be
+                               used, so the subscription card offers it for the
+                               same reason every other connected provider does. -->
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            onclick={() => void testConnection(p)}
+                            disabled={testing[p.profile_id] === true}
+                            >{testing[p.profile_id] === true ? "Testing…" : "Test"}</button
+                          >
+                          <!-- Signing in stays reachable while connected: an
+                               owner with more than one ChatGPT plan has no other
+                               way to move Raiker to the one they want. -->
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            onclick={() => void startCodexSubscriptionLogin()}
+                            disabled={codexSubscriptionBusy}
+                            >{codexSubscriptionBusy ? "Opening sign-in…" : "Switch account"}</button
+                          >
+                          <button
+                            type="button"
+                            class="btn btn-ghost btn-sm"
+                            onclick={() => void disconnectCodexSubscription()}
+                            disabled={codexSubscriptionBusy}
+                            >Sign out</button
+                          >
+                        {:else if isCodexSubscription(p)}
                           <button
                             type="button"
                             class="btn btn-primary btn-sm pc-connect"
@@ -1366,9 +1416,7 @@
                           class="btn btn-ghost btn-sm"
                           onclick={() => void openPicker(p.profile_id)}
                           aria-expanded={pickerFor === p.profile_id}
-                          >{p.model === "<model>"
-                            ? "Choose model…"
-                            : "Change model…"}</button
+                          >Select models…</button
                         >
                         {#if p.connection_configured && !p.selected && p.model !== "<model>"}
                           <button
@@ -1397,70 +1445,6 @@
                         <p class="test-result" role="status">{codexSubscriptionNotice}</p>
                       {/if}
 
-                      {#if pickerFor === p.profile_id}
-                        <div class="picker">
-                          {#if pickerLoading}
-                            <p class="picker-note" role="status">
-                              Loading models from {providerName(p.provider)}…
-                            </p>
-                          {:else}
-                            {#if pickerList !== null && pickerList.status === "available" && pickerList.models.length > 0}
-                              <select
-                                class="picker-select"
-                                bind:value={pickerChoice}
-                                aria-label="Available models"
-                              >
-                                <option value="">Pick a model…</option>
-                                {#each pickerList.models as m (m)}
-                                  <option value={m}>{modelName(m)}</option>
-                                {/each}
-                              </select>
-                            {:else}
-                              {#if pickerList !== null}
-                                <p class="picker-note">
-                                  {pickerNote(pickerList)}
-                                </p>
-                              {:else}
-                                <p class="picker-note">
-                                  Model list unavailable — enter a custom model
-                                  name.
-                                </p>
-                              {/if}
-                              <input
-                                class="picker-input"
-                                type="text"
-                                placeholder="Custom model name"
-                                bind:value={pickerChoice}
-                                aria-label="Custom model name"
-                              />
-                            {/if}
-                            <div class="picker-actions">
-                              <button
-                                type="button"
-                                class="btn btn-primary btn-sm"
-                                onclick={() =>
-                                  void select(p.profile_id, pickerChoice)}
-                                disabled={selecting ||
-                                  pickerChoice.trim() === ""}
-                                >{selecting
-                                  ? "Selecting…"
-                                  : "Use model"}</button
-                              >
-                              <button
-                                type="button"
-                                class="btn btn-ghost btn-sm"
-                                onclick={closePicker}>Cancel</button
-                              >
-                            </div>
-                            {#if selectError}<p
-                                class="error picker-error"
-                                role="alert"
-                              >
-                                {selectError}
-                              </p>{/if}
-                          {/if}
-                        </div>
-                      {/if}
                     </article>
                   {/each}
                 </div>
@@ -1697,6 +1681,7 @@
   {/if}
 {/if}
 
+
 {#if detailsFor}
   {@const capacityEntry = capacities?.entries.find(
     (entry) =>
@@ -1811,6 +1796,74 @@
   </div>
 {/if}
 
+<!-- Choosing a model is a decision with a catalogue behind it, so it gets a
+     dialog rather than an accordion inside a card. Inline, it pushed every
+     other provider down the page and turned a six-model list into a scroll
+     inside a scroll. -->
+{#if pickerFor !== null && pickerProfile !== null}
+  <div
+    class="signin-overlay"
+    role="presentation"
+    onclick={(event) => event.target === event.currentTarget && closePicker()}
+  >
+    <div
+      class="signin-dialog picker-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="picker-title"
+      tabindex="-1"
+    >
+      <button class="close" aria-label="Close model picker" onclick={closePicker}>×</button>
+      <div class="signin-logo">
+        <ProviderLogo provider={pickerProfile.provider} size={40} />
+      </div>
+      <h2 id="picker-title">{providerName(pickerProfile.provider)} models</h2>
+      {#if pickerLoading}
+        <p class="picker-note" role="status">
+          Loading models from {providerName(pickerProfile.provider)}…
+        </p>
+      {:else if pickerList !== null && pickerList.status === "available" && pickerList.models.length > 0}
+        <!-- Each switch is the whole decision: on means this model is offered
+             everywhere, off means it is not. There is no second "Use model"
+             step, because there was never a second question. -->
+        <AvailableModels
+          profileId={pickerProfile.profile_id}
+          catalogue={pickerList.models}
+          chosen={availableModelsFor(pickerProfile.profile_id)}
+          onsaved={() => void load()}
+        />
+        <div class="picker-actions">
+          <button type="button" class="btn btn-ghost btn-sm" onclick={closePicker}>Done</button>
+        </div>
+      {:else}
+        <p class="picker-note">
+          {pickerList !== null
+            ? pickerNote(pickerList)
+            : "Model list unavailable — enter a custom model name."}
+        </p>
+        <input
+          class="picker-input"
+          type="text"
+          placeholder="Custom model name"
+          bind:value={pickerChoice}
+          aria-label="Custom model name"
+        />
+        <div class="picker-actions">
+          <button
+            type="button"
+            class="btn btn-primary btn-sm"
+            onclick={() => pickerFor && void select(pickerFor, pickerChoice)}
+            disabled={selecting || pickerChoice.trim() === ""}
+            >{selecting ? "Selecting…" : "Use model"}</button
+          >
+          <button type="button" class="btn btn-ghost btn-sm" onclick={closePicker}>Cancel</button>
+        </div>
+        {#if selectError}<p class="error picker-error" role="alert">{selectError}</p>{/if}
+      {/if}
+    </div>
+  </div>
+{/if}
+
 {#if signInFor !== null && signInProfile !== null}
   {@const b = brand(signInProfile.provider)}
   {@const showLogin = b.authMethods.includes("login")}
@@ -1860,7 +1913,7 @@
               ? "(optional)"
               : "sk-…"}
             bind:value={signInApiKey}
-            autocomplete="off"
+            autocomplete="new-password"
           />
         </label>
       {/if}
@@ -1875,7 +1928,7 @@
             type="password"
             placeholder="Admin key for usage reports"
             bind:value={signInAdminApiKey}
-            autocomplete="off"
+            autocomplete="new-password"
           />
           <small>
             Used only to read genuine organization usage. Raiker never uses this
@@ -2272,21 +2325,14 @@
     font-style: italic;
   }
 
-  .picker {
-    margin-top: 0.55rem;
-    border-top: 1px dashed var(--border);
-    padding-top: 0.55rem;
-    display: flex;
-    flex-direction: column;
-    gap: 0.45rem;
+  .picker-dialog {
+    display: grid;
+    gap: 0.7rem;
+    text-align: left;
   }
-  .local-picker-inline {
-    width: 100%;
-    margin-top: 0.2rem;
-    padding-top: 0.55rem;
-    border-top: 1px dashed var(--border);
+  .picker-dialog h2 {
+    margin: 0;
   }
-  .picker-select,
   .picker-input {
     padding: 0.35rem 0.5rem;
     border-radius: var(--r-md);

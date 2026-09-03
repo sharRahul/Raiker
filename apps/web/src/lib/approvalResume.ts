@@ -86,6 +86,30 @@ export function publishApprovalResolved(message: Omit<ApprovalResolvedMessage, "
   }
 }
 
+/**
+ * Hear about a resolution made in another tab of this browser.
+ *
+ * A hint, exactly like the one the watcher acts on: the message carries ids
+ * only, and a listener that acts on it must still ask the server what is true.
+ * The prompt uses it to drop a decision the owner has already made elsewhere
+ * rather than leaving a stale card on screen until the next poll.
+ */
+export function subscribeApprovalResolved(
+  onResolved: (message: ApprovalResolvedMessage) => void,
+): () => void {
+  const bus = channel();
+  if (bus === null) return () => {};
+  const listener = (event: MessageEvent) => {
+    const message = event.data as ApprovalResolvedMessage | null;
+    if (message && message.type === "approval-resolved") onResolved(message);
+  };
+  bus.addEventListener("message", listener);
+  return () => {
+    bus.removeEventListener("message", listener);
+    bus.close();
+  };
+}
+
 export interface WatcherOptions {
   /** Which conversation this watcher speaks for. Read fresh on every check. */
   sessionId: () => string | null;

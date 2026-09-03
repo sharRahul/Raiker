@@ -57,10 +57,10 @@ describe("ModelChip", () => {
       current_profile_id: "local-gguf",
     });
     render(ModelChip, { models });
-    const link = screen.getByRole("link", { name: /local · llama\.cpp/i });
+    const link = screen.getByRole("link", { name: /local · GGUF/i });
     expect(link).toHaveAttribute("href", "#/models");
     // The tooltip carries the provider name, model, and humanized endpoint kind.
-    expect(link).toHaveAttribute("title", "llama.cpp · qwen2.5-7b-instruct · Local");
+    expect(link).toHaveAttribute("title", "GGUF · qwen2.5-7b-instruct · Local");
   });
 
   it("shows a hosted chip with honest egress state", () => {
@@ -98,6 +98,6 @@ describe("ModelChip", () => {
       current_profile_id: "local-gguf",
     });
     render(ModelChip, { models });
-    expect(screen.getByRole("link", { name: /local · llama\.cpp/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /local · GGUF/i })).toBeInTheDocument();
   });
 });

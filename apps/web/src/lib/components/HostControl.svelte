@@ -232,10 +232,12 @@
           </dl>
           <p class="quiet build-message">{build.message}</p>
           {#if build.available}
+            <!-- Settings now applies a verified update through the external
+                 helper, so this panel points at that rather than at a command
+                 line the owner would otherwise have to leave the app to run. -->
             <p class="confirm" role="status">
-              Version {build.available.version} is available. Install it with
-              <code>raiker-app update --apply</code> — an update replaces the files this
-              host is running from, so it is applied from outside it.
+              Version {build.available.version} is available.
+              <a href="#/settings?tab=updates">Install it in Settings</a>.
             </p>
           {/if}
           <button
@@ -317,7 +319,7 @@
   .build dd { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem; }
   .build-version { font-size: 0.74rem; color: var(--text-2); }
   .build-message { font-size: 0.76rem; }
-  .build code { font-size: 0.72rem; }
+  .build a { color: inherit; }
   .check-updates { justify-self: start; }
   .work ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
   .work li { display: grid; gap: 0.1rem; font-size: 0.8rem; }

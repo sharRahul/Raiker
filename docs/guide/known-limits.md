@@ -16,6 +16,23 @@ differ, that ledger is canonical.
 - The product does not implement governed finance, medical, CCTV,
   home-security, pregnancy/baby, or hardware executors.
 
+## Models and providers
+
+- A model reaches a picker once its provider is connected and Raiker has not
+  measured it as unavailable. A provider with no saved connection offers
+  nothing, and a runtime slot with nothing deployed is not a model.
+- The **ChatGPT subscription** provider needs a compatible Codex client
+  installed on the same machine. Codex owns the sign-in, the tokens and the
+  subscription entitlement; Raiker stores only that a connection exists and the
+  models Codex reports. Raiker never downloads or installs Codex for you.
+- **MLX** is an Apple-silicon framework and is offered only on macOS. GGUF files
+  run through llama.cpp on every supported platform.
+- Raiker does not show a subscription's remaining plan usage. What a provider
+  publishes about its own limits is not read, so a limit is discovered when a
+  provider reports one.
+- Folders and files are named by typing an absolute path. There is no built-in
+  browser for the host filesystem yet.
+
 ## Memory and recall
 
 Meaning-based recall works for approved memories and managed files when the
@@ -65,6 +82,10 @@ A search names at most twenty exchanges here. Beyond that the list is a wall of
 links rather than a citation anybody checks; use **Search chats** for the rest.
 
 ## Approvals and execution
+
+A pending decision is announced wherever you are in Raiker, with approve, deny
+and "decide later"; Approvals is where a decision you set aside waits. Nothing
+announces one outside the browser window yet.
 
 Not every approval executes an action. The approval detail says whether it will
 execute once or only record the decision. A target capability and the governed

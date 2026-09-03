@@ -186,6 +186,28 @@ def test_a_never_checked_model_is_not_rechecked_behind_the_owners_back(
     assert caught.value.readiness.state is ModelReadinessState.NOT_CONFIGURED
 
 
+def test_a_connected_provider_gets_its_first_check_taken_for_the_owner(
+    workspace: Path,
+) -> None:
+    """The other half of the invariant above.
+
+    A provider the owner has *connected* is one they configured deliberately, so
+    taking the first look is doing what they would have done by hand — and not
+    doing it refused the first turn on a subscription they had just signed in to.
+    """
+    from raiker.models.connections import put_model_connection
+
+    store = SQLiteStore(workspace)
+    put_model_connection(store, OWNER, PROFILE, {"connection_kind": "test"})
+    probe = _CountingProbe(store, state=ModelReadinessState.READY)
+    service = ModelReadinessService(store, probe=probe)
+
+    readiness = asyncio.run(service.require_ready_async(OWNER, PROFILE, MODEL))
+
+    assert probe.calls == 1
+    assert readiness.ready is True
+
+
 def test_a_ready_model_is_admitted_without_reaching_the_provider(
     workspace: Path, mark_model_ready: object
 ) -> None:

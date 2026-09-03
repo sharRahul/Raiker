@@ -4,8 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 
-def test_handoff_waits_then_applies_and_restarts(monkeypatch, tmp_path: Path) -> None:
+
+def test_handoff_waits_then_applies_and_restarts(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     from raiker.app.installation import ChannelConfig, Installation
     from raiker.app.update import ChannelUpdate, UpdateResult
     from raiker.app.update_handoff import apply_after_host_exit
@@ -31,17 +35,20 @@ def test_handoff_waits_then_applies_and_restarts(monkeypatch, tmp_path: Path) ->
         "raiker.app.update_handoff.read_channel_config",
         lambda _workspace: ChannelConfig("https://releases.example/stable.json", b"x" * 32, "stable"),
     )
-    monkeypatch.setattr(
-        "raiker.app.update_handoff.download_and_apply",
-        lambda *_args, **_kwargs: calls.append("apply") or UpdateResult("2.0.0", tmp_path, tmp_path, "a" * 64),
-    )
+    def record_apply(*_args: object, **_kwargs: object) -> UpdateResult:
+        calls.append("apply")
+        return UpdateResult("2.0.0", tmp_path, tmp_path, "a" * 64)
+
+    monkeypatch.setattr("raiker.app.update_handoff.download_and_apply", record_apply)
     monkeypatch.setattr("raiker.app.update_handoff.subprocess.Popen", lambda command, **_kwargs: calls.append(tuple(command)))
 
     assert apply_after_host_exit(tmp_path, parent_pid=42, restart_command=["raiker-app"]) == 0
     assert calls == [("wait", 42), "apply", ("raiker-app", "--workspace", str(tmp_path))]
 
 
-def test_handoff_does_not_restart_when_recheck_is_not_available(monkeypatch, tmp_path: Path) -> None:
+def test_handoff_does_not_restart_when_recheck_is_not_available(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     from raiker.app.installation import Installation
     from raiker.app.update_handoff import apply_after_host_exit
 

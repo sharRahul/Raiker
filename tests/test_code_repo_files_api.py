@@ -46,13 +46,16 @@ def headers(client: TestClient) -> dict[str, str]:
 def repo_id(workspace: Path) -> str:
     root = workspace / "project"
     (root / "src").mkdir(parents=True)
-    (root / "src" / "main.py").write_text("print('hello')\n", encoding="utf-8")
-    (root / "README.md").write_text("# Alpha\n", encoding="utf-8")
+    # Written with newline="" so the bytes on disk are the bytes asserted.
+    # Text mode rewrites "\n" as "\r\n" on Windows, which turned a
+    # byte-exact read-back into a platform difference rather than a finding.
+    (root / "src" / "main.py").write_text("print('hello')\n", encoding="utf-8", newline="")
+    (root / "README.md").write_text("# Alpha\n", encoding="utf-8", newline="")
     (root / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00\x00binary")
     (root / "node_modules").mkdir()
     # Something outside the repository but inside the workspace: the second
     # containment check is the only thing that stops the explorer reaching it.
-    (workspace / "secret.txt").write_text("not the repository's\n", encoding="utf-8")
+    (workspace / "secret.txt").write_text("not the repository's\n", encoding="utf-8", newline="")
     result = DashboardService(workspace).connect_local_repo(
         str(root), owner_principal_id=OWNER
     )
@@ -201,7 +204,7 @@ class TestReadFile:
     ) -> None:
         root = workspace / "other"
         root.mkdir()
-        (root / "a.txt").write_text("theirs\n", encoding="utf-8")
+        (root / "a.txt").write_text("theirs\n", encoding="utf-8", newline="")
         theirs = DashboardService(workspace).connect_local_repo(
             str(root), owner_principal_id="principal_someone_else"
         )

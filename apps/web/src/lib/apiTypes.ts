@@ -1003,7 +1003,7 @@ export interface ProviderCatalogueRefresh {
 /** Status of the locally installed Codex client session. No account identifier,
  * token, or login URL is exposed to the browser UI. */
 export interface CodexSubscriptionStatus {
-  connection_status: "connected" | "signed_out" | "login_pending";
+  connection_status: "connected" | "signed_out" | "login_pending" | "codex_missing";
   plan_type: string | null;
 }
 

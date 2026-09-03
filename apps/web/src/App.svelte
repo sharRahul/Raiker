@@ -24,6 +24,7 @@
   import LazyRoute from "./lib/components/LazyRoute.svelte";
   import { prefetchRoutes } from "./lib/routeComponents";
   import { startReadinessRevalidation } from "./lib/modelReadiness.svelte";
+  import ApprovalPrompt from "./lib/components/ApprovalPrompt.svelte";
   import ModelSetupDialog from "./lib/components/ModelSetupDialog.svelte";
   import ModelOperationTray from "./lib/components/ModelOperationTray.svelte";
 
@@ -321,6 +322,7 @@
     </div>
   </div>
   <ModelSetupDialog />
+  <ApprovalPrompt />
   <ModelOperationTray />
 {/if}
 

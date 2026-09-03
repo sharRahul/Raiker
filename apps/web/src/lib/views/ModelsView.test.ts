@@ -133,6 +133,46 @@ describe("ModelsView state grammar", () => {
     expect(screen.queryByLabelText(/API key/i)).not.toBeInTheDocument();
   });
 
+  it("names the connected ChatGPT plan and keeps sign-in reachable", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "chatgpt-codex-subscription", provider: "chatgpt-codex", model: "<model>",
+            local_only: false, requires_network: true, endpoint_kind: "remote_hosted", off_machine: true,
+          }),
+        ],
+      }),
+      "GET /api/models/chatgpt-codex/status": { connection_status: "connected", plan_type: "plus" },
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    expect(await screen.findByText("ChatGPT Plus connected")).toBeInTheDocument();
+    expect(screen.queryByText("Connection saved")).not.toBeInTheDocument();
+    // An owner with more than one ChatGPT plan must be able to move Raiker
+    // between them, so neither control disappears once one is connected.
+    expect(screen.getByRole("button", { name: "Switch account" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+  });
+
+  it("says Codex is missing rather than reporting a failed status read", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "chatgpt-codex-subscription", provider: "chatgpt-codex", model: "<model>",
+            local_only: false, requires_network: true, endpoint_kind: "remote_hosted", off_machine: true,
+          }),
+        ],
+      }),
+      "GET /api/models/chatgpt-codex/status": { connection_status: "codex_missing", plan_type: null },
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    expect(await screen.findByText(/Codex not installed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Sign in with ChatGPT" })).toBeInTheDocument();
+  });
+
   it("consolidates four llama.cpp slots and adds one four-slot MLX row below it", async () => {
     const localProfiles = [1, 2, 3, 4].flatMap((slot) => [
       profile({
@@ -158,7 +198,7 @@ describe("ModelsView state grammar", () => {
 
     render(ModelsView, { tab: "local" });
 
-    const gguf = await screen.findByRole("group", { name: "llama.cpp GGUF" });
+    const gguf = await screen.findByRole("group", { name: "GGUF" });
     const mlx = screen.getByRole("group", { name: "MLX" });
     expect(within(gguf).getAllByRole("combobox")).toHaveLength(4);
     expect(within(mlx).getAllByRole("combobox")).toHaveLength(4);
@@ -234,7 +274,11 @@ describe("ModelsView state grammar", () => {
     });
     render(ModelsView);
 
-    expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+    // A saved key is still not a proven model, so the line never says "ready".
+    // It says what is true instead of zero, which on an instance with models
+    // connected and selected read as "nothing here works".
+    expect(await screen.findByText("1 model set up")).toBeInTheDocument();
+    expect(screen.queryByText(/models? ready/)).not.toBeInTheDocument();
     expect(screen.queryByText("providers set up")).not.toBeInTheDocument();
   });
 
@@ -307,7 +351,8 @@ describe("ModelsView state grammar", () => {
     });
     render(ModelsView, { tab: "pricing" });
 
-    expect(await screen.findByText("0 models ready")).toBeInTheDocument();
+    // Hosted, with no credential saved: nothing here is set up either.
+    expect(await screen.findByText("No model ready")).toBeInTheDocument();
     expect(
       screen.getByRole("combobox", { name: "Global model" }),
     ).toBeInTheDocument();
@@ -451,7 +496,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     );
     const list = screen.getByRole("list");
     expect(list.textContent).toContain("Anthropic");
-    expect(list.textContent).toContain("llama.cpp");
+    expect(list.textContent).toContain("GGUF");
     expect(list.textContent).not.toContain("anthropic-hosted");
   });
 
@@ -568,7 +613,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView);
-    const llamaRow = await screen.findByRole("group", { name: "llama.cpp GGUF" });
+    const llamaRow = await screen.findByRole("group", { name: "GGUF" });
     await fireEvent.click(within(llamaRow).getByText("Select"));
 
     await waitFor(() => {
@@ -718,39 +763,30 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         reason_code: null,
         models: ["qwen2.5", "llama3.2"],
       },
-      "PUT /api/model-selection": {
+      "PUT /api/models/ollama-local-openai-compatible/available-models": {
         ok: true,
         profile_id: "ollama-local-openai-compatible",
-        model: "qwen2.5",
+        models: ["qwen2.5"],
       },
     });
     render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Choose model…")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
 
-    await fireEvent.click(screen.getByText("Choose model…"));
-    await waitFor(() =>
-      expect(screen.getByLabelText("Available models")).toBeTruthy(),
-    );
-
-    const select = screen.getByLabelText(
-      "Available models",
-    ) as HTMLSelectElement;
-    expect(select.textContent).toContain("Qwen 2.5");
-    expect(select.textContent).toContain("Llama 3.2");
-    await fireEvent.change(select, { target: { value: "qwen2.5" } });
-    await fireEvent.click(screen.getByText("Use model"));
+    await fireEvent.click(screen.getByText("Select models…"));
+    // One switch per model the provider published, and the switch is the whole
+    // decision — there is no second "Use model" step.
+    const qwen = await screen.findByRole("checkbox", { name: "Qwen 2.5" });
+    expect(screen.getByRole("checkbox", { name: "Llama 3.2" })).toBeTruthy();
+    await fireEvent.click(qwen);
 
     await waitFor(() => {
       const put = mock.mock.calls.find(
         (c) =>
           (c[1]?.method ?? "GET").toUpperCase() === "PUT" &&
-          String(c[0]).includes("/api/model-selection"),
+          String(c[0]).includes("/available-models"),
       );
       expect(put).toBeTruthy();
-      expect(JSON.parse(put![1]!.body as string)).toEqual({
-        profile_id: "ollama-local-openai-compatible",
-        model: "qwen2.5",
-      });
+      expect(JSON.parse(put![1]!.body as string)).toEqual({ models: ["qwen2.5"] });
     });
   });
 
@@ -779,19 +815,11 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView, { tab: "hosted" });
-    const chooseModel = await screen.findByRole("button", {
-      name: /choose model/i,
-    });
-    await fireEvent.click(chooseModel);
-    const select = (await screen.findByLabelText(
-      "Available models",
-    )) as HTMLSelectElement;
-    expect(
-      Array.from(select.options).filter(
-        (option) => option.value === "openai/gpt-4o-mini",
-      ),
-    ).toHaveLength(1);
-    expect(select.textContent).toContain("Llama 3.1 8B Instruct");
+    await fireEvent.click(
+      await screen.findByRole("button", { name: /select models/i }),
+    );
+    expect(await screen.findAllByRole("checkbox", { name: "GPT-4o Mini" })).toHaveLength(1);
+    expect(screen.getByRole("checkbox", { name: "Llama 3.1 8B Instruct" })).toBeTruthy();
   });
 
   it("falls back to manual model entry when the provider list is unavailable", async () => {
@@ -815,9 +843,9 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
       },
     });
     render(ModelsView);
-    await waitFor(() => expect(screen.getByText("Choose model…")).toBeTruthy());
+    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
 
-    await fireEvent.click(screen.getByText("Choose model…"));
+    await fireEvent.click(screen.getByText("Select models…"));
     await waitFor(() =>
       expect(screen.getByText(/denied by provider policy/i)).toBeTruthy(),
     );

@@ -181,7 +181,10 @@
 
 <style>
   .setup-shell { width: min(68rem, 100%); margin: 0 auto; display: grid; grid-template-columns: 13rem minmax(0, 1fr); gap: clamp(1.5rem, 5vw, 4rem); padding: clamp(1rem, 4vw, 3rem); }
-  .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); }
+  /* Which of the five stages you are on is the one thing worth keeping in
+     view while the model list under it is scrolled; the rail used to leave
+     with it. */
+  .stage-rail { border-right: 1px solid var(--border); padding-right: var(--space-4); position: sticky; top: var(--space-4); align-self: start; }
   .rail-title { margin: 0 0 var(--space-4); color: var(--text-1); font-family: var(--font-serif); font-size: 1.15rem; }
   ol { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-3); }
   li { display: grid; grid-template-columns: 1.7rem 1fr; align-items: center; gap: var(--space-2); color: var(--text-3); }

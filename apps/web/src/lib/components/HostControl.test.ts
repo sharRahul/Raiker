@@ -135,8 +135,14 @@ describe("HostControl install and updates", () => {
     // The message line and the "how to apply it" callout both name the
     // version; what matters is that both are present and agree.
     expect((await screen.findAllByText(/Version 2\.0\.0 is available/)).length).toBeGreaterThan(0);
-    // Applying is not offered in-app: it replaces what this host runs from.
-    expect(screen.getByText("raiker-app update --apply")).toBeInTheDocument();
+    // Applying is not done from this panel — it replaces what this host runs
+    // from — but Settings now drives the verified external helper, so the
+    // panel sends the owner there rather than to a command line.
+    expect(screen.getByRole("link", { name: "Install it in Settings" })).toHaveAttribute(
+      "href",
+      "#/settings?tab=updates",
+    );
+    expect(screen.queryByText("raiker-app update --apply")).toBeNull();
     expect(screen.queryByRole("button", { name: /install|apply/i })).toBeNull();
     expect(screen.getByText("1.1.0")).toBeInTheDocument();
   });

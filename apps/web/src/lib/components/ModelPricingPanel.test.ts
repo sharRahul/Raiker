@@ -134,7 +134,8 @@ describe("ModelPricingPanel — BUG-21", () => {
     render(ModelPricingPanel);
     await fireEvent.click(await screen.findByRole("button", { name: "History (1)" }));
     expect(
-      screen.getByRole("heading", { name: /Price history — claude-haiku/ }),
+      // The heading names the model the way the table does.
+      screen.getByRole("heading", { name: /Price history — Haiku 4.5/ }),
     ).toBeInTheDocument();
     expect(screen.getByText(/in USD 1.00 · out USD 5.00/)).toBeInTheDocument();
   });

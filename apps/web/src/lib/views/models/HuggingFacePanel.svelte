@@ -1,5 +1,6 @@
 <script lang="ts">
   import { api, ApiError } from "../../api";
+  import ProviderLogo from "../../components/ProviderLogo.svelte";
   import type {
     HuggingFaceDownloadPreview,
     HuggingFaceSearchResult,
@@ -178,7 +179,7 @@
 
 <div class="hf-shell">
   <section class="search-hero">
-    <div class="hf-brand" aria-hidden="true">HF</div>
+    <div class="hf-brand"><ProviderLogo provider="huggingface" size={40} /></div>
     <div>
       <p class="eyebrow">Hugging Face</p>
       <h2>Find a model for this machine</h2>

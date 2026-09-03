@@ -363,6 +363,14 @@ class ModelCatalogueRefreshRequest(BaseModel):
     profile_ids: list[str] | None = None
 
 
+class AvailableModelsRequest(BaseModel):
+    """Which of one provider's models stay offered in every model picker."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    models: list[str]
+
+
 class ModelWeeklyBudgetRequest(BaseModel):
     """Owner-defined advisory budget; null clears it."""
 

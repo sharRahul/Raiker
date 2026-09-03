@@ -11,6 +11,7 @@ from raiker.api.auth import AuthMiddleware
 from raiker.api.routes_instances import _require_loopback
 from raiker.api.schemas import (
     AuthSessionRequest,
+    AvailableModelsRequest,
     BrainSourceRequest,
     BrainSourceUploadRequest,
     BreachCheckRequest,
@@ -22,8 +23,8 @@ from raiker.api.schemas import (
     CreateProjectRequest,
     CreateRemoteMcpServerRequest,
     ExportSessionRequest,
-    ModelConnectionRequest,
     ModelCatalogueRefreshRequest,
+    ModelConnectionRequest,
     ModelPriceRequest,
     ModelWeeklyBudgetRequest,
     MoveProjectRequest,
@@ -46,9 +47,17 @@ from raiker.api.sessions import ApiSession
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import TASK_RECURRENCES, AuthSessionView, DashboardService
 from raiker.control.web_read_models import WebReadModels
-from raiker.models.connections import clear_model_connection, put_model_connection
 from raiker.models.codex_app_server import CodexSubscriptionSessions
-from raiker.models.exceptions import ModelProviderError, safe_error
+from raiker.models.connections import (
+    clear_model_connection,
+    get_model_connection,
+    put_model_connection,
+)
+from raiker.models.exceptions import (
+    ModelProviderError,
+    ProviderConfigurationError,
+    safe_error,
+)
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import provider_runtime_policy_from_gates
 from raiker.models.provider_usage import ProviderUsageService
@@ -1802,6 +1811,43 @@ async def list_provider_models(
     return serialize_dto(view)
 
 
+CODEX_SUBSCRIPTION_PROFILE_ID = "chatgpt-codex-subscription"
+
+
+def _record_codex_connection(request: Request, principal_id: str, *, signed_in: bool) -> None:
+    """Mirror Codex's own sign-in state into Raiker's connection marker.
+
+    Signing in to ChatGPT through the local Codex client is the owner's
+    deliberate, authenticated act of connecting this provider — exactly what
+    saving an API key is for every other hosted profile. Recording it here is
+    what makes the subscription behave like one: it survives a reload, it is
+    what ``connection_configured`` reports, and it is the consent that
+    ``provider_runtime_policy_from_gates`` reads, so an owner who has signed in
+    is not then sent to Permissions to flip a second switch before the
+    subscription can list a model.
+
+    The marker is the fact of the connection and nothing else. Access tokens,
+    refresh tokens, verifiers, device codes and authorization URLs stay inside
+    the Codex process, which is the only thing that ever holds them.
+    """
+    store = SQLiteStore(request.app.state.workspace_root)
+    already = get_model_connection(store, principal_id, CODEX_SUBSCRIPTION_PROFILE_ID) is not None
+    if signed_in == already:
+        return
+    if signed_in:
+        put_model_connection(
+            store,
+            principal_id,
+            CODEX_SUBSCRIPTION_PROFILE_ID,
+            {"connection_kind": "codex_subscription"},
+        )
+    else:
+        clear_model_connection(store, principal_id, CODEX_SUBSCRIPTION_PROFILE_ID)
+    store.invalidate_model_readiness(
+        principal_id, CODEX_SUBSCRIPTION_PROFILE_ID, reason_code="connection_changed"
+    )
+
+
 @router.get("/api/models/chatgpt-codex/status")
 async def get_chatgpt_codex_status(
     request: Request,
@@ -1810,11 +1856,22 @@ async def get_chatgpt_codex_status(
     session, _principal = auth_data
     try:
         account = await _codex_sessions(request).status(session.principal_id)
+    except ProviderConfigurationError as exc:
+        # A device without Codex is a state to describe, not a failure to
+        # report: the row can only tell the owner what to install if the read
+        # answers.
+        if safe_error(str(exc)) == "codex_app_server_not_installed":
+            return {"connection_status": "codex_missing", "plan_type": None}
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason_code": safe_error(str(exc))},
+        ) from exc
     except ModelProviderError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
+    _record_codex_connection(request, session.principal_id, signed_in=account.signed_in)
     return {
         "connection_status": "connected" if account.signed_in else "signed_out",
         "plan_type": account.plan_type,
@@ -1844,8 +1901,10 @@ async def disconnect_chatgpt_codex(
 ) -> dict[str, Any]:
     session, _principal = auth_data
     await _codex_sessions(request).disconnect(session.principal_id)
-    SQLiteStore(request.app.state.workspace_root).invalidate_model_readiness(
-        session.principal_id, "chatgpt-codex-subscription", reason_code="connection_changed"
+    store = SQLiteStore(request.app.state.workspace_root)
+    clear_model_connection(store, session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID)
+    store.invalidate_model_readiness(
+        session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID, reason_code="connection_changed"
     )
     return {"ok": True, "connection_configured": False}
 
@@ -1868,6 +1927,28 @@ async def refresh_connected_provider_catalogues(
             detail={"reason_code": str(exc)},
         ) from exc
     return {"providers": [provider.to_dict() for provider in providers]}
+
+
+@router.put("/api/models/{profile_id}/available-models")
+def set_available_models(
+    profile_id: str,
+    body: AvailableModelsRequest,
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Keep several of one provider's models offered, not just the default."""
+    session, _principal = auth_data
+    result = _service(request).set_available_models(profile_id, body.models, session.principal_id)
+    if not result.ok:
+        raise HTTPException(
+            status_code=(
+                status.HTTP_404_NOT_FOUND
+                if result.reason_code == "unknown_model_profile"
+                else status.HTTP_400_BAD_REQUEST
+            ),
+            detail={"reason_code": result.reason_code},
+        )
+    return {"ok": True, **(result.data or {})}
 
 
 @router.get("/api/sessions/{session_id}/context-usage")

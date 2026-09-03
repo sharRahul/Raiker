@@ -37,8 +37,8 @@ from raiker.app.installation import (
     update_status,
 )
 from raiker.app.release import TARGETS
-from raiker.app.updater import check_for_update
 from raiker.app.update_handoff import start_update_handoff
+from raiker.app.updater import check_for_update
 from raiker.runtime.authority.models import Principal
 
 router = APIRouter()

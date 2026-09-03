@@ -218,6 +218,55 @@ describe("first-run setup", () => {
     expect(await within(row).findByText(/Finish sign-in in the browser/)).toBeInTheDocument();
   });
 
+  it("names the connected plan and still offers a way to change accounts", async () => {
+    // The row used to replace every account control with a model picker as soon
+    // as Codex reported a session, so an owner holding both a Plus and a Pro
+    // subscription had no way to move Raiker from one to the other.
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/ollama-local/provider-models": {
+        profile_id: "ollama-local", provider: "ollama", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/lm-studio-local/provider-models": {
+        profile_id: "lm-studio-local", provider: "lm-studio", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/chatgpt-codex/status": { connection_status: "connected", plan_type: "pro" },
+      "GET /api/models/chatgpt-codex-subscription/provider-models": {
+        profile_id: "chatgpt-codex-subscription", provider: "chatgpt-codex",
+        status: "available", reason_code: null, models: ["gpt-5.6"],
+      },
+    });
+    render(ModelSetupView);
+
+    const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
+    expect(await within(row).findByText("Pro connected")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Switch account" })).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Sign out" })).toBeInTheDocument();
+    expect(within(row).queryByLabelText(/API key/i)).not.toBeInTheDocument();
+  });
+
+  it("says Codex is missing rather than blaming the status read", async () => {
+    stubFetch({
+      "GET /api/setup": required,
+      "GET /api/models": { profiles: REGISTRY, chat_profiles: [] },
+      "GET /api/model-library": { roots: [], models: [] },
+      "GET /api/models/ollama-local/provider-models": {
+        profile_id: "ollama-local", provider: "ollama", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/lm-studio-local/provider-models": {
+        profile_id: "lm-studio-local", provider: "lm-studio", status: "unavailable", reason_code: "x", models: [],
+      },
+      "GET /api/models/chatgpt-codex/status": { connection_status: "codex_missing", plan_type: null },
+    });
+    render(ModelSetupView);
+
+    const row = await screen.findByRole("group", { name: "ChatGPT subscription" });
+    expect(await within(row).findByText("Codex is not installed on this device.")).toBeInTheDocument();
+    expect(within(row).getByRole("button", { name: "Sign in with ChatGPT" })).toBeInTheDocument();
+  });
+
   it("puts a filter over a catalogue too long to scroll", async () => {
     // OpenRouter really does serve 413 models. A native select of that length is
     // technically honest and practically unusable, and the first-run wizard is the

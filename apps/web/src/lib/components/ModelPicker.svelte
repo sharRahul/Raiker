@@ -3,6 +3,7 @@
   import { providerName } from "../format";
   import { modelName } from "../modelPresentation";
   import {
+    isChoosableModel,
     openModelSetup,
     readinessForProfile,
   } from "../modelReadiness.svelte";
@@ -98,6 +99,9 @@
   const providerGroups = $derived.by(() => {
     const groups = new Map<string, ModelProfile[]>();
     for (const profile of choices) {
+      // A provider with nothing choosable is not a choice, so it does not open
+      // a group here; setting one up is one action at the end of the menu.
+      if (!isChoosableModel(profile)) continue;
       groups.set(profile.provider, [
         ...(groups.get(profile.provider) ?? []),
         profile,
@@ -105,10 +109,19 @@
     }
     return [...groups].map(([provider, profiles]) => ({ provider, profiles }));
   });
-  const readyChoices = (items: ModelProfile[]) =>
-    items.filter((profile) => profile.ready !== false);
-  const setupChoices = (items: ModelProfile[]) =>
-    items.filter((profile) => profile.ready === false);
+  /**
+   * The first published-but-unready profile, or null when every provider is
+   * usable.
+   *
+   * This menu used to list each unready profile by name, so a fresh install
+   * offered “Local GGUF”, “Local GGUF 2”, “Local GGUF 3” and “Local GGUF 4”:
+   * four rows for one runtime that is not running, none of which could be
+   * chosen. A picker should offer what can be picked, and setting a provider
+   * up is one action rather than one action per slot.
+   */
+  const firstUnconfigured = $derived(
+    choices.find((profile) => !isChoosableModel(profile)) ?? null,
+  );
   const activeProfileId = $derived(profileId || value);
   const active = $derived(
     profiles.find(
@@ -189,12 +202,7 @@
             <ProviderLogo provider={group.provider} />
             <span>{providerName(group.provider)}</span>
           </div>
-          {#if readyChoices(group.profiles).length > 0}
-            <div class="readiness-label">
-              <span class="ready-dot"></span>Ready
-            </div>
-          {/if}
-          {#each readyChoices(group.profiles) as profile (`${profile.profile_id}\u0000${profile.model}`)}
+          {#each group.profiles as profile (`${profile.profile_id}\u0000${profile.model}`)}
             <button
               type="button"
               class="model-choice menu-item"
@@ -213,25 +221,20 @@
                 />{/if}
             </button>
           {/each}
-          {#if setupChoices(group.profiles).length > 0}
-            <div class="readiness-label setup-label">Needs setup</div>
-          {/if}
-          {#each setupChoices(group.profiles) as profile (`setup-${profile.profile_id}\u0000${profile.model}`)}
-            <div class="setup-choice">
-              <ProviderLogo provider={profile.provider} />
-              <span class="setup-model">{modelName(profile.model)}</span>
-              <button
-                type="button"
-                class="setup-action"
-                aria-label={`Set up ${providerName(profile.provider)} for ${modelName(profile.model)}`}
-                onclick={() => repair(profile)}
-              >
-                Set up {providerName(profile.provider)}
-              </button>
-            </div>
-          {/each}
         </div>
       {/each}
+
+      {#if firstUnconfigured !== null}
+        <div class="setup-choice">
+          <button
+            type="button"
+            class="setup-action"
+            onclick={() => repair(firstUnconfigured)}
+          >
+            Set up another model
+          </button>
+        </div>
+      {/if}
 
       {#if efforts.length > 0}
         <!-- The thinking budget belongs to the model, so it lives inside the
@@ -292,6 +295,14 @@
 <style>
   .model-picker {
     position: relative;
+    /* The menu is positioned against this box, so the box has to be the
+       trigger's size. As a plain block it stretched to whatever column it was
+       dropped into — in the task form, the whole width of the panel — and
+       `right: 0; bottom: 100%` then opened the menu in the far corner of that
+       column instead of above the button. */
+    display: inline-flex;
+    width: fit-content;
+    max-width: 100%;
   }
   .model-trigger,
   .model-choice {
@@ -362,27 +373,6 @@
     height: 1.05rem;
     flex-basis: 1.05rem;
   }
-  .readiness-label {
-    display: flex;
-    align-items: center;
-    gap: 0.35rem;
-    padding: 0.2rem 0.48rem;
-    color: var(--text-3);
-    font-size: 0.65rem;
-    font-weight: 750;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-  }
-  .ready-dot {
-    width: 0.38rem;
-    height: 0.38rem;
-    border-radius: 50%;
-    background: var(--success, #2f9e62);
-  }
-  .setup-label {
-    margin-top: 0.18rem;
-    color: var(--warn-text, var(--text-2));
-  }
   .model-choice {
     width: 100%;
     display: grid;
@@ -416,27 +406,12 @@
     flex-basis: 1.15rem;
   }
   .setup-choice {
-    display: grid;
-    grid-template-columns: auto minmax(5rem, 1fr) auto;
-    align-items: center;
-    gap: 0.5rem;
+    display: flex;
+    justify-content: center;
     padding: 0.4rem 0.48rem;
     border-radius: var(--r-sm);
     background: var(--sunken);
     color: var(--text-2);
-  }
-  .setup-choice + .setup-choice {
-    margin-top: 0.18rem;
-  }
-  .setup-choice :global(.provider-logo) {
-    width: 1.15rem;
-    height: 1.15rem;
-    flex-basis: 1.15rem;
-  }
-  .setup-model {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
   .setup-action {
     border: 1px solid var(--warn-border, var(--neutral-border));

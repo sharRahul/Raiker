@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { ModelReadinessView } from "../apiTypes";
-  import { isRevalidating, openModelSetup } from "../modelReadiness.svelte";
+  import { blocksSending, openModelSetup } from "../modelReadiness.svelte";
 
   let {
     readiness,
@@ -14,12 +14,14 @@
   // confirming it, and the turn runs either way. Saying "Set up model" there
   // asked the owner to redo work they had already done, and disabled Send while
   // they thought about it. A real failure still gets the full strip.
-  const revalidating = $derived(isRevalidating(readiness));
+  // Aged out, or never looked at: either way the server takes the check before
+  // it admits the turn, so this is a note rather than a job for the owner.
+  const confirming = $derived(!blocksSending(readiness));
 </script>
 
 {#if readiness && !readiness.ready}
-  {#if revalidating}
-    <p class="rechecking" role="status">Re-checking this model — you can still send.</p>
+  {#if confirming}
+    <p class="rechecking" role="status">Checking this model — you can still send.</p>
   {:else}
     <div class="readiness-strip" role="status">
       <span class="indicator" aria-hidden="true"></span>

@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import stat
+import sys
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -122,6 +123,23 @@ TASK_OUTCOME_STATES = frozenset({"completed", "failed", "cancelled", "waiting_fo
 # network call is made to find out.
 _GITHUB_NAME = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._-]{0,98}[A-Za-z0-9_])?")
 _GITHUB_REF = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9._/-]{0,98}[A-Za-z0-9_-])?")
+
+
+def _runs_on_this_platform(profile: Any) -> bool:
+    """Whether a profile's runtime can exist on the machine Raiker is on.
+
+    MLX is an Apple-silicon framework, so on Windows and Linux its four slot
+    profiles were four rows in every provider list, four entries in the model
+    picker, and four things to set up that nothing on the machine could ever
+    serve. A profile whose runtime cannot exist here is not a choice, so it is
+    not published. Profiles that declare nothing are published everywhere —
+    llama.cpp included, which runs on macOS as happily as it does anywhere.
+    """
+    required = profile.raw.get("requires_platform")
+    if not required:
+        return True
+    platforms = required if isinstance(required, list) else [required]
+    return sys.platform in {str(name) for name in platforms}
 
 
 @dataclass(frozen=True)
@@ -6198,6 +6216,7 @@ class DashboardService:
             for p in registry.list_profiles()
             if not bool(p.raw.get("test_only", False))
             and not bool(p.raw.get("setup_hidden", False))
+            and _runs_on_this_platform(p)
         )
 
         def _profile_view(
@@ -6304,9 +6323,19 @@ class DashboardService:
         chat_profiles: list[ModelProfileView] = []
         seen_choices: set[tuple[str, str]] = set()
         for profile in registry_profiles:
-            choices = (
-                [] if profile.model == "<model>" else [profile.model]
-            ) + configured_by_profile.get(profile.profile_id, [])
+            # A runtime slot's `model` is the alias it *would* serve under, not
+            # a model anybody has: four llama.cpp slots put "Local GGUF",
+            # "Local GGUF 2", "Local GGUF 3" and "Local GGUF 4" into every
+            # picker on a machine with no GGUF served and nothing to serve it.
+            # A slot earns a place here by being deployed, which is what writes
+            # its configured model.
+            slot_alias = str(profile.raw.get("served_model_name") or "")
+            declared = (
+                []
+                if profile.model == "<model>" or (slot_alias and profile.model == slot_alias)
+                else [profile.model]
+            )
+            choices = declared + configured_by_profile.get(profile.profile_id, [])
             for configured_model in choices:
                 key = (profile.profile_id, configured_model)
                 if key in seen_choices:
@@ -7371,6 +7400,48 @@ class DashboardService:
                 )
             )
         return tuple(outcomes)
+
+    #: How many models one provider may keep offered at once. High enough for
+    #: any real catalogue an owner works across, low enough that a router with
+    #: four hundred models cannot be poured into every picker in the app.
+    MAX_AVAILABLE_MODELS_PER_PROFILE = 24
+
+    def set_available_models(
+        self, profile_id: str, models: list[str], acting_principal_id: str
+    ) -> ControlResult:
+        """Choose which of a provider's models stay offered in every picker.
+
+        Selecting a default used to be the only way a model entered the pickers,
+        so a provider serving six could offer one. This is the owner saying
+        which of them they actually work with; the default is a separate,
+        unchanged decision, and the model it names is always kept.
+        """
+        registry = ModelProfileRegistry.load()
+        try:
+            profile = registry.resolve_profile_id(profile_id)
+        except Exception:  # noqa: BLE001 — unknown profile fails closed
+            return ControlResult(ok=False, reason_code="unknown_model_profile")
+        if len(models) > self.MAX_AVAILABLE_MODELS_PER_PROFILE:
+            return ControlResult(ok=False, reason_code="too_many_available_models")
+        if any(not isinstance(model, str) or len(model) > 200 for model in models):
+            return ControlResult(ok=False, reason_code="invalid_model_id")
+        state = self.store.load_principal_model_state(acting_principal_id)
+        keep = (
+            (state.model or profile.model)
+            if state is not None and state.profile_id == profile_id
+            else None
+        )
+        stored = self.store.set_configured_models(
+            acting_principal_id,
+            profile_id,
+            list(models),
+            keep=keep if keep and "<" not in keep else None,
+        )
+        self._append_model_event(
+            "model_available_set_changed",
+            {"profile_id": profile_id, "provider": profile.provider, "count": len(stored)},
+        )
+        return ControlResult(ok=True, data={"profile_id": profile_id, "models": stored})
 
     async def set_model_selection(
         self, profile_id: str, model: str | None, acting_principal_id: str | None

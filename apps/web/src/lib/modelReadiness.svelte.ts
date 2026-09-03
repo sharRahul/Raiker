@@ -21,7 +21,14 @@ export function readinessForProfile(profile: ModelProfile): ModelReadinessView {
     summary: profile.readiness_summary ?? "This model has not passed a reachability check.",
     reason_code: profile.readiness_reason_code ?? "model_not_checked",
     remediation: profile.readiness_remediation ?? "Set up or check this model before sending.",
-    evidence: { provider: profile.provider },
+    // The composer needs to know whether the owner has connected this provider,
+    // because that is exactly what decides whether the server will take the
+    // first readiness check itself. `evidence` is the view's free-form half and
+    // is where a fact like this belongs rather than in a new contract field.
+    evidence: {
+      provider: profile.provider,
+      connection_configured: profile.connection_configured === true || !profile.off_machine,
+    },
     ready: profile.ready === true,
   };
 }
@@ -56,10 +63,66 @@ export function isRevalidating(readiness: ModelReadinessView | null): boolean {
   return readiness !== null && !readiness.ready && readiness.state === "stale";
 }
 
-/** True when the owner has something to fix before a turn can run. */
+/**
+ * Whether this model may be offered as a choice.
+ *
+ * Every picker in the app answers the same question — "can the owner pick
+ * this?" — so they answer it here rather than each inventing a rule. A model
+ * with a failing check is not a choice: offering it only produces a selection
+ * the next turn refuses. A model whose observation has merely aged out *is* a
+ * choice, for the same reason `isRevalidating` does not block sending: nothing
+ * is known to be wrong, and the server re-takes the observation before the turn
+ * runs. A model nobody has checked yet is not known to be broken either.
+ */
+const MEASURED_UNAVAILABLE = new Set([
+  "runtime_missing",
+  "runtime_stopped",
+  "model_missing",
+  "policy_blocked",
+  "authentication_failed",
+  "quota_exhausted",
+  "unreachable",
+  "unsupported",
+]);
+
+export function isChoosableModel(profile: {
+  readiness_state?: string | null;
+  connection_configured?: boolean;
+  off_machine?: boolean;
+}): boolean {
+  // `ready === false` is not the test: it is also false for a model nobody has
+  // checked, and excluding those emptied every picker on a fresh instance. What
+  // disqualifies a model is a check that *answered badly*.
+  if (profile.readiness_state && MEASURED_UNAVAILABLE.has(profile.readiness_state)) return false;
+  // A provider the owner holds an account with is only reachable once they have
+  // connected it. Listing "Anthropic — Sonnet 5" on an instance with no
+  // Anthropic credential offered a model that cannot answer, which is the same
+  // mistake as listing a llama.cpp slot with nothing served.
+  return profile.connection_configured === true || profile.off_machine !== true;
+}
+
+/**
+ * True when the owner has something to fix before a turn can run.
+ *
+ * A model nobody has checked yet is not one of those things. The server takes
+ * that check itself before it admits the turn, exactly as it does for an
+ * observation that aged out, so blocking here asked the owner to press **Test**
+ * on a provider they had just connected and a model they had just selected.
+ * "No model at all" still blocks: that readiness names no model, and there is
+ * nothing to look at.
+ */
 export function blocksSending(readiness: ModelReadinessView | null): boolean {
   if (readiness === null) return false;
-  return !readiness.ready && !isRevalidating(readiness);
+  if (readiness.ready) return false;
+  if (isRevalidating(readiness)) return false;
+  // Only a provider the owner has connected gets its first check taken for
+  // them, so only that case may skip the block. Everything else still asks.
+  const unmeasured =
+    readiness.state === "not_configured" &&
+    readiness.model !== "" &&
+    !readiness.model.includes("<") &&
+    readiness.evidence?.connection_configured === true;
+  return !unmeasured;
 }
 
 export function openModelSetup(

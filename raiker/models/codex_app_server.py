@@ -13,8 +13,9 @@ import json
 import os
 import shutil
 import webbrowser
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any
 from urllib.parse import urlparse
 
 from raiker.models.exceptions import (
@@ -89,6 +90,7 @@ class CodexAppServerClient:
             )
         except OSError as exc:
             raise ProviderConnectionError("codex_app_server_unavailable") from exc
+
     async def _request_running(
         self, method: str, params: dict[str, Any] | None = None
     ) -> dict[str, Any]:
@@ -170,10 +172,12 @@ class CodexAppServerClient:
         result = await self._request("account/login/start", {"type": "chatgpt"})
         login_id = result.get("loginId")
         auth_url = result.get("authUrl")
-        parsed = urlparse(auth_url) if isinstance(auth_url, str) else None
         if result.get("type") != "chatgpt" or not isinstance(login_id, str) or not login_id:
             raise ProviderResponseValidationError("codex_app_server_login_invalid")
-        if parsed is None or parsed.scheme != "https" or not parsed.netloc:
+        if not isinstance(auth_url, str):
+            raise ProviderResponseValidationError("codex_app_server_login_url_invalid")
+        parsed = urlparse(auth_url)
+        if parsed.scheme != "https" or not parsed.netloc:
             raise ProviderResponseValidationError("codex_app_server_login_url_invalid")
         self.open_browser(auth_url)
         return CodexLogin(login_id=login_id)
@@ -268,14 +272,19 @@ class CodexAppServerClient:
                         await process.stdin.drain()
                         continue
                     params = message.get("params")
-                    if message.get("method") == "item/agentMessage/delta" and isinstance(params, dict):
-                        if params.get("threadId") == thread_id and params.get("turnId") == turn_id:
-                            delta = params.get("delta")
-                            if isinstance(delta, str):
-                                text.append(delta)
-                    if message.get("method") == "turn/completed" and isinstance(params, dict):
-                        if params.get("threadId") == thread_id:
-                            return "".join(text)
+                    if not isinstance(params, dict):
+                        continue
+                    method = message.get("method")
+                    if (
+                        method == "item/agentMessage/delta"
+                        and params.get("threadId") == thread_id
+                        and params.get("turnId") == turn_id
+                    ):
+                        delta = params.get("delta")
+                        if isinstance(delta, str):
+                            text.append(delta)
+                    if method == "turn/completed" and params.get("threadId") == thread_id:
+                        return "".join(text)
             except TimeoutError as exc:
                 raise ProviderTimeoutError("codex_app_server_timeout") from exc
             except json.JSONDecodeError as exc:

@@ -100,6 +100,29 @@ def _has_merely_expired(readiness: ModelReadiness) -> bool:
     )
 
 
+def _nothing_has_been_measured(readiness: ModelReadiness, connected: frozenset[str]) -> bool:
+    """True when nobody has ever checked this model on a provider already connected.
+
+    Never-checked is otherwise the same kind of state as merely-expired: nothing
+    is known to be wrong, and the only thing between the owner and their turn is
+    a look nobody has taken. Refusing there asked the owner to press **Test** on
+    a provider they had just connected and a model they had just selected — the
+    complaint BUG-238 removed for expiry, arriving instead on first use.
+
+    The limit is the one the original invariant exists for: Raiker must never
+    quietly reach a provider the owner never configured. So this covers only
+    profiles with a saved connection, and a profile still carrying the
+    ``<model>`` placeholder is excluded because there is no exact model to look
+    at.
+    """
+    return (
+        readiness.state is ModelReadinessState.NOT_CONFIGURED
+        and readiness.key.profile_id in connected
+        and bool(readiness.key.model)
+        and "<" not in readiness.key.model
+    )
+
+
 class ModelNotReady(RuntimeError):
     def __init__(self, readiness: ModelReadiness) -> None:
         super().__init__("model_not_ready")
@@ -190,8 +213,12 @@ def _provider_label(provider: str) -> str:
         "anthropic": "Anthropic",
         "openrouter": "OpenRouter",
         "openai": "OpenAI",
+        "chatgpt-codex": "ChatGPT subscription",
         "gemini": "Gemini",
         "huggingface": "Hugging Face",
+        "ollama-cloud": "Ollama Cloud",
+        "mlx": "MLX",
+        "openai-compatible": "OpenAI-compatible",
     }.get(provider, provider.replace("-", " ").title())
 
 
@@ -806,6 +833,11 @@ class ModelReadinessService:
         re-checked here, against the real provider, and only a check that
         *fails* refuses the turn.
 
+        A model nobody has *ever* checked gets the same answer, but only on a
+        provider the owner has already connected: Raiker looks once rather than
+        refusing the first turn on a connection they just made. A provider with
+        no saved connection is still never reached on Raiker's own initiative.
+
         The TTL keeps its whole meaning: a turn still never runs on an
         observation older than the window, because a stale one is replaced by a
         fresh observation before the turn is admitted. Every other refusal —
@@ -818,9 +850,15 @@ class ModelReadinessService:
             if readiness.ready:
                 return readiness
 
+        from raiker.models.policy_state import owner_configured_providers
+
+        connected = owner_configured_providers(self.store, owner_principal_id)
         refreshed_primary: ModelReadiness | None = None
         for readiness in chain:
-            if not _has_merely_expired(readiness):
+            if not (
+                _has_merely_expired(readiness)
+                or _nothing_has_been_measured(readiness, connected)
+            ):
                 continue
             try:
                 rechecked = await self.check(

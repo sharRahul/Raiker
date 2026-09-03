@@ -28,6 +28,12 @@
 
   let pathDraft = $state("");
 
+  // The visible control is a <label>, and a label whose input is disabled does
+  // nothing at all when clicked — while still looking exactly like a button
+  // that would. Whatever disables the input has to disable the label's
+  // appearance with it, or the panel reads as broken.
+  const uploadsDisabled = $derived(disabled || store.uploading || store.full);
+
   function submitPath() {
     if (store.addPath(pathDraft)) pathDraft = "";
   }
@@ -81,6 +87,8 @@
   />
   <label
     class="btn btn-sm"
+    class:is-disabled={uploadsDisabled}
+    aria-disabled={uploadsDisabled}
     for={`${idPrefix}-image-upload`}
     title="Upload an image (PNG/JPEG/WebP/GIF, 5 MB max). Sent to the model only if the selected model supports vision."
   >
@@ -97,6 +105,8 @@
   />
   <label
     class="btn btn-sm"
+    class:is-disabled={uploadsDisabled}
+    aria-disabled={uploadsDisabled}
     for={`${idPrefix}-document-upload`}
     title="Upload a document (plain text/Markdown/CSV/PDF/Word .docx/Excel .xlsx, 32 MB max). Its extracted text is added to context as untrusted data."
   >
@@ -108,6 +118,10 @@
 </div>
 
 <style>
+  .is-disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
   .attach-panel {
     display: flex;
     align-items: center;

@@ -16,7 +16,8 @@
   import { api, ApiError } from "../api";
   import type { ModelPricingEntry, ModelPricingView } from "../apiTypes";
   import Icon from "./Icon.svelte";
-  import { relativeTime } from "../format";
+  import { providerName, relativeTime } from "../format";
+  import { modelName } from "../modelPresentation";
 
   let view = $state<ModelPricingView | null>(null);
   let loading = $state(true);
@@ -250,8 +251,12 @@
             {#each view.entries as entry (key(entry))}
               <tr>
                 <th scope="row">
+                  <!-- The name first, because that is what an owner is looking
+                       for in a table this long; the exact id underneath,
+                       because that is what a price is attached to. -->
+                  <span class="model-name">{modelName(entry.model)}</span>
                   <code>{entry.model}</code>
-                  <span class="provider">{entry.provider}</span>
+                  <span class="provider">{providerName(entry.provider)}</span>
                 </th>
                 <td>
                   <span class="source" class:owner={entry.source === "owner"}>
@@ -287,7 +292,7 @@
               {#if expanded === key(entry)}
                 <tr class="expansion">
                   <td colspan="8">
-                    <h3>Price history — {entry.model}</h3>
+                    <h3>Price history — {modelName(entry.model)}</h3>
                     <ol class="history">
                       {#each entry.history as row (row.source + row.effective_from + row.recorded_at)}
                         <li>
@@ -360,6 +365,12 @@
 </section>
 
 <style>
+  .model-name {
+    display: block;
+    color: var(--text-1);
+    font-weight: 650;
+  }
+
   .pricing { display: grid; gap: var(--space-3); }
   .pricing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
   .pricing-head h2 { margin: 0 0 .25rem; }

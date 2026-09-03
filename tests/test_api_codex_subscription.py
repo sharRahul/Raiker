@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from raiker.api.app import create_app
@@ -29,7 +30,7 @@ def _headers(workspace: Path) -> dict[str, str]:
 
 
 def test_subscription_routes_expose_safe_status_and_start_local_login(
-    tmp_path: Path, monkeypatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     workspace = tmp_path / "subscription"
     workspace.mkdir()

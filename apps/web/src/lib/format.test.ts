@@ -66,7 +66,8 @@ describe("format helpers", () => {
     expect(providerName("huggingface")).toBe("Hugging Face");
     expect(providerName("vllm")).toBe("vLLM");
     expect(providerName("anthropic")).toBe("Anthropic");
-    expect(providerName("llama.cpp")).toBe("llama.cpp");
+    // Named for the file the owner chose, not the server Raiker runs over it.
+    expect(providerName("llama.cpp")).toBe("GGUF");
     expect(providerName("something-else")).toBe("something-else");
     expect(providerName(null)).toBe("—");
   });

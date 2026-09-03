@@ -22,7 +22,12 @@ const READINESS_LABEL: Record<ModelReadinessState, string> = {
   ready: "Ready",
   checking: "Checking…",
   not_configured: "Not checked",
-  stale: "Check expired",
+  // An observation that aged out is not a fault: nothing is known to be
+  // wrong, and the server re-takes the check before it admits a turn
+  // (BUG-238). "Check expired" read as a problem the owner had to fix,
+  // which is what made a model they had set up and selected look broken
+  // every time they came back to it.
+  stale: "Re-checks on use",
   runtime_missing: "Runtime missing",
   runtime_stopped: "Runtime stopped",
   model_missing: "Model missing",

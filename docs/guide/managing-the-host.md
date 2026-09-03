@@ -87,6 +87,15 @@ outbound request only after an update channel has been configured. No signed
 Raiker artifact has been published yet, so source-checkout users normally
 update through Git and rebuild the dashboard.
 
+The same thing is in the app, at **Settings → Updates**. It names this build's
+provenance, the pinned channel, the last explicit check and any recovery point,
+and — for a signed package on a pinned channel — offers **Update and restart**.
+Opening the page contacts nothing; only **Check for updates** does. Applying
+never happens inside the web server: a short-lived helper waits for the host to
+stop, verifies the release again, swaps the installation atomically, and
+restarts the registered service. A source checkout says so and offers no apply
+path. The host-status panel links here rather than repeating a command line.
+
 ## Uninstall
 
 Start with a preview:

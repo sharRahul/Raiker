@@ -10879,6 +10879,40 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [(str(row["profile_id"]), str(row["model"])) for row in rows]
 
+    def set_configured_models(
+        self, principal_id: str, profile_id: str, models: list[str], *, keep: str | None = None
+    ) -> list[str]:
+        """Replace the models this owner keeps available for one profile.
+
+        A model became "configured" only by being selected as the default, so a
+        provider serving six models could offer exactly one of them to a picker
+        and the owner had to go back to Models to swap. This is the same list,
+        written directly: everything named here stays offered, everything else
+        for this profile stops being.
+
+        ``keep`` is the model the owner currently has selected. Removing it here
+        would leave the selection pointing at something no list mentions, so it
+        is retained whatever the request says.
+        """
+        wanted: list[str] = []
+        for model in [*models, *( [keep] if keep else [] )]:
+            trimmed = model.strip()
+            if trimmed and trimmed not in wanted:
+                wanted.append(trimmed)
+        now = utc_now()
+        with self.connect() as connection:
+            connection.execute(
+                "DELETE FROM principal_configured_models WHERE principal_id = ? AND profile_id = ?",
+                (principal_id, profile_id),
+            )
+            connection.executemany(
+                """INSERT INTO principal_configured_models
+                (principal_id, profile_id, model, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?)""",
+                [(principal_id, profile_id, model, now, now) for model in wanted],
+            )
+        return wanted
+
     def is_configured_model(self, principal_id: str, profile_id: str, model: str) -> bool:
         with self.connect() as connection:
             row = connection.execute(

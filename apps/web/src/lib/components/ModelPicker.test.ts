@@ -17,6 +17,7 @@ const profiles: ModelProfile[] = [
     requires_budget_policy: true,
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
+    connection_configured: true,
     selected: true,
     prompt_cache_ttl: null,
   },
@@ -32,6 +33,7 @@ const profiles: ModelProfile[] = [
     requires_budget_policy: true,
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
+    connection_configured: true,
     selected: false,
     prompt_cache_ttl: null,
   },
@@ -47,6 +49,7 @@ const profiles: ModelProfile[] = [
     requires_budget_policy: true,
     runtime_gate: "hosted_model_runtime",
     off_machine: true,
+    connection_configured: true,
     selected: false,
     prompt_cache_ttl: null,
   },
@@ -149,13 +152,16 @@ describe("ModelPicker", () => {
       screen.getByRole("button", { name: /model for this turn/i }),
     );
 
-    expect(screen.getByText("Ready")).toBeInTheDocument();
-    expect(screen.getByText("Needs setup")).toBeInTheDocument();
+    // Only models that can actually be chosen are listed, so an unready
+    // provider contributes no row and no name — just the one action that fixes
+    // it, at the end of the menu.
     expect(
       screen.queryByRole("menuitemradio", { name: /GPT-4o Mini/i }),
     ).not.toBeInTheDocument();
+    expect(screen.queryByText("GPT-4o Mini")).not.toBeInTheDocument();
+    expect(screen.queryByText("Ollama models")).not.toBeInTheDocument();
     await fireEvent.click(
-      screen.getByRole("button", { name: "Set up Ollama for GPT-4o Mini" }),
+      screen.getByRole("button", { name: "Set up another model" }),
     );
     expect(setupDialog.open).toBe(true);
     expect(setupDialog.profile?.profile_id).toBe(stopped.profile_id);

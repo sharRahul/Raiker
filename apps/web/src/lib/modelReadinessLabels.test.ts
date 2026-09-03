@@ -27,7 +27,8 @@ describe("readinessLabel", () => {
     expect(readinessLabel("unreachable")).toBe("Unreachable");
     expect(readinessLabel("authentication_failed")).toBe("Key rejected");
     expect(readinessLabel("quota_exhausted")).toBe("No credit");
-    expect(readinessLabel("stale")).toBe("Check expired");
+    // Aged out, not broken: the server re-takes the check before the turn.
+    expect(readinessLabel("stale")).toBe("Re-checks on use");
   });
 
   it("returns null when the backend sent no state, rather than inventing one", () => {

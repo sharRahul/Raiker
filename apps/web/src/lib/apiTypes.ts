@@ -2823,3 +2823,33 @@ export interface HostPathListing {
   /** The location is gone or cannot be read — not the same as empty. */
   missing: boolean;
 }
+
+/** The local transcription runtime dictation uses, if one is set up (BUG-256). */
+export interface SpeechRuntimeSettings {
+  /** The loopback address of a local transcription server, or "" for none. */
+  endpoint: string;
+  /** Optional, for a runtime that serves more than one model. */
+  model: string;
+  configured: boolean;
+  /**
+   * Which runtime the microphone will use, resolved by the host. A fact about
+   * this install rather than a preference — there is no mode to choose.
+   */
+  effective: "local" | "browser";
+}
+
+export interface SpeechRuntimeView {
+  runtime: SpeechRuntimeSettings;
+  max_audio_bytes: number;
+}
+
+export interface SpeechRuntimeChange {
+  endpoint?: string;
+  model?: string;
+}
+
+export interface SpeechRuntimeProbe {
+  ok: boolean;
+  reason_code: string | null;
+  endpoint: string;
+}

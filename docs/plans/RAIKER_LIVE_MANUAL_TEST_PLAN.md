@@ -61,13 +61,23 @@ npm --prefix apps/web run build
 # there is a blocklist inside the app.
 export RAIKER_MODEL_EGRESS_ALLOWLIST='api.anthropic.com,api.openai.com,generativelanguage.googleapis.com,openrouter.ai'
 
-rm -rf /tmp/raiker-manual-test && mkdir -p /tmp/raiker-manual-test
+# Not `rm -rf`. The reset waits for the previous host to release the store and
+# then reads back that the directory is gone, refusing the round if it is not
+# (BUG-266).
+python scripts/reset_live_workspace.py /tmp/raiker-manual-test --port 8765
 .venv/bin/raiker-web --workspace /tmp/raiker-manual-test --port 8765 --no-browser
 ```
 
 **A Full sweep starts on an empty workspace.** A round run against an instance
 that already has history proves the product works for someone who has used it,
 which is not the question a sweep asks. Smoke may reuse a workspace.
+
+A plain `rm -rf` is not enough to prove the workspace is empty: a host can answer
+its shutdown request and still hold the store open for a moment afterwards, and
+on Windows the removal then fails silently. The round would sign in against the
+previous round's account and report a first run that was not one. The command
+above exits non-zero rather than letting that happen — **if it fails, the round
+does not start.**
 
 Open `http://127.0.0.1:8765` in Chromium. Keep the developer console open for the
 whole round: **MUST** end with zero uncaught console errors, and any that appear

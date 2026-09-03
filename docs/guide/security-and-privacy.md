@@ -102,6 +102,14 @@ Under **Settings → Privacy**, choose whether model reasoning is retained.
 Incognito conversations switch off ambient recall for that conversation.
 Voice dictation stores prompt provenance but not microphone audio.
 
+Dictation is transcribed on this machine when you have set a speech runtime up
+under **Models → Local**, and by your browser's own service — which on some
+browsers processes the audio externally — when you have not. There is no setting
+to change: adding the runtime is the whole decision, the note under the
+microphone says which one is in use, and nothing is contacted until you dictate.
+Raiker refuses a runtime address that is not on this machine, and never writes
+the recording to disk on either path.
+
 Back up or export the instance deliberately: local ownership also means you are
 responsible for preserving its conversations, audit records, configuration, and
 vault material. Run `raiker-app --print-paths` before backup or uninstall.

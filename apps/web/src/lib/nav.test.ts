@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SETTINGS_SECTIONS } from "./settingsSections";
 import {
   DEFAULT_ROUTE,
   HUB_TABS,
@@ -186,19 +187,11 @@ describe("nav model", () => {
 // not list, so `#/settings?tab=web-access` silently opened General. A deep link
 // that lands on the wrong page looks exactly like one that works.
 describe("settings sections and their deep links", () => {
-  // The rail's own order, read from SettingsView. Kept here rather than imported
-  // because the point is that two independent lists agree.
-  const RAIL = [
-    "general",
-    "notification",
-    "personalisation",
-    "security",
-    "privacy",
-    "account",
-    "web-access",
-    "git-credential",
-    "runtime",
-  ];
+  // The rail itself, not a copy of it. This guard held a hand-copied list, and
+  // the copy drifted: `updates` shipped with a deep link that silently opened
+  // General and the guard could not see it, because the list it was comparing
+  // against had the same omission.
+  const RAIL = SETTINGS_SECTIONS.map((section) => section.id);
 
   it("gives every settings section a working deep link", () => {
     expect(HUB_TABS.settings).toEqual(RAIL);

@@ -219,3 +219,83 @@ def test_the_session_cookie_is_not_readable_by_script(client: TestClient) -> Non
     )
     assert "HttpOnly" in session_cookie
     assert "SameSite=strict" in session_cookie.replace("SameSite=Strict", "SameSite=strict")
+
+
+# ── BUG-267 — the boot probe answers "nobody" without failing ────────────────
+
+
+def test_the_boot_probe_answers_nobody_with_two_hundred(client: TestClient) -> None:
+    """A locked load asks a question; it does not make a failed request.
+
+    The page has to decide between the workspace and the lock screen before it
+    can render either. When the answer is "nobody" that is one of the two
+    expected outcomes, so it arrives as a `200` with a null principal rather
+    than the `401` the browser would write to the console on every load.
+    """
+    answer = client.get("/api/auth/session-state")
+    assert answer.status_code == 200, answer.text
+    assert answer.json() == {"principal_id": None, "display_name": None, "scope": None}
+
+
+def test_the_boot_probe_names_the_owner_when_there_is_one(client: TestClient) -> None:
+    _register(client)
+    answer = client.get("/api/auth/session-state")
+    assert answer.status_code == 200, answer.text
+    body = answer.json()
+    assert body["display_name"] == "alice"
+    assert body["principal_id"]
+    assert body["scope"] == "control"
+
+
+def test_the_boot_probe_clears_the_cookie_that_no_longer_authenticates(
+    client: TestClient,
+) -> None:
+    """A stale readable cookie is what made the page ask a second time.
+
+    `hasToken()` in the browser reads the CSRF cookie to decide whether there is
+    anything to ask with. Leaving it in place after the session behind it has
+    gone means every later load asks again and is refused again. The probe that
+    reports "nobody" clears it, so the next load has nothing to ask with.
+    """
+    _register(client)
+    client.cookies.set(SESSION_COOKIE, "not-a-live-session")
+    answer = client.get("/api/auth/session-state")
+    assert answer.status_code == 200, answer.text
+    assert answer.json()["principal_id"] is None
+    expired = [
+        value
+        for key, value in answer.headers.multi_items()
+        if key.lower() == "set-cookie"
+    ]
+    assert any(value.startswith(f"{CSRF_COOKIE}=") for value in expired)
+    assert any(value.startswith(f"{SESSION_COOKIE}=") for value in expired)
+    assert not client.cookies.get(CSRF_COOKIE)
+
+
+def test_whoami_still_refuses_for_a_caller_that_needs_an_identity(
+    client: TestClient,
+) -> None:
+    """The governed read is unchanged; only the page's boot question moved."""
+    assert client.get("/api/auth/whoami").status_code == 401
+
+
+def test_the_boot_probe_does_not_translate_every_refusal_into_nobody(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only "not authenticated" means nobody.
+
+    Reporting a null principal for any refusal would hide a fault behind the
+    lock screen, and clearing the owner's cookie on one would sign them out over
+    something that had nothing to do with their session.
+    """
+    from fastapi import HTTPException
+
+    from raiker.api import routes_auth
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise HTTPException(status_code=403, detail={"reason_code": "insufficient_scope"})
+
+    monkeypatch.setattr(routes_auth.AuthMiddleware, "authenticate", refuse)
+    refused = client.get("/api/auth/session-state")
+    assert refused.status_code == 403
+    assert refused.json()["detail"]["reason_code"] == "insufficient_scope"

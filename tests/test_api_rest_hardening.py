@@ -38,6 +38,26 @@ def test_security_headers_present(workspace: Path) -> None:
     assert "strict-transport-security" not in resp.headers
 
 
+def test_the_microphone_is_allowed_on_raikers_own_page_and_nowhere_else(
+    workspace: Path,
+) -> None:
+    """BUG-256 — `microphone=()` denied the feature to this origin too.
+
+    The web UI is served by this same app, so the header lands on the document
+    that carries the dictation control. A bare `()` meant the microphone button
+    in both composers could never work in a served build, whichever speech
+    runtime it was pointed at. `self` opens it for Raiker's own page and leaves
+    it shut for anything embedded in it.
+    """
+    client = TestClient(create_app(workspace))
+    policy = client.get("/api/events", headers=_headers(workspace)).headers.get(
+        "permissions-policy", ""
+    )
+    assert "microphone=(self)" in policy
+    assert "camera=()" in policy
+    assert "geolocation=()" in policy
+
+
 def test_hsts_emitted_when_enabled(workspace: Path) -> None:
     client = TestClient(create_app(workspace, hsts=True))
     resp = client.get("/api/events", headers=_headers(workspace))

@@ -162,6 +162,18 @@ class ComposerApprovalModeRequest(BaseModel):
     approval_mode: str
 
 
+class SpeechRuntimeRequest(BaseModel):
+    """The local transcription runtime dictation should use, if any (BUG-256).
+
+    Both fields are optional so a caller can set the address without restating
+    the model, which is the common case: most transcription servers serve one.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    endpoint: str | None = None
+    model: str | None = None
+
+
 class TaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
     title: str

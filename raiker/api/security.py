@@ -19,7 +19,14 @@ _SECURITY_HEADERS: tuple[tuple[bytes, bytes], ...] = (
     (b"referrer-policy", b"no-referrer"),
     (b"cross-origin-opener-policy", b"same-origin"),
     (b"cross-origin-resource-policy", b"same-origin"),
-    (b"permissions-policy", b"geolocation=(), microphone=(), camera=()"),
+    # `microphone=(self)` and not `microphone=()`. Raiker's own page is the one
+    # that carries the dictation control, and a bare `()` denies the feature to
+    # *every* origin including this one — which made the microphone button in
+    # both composers unable to work at all in a served build, whichever speech
+    # runtime it was pointed at. `self` is still a closed door to anything
+    # embedded: a cross-origin frame inside this page gets nothing. Geolocation
+    # and camera have no surface in Raiker, so they stay denied outright.
+    (b"permissions-policy", b"geolocation=(), microphone=(self), camera=()"),
 )
 
 

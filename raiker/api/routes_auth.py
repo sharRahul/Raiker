@@ -192,13 +192,48 @@ async def logout(request: Request, response: Response) -> dict[str, Any]:
 
 @router.get("/api/auth/whoami")
 async def whoami(request: Request) -> dict[str, Any]:
-    """Who this browser is, if anyone — the question a reload has to ask (BUG-253).
+    """Who this browser is — the governed read, which refuses when nobody is (BUG-253).
 
     A safe read, so no CSRF proof is required. It answers 401 exactly as every
-    other governed route does when there is no live session, which is what makes
-    it usable as the lock screen's own test.
+    other governed route does when there is no live session. That is right for a
+    caller that *needs* an identity — the CLI, a script, a test — and wrong for
+    the page's own boot probe, which has ``/api/auth/session-state`` instead.
     """
     session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    return {
+        "principal_id": principal.principal_id,
+        "display_name": principal.display_name,
+        "scope": session.scope,
+    }
+
+
+@router.get("/api/auth/session-state")
+async def session_state(request: Request, response: Response) -> dict[str, Any]:
+    """Whether this browser is signed in — an answer, never a failure (BUG-267).
+
+    The page asks this once on boot to decide between the workspace and the lock
+    screen, and "nobody" is one of the two expected answers. Asking it of
+    ``/api/auth/whoami`` made the browser write a failed request to the console
+    on every locked load, which is how a console stops being the place a real
+    fault stands out. So the boot question gets a route that answers it: ``200``
+    with a null principal, and ``200`` with the principal when there is one.
+
+    It is not a second way in. Nothing here is readable without a live session —
+    a caller that is not signed in learns only that it is not signed in, which is
+    what it asked. The stale readable CSRF cookie is cleared on that answer, so
+    the *next* load has nothing to ask with and does not ask at all.
+    """
+    try:
+        session, principal = AuthMiddleware(_ws(request)).authenticate(request)
+    except HTTPException as refusal:
+        # Only "not authenticated" means nobody. Any other refusal is something
+        # the caller should see rather than have translated into a null
+        # principal — and clearing the owner's cookie on one would sign them out
+        # over a fault that had nothing to do with their session.
+        if refusal.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
+        clear_session_cookie(response)
+        return {"principal_id": None, "display_name": None, "scope": None}
     return {
         "principal_id": principal.principal_id,
         "display_name": principal.display_name,

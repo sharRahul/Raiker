@@ -173,6 +173,9 @@
     // visit to Permissions is exactly when they change — so they are re-read on
     // return rather than held as they stood when Build first mounted.
     void readStandingModes();
+    void api.speechRuntime().then((view) => {
+      speechRuntime = view.runtime.effective;
+    }).catch(() => {});
     void api.settings().then((view) => {
       speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
     }).catch(() => {});
@@ -216,6 +219,10 @@
 
   let promptText = $state("");
   let speechLanguage = $state<SpeechLanguage>("auto");
+  // BUG-256 — which speech runtime dictation will use. Read once on mount and
+  // defaulted to the browser, so a composer that cannot reach the host still
+  // offers dictation rather than nothing.
+  let speechRuntime = $state<"browser" | "local">("browser");
   let voiceControl = $state<VoiceDictationHandle | undefined>();
   let voiceDictated = $state(false);
   let voiceTypedBefore = $state(false);
@@ -2022,6 +2029,7 @@
               selectionStart={promptSelectionStart}
               selectionEnd={promptSelectionEnd}
               language={speechLanguage}
+              runtime={speechRuntime}
               disabled={streaming}
               onchange={onVoiceDraft}
               onfinalized={() => (voiceDictated = true)}

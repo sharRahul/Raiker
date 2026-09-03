@@ -169,11 +169,22 @@ async def put_settings(body: SettingsRequest, request: Request) -> dict[str, Any
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="invalid_speech_language",
         )
-    await _check_config_change(ws, principal.principal_id, _load(ws, principal.principal_id), body.settings)
+    stored = _load(ws, principal.principal_id)
+    # BUG-256 — the `voice` section has two editors: the Voice settings section
+    # and the speech runtime row on the Models page. This route replaces the
+    # whole blob with whatever the page last read, so leaving `voice` in it would
+    # let a save here silently revert an address configured on the other surface.
+    # `/api/speech/runtime` is its only writer, and it validates the address.
+    settings = dict(body.settings)
+    if "voice" in stored:
+        settings["voice"] = stored["voice"]
+    else:
+        settings.pop("voice", None)
+    await _check_config_change(ws, principal.principal_id, stored, settings)
     SQLiteStore(ws).put_user_settings(
-        principal.principal_id, json.dumps(body.settings), utc_now()
+        principal.principal_id, json.dumps(settings), utc_now()
     )
-    return {"settings": body.settings}
+    return {"settings": settings}
 
 
 @router.get("/api/settings/composer-approval-mode")

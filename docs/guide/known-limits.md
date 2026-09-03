@@ -118,6 +118,13 @@ Voice is turn-based dictation and manual playback. Continuous listening,
 hands-free control, and full-duplex conversation are not available. Dictated
 text remains editable, and only pressing **Send** creates a turn.
 
+On-device dictation needs a transcription server you install and run yourself —
+Raiker does not bundle one, and it shows no words until the recording stops,
+because a local runtime hears the whole clip before transcribing it. Without one,
+dictation falls back to the browser; there is no setting to force it either way.
+Read-aloud still uses the browser's own voice; there is no local speech
+*synthesis*.
+
 Raiker can ask a structured clarification question mid-turn: it parks the turn,
 offers the options it wrote, and continues on the one you pick. A question
 grants nothing, so answering it is not an approval and cannot stand in for one.

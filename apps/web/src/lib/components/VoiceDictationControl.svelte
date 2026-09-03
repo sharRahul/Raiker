@@ -32,10 +32,14 @@
 
 <script lang="ts">
   import { onMount } from "svelte";
+  import { api } from "../api";
   import {
     audioSessionCoordinator,
     browserRecognitionAdapter,
+    browserTranscriptionPorts,
+    createLocalTranscriptionAdapter,
     type AudioSessionCoordinator,
+    type RecognitionPhase,
     type SpeechLanguage,
     type VoiceRecognitionAdapter,
   } from "../voice";
@@ -47,7 +51,8 @@
     selectionEnd = selectionStart,
     language = "auto",
     disabled = false,
-    adapter = browserRecognitionAdapter,
+    runtime = "browser",
+    adapter = undefined,
     coordinator = audioSessionCoordinator,
     onchange,
     onfinalized = () => {},
@@ -59,6 +64,16 @@
     selectionEnd?: number;
     language?: SpeechLanguage;
     disabled?: boolean;
+    /**
+     * Which speech runtime dictation will use (BUG-256).
+     *
+     * A fact about this install, not a preference: `local` when the owner has
+     * set a transcription runtime up on this machine, `browser` when they have
+     * not. There is no third state and no switch — the button behaves the same
+     * either way, and only the disclosure below it changes.
+     */
+    runtime?: "browser" | "local";
+    /** Overridden in tests; otherwise chosen from `runtime`. */
     adapter?: VoiceRecognitionAdapter;
     coordinator?: AudioSessionCoordinator;
     onchange: (next: string, cursor: number) => void;
@@ -68,6 +83,7 @@
   } = $props();
 
   let listening = $state(false);
+  let phase = $state<RecognitionPhase>("listening");
   let errorMessage = $state("");
   let snapshotDraft = "";
   let snapshotStart = 0;
@@ -78,7 +94,36 @@
   const disclosureId = `${ownerId}-disclosure`;
   const unavailableId = `${ownerId}-unavailable`;
 
-  const supported = $derived(adapter.supported());
+  /**
+   * The on-device runtime, built once and only when it is the one in use.
+   *
+   * It closes over `api.transcribeSpeech`, which is the only thing here that
+   * leaves the page — and it goes to Raiker's own host, which forwards it to the
+   * address the owner configured and nowhere else.
+   */
+  const localAdapter = createLocalTranscriptionAdapter(
+    browserTranscriptionPorts((wav, chosen) =>
+      api.transcribeSpeech(wav, chosen).then((result) => result.text),
+    ),
+  );
+
+  const activeAdapter = $derived(
+    adapter ?? (runtime === "local" ? localAdapter : browserRecognitionAdapter),
+  );
+
+  const supported = $derived(activeAdapter.supported());
+
+  const disclosure = $derived(
+    runtime === "local"
+      ? "Audio is transcribed by the speech runtime on this machine. Raiker does not retain it."
+      : "Raiker does not retain audio. Your browser's speech service may process audio externally.",
+  );
+
+  const unavailableReason = $derived(
+    runtime === "local"
+      ? "Dictation is unavailable because this browser cannot record audio. You can keep typing."
+      : "Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.",
+  );
 
   function transcriptText(includeInterim: boolean) {
     return [finalized, includeInterim ? interim : ""].filter(Boolean).join(" ");
@@ -123,13 +168,14 @@
     snapshotEnd = Math.max(snapshotStart, Math.min(selectionEnd, draft.length));
     finalized = "";
     interim = "";
+    phase = "listening";
     // This callback deliberately precedes adapter.start: a synchronous fake or
     // browser callback must not make dictated text look like pre-existing text.
     setListening(true);
     try {
       coordinator.startRecognition(
         ownerId,
-        () => adapter.start(language, {
+        () => activeAdapter.start(language, {
           interim(text) {
             interim = text.trim();
             updateDraft(true);
@@ -144,6 +190,14 @@
           },
           end() {
             if (listening) preserveFinalized();
+            // The on-device turn finishes here rather than in `done`, because
+            // the transcript arrives after the recording stops. Releasing is
+            // idempotent, so the browser path — which already released — is
+            // unaffected.
+            coordinator.release(ownerId);
+          },
+          phase(next) {
+            phase = next;
           },
           error(code) {
             const restore = code === "not-allowed" || code === "audio-capture" || code === "no-speech";
@@ -157,7 +211,7 @@
             setListening(false);
           },
         }),
-        () => adapter.abort(),
+        () => activeAdapter.abort(),
       );
     } catch {
       setListening(false);
@@ -169,12 +223,32 @@
     if (code === "not-allowed") return "Allow microphone and speech-recognition access in your browser, then try again.";
     if (code === "audio-capture") return "No usable microphone was found. Check your device and try again.";
     if (code === "no-speech") return "No speech was recognized. Your original draft was restored.";
-    if (code === "network") return "The browser speech service is unavailable. Finalized words were kept; you can keep typing.";
+    // The reason codes the host returns for the on-device runtime. Each names
+    // the thing the owner would have to change, rather than "transcription
+    // failed" — which is true of all four and useful for none.
+    if (code === "speech_runtime_not_configured") return "The speech runtime is no longer set up. Add one under Models → Local.";
+    if (code === "speech_runtime_unreachable") return "The speech runtime on this machine did not answer. Check that it is running.";
+    if (code === "speech_runtime_refused") return "The speech runtime refused the recording. Check that it serves transcription.";
+    if (code === "speech_audio_too_large") return "That recording is too long to transcribe. Dictate in shorter passes.";
+    if (code === "network") {
+      return runtime === "local"
+        ? "The speech runtime on this machine could not be reached. Finalized words were kept; you can keep typing."
+        : "The browser speech service is unavailable. Finalized words were kept; you can keep typing.";
+    }
     return "Dictation stopped unexpectedly. Finalized words were kept; you can keep typing.";
   }
 
   export function done() {
     if (!listening) return false;
+    if (runtime === "local") {
+      // The clip is only complete once recording stops, and the transcript
+      // arrives afterwards through `final`. Releasing the coordinator here would
+      // abort the recording that is about to be transcribed, so the turn is left
+      // running until `end` or `error` reports how it went.
+      phase = "transcribing";
+      activeAdapter.stop();
+      return true;
+    }
     preserveFinalized();
     coordinator.release(ownerId);
     return true;
@@ -209,8 +283,16 @@
 
 <div class="voice-control">
   {#if listening}
-    <span class="listening" role="status"><span class="live-dot"></span>Listening…</span>
-    <button type="button" class="voice-button active" aria-label="Done dictating" onclick={done}>
+    <span class="listening" role="status"
+      ><span class="live-dot"></span>{phase === "transcribing" ? "Transcribing…" : "Listening…"}</span
+    >
+    <button
+      type="button"
+      class="voice-button active"
+      aria-label="Done dictating"
+      disabled={phase === "transcribing"}
+      onclick={done}
+    >
       <Icon name="check" size={15} />
     </button>
     <button type="button" class="voice-button" aria-label="Cancel dictation" onclick={cancel}>
@@ -232,9 +314,9 @@
 
   <details class="voice-info" ontoggle={keepDisclosureOnScreen}>
     <summary aria-label="About dictation privacy"><Icon name="info" size={14} /></summary>
-    <p id={disclosureId}>Raiker does not retain audio. Your browser's speech service may process audio externally.</p>
+    <p id={disclosureId}>{disclosure}</p>
     {#if !supported}
-      <p id={unavailableId}>Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.</p>
+      <p id={unavailableId}>{unavailableReason}</p>
     {/if}
   </details>
 </div>

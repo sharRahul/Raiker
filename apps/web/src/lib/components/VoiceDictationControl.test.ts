@@ -124,3 +124,70 @@ it("always exposes browser-processing disclosure and an honest unsupported state
   expect(screen.getByRole("button", { name: "Dictate" })).toBeDisabled();
   expect(screen.getByText(/You can keep typing/)).toBeInTheDocument();
 });
+
+// ── BUG-256 — the disclosure has to match the runtime that is actually in use ──
+
+describe("on-device dictation", () => {
+  it("says the audio stays here when the local runtime is the one in use", async () => {
+    render(VoiceDictationControl, {
+      draft: "",
+      runtime: "local",
+      adapter: recognitionAdapterFake(),
+      onchange: vi.fn(),
+    });
+    await fireEvent.click(screen.getByLabelText("About dictation privacy"));
+    expect(
+      screen.getByText(/transcribed by the speech runtime on this machine/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/browser's speech service may process audio externally/),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the browser's disclosure when the browser is the one in use", async () => {
+    render(VoiceDictationControl, {
+      draft: "",
+      runtime: "browser",
+      adapter: recognitionAdapterFake(),
+      onchange: vi.fn(),
+    });
+    await fireEvent.click(screen.getByLabelText("About dictation privacy"));
+    expect(
+      screen.getByText(/browser's speech service may process audio externally/),
+    ).toBeInTheDocument();
+  });
+
+  it("says it is transcribing rather than still listening", async () => {
+    // An on-device turn does not end when recording does: the clip still has to
+    // be transcribed, which is exactly the wait this label exists to describe.
+    const adapter = recognitionAdapterFake();
+    adapter.stop = vi.fn();
+    render(VoiceDictationControl, {
+      draft: "",
+      runtime: "local",
+      adapter,
+      onchange: vi.fn(),
+    });
+    await fireEvent.click(screen.getByLabelText("Dictate"));
+    expect(screen.getByText("Listening…")).toBeInTheDocument();
+    await fireEvent.click(screen.getByLabelText("Done dictating"));
+    expect(await screen.findByText("Transcribing…")).toBeInTheDocument();
+    // The recording stopped; the words arrive afterwards.
+    expect(adapter.stop).toHaveBeenCalled();
+  });
+
+  it("names the thing to change when the runtime does not answer", async () => {
+    const adapter = recognitionAdapterFake();
+    render(VoiceDictationControl, {
+      draft: "",
+      runtime: "local",
+      adapter,
+      onchange: vi.fn(),
+    });
+    await fireEvent.click(screen.getByLabelText("Dictate"));
+    adapter.error("speech_runtime_unreachable");
+    await waitFor(() =>
+      expect(screen.getByRole("alert")).toHaveTextContent(/did not answer. Check that it is running/),
+    );
+  });
+});

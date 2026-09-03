@@ -23,7 +23,7 @@
   </div>
   <label>
     <span>Speech language</span>
-    <small>Used for dictation and manual response read-aloud in both Chat and Build.</small>
+    <small>Used for dictation and read-aloud in both Chat and Build.</small>
     <select aria-label="Speech language" value={speechLanguage} onchange={(e) => save({ "general.speech_language": e.currentTarget.value })}>
       <option value="auto">Auto (device language)</option>
       <option value="en">English</option>
@@ -39,7 +39,6 @@
       <option value="tr">Türkçe</option>
       <option value="uk">Українська</option>
     </select>
-    <small class="voice-disclosure">Raiker does not retain audio. Your browser's speech service may process audio externally.</small>
   </label>
   <label>
     <span>Language</span>
@@ -104,6 +103,5 @@
   .settings-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); padding: var(--card-pad-y) var(--card-pad-x); margin-bottom: var(--space-4); }
   label { display: grid; gap: .3rem; max-width: 34rem; margin-top: var(--space-5); font-weight: 650; }
   label small { color: var(--text-2); font-weight: 400; }
-  .voice-disclosure { padding-left: .65rem; border-left: 2px solid var(--accent-border); }
   select { width: 100%; }
 </style>

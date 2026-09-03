@@ -15445,6 +15445,12 @@ microphone is allowed to this origin and to no other.
 browser, dictates, and asserts the words arrive in the composer from a runtime on
 loopback.
 
+**What this does not close.** Read aloud still speaks with whatever voice the
+browser hands it, and Chrome ships remote ones for several languages. That is a
+smaller problem — what crosses the boundary is the response text rather than a
+recording of the owner — but it is the same asymmetry in the other direction, and
+it is raised as [BUG-269](TO_BE_FIXED.md#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local).
+
 **User-interface outcome.** The microphone works entirely on this machine when
 the owner sets a runtime up; **Settings → Voice** states which of the two is in
 use; and the disclosure under the button says what is actually happening to the

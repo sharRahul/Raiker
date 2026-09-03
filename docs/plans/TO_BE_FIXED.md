@@ -107,6 +107,7 @@ names.
 | [BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local) | Medium | Voice / privacy posture | **Closed 2026-09-03 (FIXED-363)** — a speech runtime on this machine, and a security header that had been denying the microphone to Raiker's own page all along |
 | [BUG-266](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | **Closed 2026-09-03 (FIXED-364)** — the reset waits for the process, not the response, and reads the directory back |
 | [BUG-267](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | **Closed 2026-09-03 (FIXED-362)** — the boot question gets a route that answers it rather than refusing it |
+| [BUG-269](#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local) | Low | Voice / privacy posture | Open — raised 2026-09-03 while closing BUG-256. Dictation can now run on this device; playback cannot |
 | [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
 | [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
 | [BUG-258](FIXED_ITEMS.md#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | **Closed 2026-09-03 (FIXED-356)** — the default was `text-embedding-ada-002` |
@@ -844,3 +845,37 @@ fails.
 [FIXED-362](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure).**
 `GET /api/auth/session-state` answers the page's boot question with `200` both
 ways, and clears the stale cookie so the next load does not ask at all.
+
+---
+
+## BUG-269 — Read aloud is the half of voice that is still not local
+
+**Severity: Low. Area: voice / privacy posture. Status: Open — raised 2026-09-03
+while closing
+[BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local).**
+
+**Observed.** Dictation can now be made to run entirely on this machine.
+**Read aloud** cannot: it calls the browser's `speechSynthesis`, and there is no
+setting for it in **Settings → Voice** beside the one that governs the
+microphone.
+
+**Why it is lower than BUG-256 was.** What crosses the boundary is the
+*response text*, not a recording of the owner, and on most platforms the browser
+speaks with an OS voice that never leaves the device at all. But "most" is doing
+work in that sentence: Chrome ships remote voices for several languages and
+picks one without saying so, and Raiker cannot tell which kind it got. The
+asymmetry is also its own defect — an owner who has just set on-device
+transcription up has no reason to expect the other direction to behave
+differently, and nothing tells them it does.
+
+**Proposed fix.** The same shape as BUG-256, one size smaller. `speechSynthesis`
+exposes `voice.localService`; a *Use only on-device voices* choice in
+**Settings → Voice** would filter `getVoices()` to those and say plainly when a
+language has none, rather than silently falling back to a remote one. A local
+synthesis runtime — Piper or equivalent, pointed at the way the transcription
+server now is — is the fuller answer and is worth doing only if the filter turns
+out not to be enough.
+
+**Required user-interface outcome.** **Settings → Voice** governs both
+directions, and read-aloud either uses a voice that stays on this machine or
+says that it could not find one.

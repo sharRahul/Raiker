@@ -20,6 +20,7 @@ from raiker.models.connections import get_model_connection, list_model_connectio
 from raiker.models.price_registry import PriceRegistry
 from raiker.models.pricing import resolve_model_facts
 from raiker.models.registry import ModelProfileRegistry
+from raiker.models.subscription_limits import SubscriptionLimits, SubscriptionLimitStore
 from raiker.runtime.model_facts_store import ModelFactsStore
 from raiker.runtime.model_usage import ModelUsageLedger, UsageTotals
 
@@ -59,6 +60,10 @@ class ProviderUsageRow:
     unpriced_models: tuple[str, ...]
     owner_budget: int | None
     native: NativeQuotaSnapshot
+    # BUG-254 — what the subscription itself said about its own windows, if it
+    # said anything. `None` is the honest answer for a provider that reports
+    # nothing, and the surface shows nothing rather than an estimate.
+    subscription: SubscriptionLimits | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -102,6 +107,9 @@ class ProviderUsageRow:
                     for metric in self.native.metrics
                 ],
             },
+            "subscription": (
+                self.subscription.to_dict() if self.subscription is not None else None
+            ),
         }
 
 
@@ -502,6 +510,10 @@ class ProviderUsageService:
                         principal_id, profile.profile_id
                     ),
                     native=native,
+                    # Free: already recorded when a turn ran, never fetched here.
+                    subscription=SubscriptionLimitStore(self.store).latest(
+                        principal_id, profile.profile_id
+                    ),
                 )
             )
         return tuple(rows)

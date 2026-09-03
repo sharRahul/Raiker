@@ -259,3 +259,28 @@ describe("LoginView", () => {
     expect(screen.getByLabelText("Username")).not.toBeDisabled();
   });
 });
+
+it("says an instance already has its owner instead of blaming the password", async () => {
+  // BUG-265 — the server refuses a second account by policy and says so. The
+  // screen used to replace that with "Authentication failed.", which sends an
+  // owner looking for a wrong password that was in fact correct.
+  stubFetch({
+    "GET /api/health": { status: "ok", store: "ok" },
+    "GET /api/auth/bootstrap-status": { can_register: true },
+    "POST /api/auth/register": {
+      __status: 409,
+      detail: "Create new user and separate Raiker instance instead",
+    },
+  });
+  render(LoginView, { onAuthenticated: vi.fn(), runtimeState: "locked" });
+
+  await screen.findByText(/Create a User Account to get started/);
+  await fireEvent.input(screen.getByLabelText("Username"), { target: { value: "Rahul" } });
+  await fireEvent.input(screen.getByLabelText("Password"), { target: { value: "Ithink@10" } });
+  await fireEvent.input(screen.getByLabelText("Confirm password"), {
+    target: { value: "Ithink@10" },
+  });
+  await fireEvent.click(screen.getByRole("button", { name: "Create a User Account" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(/already has its owner/);
+});

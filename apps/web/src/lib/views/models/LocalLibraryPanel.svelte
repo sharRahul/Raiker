@@ -2,10 +2,14 @@
   import { onMount } from "svelte";
   import { api, ApiError } from "../../api";
   import type { ModelLibraryView } from "../../apiTypes";
+  import Icon from "../../components/Icon.svelte";
+  import PathPicker from "../../components/PathPicker.svelte";
 
   let library = $state<ModelLibraryView | null>(null);
   let root = $state("");
   let busy = $state(false);
+  // BUG-251 — an approved folder can be browsed to rather than spelled.
+  let browsing = $state(false);
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
   const ggufModels = $derived(
@@ -125,6 +129,9 @@
           aria-label="Absolute model folder"
         /></label
       >
+      <button type="button" class="btn" onclick={() => (browsing = true)}>
+        <Icon name="folder" size={14} /> Browse
+      </button>
       <button class="btn" type="submit" disabled={busy || !root.trim()}
         >Add and scan</button
       >
@@ -189,6 +196,15 @@
       </div>{/if}
   </section>
 </div>
+
+{#if browsing}
+  <PathPicker
+    title="Choose a model folder"
+    start={root}
+    onchoose={(path) => { root = path; browsing = false; }}
+    onclose={() => (browsing = false)}
+  />
+{/if}
 
 <style>
   .library-layout {

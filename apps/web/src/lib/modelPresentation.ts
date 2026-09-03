@@ -60,3 +60,41 @@ function word(value: string): string {
   };
   return known[value.toLowerCase()] ?? `${value.charAt(0).toUpperCase()}${value.slice(1).toLowerCase()}`;
 }
+
+/**
+ * The models in a provider's catalogue that could answer a turn (BUG-258).
+ *
+ * "Choose where Raiker thinks" listed OpenAI's whole catalogue — 124 entries —
+ * and *defaulted* to `text-embedding-ada-002`, because the list arrives in the
+ * provider's own order and the first entry wins. An owner who accepted the
+ * default pinned a model that cannot answer anything, and found out at their
+ * first turn.
+ *
+ * This is not a capability guess. Every pattern below is the provider's own
+ * naming for a different endpoint family — embeddings, speech, images,
+ * moderation — none of which serve a chat completion. Anything a provider names
+ * outside those families is left in, so a new or unusual chat model is never
+ * hidden by a rule written before it existed.
+ *
+ * When the filter would empty the list, the unfiltered list is returned
+ * instead: a picker that offers nothing is worse than one that offers too much,
+ * and a provider whose entire catalogue looks like this is a provider this rule
+ * does not understand.
+ */
+const NOT_A_CHAT_MODEL = [
+  /(^|[/\-_])text-embedding/i,
+  /(^|[/\-_])embed(ding)?([-_.]|$)/i,
+  /(^|[/\-_])whisper/i,
+  /(^|[/\-_])tts([-_.]|$)/i,
+  /(^|[/\-_])dall-e/i,
+  /(^|[/\-_])moderation/i,
+  /(^|[/\-_])rerank/i,
+  /(^|[/\-_])sora/i,
+];
+
+export function chatCandidates(models: string[]): string[] {
+  const kept = models.filter(
+    (model) => !NOT_A_CHAT_MODEL.some((pattern) => pattern.test(model)),
+  );
+  return kept.length > 0 ? kept : models;
+}

@@ -9,6 +9,7 @@
   const labels = { account: "Account", model: "Model", privacy: "Privacy", backup: "Backup", finish: "Finish" };
   let setup: SetupState | null = $state(null);
   let profiles: ModelProfile[] = $state([]);
+  let chatProfiles: ModelProfile[] = $state([]);
   let backupTarget = $state("");
   let busy = $state(false);
   let error = $state("");
@@ -49,7 +50,11 @@
 
   async function loadProfiles() {
     try {
-      ({ profiles } = await api.models());
+      const view = await api.models();
+      profiles = view.profiles;
+      // BUG-261 — the picker's switches have to open showing what is already
+      // kept offered, or every one of them reads as off.
+      chatProfiles = view.chat_profiles ?? [];
     } catch {
       // The rows keep the snapshot they already have rather than emptying: a
       // failed refresh is not evidence that a provider went away.
@@ -133,6 +138,7 @@
       </header>
       <ProviderMatrix
         {profiles}
+        {chatProfiles}
         onchanged={() => void loadProfiles()}
         onselected={(profileId, model) => void chooseModel(profileId, model)}
       />

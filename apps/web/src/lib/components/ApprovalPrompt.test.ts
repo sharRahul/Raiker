@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { api, setToken } from "../api";
 import type { ApprovalView } from "../apiTypes";
+import { uiPrefs } from "../prefs.svelte";
 import ApprovalPrompt from "./ApprovalPrompt.svelte";
 
 beforeEach(() => {
@@ -10,6 +11,9 @@ beforeEach(() => {
 });
 afterEach(() => {
   setToken(null);
+  uiPrefs.desktop = false;
+  Object.defineProperty(document, "hidden", { value: false, configurable: true });
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -90,4 +94,65 @@ it("puts one decision aside without resolving it", async () => {
 
   expect(await screen.findByText("Run command")).toBeInTheDocument();
   expect(resolve).not.toHaveBeenCalled();
+});
+
+// BUG-255 — a decision raised while Raiker is in the background.
+
+/** Put a Notification constructor in place and report what it was handed. */
+function stubNotifications(permission: NotificationPermission) {
+  const raised: { title: string; options?: NotificationOptions }[] = [];
+  class StubNotification {
+    onclick: (() => void) | null = null;
+    static permission = permission;
+    constructor(title: string, options?: NotificationOptions) {
+      raised.push({ title, options });
+    }
+    close() {}
+  }
+  vi.stubGlobal("Notification", StubNotification);
+  return raised;
+}
+
+function setHidden(hidden: boolean) {
+  Object.defineProperty(document, "hidden", { value: hidden, configurable: true });
+  document.dispatchEvent(new Event("visibilitychange"));
+}
+
+it("announces a decision to the desktop when Raiker is not the window on screen", async () => {
+  uiPrefs.desktop = true;
+  const raised = stubNotifications("granted");
+  setHidden(true);
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+
+  render(ApprovalPrompt);
+
+  await waitFor(() => expect(raised).toHaveLength(1));
+  expect(raised[0].title).toBe("Raiker needs a decision");
+  expect(raised[0].options?.body).toContain("Write file");
+  // One subject, one banner, however many times the poll sees it.
+  expect(raised[0].options?.tag).toBe("raiker-approval");
+});
+
+it("says nothing to the desktop about a decision the owner can already see", async () => {
+  uiPrefs.desktop = true;
+  const raised = stubNotifications("granted");
+  setHidden(false);
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+
+  render(ApprovalPrompt);
+
+  expect(await screen.findByText("Approval needed")).toBeInTheDocument();
+  expect(raised).toHaveLength(0);
+});
+
+it("respects the owner's preference even when the browser would allow it", async () => {
+  uiPrefs.desktop = false;
+  const raised = stubNotifications("granted");
+  setHidden(true);
+  vi.spyOn(api, "approvals").mockResolvedValue([approval()]);
+
+  render(ApprovalPrompt);
+
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(raised).toHaveLength(0);
 });

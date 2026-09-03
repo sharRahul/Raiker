@@ -1,24 +1,21 @@
 <script lang="ts">
   import type { Notification as RaikerNotification } from "../apiTypes";
+  import { canRaiseDesktopNotice, raiseDesktopNotice } from "../desktopNotice";
   import { uiPrefs } from "../prefs.svelte";
 
   let { notifications }: { notifications: RaikerNotification[] } = $props();
   const unread = $derived(notifications.filter((notification) => !notification.read));
 
-  // Mirror new unread notifications to the desktop when the owner enabled the
-  // preference and the browser permission is granted. Best-effort only — the
-  // in-app record is the source of truth.
+  // Mirror new unread notifications to the desktop through the one path every
+  // surface uses (BUG-255). Best-effort only — the in-app record is the source
+  // of truth.
   let mirrored = new Set<string>();
   $effect(() => {
-    if (!uiPrefs.desktop || typeof Notification === "undefined" || Notification.permission !== "granted") return;
+    if (!canRaiseDesktopNotice()) return;
     for (const item of unread) {
       if (mirrored.has(item.notification_id)) continue;
       mirrored.add(item.notification_id);
-      try {
-        new Notification(item.title, { body: item.body });
-      } catch {
-        // Notification constructor unavailable (e.g. headless): in-app only.
-      }
+      raiseDesktopNotice({ title: item.title, body: item.body, tag: item.notification_id });
     }
   });
 </script>

@@ -38,6 +38,7 @@ import type {
   ConnectionsView,
   ConnectorStoreView,
   HostActionResult,
+  HostPathListing,
   HostStatusView,
   UpdateCheckResult,
   UpdateApplyResult,
@@ -137,16 +138,71 @@ import type { ApprovalMode } from "./approvalMode";
 // Bearer token held in memory only — never localStorage/sessionStorage (security requirement).
 let token: string | null = null;
 
+/**
+ * The CSRF token that pairs with the session cookie (BUG-253).
+ *
+ * The cookie is what makes a reload keep the session; it is also what creates a
+ * CSRF surface, because a browser attaches a cookie by itself and never
+ * attaches an `Authorization` header by itself. This value — handed back by the
+ * sign-in, and readable from Raiker's own cookie after a reload — is echoed in a
+ * header on every state-changing request, which is the half a cross-site page
+ * cannot produce. Holding it in a variable is not a secrecy claim: it is a
+ * convenience over re-reading the readable cookie on every call.
+ */
+let csrfToken: string | null = null;
+
 export function setToken(value: string | null): void {
   token = value;
 }
 
+export function setCsrfToken(value: string | null): void {
+  csrfToken = value;
+}
+
+/**
+ * Raiker's own readable CSRF cookie, for the case where a reload dropped it.
+ *
+ * Wrapped because reading `document.cookie` can throw — a document with an
+ * opaque origin, a browser configured to block site data, an embedding context
+ * with no cookie access. None of those are reasons to fail the request that was
+ * about to be sent: the correct answer to "can this be read?" is "no", and the
+ * server's own refusal is what governs the outcome.
+ */
+function csrfFromCookie(): string | null {
+  try {
+    if (typeof document === "undefined") return null;
+    const match = document.cookie.match(/(?:^|;\s*)raiker_csrf=([^;]*)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Whether this browser holds something that can authenticate.
+ *
+ * After a reload the in-memory bearer token is gone and the session cookie is
+ * `HttpOnly`, so it cannot be seen from here at all. The readable CSRF cookie is
+ * the observable half of the same sign-in, which is what makes it the right
+ * question to ask: the *authoritative* answer is still `/api/auth/whoami`.
+ */
 export function hasToken(): boolean {
-  return token !== null;
+  return token !== null || csrfToken !== null || csrfFromCookie() !== null;
 }
 
 export function getToken(): string | null {
   return token;
+}
+
+/** The auth headers for one request, whichever way this browser is signed in. */
+function authHeaders(headers: Headers, method: string | undefined): Headers {
+  if (token !== null) headers.set("Authorization", `Bearer ${token}`);
+  const verb = (method ?? "GET").toUpperCase();
+  if (verb !== "GET" && verb !== "HEAD" && verb !== "OPTIONS") {
+    const csrf = csrfToken ?? csrfFromCookie();
+    if (csrf !== null) headers.set("X-Raiker-CSRF", csrf);
+  }
+  return headers;
 }
 
 export class ApiError extends Error {
@@ -177,11 +233,11 @@ function reasonCodeFrom(body: unknown): string | null {
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const headers = new Headers(init.headers);
-  if (token !== null) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const resp = await fetch(instancePath(path), { ...init, headers });
+  const headers = authHeaders(new Headers(init.headers), init.method);
+  // `same-origin` so the session cookie rides along after a reload. It is not
+  // `include`: Raiker never calls another origin, and a cookie should not be
+  // offered to one.
+  const resp = await fetch(instancePath(path), { ...init, headers, credentials: "same-origin" });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -202,11 +258,8 @@ async function requestBlob(
   path: string,
   init: RequestInit = {},
 ): Promise<Blob> {
-  const headers = new Headers(init.headers);
-  if (token !== null) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
-  const resp = await fetch(instancePath(path), { ...init, headers });
+  const headers = authHeaders(new Headers(init.headers), init.method);
+  const resp = await fetch(instancePath(path), { ...init, headers, credentials: "same-origin" });
   if (!resp.ok) {
     let reasonCode: string | null = null;
     try {
@@ -253,10 +306,12 @@ function postJson<T>(path: string, body: unknown): Promise<T> {
 
 /** Mint a bearer token for the local owner principal and hold it in memory. */
 export async function connect(): Promise<AuthSession> {
-  const session = await postJson<AuthSession>("/api/auth/session", {
-    as_principal: null,
-  });
+  const session = await postJson<AuthSession & { csrf_token?: string | null }>(
+    "/api/auth/session",
+    { as_principal: null },
+  );
   setToken(session.token);
+  setCsrfToken(session.csrf_token ?? null);
   return session;
 }
 
@@ -306,14 +361,43 @@ export interface LoginResult {
   principal_id: string;
   token: string | null;
   ticket: string | null;
+  /** Pairs with the session cookie on every write (BUG-253). */
+  csrf_token?: string | null;
 }
 
-/** On a full 'session' result the bearer token is stored in memory. */
+/**
+ * On a full 'session' result the bearer token is stored in memory, and the CSRF
+ * token that guards the reload-surviving cookie is stored beside it.
+ */
 function adoptSession(result: LoginResult): LoginResult {
   if (result.stage === "session" && result.token) {
     setToken(result.token);
+    setCsrfToken(result.csrf_token ?? null);
   }
   return result;
+}
+
+/**
+ * Whether this browser is already signed in, from the server's point of view
+ * (BUG-253).
+ *
+ * After a reload there is no bearer token in memory and the session cookie is
+ * `HttpOnly`, so the only honest way to answer is to ask. A 401 here is not an
+ * error — it is the answer "nobody", and it is what puts the lock screen up.
+ */
+export async function restoreSession(): Promise<string | null> {
+  if (!hasToken()) return null;
+  try {
+    const who = await request<{ principal_id: string }>("/api/auth/whoami");
+    setCsrfToken(csrfFromCookie());
+    return who.principal_id;
+  } catch {
+    // A cookie that no longer authenticates is worse than none: it would make
+    // every later call fail with the owner looking at a workspace. Forget it.
+    setToken(null);
+    setCsrfToken(null);
+    return null;
+  }
 }
 
 export const auth = {
@@ -350,6 +434,7 @@ export const auth = {
       await postJson<{ ok: boolean }>("/api/auth/logout", {});
     } finally {
       setToken(null);
+      setCsrfToken(null);
     }
   },
   elevate: (password?: string, mfaCode?: string) =>
@@ -397,6 +482,7 @@ export interface SettingsView {
 }
 
 export const api = {
+  restoreSession,
   // ── The user guide, served from the install rather than a repository ──
   guide: () => request<GuideIndex>("/api/guide"),
   guideSection: (slug: string) =>
@@ -456,6 +542,13 @@ export const api = {
   // work is in flight, and the four actions the distribution design requires.
   // Quit and Restart report waiting work first and only stop once confirmed.
   host: () => request<HostStatusView>("/api/host"),
+  // BUG-251 — the host lists directory *names* so a field can offer Browse…
+  // instead of asking the owner to spell an absolute path. Names only; nothing
+  // here reads a file, and every approval path still governs what happens next.
+  hostPaths: (path: string, files = false) =>
+    request<HostPathListing>(
+      `/api/host/paths?path=${encodeURIComponent(path)}${files ? "&files=true" : ""}`,
+    ),
   pauseHost: (reason?: string) =>
     postJson<HostActionResult>("/api/host/pause", { reason: reason ?? null }),
   resumeHost: () => postJson<HostActionResult>("/api/host/resume", {}),
@@ -924,6 +1017,11 @@ export const api = {
     request<CodexSubscriptionStatus>("/api/models/chatgpt-codex/status"),
   startCodexSubscriptionLogin: () =>
     postJson<CodexSubscriptionStatus>("/api/models/chatgpt-codex/login", {}),
+  // BUG-259 — adopting the subscription is its own act. Reading the status no
+  // longer connects anything, so this is the only way a ChatGPT account becomes
+  // one of this owner's providers.
+  connectCodexSubscription: () =>
+    postJson<CodexSubscriptionStatus>("/api/models/chatgpt-codex/connection", {}),
   disconnectCodexSubscription: () =>
     request<{ ok: boolean; connection_configured: boolean }>(
       "/api/models/chatgpt-codex/connection",
@@ -2140,10 +2238,7 @@ async function streamSse(
   onEvent: (event: StreamEvent) => void,
   signal?: AbortSignal,
 ): Promise<void> {
-  const headers = new Headers({ "Content-Type": "application/json" });
-  if (token !== null) {
-    headers.set("Authorization", `Bearer ${token}`);
-  }
+  const headers = authHeaders(new Headers({ "Content-Type": "application/json" }), "POST");
   // Streaming routes go through `instancePath` like every other call, so a
   // dashboard served under /instances/<name> streams from its own instance
   // rather than the default workspace.
@@ -2151,6 +2246,7 @@ async function streamSse(
   const resp = await fetch(url, {
     method: "POST",
     headers,
+    credentials: "same-origin",
     ...(body === null ? {} : { body }),
     signal,
   });

@@ -37,19 +37,33 @@
   import { providerErrorGuidance } from "../providerErrors";
   import Icon from "./Icon.svelte";
   import ProviderLogo from "./ProviderLogo.svelte";
+  import AvailableModels from "../views/models/AvailableModels.svelte";
 
   let {
     profiles,
+    chatProfiles = [],
     onselected,
     onchanged,
   }: {
     /** Every profile the registry publishes, from `GET /api/models`. */
     profiles: ModelProfile[];
+    /**
+     * The models this owner already keeps offered, from the same snapshot
+     * (`chat_profiles`). Needed by the picker so its switches open showing what
+     * is actually on, rather than all-off (BUG-261). Empty is a safe default:
+     * the picker then opens with nothing selected, which is true of a provider
+     * nobody has chosen from yet.
+     */
+    chatProfiles?: ModelProfile[];
     /** A model was pinned to a profile; the caller decides what that means next. */
     onselected?: (profileId: string, model: string) => void;
     /** Something that changes the model view was saved. */
     onchanged?: () => void;
   } = $props();
+
+  /** The models kept offered for one profile, from the caller's snapshot. */
+  const availableFor = (profileId: string) =>
+    chatProfiles.filter((profile) => profile.profile_id === profileId).map((profile) => profile.model);
 
   /** Where a provider's key is issued. Shown as text, never fetched. */
   const KEY_SOURCE: Record<string, string> = {
@@ -268,23 +282,98 @@
     }
   }
 
+  /**
+   * Whether the local Codex client is signed in to a ChatGPT account that this
+   * owner has *not* adopted (BUG-259). The row offers it; it never takes it.
+   */
+  let subscriptionAvailable = $state(false);
+
+  /**
+   * The model picker, on the first-run screen too (BUG-261).
+   *
+   * Setup offered one dropdown per provider and the Models page offered a
+   * dialog with a search and a switch per model. The screen where an owner meets
+   * a four-hundred-model catalogue for the *first* time was the one with the
+   * weaker control, which is exactly backwards. It is the same component, so
+   * both screens gain anything either one learns.
+   */
+  let pickerFor = $state<Row | null>(null);
+
+  /**
+   * Install a local runtime from here (BUG-262). Setup could detect Ollama and
+   * LM Studio and, when neither was there, say so and stop — leaving an owner
+   * on the one screen whose whole job is "choose where Raiker thinks" with
+   * nothing to choose and nowhere to go. The download still comes from the
+   * vendor and Raiker still accepts nobody's terms.
+   */
+  async function openInstaller(row: Row, runtime: "ollama" | "lmstudio") {
+    busy = set(busy, row.profileId, "saving");
+    failure = drop(failure, row.profileId);
+    try {
+      const plan = await api.previewModelOperation("install", runtime);
+      const url = (plan as { source_url?: string }).source_url ?? "";
+      if (!url.startsWith("https://")) throw new Error("unsafe source");
+      window.open(url, "_blank", "noopener,noreferrer");
+      note = set(
+        note,
+        row.profileId,
+        `Opened the official ${row.label} download. Come back and press Detect once it is installed.`,
+      );
+    } catch {
+      failure = set(failure, row.profileId, "Could not open the reviewed vendor download.");
+    } finally {
+      busy = drop(busy, row.profileId);
+    }
+  }
+
+  /** True when this local runtime answered with nothing to offer. */
+  function needsInstall(row: Row): boolean {
+    if (row.provider !== "ollama" && row.provider !== "lm-studio") return false;
+    const list = catalogue[row.profileId];
+    return list !== undefined && list.models.length === 0;
+  }
+
   async function readSubscriptionStatus(row: Row, poll = false) {
     try {
       const status = await api.codexSubscriptionStatus();
       const connected = status.connection_status === "connected";
       stored = set(stored, row.profileId, connected);
+      subscriptionAvailable = status.connection_status === "available";
       subscriptionPlan = status.plan_type;
       if (connected) {
         note = set(note, row.profileId, "Reading available models…");
         await detect(row);
       } else if (status.connection_status === "codex_missing") {
         failure = set(failure, row.profileId, "Codex is not installed on this device.");
+      } else if (subscriptionAvailable && poll) {
+        // The owner pressed "Sign in with ChatGPT" and has now finished it in
+        // the browser, so adopting the account is what they asked for. Nothing
+        // adopts on a plain read — that is the whole point of BUG-259.
+        await connectSubscription(row);
       } else if (poll) {
         note = set(note, row.profileId, "Finish sign-in in the browser. Raiker will check again shortly.");
         loginPolling = setTimeout(() => void readSubscriptionStatus(row, true), 2000);
       }
     } catch {
       failure = set(failure, row.profileId, "The local Codex client could not report ChatGPT sign-in status.");
+    }
+  }
+
+  /** Adopt the account Codex is already signed in to — the owner's explicit act. */
+  async function connectSubscription(row: Row) {
+    busy = set(busy, row.profileId, "saving");
+    failure = drop(failure, row.profileId);
+    try {
+      const status = await api.connectCodexSubscription();
+      stored = set(stored, row.profileId, true);
+      subscriptionAvailable = false;
+      subscriptionPlan = status.plan_type;
+      note = set(note, row.profileId, "Reading available models…");
+      busy = drop(busy, row.profileId);
+      await detect(row);
+    } catch {
+      busy = drop(busy, row.profileId);
+      failure = set(failure, row.profileId, "That subscription could not be connected.");
     }
   }
 
@@ -378,15 +467,22 @@
     }
   }
 
-  /** Pin one concrete model to this profile. Enforced gate-manager-only server-side. */
-  async function pin(row: Row) {
-    const model = (choice[row.profileId] ?? "").trim();
+  /**
+   * Pin one concrete model to this profile. Enforced gate-manager-only
+   * server-side. The model is named by the caller now rather than read out of a
+   * dropdown, because there is no dropdown any more (BUG-264).
+   */
+  async function pin(row: Row, chosenModel: string) {
+    const model = chosenModel.trim();
     if (model === "") return;
     busy = set(busy, row.profileId, "pinning");
     failure = drop(failure, row.profileId);
     try {
       await api.selectModel(row.profileId, model);
-      note = set(note, row.profileId, `${modelName(model)} is now this provider's model.`);
+      // The row's own "Selected: …" line already names it, and saying the same
+      // model twice in two sentences is the kind of text this screen has least
+      // room for.
+      note = drop(note, row.profileId);
       onchanged?.();
       onselected?.(row.profileId, model);
     } catch (error) {
@@ -427,30 +523,7 @@
     }
   }
 
-  /**
-   * A catalogue past this many models gets a filter box above it.
-   *
-   * OpenRouter really does serve 413 models. A native `<select>` of that length is
-   * technically honest and practically unusable — the reference products that face
-   * the same list all put a search box over it — and the first-run wizard is the
-   * worst place to make someone scroll one. Below the threshold a filter is just a
-   * control in the way, so it is absent.
-   */
-  const FILTER_THRESHOLD = 12;
-  let filter = $state<Record<string, string>>({});
 
-  /** This row's catalogue, narrowed by whatever the owner typed. */
-  function visibleModels(row: Row): string[] {
-    const all = catalogue[row.profileId]?.models ?? [];
-    const needle = (filter[row.profileId] ?? "").trim().toLowerCase();
-    if (needle === "") return all;
-    // Matched against both the raw id and the displayed name: an owner reading
-    // "Sonnet 4.5" should not have to know it is `claude-sonnet-4-5-20250929`.
-    return all.filter(
-      (model) =>
-        model.toLowerCase().includes(needle) || modelName(model).toLowerCase().includes(needle),
-    );
-  }
 
   /** What a listing attempt actually found, in the row's own words. */
   function catalogueNote(row: Row, list: ProviderModelList): string {
@@ -464,10 +537,36 @@
       case "unsupported":
         return `${row.label} does not publish a model list. Type the exact model id instead.`;
       default:
-        return row.kind === "key"
-          ? `${row.label} could not be reached. Check the credential and this device's network access.`
-          : `${row.label} is not running on this device.`;
+        // BUG-257 — "could not be reached" was said about every failure,
+        // including a provider that answered perfectly well and rejected the
+        // key. Sending the owner to check their network for a credential
+        // problem is a wrong instruction, not a vague one, so each cause now
+        // names the thing to fix.
+        if (row.kind !== "key") return `${row.label} is not running on this device.`;
+        // A governed reason code carries the provider's own detail after a
+        // colon (`provider_auth_failed:http_401`), so the family is the prefix.
+        // Matching the whole string would silently fall through to the network
+        // sentence, which is the exact wrong instruction this fixes.
+        return keyFailureNote(row, list.reason_code);
     }
+  }
+
+  /** Why a stored key produced no catalogue, named so the fix is obvious. */
+  function keyFailureNote(row: Row, reasonCode: string | null): string {
+    const cause = (reasonCode ?? "").split(":")[0];
+    if (cause === "provider_auth_failed") {
+      return `${row.label} rejected this key. Check it, or paste a new one.`;
+    }
+    if (cause === "provider_rate_limited") {
+      return `${row.label} is rate-limiting this key right now. Try again shortly.`;
+    }
+    if (cause === "provider_quota_exhausted") {
+      return `${row.label} says this account is out of quota.`;
+    }
+    if (cause === "provider_timeout") {
+      return `${row.label} did not answer in time. Try again.`;
+    }
+    return `${row.label} could not be reached. Check this device's network access.`;
   }
 
   // Local runtimes are asked once on open: detection is the row's whole content,
@@ -571,39 +670,13 @@
               {busy[row.profileId] === "saving" ? "Saving…" : "Save endpoint"}
             </button>
           {/if}
-          {#if (catalogue[row.profileId]?.models.length ?? 0) > FILTER_THRESHOLD}
-            <label class="field filter-field">
-              <span class="sr-only">Filter {row.label} models</span>
-              <input
-                class="input"
-                type="search"
-                placeholder={`Filter ${catalogue[row.profileId].models.length} models`}
-                aria-label={`Filter ${row.label} models`}
-                bind:value={filter[row.profileId]}
-              />
-            </label>
+          <!-- BUG-264 — no dropdown. Choosing which models are kept and choosing
+               which one answers were two controls over the same list, and one of
+               them was a `<select>` of four hundred entries with no search. Both
+               questions are asked in the picker now, which has one. -->
+          {#if busy[row.profileId] === "detecting"}
+            <span class="row-note" role="status">Asking {row.label}…</span>
           {/if}
-          <label class="field">
-            <span class="sr-only">{row.label} model</span>
-            <select
-              class="select"
-              aria-label={`${row.label} model`}
-              bind:value={choice[row.profileId]}
-              disabled={visibleModels(row).length === 0}
-            >
-              {#if busy[row.profileId] === "detecting"}
-                <option value="">Asking {row.label}…</option>
-              {:else if (catalogue[row.profileId]?.models.length ?? 0) === 0}
-                <option value="">No model detected</option>
-              {:else if visibleModels(row).length === 0}
-                <option value="">No model matches that filter</option>
-              {:else}
-                {#each visibleModels(row) as model (model)}
-                  <option value={model}>{modelName(model)}</option>
-                {/each}
-              {/if}
-            </select>
-          </label>
           <button
             class="btn btn-ghost btn-sm"
             type="button"
@@ -612,14 +685,22 @@
           >
             <Icon name="refresh" size={14} /> Detect
           </button>
-          <button
-            class="btn btn-sm btn-primary"
-            type="button"
-            disabled={busy[row.profileId] !== undefined || !(choice[row.profileId] ?? "")}
-            onclick={() => void pin(row)}
-          >
-            {busy[row.profileId] === "pinning" ? "Selecting…" : "Use this model"}
-          </button>
+          {#if needsInstall(row)}
+            <!-- BUG-262 — a runtime that is not installed is the one case where
+                 "Detect" can never help. The download is the vendor's own. -->
+            <button
+              class="btn btn-sm btn-primary"
+              type="button"
+              disabled={busy[row.profileId] !== undefined}
+              onclick={() => void openInstaller(row, row.provider === "ollama" ? "ollama" : "lmstudio")}
+            >
+              {busy[row.profileId] === "saving" ? "Opening…" : `Install ${row.label}`}
+            </button>
+          {:else if (catalogue[row.profileId]?.models.length ?? 0) > 0}
+            <button class="btn btn-sm btn-primary" type="button" onclick={() => (pickerFor = row)}>
+              {row.pinned ? "Change model" : "Choose a model"}
+            </button>
+          {/if}
         {/if}
       </div>
 
@@ -652,20 +733,20 @@
               ? `${subscriptionPlan.charAt(0).toUpperCase()}${subscriptionPlan.slice(1)} connected`
               : "Connected"}
           </span>
-          <label class="field">
-            <span class="sr-only">{row.label} model</span>
-            <select class="select" aria-label={`${row.label} model`} bind:value={choice[row.profileId]} disabled={visibleModels(row).length === 0}>
-              {#if busy[row.profileId] === "detecting"}<option value="">Asking {row.label}…</option>
-              {:else if (catalogue[row.profileId]?.models.length ?? 0) === 0}<option value="">No model listed</option>
-              {:else}{#each visibleModels(row) as model (model)}<option value={model}>{modelName(model)}</option>{/each}{/if}
-            </select>
-          </label>
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void detect(row)}><Icon name="refresh" size={14} /> Refresh</button>
-          <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined || !(choice[row.profileId] ?? "")} onclick={() => void pin(row)}>{busy[row.profileId] === "pinning" ? "Selecting…" : "Use this model"}</button>
+          {#if (catalogue[row.profileId]?.models.length ?? 0) > 0}
+            <button class="btn btn-sm btn-primary" type="button" onclick={() => (pickerFor = row)}>{row.pinned ? "Change model" : "Choose a model"}</button>
+          {/if}
           <!-- Reachable while connected: an owner holding more than one ChatGPT
                plan has no other way to move Raiker between them. -->
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Switch account</button>
           <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void disconnectSubscription(row)}>Sign out</button>
+        {:else if subscriptionAvailable}
+          <!-- BUG-259 — Codex is signed in to somebody's ChatGPT account. That
+               is an offer, not a connection: a fresh Raiker on a shared machine
+               must not adopt an account nobody here chose. -->
+          <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void connectSubscription(row)}>{busy[row.profileId] === "saving" ? "Connecting…" : "Use this subscription"}</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>Use a different account</button>
         {:else}
           <button class="btn btn-sm btn-primary" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void startSubscriptionLogin(row)}>{busy[row.profileId] === "saving" ? "Opening sign-in…" : "Sign in with ChatGPT"}</button>
         {/if}
@@ -675,6 +756,7 @@
         {#if failure[row.profileId]}<span class="failed" role="alert">{failure[row.profileId]}</span>
         {:else if note[row.profileId]}<span role="status">{note[row.profileId]}</span>
         {:else if catalogue[row.profileId]}<span>{catalogueNote(row, catalogue[row.profileId])}</span>
+        {:else if subscriptionAvailable}<span>{subscriptionPlan ? `A ${subscriptionPlan} account is signed in to Codex on this device.` : "A ChatGPT account is signed in to Codex on this device."} Raiker will not use it until you say so.</span>
         {:else if !isConnected(row)}<span>Sign in with the ChatGPT subscription on this device.</span>{/if}
       </p>
     </article>
@@ -702,47 +784,13 @@
       <div class="controls">
         {#if isConnected(row)}
           <span class="stored"><Icon name="lock" size={13} /> Key stored</span>
-          {#if (catalogue[row.profileId]?.models.length ?? 0) > FILTER_THRESHOLD}
-            <label class="field filter-field">
-              <span class="sr-only">Filter {row.label} models</span>
-              <input
-                class="input"
-                type="search"
-                placeholder={`Filter ${catalogue[row.profileId].models.length} models`}
-                aria-label={`Filter ${row.label} models`}
-                bind:value={filter[row.profileId]}
-              />
-            </label>
+          {#if busy[row.profileId] === "detecting"}
+            <span class="row-note" role="status">Asking {row.label}…</span>
+          {:else if (catalogue[row.profileId]?.models.length ?? 0) > 0}
+            <button class="btn btn-sm btn-primary" type="button" onclick={() => (pickerFor = row)}>
+              {row.pinned ? "Change model" : "Choose a model"}
+            </button>
           {/if}
-          <label class="field">
-            <span class="sr-only">{row.label} model</span>
-            <select
-              class="select"
-              aria-label={`${row.label} model`}
-              bind:value={choice[row.profileId]}
-              disabled={visibleModels(row).length === 0}
-            >
-              {#if busy[row.profileId] === "detecting"}
-                <option value="">Asking {row.label}…</option>
-              {:else if (catalogue[row.profileId]?.models.length ?? 0) === 0}
-                <option value="">No model listed</option>
-              {:else if visibleModels(row).length === 0}
-                <option value="">No model matches that filter</option>
-              {:else}
-                {#each visibleModels(row) as model (model)}
-                  <option value={model}>{modelName(model)}</option>
-                {/each}
-              {/if}
-            </select>
-          </label>
-          <button
-            class="btn btn-sm btn-primary"
-            type="button"
-            disabled={busy[row.profileId] !== undefined || !(choice[row.profileId] ?? "")}
-            onclick={() => void pin(row)}
-          >
-            {busy[row.profileId] === "pinning" ? "Selecting…" : "Use this model"}
-          </button>
           <button
             class="btn btn-ghost btn-sm"
             type="button"
@@ -792,7 +840,63 @@
   {/each}
 </div>
 
+{#if pickerFor !== null}
+  <!-- BUG-261 — the same picker the Models page opens, on the screen where an
+       owner meets a catalogue for the first time. Its search and its per-model
+       switches are the component's, not a second copy of them. -->
+  {@const picked = pickerFor}
+  <dialog
+    class="picker-dialog"
+    open
+    aria-labelledby="matrix-picker-title"
+    onclick={(event) => { if (event.target === event.currentTarget) pickerFor = null; }}
+  >
+    <header>
+      <ProviderLogo provider={picked.provider} size={26} />
+      <h2 id="matrix-picker-title">{picked.label} models</h2>
+      <button type="button" class="close" aria-label="Close model picker" onclick={() => (pickerFor = null)}>×</button>
+    </header>
+    <AvailableModels
+      profileId={picked.profileId}
+      catalogue={catalogue[picked.profileId]?.models ?? []}
+      chosen={availableFor(picked.profileId)}
+      defaultModel={picked.pinned}
+      onuse={(model) => void pin(picked, model)}
+      onsaved={() => onchanged?.()}
+    />
+    <footer>
+      <button type="button" class="btn btn-ghost btn-sm" onclick={() => (pickerFor = null)}>Done</button>
+    </footer>
+  </dialog>
+{/if}
+
 <style>
+  .picker-dialog {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    width: min(28rem, calc(100vw - 2rem));
+    max-height: min(80vh, 34rem);
+    margin: auto;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: var(--space-3);
+    padding: var(--space-4);
+    border: 1px solid var(--border);
+    border-radius: var(--r-lg);
+    background: var(--surface);
+    color: var(--text-1);
+    box-shadow: var(--shadow-2);
+  }
+  .picker-dialog header { display: flex; align-items: center; gap: var(--space-2); }
+  .picker-dialog h2 { margin: 0; font-size: 1rem; }
+  .picker-dialog .close {
+    margin-left: auto;
+    border: 0; background: transparent; color: var(--text-3);
+    font-size: 1.2rem; line-height: 1; cursor: pointer; padding: 0.1rem 0.35rem;
+  }
+  .picker-dialog footer { display: flex; justify-content: flex-end; }
+
   .provider-matrix {
     display: grid;
     gap: var(--space-2);
@@ -866,9 +970,6 @@
   }
   /* Narrower than the picker it filters: the list is the answer, the filter is
      how you reach it. */
-  .filter-field {
-    flex: 0 1 9rem;
-  }
   .stored {
     display: inline-flex;
     align-items: center;

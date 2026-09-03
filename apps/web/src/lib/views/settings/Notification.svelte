@@ -27,7 +27,10 @@
     <input type="checkbox" checked={desktop} onchange={(e) => toggleDesktop(e.currentTarget.checked)} />
     Desktop alerts
   </label>
-  <p class="sub">Saved to your account and honored by the notification center.</p>
+  <p class="sub">
+    Desktop alerts appear only while Raiker is not the window you are looking at,
+    and cover approvals waiting on you.
+  </p>
 </section>
 
 <style>

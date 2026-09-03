@@ -109,6 +109,13 @@
   );
 
   onMount(() => {
+    // BUG-253 — a refresh used to land on the unlock screen, which is exactly
+    // what applying a UI change asks an owner to do. The session now rides in an
+    // HttpOnly cookie, so the question "is this browser still signed in?" has an
+    // answer, and only the server can give it.
+    void api.restoreSession().then((principalId) => {
+      if (principalId !== null) onAuthenticated(principalId);
+    });
     desktopNavigationOpen = localStorage.getItem("raiker.navigation.desktop") !== "false";
     const navigationQuery = typeof window.matchMedia === "function"
       ? window.matchMedia("(max-width: 1023px)")

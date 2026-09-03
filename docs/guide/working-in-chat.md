@@ -12,6 +12,8 @@ they live in **Sessions**, **Approvals**, and **Observability**.
 |---|---|---|
 | **Attach → Image…** | `Add attachment` | Upload `png`, `jpeg`, `webp`, `gif` for vision-capable models |
 | **Attach → Document…** | `Add attachment` | Upload `txt`, `md`, `csv`, `pdf`, `docx`, `xlsx`; text is extracted server-side |
+| **Attach → Browse…** | `Attachment path` | Pick a workspace file or folder instead of typing its path |
+| *(drop a file on the composer)* | — | Same import as the buttons, with the same checks. Works on the Chat and Build composers, the task composer, the document library, and a project's files |
 | **New chat** | — | Start a fresh conversation. Disabled while the current chat is still empty. |
 | **⋯** | `Conversation actions` | **Export conversation…** and **Print / Save as PDF**. Both are also in Build. |
 | **Model** | `Model for this turn: <name>` | Only *configured* profiles. No free-text model ids. The menu also carries **Effort** — this model's own thinking levels and a **Thinking** switch — when the model publishes any. |

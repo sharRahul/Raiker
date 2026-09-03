@@ -66,7 +66,12 @@ from raiker.execution.profiles import (
 )
 from raiker.memory.store import get_memory, list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
-from raiker.models.exceptions import ModelProviderError, ProviderPolicyError, safe_error
+from raiker.models.exceptions import (
+    ModelProviderError,
+    ProviderPolicyError,
+    provider_error_code,
+    safe_error,
+)
 from raiker.models.factory import ModelProviderFactory
 from raiker.models.policy_state import (
     HOSTED_MODEL_GATE,
@@ -7320,12 +7325,27 @@ class DashboardService:
                 models=(),
             )
         except ModelProviderError as exc:
-            unsupported = "unsupported" in str(exc)
+            # BUG-257 — every provider failure used to come back as
+            # `provider_unreachable`, which the Models page states as "could not
+            # be reached. Check the credential and this device's network
+            # access." A provider that answered 401 was reached perfectly well,
+            # and sending the owner to check their network for a key the
+            # provider rejected is the wrong instruction, not merely a vague
+            # one. The error classes already distinguish these; only this branch
+            # was flattening them.
+            if "unsupported" in str(exc):
+                return ProviderModelListView(
+                    profile_id=profile.profile_id,
+                    provider=profile.provider,
+                    status="unsupported",
+                    reason_code="model_listing_unsupported",
+                    models=(),
+                )
             return ProviderModelListView(
                 profile_id=profile.profile_id,
                 provider=profile.provider,
-                status="unsupported" if unsupported else "unavailable",
-                reason_code="model_listing_unsupported" if unsupported else "provider_unreachable",
+                status="unavailable",
+                reason_code=provider_error_code(exc),
                 models=(),
             )
         except Exception as exc:  # noqa: BLE001 — network/parse failures fail closed

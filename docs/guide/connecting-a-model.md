@@ -47,8 +47,10 @@ A successful profile carries a green **Ready** label, and the Models header says
 row per provider. The three local runtimes are *asked* what they are serving and
 offer the answer in a dropdown; a runtime that is not running says so. Every
 API-key provider takes its key inline and then lists **that provider's own**
-catalogue — a long one carries a filter — so a model can be connected and pinned
-without leaving the wizard.
+catalogue, so a model can be connected and chosen without leaving the wizard.
+Choosing happens in the model picker, which has a search: there is no dropdown
+to scroll. A local runtime that is not installed offers to open the vendor's own
+download instead of a control that could not work.
 
 ## Local discovery and acquisition
 
@@ -57,9 +59,13 @@ without leaving the wizard.
 - **LM Studio:** Raiker opens LM Studio's official download; Raiker does not
   redistribute it. Start the local server, then select an exact catalogue model.
 - **Existing GGUF files:** add an explicit folder under **Local library**.
-  Raiker scans only approved roots, does not follow escaping symlinks, reads a
-  bounded GGUF header, groups shards, and leaves original files in place.
-  **Deploy** starts managed loopback llama.cpp for a complete model.
+  **Browse** opens a folder picker served by the Raiker host — a browser cannot
+  produce an absolute path on its own — or type one if you prefer. It lists
+  directory *names* only and grants nothing; approving the folder is still the
+  separate act. Raiker scans only approved roots, does not follow escaping
+  symlinks, reads a bounded GGUF header, groups shards, and leaves original
+  files in place. **Deploy** starts managed loopback llama.cpp for a complete
+  model.
 - **Hugging Face:** search the Hub under **Discover**. Raiker shows immutable
   revision, files, size, format, licence and gated status; GGUF variants are
   preferred. Confirming a download writes a collision-safe snapshot beneath an
@@ -135,14 +141,23 @@ Raiker.
 
 * **Sign in with ChatGPT** starts the flow in Codex. If Codex is not installed,
   the card says so; Raiker does not download or install it for you.
+* **If Codex is already signed in, Raiker does not use that account until you
+  say so.** The card says an account is signed in on this device and offers
+  **Use this subscription** beside **Use a different account**. Reading the
+  status never connects anything — on a shared machine the account Codex holds
+  may not be yours.
 * Once connected the card names the plan — "ChatGPT Plus connected" — and keeps
   **Switch account** and **Sign out** available, so an owner with more than one
   plan can move between them.
-* **Select models…** lists what that subscription actually grants. Turn on as
-  many as you work with; each one appears in every model picker under **ChatGPT
-  subscription**.
-* Raiker does not read your plan's remaining usage. A limit is reported by the
-  provider when you reach it.
+* **Choose a model** opens the picker: a search over the whole catalogue, a
+  switch per model for what stays offered everywhere, and **Use** to make one
+  this provider's default. The current default is marked rather than offered
+  again.
+* Raiker shows how much of your plan's window is left **when the provider says
+  so as part of a turn** — ChatGPT reports a five-hour and a weekly window. It
+  is never polled from a portal and never estimated, so a provider that reports
+  nothing shows nothing. The figures appear on the provider card and in
+  **Observability → Activity**.
 
 ---
 

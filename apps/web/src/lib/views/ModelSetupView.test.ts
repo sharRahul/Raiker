@@ -121,16 +121,16 @@ describe("first-run setup", () => {
     for (const label of ["Ollama", "LM Studio", "Anthropic", "OpenRouter"]) {
       expect(screen.getByText(label)).toBeInTheDocument();
     }
-    const detected = await screen.findByLabelText("Ollama model");
-    await waitFor(() =>
-      expect([...detected.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
-        "Gemma 4:31B Cloud",
-        "Qwen 3:8B",
-      ]),
-    );
+    // BUG-264 — the row no longer carries a `<select>` of the catalogue. It
+    // reports what the runtime answered and opens the picker, which is the one
+    // place a model is chosen and the only one with a search.
+    const ollama = await screen.findByRole("group", { name: "Ollama" });
+    expect(await within(ollama).findByText(/2 models from Ollama/)).toBeInTheDocument();
+    expect(within(ollama).getByRole("button", { name: "Choose a model" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Ollama model")).not.toBeInTheDocument();
     // A runtime that is not running says so rather than offering a guess.
     expect(await screen.findByText(/LM Studio is not running on this device/)).toBeInTheDocument();
-    // A key-based provider has an input, not a dropdown, until a key is stored.
+    // A key-based provider has an input until a key is stored, and no picker.
     expect(screen.getByLabelText("Anthropic API key")).toBeInTheDocument();
     expect(screen.queryByLabelText("Anthropic model")).not.toBeInTheDocument();
   });
@@ -165,19 +165,19 @@ describe("first-run setup", () => {
     });
     await fireEvent.click(within(row).getByRole("button", { name: "Save and list models" }));
 
-    // The catalogue is the provider's own answer; no model name is invented.
-    const picker = await screen.findByLabelText("Anthropic model");
-    await waitFor(() =>
-      expect([...picker.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
-        "Opus 4.5",
-        "Haiku 4.5",
-      ]),
-    );
-    expect(screen.getByText(/Anthropic answered with 2 models/)).toBeInTheDocument();
+    expect(await screen.findByText(/Anthropic answered with 2 models/)).toBeInTheDocument();
     // The key's value never comes back — the row can only say one is stored.
     expect(screen.queryByLabelText("Anthropic API key")).not.toBeInTheDocument();
 
-    await fireEvent.click(within(row).getByRole("button", { name: "Use this model" }));
+    // BUG-264 — choosing happens in the picker, which is also where the search
+    // is. The catalogue is the provider's own answer; no model name is invented.
+    await fireEvent.click(within(row).getByRole("button", { name: "Choose a model" }));
+    const dialog = await screen.findByRole("dialog", { name: "Anthropic models" });
+    expect(
+      [...dialog.querySelectorAll(".name")].map((name) => name.textContent),
+    ).toEqual(["Opus 4.5", "Haiku 4.5"]);
+
+    await fireEvent.click(within(dialog).getAllByRole("button", { name: "Use" })[0]);
     await waitFor(() =>
       expect(
         fetchMock.mock.calls.some(
@@ -299,22 +299,20 @@ describe("first-run setup", () => {
     });
     await fireEvent.click(within(row).getByRole("button", { name: "Save and list models" }));
 
-    const filter = await within(row).findByLabelText("Filter OpenRouter models");
-    expect(filter).toHaveAttribute("placeholder", "Filter 40 models");
-    const picker = within(row).getByLabelText("OpenRouter model");
-    expect(picker.querySelectorAll("option")).toHaveLength(40);
+    // BUG-260/BUG-264 — the search is inside the picker, over the whole
+    // catalogue, instead of a filter field wedged beside a dropdown.
+    await fireEvent.click(await within(row).findByRole("button", { name: "Choose a model" }));
+    const dialog = await screen.findByRole("dialog", { name: "OpenRouter models" });
+    const search = within(dialog).getByLabelText("Search models");
+    expect(dialog.querySelectorAll(".name")).toHaveLength(40);
 
-    await fireEvent.input(filter, { target: { value: "model-7-" } });
-    await waitFor(() => expect(picker.querySelectorAll("option")).toHaveLength(1));
-    expect(picker).toHaveTextContent("Model 7 Instruct");
+    await fireEvent.input(search, { target: { value: "model-7-" } });
+    await waitFor(() => expect(dialog.querySelectorAll(".name")).toHaveLength(1));
+    expect(dialog).toHaveTextContent("Model 7 Instruct");
 
-    // A filter that matches nothing says so rather than presenting an empty picker.
-    await fireEvent.input(filter, { target: { value: "nothing-like-this" } });
-    await waitFor(() =>
-      expect(within(row).getByLabelText("OpenRouter model")).toHaveTextContent(
-        "No model matches that filter",
-      ),
-    );
+    // A search that matches nothing says so rather than showing an empty list.
+    await fireEvent.input(search, { target: { value: "nothing-like-this" } });
+    await waitFor(() => expect(dialog).toHaveTextContent(/No model matches/));
   });
 
   it("states the privacy boundary as an explicit choice", async () => {

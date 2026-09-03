@@ -100,7 +100,11 @@ export type IconName =
   // The neutral fallback. A tool with no family still renders as a tool, which
   // is the difference between "Raiker did something you cannot name" and the
   // silence BUG-206 was filed about.
-  | "tool";
+  | "tool"
+  // BUG-251 — "go up one folder" in the path picker. Its own glyph rather than a
+  // rotated `chevron-right`: a bare chevron beside a path reads as "expand this",
+  // and the folder is the half that says which direction is meant.
+  | "folder-up";
 
 // Each icon is one or more SVG path `d` strings (stroke, round caps).
 export const ICON_PATHS: Record<IconName, string[]> = {
@@ -201,6 +205,11 @@ export const ICON_PATHS: Record<IconName, string[]> = {
     "M17.5 10.5a5 5 0 0 1-5 5H6.5",
   ],
   folder: ["M3 6.5a1 1 0 0 1 1-1h4.5l2 2.5H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11Z"],
+  "folder-up": [
+    "M3 6.5a1 1 0 0 1 1-1h4.5l2 2.5H20a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-11Z",
+    "M12 17.5v-5",
+    "M9.5 14.5 12 12l2.5 2.5",
+  ],
   panel: ["M4 5h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z", "M15 5v14"],
   clock: ["M12 3.5a8.5 8.5 0 1 1 0 17 8.5 8.5 0 0 1 0-17Z", "M12 7.5V12l3 2"],
   circle: ["M12 4.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z"],

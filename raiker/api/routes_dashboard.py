@@ -43,6 +43,7 @@ from raiker.api.schemas import (
     TaskCreateRequest,
     serialize_dto,
 )
+from raiker.api.session_cookie import issue as issue_session_cookie
 from raiker.api.sessions import ApiSession
 from raiker.auth.vault_key_file import ensure_vault_key
 from raiker.control.dashboard import TASK_RECURRENCES, AuthSessionView, DashboardService
@@ -164,7 +165,9 @@ def revoke_session_command_grant(
 # must authenticate through /api/auth/login (+ MFA). This preserves the owner
 # bootstrap path without leaving an unauthenticated entry to a configured system.
 @router.post("/api/auth/session")
-async def mint_session(body: AuthSessionRequest, request: Request) -> dict[str, Any]:
+async def mint_session(
+    body: AuthSessionRequest, request: Request, response: Response
+) -> dict[str, Any]:
     from raiker.storage.sqlite import SQLiteStore
 
     _require_loopback(request)
@@ -181,7 +184,14 @@ async def mint_session(body: AuthSessionRequest, request: Request) -> dict[str, 
             status_code=status.HTTP_403_FORBIDDEN,
             detail={"ok": False, "reason_code": result.reason_code},
         )
-    return serialize_dto(result)
+    body_out = dict(serialize_dto(result))
+    # BUG-253 — the bootstrap path gets the same reload-surviving session the
+    # lock screen does. Without this, the one install that has no account yet is
+    # the one install where a refresh still loses the session.
+    token = body_out.get("token")
+    if isinstance(token, str) and token:
+        body_out["csrf_token"] = issue_session_cookie(request, response, token)
+    return body_out
 
 
 # ── Read-only governed views (Bearer required) ────────────────────────────────
@@ -1815,16 +1825,24 @@ CODEX_SUBSCRIPTION_PROFILE_ID = "chatgpt-codex-subscription"
 
 
 def _record_codex_connection(request: Request, principal_id: str, *, signed_in: bool) -> None:
-    """Mirror Codex's own sign-in state into Raiker's connection marker.
+    """Record — or clear — Raiker's marker that this owner adopted the subscription.
 
-    Signing in to ChatGPT through the local Codex client is the owner's
-    deliberate, authenticated act of connecting this provider — exactly what
-    saving an API key is for every other hosted profile. Recording it here is
-    what makes the subscription behave like one: it survives a reload, it is
-    what ``connection_configured`` reports, and it is the consent that
-    ``provider_runtime_policy_from_gates`` reads, so an owner who has signed in
-    is not then sent to Permissions to flip a second switch before the
-    subscription can list a model.
+    Signing in to ChatGPT through the local Codex client is a deliberate,
+    authenticated act, and recording it is what makes the subscription behave
+    like any other connected provider: it survives a reload, it is what
+    ``connection_configured`` reports, and it is the consent that
+    ``provider_runtime_policy_from_gates`` reads, so an owner who has connected
+    is not then sent to Permissions to flip a second switch.
+
+    **BUG-259 — it must not be called from a read.** It used to be, from
+    ``GET .../status``, and the consequence was that a brand-new Raiker on a
+    machine where somebody had once signed Codex in adopted that ChatGPT
+    account by itself: merely opening the setup page connected an identity
+    nobody had chosen, listed its models, and reported it as connected. A read
+    that performs a connection is exactly what "nothing is contacted until you
+    ask" exists to forbid, and adopting an account is worse than contacting a
+    host. Only the two explicit routes below reach this — the owner pressing
+    connect, or disconnect.
 
     The marker is the fact of the connection and nothing else. Access tokens,
     refresh tokens, verifiers, device codes and authorization URLs stay inside
@@ -1871,10 +1889,66 @@ async def get_chatgpt_codex_status(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={"reason_code": safe_error(str(exc))},
         ) from exc
-    _record_codex_connection(request, session.principal_id, signed_in=account.signed_in)
+    # BUG-259 — a read reports; it does not adopt. Three states, not two, because
+    # "Codex is signed in" and "this owner chose to use it" are different facts
+    # and collapsing them is what made a fresh install connect itself:
+    #
+    #   connected  — this owner has adopted the subscription.
+    #   available  — Codex is signed in, and nobody here has said to use it.
+    #   signed_out — Codex has no session to offer.
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    adopted = (
+        get_model_connection(store, session.principal_id, CODEX_SUBSCRIPTION_PROFILE_ID)
+        is not None
+    )
+    if adopted and not account.signed_in:
+        # The Codex session went away underneath a connection Raiker recorded.
+        # Leaving the marker would keep offering models nothing can serve.
+        _record_codex_connection(request, session.principal_id, signed_in=False)
+        adopted = False
+    if adopted:
+        connection_status = "connected"
+    elif account.signed_in:
+        connection_status = "available"
+    else:
+        connection_status = "signed_out"
     return {
-        "connection_status": "connected" if account.signed_in else "signed_out",
+        "connection_status": connection_status,
         "plan_type": account.plan_type,
+    }
+
+
+@router.post("/api/models/chatgpt-codex/connection")
+async def connect_chatgpt_codex(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Adopt the ChatGPT subscription the local Codex client is signed in to.
+
+    BUG-259 — the explicit act that ``GET .../status`` used to perform by
+    itself. It refuses when Codex has no session, because recording a connection
+    to an account that does not exist would put a provider in the pickers that
+    cannot answer anything.
+    """
+    session, _principal = auth_data
+    try:
+        account = await _codex_sessions(request).status(session.principal_id)
+    except ModelProviderError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"reason_code": safe_error(str(exc))},
+        ) from exc
+    if not account.signed_in:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"ok": False, "reason_code": "chatgpt_subscription_signed_out"},
+        )
+    _record_codex_connection(request, session.principal_id, signed_in=True)
+    return {
+        "ok": True,
+        "connection_status": "connected",
+        "plan_type": account.plan_type,
+        "connection_configured": True,
     }
 
 

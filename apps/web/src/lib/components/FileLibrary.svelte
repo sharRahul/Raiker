@@ -20,6 +20,7 @@
     ManagedFileScope,
     ManagedFileUpload,
   } from "../apiTypes";
+  import { createFileDrop } from "../fileDrop.svelte";
   import { api } from "../api";
   import Icon from "./Icon.svelte";
 
@@ -183,16 +184,12 @@
 
   // Dropping files on the library is the same import the buttons run; a
   // library with an obvious place to drop things does not need to be told
-  // where the button is.
-  let dragging = $state(false);
-
-  function onDrop(event: DragEvent) {
-    event.preventDefault();
-    dragging = false;
-    if (!ready || importing) return;
-    const dropped = event.dataTransfer?.files;
-    if (dropped && dropped.length > 0) void importFiles(dropped);
-  }
+  // where the button is. The target itself is shared with every other surface
+  // that accepts an upload (BUG-252) so the gesture behaves identically.
+  const drop = createFileDrop({
+    onFiles: (files) => void importFiles(files),
+    enabled: () => ready && !importing,
+  });
 
   const failures = $derived(
     lastResults.filter((result): result is Extract<ManagedFileImportResult, { ok: false }> => !result.ok),
@@ -206,14 +203,12 @@
 
 <section
   class="file-library"
-  class:dragging
+  class:drop-active={drop.over}
   aria-labelledby="file-library-heading"
-  ondragover={(event) => {
-    event.preventDefault();
-    dragging = true;
-  }}
-  ondragleave={() => (dragging = false)}
-  ondrop={onDrop}
+  ondragenter={drop.ondragenter}
+  ondragover={drop.ondragover}
+  ondragleave={drop.ondragleave}
+  ondrop={drop.ondrop}
 >
   <header class="library-head">
     <div>
@@ -269,7 +264,7 @@
   />
 
   <p class="import-status" role="status" aria-live="polite">
-    {#if importing}Importing…{:else if dragging}Drop to add{:else if importSummary}{importSummary}{/if}
+    {#if importing}Importing…{:else if drop.over}Drop to add{:else if importSummary}{importSummary}{/if}
   </p>
 
   {#if !ready}
@@ -334,11 +329,6 @@
 </section>
 
 <style>
-  .file-library.dragging {
-    outline: 2px dashed var(--accent-border);
-    outline-offset: 4px;
-  }
-
   .file-library { display: grid; gap: var(--space-3); }
   .library-head {
     display: flex;

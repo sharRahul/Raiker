@@ -1,16 +1,36 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import IdentityChip from "../components/IdentityChip.svelte";
   import PageState from "../components/PageState.svelte";
   import GuideLink from "../components/GuideLink.svelte";
+  import ProviderLogo from "../components/ProviderLogo.svelte";
+  import SubscriptionLimitStrip from "../components/SubscriptionLimitStrip.svelte";
   import { api, ApiError } from "../api";
-  import type { AuditExportView, EventEntry } from "../apiTypes";
-  import { humanize, relativeTime, shortId } from "../format";
+  import type { AuditExportView, EventEntry, ProviderWeeklyUsage } from "../apiTypes";
+  import { humanize, providerName, relativeTime, shortId } from "../format";
 
   let { sessionId = null }: { sessionId?: string | null } = $props();
   let events = $state<EventEntry[] | null>(null);
   let loadError = $state<string | null>(null);
+
+  // BUG-254 — a connected subscription states how much of its own window is
+  // left as part of a turn. Shown here because this is where an owner comes to
+  // ask "what is going on right now", and hitting a limit mid-turn is exactly
+  // the thing that page should have warned about. Only providers that actually
+  // volunteered a reading appear; the rest are silent by design.
+  let subscriptions = $state<ProviderWeeklyUsage[]>([]);
+
+  async function loadSubscriptions() {
+    try {
+      const usage = await api.weeklyModelUsage(false);
+      subscriptions = usage.providers.filter((row) => Boolean(row.subscription));
+    } catch {
+      // A usage read that fails costs this section and nothing else.
+      subscriptions = [];
+    }
+  }
 
   let sessionFilter = $state("");
   let typeFilter = $state("");
@@ -86,6 +106,8 @@
     sessionFilter = sessionId ?? "";
     void load();
   });
+
+  onMount(() => void loadSubscriptions());
 </script>
 
 <div class="head-row">
@@ -114,6 +136,19 @@
     </button>
   </div>
 </div>
+
+{#if subscriptions.length > 0}
+  <section class="subscriptions" aria-label="Subscription limits">
+    {#each subscriptions as row (row.profile_id)}
+      {#if row.subscription}
+        <article class="subscription">
+          <span class="mark"><ProviderLogo provider={row.provider} size={18} /></span>
+          <SubscriptionLimitStrip limits={row.subscription} label={providerName(row.provider)} />
+        </article>
+      {/if}
+    {/each}
+  </section>
+{/if}
 
 {#if exportPanelOpen}
   <div class="card export-card" id="audit-export-panel">
@@ -232,6 +267,23 @@
 {/if}
 
 <style>
+  .subscriptions {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+    gap: var(--space-3);
+    margin-bottom: var(--space-3);
+  }
+  .subscription {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+  }
+  .subscription .mark { flex: none; display: inline-flex; }
+
   .head-actions {
     display: flex;
     gap: var(--space-2);

@@ -12,6 +12,7 @@
   import ComposerChips from "../components/ComposerChips.svelte";
   import GuideLink from "../components/GuideLink.svelte";
   import { createAttachmentStore, type ComposerAttachment } from "../composerAttachments.svelte";
+  import { createFileDrop } from "../fileDrop.svelte";
   import { api, ApiError } from "../api";
   import { rememberSurfaceModel, surfaceModel, type Surface } from "../surfaceModel.svelte";
   import { takeScheduleRequest } from "../scheduleHandoff";
@@ -44,6 +45,12 @@
   let modelProfile = $state("");
   let model = $state("");
   const attachStore = createAttachmentStore();
+  // A file dropped on the task composer rides with the task, exactly as if it
+  // had been picked from the attach panel (BUG-252).
+  const composerDrop = createFileDrop({
+    onFiles: (files) => void attachStore.acceptFiles(files),
+    enabled: () => !creating && !attachStore.full,
+  });
   const profiles = $derived(chatProfiles());
   // One composer creates both, and the cadence chips say which: a schedule
   // captures its model onto every future run, so it is worth remembering apart
@@ -276,11 +283,20 @@
   <header>  <GuideLink route="tasks" />
 <button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
 
-  <form class="card composer" onsubmit={(event) => { event.preventDefault(); void createTask(); }}>
+  <form
+    class="card composer"
+    class:drop-active={composerDrop.over}
+    ondragenter={composerDrop.ondragenter}
+    ondragover={composerDrop.ondragover}
+    ondragleave={composerDrop.ondragleave}
+    ondrop={composerDrop.ondrop}
+    onsubmit={(event) => { event.preventDefault(); void createTask(); }}
+  >
     <div class="composer-heading"><div><h3>Plan work</h3></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Once</button><button type="button" class="chip" aria-pressed={cadence === "routine"} onclick={() => cadence = "routine"}>Routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background</button></div></div>
     <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "routine" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
+    {#if composerDrop.over}<p class="drop-note" role="status">Drop to attach</p>{/if}
     <ComposerChips store={attachStore} disabled={creating} />
     <ComposerAttachPanel store={attachStore} disabled={creating} idPrefix="task" />
     <div class="fields"><label>Parent work<select class="select" aria-label="Parent work" bind:value={parentTaskId}><option value="">No parent — top-level work</option>{#each tasks ?? [] as task (task.task_id)}<option value={task.task_id}>{task.title}</option>{/each}</select></label><label>Priority<select class="select" aria-label="Priority" bind:value={priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label>{#if cadence === "routine"}<label>Repeat<select class="select" aria-label="Repeat" bind:value={routineEvery}>{#each AGENT_CADENCES.filter((option) => option.id !== "background") as option (option.id)}<option value={option.id}>{option.label}</option>{/each}</select></label>{/if}{#if wantsStartTime}<label>{cadence === "routine" ? "First run" : "Start time"}<input class="input" aria-label={cadence === "routine" ? "First run" : "Start time"} type="datetime-local" bind:value={scheduledAt} required /></label>{/if}</div>

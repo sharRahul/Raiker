@@ -26,11 +26,19 @@
   import { publishApprovalResolved, subscribeApprovalResolved } from "../approvalResume";
   import type { ApprovalView } from "../apiTypes";
   import { capabilityLabel } from "../capabilityModel";
+  import { raikerIsHidden, raiseDesktopNotice } from "../desktopNotice";
   import { humanize } from "../format";
   import Icon from "./Icon.svelte";
 
   /** How often pending approvals are re-read while the tab is visible. */
   const POLL_MS = 5000;
+  /**
+   * And while it is not (BUG-255). A hidden tab used to skip the read entirely,
+   * which is exactly when a background task raises the decision nobody is
+   * watching for. Slower rather than off: browsers throttle a hidden tab's
+   * timers anyway, and the answer only has to arrive before the owner does.
+   */
+  const HIDDEN_POLL_MS = 30000;
 
   let pending = $state<ApprovalView[]>([]);
   let deferred = $state<string[]>([]);
@@ -48,6 +56,7 @@
     if (!hasToken()) return;
     try {
       pending = await api.approvals("pending");
+      announce(pending);
     } catch {
       // A read that fails changes nothing on screen: the inbox is still there,
       // and the next tick tries again.
@@ -57,9 +66,44 @@
   function schedule() {
     if (timer !== null) clearTimeout(timer);
     timer = setTimeout(async () => {
-      if (typeof document === "undefined" || !document.hidden) await poll();
+      await poll();
       schedule();
-    }, POLL_MS);
+    }, raikerIsHidden() ? HIDDEN_POLL_MS : POLL_MS);
+  }
+
+  /**
+   * Announce a decision the owner cannot see, and only then (BUG-255). Every
+   * approval already exists in the inbox and in the card below; this adds the
+   * one thing neither can do, which is reach a window that is not on screen.
+   *
+   * Announced once per approval, so a decision that stays pending across polls
+   * does not re-alert. Deferring one with "Later" is the owner saying they know
+   * about it, so it is marked announced rather than raised again.
+   */
+  let announced = new Set<string>();
+
+  function announce(items: ApprovalView[]) {
+    if (!raikerIsHidden()) {
+      // Visible: nothing to announce, but record what the owner can see so
+      // hiding the tab afterwards does not alert about it.
+      for (const item of items) announced.add(item.approval_id);
+      return;
+    }
+    const fresh = items.filter((item) => !announced.has(item.approval_id));
+    if (fresh.length === 0) return;
+    for (const item of fresh) announced.add(item.approval_id);
+    const first = fresh[0];
+    raiseDesktopNotice({
+      title: "Raiker needs a decision",
+      body:
+        fresh.length === 1
+          ? `${humanize(first.tool_name)} — ${capabilityLabel(first.capability)}`
+          : `${humanize(first.tool_name)} and ${fresh.length - 1} more are waiting.`,
+      // One subject, one banner: a second pending approval replaces the first
+      // rather than stacking another notification on the owner's desktop.
+      tag: "raiker-approval",
+      route: "#/approvals",
+    });
   }
 
   async function decide(approve: boolean) {
@@ -97,6 +141,9 @@
   function later() {
     if (current === null) return;
     deferred = [...deferred, current.approval_id];
+    // Deferring is the owner saying they know about it. Nothing should tap them
+    // on the shoulder about it again.
+    announced.add(current.approval_id);
     failure = null;
   }
 
@@ -109,6 +156,16 @@
     schedule();
   });
 
+  // Coming back to the tab should not mean waiting out a slow tick: read now,
+  // and put the cadence back to the visible one.
+  function onVisibility() {
+    void poll();
+    schedule();
+  }
+  if (typeof document !== "undefined") {
+    document.addEventListener("visibilitychange", onVisibility);
+  }
+
   // A decision made in another tab removes this card without waiting for the
   // next poll.
   const unsubscribe = subscribeApprovalResolved((message) => {
@@ -117,6 +174,9 @@
 
   onDestroy(() => {
     if (timer !== null) clearTimeout(timer);
+    if (typeof document !== "undefined") {
+      document.removeEventListener("visibilitychange", onVisibility);
+    }
     unsubscribe();
   });
 </script>

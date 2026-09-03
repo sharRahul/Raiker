@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { modelName } from "./modelPresentation";
+import { chatCandidates, modelName } from "./modelPresentation";
 
 describe("modelName", () => {
   it("turns provider model identifiers into concise product names", () => {
@@ -24,5 +24,34 @@ describe("modelName", () => {
 
   it("keeps unrecognised identifiers readable without changing them at the API boundary", () => {
     expect(modelName("reasoning-model")).toBe("Reasoning Model");
+  });
+});
+
+describe("what a provider's catalogue can actually answer with (BUG-258)", () => {
+  it("leaves out the endpoint families that cannot serve a turn", () => {
+    expect(
+      chatCandidates([
+        "text-embedding-ada-002",
+        "whisper-1",
+        "tts-1",
+        "dall-e-3",
+        "omni-moderation-latest",
+        "gpt-4o",
+        "o3-mini",
+      ]),
+    ).toEqual(["gpt-4o", "o3-mini"]);
+  });
+
+  it("keeps anything the provider did not name as one of those families", () => {
+    // A rule written today must not hide a chat model released tomorrow.
+    const models = ["some-new-frontier-model", "meta-llama/Llama-4-70B-Instruct"];
+    expect(chatCandidates(models)).toEqual(models);
+  });
+
+  it("does not empty a picker it cannot make sense of", () => {
+    // A provider whose whole catalogue looks like this is one this rule does
+    // not understand; offering too much beats offering nothing.
+    const models = ["text-embedding-3-large", "text-embedding-3-small"];
+    expect(chatCandidates(models)).toEqual(models);
   });
 });

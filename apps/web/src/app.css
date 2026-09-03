@@ -1309,3 +1309,21 @@ code,
   width: 1.5rem;
   height: 1.5rem;
 }
+
+/* ── Drop targets (BUG-252) ──
+   Every surface that accepts an upload accepts a dropped file, and says so the
+   same way: a dashed accent outline while a file is over it. One rule rather
+   than one per surface, because a gesture that looks different in each place
+   reads as a different gesture. The outline is drawn outside the box so it
+   never reflows the contents mid-drag. */
+.drop-active {
+  outline: 2px dashed var(--accent-border);
+  outline-offset: 4px;
+  border-radius: var(--r-md);
+}
+/* The one line a drop target says for itself. Placed by the surface, not by
+   this rule, because only the surface knows where its own text belongs. */
+.drop-note {
+  color: var(--accent);
+  font-size: var(--text-xs);
+}

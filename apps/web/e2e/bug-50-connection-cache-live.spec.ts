@@ -47,7 +47,7 @@ import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
-import { hostedProviderCard, signInAsOwner } from "./hosted-provider";
+import { hostedProviderCard, keepOffered, offeredModelIds, openModelDialog, signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -202,15 +202,13 @@ test("a real hosted turn still answers on the host that served them", async () =
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
 
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  const reachable = await catalogue.isVisible({ timeout: 60_000 }).catch(() => false);
+  const dialog = await openModelDialog(page, card);
+  const offered = await offeredModelIds(dialog);
   // A credential the provider itself rejects is not a finding about this host.
   // The product says so on the card; the turn below simply cannot be driven.
-  test.skip(!reachable, "the provider rejected this credential — no live catalogue");
+  test.skip(offered.length === 0, "the provider rejected this credential — no live catalogue");
 
-  await catalogue.selectOption(MODEL);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepOffered(dialog, MODEL);
   await expect(card.locator("code").filter({ hasText: /Haiku 4\.5/i })).toBeVisible({
     timeout: 30_000,
   });

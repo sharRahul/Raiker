@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
@@ -25,16 +25,11 @@ async function connectProvider(provider: string, keyLabel: string, key: string) 
 }
 
 async function chooseFirstModel(card: ReturnType<Page["locator"]>, preferred?: string) {
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  const values = await catalogue.locator("option").evaluateAll((options) =>
-    options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
-  );
+  const dialog = await openModelDialog(page, card);
+  const values = await offeredModelIds(dialog);
   const model = preferred && values.includes(preferred) ? preferred : values[0];
   expect(model, "provider returned at least one selectable model").toBeTruthy();
-  await catalogue.selectOption(model);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepOffered(dialog, model);
 }
 
 async function runTurn(marker: string) {
@@ -90,11 +85,7 @@ test("Ollama gemma4:31b-cloud answers a real turn", async () => {
   test.setTimeout(360_000);
   await page.goto(`${BASE}/#/models`);
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });
-  await ollama.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = ollama.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption("gemma4:31b-cloud");
-  await ollama.getByRole("button", { name: "Use model" }).click();
+  await keepModelAvailable(page, ollama, "gemma4:31b-cloud");
   await runTurn("ADD01 OLLAMA LIVE");
   await capture(page, join(SHOTS, "add01-ollama-turn-live.png"));
 });

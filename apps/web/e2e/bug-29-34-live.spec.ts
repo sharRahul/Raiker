@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, hostedProviderCard, keepModelAvailable } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -43,11 +43,7 @@ test("BUG-29 through BUG-34 live product review", async ({ page, request }) => {
 
   const ollama = page.locator(".local-row").filter({ hasText: "Ollama" });
   if (!(await ollama.getByText("selected", { exact: true }).isVisible())) {
-    await ollama.getByRole("button", { name: /Choose model/ }).click();
-    const available = ollama.getByLabel("Available models");
-    await expect(available).toBeVisible({ timeout: 30_000 });
-    await available.selectOption("gemma4:31b-cloud");
-    await ollama.getByRole("button", { name: "Use model" }).click();
+    await keepModelAvailable(page, ollama, "gemma4:31b-cloud");
   }
   await expect(ollama.getByText(/Gemma 4:31B Cloud/)).toBeVisible({ timeout: 20_000 });
 

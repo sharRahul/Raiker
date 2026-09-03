@@ -12,7 +12,7 @@
  */
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { join } from "node:path";
-import { dismissFirstRunModelSetup, hostedProviderCard, OWNER_CREDENTIALS, useHostedModel } from "./hosted-provider";
+import { OWNER_CREDENTIALS, dismissFirstRunModelSetup, hostedProviderCard, keepModelAvailable, useHostedModel } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
@@ -101,11 +101,7 @@ async function chooseOllama(model: string): Promise<void> {
   await page.goto(`${BASE}/#/models?tab=local`);
   const row = page.locator(".local-row").filter({ hasText: "Ollama" });
   await expect(row).toBeVisible({ timeout: 30_000 });
-  await row.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = row.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption(model);
-  await row.getByRole("button", { name: "Use model" }).click();
+  await keepModelAvailable(page, row, model);
   const pinned = page.locator(".local-row").filter({ hasText: "Ollama" });
   await pinned.getByRole("button", { name: "Test", exact: true }).click();
   await expect(pinned.getByText(/can reach/i)).toBeVisible({ timeout: 120_000 });

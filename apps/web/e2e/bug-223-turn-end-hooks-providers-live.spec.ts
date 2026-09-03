@@ -21,7 +21,7 @@ import { expect, test, type Browser, type BrowserContext, type Page } from "@pla
 import { capture } from "./capture";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { keepModelAvailable, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -151,13 +151,9 @@ test("Stop fires on a turn answered by a local Ollama model", async () => {
   const select = row.getByRole("button", { name: "Select", exact: true });
   if (await select.isVisible().catch(() => false)) await select.click();
 
-  await row.getByRole("button", { name: /Choose model…|Change model…/ }).click();
   // The catalogue is what the daemon actually published. Falling back to the
   // free-text field would let this pass against a model Ollama does not have.
-  const catalogue = row.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption(model);
-  await row.getByRole("button", { name: "Use model" }).click();
+  await keepModelAvailable(page, row, model);
   await expect(row.locator("code")).toBeVisible({ timeout: 60_000 });
 
   await page.goto(`${BASE}/#/models?tab=local`);

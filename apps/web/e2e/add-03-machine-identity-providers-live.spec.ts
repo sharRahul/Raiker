@@ -1,7 +1,7 @@
 import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { hostedProviderCard, OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, hostedProviderCard, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
@@ -25,23 +25,17 @@ async function connectProvider(provider: string, keyLabel: string, key: string):
 }
 
 async function chooseModel(card: Locator, preferred?: string): Promise<void> {
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  const custom = card.getByLabel("Custom model name");
-  await expect(catalogue.or(custom)).toBeVisible({ timeout: 60_000 });
-  if (await custom.isVisible()) {
+  const dialog = await openModelDialog(page, card);
+  const values = await offeredModelIds(dialog);
+  if (values.length === 0) {
     expect(preferred, `${await card.innerText()} needs an explicit model id`).toBeTruthy();
-    await custom.fill(preferred!);
-    await card.getByRole("button", { name: "Use model" }).click();
+    await dialog.getByLabel("Custom model name").fill(preferred!);
+    await dialog.getByRole("button", { name: "Use model" }).click();
     return;
   }
-  const values = await catalogue.locator("option").evaluateAll((options) =>
-    options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
-  );
   const selected = preferred && values.includes(preferred) ? preferred : values[0];
   expect(selected, `${await card.innerText()} returned a selectable model`).toBeTruthy();
-  await catalogue.selectOption(selected);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepOffered(dialog, selected);
 }
 
 async function runAttributedTurn(marker: string, screenshotName: string): Promise<void> {

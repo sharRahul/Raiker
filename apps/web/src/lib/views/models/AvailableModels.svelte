@@ -57,6 +57,7 @@
       <label class="row">
         <input
           type="checkbox"
+          value={model}
           checked={selected.includes(model)}
           onchange={() => void toggle(model)}
         />

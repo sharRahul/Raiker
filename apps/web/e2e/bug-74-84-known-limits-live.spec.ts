@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { connectHostedProvider, signInAsOwner } from "./hosted-provider";
+import { connectHostedProvider, keepOffered, offeredModelIds, openModelDialog, signInAsOwner } from "./hosted-provider";
 
 /**
  * Live evidence for the 2026-08-10 round: FIXED-161 through FIXED-170.
@@ -153,18 +153,11 @@ test("the 2026-08-10 round's surfaces, live", async ({ page }) => {
   );
   await capture(page, join(SHOTS, "round0810-07-anthropic-connected.png"));
 
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  const values = await catalogue
-    .locator("option")
-    .evaluateAll((options) =>
-      options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
-    );
+  const dialog = await openModelDialog(page, card);
+  const values = await offeredModelIds(dialog);
   const preferred =
     values.find((value) => value.includes("haiku")) ?? values[0];
-  await catalogue.selectOption(preferred);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepOffered(dialog, preferred);
 
   // FIXED-169 — the chip names when the check was last confirmed. Pinning a
   // model is a *preference*; the exact-model check is what makes it ready, and

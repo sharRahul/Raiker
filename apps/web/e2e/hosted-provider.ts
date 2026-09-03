@@ -197,6 +197,56 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
   ).toBeVisible({ timeout: 120_000 });
 }
 
+/**
+ * Open a provider's model dialog and hand back the dialog itself.
+ *
+ * The dialog is mounted at the page root rather than inside the card, so a
+ * spec that scoped its query to the card found nothing once the inline picker
+ * became a dialog.
+ */
+export async function openModelDialog(page: Page, card: Locator): Promise<Locator> {
+  await card
+    .getByRole("button", { name: /Select models|Choose model|Change model/ })
+    .click();
+  const dialog = page.getByRole("dialog", { name: /models/i });
+  await expect(dialog).toBeVisible({ timeout: 60_000 });
+  return dialog;
+}
+
+/** Every model id this provider published, in the order it published them. */
+export async function offeredModelIds(dialog: Locator): Promise<string[]> {
+  return dialog
+    .locator('input[type="checkbox"]')
+    .evaluateAll((boxes) =>
+      boxes.map((box) => (box as HTMLInputElement).value).filter(Boolean),
+    );
+}
+
+/** Turn one model's switch on, if it is not already on, and close the dialog. */
+export async function keepOffered(dialog: Locator, model: string): Promise<void> {
+  const box = dialog.locator(`input[type="checkbox"][value="${model}"]`);
+  await expect(box).toBeAttached({ timeout: 30_000 });
+  if (!(await box.isChecked())) await box.click();
+  await expect(box).toBeChecked({ timeout: 30_000 });
+  await dialog.getByRole("button", { name: "Done" }).click();
+  await expect(dialog).toBeHidden({ timeout: 30_000 });
+}
+
+/**
+ * Keep one exact model offered by this provider.
+ *
+ * Choosing models is a dialog of switches rather than a select-and-confirm
+ * inside the card: each switch is the whole decision, and the switch carries
+ * the model id so a spec never has to know how a display name is derived.
+ */
+export async function keepModelAvailable(
+  page: Page,
+  card: Locator,
+  model: string,
+): Promise<void> {
+  await keepOffered(await openModelDialog(page, card), model);
+}
+
 /** Connect a provider, pin an exact model, and leave it ready to answer a turn. */
 export async function useHostedModel(
   page: Page,
@@ -210,11 +260,7 @@ export async function useHostedModel(
     options.keyLabel,
     options.key,
   );
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption(options.model);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepModelAvailable(page, card, options.model);
   await expect(card.locator("code")).toBeVisible({ timeout: 30_000 });
   // Reload before checking. **Test** probes the model the card was rendered
   // with, and the card the picker just closed still holds the profile as it was

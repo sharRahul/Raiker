@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
 
 /**
  * What the **Test** control on a hosted provider card actually does.
@@ -66,19 +66,13 @@ test("Test on a connected provider card resolves the pinned model's readiness", 
     await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 120_000 });
   }
 
-  const pick = card.getByRole("button", { name: /Choose model|Change model/ });
-  await pick.click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 120_000 });
-  const values = await catalogue
-    .locator("option")
-    .evaluateAll((n) => n.map((o) => (o as HTMLOptionElement).value));
+  const dialog = await openModelDialog(page, card);
+  const values = await offeredModelIds(dialog);
   console.log("CATALOGUE:", JSON.stringify(values));
   const model = values.includes("claude-haiku-4-5-20251001")
     ? "claude-haiku-4-5-20251001"
     : values.find((v) => v.length > 0)!;
-  await catalogue.selectOption(model);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepOffered(dialog, model);
   console.log("PINNED:", model);
 
   await page.goto(`${BASE}/#/models?tab=hosted`);

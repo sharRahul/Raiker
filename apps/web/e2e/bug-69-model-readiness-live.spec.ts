@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
 
 /**
  * BUG-69's live evidence, runnable with **one** provider key (BUG-84).
@@ -93,27 +93,20 @@ async function connectProvider(page: Page, leg: ProviderLeg): Promise<Locator> {
 }
 
 async function chooseModel(card: Locator, preferred?: string) {
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  const custom = card.getByLabel("Custom model name");
-  await expect(catalogue.or(custom)).toBeVisible({ timeout: 60_000 });
-  if (await catalogue.isVisible()) {
-    const values = await catalogue
-      .locator("option")
-      .evaluateAll((options) =>
-        options
-          .map((option) => (option as HTMLOptionElement).value)
-          .filter(Boolean),
-      );
+  const dialog = await openModelDialog(page, card);
+  const custom = dialog.getByLabel("Custom model name");
+  const values = await offeredModelIds(dialog);
+  if (values.length > 0) {
     const choice =
       preferred && values.includes(preferred) ? preferred : values[0];
     expect(choice).toBeTruthy();
-    await catalogue.selectOption(choice);
-  } else {
-    expect(preferred, "provide an exact fallback model id").toBeTruthy();
-    await custom.fill(preferred!);
+    await keepOffered(dialog, choice);
+    return;
   }
-  await card.getByRole("button", { name: "Use model" }).click();
+  // No catalogue: the dialog degrades to a typed model id.
+  expect(preferred, "provide an exact fallback model id").toBeTruthy();
+  await custom.fill(preferred!);
+  await dialog.getByRole("button", { name: "Use model" }).click();
 }
 
 /**

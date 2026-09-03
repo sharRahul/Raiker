@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { OWNER_CREDENTIALS, keepOffered, offeredModelIds, openModelDialog } from "./hosted-provider";
 
 /**
  * One owner, four backends, through the product's own surfaces.
@@ -138,33 +138,27 @@ test("owner registers and every backend reaches a classified readiness state", a
     const dom = await page.content();
     expect(dom.includes(leg.key)).toBe(false);
 
-    await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-    const catalogue = card.getByLabel("Available models");
-    const unreachable = card.getByText(/Provider unreachable/i);
-    await expect(catalogue.or(unreachable).first()).toBeVisible({ timeout: 120_000 });
+    const dialog = await openModelDialog(page, card);
+    const offered = await offeredModelIds(dialog);
 
     // A provider whose catalogue cannot be fetched is one of this suite's
     // outcomes, not a failure of it: the card degrades to a typed model id and
     // says why. Record the state and move to the next leg rather than asserting
     // a catalogue the network never allowed.
-    if (!(await catalogue.isVisible().catch(() => false))) {
+    if (offered.length === 0) {
       const status = (await card.innerText()).replace(/\s+/g, " ");
       verdicts.push(`${leg.provider}: catalogue unreachable — card reads "${status.slice(0, 160)}"`);
       expect(status).not.toMatch(/\bConnected\b/);
       await capture(page, join(SHOTS, `review-02-${leg.provider.toLowerCase()}-unreachable.png`));
+      await dialog.getByRole("button", { name: /Done|Cancel/ }).click();
       continue;
     }
-    const options = await catalogue.locator("option").allTextContents();
-    const values = await catalogue.locator("option").evaluateAll((nodes) =>
-      nodes.map((node) => (node as HTMLOptionElement).value),
-    );
-    const chosen = values.includes(leg.model) ? leg.model : values.find((v) => v.length > 0);
+    const options = await dialog.locator(".name").allTextContents();
+    const chosen = offered.includes(leg.model) ? leg.model : offered[0];
     expect(chosen, `${leg.provider} returned an empty catalogue`).toBeTruthy();
-    await catalogue.selectOption(chosen as string);
-    await card.getByRole("button", { name: "Use model" }).click();
-    // The picker overlays the card's own controls; clicking Test while it is
-    // still open tests the card as it was before the pin.
-    await expect(catalogue).toBeHidden({ timeout: 60_000 });
+    // keepOffered closes the dialog, so the card's own controls are reachable
+    // again before Test is pressed.
+    await keepOffered(dialog, chosen);
 
     await openHosted(page);
     const pinned = page

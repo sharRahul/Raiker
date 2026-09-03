@@ -22,7 +22,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { checkModelReady, hostedProviderCard, signInAsOwner } from "./hosted-provider";
+import { checkModelReady, hostedProviderCard, keepModelAvailable, signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -71,11 +71,7 @@ test("the batching model is connected through the product UI", async () => {
   await page.locator(".signin-connect").click();
   await expect(card.getByText("Connection saved")).toBeVisible({ timeout: 60_000 });
 
-  await card.getByRole("button", { name: /Choose model|Change model/ }).click();
-  const catalogue = card.getByLabel("Available models");
-  await expect(catalogue).toBeVisible({ timeout: 60_000 });
-  await catalogue.selectOption(MODEL);
-  await card.getByRole("button", { name: "Use model" }).click();
+  await keepModelAvailable(page, card, MODEL);
   // The card shows the pinned model in its display form, not its raw identifier.
   await expect(card.locator("code").filter({ hasText: /Raiker Batch Stub/i })).toBeVisible({
     timeout: 30_000,

@@ -1095,7 +1095,7 @@ assertion-only breakpoint coverage at 768/834, 1024, and 1440; left/right rail s
 combinations; independent scrolling; focus trap/restoration; reduced motion;
 keyboard-only reveal; no horizontal overflow; token-value assertions; contrast
 checks; and zero console errors. The current 208-image catalogue is documented
-under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2026-08-28).
+under [`screenshots/`](screenshots/README.md#current-adaptive-shell-catalogue--2026-09-03).
 
 ---
 

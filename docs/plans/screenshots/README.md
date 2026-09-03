@@ -12,13 +12,19 @@ evidence those write-ups point at.
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
 
-## Current adaptive-shell catalogue — 2026-08-28
+## Current adaptive-shell catalogue — 2026-09-03
 
-The mutable `pages/` catalogue contains 208 viewport-only PNG files:
+The mutable `pages/` catalogue contains 216 viewport-only PNG files:
 
 ```text
-26 route/tab states × 4 display classes × 2 themes = 208
+27 route/tab states × 4 display classes × 2 themes = 216
 ```
+
+Beside them sit 25 unprefixed captures (`01-workbench.png` … `25-settings.png`)
+written by [`all-pages-live.spec.ts`](../../../apps/web/e2e/all-pages-live.spec.ts),
+which is a different sweep with a different question: one width, every route, and
+whether the console stayed clean. They are named for their own scheme so the two
+sets cannot be mistaken for each other.
 
 | Prefix | Viewport | Purpose |
 |---|---:|---|

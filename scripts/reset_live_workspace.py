@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: Apache-2.0
 """Start a live round on a genuinely empty workspace, or refuse to start one.
 
 BUG-266. A round was reset by stopping ``raiker-web`` and running ``rm -rf`` on

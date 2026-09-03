@@ -166,18 +166,19 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await expect(build).toHaveValue("keep this");
   await capture(page, join(shots, "voice-build-desktop.png"));
 
-  // Speech moved out of General into its own section when it gained a runtime
-  // to configure (BUG-256). The language is still a queued settings write; what
-  // changed is where the control lives and what sits beside it.
-  await page.goto("http://raiker.test/#/settings?tab=voice");
-  await expect(page.getByText("Dictation uses your browser's speech service.")).toBeVisible();
+  // Speech language is a queued settings write in General. BUG-256 added a
+  // runtime, not a preference: there is no Voice section and nothing asks the
+  // owner where audio should be transcribed, so General is the only place this
+  // control has ever lived.
+  await page.goto("http://raiker.test/#/settings?tab=general");
+  await expect(page.getByRole("button", { name: "Voice" })).toHaveCount(0);
   await page.getByLabel("Speech language").selectOption("ja");
   await capture(page, join(shots, "voice-settings.png"));
   await Promise.all([
     page.waitForRequest((request) => request.method() === "PUT" && new URL(request.url()).pathname === "/api/settings"),
     page.getByRole("button", { name: /save changes/i }).click(),
   ]);
-  await page.goto("http://raiker.test/#/settings?tab=voice");
+  await page.goto("http://raiker.test/#/settings?tab=general");
   await expect(page.getByLabel("Speech language")).toHaveValue("ja");
 
   await page.setViewportSize({ width: 390, height: 844 });

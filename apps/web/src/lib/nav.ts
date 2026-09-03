@@ -62,10 +62,12 @@ export const HUB_TABS: Record<string, string[]> = {
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
   // page. `web-access` and `git-credential` were in exactly that state before
-  // `privacy` joined them.
+  // `privacy` joined them, and `updates` still was until the sweep that added
+  // `voice` checked the whole list against the rail rather than one new entry.
   settings: [
     "general",
     "notification",
+    "voice",
     "personalisation",
     "security",
     "privacy",
@@ -73,6 +75,7 @@ export const HUB_TABS: Record<string, string[]> = {
     "web-access",
     "git-credential",
     "runtime",
+    "updates",
   ],
 };
 

@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-03 | Targeted + full responsive sweep | `bug-256-`, `pages/` | Anthropic, key entered through the interface | Dictation running with nothing leaving the machine, a locked load that refuses nothing, and every page measured at four widths in both themes |
 | 2026-08-30 | Targeted + measured responsive sweep | `b13-`, `bug-239-`, `bug-245-`, `ui-sweep-` | Anthropic (`claude-haiku-4-5-20251001`), key entered through the interface | The repository on screen in Build, Permissions telling the truth about an untouched gate, a cited exchange that opens — and every route *measured* at three widths rather than photographed |
 | 2026-08-29 | Targeted | `bug-244-`, `bug-246-` | — (no model needed) | An import that says what is already stored before it writes, and the authority matrix readable at a phone width |
 | 2026-08-29 | Targeted + full responsive audit | `b18-`, `mem08-` | Anthropic | Rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, and every route measured at four widths |
@@ -609,6 +610,67 @@ spec that asserts an impossible state is worse than no spec.
 * This was a **targeted** round. The last full sweep remains 2026-08-08.
 
 ---
+
+## 2026-09-03 — the last surface that was not local, and a console that stays quiet
+
+**Tier: targeted, plus a measured responsive sweep.**
+Anthropic, connected through Models in the running app. Workspace: a fresh
+instance, reset with `scripts/reset_live_workspace.py` rather than `rm -rf` —
+the first round to use the checked reset it was closed with.
+
+### What it verified
+
+* **Dictation can run with nothing leaving the machine.** A transcription server
+  on loopback, configured on **Models → Local** beside the other local runtimes
+  and proved by asking it to transcribe generated silence. With a fake capture
+  device, the browser recorded, converted to 16 kHz mono WAV in the page, posted
+  the clip to Raiker, and the words arrived in the Chat draft from a service
+  Raiker reaches only because the owner pointed it there
+  (`bug-256-speech-runtime-models`, `bug-256-dictated-on-device`).
+* **The choice is the owner's, and the interface says which one is in use.**
+  **Settings → Voice** offers *Automatic*, *On this device* and *Browser
+  speech*; the note under the microphone changes with it, in place of the
+  sentence that always assumed the browser (`bug-256-voice-settings`).
+* **An address that is not on this machine is refused where it is typed** — a
+  hosted host and a private-network one both answered `speech_endpoint_not_local`
+  before anything was contacted.
+* **A locked load refuses nothing.** Every response before sign-in was watched:
+  no `401`, no console error. That is BUG-267's outcome stated as an assertion
+  rather than as an absence somebody has to notice.
+* **Every page, at four widths, in both themes.** The canonical sweep —
+  `ui-sweep-responsive-live.spec.ts` — over 27 route/tab states at 390, 1920,
+  3840 and 7680 in light and dark: no horizontal overflow, no icon rendering
+  without a glyph, no selected tab scrolled off its own strip, no control under
+  WCAG 2.2's 24px target, and no console error, across all eight passes. The
+  catalogue in [`screenshots/pages/`](screenshots/pages) was re-captured in full.
+
+### What it found
+
+**The microphone could never have worked in a served build.**
+`SecurityHeadersMiddleware` sent `Permissions-Policy: microphone=()`, and the web
+UI is served by the same app, so the header landed on the document carrying the
+control. A bare `()` denies the feature to *every* origin, including this one.
+Every previous voice round drove a Playwright recognition adapter injected into
+the page, which is why none of them touched the real capture path and none of
+them saw it. Closed in the round as
+[FIXED-363](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local);
+the header is now `microphone=(self)`.
+
+**A control under the minimum touch target, in the section this round added.**
+The Voice radios measured 13x24 on a phone. The sweep found it the same way it
+found FIXED-318: by measuring, because nothing about it looked wrong. The cause
+was a full-width rule meant for the address field, and then an `auto` that
+overrode the shell's own control sizing while undoing it.
+
+**Two more, both closed here:**
+
+* The Models speech row adopted its stored address unconditionally, so an owner
+  typing before the read resolved lost what they had typed — FIXED-85's defect in
+  a new place, found because the spec types faster than a person.
+* `#/settings?tab=updates` had always opened General. BUG-215 added a guard for
+  exactly that, but it compared the rail against a hand-copied third list which
+  carried the same omission. The rail now lives in one module and the guard reads
+  it.
 
 ## 2026-08-30 — the repository on screen, an honest gate, a citation that opens
 

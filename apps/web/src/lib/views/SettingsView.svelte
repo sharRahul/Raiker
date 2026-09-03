@@ -8,30 +8,17 @@
   import Personalisation from "./settings/Personalisation.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Privacy from "./settings/Privacy.svelte";
+  import Voice from "./settings/Voice.svelte";
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
   import GitCredential from "./settings/GitCredential.svelte";
   import Updates from "./settings/Updates.svelte";
   import Icon from "../components/Icon.svelte";
+  import { SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
 
   let { principal = "—", tab = "general" }: { principal?: string; tab?: string } = $props();
 
-  // Only sections the runtime actually backs. Voice, trusted-contact
-  // recovery, data-export tooling, and cloud/cache controls have no backend
-  // consumer, so they are not presented as settings at all.
-  const SECTIONS = [
-    { id: "general", label: "General", icon: "settings", group: "Personal" },
-    { id: "notification", label: "Notifications", icon: "bell", group: "Personal" },
-    { id: "personalisation", label: "Personalisation", icon: "spark", group: "Personal" },
-    { id: "security", label: "Security & sign-in", icon: "lock", group: "Personal" },
-    { id: "privacy", label: "Privacy", icon: "shield", group: "Personal" },
-    { id: "account", label: "Account", icon: "user", group: "Personal" },
-    { id: "web-access", label: "Web access", icon: "connections", group: "System" },
-    { id: "git-credential", label: "Git credential", icon: "branch", group: "System" },
-    { id: "runtime", label: "Runtime configuration", icon: "system", group: "System" },
-    { id: "updates", label: "Updates", icon: "refresh", group: "System" },
-  ] as const;
 
   let active = $derived<string>(SECTIONS.some((section) => section.id === tab) ? tab : "general");
   let settings = $state<Record<string, unknown>>({});
@@ -166,6 +153,8 @@
       <General {settings} {save} />
     {:else if active === "notification"}
       <Notification {settings} {save} />
+    {:else if active === "voice"}
+      <Voice {settings} {save} />
     {:else if active === "personalisation"}
       <Personalisation {settings} {save} />
     {:else if active === "security"}

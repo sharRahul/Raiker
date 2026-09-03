@@ -104,9 +104,9 @@ names.
 | [BUG-253](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-353)** — an HttpOnly session cookie with a double-submit CSRF token and an origin check |
 | [BUG-254](FIXED_ITEMS.md#fixed-354--a-subscriptions-own-usage-and-limits-were-not-shown) | Medium | Models / Observability | **Closed 2026-09-03 (FIXED-354)** — the limit windows a provider volunteers with a turn, and nothing when it volunteers none |
 | [BUG-255](FIXED_ITEMS.md#fixed-351--a-decision-raised-while-raiker-was-in-the-background-reached-nobody) | Low | Approvals / notifications | **Closed 2026-09-03 (FIXED-351)** — the already-permissioned browser notification, only while Raiker is not the visible window |
-| [BUG-256](#bug-256--dictation-sends-audio-to-the-browsers-speech-service) | Medium | Voice / privacy posture | Open — raised 2026-09-03. The one surface that is not local by default; needs a local speech runtime treated like any other local runtime |
-| [BUG-266](#bug-266--a-live-workspace-directory-cannot-be-deleted-while-the-host-holds-it) | Low | Live test harness / host lifecycle | Open — raised 2026-09-03; a reset that fails silently produces evidence about the wrong state |
-| [BUG-267](#bug-267--the-boot-session-probe-logs-a-401-to-the-console-on-every-locked-load) | Low | Authentication / web UI | Open — raised 2026-09-03 alongside FIXED-353 |
+| [BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local) | Medium | Voice / privacy posture | **Closed 2026-09-03 (FIXED-363)** — a speech runtime on this machine, and a security header that had been denying the microphone to Raiker's own page all along |
+| [BUG-266](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | **Closed 2026-09-03 (FIXED-364)** — the reset waits for the process, not the response, and reads the directory back |
+| [BUG-267](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | **Closed 2026-09-03 (FIXED-362)** — the boot question gets a route that answers it rather than refusing it |
 | [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
 | [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
 | [BUG-258](FIXED_ITEMS.md#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | **Closed 2026-09-03 (FIXED-356)** — the default was `text-embedding-ada-002` |
@@ -819,86 +819,28 @@ the window the owner is looking at.
 
 ## BUG-256 — Dictation sends audio to the browser's speech service
 
-**Severity: Medium. Area: voice / privacy posture. Status: Open — raised
-2026-09-03.**
-
-**Observed.** The microphone button in every composer uses the browser's own
-`SpeechRecognition`, and the control says so: "Raiker does not retain audio.
-Your browser's speech service may process audio externally." On Chrome that
-means the audio leaves the machine, which is the one thing a local-first
-product should not do silently for a control that looks like a local one.
-
-**Why this is worth closing.** Everything else in Raiker can be run entirely on
-this device — models, embeddings, indexes, storage. Speech is the last surface
-where the default quietly is not, and the alternative already exists as a small
-local binary.
-
-**Proposed fix.** A local speech-to-text runtime, treated exactly like a local
-model runtime rather than as a special case:
-
-1. A `whisper.cpp` (or equivalent) server the owner points Raiker at, detected
-   and configured on the Models page beside the other local runtimes, with the
-   same "nothing is contacted until you ask" rule.
-2. A **Voice** section in Settings choosing between *browser speech* (fast, off
-   device) and *local transcription* (on device), stating plainly what each one
-   does with the audio. The choice is the owner's; neither is forced.
-3. Capture in the composer posts the recorded audio to the local endpoint and
-   receives the transcript. Audio is never written to the workspace, and the
-   endpoint is subject to the same loopback and policy rules as any other local
-   runtime.
-
-**Required user-interface outcome.** The microphone can be made to work entirely
-on this machine, the setting says which of the two is in use, and the
-disclosure under the button matches the choice rather than assuming the browser.
+**Closed 2026-09-03 as
+[FIXED-363](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local).**
+A local speech-to-text runtime, configured beside the other local runtimes and
+chosen in **Settings → Voice**. Fixing it also uncovered that
+`Permissions-Policy: microphone=()` had been denying the microphone to Raiker's
+own page, so the control could never have worked in a served build.
 
 ---
 
 ## BUG-266 — A live workspace directory cannot be deleted while the host holds it
 
-**Severity: Low. Area: live test harness / host lifecycle. Status: Open — raised
-2026-09-03.**
-
-**Observed.** Resetting a live round by stopping `raiker-web` and removing its
-workspace directory left the directory in place on Windows: the SQLCipher file
-handle survives long enough that an immediate `rm -rf` silently fails, and the
-next run signs in against the *previous* round's account. The round then reports
-a first run that is not one — which is exactly how
-[FIXED-357](FIXED_ITEMS.md#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)
-nearly went unnoticed a second time.
-
-**Why it is a defect and not just an operator error.** A test harness whose reset
-can fail silently produces evidence about the wrong state, and every
-`FIXED_ITEMS` entry proved on a "fresh" workspace inherits that doubt.
-
-**Proposed fix.** The reset path should wait for the host to release the store —
-the process exit, not the HTTP response — and then verify the directory is gone
-rather than assuming it. A reset that cannot complete must fail loudly instead of
-leaving the previous round's data behind.
-
-**Required user-interface outcome.** None; this is harness behaviour. The
-outcome is that a live round either starts on a genuinely empty workspace or
-refuses to start.
+**Closed 2026-09-03 as
+[FIXED-364](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data).**
+`scripts/reset_live_workspace.py` waits for the process to exit, retries the
+removal, reads the directory back, and refuses the round if any of the three
+fails.
 
 ---
 
 ## BUG-267 — The boot session probe logs a 401 to the console on every locked load
 
-**Severity: Low. Area: authentication / web UI. Status: Open — raised
-2026-09-03, alongside
-[FIXED-353](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out).**
-
-**Observed.** `restoreSession` asks `GET /api/auth/whoami` on boot. When nobody
-is signed in the answer is `401`, which is correct and is handled — but the
-browser writes it to the console as a failed resource on every locked load.
-
-**Why it is worth closing.** The console is where a real fault is supposed to
-stand out. A 401 that is an expected answer, printed on every load, is the kind
-of routine noise that trains a reader to ignore the console.
-
-**Proposed fix.** Ask only when there is something to ask with — the readable
-CSRF cookie already tells the page whether a session plausibly exists, and
-`hasToken()` already consults it. The remaining case is a cookie that has
-expired server-side, which is the one time a 401 is genuinely informative.
-
-**Required user-interface outcome.** None visible. A locked load leaves a clean
-console.
+**Closed 2026-09-03 as
+[FIXED-362](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure).**
+`GET /api/auth/session-state` answers the page's boot question with `200` both
+ways, and clears the stale cookie so the next load does not ask at all.

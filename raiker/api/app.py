@@ -38,6 +38,7 @@ from raiker.api.routes_prompts import router as prompts_router
 from raiker.api.routes_settings import router as settings_router
 from raiker.api.routes_setup import router as setup_router
 from raiker.api.routes_skills import router as skills_router
+from raiker.api.routes_speech import router as speech_router
 from raiker.api.routes_tray import router as tray_router
 from raiker.api.routes_updates import router as updates_router
 from raiker.api.routes_vault import router as vault_router
@@ -48,6 +49,7 @@ from raiker.api.security import (
     StaticCacheMiddleware,
 )
 from raiker.control.knowledge_scope import MAX_KNOWLEDGE_UPLOAD_BYTES
+from raiker.models.speech_runtime import MAX_AUDIO_BYTES as MAX_SPEECH_AUDIO_BYTES
 from raiker.runtime.attachments import MAX_ATTACHMENT_BYTES
 from raiker.runtime.executors.registry import ExecutorRegistry
 from raiker.skills.package import MAX_BUNDLE_BYTES as MAX_SKILL_BUNDLE_BYTES
@@ -85,6 +87,12 @@ _REDACTION_EXEMPT_PATHS = frozenset(
         # leaking out of a payload, not to censor the owner's own directory
         # tree back to them.
         "/api/host/paths",
+        # BUG-256 — a dictated transcript, on its way back to the composer the
+        # owner dictated it into. It is their own words, produced by a runtime on
+        # their own machine, and it goes nowhere else. Passing it through the
+        # secret redactor could only turn a sentence into `[REDACTED_SECRET]` in
+        # their draft — the exact failure BUG-268 found on the folder picker.
+        "/api/speech/transcribe",
     }
 )
 
@@ -413,6 +421,10 @@ def create_app(
             # A Knowledge Map upload is one base64 text document, capped at the
             # service's own 5 MB before it is written anywhere.
             "/api/brain/sources/upload": (MAX_KNOWLEDGE_UPLOAD_BYTES * 4) // 3 + 4096,
+            # BUG-256 — one dictated clip, as raw 16 kHz mono PCM rather than
+            # base64, capped by the speech runtime's own limit. The default body
+            # size would have cut a dictation off after about thirty seconds.
+            "/api/speech/transcribe": MAX_SPEECH_AUDIO_BYTES + 8192,
         },
     )
     app.add_middleware(
@@ -426,6 +438,7 @@ def create_app(
     app.include_router(instances_router)
     app.include_router(vault_router)
     app.include_router(settings_router)
+    app.include_router(speech_router)
     app.include_router(control_router)
     app.include_router(host_router)
     app.include_router(updates_router)

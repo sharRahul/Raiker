@@ -69,6 +69,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `bug-256-`, refreshed `pages/` | **2026-09-03**, dictation transcribed by a runtime on this machine, the Voice section that chooses it, and a full responsive catalogue at 390/1920/3840/7680 in both themes | Anthropic, key entered through the interface; the transcription runtime is a loopback stand-in |
 | `bug-244-`, `bug-246-` | **2026-08-29**, an import that says what is already stored before it writes, and the delegated-authority verdicts readable at 390 px | none — neither scenario needs a model |
 | `b18-`, `mem08-` | **2026-08-29**, the rewind asked for at the turn that caused the change, a turn coordinate that opens the exchange, both at 1440 and 390 px — plus a measured audit of all thirty route and tab states at four widths | Anthropic (`claude-haiku-4-5-20251001`) |
 | `fixed-309-` … `fixed-312-`, `r0829-` | **2026-08-29**, Build's conversation surviving a reload, the memory integrity report reaching a page, recall named and correctable in the answer it shaped, an inline diff in Build, and a responsive sweep at 375/768/1024/1440 with zero console errors | Anthropic (`claude-haiku-4-5-20251001`) |

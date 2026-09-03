@@ -132,6 +132,9 @@ import type {
   ProjectBrowseView,
   ProjectRootIndexResult,
   ProjectRootStatus,
+  SpeechRuntimeChange,
+  SpeechRuntimeProbe,
+  SpeechRuntimeView,
 } from "./apiTypes";
 import type { ApprovalMode } from "./approvalMode";
 
@@ -184,7 +187,8 @@ function csrfFromCookie(): string | null {
  * After a reload the in-memory bearer token is gone and the session cookie is
  * `HttpOnly`, so it cannot be seen from here at all. The readable CSRF cookie is
  * the observable half of the same sign-in, which is what makes it the right
- * question to ask: the *authoritative* answer is still `/api/auth/whoami`.
+ * question to ask: the *authoritative* answer is still the server's, asked
+ * once on boot through `/api/auth/session-state`.
  */
 export function hasToken(): boolean {
   return token !== null || csrfToken !== null || csrfFromCookie() !== null;
@@ -382,13 +386,25 @@ function adoptSession(result: LoginResult): LoginResult {
  * (BUG-253).
  *
  * After a reload there is no bearer token in memory and the session cookie is
- * `HttpOnly`, so the only honest way to answer is to ask. A 401 here is not an
- * error — it is the answer "nobody", and it is what puts the lock screen up.
+ * `HttpOnly`, so the only honest way to answer is to ask. "Nobody" is one of the
+ * two expected answers, and it is what puts the lock screen up.
+ *
+ * It asks `/api/auth/session-state` rather than `/api/auth/whoami` (BUG-267). Both
+ * answer the same question; only one answers "nobody" with a `200`. Asking the
+ * governed route made the browser log a failed request on every locked load —
+ * routine noise in the one place a real fault is supposed to stand out.
  */
 export async function restoreSession(): Promise<string | null> {
   if (!hasToken()) return null;
   try {
-    const who = await request<{ principal_id: string }>("/api/auth/whoami");
+    const who = await request<{ principal_id: string | null }>("/api/auth/session-state");
+    if (who.principal_id === null) {
+      // The server has already cleared the cookie that said otherwise; drop the
+      // half this page was holding so the next load has nothing to ask with.
+      setToken(null);
+      setCsrfToken(null);
+      return null;
+    }
     setCsrfToken(csrfFromCookie());
     return who.principal_id;
   } catch {
@@ -509,6 +525,35 @@ export const api = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ settings }),
     }),
+  // ── Dictation's runtime (BUG-256) ──
+  // Reading contacts nothing. Probing contacts only the address the owner
+  // typed. Transcribing sends one clip and gets one transcript back; the audio
+  // is never written anywhere on either side of the call.
+  speechRuntime: () => request<SpeechRuntimeView>("/api/speech/runtime"),
+  saveSpeechRuntime: (change: SpeechRuntimeChange) =>
+    request<SpeechRuntimeView>("/api/speech/runtime", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(change),
+    }),
+  probeSpeechRuntime: (change: SpeechRuntimeChange = {}) =>
+    request<SpeechRuntimeProbe>("/api/speech/runtime/probe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(change),
+    }),
+  transcribeSpeech: (clip: Blob, language?: string) =>
+    request<{ text: string }>(
+      language && language !== "auto"
+        ? `/api/speech/transcribe?language=${encodeURIComponent(language)}`
+        : "/api/speech/transcribe",
+      {
+        method: "POST",
+        headers: { "Content-Type": clip.type || "audio/wav" },
+        body: clip,
+      },
+    ),
+
   vaultStatus: () => request<{ state: string }>("/api/vault/status"),
   setVaultKey: (key: string, mfaCode?: string) =>
     request<{ state: string }>("/api/vault/key", {

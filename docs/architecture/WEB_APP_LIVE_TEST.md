@@ -15,6 +15,36 @@ the model provider → the audit event log. It also exercises the two features i
 PR #106: the **user-owned fallback sequence** and **prompt caching + normalised
 cache-hit metrics**.
 
+## Result — 2026-09-03 (on-device dictation, the boot session probe, a three-width sweep)
+
+A workspace reset with `scripts/reset_live_workspace.py` — the checked reset
+BUG-266 asked for, not `rm -rf` — and a built SPA served by `raiker-web` on
+`127.0.0.1:8765`. The Anthropic key was entered through the Models reconnect
+dialog by the spec and appears in no command, document or screenshot. The
+transcription runtime was a stand-in HTTP server the spec starts on loopback:
+what is being proved is the path, and the words come from a service Raiker
+reaches only because the owner pointed it there.
+
+| Check | Result |
+|---|---|
+| A locked load makes no refused request | ✅ `ui-sweep-live.spec.ts` watched every response and asserted **no 401** and no console error before sign-in — the outcome BUG-267 asked for, and one the browser's own log could not be told to ignore |
+| The microphone is allowed to Raiker's own page | ✅ `Permissions-Policy: microphone=(self)`; it was `microphone=()`, which denied the feature to this origin too and made dictation inert in **any** served build |
+| A speech runtime is configured beside the other local ones | ✅ **Models → Local** shows *Not set up*, accepts a loopback address, and reports *Answered. Dictation can run on this device.* after transcribing generated silence |
+| An address off this machine is refused where it is typed | ✅ `speech_endpoint_not_local` for both a hosted host and a private-network one, before anything is contacted |
+| The choice is stated where it is made | ✅ **Settings → Voice** offers *Automatic*, *On this device* and *Browser speech*, and says which one dictation will use |
+| The disclosure matches the runtime in use | ✅ the note under the microphone reads "transcribed by the speech runtime on this machine" once the owner chooses on-device, in place of the browser sentence |
+| Words dictated on this machine reach the composer | ✅ with a fake capture device, `speech-runtime-live.spec.ts` recorded, converted to 16 kHz mono WAV in the page, posted to `/api/speech/transcribe`, and asserted the transcript in the Chat draft — the runtime confirmed it received the clip |
+| Every page at four widths, both themes | ✅ `ui-sweep-responsive-live.spec.ts` over 27 route/tab states at 390, 1920, 3840 and 7680 in light and dark: no overflow, no glyphless icon, no selected tab off its strip, no control under 24px, no console error |
+| An address typed before the read resolved survives it | ✅ found in this round — the Models speech row adopted the stored value unconditionally, FIXED-85's defect in a new place; fixed and guarded |
+| Every control meets the minimum touch target | ✅ found in this round — the new Voice radios measured 13x24 on a phone, under WCAG 2.2's 24px; the sweep measured it rather than photographing it |
+| A settings deep link opens the section it names | ✅ found in this round — `#/settings?tab=updates` had always opened General, because the guard for exactly that compared the rail against a hand-copied list with the same omission |
+| Suites | ✅ `speech-runtime-live` 1/1, `ui-sweep-responsive-live` 9/9, `composer.spec.ts` (mocked) 9/9 |
+| Visual review | ✅ `docs/plans/screenshots/working/bug-256-voice-settings.png`, `bug-256-speech-runtime-models.png`, `bug-256-dictated-on-device.png`, and the re-captured `docs/plans/screenshots/pages/` catalogue inspected at original resolution |
+
+This round proves dictation can run with nothing leaving the machine, and that
+the control which claims so is reachable at all — the second half was not true
+before it, in any released build.
+
 ## Result — 2026-08-22 (plugin contributions, MCP offers, the channel surface, the unattended posture, responsive sweep)
 
 The running built SPA was unlocked with Rahul's existing account. The Anthropic

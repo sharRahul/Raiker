@@ -374,6 +374,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-359](#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | Fixed 2026-09-03 (BUG-261, BUG-262) |
 | [FIXED-360](#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | Fixed 2026-09-03 (BUG-265) |
 | [FIXED-361](#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | Fixed 2026-09-03 (BUG-268) |
+| [FIXED-362](#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | Fixed 2026-09-03 (BUG-267) |
+| [FIXED-363](#fixed-363--dictation-was-the-last-surface-that-was-not-local) | Medium | Voice / privacy posture | Fixed 2026-09-03 (BUG-256) |
+| [FIXED-364](#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | Fixed 2026-09-03 (BUG-266) |
 
 ---
 
@@ -15326,3 +15329,160 @@ against the un-exempted middleware first, so it fails when the fix is removed.
 **User-interface outcome.** **Browse** returns the folder that was chosen,
 whatever it is called.
 
+---
+
+## FIXED-362 — An expected answer was written to the console as a failure
+
+**Severity: Low. Area: authentication / web UI. Status: Fixed 2026-09-03
+(BUG-267), raised alongside
+[FIXED-353](#fixed-353--reloading-the-page-signed-the-owner-out).**
+
+**Observed.** On every locked load the browser wrote a failed resource to the
+console. Nothing was broken: the page had asked `GET /api/auth/whoami` who this
+browser is, the answer was "nobody", and `401` is how that route says so.
+
+**Root cause.** The boot probe reused the *governed* read. That route is right
+for a caller that needs an identity — the CLI, a script, a test — and wrong for
+the one question the page has to ask before it can render anything, where
+"nobody" is one of the two expected answers rather than a fault. A browser
+cannot be told that a 4xx was expected; it logs the request either way.
+
+**Why it is worth closing.** The console is where a real fault is supposed to
+stand out. Routine noise printed on every load is what trains a reader to stop
+looking at it.
+
+**Fixed.** `GET /api/auth/session-state` answers the boot question and answers
+it with `200` both ways: the principal when there is one, `null` when there is
+not. It is not a second way in — an unauthenticated caller learns only that it
+is not authenticated, which is what it asked. It also clears the readable CSRF
+cookie on that answer, so the *next* load has nothing to ask with and does not
+ask at all. `/api/auth/whoami` is unchanged and still refuses.
+
+The name is deliberately not `GET /api/auth/session`: `POST` on that path is the
+first-run bootstrap mint, and a reader skimming route definitions should not
+have to work out which of two very different things a change touches.
+
+**Guarded.** `tests/test_routes_auth.py` asserts the probe answers `200` with a
+null principal, names the owner when there is one, expires both cookies when the
+session behind them is gone, and that `whoami` still refuses.
+`apps/web/e2e/ui-sweep-live.spec.ts` fails the round if *any* request on a locked
+load is refused, which is the assertion the console noise deserved.
+
+**User-interface outcome.** None visible. A locked load leaves a clean console.
+
+---
+
+## FIXED-363 — Dictation was the last surface that was not local
+
+**Severity: Medium. Area: voice / privacy posture. Status: Fixed 2026-09-03
+(BUG-256).**
+
+**Observed.** The microphone button in both composers drove the browser's own
+`SpeechRecognition`, and the disclosure under it admitted as much: "Your
+browser's speech service may process audio externally." On Chrome that means the
+audio leaves the machine — the one thing a local-first product should not do
+quietly behind a control that looks local. Everything else in Raiker can be run
+entirely on this device: models, embeddings, indexes, storage.
+
+**Found while fixing it: the microphone could never have worked at all.**
+`SecurityHeadersMiddleware` sent `Permissions-Policy: microphone=()`, and the
+web UI is served by the same app, so the header landed on the document carrying
+the control. A bare `()` denies the feature to *every* origin including this
+one. The button was inert in any served build, whichever speech runtime it was
+pointed at, and no test had ever driven it in a real browser against a real host.
+
+**Fixed.** A local speech-to-text runtime, treated as a local runtime rather
+than as a special case:
+
+* `raiker/models/speech_runtime.py` holds the owner's choice and the client for
+  it. An endpoint has to classify as `local_machine` — a hosted or
+  private-network transcription server is refused where it is typed, because the
+  whole point of the setting is that the audio does not leave the machine.
+  `trust_env=False`, so an ambient proxy cannot route a local transcription off
+  it either.
+* `/api/speech/runtime` reads the choice without contacting anything, and is the
+  **only** writer of the `voice` settings section — two surfaces edit it, and
+  `PUT /api/settings` replaces the whole blob with whatever the page last read,
+  so it now preserves the stored section rather than reverting an address
+  configured elsewhere. `/api/speech/runtime/probe` asks the runtime to
+  transcribe a moment of silence, which proves the route, the format and the
+  reachability rather than a model list. `/api/speech/transcribe` forwards one
+  clip and returns the text; the audio is held in memory for the length of the
+  request and there is no path in it that could write the clip anywhere.
+* The page records with `MediaRecorder` and converts to 16 kHz mono WAV before
+  sending, because a plain `whisper-server` built without ffmpeg reads that and
+  nothing else. An owner who installed the ordinary build gets a working
+  microphone rather than a refusal they would have to diagnose. Both the
+  OpenAI-compatible `/v1/audio/transcriptions` route and `whisper-server`'s own
+  `/inference` are tried, so they need not know which one they have.
+* `Permissions-Policy` is now `microphone=(self)`: open to Raiker's own page,
+  still shut to anything embedded in it. Geolocation and camera have no surface
+  in Raiker and stay denied outright.
+
+**The choice stays the owner's.** **Settings → Voice** offers *Automatic*, *On
+this device* and *Browser speech*, and says which one is in use. Automatic is the
+default and prefers the machine it is running on, so configuring a runtime is the
+whole decision and an install without one keeps working exactly as before.
+Choosing *On this device* with no runtime disables the button and says what is
+missing rather than quietly falling back to the browser.
+
+**Found while sweeping the UI, and fixed here.** Two defects the work uncovered:
+the Models speech row let its own read overwrite an address typed before the read
+resolved — FIXED-85's defect in a new place — and `HUB_TABS.settings` did not
+list `updates`, so that deep link had always opened General instead. The guard
+BUG-215 added for exactly that could not see it, because it compared the rail
+against a hand-copied third list carrying the same omission. The rail now lives
+in `apps/web/src/lib/settingsSections.ts` and the guard reads it: two lists can
+disagree, a list and a reference to it cannot.
+
+**Guarded.** `tests/test_api_speech_runtime.py` stands a real transcription
+server on loopback and drives the whole path through it — including that a
+settings save cannot revert the address, that an off-machine endpoint is refused,
+and that a transcript reaches the composer unredacted (BUG-268's lesson, applied
+before it could happen again). `tests/test_api_rest_hardening.py` asserts the
+microphone is allowed to this origin and to no other.
+`apps/web/e2e/speech-runtime-live.spec.ts` opens a fake capture device in a real
+browser, dictates, and asserts the words arrive in the composer from a runtime on
+loopback.
+
+**User-interface outcome.** The microphone works entirely on this machine when
+the owner sets a runtime up; **Settings → Voice** states which of the two is in
+use; and the disclosure under the button says what is actually happening to the
+audio instead of assuming the browser. Evidence:
+[`screenshots/working/bug-256-voice-settings.png`](screenshots/working/bug-256-voice-settings.png),
+[`screenshots/working/bug-256-speech-runtime-models.png`](screenshots/working/bug-256-speech-runtime-models.png),
+[`screenshots/working/bug-256-dictated-on-device.png`](screenshots/working/bug-256-dictated-on-device.png).
+
+---
+
+## FIXED-364 — A live round could start on the previous round's data
+
+**Severity: Low. Area: live test harness / host lifecycle. Status: Fixed
+2026-09-03 (BUG-266).**
+
+**Observed.** A round was reset by stopping `raiker-web` and running `rm -rf` on
+its workspace. On Windows the SQLCipher file handle outlives the HTTP response
+that reported the shutdown, so the removal failed silently and the next run
+signed in against the previous round's account — reporting a first run that was
+not one. That is how
+[FIXED-357](#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)
+nearly went unnoticed a second time.
+
+**Why it is a defect and not an operator error.** A reset that can fail silently
+produces evidence about the wrong state, and every entry in this document proved
+on a "fresh" workspace inherits that doubt.
+
+**Fixed.** `scripts/reset_live_workspace.py` checks three things in order rather
+than assuming them: nothing is listening on the round's port — the process exit,
+not the HTTP response — the removal is retried briefly because a lagging handle
+is normal, and the directory is read back from the filesystem afterwards. Any of
+the three failing exits non-zero with the reason.
+[`RAIKER_LIVE_MANUAL_TEST_PLAN.md`](RAIKER_LIVE_MANUAL_TEST_PLAN.md) calls it in
+place of `rm -rf`, and says that a failure stops the round.
+
+**Guarded.** `tests/test_reset_live_workspace.py` covers the exact shape of the
+failure — a removal that raises nothing and leaves the data in place — as well as
+a handle that clears on the second attempt, and a host still holding the port.
+
+**User-interface outcome.** None; this is harness behaviour. The outcome is that
+a live round either starts on a genuinely empty workspace or refuses to start.

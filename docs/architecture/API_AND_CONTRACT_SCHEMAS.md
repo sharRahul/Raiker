@@ -26,9 +26,30 @@ optional `input_mode: "typed" | "dictated" | "mixed"`, defaulting to `typed`
 for existing clients. The value is revalidated when the HTTP request becomes a
 `PromptEnvelope` and again at the Agent Gateway, so an internal or external
 client cannot invent another provenance class. It is metadata only: Raiker does
-not accept or retain microphone audio and does not store a second transcript.
+not retain microphone audio and does not store a second transcript.
 Voice-created prompts use the same authenticated prompt route, session scope,
 policy, model selection, approval and audit path as keyboard-created prompts.
+
+### Speech runtime
+
+`GET /api/speech/runtime` returns the owner's dictation choice — `mode`
+(`auto`/`local`/`browser`), the loopback `endpoint` of a transcription server,
+and the `effective` runtime the host resolved from them — and contacts nothing to
+do it. `PUT` records the same fields and refuses an `endpoint` that does not
+classify as `local_machine`, with `speech_endpoint_not_local`. It is the only
+writer of the `voice` settings section: `PUT /api/settings` preserves the stored
+section rather than replacing it, because two surfaces edit it and that route
+sends the whole blob.
+
+`POST /api/speech/runtime/probe` asks the configured runtime to transcribe a
+moment of generated silence and reports whether it answered. `POST
+/api/speech/transcribe` takes one clip as the raw request body — 16 kHz mono WAV
+in practice, capped at 12 MB — forwards it to the runtime as a multipart form on
+`/v1/audio/transcriptions` or `/inference`, and returns `{"text": …}`. The audio
+is held in memory for the length of the request; no path here writes it anywhere.
+The response is exempt from the redaction middleware for the reason the host path
+listing is: it carries the owner's own words back to the composer they dictated
+them into.
 
 ### Composer surface
 

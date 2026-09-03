@@ -73,6 +73,14 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/models") body = { profiles: [model], current_profile_id: model.profile_id, current_model: model.model, fallback_sequence: [] };
       else if (path.endsWith("/provider-models")) body = { profile_id: model.profile_id, provider: model.provider, status: "available", reason_code: null, models: ["claude-sonnet-4-5", "claude-opus-4-1"] };
       else if (path === "/api/settings/composer-approval-mode") body = { approval_mode: "manual" };
+      // BUG-256 — the composers read which speech runtime the owner's choice
+      // resolved to. This fixture is a default install: no local runtime, so
+      // dictation stays on the browser and the fake recognition above is what
+      // the microphone drives.
+      else if (path === "/api/speech/runtime") body = {
+        runtime: { mode: "auto", endpoint: "", model: "", configured: false, effective: "browser" },
+        max_audio_bytes: 12_582_912,
+      };
       else if (path === "/api/code-repos") body = { repositories: [], active_repo_id: null };
       else if (path === "/api/host") body = { state: "running", detail: "Raiker is running.", pid: 4242, waiting: [], background_work: 0, service: { supported: true, registered: false, mechanism: "systemd --user", label: "raiker.service" } };
       else if (path === "/api/tasks") body = [];
@@ -158,14 +166,18 @@ test("governed voice stays editable and visually consistent in Chat, Build, mobi
   await expect(build).toHaveValue("keep this");
   await capture(page, join(shots, "voice-build-desktop.png"));
 
-  await page.goto("http://raiker.test/#/settings?tab=general");
+  // Speech moved out of General into its own section when it gained a runtime
+  // to configure (BUG-256). The language is still a queued settings write; what
+  // changed is where the control lives and what sits beside it.
+  await page.goto("http://raiker.test/#/settings?tab=voice");
+  await expect(page.getByText("Dictation uses your browser's speech service.")).toBeVisible();
   await page.getByLabel("Speech language").selectOption("ja");
   await capture(page, join(shots, "voice-settings.png"));
   await Promise.all([
     page.waitForRequest((request) => request.method() === "PUT" && new URL(request.url()).pathname === "/api/settings"),
     page.getByRole("button", { name: /save changes/i }).click(),
   ]);
-  await page.goto("http://raiker.test/#/settings?tab=general");
+  await page.goto("http://raiker.test/#/settings?tab=voice");
   await expect(page.getByLabel("Speech language")).toHaveValue("ja");
 
   await page.setViewportSize({ width: 390, height: 844 });

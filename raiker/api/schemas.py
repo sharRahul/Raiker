@@ -162,6 +162,20 @@ class ComposerApprovalModeRequest(BaseModel):
     approval_mode: str
 
 
+class SpeechRuntimeRequest(BaseModel):
+    """The owner's dictation choice, and the runtime it names (BUG-256).
+
+    Every field is optional so the two surfaces that write it — the Voice
+    section in Settings and the Speech runtime row on the Models page — can each
+    change only the half they own, without one silently reverting the other.
+    """
+
+    model_config = ConfigDict(extra="forbid", protected_namespaces=())
+    mode: str | None = None
+    endpoint: str | None = None
+    model: str | None = None
+
+
 class TaskCreateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
     title: str

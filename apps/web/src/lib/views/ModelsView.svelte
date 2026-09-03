@@ -33,6 +33,7 @@
   import ProviderUsagePanel from "./models/ProviderUsagePanel.svelte";
   import ProvidersPanel from "./models/ProvidersPanel.svelte";
   import LocalFrameworkRow from "./models/LocalFrameworkRow.svelte";
+  import SpeechRuntimePanel from "./models/SpeechRuntimePanel.svelte";
 
   // The shell owns a models snapshot for the topbar chip; it passes onchanged
   // so a selection here is reflected there without a full page reload. `tab`
@@ -1239,6 +1240,10 @@
                       testResult={testResults[frameworkProfiles("mlx")[0].profile_id] ?? null}
                     />
                   {/if}
+                  <!-- BUG-256 — dictation's runtime is a local runtime, and it
+                       belongs beside the others rather than in a category of
+                       its own. Nothing here is contacted until Save and test. -->
+                  <SpeechRuntimePanel />
                 </div>
               {:else}
                 <div class="provider-grid">

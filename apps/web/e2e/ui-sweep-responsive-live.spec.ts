@@ -61,6 +61,7 @@ const ROUTES = [
   ["observe-notifications", "observe?tab=notifications"],
   ["guide", "guide"],
   ["settings", "settings"],
+  ["settings-voice", "settings?tab=voice"],
 ] as const;
 
 const CAPTURES = [
@@ -116,6 +117,35 @@ async function settle(page: import("@playwright/test").Page) {
 }
 
 test.describe.configure({ mode: "serial" });
+
+/**
+ * BUG-267 — the console on a locked load.
+ *
+ * This is the one check the sweep below cannot make, because it signs in first.
+ * The page asks who this browser is before it can render either the workspace or
+ * the lock screen, and "nobody" is one of the two expected answers. Asking it of
+ * a route that refuses made the browser write a failed request to the console on
+ * every load — routine noise in the one place a real fault is meant to stand out.
+ *
+ * Asserted as "nothing was refused" rather than "the console was quiet", because
+ * a browser cannot be told a 4xx was expected: it logs the request either way,
+ * and the only way to keep the log clean is not to be refused.
+ */
+test("a locked load refuses nothing and logs nothing", async ({ page }) => {
+  const problems: string[] = [];
+  const refused: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") problems.push(message.text());
+  });
+  page.on("pageerror", (error) => problems.push(String(error)));
+  page.on("response", (response) => {
+    if (response.status() === 401) refused.push(`401 ${response.url()}`);
+  });
+  await page.goto(`${BASE}/#/workbench`);
+  await expect(page.getByLabel("Username")).toBeEnabled({ timeout: 60_000 });
+  expect(refused).toEqual([]);
+  expect(problems).toEqual([]);
+});
 
 for (const [label, viewport] of ACTIVE_CAPTURES) {
   for (const theme of THEMES) {

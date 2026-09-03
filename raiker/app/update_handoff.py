@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import argparse
 import os
-import platform
 import subprocess
 import sys
 import time
@@ -89,20 +88,29 @@ def start_update_handoff(workspace: str | Path, *, parent_pid: int) -> None:
         "--parent-pid",
         str(parent_pid),
     ]
-    # Windows has no session concept, and POSIX has no creation flags, so the
-    # two detachment mechanisms are spelled out rather than merged into one
-    # loosely typed keyword bag.
-    windows = platform.system().lower().startswith("win")
-    subprocess.Popen(  # noqa: S603 - fixed local Python module
-        command,
-        cwd=str(Path(workspace)),
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-        creationflags=(
-            subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS if windows else 0
-        ),
-        start_new_session=not windows,
-    )
+    # Windows has no session concept and POSIX has no creation flags, so the two
+    # detachment mechanisms are written out separately rather than merged into
+    # one loosely typed keyword bag. The branch is on `sys.platform` rather than
+    # `platform.system()` because that is the form a type checker narrows: the
+    # Windows-only constants below do not exist on Linux, and reaching them
+    # through a runtime string comparison hid that from every checker but the
+    # one running on Linux.
+    if sys.platform == "win32":
+        subprocess.Popen(  # noqa: S603 - fixed local Python module
+            command,
+            cwd=str(Path(workspace)),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS,
+        )
+    else:
+        subprocess.Popen(  # noqa: S603 - fixed local Python module
+            command,
+            cwd=str(Path(workspace)),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            start_new_session=True,
+        )
 
 
 def main(argv: list[str] | None = None) -> int:

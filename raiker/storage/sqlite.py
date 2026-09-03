@@ -65,6 +65,8 @@ from raiker.storage.migrations import (
     AGENT_PLANS_SQL,
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    APPROVAL_DECISION_SCOPE_MIGRATION_ID,
+    APPROVAL_DECISION_SCOPE_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
     ATTACHMENT_STORE_SQL,
     BRAIN_PREFERENCES_MIGRATION_ID,
@@ -1539,6 +1541,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 TASK_THREAD_SESSION_SQL,
                 connection,
             )
+            self._apply_migration(
+                APPROVAL_DECISION_SCOPE_MIGRATION_ID,
+                APPROVAL_DECISION_SCOPE_SQL,
+                connection,
+            )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
             self._apply_migration(
                 MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
@@ -2396,6 +2403,40 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (owner_principal_id, repo_path, like, like, like, limit),
             ).fetchall()
         return [dict(row) for row in rows]
+
+    def save_approval_decision_scope(self, approval_id: str, hunk_ids: list[str]) -> None:
+        """Record which hunks of an approved change set the owner accepted (B14).
+
+        Written before the relay runs, so what executes is decided by a row and
+        not by an argument travelling alongside a request. It narrows only: the
+        relay refuses anything not already in the approved patch.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET decision_scope_json = ? WHERE approval_id = ?",
+                (json.dumps({"accepted_hunks": list(hunk_ids)}, sort_keys=True), approval_id),
+            )
+
+    @staticmethod
+    def approval_accepted_hunks(approval: dict[str, Any]) -> list[str] | None:
+        """The hunks this approval was narrowed to, or ``None`` for all of them.
+
+        ``None`` and ``[]`` are different answers and both are real: nothing
+        recorded means the owner accepted the whole change set, which is what
+        every approval decided before B14 and what most still decide; an empty
+        list means they accepted no part of it.
+        """
+        raw = approval.get("decision_scope_json")
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(str(raw))
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(parsed, dict) or "accepted_hunks" not in parsed:
+            return None
+        value = parsed.get("accepted_hunks")
+        return [str(item) for item in value] if isinstance(value, list) else None
 
     def find_code_map_symbols(
         self, owner_principal_id: str, repo_path: str, name: str, *, limit: int = 40

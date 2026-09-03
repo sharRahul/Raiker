@@ -31,6 +31,16 @@
   let selected = $state<ApprovalDetailView | null>(null);
   let detailError = $state<string | null>(null);
   let decisionReason = $state("");
+  /**
+   * B14 — the hunks this reviewer has accepted, or null while they have not
+   * narrowed anything.
+   *
+   * `undefined` and "every hunk" are deliberately different states. `undefined`
+   * means the decision is the one approvals have always carried — all of it —
+   * and the request omits the field entirely, so no scope is recorded. A list
+   * means the reviewer touched a checkbox, even if they re-selected everything.
+   */
+  let hunkSelection = $state<string[] | undefined>(undefined);
   let busy = $state(false);
   // BUG-62 — an executed action whose result is a row rather than a file carries
   // a receipt, so the notice can point at the thing that now exists.
@@ -87,6 +97,10 @@
     detailError = null;
     decisionReason = "";
     notice = null;
+    // B14 — a narrowing belongs to the change it was made on. Carrying one
+    // across to the next approval would apply hunk positions from one diff to a
+    // completely different one.
+    hunkSelection = undefined;
     try {
       selected = await api.approval(id);
     } catch (e) {
@@ -188,6 +202,11 @@
       const result = await api.resolveApproval(selected.approval.approval_id, {
         approve,
         reason: decisionReason.trim() || (approve ? "approved via web UI" : "denied via web UI"),
+        // B14 — sent only when the reviewer actually narrowed the change.
+        // Accepting all of it is the same decision it has always been, and
+        // saying so with an explicit list would record a scope on every
+        // approval for no reason.
+        ...(approve && hunkSelection !== undefined ? { accepted_hunks: hunkSelection } : {}),
       });
       const receipt = result.execution?.receipt;
       const checkpoint = result.execution?.checkpoint_capture;
@@ -530,7 +549,15 @@
       <!-- B14 — the same reader Build uses, so a change looks the same wherever
            it is decided: added and removed lines told apart, the hunk's own
            line numbers, and long lines scrolling inside the diff. -->
-      <DiffView diff={selected.diff} path={selected.diff_path} />
+      <!-- B14 — and the reviewer can accept part of it. An approval used to
+           govern the whole change set, so wanting two of five hunks meant
+           rejecting everything and asking again. -->
+      <DiffView
+        diff={selected.diff}
+        path={selected.diff_path}
+        selectable={selected.approval.status === "pending" && !selected.approval.is_expired}
+        bind:selection={hunkSelection}
+      />
     {:else if selected.preview_kind === "git_change"}
       <!-- B11 — a repository change is reviewed where the decision is made:
            the exact file list and diff a commit would record, or the refs a

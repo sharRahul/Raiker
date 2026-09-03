@@ -233,6 +233,44 @@ class ApprovalExecutionRelay:
                 artifacts={"approval_id": approval_id, "posture": posture},
             )
 
+        # B14 — the owner accepted part of this change set.
+        #
+        # Applied *here*, after the immutable-intent hash check above, and only
+        # ever as a narrowing: `select_hunks` copies bytes out of the approved
+        # patch and copies nothing else in, so what runs is a subset of what was
+        # approved and the hash still covers the whole of it. An id naming no
+        # hunk in the approved patch refuses the execution rather than being
+        # ignored, because silently dropping it would apply a change the owner
+        # did not press Accept on.
+        accepted_hunks = self._store.approval_accepted_hunks(approval)
+        if accepted_hunks is not None:
+            from raiker.tools.patch_selection import select_hunks, unknown_hunk_ids
+
+            approved_patch = str(tool_args.get("patch", ""))
+            unknown = unknown_hunk_ids(approved_patch, accepted_hunks)
+            if unknown:
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="unknown_hunk_selection",
+                    summary=(
+                        f"Approval {approval_id} names {len(unknown)} hunk(s) that are not in "
+                        "the approved change; refused."
+                    ),
+                    artifacts={"approval_id": approval_id, "unknown_hunks": unknown},
+                )
+            narrowed = select_hunks(approved_patch, accepted_hunks)
+            if not narrowed.strip():
+                # Accepting no part of a change is not an apply. Refusing here
+                # rather than running an empty patch keeps "nothing was changed"
+                # a stated outcome instead of a silent one.
+                return ExecutionResult(
+                    ok=False, capability=self.capability, action_id=action.action_id,
+                    reason_code="no_hunk_accepted",
+                    summary=f"Approval {approval_id} accepted no part of the change.",
+                    artifacts={"approval_id": approval_id},
+                )
+            tool_args = {**tool_args, "patch": narrowed}
+
         # A2 — resolve the approved action's target capability. A relay may never
         # execute another relay (no recursion, no relay-approves-relay).
         from raiker.runtime.authority.router import CAPABILITY_GATE_MAP, NON_ALLOW_DECISIONS

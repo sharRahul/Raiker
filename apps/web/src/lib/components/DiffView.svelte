@@ -8,11 +8,17 @@
    * than colour, and the whole thing scrolling inside itself so a long line
    * never widens the page.
    *
-   * It adds no authority. Nothing here resolves an approval, edits a hunk, or
-   * changes what will run — this is the reading surface, and the decision stays
-   * with the buttons the approval already owns.
+   * It adds no authority. Nothing here edits a hunk or changes what a change
+   * *says*; the decision still belongs to the buttons the approval owns.
+   *
+   * B14 — what it does now carry is the reviewer's own narrowing. With
+   * `selection` bound, each hunk gets a checkbox and the caller sends the
+   * accepted ids alongside Accept. That is a smaller decision, never a
+   * different one: the ids are positions in this diff, the server validates
+   * every one against the approved patch, and a selection can only ever remove
+   * hunks from what runs.
    */
-  import { diffStat, diffSummary, parseUnifiedDiff } from "../diff";
+  import { diffSelectable, diffStat, diffSummary, hunkId, hunkIds, parseUnifiedDiff } from "../diff";
   import Icon from "./Icon.svelte";
 
   let {
@@ -21,15 +27,41 @@
     /** Collapsed by default in a transcript; open where the diff is the page. */
     open = true,
     emptyLabel = "(empty diff)",
+    /**
+     * Turn on per-hunk acceptance. Off by default, so every surface that only
+     * displays a diff stays purely a reader.
+     */
+    selectable: allowSelection = false,
+    /**
+     * The hunks the reviewer has accepted, bindable. `undefined` means they
+     * have not narrowed anything, which is not the same as having accepted
+     * every hunk explicitly — the caller uses that difference to decide whether
+     * to record a scope at all.
+     */
+    selection = $bindable(undefined),
   }: {
     diff: string | null;
     path?: string | null;
     open?: boolean;
     emptyLabel?: string;
+    selectable?: boolean;
+    selection?: string[] | undefined;
   } = $props();
 
   const files = $derived(parseUnifiedDiff(diff ?? ""));
   const stat = $derived(diffStat(files));
+  const everyHunk = $derived(hunkIds(files));
+  // Offered only where it can be honoured: a diff whose sections the server's
+  // applier understands, and more than one hunk to choose between.
+  const selectable = $derived(allowSelection && diffSelectable(files));
+  const accepted = $derived(new Set(selection ?? everyHunk));
+
+  function toggle(id: string) {
+    const current = selection ?? everyHunk;
+    selection = accepted.has(id)
+      ? current.filter((item) => item !== id)
+      : everyHunk.filter((item) => current.includes(item) || item === id);
+  }
   // Null until the reader has an opinion, so `open` stays the default rather
   // than a value captured once at construction.
   let opened = $state<boolean | null>(null);
@@ -54,6 +86,18 @@
       </span>
     </button>
 
+    {#if selectable && expanded}
+      <p class="pick-note" role="status">
+        {accepted.size === everyHunk.length
+          ? `All ${everyHunk.length} hunks`
+          : `${accepted.size} of ${everyHunk.length} hunks`}
+        <button type="button" class="pick-all" onclick={() => (selection = everyHunk)}
+          >Select all</button
+        >
+        <button type="button" class="pick-all" onclick={() => (selection = [])}>Select none</button>
+      </p>
+    {/if}
+
     {#if expanded}
       {#each files as file, index (file.path + index)}
         <div class="diff-file">
@@ -72,7 +116,27 @@
             <table class="diff-table">
               <tbody>
                 {#each file.lines as line, i (i)}
-                  <tr class={`row-${line.kind}`}>
+                  <tr
+                    class={`row-${line.kind}`}
+                    class:hunk-declined={selectable &&
+                      line.hunkIndex !== null &&
+                      !accepted.has(hunkId(index, line.hunkIndex))}
+                  >
+                    {#if selectable}
+                      <td class="pick">
+                        {#if line.kind === "hunk" && line.hunkIndex !== null}
+                          {@const id = hunkId(index, line.hunkIndex)}
+                          <input
+                            type="checkbox"
+                            checked={accepted.has(id)}
+                            onchange={() => toggle(id)}
+                            aria-label={`Accept hunk ${line.hunkIndex + 1} of ${
+                              file.path === "" ? "the proposed change" : file.path
+                            }`}
+                          />
+                        {/if}
+                      </td>
+                    {/if}
                     <td class="gutter" aria-hidden="true">{line.oldLine ?? ""}</td>
                     <td class="gutter" aria-hidden="true">{line.newLine ?? ""}</td>
                     <td class="sign" aria-hidden="true"
@@ -157,6 +221,44 @@
     white-space: nowrap;
   }
   .sign { width: 1px; padding: 0 0.2rem; user-select: none; }
+  /* B14 — the reviewer's own narrowing. The checkbox sits on the hunk header,
+     where the hunk begins, and the lines it governs dim when it is declined —
+     so what will and will not be applied is legible without reading the count.
+     Dimming is a *second* signal beside the checkbox's own state, never the
+     only one. */
+  .pick {
+    width: 1px;
+    padding: 0 0.35rem;
+    vertical-align: middle;
+  }
+  .pick input {
+    margin: 0;
+    cursor: pointer;
+  }
+  .hunk-declined td:not(.pick) {
+    opacity: 0.4;
+  }
+  .pick-note {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0;
+    padding: 0.3rem 0.55rem;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-2);
+    font-size: var(--text-xs);
+  }
+  .pick-all {
+    border: 0;
+    padding: 0;
+    background: none;
+    color: var(--accent);
+    font: inherit;
+    font-size: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
   .code { padding: 0 0.5rem 0 0.2rem; white-space: pre; }
   .row-add { background: var(--ok-soft); }
   .row-add .sign, .row-add .code { color: var(--ok); }

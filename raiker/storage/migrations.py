@@ -3651,3 +3651,24 @@ CREATE INDEX IF NOT EXISTS idx_tasks_thread_session
   ON tasks(thread_session_id)
   WHERE thread_session_id IS NOT NULL;
 """
+
+
+# B14 — the owner accepted part of a change set.
+#
+# An approval governed the whole thing: Accept applied every hunk, Reject applied
+# none, and a reviewer who wanted two of five had to reject and ask again. That
+# is the one interaction a coding agent's review surface exists to support.
+#
+# This column records the *decision*, not an edited payload. It holds the hunk
+# ids the owner accepted — positions in the approved diff, never content — so the
+# immutable-intent hash the relay checks still covers the entire approved change
+# set and what runs is a subset of it. It is deliberately not `arguments_json`
+# and deliberately not `answer_json`: a narrowed approval is neither a different
+# action nor an answer to a question, and folding it into either would make the
+# distinction depend on reading a field's contents to know which kind of row you
+# had.
+APPROVAL_DECISION_SCOPE_MIGRATION_ID = "RAIKER-2050-approval-decision-scope"
+
+APPROVAL_DECISION_SCOPE_SQL = """
+ALTER TABLE approvals ADD COLUMN decision_scope_json TEXT;
+"""

@@ -12,7 +12,10 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "home", label: "Workbench", icon: "spark", hint: "Resume governed work and see what needs attention" },
     { id: "new-chat", label: "Chat", icon: "chat", hint: "Start or continue a governed conversation" },
     { id: "build", label: "Build", icon: "code", hint: "Code against a repository with Plan, Edit, and Auto" },
-    { id: "search-chat", label: "Search chats", icon: "search", hint: "Browse or search your chat history" },
+    // C18 — this destination stopped being only a search. With an empty box it
+    // is the board of everything the owner has going, chats and routine threads
+    // alike; with a query it is the search it always was.
+    { id: "search-chat", label: "Threads", icon: "search", hint: "Everything you have going, and a search across it" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
   ] },

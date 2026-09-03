@@ -195,6 +195,27 @@ async def mint_session(
 
 
 # ── Read-only governed views (Bearer required) ────────────────────────────────
+@router.get("/api/work-threads")
+async def list_work_threads(
+    request: Request,
+    limit: int = 100,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> list[dict[str, Any]]:
+    """What this owner is working on, across chats, projects and routines (C18).
+
+    Chat search answers *"where did I say that"*. This answers *"what am I
+    working on"*, which is a different question and had no reader: it spans the
+    conversations the owner started **and** the threads a routine is advancing
+    on its own, names the project each sits in, and says which are blocked on a
+    decision.
+
+    Owner-scoped exactly like `/api/sessions`, and read-only. It joins rows that
+    already existed rather than recording anything new.
+    """
+    user_id = auth_data[1].delegated_by_user_id
+    return serialize_dto(_service(request).list_work_threads(user_id=user_id, limit=limit))
+
+
 @router.get("/api/sessions")
 async def list_sessions(
     request: Request,

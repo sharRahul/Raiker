@@ -124,6 +124,7 @@ import type {
   UploadedAttachment,
   WebBlocklist,
   WebBlocklistProbe,
+  WorkThread,
   GitCredentialStatus,
   ManagedFile,
   ManagedFileImportResponse,
@@ -1576,6 +1577,10 @@ export const api = {
         origin,
       }),
     ),
+  // C18 — what the owner is working on, across chats, projects and routines.
+  // Chat search answers "where did I say that"; this answers the other question.
+  workThreads: (limit = 100) =>
+    request<WorkThread[]>(`/api/work-threads?limit=${limit}`),
   searchChats: (q: string) =>
     request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
@@ -2178,7 +2183,13 @@ export const api = {
     ),
   approval: (id: string) =>
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
-  resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
+  // B14 — `accepted_hunks` carries the reviewer's own narrowing: hunk positions
+  // in the approved diff, validated server-side against that same diff. Omitted
+  // means the whole change set, which is what a decision has always meant.
+  resolveApproval: (
+    id: string,
+    body: { approve: boolean; reason: string; accepted_hunks?: string[] },
+  ) =>
     postJson<ResolveApprovalResult>(
       `/api/approvals/${encodeURIComponent(id)}/resolve`,
       body,

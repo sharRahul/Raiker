@@ -670,3 +670,75 @@ describe("ApprovalsView", () => {
     });
   });
 });
+
+// B14 remainder — accepting part of a change set.
+//
+// An approval governed all of it. A reviewer who wanted two of five hunks had
+// to reject everything and ask again, which is the interaction a coding review
+// is made of.
+describe("ApprovalsView per-hunk acceptance", () => {
+  const TWO_HUNKS = {
+    ...DETAIL,
+    diff: "--- a/notes.txt\n+++ b/notes.txt\n@@ -1,2 +1,2 @@\n-a\n+A\n k\n@@ -9,2 +9,2 @@\n-b\n+B\n k\n",
+  };
+
+  function routes(overrides: Record<string, unknown> = {}) {
+    return {
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": TWO_HUNKS,
+      "POST /api/approvals/appr_1/resolve": {
+        approval_id: "appr_1",
+        action_id: "act_1",
+        status: "executed",
+        executes_action: true,
+      },
+      ...overrides,
+    };
+  }
+
+  it("sends only the hunks the reviewer kept", async () => {
+    const fetchMock = stubFetch(routes());
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
+    await fireEvent.click(screen.getAllByRole("checkbox")[0]);
+    await fireEvent.click(screen.getByRole("button", { name: /approve/i }));
+
+    const post = await waitFor(() =>
+      fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).toMatchObject({
+      approve: true,
+      accepted_hunks: ["0:1"],
+    });
+  });
+
+  it("records no scope at all when the reviewer accepts the whole change", async () => {
+    // Approving all of it is the decision approvals have always carried, and
+    // saying so with an explicit list would record a scope on every approval.
+    const fetchMock = stubFetch(routes());
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    await waitFor(() => expect(screen.getAllByRole("checkbox")).toHaveLength(2));
+    await fireEvent.click(screen.getByRole("button", { name: /approve/i }));
+
+    const post = await waitFor(() =>
+      fetchMock.mock.calls.find(([url]) => String(url).endsWith("/resolve")),
+    );
+    expect(JSON.parse(String(post?.[1]?.body))).not.toHaveProperty("accepted_hunks");
+  });
+
+  it("offers no per-hunk control on an expired approval", async () => {
+    stubFetch({
+      "GET /api/approvals": [EXPIRED],
+      "GET /api/approvals/appr_1": { ...TWO_HUNKS, approval: EXPIRED },
+    });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    await screen.findByText(/expired at/i);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+});

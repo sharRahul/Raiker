@@ -1243,6 +1243,44 @@ class ProjectDetailView:
 
 
 @dataclass(frozen=True)
+class WorkThreadView:
+    """One thread of the owner's work, whatever started it (GAP-CHAT C18).
+
+    Chat search covered titles and message text, which answers *"where did I say
+    that"* and not *"what am I working on"*. Those are different questions: the
+    second one spans conversations the owner typed **and** the threads a routine
+    is advancing on its own (C11), it wants the project each sits in, and it
+    wants to know which of them is blocked on the owner.
+
+    Every field here is read from a row that already existed. This view invents
+    no state; it is the join nothing was performing.
+    """
+
+    session_id: str
+    title: str
+    #: ``chat`` for a conversation the owner started, ``routine`` for a thread a
+    #: task is advancing. The distinction is what makes "resume the thread a
+    #: routine is advancing" possible at all — it used to be unreachable.
+    kind: str
+    updated_at: str
+    turn_count: int
+    project_id: str | None = None
+    project_name: str | None = None
+    #: Set only on a ``routine`` thread: the task advancing it.
+    task_id: str | None = None
+    task_status: str | None = None
+    cadence: str | None = None
+    next_run_at: str | None = None
+    #: What this thread is waiting on, in the owner's language, or None when it
+    #: is not waiting on anything. Only ever states a blocker the runtime
+    #: actually holds — never a guess about staleness.
+    waiting_on: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class TaskView:
     task_id: str
     session_id: str
@@ -6048,6 +6086,94 @@ class DashboardService:
             self._task_view(t, thread_turns=turns.get(t.thread_session_id or "", 0))
             for t in rows
         ]
+
+    def list_work_threads(
+        self,
+        *,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[WorkThreadView]:
+        """Every thread of this owner's work, newest first (GAP-CHAT C18).
+
+        Two kinds, in one list, because the owner has one head:
+
+        * **Chats** they started, with the project each sits in — which is the
+          "cross-project view" the gap named. It was absent not because projects
+          were unknown but because nothing joined them to the conversation list.
+        * **Routine threads** a task is advancing (C11). Before those existed
+          there was nothing to resume: a routine's cycles ran in a hidden Inbox
+          transcript. Now each routine owns a conversation, and this is where an
+          owner finds it without going through Tasks first.
+
+        ``waiting_on`` states only a blocker the runtime is actually holding —
+        an approval a task is parked on. A thread nobody is waiting on says so by
+        saying nothing, rather than by having a staleness heuristic invented for
+        it.
+        """
+        projects = {
+            project.project_id: project.name
+            for project in self.list_projects(user_id=user_id).projects
+        }
+        threads: list[WorkThreadView] = []
+        for session in self.store.list_sessions(
+            limit=limit, user_id=user_id, include_archived=False, origin="chat"
+        ):
+            session_id = str(session.get("session_id", ""))
+            project_id = session.get("project_id")
+            threads.append(
+                WorkThreadView(
+                    session_id=session_id,
+                    title=str(session.get("title") or "").strip() or "Untitled chat",
+                    kind="chat",
+                    updated_at=str(session.get("updated_at", "")),
+                    turn_count=int(session.get("turn_count") or 0),
+                    project_id=project_id,
+                    project_name=projects.get(str(project_id)) if project_id else None,
+                )
+            )
+        # A routine thread's identity comes from its task, not from its session:
+        # the task is what carries the cadence, the status and the next slot, and
+        # it is what the owner recognises the thread by.
+        tasks = [
+            task
+            for task in self.store.list_tasks(user_id=user_id)
+            if task.thread_session_id and not getattr(task, "parent_turn_id", None)
+        ]
+        turns = self.store.count_turns_by_session(
+            [str(task.thread_session_id) for task in tasks]
+        )
+        for task in tasks:
+            session_id = str(task.thread_session_id)
+            count = turns.get(session_id, 0)
+            if count == 0:
+                # A routine that has not run has no thread to resume. Listing it
+                # would put a link to an empty transcript in a list whose whole
+                # promise is that every row is somewhere to continue.
+                continue
+            threads.append(
+                WorkThreadView(
+                    session_id=session_id,
+                    title=task.title,
+                    kind="routine",
+                    updated_at=task.updated_at,
+                    turn_count=count,
+                    project_id=task.project_id,
+                    project_name=(
+                        projects.get(str(task.project_id)) if task.project_id else None
+                    ),
+                    task_id=task.task_id,
+                    task_status=task.status,
+                    cadence=task.recurrence,
+                    next_run_at=task.scheduled_at,
+                    waiting_on=(
+                        "Waiting for your approval"
+                        if task.status == "waiting_for_approval"
+                        else None
+                    ),
+                )
+            )
+        threads.sort(key=lambda thread: thread.updated_at, reverse=True)
+        return threads[:limit]
 
     def create_task(
         self,

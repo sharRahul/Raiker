@@ -1452,6 +1452,31 @@ export interface DiagnosticsExport {
   [key: string]: unknown;
 }
 
+/**
+ * C18 — one thread of the owner's work, whatever started it.
+ *
+ * Chat search covers titles and message text, which answers "where did I say
+ * that" and not "what am I working on". The second question spans conversations
+ * the owner typed *and* the threads a routine is advancing on its own (C11),
+ * wants the project each sits in, and wants to know which are blocked.
+ */
+export interface WorkThread {
+  session_id: string;
+  title: string;
+  /** "chat" — the owner started it. "routine" — a task is advancing it. */
+  kind: "chat" | "routine";
+  updated_at: string;
+  turn_count: number;
+  project_id: string | null;
+  project_name: string | null;
+  task_id?: string | null;
+  task_status?: string | null;
+  cadence?: string | null;
+  next_run_at?: string | null;
+  /** A blocker the runtime is actually holding, or null. Never a guess. */
+  waiting_on?: string | null;
+}
+
 export interface SessionSummary {
   session_id: string;
   title: string | null;

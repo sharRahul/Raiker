@@ -30,7 +30,7 @@ describe("Sidebar navigation", () => {
   it("keeps Core visible and exposes the other sections as disclosures", () => {
     render(Sidebar, { current: "models" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
-    expect(within(nav).getByRole("link", { name: "Search chats" })).toBeVisible();
+    expect(within(nav).getByRole("link", { name: "Threads" })).toBeVisible();
     expect(within(nav).getByRole("button", { name: "Manage" })).toHaveAttribute("aria-expanded", "true");
     expect(within(nav).getByRole("button", { name: "Knowledge" })).toHaveAttribute("aria-expanded", "true");
     expect(within(nav).getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");

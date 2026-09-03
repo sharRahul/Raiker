@@ -17,7 +17,11 @@ from raiker.api.schemas import (
 )
 from raiker.api.sessions import ApiSession
 from raiker.approvals import ApprovalInbox
-from raiker.approvals.execution import ApprovalExecutionBridge, executable_capability
+from raiker.approvals.execution import (
+    ApprovalExecutionBridge,
+    approval_arguments,
+    executable_capability,
+)
 from raiker.contracts.ids import utc_now
 from raiker.contracts.models import OWNER_QUESTION_TOOL
 from raiker.control.dashboard import DashboardService
@@ -34,6 +38,7 @@ from raiker.runtime.turn_suspension import (
     owner_answer_outcome,
 )
 from raiker.storage.sqlite import SQLiteStore
+from raiker.tools.patch_selection import unknown_hunk_ids
 
 router = APIRouter()
 
@@ -425,6 +430,42 @@ async def resolve_approval(
             status_code=status.HTTP_409_CONFLICT,
             detail={"ok": False, "reason_code": "approval_is_a_question"},
         )
+
+    # B14 — the owner accepted part of the change set. Recorded as a decision
+    # before anything runs, so what executes is decided by a row rather than by
+    # an argument travelling beside a request, and validated here against the
+    # approval's own patch so a selection can only ever name hunks that were
+    # already approved.
+    if body.accepted_hunks is not None:
+        if not body.approve:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"ok": False, "reason_code": "hunk_selection_requires_approval"},
+            )
+        approved_patch = str(approval_arguments(approval_row).get("patch", ""))
+        if not approved_patch.strip():
+            # Only a patch has hunks. Offering a selection on anything else
+            # would be a control with nothing behind it.
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={"ok": False, "reason_code": "action_has_no_hunks"},
+            )
+        unknown = unknown_hunk_ids(approved_patch, body.accepted_hunks)
+        if unknown:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={
+                    "ok": False,
+                    "reason_code": "unknown_hunk_selection",
+                    "unknown_hunks": unknown,
+                },
+            )
+        if not body.accepted_hunks:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"ok": False, "reason_code": "no_hunk_accepted"},
+            )
+        store.save_approval_decision_scope(approval_id, body.accepted_hunks)
 
     # BUG-06 — an approved file mutation is actually performed. The relay needs
     # the approval still `pending` (it claims it atomically), so this runs

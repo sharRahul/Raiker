@@ -31,7 +31,7 @@ reaches only because the owner pointed it there.
 | The microphone is allowed to Raiker's own page | ✅ `Permissions-Policy: microphone=(self)`; it was `microphone=()`, which denied the feature to this origin too and made dictation inert in **any** served build |
 | A speech runtime is configured beside the other local ones | ✅ **Models → Local** shows *Not set up*, accepts a loopback address, and reports *Answered. Dictation can run on this device.* after transcribing generated silence |
 | An address off this machine is refused where it is typed | ✅ `speech_endpoint_not_local` for both a hosted host and a private-network one, before anything is contacted |
-| The choice is stated where it is made | ✅ **Settings → Voice** offers *Automatic*, *On this device* and *Browser speech*, and says which one dictation will use |
+| The runtime in use is stated, and nothing is asked | ✅ no mode selector: adding a runtime is the whole decision, and the note under the microphone says which one dictation will use |
 | The disclosure matches the runtime in use | ✅ the note under the microphone reads "transcribed by the speech runtime on this machine" once the owner chooses on-device, in place of the browser sentence |
 | Words dictated on this machine reach the composer | ✅ with a fake capture device, `speech-runtime-live.spec.ts` recorded, converted to 16 kHz mono WAV in the page, posted to `/api/speech/transcribe`, and asserted the transcript in the Chat draft — the runtime confirmed it received the clip |
 | Every page at four widths, both themes | ✅ `ui-sweep-responsive-live.spec.ts` over 27 route/tab states at 390, 1920, 3840 and 7680 in light and dark: no overflow, no glyphless icon, no selected tab off its strip, no control under 24px, no console error |

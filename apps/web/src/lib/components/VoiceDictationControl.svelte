@@ -52,7 +52,6 @@
     language = "auto",
     disabled = false,
     runtime = "browser",
-    runtimeConfigured = false,
     adapter = undefined,
     coordinator = audioSessionCoordinator,
     onchange,
@@ -65,10 +64,15 @@
     selectionEnd?: number;
     language?: SpeechLanguage;
     disabled?: boolean;
-    /** Which speech runtime the owner's choice resolved to (BUG-256). */
+    /**
+     * Which speech runtime dictation will use (BUG-256).
+     *
+     * A fact about this install, not a preference: `local` when the owner has
+     * set a transcription runtime up on this machine, `browser` when they have
+     * not. There is no third state and no switch — the button behaves the same
+     * either way, and only the disclosure below it changes.
+     */
     runtime?: "browser" | "local";
-    /** Whether a local transcription runtime has actually been configured. */
-    runtimeConfigured?: boolean;
     /** Overridden in tests; otherwise chosen from `runtime`. */
     adapter?: VoiceRecognitionAdapter;
     coordinator?: AudioSessionCoordinator;
@@ -107,16 +111,7 @@
     adapter ?? (runtime === "local" ? localAdapter : browserRecognitionAdapter),
   );
 
-  /**
-   * Whether the button can do anything.
-   *
-   * On-device dictation needs both a browser that can record and a runtime to
-   * send the recording to. Missing either is a different sentence to the owner,
-   * so the two are tracked apart rather than collapsed into "unavailable".
-   */
-  const supported = $derived(
-    activeAdapter.supported() && (runtime !== "local" || runtimeConfigured),
-  );
+  const supported = $derived(activeAdapter.supported());
 
   const disclosure = $derived(
     runtime === "local"
@@ -125,8 +120,8 @@
   );
 
   const unavailableReason = $derived(
-    runtime === "local" && !runtimeConfigured
-      ? "On-device dictation needs a speech runtime. Add one under Settings → Voice."
+    runtime === "local"
+      ? "Dictation is unavailable because this browser cannot record audio. You can keep typing."
       : "Dictation is unavailable because this browser does not provide speech recognition. You can keep typing.",
   );
 
@@ -231,7 +226,7 @@
     // The reason codes the host returns for the on-device runtime. Each names
     // the thing the owner would have to change, rather than "transcription
     // failed" — which is true of all four and useful for none.
-    if (code === "speech_runtime_not_configured") return "No speech runtime is configured. Add one under Settings → Voice.";
+    if (code === "speech_runtime_not_configured") return "The speech runtime is no longer set up. Add one under Models → Local.";
     if (code === "speech_runtime_unreachable") return "The speech runtime on this machine did not answer. Check that it is running.";
     if (code === "speech_runtime_refused") return "The speech runtime refused the recording. Check that it serves transcription.";
     if (code === "speech_audio_too_large") return "That recording is too long to transcribe. Dictate in shorter passes.";

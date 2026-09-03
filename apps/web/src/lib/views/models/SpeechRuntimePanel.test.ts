@@ -5,7 +5,7 @@ import { api } from "../../api";
 import type { SpeechRuntimeSettings } from "../../apiTypes";
 
 function runtime(overrides: Partial<SpeechRuntimeSettings> = {}): SpeechRuntimeSettings {
-  return { mode: "auto", endpoint: "", model: "", configured: false, effective: "browser", ...overrides };
+  return { endpoint: "", model: "", configured: false, effective: "browser", ...overrides };
 }
 
 beforeEach(() => vi.restoreAllMocks());

@@ -19,7 +19,6 @@ from raiker.api.schemas import SpeechRuntimeRequest
 from raiker.contracts.ids import utc_now
 from raiker.models.speech_runtime import (
     MAX_AUDIO_BYTES,
-    SPEECH_MODES,
     SpeechRuntimeError,
     SpeechRuntimeSettings,
     normalise_endpoint,
@@ -87,14 +86,11 @@ async def read_speech_runtime(request: Request) -> dict[str, Any]:
 async def write_speech_runtime(
     body: SpeechRuntimeRequest, request: Request
 ) -> dict[str, Any]:
-    """Record the choice, and refuse an address that is not on this machine."""
+    """Record the runtime, and refuse an address that is not on this machine."""
     _session, principal = AuthMiddleware(_ws(request)).authenticate(request)
     ws = _ws(request)
     current = load_speech_runtime(ws, principal.principal_id)
 
-    mode = current.mode if body.mode is None else body.mode
-    if mode not in SPEECH_MODES:
-        raise _refuse("invalid_speech_mode")
     try:
         endpoint = (
             current.endpoint if body.endpoint is None else normalise_endpoint(body.endpoint)
@@ -105,12 +101,11 @@ async def write_speech_runtime(
 
     blob = _settings_blob(ws, principal.principal_id)
     blob["voice"] = {
-        "input": mode,
         "transcription_endpoint": endpoint,
         "transcription_model": model,
     }
     SQLiteStore(ws).put_user_settings(principal.principal_id, json.dumps(blob), utc_now())
-    settings = SpeechRuntimeSettings(mode=mode, endpoint=endpoint, model=model)
+    settings = SpeechRuntimeSettings(endpoint=endpoint, model=model)
     return {"runtime": settings.to_dict(), "max_audio_bytes": MAX_AUDIO_BYTES}
 
 
@@ -134,7 +129,6 @@ async def probe_speech_runtime(
     if not endpoint:
         raise _refuse("speech_runtime_not_configured")
     candidate = SpeechRuntimeSettings(
-        mode=stored.mode,
         endpoint=endpoint,
         model=body.model.strip() if body and body.model is not None else stored.model,
     )

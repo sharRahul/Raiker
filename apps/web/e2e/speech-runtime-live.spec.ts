@@ -72,15 +72,15 @@ test("dictation can be made to run on this machine, and says so", async ({ page 
   await expect(speech.getByText("Configured")).toBeVisible();
   await capture(page, `${SHOTS}/bug-256-speech-runtime-models.png`, speech);
 
-  // ── The choice is the owner's, and Settings says which one is in use ──
-  await page.goto(`${BASE}/#/settings?tab=voice`);
-  await expect(page.getByRole("heading", { name: "Voice" })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByText("Dictation runs on this device.")).toBeVisible();
-  await page.getByRole("radio", { name: /^On this device/ }).click();
-  await expect(page.getByText("Dictation runs on this device.")).toBeVisible();
-  // The address field is disabled while a save is in flight; capture the
-  // settled page so the evidence shows the controls as an owner finds them.
-  await expect(page.getByRole("button", { name: "Save and test" })).toBeEnabled();
+  // ── There is nothing to choose, and nowhere that asks ──
+  await page.goto(`${BASE}/#/settings`);
+  await expect(page.getByRole("heading", { name: "Settings" }).first()).toBeVisible({
+    timeout: 30_000,
+  });
+  await expect(page.getByRole("button", { name: "Voice" })).toHaveCount(0);
+  await expect(page.getByRole("radiogroup", { name: /transcribed/i })).toHaveCount(0);
+  // Speech language stays in General, where it was before any of this.
+  await expect(page.getByLabel("Speech language")).toBeVisible();
   await capture(page, `${SHOTS}/bug-256-voice-settings.png`);
 
   // ── The disclosure under the microphone matches that choice ──

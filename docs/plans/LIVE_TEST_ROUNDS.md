@@ -627,10 +627,11 @@ the first round to use the checked reset it was closed with.
   the clip to Raiker, and the words arrived in the Chat draft from a service
   Raiker reaches only because the owner pointed it there
   (`bug-256-speech-runtime-models`, `bug-256-dictated-on-device`).
-* **The choice is the owner's, and the interface says which one is in use.**
-  **Settings → Voice** offers *Automatic*, *On this device* and *Browser
-  speech*; the note under the microphone changes with it, in place of the
-  sentence that always assumed the browser (`bug-256-voice-settings`).
+* **The interface says which runtime is in use, and asks nothing.** The note
+  under the microphone reads "transcribed by the speech runtime on this machine"
+  once a runtime is set up, in place of the sentence that always assumed the
+  browser. The round's first cut carried a three-way selector in a Settings
+  section; it was removed as one decision too many, and the evidence recaptured.
 * **An address that is not on this machine is refused where it is typed** — a
   hosted host and a private-network one both answered `speech_endpoint_not_local`
   before anything was contacted.

@@ -2824,20 +2824,16 @@ export interface HostPathListing {
   missing: boolean;
 }
 
-/** How dictation decides which speech runtime to use (BUG-256). */
-export type SpeechMode = "auto" | "local" | "browser";
-
-/** The owner's dictation choice, and the runtime it names. */
+/** The local transcription runtime dictation uses, if one is set up (BUG-256). */
 export interface SpeechRuntimeSettings {
-  mode: SpeechMode;
   /** The loopback address of a local transcription server, or "" for none. */
   endpoint: string;
   /** Optional, for a runtime that serves more than one model. */
   model: string;
   configured: boolean;
   /**
-   * Which runtime the microphone will actually use, resolved by the host so the
-   * settings page and the composer cannot disagree about what "auto" means.
+   * Which runtime the microphone will use, resolved by the host. A fact about
+   * this install rather than a preference — there is no mode to choose.
    */
   effective: "local" | "browser";
 }
@@ -2848,7 +2844,6 @@ export interface SpeechRuntimeView {
 }
 
 export interface SpeechRuntimeChange {
-  mode?: SpeechMode;
   endpoint?: string;
   model?: string;
 }

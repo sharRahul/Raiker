@@ -8,7 +8,6 @@
   import Personalisation from "./settings/Personalisation.svelte";
   import SecurityLogin from "./settings/SecurityLogin.svelte";
   import Privacy from "./settings/Privacy.svelte";
-  import Voice from "./settings/Voice.svelte";
   import Account from "./settings/Account.svelte";
   import Runtime from "./settings/Runtime.svelte";
   import WebAccess from "./settings/WebAccess.svelte";
@@ -153,8 +152,6 @@
       <General {settings} {save} />
     {:else if active === "notification"}
       <Notification {settings} {save} />
-    {:else if active === "voice"}
-      <Voice {settings} {save} />
     {:else if active === "personalisation"}
       <Personalisation {settings} {save} />
     {:else if active === "security"}

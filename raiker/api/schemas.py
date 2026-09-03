@@ -163,15 +163,13 @@ class ComposerApprovalModeRequest(BaseModel):
 
 
 class SpeechRuntimeRequest(BaseModel):
-    """The owner's dictation choice, and the runtime it names (BUG-256).
+    """The local transcription runtime dictation should use, if any (BUG-256).
 
-    Every field is optional so the two surfaces that write it — the Voice
-    section in Settings and the Speech runtime row on the Models page — can each
-    change only the half they own, without one silently reverting the other.
+    Both fields are optional so a caller can set the address without restating
+    the model, which is the common case: most transcription servers serve one.
     """
 
     model_config = ConfigDict(extra="forbid", protected_namespaces=())
-    mode: str | None = None
     endpoint: str | None = None
     model: str | None = None
 

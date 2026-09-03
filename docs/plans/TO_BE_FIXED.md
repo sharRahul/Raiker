@@ -108,6 +108,7 @@ names.
 | [BUG-266](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | **Closed 2026-09-03 (FIXED-364)** — the reset waits for the process, not the response, and reads the directory back |
 | [BUG-267](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | **Closed 2026-09-03 (FIXED-362)** — the boot question gets a route that answers it rather than refusing it |
 | [BUG-269](#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local) | Low | Voice / privacy posture | Open — raised 2026-09-03 while closing BUG-256. Dictation can now run on this device; playback cannot |
+| [BUG-270](#bug-270--a-fresh-install-names-an-ollama-model-nobody-has) | Medium | Models / first-run default / owner decision | Open — raised 2026-09-03. The fix is known; which of two it should be is **an owner decision**, because one of them changes what pressing Send does on an unconfigured install |
 | [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
 | [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
 | [BUG-258](FIXED_ITEMS.md#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | **Closed 2026-09-03 (FIXED-356)** — the default was `text-embedding-ada-002` |
@@ -823,7 +824,7 @@ the window the owner is looking at.
 **Closed 2026-09-03 as
 [FIXED-363](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local).**
 A local speech-to-text runtime, configured beside the other local runtimes and
-chosen in **Settings → Voice**. Fixing it also uncovered that
+used automatically when it is there. Fixing it also uncovered that
 `Permissions-Policy: microphone=()` had been denying the microphone to Raiker's
 own page, so the control could never have worked in a served build.
 
@@ -855,9 +856,9 @@ while closing
 [BUG-256](FIXED_ITEMS.md#fixed-363--dictation-was-the-last-surface-that-was-not-local).**
 
 **Observed.** Dictation can now be made to run entirely on this machine.
-**Read aloud** cannot: it calls the browser's `speechSynthesis`, and there is no
-setting for it in **Settings → Voice** beside the one that governs the
-microphone.
+**Read aloud** cannot: it calls the browser's `speechSynthesis`, and nothing in
+the product lets an owner keep it on the device the way a transcription runtime
+now does for the microphone.
 
 **Why it is lower than BUG-256 was.** What crosses the boundary is the
 *response text*, not a recording of the owner, and on most platforms the browser
@@ -870,12 +871,87 @@ differently, and nothing tells them it does.
 
 **Proposed fix.** The same shape as BUG-256, one size smaller. `speechSynthesis`
 exposes `voice.localService`; a *Use only on-device voices* choice in
-**Settings → Voice** would filter `getVoices()` to those and say plainly when a
-language has none, rather than silently falling back to a remote one. A local
+Raiker could prefer those and say plainly when a language has none, rather than
+silently using a remote one — with no setting, exactly as dictation now works. A local
 synthesis runtime — Piper or equivalent, pointed at the way the transcription
 server now is — is the fuller answer and is worth doing only if the filter turns
 out not to be enough.
 
-**Required user-interface outcome.** **Settings → Voice** governs both
-directions, and read-aloud either uses a voice that stays on this machine or
-says that it could not find one.
+**Required user-interface outcome.** Read-aloud either uses a voice that stays on
+this machine or says that it could not find one, without asking the owner to
+configure anything.
+
+---
+
+## BUG-270 — A fresh install names an Ollama model nobody has
+
+**Severity: Medium. Area: models / first-run default. Status: Open — raised
+2026-09-03. The remainder is an owner decision.**
+
+**Observed.** On a machine with no `ollama` binary and nothing listening on
+`11434`, a brand-new workspace reports:
+
+```
+current_profile_id: ollama-local-openai-compatible
+current_model:      gemma4:31b-cloud
+selected=True  configured=True  ready=False  state=not_configured
+```
+
+Models reads **"5 models set up"** and the **Global model** is *Gemma 4:31B
+Cloud*; both composers offer it as the model for the next turn. Nothing named
+there exists on the machine. (`gemma4:31b-cloud` is not even a local model — the
+`cloud` suffix is Ollama's hosted tier.)
+
+**Root cause.** `raiker/config/model-profiles.json` hard-codes
+`"model": "gemma4:31b-cloud"` on `ollama-local-openai-compatible`. Thirteen of
+the eighteen shipped profiles use the `<model>` placeholder and correctly report
+*not configured*; four more name `local-gguf`…`local-gguf-4`, which are aliases
+**Raiker itself** creates when it deploys into a slot. The Ollama entry is the
+only one naming a **third-party** model that must already exist, and it is also
+the only `is_native_default`, so a fresh install selects it.
+
+`configured` is `effective_model != "<model>"` — *"this profile names a concrete
+model string"*. [FIXED-204](FIXED_ITEMS.md#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected)
+already found that this is not a real check and fixed the **badges** to read
+`readiness_state` instead; the count, the global default and the composer chip
+still read the model string. The profile's own
+`"default_state": "disabled_until_provider_detected"` is declared and not
+honoured, because nothing detects the provider.
+
+**Why the obvious fix is not obviously right.** Changing the model to `<model>`
+makes every surface honest immediately — and it also removes the runtime's
+out-of-box fallback. Five tests encode that contract directly:
+
+```python
+def test_gateway_uses_native_default_without_selection(tmp_path):
+    assert AgentGateway(tmp_path).default_provider == ("ollama", "gemma4:31b-cloud")
+```
+
+So the decision is not cosmetic:
+
+* **A — the placeholder.** `"model": "<model>"`. Every surface stops claiming a
+  model. `gateway.default_provider` no longer resolves out of the box, so
+  pressing **Send** on an unconfigured install must fail closed with "choose a
+  model" rather than attempting a call. First-run setup already covers choosing
+  one ([FIXED-359](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it)),
+  and `test_gateway_falls_back_when_placeholder_unresolved` and
+  `default-ollama-live.spec.ts` are asserting the current behaviour and would be
+  rewritten to assert the new one.
+* **B — detect before claiming.** Keep the concrete default, and make
+  `configured` mean what the profile already says: honour
+  `disabled_until_provider_detected`. Preserves the intended experience for
+  someone who *does* have Ollama. Needs a cached detection result rather than a
+  live probe, because a status read must not perform a connection
+  ([FIXED-357](FIXED_ITEMS.md#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)).
+
+**A separate, smaller half either way.** With the Ollama entry excluded, a fresh
+install still reads **"4 models set up"** — the four empty llama.cpp slots, whose
+`local-gguf*` aliases pass the same `!= "<model>"` test. FIXED-204's own text
+says `local-gguf` "is not a model at all: it is the placeholder for a GGUF file
+the owner has yet to supply." Deploying into a slot does not currently record a
+saved connection, so there is no field that tells a served slot from an empty
+one; giving the count an honest predicate needs one.
+
+**Required user-interface outcome.** A fresh install does not name a model that
+is not installed, in the meter, in the Global model control, or in either
+composer's model chip.

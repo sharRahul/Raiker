@@ -111,14 +111,13 @@ describe("supported-preferences settings", () => {
       "Personalisation",
       "Security & sign-in",
       "Account",
-      // Voice joined the list when it gained a backend: a speech runtime that
-      // runs on this machine (BUG-256).
-      "Voice",
     ]) {
       expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
     }
     expect(screen.queryByRole("button", { name: "Storage" })).not.toBeInTheDocument();
-    // Unsupported surfaces are removed, not presented as settings.
+    // Unsupported surfaces are removed, not presented as settings. Voice has a
+    // runtime but not a decision, so it is not one either (BUG-256).
+    expect(screen.queryByRole("button", { name: "Voice" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Trusted Contact" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Data Controls" })).toBeNull();
   });

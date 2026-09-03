@@ -14,10 +14,10 @@ evidence those write-ups point at.
 
 ## Current adaptive-shell catalogue — 2026-09-03
 
-The mutable `pages/` catalogue contains 216 viewport-only PNG files:
+The mutable `pages/` catalogue contains 208 viewport-only PNG files:
 
 ```text
-27 route/tab states × 4 display classes × 2 themes = 216
+26 route/tab states × 4 display classes × 2 themes = 208
 ```
 
 Beside them sit 25 unprefixed captures (`01-workbench.png` … `25-settings.png`)

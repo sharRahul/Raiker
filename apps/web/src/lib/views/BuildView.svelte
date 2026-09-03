@@ -175,7 +175,6 @@
     void readStandingModes();
     void api.speechRuntime().then((view) => {
       speechRuntime = view.runtime.effective;
-      speechRuntimeConfigured = view.runtime.configured;
     }).catch(() => {});
     void api.settings().then((view) => {
       speechLanguage = speechLanguagePreference(view.settings["general.speech_language"]);
@@ -220,11 +219,10 @@
 
   let promptText = $state("");
   let speechLanguage = $state<SpeechLanguage>("auto");
-  // BUG-256 — which speech runtime the owner's choice resolved to. Read once on
-  // mount and defaulted to the browser, so a composer that cannot reach the host
-  // still offers dictation rather than nothing.
+  // BUG-256 — which speech runtime dictation will use. Read once on mount and
+  // defaulted to the browser, so a composer that cannot reach the host still
+  // offers dictation rather than nothing.
   let speechRuntime = $state<"browser" | "local">("browser");
-  let speechRuntimeConfigured = $state(false);
   let voiceControl = $state<VoiceDictationHandle | undefined>();
   let voiceDictated = $state(false);
   let voiceTypedBefore = $state(false);
@@ -2032,7 +2030,6 @@
               selectionEnd={promptSelectionEnd}
               language={speechLanguage}
               runtime={speechRuntime}
-              runtimeConfigured={speechRuntimeConfigured}
               disabled={streaming}
               onchange={onVoiceDraft}
               onfinalized={() => (voiceDictated = true)}

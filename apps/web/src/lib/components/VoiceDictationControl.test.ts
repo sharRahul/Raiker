@@ -132,7 +132,6 @@ describe("on-device dictation", () => {
     render(VoiceDictationControl, {
       draft: "",
       runtime: "local",
-      runtimeConfigured: true,
       adapter: recognitionAdapterFake(),
       onchange: vi.fn(),
     });
@@ -158,19 +157,6 @@ describe("on-device dictation", () => {
     ).toBeInTheDocument();
   });
 
-  it("points an owner who chose on-device at the setting that is missing", async () => {
-    render(VoiceDictationControl, {
-      draft: "",
-      runtime: "local",
-      runtimeConfigured: false,
-      adapter: recognitionAdapterFake(),
-      onchange: vi.fn(),
-    });
-    expect(screen.getByLabelText("Dictate")).toBeDisabled();
-    await fireEvent.click(screen.getByLabelText("About dictation privacy"));
-    expect(screen.getByText(/needs a speech runtime/)).toBeInTheDocument();
-  });
-
   it("says it is transcribing rather than still listening", async () => {
     // An on-device turn does not end when recording does: the clip still has to
     // be transcribed, which is exactly the wait this label exists to describe.
@@ -179,7 +165,6 @@ describe("on-device dictation", () => {
     render(VoiceDictationControl, {
       draft: "",
       runtime: "local",
-      runtimeConfigured: true,
       adapter,
       onchange: vi.fn(),
     });
@@ -196,7 +181,6 @@ describe("on-device dictation", () => {
     render(VoiceDictationControl, {
       draft: "",
       runtime: "local",
-      runtimeConfigured: true,
       adapter,
       onchange: vi.fn(),
     });

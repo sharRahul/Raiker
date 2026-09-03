@@ -61,7 +61,6 @@ const ROUTES = [
   ["observe-notifications", "observe?tab=notifications"],
   ["guide", "guide"],
   ["settings", "settings"],
-  ["settings-voice", "settings?tab=voice"],
 ] as const;
 
 const CAPTURES = [

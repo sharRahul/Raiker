@@ -19,7 +19,6 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.models.speech_runtime import (
     SpeechRuntimeError,
-    SpeechRuntimeSettings,
     normalise_endpoint,
     parse_settings,
     silent_probe_clip,
@@ -85,7 +84,6 @@ def test_reading_the_choice_contacts_nothing(client: TestClient) -> None:
     headers = _owner(client)
     body = client.get("/api/speech/runtime", headers=headers).json()
     assert body["runtime"] == {
-        "mode": "auto",
         "endpoint": "",
         "model": "",
         "configured": False,
@@ -93,20 +91,21 @@ def test_reading_the_choice_contacts_nothing(client: TestClient) -> None:
     }
 
 
-def test_an_install_with_a_runtime_dictates_on_the_device_by_default(
-    client: TestClient,
-) -> None:
-    """The default is `auto`, and `auto` prefers the machine it is running on.
+def test_setting_a_runtime_up_is_the_whole_decision(client: TestClient) -> None:
+    """There is no mode. An install with a runtime uses it; one without does not.
 
-    This is what closes BUG-256 without forcing anything: configuring a runtime
-    is the whole decision, and an install without one keeps working.
+    A switch would have asked the owner to answer a question they had already
+    answered by installing the thing, and left a second place for the two
+    surfaces to disagree.
     """
     headers = _owner(client)
     saved = client.put(
         "/api/speech/runtime", headers=headers, json={"endpoint": "http://127.0.0.1:8910"}
     ).json()
-    assert saved["runtime"]["mode"] == "auto"
     assert saved["runtime"]["effective"] == "local"
+    cleared = client.put("/api/speech/runtime", headers=headers, json={"endpoint": ""}).json()
+    assert cleared["runtime"]["effective"] == "browser"
+    assert "mode" not in cleared["runtime"]
 
 
 def test_an_address_off_this_machine_is_refused(client: TestClient) -> None:
@@ -118,30 +117,25 @@ def test_an_address_off_this_machine_is_refused(client: TestClient) -> None:
         assert refused.json()["detail"]["reason_code"] == "speech_endpoint_not_local"
 
 
-def test_each_surface_writes_only_its_own_half(client: TestClient) -> None:
-    """Settings owns the mode, the Models page owns the address; neither reverts the other."""
+def test_the_address_can_be_set_without_restating_the_model(client: TestClient) -> None:
+    """Most transcription servers serve one model; naming it is optional."""
     headers = _owner(client)
-    client.put("/api/speech/runtime", headers=headers, json={"endpoint": "http://127.0.0.1:8910"})
-    client.put("/api/speech/runtime", headers=headers, json={"mode": "browser"})
+    client.put(
+        "/api/speech/runtime",
+        headers=headers,
+        json={"endpoint": "http://127.0.0.1:8910", "model": "base.en"},
+    )
+    client.put("/api/speech/runtime", headers=headers, json={"endpoint": "http://127.0.0.1:8911"})
     body = client.get("/api/speech/runtime", headers=headers).json()["runtime"]
-    assert body["endpoint"] == "http://127.0.0.1:8910"
-    assert body["mode"] == "browser"
-    # An owner who asked for the browser gets the browser, runtime or no runtime.
-    assert body["effective"] == "browser"
-
-
-def test_asking_for_on_device_only_does_not_fall_back_to_the_browser() -> None:
-    """`local` with no runtime is a problem to report, not one to paper over."""
-    settings = SpeechRuntimeSettings(mode="local", endpoint="")
-    assert settings.effective == "local"
-    assert settings.configured is False
+    assert body["endpoint"] == "http://127.0.0.1:8911"
+    assert body["model"] == "base.en"
 
 
 def test_a_malformed_voice_section_leaves_dictation_on_the_browser() -> None:
-    sections: tuple[object, ...] = (None, [], "browser", {"input": "nonsense"})
+    sections: tuple[object, ...] = (None, [], "browser", {"transcription_endpoint": 7})
     for section in sections:
-        assert parse_settings(section).mode == "auto"
-    assert parse_settings({"input": "local"}).mode == "local"
+        assert parse_settings(section).effective == "browser"
+    assert parse_settings({"transcription_endpoint": "http://127.0.0.1:8910"}).effective == "local"
 
 
 def test_an_empty_endpoint_is_a_valid_state_not_a_refusal() -> None:
@@ -298,12 +292,16 @@ def test_a_settings_save_cannot_revert_the_runtime_address(client: TestClient) -
     saved = client.put(
         "/api/settings",
         headers=headers,
-        json={"settings": {"general.speech_language": "en", "voice": {"input": "browser"}}},
+        json={
+            "settings": {
+                "general.speech_language": "en",
+                "voice": {"transcription_endpoint": ""},
+            }
+        },
     )
     assert saved.status_code == 200, saved.text
     runtime = client.get("/api/speech/runtime", headers=headers).json()["runtime"]
     assert runtime["endpoint"] == "http://127.0.0.1:8910"
-    assert runtime["mode"] == "auto"
     # The rest of the blob is saved exactly as sent.
     assert client.get("/api/settings", headers=headers).json()["settings"][
         "general.speech_language"

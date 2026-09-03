@@ -15419,12 +15419,15 @@ than as a special case:
   still shut to anything embedded in it. Geolocation and camera have no surface
   in Raiker and stay denied outright.
 
-**The choice stays the owner's.** **Settings → Voice** offers *Automatic*, *On
-this device* and *Browser speech*, and says which one is in use. Automatic is the
-default and prefers the machine it is running on, so configuring a runtime is the
-whole decision and an install without one keeps working exactly as before.
-Choosing *On this device* with no runtime disables the button and says what is
-missing rather than quietly falling back to the browser.
+**There is no mode to choose.** Setting a runtime up is the whole decision:
+dictation uses it when one is there and the browser when none is. The first cut
+of this shipped a three-way selector in a **Settings → Voice** section, and that
+was one decision too many — it asked the owner to answer a question they had
+already answered by installing the thing, and left a second place for two
+surfaces to disagree. It was removed before merge. Speech language stays in
+**Settings → General** where it was, the runtime is configured on
+**Models → Local** beside the other local runtimes, and the only thing that
+changes with it is the sentence under the microphone.
 
 **Found while sweeping the UI, and fixed here.** Two defects the work uncovered:
 the Models speech row let its own read overwrite an address typed before the read

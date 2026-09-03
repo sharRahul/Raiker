@@ -13,9 +13,10 @@ posted to it and never written anywhere. ``whisper.cpp``'s ``whisper-server`` is
 the reference, and anything speaking either its native ``/inference`` route or
 the OpenAI-compatible ``/v1/audio/transcriptions`` route works unchanged.
 
-The choice of *whether* to use it stays the owner's. Nothing here forces local
-transcription on an install that has no runtime, and nothing here contacts a
-runtime that has not been configured.
+There is deliberately **no mode to choose**. Setting a runtime up is the whole
+decision: dictation uses it when one is there and the browser when none is. A
+switch would have made the owner answer a question they have already answered by
+installing the thing, and left a second place for the two surfaces to disagree.
 """
 
 from __future__ import annotations
@@ -31,13 +32,6 @@ import httpx
 
 from raiker.models.endpoint_policy import EndpointPolicy, validate_endpoint_policy
 from raiker.models.exceptions import ProviderPolicyError
-
-#: How the microphone decides which speech runtime to use.
-#:
-#: ``auto`` is the default and is what closes BUG-256 without forcing anything:
-#: an install with a configured local runtime dictates on the device, and one
-#: without keeps working through the browser exactly as before.
-SPEECH_MODES: Final = frozenset({"auto", "local", "browser"})
 
 #: The largest clip the host will forward. 16 kHz mono PCM16 is 32 kB a second,
 #: so this is a little over six minutes — long past the point where a dictation
@@ -62,9 +56,8 @@ class SpeechRuntimeError(RuntimeError):
 
 @dataclass(frozen=True)
 class SpeechRuntimeSettings:
-    """What the owner has chosen. Reading this contacts nothing."""
+    """The runtime the owner set up, if any. Reading this contacts nothing."""
 
-    mode: str = "auto"
     endpoint: str = ""
     model: str = ""
 
@@ -74,22 +67,15 @@ class SpeechRuntimeSettings:
 
     @property
     def effective(self) -> str:
-        """Which runtime the microphone will actually use.
+        """Which runtime the microphone will use — a fact, not a preference.
 
-        ``auto`` resolves here rather than in the browser so the setting page and
-        the composer cannot disagree about it. ``local`` stays ``local`` with no
-        endpoint: an owner who asked for on-device only should be told the
-        runtime is missing, not quietly sent to the browser instead.
+        Resolved here rather than in the browser so the composer and anything
+        that describes it cannot disagree about the answer.
         """
-        if self.mode == "browser":
-            return "browser"
-        if self.mode == "local":
-            return "local"
         return "local" if self.configured else "browser"
 
     def to_dict(self) -> dict[str, Any]:
         return {
-            "mode": self.mode,
             "endpoint": self.endpoint,
             "model": self.model,
             "configured": self.configured,
@@ -106,11 +92,9 @@ def parse_settings(section: Any) -> SpeechRuntimeSettings:
     """
     if not isinstance(section, dict):
         return SpeechRuntimeSettings()
-    mode = section.get("input")
     endpoint = section.get("transcription_endpoint")
     model = section.get("transcription_model")
     return SpeechRuntimeSettings(
-        mode=mode if isinstance(mode, str) and mode in SPEECH_MODES else "auto",
         endpoint=endpoint.strip() if isinstance(endpoint, str) else "",
         model=model.strip() if isinstance(model, str) else "",
     )

@@ -32,14 +32,15 @@ policy, model selection, approval and audit path as keyboard-created prompts.
 
 ### Speech runtime
 
-`GET /api/speech/runtime` returns the owner's dictation choice — `mode`
-(`auto`/`local`/`browser`), the loopback `endpoint` of a transcription server,
-and the `effective` runtime the host resolved from them — and contacts nothing to
-do it. `PUT` records the same fields and refuses an `endpoint` that does not
-classify as `local_machine`, with `speech_endpoint_not_local`. It is the only
-writer of the `voice` settings section: `PUT /api/settings` preserves the stored
-section rather than replacing it, because two surfaces edit it and that route
-sends the whole blob.
+`GET /api/speech/runtime` returns the loopback `endpoint` of the owner's
+transcription server, the optional `model`, and the `effective` runtime the host
+resolved from them (`local` when one is set up, `browser` when not) — and
+contacts nothing to do it. There is deliberately no mode: setting a runtime up is
+the whole decision. `PUT` records the same fields and refuses an `endpoint` that
+does not classify as `local_machine`, with `speech_endpoint_not_local`. It is the
+only writer of the `voice` settings section: `PUT /api/settings` preserves the
+stored section rather than replacing it, because that route sends the whole blob
+and would otherwise revert an address set on the Models page.
 
 `POST /api/speech/runtime/probe` asks the configured runtime to transcribe a
 moment of generated silence and reports whether it answered. `POST

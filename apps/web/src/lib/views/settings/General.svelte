@@ -8,6 +8,7 @@
   const region = $derived((settings["general.region"] as string) ?? "GB");
   const timezone = $derived((settings["general.timezone"] as string) ?? "Europe/London");
   const startupRoute = $derived((settings["general.startup_route"] as string) ?? "workbench");
+  const speechLanguage = $derived((settings["general.speech_language"] as string) ?? "auto");
 </script>
 
 <header class="section-heading">
@@ -20,6 +21,25 @@
     <h3 id="language-region">Language and region</h3>
     <p>These preferences control interface text, dates, times, and regional formatting.</p>
   </div>
+  <label>
+    <span>Speech language</span>
+    <small>Used for dictation and read-aloud in both Chat and Build.</small>
+    <select aria-label="Speech language" value={speechLanguage} onchange={(e) => save({ "general.speech_language": e.currentTarget.value })}>
+      <option value="auto">Auto (device language)</option>
+      <option value="en">English</option>
+      <option value="fr">Français</option>
+      <option value="de">Deutsch</option>
+      <option value="hi">हिन्दी</option>
+      <option value="it">Italiano</option>
+      <option value="ja">日本語</option>
+      <option value="ko">한국어</option>
+      <option value="pt">Português</option>
+      <option value="ru">Русский</option>
+      <option value="es">Español</option>
+      <option value="tr">Türkçe</option>
+      <option value="uk">Українська</option>
+    </select>
+  </label>
   <label>
     <span>Language</span>
     <small>Controls the language used throughout Raiker.</small>

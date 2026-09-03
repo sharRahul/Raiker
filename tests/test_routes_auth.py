@@ -277,3 +277,25 @@ def test_whoami_still_refuses_for_a_caller_that_needs_an_identity(
 ) -> None:
     """The governed read is unchanged; only the page's boot question moved."""
     assert client.get("/api/auth/whoami").status_code == 401
+
+
+def test_the_boot_probe_does_not_translate_every_refusal_into_nobody(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only "not authenticated" means nobody.
+
+    Reporting a null principal for any refusal would hide a fault behind the
+    lock screen, and clearing the owner's cookie on one would sign them out over
+    something that had nothing to do with their session.
+    """
+    from fastapi import HTTPException
+
+    from raiker.api import routes_auth
+
+    def refuse(*_args: object, **_kwargs: object) -> None:
+        raise HTTPException(status_code=403, detail={"reason_code": "insufficient_scope"})
+
+    monkeypatch.setattr(routes_auth.AuthMiddleware, "authenticate", refuse)
+    refused = client.get("/api/auth/session-state")
+    assert refused.status_code == 403
+    assert refused.json()["detail"]["reason_code"] == "insufficient_scope"

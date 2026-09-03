@@ -225,7 +225,13 @@ async def session_state(request: Request, response: Response) -> dict[str, Any]:
     """
     try:
         session, principal = AuthMiddleware(_ws(request)).authenticate(request)
-    except HTTPException:
+    except HTTPException as refusal:
+        # Only "not authenticated" means nobody. Any other refusal is something
+        # the caller should see rather than have translated into a null
+        # principal — and clearing the owner's cookie on one would sign them out
+        # over a fault that had nothing to do with their session.
+        if refusal.status_code != status.HTTP_401_UNAUTHORIZED:
+            raise
         clear_session_cookie(response)
         return {"principal_id": None, "display_name": None, "scope": None}
     return {

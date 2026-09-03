@@ -373,6 +373,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-358](#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | Fixed 2026-09-03 (BUG-260, BUG-263, BUG-264) |
 | [FIXED-359](#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | Fixed 2026-09-03 (BUG-261, BUG-262) |
 | [FIXED-360](#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | Fixed 2026-09-03 (BUG-265) |
+| [FIXED-361](#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | Fixed 2026-09-03 (BUG-268) |
 
 ---
 
@@ -15285,3 +15286,43 @@ generic, unchanged.
 
 **User-interface outcome.** An owner who typed the right password is not sent
 looking for a wrong one.
+
+---
+
+## FIXED-361 — The folder picker handed back `[REDACTED_SECRET]` instead of a path
+
+**Severity: High. Area: web UI / redaction. Status: Fixed — raised and closed
+2026-09-03, by Linux CI, hours after
+[FIXED-352](#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know)
+shipped.**
+
+**Observed.** `GET /api/host/paths` answered with `/[REDACTED_SECRET]` in place
+of the directory it was asked about. The picker then filled the field with that
+string, so **Browse** produced a path that names nothing.
+
+**Root cause.** `RedactionMiddleware` scans every response for
+credential-shaped values, and a filesystem path segment is a high-entropy string
+with no structure distinguishing it from a token. FIXED-352 added a route whose
+entire payload is such strings and did not consider the redactor.
+
+**Why the local run missed it.** Windows temporary directories are short and
+word-shaped; Linux runners use `pytest-of-runner/pytest-0/test_…`, which trips
+the detector. The full suite passed on the author's machine and failed in CI —
+and the same failure was waiting for any owner with a hashed, GUID-named or
+key-named folder.
+
+**Fixed.** `/api/host/paths` joins the redaction exemptions. This is right
+rather than merely convenient: the route returns directory *names* the owner
+explicitly asked to browse, over a loopback-only owner-authenticated read — the
+same information their file manager shows them — and it reads no file content,
+so there is nothing in the payload for the redactor to protect. Its job is to
+stop a credential leaking out of a response, not to censor the owner's own
+directory tree back to them.
+
+**Guarded.** `tests/test_api_host.py` browses a directory deliberately named
+like an API key and asserts the path comes back intact. The guard was checked
+against the un-exempted middleware first, so it fails when the fix is removed.
+
+**User-interface outcome.** **Browse** returns the folder that was chosen,
+whatever it is called.
+

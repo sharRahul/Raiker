@@ -225,5 +225,29 @@ def test_a_location_that_is_gone_says_so_rather_than_looking_empty(
     assert body["entries"] == []
 
 
+def test_a_secret_shaped_directory_name_survives_the_listing(
+    client: TestClient, tmp_path: Path
+) -> None:
+    """BUG-268 — the redactor cannot tell a path segment from a credential.
+
+    A directory name is a high-entropy string with no structure, so the response
+    redactor rewrote ordinary folders as ``/[REDACTED_SECRET]`` and the picker
+    handed that to the field. Linux CI found it first because its temporary
+    directories look exactly like this; an owner with a hashed or GUID-named
+    folder would have hit it on their own machine.
+    """
+    root = tmp_path / "sk-live-51H8cQ2vBnZmXpLwRtYuIoPaSdFgHjKl"
+    (root / "checkpoints-a3f9c1d4e5b60789").mkdir(parents=True)
+
+    body = client.get(
+        "/api/host/paths", params={"path": str(root)}, headers=_headers(client)
+    ).json()
+    assert body["path"] == str(root), "the path the owner is looking at must come back intact"
+    assert body["entries"][0]["name"] == "checkpoints-a3f9c1d4e5b60789"
+    assert body["entries"][0]["path"] == str(root / "checkpoints-a3f9c1d4e5b60789")
+    assert "REDACTED" not in body["path"]
+    assert "REDACTED" not in body["entries"][0]["path"]
+
+
 def test_browsing_needs_the_owner_session_like_everything_else(client: TestClient) -> None:
     assert client.get("/api/host/paths").status_code == 401

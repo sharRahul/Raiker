@@ -361,8 +361,11 @@ test("Models names providers in plain language and offers a real model list", as
   await expect(page.getByRole("heading", { name: "Choose where Raiker thinks" })).toBeVisible();
   // The internal profile id is never the thing the owner is shown.
   await expect(page.getByText("anthropic-hosted")).toHaveCount(0);
-  await page.getByRole("button", { name: /Change model/i }).first().click();
-  await expect(page.getByRole("combobox", { name: "Available models" })).toBeVisible();
+  // Choosing models is a dialog of switches now, not an inline select: each
+  // switch keeps one of the provider's models offered in every picker.
+  await page.getByRole("button", { name: /Select models/i }).first().click();
+  await expect(page.getByRole("dialog", { name: /models/i })).toBeVisible();
+  await expect(page.getByRole("checkbox").first()).toBeVisible();
   await capture(page, join(shots, "models-redesign.png"));
 });
 

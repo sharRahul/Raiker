@@ -91,6 +91,7 @@
     overflow-y: auto;
   }
   .row {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 0.45rem;
@@ -98,11 +99,17 @@
     font-size: 0.76rem;
     cursor: pointer;
   }
+  /* Transparent rather than absent: the real control keeps the size of the
+     switch it is drawn as, so it is a pointer target and an assertable element
+     in its own right instead of a zero-by-zero box behind a picture. */
   input {
     position: absolute;
+    left: 0.1rem;
     opacity: 0;
-    width: 0;
-    height: 0;
+    margin: 0;
+    width: 1.65rem;
+    height: 0.92rem;
+    cursor: pointer;
   }
   .track {
     flex: 0 0 auto;

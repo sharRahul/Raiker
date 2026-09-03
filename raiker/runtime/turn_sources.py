@@ -370,6 +370,47 @@ def source_from_tool_result(
             # openable at that exchange rather than only readable as a heading.
             anchors=anchors_from_tool_result(tool_name, output),
         )
+    # B10 — a language read cites the file it read, the same way `read_file`
+    # does. An answer built on a file's outline is drawn from that file, and an
+    # owner checking the answer should land on it.
+    if tool_name == "document_symbols":
+        path = _text(output.get("path") or args.get("path"))
+        return SourceDraft(
+            kind=kind,
+            title=f"Outline: {path}" if path else "File outline",
+            locator=path,
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", 0), "declarations"),
+            passage=passage,
+        )
+    if tool_name == "find_definition":
+        name = _text(args.get("name"), 200)
+        definitions = output.get("definitions", []) or []
+        first = definitions[0] if definitions and isinstance(definitions[0], dict) else {}
+        return SourceDraft(
+            kind=kind,
+            title=f"Defined: {name}" if name else "Definition",
+            # The declaring file is a more useful coordinate than the repository
+            # here, because the whole point of the call was to find one file.
+            locator=_text(first.get("path") or output.get("repository")),
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", 0), "declarations"),
+            passage=passage,
+        )
+    if tool_name == "diagnostics":
+        checked = output.get("checked", []) or []
+        return SourceDraft(
+            kind=kind,
+            title=(
+                f"Checked: {_text(checked[0])}"
+                if len(checked) == 1
+                else f"Checked {len(checked)} files"
+            ),
+            locator=_text(checked[0]) if len(checked) == 1 else _text(output.get("repository")),
+            tool_name=tool_name,
+            detail=_count_detail(output.get("count", 0), "problems"),
+            passage=passage,
+        )
     # The other half of the code map. `code_map_search` says where a name is
     # declared and has always been citable; this says where it is *used*, and
     # was declared alongside it and dropped in the same silence.

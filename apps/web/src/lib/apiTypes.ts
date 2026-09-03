@@ -677,7 +677,20 @@ export interface ModelProfile {
   context_window_tokens?: number | null;
   /** "provider" | "config" — which source supplied the capacity above. */
   context_window_source?: string | null;
+  /**
+   * BUG-270 — "this profile names a model that exists on this machine". It used
+   * to mean only "names a model string", which is why a host with no Ollama
+   * still saw `gemma4:31b-cloud` offered as the default. A profile declaring
+   * `disabled_until_provider_detected` now earns this by detection, a saved
+   * connection, or a completed deployment.
+   */
   configured?: boolean;
+  /**
+   * Whether the local runtime behind this profile was found on this machine.
+   * `null`/absent means nothing has looked, or the profile does not depend on
+   * one — in either case the UI says nothing rather than claiming an absence.
+   */
+  provider_detected?: boolean | null;
   /** Only API-key providers can accrue an API bill; local runtimes cannot. */
   billable?: boolean;
   /** Whether this exact provider/model profile supports a reasoning mode. */
@@ -880,6 +893,12 @@ export interface ModelsView {
   fallback_sequence: string[];
   no_silent_hosted_fallback: boolean;
   ready_provider_count?: number;
+  /**
+   * BUG-270 — models the owner actually has set up, counted on the server where
+   * the deployment and detection facts live. The browser used to derive this
+   * itself from the model string and counted four empty local slots.
+   */
+  usable_provider_count?: number;
 }
 
 export interface NativeUsageMetric {
@@ -1741,6 +1760,15 @@ export interface TaskView {
   parent_task_id?: string | null;
   model_profile?: string | null;
   model?: string | null;
+  /**
+   * C11 — this task's own conversation. Every cycle runs in it, so a routine
+   * accumulates a readable thread rather than interleaving its turns with every
+   * other task's in one hidden Inbox transcript. Null for a task created before
+   * threads existed.
+   */
+  thread_session_id?: string | null;
+  /** How many turns that thread holds. Zero means there is nothing to open. */
+  thread_turns?: number;
   attachments?: PromptAttachment[];
 }
 
@@ -2761,6 +2789,30 @@ export interface CodeRepoBrowseView {
   root_missing: boolean;
   /** Which of those two, so the interface can say which; "" when present. */
   reason_code?: string;
+}
+
+// B10 — parse-level problems for one open file, from the same service and the
+// same `language_intelligence` gate the agent's own `diagnostics` tool uses.
+//
+// `checked` is the field that carries the honesty contract: false means this
+// runtime has no parser for the file's language and it was NOT looked at. A
+// surface must say "not checked" for it, never "no problems".
+export interface CodeRepoDiagnostic {
+  path: string;
+  line: number;
+  column: number;
+  severity: string;
+  message: string;
+  source: string;
+}
+
+export interface CodeRepoDiagnosticsView {
+  path: string;
+  checked: boolean;
+  available: boolean;
+  reason_code: string;
+  reason: string;
+  diagnostics: CodeRepoDiagnostic[];
 }
 
 // B13 — one bounded text file for the read-only viewer. A file that cannot be

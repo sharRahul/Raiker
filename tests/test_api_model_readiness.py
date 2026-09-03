@@ -49,7 +49,18 @@ def _auth(token: str) -> dict[str, str]:
 def test_native_default_is_selected_but_not_ready_without_a_check(
     client: TestClient,
     owner_token: str,
+    workspace: Path,
 ) -> None:
+    """With Ollama installed, the shipped default is selected and unproven.
+
+    BUG-270 made `configured` mean "names a model that exists here" rather than
+    "names a model string", so this — the case where it does exist — states the
+    detection that makes the claim true. `ready` is still False: detection finds
+    a binary, and only a readiness check finds a model that answers.
+    """
+    SQLiteStore(workspace).save_local_runtime_presence(
+        "ollama", present=True, executable="/usr/local/bin/ollama"
+    )
     body = client.get("/api/models", headers=_auth(owner_token)).json()
 
     ollama = next(
@@ -59,9 +70,31 @@ def test_native_default_is_selected_but_not_ready_without_a_check(
     )
     assert ollama["selected"] is True
     assert ollama["configured"] is True
+    assert ollama["provider_detected"] is True
     assert ollama["ready"] is False
     assert ollama["readiness_state"] == "not_configured"
     assert body["ready_provider_count"] == 0
+
+
+def test_undetected_native_default_is_not_configured_and_not_selected(
+    client: TestClient,
+    owner_token: str,
+) -> None:
+    """BUG-270 — nothing on this host serves `gemma4:31b-cloud`, so nothing says so."""
+    body = client.get("/api/models", headers=_auth(owner_token)).json()
+
+    ollama = next(
+        profile
+        for profile in body["profiles"]
+        if profile["profile_id"] == "ollama-local-openai-compatible"
+    )
+    assert ollama["selected"] is False
+    assert ollama["configured"] is False
+    assert ollama["provider_detected"] is False
+    assert body["current_profile_id"] is None
+    # The four empty llama.cpp slots carry `local-gguf…` model strings and used
+    # to be counted the same way, which is the other half of "5 models set up".
+    assert body["usable_provider_count"] == 0
 
 
 def test_check_marks_only_the_exact_catalogue_model_ready(

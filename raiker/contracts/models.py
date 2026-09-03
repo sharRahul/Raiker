@@ -1005,8 +1005,24 @@ class TaskRecord:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    # C11 — this task's own conversation. Every cycle of a routine runs in it, so
+    # the routine accumulates a readable thread instead of interleaving its turns
+    # with every other task's in one shared `sess_inbox_<principal>` transcript.
+    # The owner can open it in Chat and reply, and the reply is in the same
+    # conversation the next cycle runs in, which is what makes it steer.
+    #
+    # `session_id` stays the inbox: it is where the owner principal is carried,
+    # and a task created before this existed has no thread and still works.
+    thread_session_id: str | None = None
     attachments: list[dict[str, Any]] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
+
+    #: Where this task's governed turns run. The thread when it has one, and the
+    #: inbox for a task created before threads existed — one place that answers
+    #: it, so the scheduler, the resume path and the API cannot disagree.
+    @property
+    def run_session_id(self) -> str:
+        return self.thread_session_id or self.session_id
 
     def __post_init__(self) -> None:
         _schema(self.schema_version)

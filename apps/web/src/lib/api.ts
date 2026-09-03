@@ -32,6 +32,7 @@ import type {
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
+  CodeRepoDiagnosticsView,
   CodeRepoFileView,
   CodeReposView,
   CredentialLifecycle,
@@ -644,6 +645,18 @@ export const api = {
       profile_id,
       model,
     }),
+  // BUG-270 — which local model runtimes are installed on this machine.
+  // Detection is a PATH lookup cached in a row, so the read is free and this
+  // POST is the owner saying "I just installed one, look again".
+  detectLocalRuntimes: () =>
+    postJson<{
+      runtimes: {
+        runtime: string;
+        present: boolean;
+        executable: string | null;
+        detected_at: string;
+      }[];
+    }>("/api/local-runtimes/detect", {}),
   // Where each work surface's model picker starts. A preference only: the turn
   // still names its exact profile and model, and readiness judges that pair.
   surfaceModels: () =>
@@ -1833,6 +1846,11 @@ export const api = {
   readCodeRepoFile: (repoId: string, path: string) =>
     request<CodeRepoFileView>(
       `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
+    ),
+  // B10 — what a parser sees in the file the owner just opened.
+  readCodeRepoDiagnostics: (repoId: string, path: string) =>
+    request<CodeRepoDiagnosticsView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/diagnostics?path=${encodeURIComponent(path)}`,
     ),
   connectLocalRepo: (path: string) =>
     postJson<{ ok: boolean; repo_id: string; local_subpath: string }>(

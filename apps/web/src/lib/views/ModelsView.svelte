@@ -295,6 +295,10 @@
   // providers answering when one did. Keyed by profile id, a card renders only
   // its own result and hosted cards keep their independent status.
   let testResults = $state<Record<string, string>>({});
+  // BUG-270 — the owner has just installed a runtime and wants the card to stop
+  // saying it is missing. One flag for the whole view: detection is a single
+  // pass over every runtime, not a per-provider operation.
+  let detecting = $state(false);
   let detailsFor = $state<ModelProfile | null>(null);
   // Governed refusals are policy outcomes, not faults. Hold the reason code so
   // the dialog can render the control that unblocks it instead of a bare code.
@@ -454,6 +458,19 @@
   // the exact-model readiness check and reports (and records) that verdict;
   // profiles with no model pinned still get the catalogue reachability note,
   // which is the only honest answer available for them.
+  async function redetectRuntimes() {
+    detecting = true;
+    try {
+      await api.detectLocalRuntimes();
+      await load();
+    } catch {
+      // A failed look leaves the last answer standing rather than replacing it
+      // with a claim this call did not establish.
+    } finally {
+      detecting = false;
+    }
+  }
+
   async function testConnection(profile: ModelProfile) {
     const id = profile.profile_id;
     testing = { ...testing, [id]: true };
@@ -748,10 +765,23 @@
   // Set up and usable, whether or not the last observation is still inside its
   // window. This is what an owner means by "I have models"; `readyCount` is
   // what Raiker has actually proven.
+  //
+  // BUG-270 — the local half of this is a fact the browser cannot see. Four
+  // empty llama.cpp slots carry `local-gguf…` model strings and the Ollama
+  // native default names a third-party model, so `model !== "<model>"` counted
+  // five models on a machine with none of them installed. The server now answers
+  // it from the deployment rows and the cached runtime detection; this reads
+  // that number and only falls back to the old client-side shape when an older
+  // backend sends no field.
   const usableCount = $derived(
-    (models?.profiles ?? []).filter(
-      (p) => p.model !== "<model>" && isChoosableModel(p) && (p.connection_configured || !p.off_machine),
-    ).length,
+    models?.usable_provider_count ??
+      (models?.profiles ?? []).filter(
+        (p) =>
+          p.configured !== false &&
+          p.model !== "<model>" &&
+          isChoosableModel(p) &&
+          (p.connection_configured || !p.off_machine),
+      ).length,
   );
 
   // Each provider's bar is its share of total spend across every provider, so
@@ -1138,6 +1168,26 @@
                             >{:else}<code>{modelName(p.model)}</code>{/if}
                         </p>
                         <p class="row-help">{providerHelp(p)}</p>
+                        <!-- BUG-270 — "On this device" is a section whose whole
+                             claim is about this device, so the one fact it can
+                             state without measuring anything belongs here:
+                             whether the runtime is installed at all. Rendered
+                             only when detection has an answer — `undefined`
+                             means nothing has looked, and silence is honest
+                             then. -->
+                        {#if p.provider_detected === false}
+                          <p class="posture-line runtime-missing">
+                            <Icon name="warning" size={14} />
+                            Not installed on this machine
+                            <button
+                              type="button"
+                              class="link-button"
+                              onclick={() => void redetectRuntimes()}
+                              disabled={detecting}
+                              >{detecting ? "Looking…" : "Look again"}</button
+                            >
+                          </p>
+                        {/if}
                         <div class="chips">
                           <span class="chip"
                             >{endpointLabel(p.endpoint_kind)}</span
@@ -1306,6 +1356,27 @@
                            the posture is one quiet line. -->
                       {#if posture(p) !== ""}
                         <p class="posture-line">{posture(p)}</p>
+                      {/if}
+                      <!-- BUG-270 — a local runtime that is not on this machine
+                           is the one thing the card can say without measuring
+                           anything, and it is exactly what an owner needs to
+                           read before wondering why a model they never
+                           installed is not answering. Only rendered when
+                           detection has an answer: `provider_detected` is null
+                           when nothing has looked, and silence is the honest
+                           output then. -->
+                      {#if p.provider_detected === false}
+                        <p class="posture-line runtime-missing">
+                          <Icon name="warning" size={14} />
+                          Not installed on this machine
+                          <button
+                            type="button"
+                            class="link-button"
+                            onclick={() => void redetectRuntimes()}
+                            disabled={detecting}
+                            >{detecting ? "Looking…" : "Look again"}</button
+                          >
+                        </p>
                       {/if}
                       <!-- Shown only where there is something to report: a
                            local runtime that cannot bill and a provider with no
@@ -2113,6 +2184,30 @@
     margin: 0.1rem 0 0;
     color: var(--text-3);
     font-size: 0.74rem;
+  }
+  /* BUG-270 — the one line on a provider card that is about this machine
+     rather than about a provider. It carries the warning tone because it is
+     the reason nothing on the card will answer, and it wraps rather than
+     truncating so the "Look again" action survives a narrow window. */
+  .runtime-missing {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    color: var(--warn, var(--text-2));
+  }
+  .runtime-missing .link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .runtime-missing .link-button:disabled {
+    cursor: default;
+    opacity: 0.6;
   }
   .details-actions {
     display: flex;

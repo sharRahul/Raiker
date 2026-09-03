@@ -265,6 +265,10 @@ const DOMAIN_OF: Record<string, (typeof CAPABILITY_DOMAIN_ORDER)[number]> = {
   // B9 — the repository code map. Workspace, beside the file capabilities, because
   // it reads workspace files and writes a derived index and reaches nothing else.
   code_map_indexing: "Workspace",
+  // B10 — beside the code map, and separate from it. The map writes a derived
+  // index of this machine; these three only parse a file the agent may already
+  // open, so an owner can have either without the other.
+  language_intelligence: "Workspace",
   graph_codemap_planning: "Workspace",
   graph_indexing_runtime: "Workspace",
   semantic_memory_runtime: "Workspace",
@@ -484,6 +488,11 @@ const CAPABILITY_COPY: Record<string, CapabilityCopy> = {
     label: "Code map",
     description:
       "Index this repository's files and what they declare, so the agent can find a definition instead of guessing a search pattern. Local and read-derived: it reads files the agent may already open, returns coordinates rather than code, and never leaves this machine.",
+  },
+  language_intelligence: {
+    label: "Language intelligence",
+    description:
+      "Let the agent outline a file, jump to where a name is declared, and check a file for syntax problems after editing it. Parses files on this machine and writes nothing — not even an index. Diagnostics are parse-level: a language with no parser here is reported as not checked, never as clean.",
   },
   graph_codemap_indexing: {
     label: "Graph memory indexing (not implemented)",

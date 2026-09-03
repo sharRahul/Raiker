@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
 from raiker.cli.principal_resolver import bootstrap_owner
+from raiker.storage.sqlite import SQLiteStore
 
 
 @pytest.fixture
@@ -63,7 +64,22 @@ class TestDiagnostics:
             assert {"profile_id", "provider", "requires_network", "local_only"} <= set(entry)
 
     def test_fresh_workspace_has_a_shipped_default_model(self, workspace: Path, client: TestClient) -> None:
-        # Ollama gemma4:31b-cloud is the usable local default, so a fresh
-        # workspace must not claim that model selection is missing.
+        # Ollama gemma4:31b-cloud is the usable local default *once the runtime
+        # is on the machine*. BUG-270: it was reported as the selection whether
+        # or not it was, so diagnostics stayed silent on a host that could not
+        # run a turn. With the runtime detected, the original contract holds.
+        SQLiteStore(workspace).save_local_runtime_presence(
+            "ollama", present=True, executable="/usr/local/bin/ollama"
+        )
         body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
         assert not any("model profile" in gap.lower() for gap in body["missing_config"])
+
+    def test_fresh_workspace_without_the_runtime_names_the_gap(
+        self, workspace: Path, client: TestClient
+    ) -> None:
+        # BUG-270 — and this is the answer it was hiding. With no `ollama` on
+        # the machine there is genuinely no model selected, and diagnostics
+        # saying so is the difference between a fixable gap and a turn that
+        # fails for reasons the owner cannot see.
+        body = client.get("/api/diagnostics", headers=_headers(workspace)).json()
+        assert any("model profile" in gap.lower() for gap in body["missing_config"])

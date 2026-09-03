@@ -60,6 +60,80 @@ function models(partial: Partial<ModelsData>): ModelsData {
   };
 }
 
+describe("BUG-270 — a card never claims a runtime that is not here", () => {
+  it("says a local runtime is not installed and offers to look again", async () => {
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            configured: false,
+            provider_detected: false,
+          }),
+        ],
+        usable_provider_count: 0,
+      }),
+      "POST /api/local-runtimes/detect": { runtimes: [] },
+    });
+    render(ModelsView, { tab: "local" });
+
+    // The line carries a warning icon and an inline action, so it is matched on
+    // the element that holds all three rather than on a bare text node.
+    expect(
+      await screen.findByText(/Not installed on this machine/),
+    ).toBeTruthy();
+    await fireEvent.click(await screen.findByRole("button", { name: "Look again" }));
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/local-runtimes/detect",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
+  it("says nothing about a machine nothing has looked at", async () => {
+    // `provider_detected` absent means either no detector ran or the profile
+    // does not depend on a local runtime. Neither licenses claiming an absence.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "local" });
+
+    await waitFor(() =>
+      expect(screen.getAllByRole("heading", { name: "Ollama" }).length).toBeGreaterThan(0),
+    );
+    expect(screen.queryByText(/Not installed on this machine/)).toBeNull();
+  });
+
+  it("counts models set up from the server rather than from the model string", async () => {
+    // Four empty llama.cpp slots carry `local-gguf…` aliases, which is what the
+    // browser used to count. The server knows which of them serve anything.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({ profile_id: "raiker-local-llama-cpp", model: "local-gguf" }),
+          profile({ profile_id: "raiker-local-llama-cpp-2", model: "local-gguf-2" }),
+        ],
+        usable_provider_count: 0,
+        ready_provider_count: 0,
+      }),
+    });
+    render(ModelsView, { tab: "local" });
+
+    expect(await screen.findByText("No model ready")).toBeTruthy();
+  });
+});
+
 describe("ModelsView state grammar", () => {
   it("refreshes connected provider catalogues before reloading model choices", async () => {
     const mock = stubFetch({

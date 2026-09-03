@@ -83,6 +83,12 @@ ESTABLISHING_TOOLS = frozenset({
     "git_log",
     "code_map_search",
     "code_map_references",
+    # B10 — outlining a file or looking a definition up in it is looking at it,
+    # for exactly the reason `read_file` is: a turn that did either has
+    # demonstrably reached that path.
+    "document_symbols",
+    "find_definition",
+    "diagnostics",
     # A write already made in this turn establishes its own target: a second
     # edit to a file the turn just created is the same work continuing.
     "write_file",

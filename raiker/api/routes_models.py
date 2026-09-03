@@ -26,6 +26,7 @@ from raiker.api.schemas import (
     SurfaceModelDefaultRequest,
 )
 from raiker.api.sessions import ApiSession
+from raiker.models import local_presence
 from raiker.models.conversion import ConversionRefused, ModelConversionService
 from raiker.models.huggingface import HfVariant, HuggingFaceAccessError, HuggingFaceService
 from raiker.models.library import ModelLibraryService
@@ -217,6 +218,62 @@ def update_model_setup(
             created_at=current.created_at,
         )
     ).to_dict()
+
+
+@router.get("/api/local-runtimes")
+def list_local_runtimes(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """What local model runtimes were last found on this machine (BUG-270).
+
+    A pure row read. The detection that wrote those rows is a PATH lookup and
+    never a connection, so neither this route nor the dashboard read it feeds
+    can contact a provider (FIXED-357).
+    """
+    _session, principal = auth_data
+    _require_human(principal)
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    return {
+        "runtimes": [
+            {
+                "runtime": result.runtime,
+                "present": result.present,
+                "executable": result.executable,
+                "detected_at": result.detected_at,
+            }
+            for result in sorted(local_presence.cached(store).values(), key=lambda r: r.runtime)
+        ]
+    }
+
+
+@router.post("/api/local-runtimes/detect")
+def detect_local_runtimes(
+    request: Request,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Look again, now — the owner just installed something (BUG-270).
+
+    Detection is cached for an hour so a status read costs a row read rather
+    than a PATH scan. That cache is exactly wrong in the one minute after an
+    owner installs Ollama, so this forces a fresh look and nothing else.
+    """
+    _session, principal = auth_data
+    _require_human(principal)
+    store = SQLiteStore(request.app.state.workspace_root)  # type: ignore[attr-defined]
+    return {
+        "runtimes": [
+            {
+                "runtime": result.runtime,
+                "present": result.present,
+                "executable": result.executable,
+                "detected_at": result.detected_at,
+            }
+            for result in sorted(
+                local_presence.detect(store, force=True).values(), key=lambda r: r.runtime
+            )
+        ]
+    }
 
 
 @router.post("/api/model-operations/preview")

@@ -32,6 +32,7 @@ from raiker.contracts.models import (
     PromptEnvelope,
     PromptOptions,
     PromptPayload,
+    TaskRecord,
     UserMetadata,
 )
 from raiker.events.writer import EventLogWriter
@@ -83,7 +84,7 @@ class TaskScheduler:
         """
         resumed = 0
         for task in self.store.list_tasks(status="waiting_for_approval"):
-            resumed += await self._resume_task(task.task_id, task.session_id)
+            resumed += await self._resume_task(task)
         return resumed
 
     async def resume_task(self, task_id: str, owner_principal_id: str) -> dict[str, object]:
@@ -105,7 +106,7 @@ class TaskScheduler:
             return {"ok": False, "reason_code": "task_not_found"}
         if task.status not in ("waiting_for_approval", "paused"):
             return {"ok": False, "reason_code": f"task_not_resumable:{task.status}"}
-        ran = await self._resume_task(task_id, task.session_id)
+        ran = await self._resume_task(task)
         current = self.store.load_task(task_id)
         return {
             "ok": ran > 0,
@@ -114,8 +115,17 @@ class TaskScheduler:
             "summary": (current.summary if current is not None else "") or "",
         }
 
-    async def _resume_task(self, task_id: str, session_id: str) -> int:
-        """Continue every resolved-but-unclaimed turn parked under one task."""
+    async def _resume_task(self, task: TaskRecord) -> int:
+        """Continue every resolved-but-unclaimed turn parked under one task.
+
+        C11 — the owner principal comes from the task's ``session_id`` (the
+        Inbox, which is where it has always been carried) and the parked turn is
+        looked for in ``run_session_id`` (the task's own thread, when it has
+        one). Reading the two from separate fields is what lets a routine own a
+        conversation without the resume path losing track of whose it is.
+        """
+        task_id = task.task_id
+        session_id = task.session_id
         principal_id = session_id.removeprefix("sess_inbox_")
         manager = TaskManager(self.store, EventLogWriter(self.store))
         if principal_id == session_id or self.store.get_principal(principal_id) is None:
@@ -123,7 +133,9 @@ class TaskScheduler:
                 task_id, "This scheduled run has no valid owner, so it cannot continue."
             )
             return 0
-        turns = self.store.list_resumable_suspended_turns(principal_id, session_id=session_id)
+        turns = self.store.list_resumable_suspended_turns(
+            principal_id, session_id=task.run_session_id
+        )
         if not turns:
             # Still waiting on the decision. Not an error, and not a state
             # change: the card already says exactly this.
@@ -199,20 +211,24 @@ class TaskScheduler:
                 continue
             prompt = task.objective or task.title
             turn_id = new_id("turn_")
+            # C11 — the cycle runs in the task's own conversation, so the
+            # routine accumulates a readable thread and anything the owner
+            # replied there is already in the context this cycle reads.
+            run_session_id = task.run_session_id
             for attachment in task.attachments:
                 attachment_id = str(attachment.get("attachment_id", ""))
                 if attachment_id and self.store.load_attachment_metadata(
                     attachment_id, owner_principal_id=principal_id
                 ) is not None:
                     self.store.save_session_attachment_ref(
-                        session_id=task.session_id,
+                        session_id=run_session_id,
                         attachment_id=attachment_id,
                         owner_principal_id=principal_id,
                         turn_id=turn_id,
                     )
             response = await AgentGateway(self.workspace_root, principal_id=principal_id).submit_prompt_async(
                 PromptEnvelope(
-                    request_id=new_id("req_"), session_id=task.session_id, turn_id=turn_id,
+                    request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
                     client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
                     user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt, attachments=task.attachments),
                     options=PromptOptions(

@@ -330,3 +330,88 @@ class CodeMapIndexExecutor:
             summary=str(error.get("message", "Code map indexing failed closed.")),
             artifacts={},
         )
+
+
+class LanguageIntelligenceExecutor:
+    """B10 — outline a file, resolve a definition, or check a file for problems.
+
+    The three reads have to be reachable through the governed action path and not
+    only through the model's tool broker, for the same reason the code map's scan
+    is: a capability with no executor is stripped of its enable targets by the
+    activation layer and reads as *deferred* in the interface. A gate the owner
+    cannot turn on is not a control; it is a label.
+
+    It writes nothing at all — not even a derived index, which is the one thing
+    the code map beside it does write. Every answer is a parse of a file the agent
+    may already open with ``read_file``, so this grants no authority the turn did
+    not already have.
+    """
+
+    capability = "language_intelligence"
+
+    #: What ``operation`` may name. Kept as a set so an unknown operation is
+    #: refused by name rather than silently falling through to a default.
+    OPERATIONS = ("document_symbols", "find_definition", "diagnostics")
+
+    def __init__(self, workspace_root: str | Path, store: SQLiteStore) -> None:
+        self._workspace_root = Path(workspace_root).resolve()
+        self._store = store
+
+    def execute(self, action: GovernedAction, principal: Principal) -> ExecutionResult:
+        from raiker.graph.language_service import LanguageIntelligenceService
+
+        service = LanguageIntelligenceService(
+            self._workspace_root, self._store, principal_id=principal.principal_id
+        )
+        operation = str(action.arguments.get("operation", "document_symbols"))
+        if operation not in self.OPERATIONS:
+            return ExecutionResult(
+                ok=False, capability=self.capability, action_id=action.action_id,
+                reason_code=f"unknown_operation:{operation}",
+                summary=(
+                    "Language intelligence supports "
+                    + ", ".join(f"'{name}'" for name in self.OPERATIONS)
+                    + "."
+                ),
+            )
+        if operation == "document_symbols":
+            result = service.document_symbols(str(action.arguments.get("path", "")))
+            summary = (
+                f"{result.get('count', 0)} declaration(s) in {result.get('path', '')}."
+                if result.get("status") == "success"
+                else ""
+            )
+        elif operation == "find_definition":
+            from_path = action.arguments.get("from_path")
+            result = service.find_definition(
+                str(action.arguments.get("name", "")),
+                from_path=str(from_path) if from_path else None,
+            )
+            summary = (
+                f"{result.get('count', 0)} declaration(s) of {result.get('name', '')}."
+                if result.get("status") == "success"
+                else ""
+            )
+        else:
+            raw = action.arguments.get("paths", [])
+            paths = [str(item) for item in raw] if isinstance(raw, (list, tuple)) else []
+            result = service.diagnostics(paths)
+            summary = (
+                f"{result.get('count', 0)} problem(s) across "
+                f"{len(result.get('checked', []))} checked file(s); "
+                f"{len(result.get('unsupported', []))} not checked."
+                if result.get("status") == "success"
+                else ""
+            )
+        if result.get("status") == "success":
+            return ExecutionResult(
+                ok=True, capability=self.capability, action_id=action.action_id,
+                summary=summary, artifacts=result,
+            )
+        error = result.get("error", {}) if isinstance(result.get("error"), dict) else {}
+        return ExecutionResult(
+            ok=False, capability=self.capability, action_id=action.action_id,
+            reason_code=str(error.get("type", "language_intelligence_failed")),
+            summary=str(error.get("message", "Language intelligence failed closed.")),
+            artifacts={},
+        )

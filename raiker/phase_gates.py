@@ -109,6 +109,11 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     # the "two lists that have to agree" defect this codebase keeps finding, so
     # the code map answers to its own name and the Phase-3 contract stays true.
     "code_map_indexing",
+    # B10 — symbols and parse-level diagnostics over the repository Build points
+    # at. A sibling of the code map rather than part of it: the map *writes* a
+    # derived index of the owner's machine, these only read files the agent may
+    # already open, and an owner should be able to have one without the other.
+    "language_intelligence",
 }
 
 ALL_CAPABILITIES = (

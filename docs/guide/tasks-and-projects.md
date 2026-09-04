@@ -30,6 +30,14 @@ forty exactly as they did to cycle one, and a schedule only fires while Raiker i
 running on this device — a closed laptop is a missed slot, and an elapsed slot is
 skipped rather than run late.
 
+**Every task has a conversation of its own.** Each cycle runs in it, so a routine
+builds up a readable history instead of overwriting a one-line summary. The card
+carries **Thread · N** once there is something to read; it opens in Chat, where
+you can see what each cycle actually did and **reply**. A reply is not a note
+filed somewhere — the next cycle runs in that same conversation and reads it, so
+replying is how you steer a routine without editing its instructions. Routine
+threads also appear on **Threads** beside your own conversations.
+
 Use the attachment panel to add a workspace path, image, or document. The same
 governed attachment payload used by Chat and Build is stored with the task and
 delivered when its scheduler turn starts. Attached files appear on the task card

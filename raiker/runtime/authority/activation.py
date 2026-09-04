@@ -91,6 +91,13 @@ def _build_registry() -> dict[str, ActivationRequirement]:
         notes="Local read-derived symbol index; no egress, no mutation outside the index.",
     )
 
+    # B10 — language intelligence. Tier 1 for the same reason and with less
+    # reach: it reads workspace files and writes nothing at all.
+    r["language_intelligence"] = _req(
+        "language_intelligence", "1",
+        notes="Local parse of workspace files; no egress, no index, no mutation.",
+    )
+
     # Runtime domain — Tier 1
     for cap in ("approval_execution_relay", "file_write_execution", "patch_apply_execution"):
         r[cap] = _req(cap, "1", notes="First-slice caps; executor registered.")

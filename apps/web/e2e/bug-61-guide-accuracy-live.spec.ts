@@ -158,8 +158,9 @@ test("getting-started — the sidebar groups are the ones the guide lists", asyn
     "Workbench",
     "Chat",
     "Build",
-    // The rail says "Search chats"; the guide once called it "Search Chat".
-    "Search chats",
+    // The rail says "Threads" since C18 made this the board as well as the
+    // search; the guide once called it "Search Chat".
+    "Threads",
     "Tasks",
     "Projects",
     "Memory",

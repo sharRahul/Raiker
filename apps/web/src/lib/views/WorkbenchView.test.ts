@@ -15,15 +15,28 @@ afterEach(() => {
   resetModels();
 });
 
+// C18 — "continue working" reads threads, not sessions: the owner's own
+// conversations *and* the threads a routine is advancing on its own (C11).
 const SESSION = {
   session_id: "sess_1",
   title: "Draft the quarterly note",
-  status: "active",
-  created_at: "2026-07-20T00:00:00Z",
+  kind: "chat",
   updated_at: "2026-07-24T00:00:00Z",
   turn_count: 3,
-  pinned: false,
-  tags: [],
+  project_id: null,
+  project_name: null,
+};
+
+const ROUTINE_THREAD = {
+  session_id: "sess_routine",
+  title: "Overnight research",
+  kind: "routine",
+  updated_at: "2026-07-25T00:00:00Z",
+  turn_count: 6,
+  project_id: null,
+  project_name: null,
+  task_id: "t_agent",
+  cadence: "daily",
 };
 
 function task(partial: Record<string, unknown>) {
@@ -66,7 +79,7 @@ const SCHEDULED = task({
 
 function routes(overrides: Record<string, unknown> = {}) {
   return {
-    "GET /api/sessions": [SESSION],
+    "GET /api/work-threads": [SESSION],
     "GET /api/tasks": [],
     "GET /api/approvals": [],
     "GET /api/projects": {
@@ -226,12 +239,32 @@ describe("WorkbenchView", () => {
     expect(screen.getAllByText(/no work was started or changed/i)).not.toHaveLength(0);
   });
 
-  it("offers only conversations to resume, never a task's own server-owned session", async () => {
+  it("offers threads to resume, never a task's own server-owned Inbox session", async () => {
     const fetchMock = stubFetch(routes());
     render(WorkbenchView);
 
     await waitFor(() => expect(screen.getByText(SESSION.title)).toBeInTheDocument());
-    const sessionCall = fetchMock.mock.calls.find(([url]) => String(url).includes("/api/sessions"));
-    expect(String(sessionCall?.[0])).toContain("origin=chat");
+    // The read is the thread board, which excludes the Inbox by construction —
+    // it lists conversations and per-task threads, and the Inbox is neither.
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes("/api/work-threads")),
+    ).toBe(true);
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).includes("/api/sessions")),
+    ).toBe(false);
+  });
+
+  it("offers a routine's own thread to continue, and says it is one", async () => {
+    // Before C11 a routine's cycles ran in a hidden shared transcript, so there
+    // was nothing here to continue and no way to tell a routine from a chat.
+    stubFetch(routes({ "GET /api/work-threads": [SESSION, ROUTINE_THREAD] }));
+    render(WorkbenchView);
+
+    await waitFor(() => expect(screen.getByText("Overnight research")).toBeInTheDocument());
+    expect(screen.getByRole("link", { name: "Overnight research" })).toHaveAttribute(
+      "href",
+      "#/new-chat?session=sess_routine",
+    );
+    expect(screen.getByText(/Routine ·/)).toBeInTheDocument();
   });
 });

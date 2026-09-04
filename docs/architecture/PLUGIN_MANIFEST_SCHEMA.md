@@ -127,7 +127,7 @@ All entrypoints are metadata during Phase 3 planning unless the relevant runtime
 | `channels` | External channel connectors | Phase 4 | Pairing/sender trust required. |
 | `tools` | Tool adapters | Phase 3 | Must register through Tool Broker. |
 | `mcp_servers` | MCP server definitions | Phase 3 to Phase 4 | Startup disabled until trust and approval gates exist. |
-| `lsp_servers` | LSP/code-intelligence server definitions | Phase 3 | Startup disabled until workspace/plugin trust. |
+| `lsp_servers` | LSP/code-intelligence server definitions | Not planned | Accepted and inert: Raiker has no language-server client, by decision. See below. |
 | `monitors` | Background monitor/watch definitions | Phase 4 | Disabled by default; shell-equivalent approval required. |
 | `tui_panels` | Terminal panels | Phase 3 | Display-only unless action permissions granted. |
 | `web_panels` | Web/dashboard panels | Phase 3 | Must use shared workspace/action contracts. |
@@ -321,6 +321,25 @@ point:
   and the result is an *offer* the owner adds through the ordinary governed create
   path (FIXED-260). Nothing is activated by the declaration.
 - **LSP servers are accepted-and-inert because there is no surface**, not because
-  a gate has not opened. Raiker has no language-server client at all, so this
-  field currently has no destination — tracked as BUG-227. The other inert fields
-  above have a surface waiting behind a gate; this one does not.
+  a gate has not opened. The other inert fields above have a surface waiting
+  behind a gate; this one does not.
+
+  **BUG-227's first question is now answered: Raiker does not want an LSP
+  client.** A language server is a long-running subprocess that reads the
+  workspace, so it would need `CommandService`'s execution boundary, its own
+  lifecycle, its own capability, and a crash-recovery story — a large governed
+  subsystem. What Build actually needed from language intelligence is delivered
+  without one, as GAP-BUILD B10: `document_symbols`, `find_definition` and
+  `diagnostics`, governed by the `language_intelligence` capability and
+  implemented in `raiker/graph/language_service.py`. They parse files this
+  process can already read, hold no state, and cannot outlive the turn that
+  asked.
+
+  What that decision costs is stated rather than hidden: no cross-file type
+  inference, no rename refactoring, no completions, and diagnostics that are
+  parse-level rather than type-level. A file in a language this runtime cannot
+  parse is reported as **not checked**, never as clean. If a future need makes
+  those costs binding, this field becomes an *offer* in the FIXED-260 sense — a
+  language server is a tool source, not an install — and step 2 of BUG-227
+  (execution boundary, capability, lifecycle) is the prerequisite, not the
+  manifest field.

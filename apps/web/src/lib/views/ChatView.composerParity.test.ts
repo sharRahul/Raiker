@@ -97,6 +97,33 @@ const NON_REASONING_PROFILE = {
 };
 
 describe("ChatView composer parity", () => {
+  // FIXED-365 exposed this. With no model selected there is no capacity to
+  // report, so the ring drew a bare grey circle beside Send — a control with no
+  // content and no explanation, which a fresh install now meets every time
+  // rather than almost never.
+  it("says the capacity is unknown rather than drawing an unexplained ring", async () => {
+    stubFetch({ ...routes(), "GET /api/models": { profiles: [], chat_profiles: [] } });
+    render(ChatView, { projects });
+
+    expect(
+      await screen.findByRole("button", { name: "Context window — capacity unknown" }),
+    ).toBeInTheDocument();
+  });
+
+  it("names the window plainly once a model reports one", async () => {
+    const sized = {
+      profile_id: "test-ready", provider: "ollama", model: "test-model",
+      selected: true, configured: true, ready: true, readiness_state: "ready",
+      context_window_tokens: 200_000,
+    };
+    stubFetch({ ...routes(), "GET /api/models": { profiles: [sized], chat_profiles: [sized] } });
+    render(ChatView, { projects });
+
+    expect(
+      await screen.findByRole("button", { name: "Context window" }),
+    ).toBeInTheDocument();
+  });
+
   it("is the Cowork-minimal composer: no Build switch, no duplicate capacity chip", async () => {
     stubFetch(routes());
     render(ChatView, { projects });
@@ -110,7 +137,7 @@ describe("ChatView composer parity", () => {
     expect(screen.queryByLabelText("Execution environment")).not.toBeInTheDocument();
     // What a Cowork-shaped composer does keep.
     expect(screen.getByRole("button", { name: "Dictate" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Context window" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Context window/ })).toBeInTheDocument();
   });
 
   it("keeps dictated text editable and sends it only after explicit Send", async () => {
@@ -216,7 +243,7 @@ describe("ChatView composer parity", () => {
     expect(rail.closest(".chat-layout")).toHaveClass("with-rail");
     expect(screen.getByLabelText("Project for this chat")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /approval mode/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Context window" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Context window/ })).toBeInTheDocument();
   });
 
   it("uses the persisted selected model and exposes only its supported thinking efforts", async () => {

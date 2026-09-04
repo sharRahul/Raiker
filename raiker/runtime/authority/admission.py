@@ -108,6 +108,9 @@ CAPABILITY_UNSET_RESOLUTION: dict[str, str] = {
     # with nothing persisted has not said yes yet; only a caller with no account
     # falls back to the shipped table.
     "code_map_indexing": UNSET_SHIPPED_DEFAULT_UNSCOPED,
+    # B10 — the same three-branch resolution as the code map it sits beside, so
+    # an owner meets one posture for "read my repository" rather than two.
+    "language_intelligence": UNSET_SHIPPED_DEFAULT_UNSCOPED,
     # Delegation, for the same reason and by the same precedent. It is the
     # posture `RUNTIME_EXECUTORS_SPEC.md` documents for every integrated
     # capability: the web dashboard's per-principal controls are fail-closed

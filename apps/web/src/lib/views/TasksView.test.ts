@@ -70,6 +70,52 @@ describe("TasksView", () => {
     ));
   });
 
+  // C11 — background work used to finish into a status line. Each task now runs
+  // its cycles in a conversation of its own, and the card is where the owner
+  // reaches it.
+  it("links to the task's own conversation once it has run", async () => {
+    const task = {
+      task_id: "task_nightly", session_id: "sess_inbox", status: "queued",
+      title: "Overnight research", objective: "Summarise what changed.",
+      current_step: null, progress_percent: null,
+      created_at: "2026-08-11T09:00:00Z", updated_at: "2026-08-11T09:00:00Z",
+      completed_at: null, summary: null, project_id: null,
+      scheduled_at: null, recurrence: "daily", reminder_at: null, parent_task_id: null,
+      thread_session_id: "sess_thread_1", thread_turns: 3,
+    };
+    stubFetch({
+      "GET /api/tasks": [task],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+
+    const link = await screen.findByRole("link", { name: /Thread/ });
+    expect(link).toHaveAttribute("href", "#/new-chat?session=sess_thread_1");
+    expect(link).toHaveTextContent("3");
+  });
+
+  it("does not offer a thread that has nothing in it yet", async () => {
+    // A link to an empty transcript is a dead end, and a routine that has not
+    // run has one.
+    const task = {
+      task_id: "task_new", session_id: "sess_inbox", status: "queued",
+      title: "Overnight research", objective: "Summarise what changed.",
+      current_step: null, progress_percent: null,
+      created_at: "2026-08-11T09:00:00Z", updated_at: "2026-08-11T09:00:00Z",
+      completed_at: null, summary: null, project_id: null,
+      scheduled_at: null, recurrence: "daily", reminder_at: null, parent_task_id: null,
+      thread_session_id: "sess_thread_2", thread_turns: 0,
+    };
+    stubFetch({
+      "GET /api/tasks": [task],
+      "GET /api/models": { profiles: [READY_MODEL], chat_profiles: [READY_MODEL] },
+    });
+    render(TasksView);
+
+    await screen.findByRole("heading", { name: "Overnight research" });
+    expect(screen.queryByRole("link", { name: /Thread/ })).toBeNull();
+  });
+
   it("preserves task fields and disables all cadences when the model is unready", async () => {
     const stopped = { profile_id: "ollama", provider: "ollama", model: "qwen", selected: true, configured: true, ready: false, readiness_state: "runtime_stopped", readiness_summary: "Ollama is not reachable.", readiness_reason_code: "local_runtime_unreachable", readiness_remediation: "Start Ollama, then check again." };
     stubFetch({ "GET /api/tasks": [], "GET /api/models": { profiles: [stopped], chat_profiles: [stopped] } });

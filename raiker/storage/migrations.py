@@ -3603,3 +3603,72 @@ OWNER_QUESTION_ANSWER_MIGRATION_ID = "RAIKER-2047-owner-question-answer"
 OWNER_QUESTION_ANSWER_SQL = """
 ALTER TABLE approvals ADD COLUMN answer_json TEXT;
 """
+
+
+# BUG-270 — a fresh install named an Ollama model nobody has.
+#
+# `ollama-local-openai-compatible` is the only shipped profile that both names a
+# concrete *third-party* model and carries `is_native_default`, so a brand-new
+# workspace selected it and every surface — the setup meter, the Global model
+# control, both composer chips — printed a model string for a runtime that is
+# not on the machine.  The profile already declares
+# `default_state: disabled_until_provider_detected`; nothing detected the
+# provider, so the declaration was inert.
+#
+# This table is what makes the declaration enforceable *without* turning a
+# status read into a probe (FIXED-357).  Detection is a PATH lookup, never a
+# connection, and its result is written here once so every later read is a row
+# read.  It is machine-scoped rather than owner-scoped: whether a binary exists
+# on this host is not a fact about a principal.
+LOCAL_RUNTIME_PRESENCE_MIGRATION_ID = "RAIKER-2048-local-runtime-presence"
+
+LOCAL_RUNTIME_PRESENCE_SQL = """
+CREATE TABLE IF NOT EXISTS local_runtime_presence (
+  runtime TEXT PRIMARY KEY,
+  present INTEGER NOT NULL,
+  executable TEXT,
+  detected_at TEXT NOT NULL
+);
+"""
+
+
+# C11 — a routine's cycles belong in a conversation, not in a shared inbox.
+#
+# Every task for a principal ran in one `sess_inbox_<principal>` session, so the
+# overnight research routine and the hourly build check interleaved their turns
+# in a single transcript that Chat deliberately hides. "What did the overnight
+# run find?" had no thread to be asked in, and a reply had nowhere to land.
+#
+# `thread_session_id` is that thread: one durable conversation per task, created
+# with the task, run in on every cycle, and openable and repliable in Chat. The
+# task keeps `session_id` — the inbox — unchanged, because that is where the
+# owner principal is carried and where existing tasks' history already is.
+TASK_THREAD_SESSION_MIGRATION_ID = "RAIKER-2049-task-thread-session"
+
+TASK_THREAD_SESSION_SQL = """
+ALTER TABLE tasks ADD COLUMN thread_session_id TEXT;
+CREATE INDEX IF NOT EXISTS idx_tasks_thread_session
+  ON tasks(thread_session_id)
+  WHERE thread_session_id IS NOT NULL;
+"""
+
+
+# B14 — the owner accepted part of a change set.
+#
+# An approval governed the whole thing: Accept applied every hunk, Reject applied
+# none, and a reviewer who wanted two of five had to reject and ask again. That
+# is the one interaction a coding agent's review surface exists to support.
+#
+# This column records the *decision*, not an edited payload. It holds the hunk
+# ids the owner accepted — positions in the approved diff, never content — so the
+# immutable-intent hash the relay checks still covers the entire approved change
+# set and what runs is a subset of it. It is deliberately not `arguments_json`
+# and deliberately not `answer_json`: a narrowed approval is neither a different
+# action nor an answer to a question, and folding it into either would make the
+# distinction depend on reading a field's contents to know which kind of row you
+# had.
+APPROVAL_DECISION_SCOPE_MIGRATION_ID = "RAIKER-2050-approval-decision-scope"
+
+APPROVAL_DECISION_SCOPE_SQL = """
+ALTER TABLE approvals ADD COLUMN decision_scope_json TEXT;
+"""

@@ -25,7 +25,7 @@ const SECTIONS: Record<string, GuideTarget> = {
   extensions: { slug: "extensions-and-mcp", label: "How extensions work" },
   connections: { slug: "extensions-and-mcp", label: "How connectors work" },
   "new-chat": { slug: "working-in-chat", label: "How Chat works" },
-  "search-chat": { slug: "working-in-chat", label: "How chat history works" },
+  "search-chat": { slug: "working-in-chat", label: "How threads and chat history work" },
   checkpoints: { slug: "permissions-and-runtime-modes", label: "How checkpoints work" },
   observe: { slug: "troubleshooting", label: "How to read the record" },
   // The audit log carried four sentences of standing explanation above its own

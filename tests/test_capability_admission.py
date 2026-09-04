@@ -120,7 +120,14 @@ def test_the_resolution_is_a_table_rather_than_a_call_site_decision() -> None:
     bundle that described it, not between two enforcing paths.
     """
     assert unset_resolution_for("shell_execution") == UNSET_OFF
-    assert set(CAPABILITY_UNSET_RESOLUTION) == {"web_fetch", "code_map_indexing", "subagents"}
+    assert set(CAPABILITY_UNSET_RESOLUTION) == {
+        "web_fetch",
+        "code_map_indexing",
+        # B10 — the same three-branch resolution as the code map it sits beside,
+        # so an owner meets one posture for "read my repository" rather than two.
+        "language_intelligence",
+        "subagents",
+    }
 
 
 def test_an_invalid_resolution_is_refused_rather_than_guessed(store: SQLiteStore) -> None:

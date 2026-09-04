@@ -1395,6 +1395,15 @@
   // and per-hunk acceptance is not offered because the runtime has no such
   // decision to record.
   let approvalDiffs = $state<Record<string, { diff: string | null; path: string | null }>>({});
+  /**
+   * B14 — per decision, the hunks the reviewer has accepted, keyed by approval.
+   *
+   * Absent means they have not narrowed this one and Accept means all of it,
+   * which is what a decision has always meant. Keyed rather than held as one
+   * value because Build renders every pending decision at once, and a selection
+   * belongs to the diff it was made on.
+   */
+  let approvalHunks = $state<Record<string, string[] | undefined>>({});
 
   async function loadApprovals() {
     if (sessionId === null) return;
@@ -1441,9 +1450,12 @@
     approvalBusy = approval.approval_id;
     approvalNotice = null;
     try {
+      const accepted = approvalHunks[approval.approval_id];
       const result = await api.resolveApproval(approval.approval_id, {
         approve,
         reason: approve ? "accepted in the Build workspace" : "rejected in the Build workspace",
+        // B14 — sent only when this reviewer actually narrowed this change.
+        ...(approve && accepted !== undefined ? { accepted_hunks: accepted } : {}),
       });
       approvalNotice = !approve
         ? "Rejection recorded."
@@ -1908,10 +1920,15 @@
                 {humanize(approval.capability)} · raised {relativeTime(approval.created_at)}
               </p>
               {#if approvalDiffs[approval.approval_id] !== undefined}
-                <!-- B14 — the change, read where it was proposed. -->
+                <!-- B14 — the change, read *and decided* where it was
+                     proposed. Accepting part of it is the act a coding review
+                     is made of, and it used to mean rejecting everything and
+                     asking again. -->
                 <DiffView
                   diff={approvalDiffs[approval.approval_id].diff}
                   path={approvalDiffs[approval.approval_id].path}
+                  selectable={approval.status === "pending"}
+                  bind:selection={approvalHunks[approval.approval_id]}
                 />
               {/if}
               <div class="decision-actions">
@@ -2073,9 +2090,13 @@
               <button
                 type="button"
                 class="context-trigger"
-                aria-label="Context window"
+                aria-label={activeProfile?.context_window_tokens
+                  ? "Context window"
+                  : "Context window — capacity unknown"}
                 aria-expanded={contextOpen}
-                title="Context window"
+                title={activeProfile?.context_window_tokens
+                  ? "Context window"
+                  : "Context window — capacity unknown"}
                 onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
               >
                 <ContextRing

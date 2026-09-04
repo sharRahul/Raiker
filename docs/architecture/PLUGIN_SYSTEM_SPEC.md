@@ -20,7 +20,7 @@ full list this document specifies — commands, subagents, channels, LSP servers
 monitors, tool adapters, themes, output styles, TUI panels, web/dashboard panels,
 mobile panels, memory adapters, model providers, user-configurable settings and
 policy fragments — is what a plugin *may eventually* provide. Two of them are
-tracked as work (**panels**, BUG-228; **LSP servers**, BUG-227) and several are
+tracked as work (**panels**, BUG-228) and several are
 [deliberately refused](REFERENCE_PLATFORM_COMPATIBILITY.md#4-deliberately-refused):
 a plugin-authored executable on a command's `PATH` is plugin code execution with
 an extra step, and a background monitor is a long-running command whose output
@@ -289,7 +289,28 @@ Required controls:
 
 ### LSP Servers
 
-Plugins may declare LSP/code-intelligence server configurations. LSP servers may support diagnostics, definitions, references, type info, symbols, implementations, and call hierarchy.
+**Not planned. BUG-227 was answered by deciding against a language-server
+client, not by building one.** A language server is a long-running subprocess
+that reads the workspace, so it would need `CommandService`'s execution
+boundary, its own capability, its own lifecycle and a crash-recovery story.
+What Build needed from language intelligence ships without one — GAP-BUILD B10's
+`document_symbols`, `find_definition` and `diagnostics`, under the
+`language_intelligence` capability — alongside the code map's
+`code_map_search`/`code_map_references`. Those parse files this process can
+already read, hold no state, and cannot outlive the turn.
+
+The cost is stated rather than hidden: no cross-file type inference, no rename
+refactoring, no completions, and parse-level rather than type-level diagnostics.
+A file in a language this runtime cannot parse is reported as **not checked**,
+never as clean.
+
+`contributes.lsp_servers` therefore stays accepted-and-inert, and the manifest
+schema says so in those words. Should the costs above become binding, the field
+becomes an *offer* in the FIXED-260 sense — a language server is a tool source,
+not an install — and the controls below are the prerequisites for that, not a
+description of a shipped surface.
+
+The design target, if it is ever built: plugins may declare LSP/code-intelligence server configurations. LSP servers may support diagnostics, definitions, references, type info, symbols, implementations, and call hierarchy.
 
 Required controls:
 

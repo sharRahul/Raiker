@@ -30,7 +30,9 @@ from raiker.models.exceptions import (
     ProviderStreamError,
     ProviderTimeoutError,
     ProviderUnsupportedCapabilityError,
+    ProviderWorkspaceRequiredError,
     is_quota_exhausted,
+    needs_workspace_id,
     stream_failure,
 )
 from raiker.models.health import ProviderHealth
@@ -58,6 +60,11 @@ def _map_status(status: int, *, model: str, body: str = "") -> Exception:
     # OpenAI reports an exhausted allowance as 429 `insufficient_quota` and
     # OpenAI-compatible routers as a bare 402. Neither is fixed by waiting, so
     # neither may be reported as a rate limit.
+    # BUG-272 — a valid, identity-linked key with no workspace named. Checked
+    # beside quota and for the same reason: the status is an ordinary 400 and
+    # only the body says which 400 it is. There is no credential to rotate here.
+    if needs_workspace_id(status, body):
+        return ProviderWorkspaceRequiredError(f"provider_workspace_required:http_{status}")
     if is_quota_exhausted(status, body):
         return ProviderQuotaExhaustedError(f"provider_quota_exhausted:http_{status}")
     if status in {401, 403}:

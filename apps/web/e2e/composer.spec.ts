@@ -86,6 +86,10 @@ test.beforeEach(async ({ page }) => {
       else if (path === "/api/tasks") body = [];
       else if (path === "/api/notifications") body = [];
       else if (path === "/api/sessions") body = [];
+      // C18 — Workbench's "Continue working" reads threads rather than
+      // sessions: the owner's conversations *and* the threads a routine is
+      // advancing, from one route.
+      else if (path === "/api/work-threads") body = [];
       else if (path === "/api/approvals") body = [];
       else if (path === "/api/capabilities") body = [];
       // One configured rule that enforces, one that never fires, and one file
@@ -423,7 +427,7 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["workbench", "Workbench", "operational"],
     ["new-chat", "Chat", "work-surface"],
     ["build", "Build", "work-surface"],
-    ["search-chat", "Search chats", "reading"],
+    ["search-chat", "Threads", "reading"],
     ["tasks", "Tasks", "operational"],
     ["projects", "Projects", "operational"],
     ["memory", "Memory", "operational"],

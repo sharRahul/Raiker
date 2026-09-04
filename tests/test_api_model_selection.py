@@ -129,9 +129,38 @@ class TestProviderModelListing:
 
 
 class TestSetModelSelection:
-    def test_fresh_workspace_reports_ollama_as_the_default_selection(
+    def test_fresh_workspace_names_no_model_when_ollama_is_not_installed(
         self, client: TestClient, owner_token: str
     ) -> None:
+        """BUG-270 — the native default is a claim about this machine.
+
+        `ollama-local-openai-compatible` is the only shipped profile that both
+        names a concrete third-party model and carries `is_native_default`, so a
+        brand-new workspace adopted it unconditionally and printed
+        `gemma4:31b-cloud` in the setup meter, the Global model control and both
+        composer chips on a host with no `ollama` binary. The profile has always
+        declared `disabled_until_provider_detected`; nothing enforced it.
+        """
+        read = client.get("/api/models", headers=_auth(owner_token)).json()
+        assert read["current_profile_id"] is None
+        assert read["current_model"] is None
+        assert [profile for profile in read["profiles"] if profile["selected"]] == []
+        # And no picker offers it either, which is what the composer chip reads.
+        assert not any(
+            profile["model"] == "gemma4:31b-cloud" for profile in read["chat_profiles"]
+        )
+
+    def test_fresh_workspace_adopts_ollama_once_it_is_detected(
+        self, client: TestClient, owner_token: str, workspace: Path
+    ) -> None:
+        """The other half: an owner who *does* have Ollama keeps the default.
+
+        Detection is a PATH lookup written to a row, so a test states the fact
+        the same way the detector does rather than putting a binary on PATH.
+        """
+        SQLiteStore(workspace).save_local_runtime_presence(
+            "ollama", present=True, executable="/usr/local/bin/ollama"
+        )
         read = client.get("/api/models", headers=_auth(owner_token)).json()
         assert read["current_profile_id"] == "ollama-local-openai-compatible"
         assert read["current_model"] == "gemma4:31b-cloud"

@@ -15,6 +15,15 @@ class ProviderPolicyError(ModelProviderError):
     pass
 
 
+class ProviderWorkspaceRequiredError(ModelProviderError):
+    """BUG-272 — the key is valid and needs a workspace named alongside it.
+
+    Its own class rather than a configuration error, because the two send the
+    owner to different places: a misconfiguration is Raiker's settings, and this
+    is the shape of the credential they pasted.
+    """
+
+
 class ProviderConnectionError(ModelProviderError):
     pass
 
@@ -74,6 +83,7 @@ _PROVIDER_ERROR_CLASS_CODES: dict[str, str] = {
     "ProviderTimeoutError": "provider_timeout",
     "ProviderRateLimitError": "provider_rate_limited",
     "ProviderQuotaExhaustedError": "provider_quota_exhausted",
+    "ProviderWorkspaceRequiredError": "provider_workspace_required",
     "ProviderModelNotFoundError": "model_not_found",
     "ProviderConnectionError": "provider_connection_failed",
     "ProviderConfigurationError": "provider_misconfigured",
@@ -109,6 +119,37 @@ _QUOTA_MARKERS: tuple[str, ...] = (
     "plans and billing",
     "payment required",
 )
+
+
+# BUG-272 — an identity-linked key needs a workspace named on every request.
+#
+# Anthropic answers a perfectly valid key with HTTP 400 and a body that says
+# exactly what is missing. Without this the owner met `provider_http_error:http_400`
+# on a key that is not broken and has nothing to rotate — the same shape as
+# FIXED-355, where a rejected key was reported as a network failure.
+#
+# Classified from the body for the same reason quota is: the status alone means
+# nothing (400 is also an ordinary bad request), and the fix is the owner's to
+# make rather than a retry's.
+_WORKSPACE_MARKERS: tuple[str, ...] = (
+    "workspace-id is required",
+    "workspace_id is required",
+    "identity-linked api key",
+)
+
+
+def needs_workspace_id(status: int, body: str) -> bool:
+    """True when the provider refused because no workspace was named.
+
+    ``body`` is read only to classify; nothing from it is kept, exactly as in
+    :func:`is_quota_exhausted`. The caller raises a fixed reason code, so a
+    provider that names an organisation or an account in this message cannot
+    carry it into an event, an API response, or the readiness record.
+    """
+    if status != 400:
+        return False
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _WORKSPACE_MARKERS)
 
 
 def is_quota_exhausted(status: int, body: str) -> bool:
@@ -198,6 +239,13 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
     (
         "provider_rate_limited",
         "the provider is rate limiting this account right now. Wait a moment and try again.",
+    ),
+    (
+        # BUG-272 — the credential is fine and there is nothing to rotate.
+        "provider_workspace_required",
+        "the provider needs a workspace named on every request for this kind of key. "
+        "This key is identity-linked, so use a standard API key from the provider's "
+        "console instead, or one scoped to a single workspace.",
     ),
     (
         # BUG-76 — the circuit breaker, not a provider answer. Saying so is the

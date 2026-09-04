@@ -32,6 +32,7 @@ import type {
   CodeMapPaths,
   CodeMapStatus,
   CodeRepoBrowseView,
+  CodeRepoDiagnosticsView,
   CodeRepoFileView,
   CodeReposView,
   CredentialLifecycle,
@@ -123,6 +124,7 @@ import type {
   UploadedAttachment,
   WebBlocklist,
   WebBlocklistProbe,
+  WorkThread,
   GitCredentialStatus,
   ManagedFile,
   ManagedFileImportResponse,
@@ -644,6 +646,18 @@ export const api = {
       profile_id,
       model,
     }),
+  // BUG-270 — which local model runtimes are installed on this machine.
+  // Detection is a PATH lookup cached in a row, so the read is free and this
+  // POST is the owner saying "I just installed one, look again".
+  detectLocalRuntimes: () =>
+    postJson<{
+      runtimes: {
+        runtime: string;
+        present: boolean;
+        executable: string | null;
+        detected_at: string;
+      }[];
+    }>("/api/local-runtimes/detect", {}),
   // Where each work surface's model picker starts. A preference only: the turn
   // still names its exact profile and model, and readiness judges that pair.
   surfaceModels: () =>
@@ -1563,6 +1577,10 @@ export const api = {
         origin,
       }),
     ),
+  // C18 — what the owner is working on, across chats, projects and routines.
+  // Chat search answers "where did I say that"; this answers the other question.
+  workThreads: (limit = 100) =>
+    request<WorkThread[]>(`/api/work-threads?limit=${limit}`),
   searchChats: (q: string) =>
     request<SessionSummary[]>(withQuery("/api/chat-search", { q })),
 
@@ -1833,6 +1851,11 @@ export const api = {
   readCodeRepoFile: (repoId: string, path: string) =>
     request<CodeRepoFileView>(
       `/api/code/repos/${encodeURIComponent(repoId)}/file?path=${encodeURIComponent(path)}`,
+    ),
+  // B10 — what a parser sees in the file the owner just opened.
+  readCodeRepoDiagnostics: (repoId: string, path: string) =>
+    request<CodeRepoDiagnosticsView>(
+      `/api/code/repos/${encodeURIComponent(repoId)}/diagnostics?path=${encodeURIComponent(path)}`,
     ),
   connectLocalRepo: (path: string) =>
     postJson<{ ok: boolean; repo_id: string; local_subpath: string }>(
@@ -2160,7 +2183,13 @@ export const api = {
     ),
   approval: (id: string) =>
     request<ApprovalDetailView>(`/api/approvals/${encodeURIComponent(id)}`),
-  resolveApproval: (id: string, body: { approve: boolean; reason: string }) =>
+  // B14 — `accepted_hunks` carries the reviewer's own narrowing: hunk positions
+  // in the approved diff, validated server-side against that same diff. Omitted
+  // means the whole change set, which is what a decision has always meant.
+  resolveApproval: (
+    id: string,
+    body: { approve: boolean; reason: string; accepted_hunks?: string[] },
+  ) =>
     postJson<ResolveApprovalResult>(
       `/api/approvals/${encodeURIComponent(id)}/resolve`,
       body,

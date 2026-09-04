@@ -24,6 +24,19 @@ const MATCH = {
   archived_at: null,
 };
 
+function thread(partial: Record<string, unknown> = {}) {
+  return {
+    session_id: "sess_1",
+    title: "Release planning",
+    kind: "chat",
+    updated_at: "2026-07-16T01:00:00Z",
+    turn_count: 4,
+    project_id: null,
+    project_name: null,
+    ...partial,
+  };
+}
+
 describe("SearchChatView", () => {
   // A single-turn conversation read "1 turns" in the FTS5 evidence sweep of
   // 2026-08-17. Small, but it is on the row a reader scans to decide whether a
@@ -42,26 +55,106 @@ describe("SearchChatView", () => {
     );
   });
 
-  it("browses every chat recent-first while the query is empty", async () => {
+  // C18 — with an empty box this page stopped being a search and became the
+  // board: what the owner is working on, across chats, projects and routines.
+  // The routine threads are the half that had no reader at all before C11 gave
+  // each task a conversation.
+  it("lists every thread of work recent-first while the query is empty", async () => {
     const fetchMock = stubFetch({
-      "GET /api/sessions": [
-        { ...MATCH, session_id: "sess_older", title: "Older chat", updated_at: "2026-07-15T01:00:00Z" },
-        { ...MATCH, session_id: "sess_newest", title: "Newest chat", updated_at: "2026-07-16T01:00:00Z" },
+      "GET /api/work-threads": [
+        thread({ session_id: "sess_newest", title: "Newest chat" }),
+        thread({
+          session_id: "sess_older",
+          title: "Older chat",
+          updated_at: "2026-07-15T01:00:00Z",
+        }),
       ],
     });
     render(SearchChatView);
     expect(await screen.findByText("Newest chat")).toBeInTheDocument();
-    // No search ran, so no exchange matched: the link opens the conversation.
     const links = screen.getAllByRole("link", { name: /newest chat/i });
     expect(links[0]).toHaveAttribute("href", "#/new-chat?session=sess_newest");
-    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("origin=chat"))).toBe(true);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/api/work-threads"))).toBe(
+      true,
+    );
   });
 
-  it("keeps untitled and empty chats browseable", async () => {
-    stubFetch({ "GET /api/sessions": [{ ...MATCH, title: null, turn_count: 0 }] });
+  it("shows a routine's own thread beside the owner's chats", async () => {
+    stubFetch({
+      "GET /api/work-threads": [
+        thread({ session_id: "sess_chat", title: "Release planning" }),
+        thread({
+          session_id: "sess_routine",
+          title: "Overnight research",
+          kind: "routine",
+          cadence: "daily",
+          task_id: "task_1",
+        }),
+      ],
+    });
     render(SearchChatView);
-    expect(await screen.findByText("Untitled chat")).toBeInTheDocument();
-    expect(screen.getByText(/0 turns/)).toBeInTheDocument();
+
+    expect(await screen.findByText("Overnight research")).toBeInTheDocument();
+    expect(screen.getByText("Runs daily")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /overnight research/i })).toHaveAttribute(
+      "href",
+      "#/new-chat?session=sess_routine",
+    );
+  });
+
+  it("narrows the board to routines, and to one project", async () => {
+    stubFetch({
+      "GET /api/work-threads": [
+        thread({
+          session_id: "sess_chat",
+          title: "Release planning",
+          project_id: "proj_a",
+          project_name: "Alpha",
+        }),
+        thread({
+          session_id: "sess_routine",
+          title: "Overnight research",
+          kind: "routine",
+          cadence: "daily",
+        }),
+      ],
+    });
+    render(SearchChatView);
+
+    await screen.findByText("Release planning");
+    await fireEvent.click(screen.getByRole("button", { name: "Routines" }));
+    expect(screen.queryByText("Release planning")).toBeNull();
+    expect(screen.getByText("Overnight research")).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "All" }));
+    // The cross-project view the gap named: a project the owner can filter to,
+    // built from the threads that are actually in one.
+    await fireEvent.change(screen.getByLabelText("Filter by project"), {
+      target: { value: "proj_a" },
+    });
+    expect(screen.getByText("Release planning")).toBeInTheDocument();
+    expect(screen.queryByText("Overnight research")).toBeNull();
+  });
+
+  it("says what a thread is blocked on rather than leaving it to be discovered", async () => {
+    stubFetch({
+      "GET /api/work-threads": [
+        thread({
+          session_id: "sess_routine",
+          title: "Overnight research",
+          kind: "routine",
+          waiting_on: "Waiting for your approval",
+        }),
+      ],
+    });
+    render(SearchChatView);
+    expect(await screen.findByText("Waiting for your approval")).toBeInTheDocument();
+  });
+
+  it("says so plainly when nothing is going yet", async () => {
+    stubFetch({ "GET /api/work-threads": [] });
+    render(SearchChatView);
+    expect(await screen.findByText("Nothing going yet")).toBeInTheDocument();
   });
 
   it("links each match back into the conversation", async () => {

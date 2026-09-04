@@ -31,8 +31,8 @@
     ApprovalView,
     Diagnostics,
     ProjectsList,
-    SessionSummary,
     TaskView,
+    WorkThread,
   } from "../apiTypes";
   import Badge from "../components/Badge.svelte";
   import Icon from "../components/Icon.svelte";
@@ -43,7 +43,10 @@
   import GuideLink from "../components/GuideLink.svelte";
   import { isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
 
-  let sessions = $state<SessionSummary[] | null>(null);
+  // C18 — "continue working" used to mean only the conversations the owner
+  // typed, so a routine advancing a thread on its own was invisible here and
+  // reachable only through Tasks. One read now answers both.
+  let sessions = $state<WorkThread[] | null>(null);
   let tasks = $state<TaskView[] | null>(null);
   let approvals = $state<ApprovalView[] | null>(null);
   let projects = $state<ProjectsList | null>(null);
@@ -86,7 +89,7 @@
   // Deliberately not "the active project": no route is scoped by one any more.
   // What the board can honestly say is how many projects exist.
   const projectCount = $derived(projects?.projects.length ?? 0);
-  const named = $derived((sessions ?? []).filter((s) => (s.title ?? "").trim() !== ""));
+  const named = $derived((sessions ?? []).filter((s) => s.title.trim() !== ""));
   const hasActivity = $derived(
     named.length > 0 || (tasks ?? []).length > 0 || (projects?.projects ?? []).length > 0,
   );
@@ -104,9 +107,11 @@
     unavailable = false;
     try {
       [sessions, tasks, approvals, projects] = await Promise.all([
-        // Conversations only — the server-owned session a task run executes in is
-        // not something to "resume" (BUG-10).
-        api.sessions(undefined, false, "chat"),
+        // Threads, not sessions: the owner's own conversations plus the
+        // threads a routine is advancing (C11/C18). The Inbox — the
+        // server-owned session task bookkeeping lands in — is still not
+        // something to resume and is still not listed (BUG-10).
+        api.workThreads(),
         api.tasks(),
         api.approvals(),
         api.projects(),
@@ -334,14 +339,15 @@
           <section class="board card" aria-labelledby="resume-h">
             <div class="card-head">
               <h3 id="resume-h">Continue working</h3>
-              <a href="#/sessions">All sessions</a>
+              <a href="#/search-chat">All threads</a>
             </div>
             <ul class="resumes">
               {#each named.slice(0, 5) as session (session.session_id)}
                 <li>
                   <a href={`#/new-chat?session=${encodeURIComponent(session.session_id)}`}>{session.title}</a>
                   <span>
-                    {session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · updated
+                    {#if session.kind === "routine"}Routine · {/if}{#if session.project_name}{session.project_name}
+                      · {/if}{session.turn_count} turn{session.turn_count === 1 ? "" : "s"} · updated
                     {relativeTime(session.updated_at)}
                   </span>
                 </li>

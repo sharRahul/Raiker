@@ -55,7 +55,7 @@ describe("nav model", () => {
   });
 
   it("uses sentence case for the direct conversation browser", () => {
-    expect(navItem("search-chat").label).toBe("Search chats");
+    expect(navItem("search-chat").label).toBe("Threads");
   });
 
   it("consolidates the operational record into one Observe destination", () => {

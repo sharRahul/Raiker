@@ -101,15 +101,28 @@ you asked, because the transcript is a record.
 
 **One patch, one approval, one reversible change set.** A unified diff may cover
 several files, including creates and deletes, and it is applied as a single
-approval. There is no partial application: one bad hunk fails the whole proposal.
+approval. Applying is still all-or-nothing: one bad hunk fails the whole
+proposal, so a change either lands complete or does not land.
 
 **You read the diff where it was proposed.** A pending decision in Build shows
 the change under it — the file it touches, `+n −m`, and the hunk with its own
 line numbers — with **Accept** and **Reject** beneath. It is the same governed
 preview the Approvals inbox reads and the same record either surface resolves;
 **Open in Approvals** is still there when you want the full detail, the execution
-evidence, or the identity chain. There is no per-hunk accept, because there is no
-per-hunk decision for the runtime to record.
+evidence, or the identity chain.
+
+**You can accept part of it.** Each hunk carries a checkbox; clear the ones you
+do not want and press **Accept**, and only the hunks you kept are applied. A file
+whose hunks you all declined is not touched at all. The count above the diff says
+where you are — *"2 of 5 hunks"* — with **Select all** and **Select none**.
+
+This is a *smaller* decision, never a different one. What you can accept is
+always some part of the change Raiker proposed and you read: there is no way to
+edit a line here and approve your own text, because those bytes would be an
+action nobody reviewed. Declining every hunk is refused rather than run as an
+empty change — reject the proposal instead, which says what happened. The
+checkbox appears only where all of that holds: a pending decision, on a diff the
+applier understands, with more than one hunk in it.
 
 **Matching is strict about which code you named, not about how you typed it.**
 The exact text is tried first; when that finds nothing, the same search runs
@@ -233,6 +246,27 @@ uses of one identifier. It is textual, so a same-named symbol from another modul
 matches too — and it says so rather than implying a precision it does not have. A
 scan that hits one of its bounds reports `partial` and names the bound. There is
 no resolved call graph.
+
+**Language intelligence** is a separate switch beside it, for the questions the
+map does not answer. With it on, Raiker can outline one file — every declaration
+with its line range — jump to where an exact name is *declared* rather than
+ranking a fuzzy match, and check a file for syntax problems. Nothing is stored:
+these read the file on disk, which is what makes the outline correct the instant
+after an edit.
+
+The two switches are separate because they do different things to your machine.
+The code map **writes** an index of your repository; language intelligence writes
+nothing at all. You can have either without the other.
+
+Know what the check is and is not: it is **parse-level** — syntax and structure,
+not types, imports or lint rules — and it covers Python, JSON, TOML and YAML. A
+file in any other language is reported as **not checked**, never as clean, in the
+tool result and in Build's file viewer alike. A file that parses can still be
+wrong; run the repository's own checker for the rest.
+
+There is no language server. Raiker does not start one, so there is no
+cross-file type inference, no rename refactoring and no completions — and
+nothing long-running to supervise, crash or leak.
 
 ## The operating protocol
 

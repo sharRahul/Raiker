@@ -189,7 +189,13 @@ def test_subagent_has_its_own_principal_and_parks_mutation_for_parent(tmp_path: 
     # *see* by exactly the relationships whose evidence it could already read
     # through `memory_search`.
     assert json.loads(contract["allowed_tools_json"]) == sorted(
-        ["code_map_references", "code_map_search", "conversation_search", "diff_files",
+        # B10 — `document_symbols`, `find_definition` and `diagnostics` join under
+        # the same rule as the code map reads beside them: they parse a file the
+        # subagent can already open with `read_file`, mutate nothing, and make no
+        # network call. They widen what a subagent can *see* by nothing at all —
+        # only by how quickly it can find it.
+        ["code_map_references", "code_map_search", "conversation_search",
+         "diagnostics", "diff_files", "document_symbols", "find_definition",
          "git_diff", "git_log", "git_status", "glob", "grep", "knowledge_graph",
          "list_directory", "memory_get", "memory_list", "memory_search", "read_file",
          "skill_load", "stat_path", "vector_get"]

@@ -72,6 +72,7 @@ from raiker.tools.git import (
     selected_repository_subpath,
 )
 from raiker.tools.graph_tools import knowledge_graph
+from raiker.tools.language_tools import diagnostics, document_symbols, find_definition
 from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
 from raiker.tools.memory_tools import (
     memory_get,
@@ -367,6 +368,28 @@ class ToolBroker:
                     if self.store
                     else None
                 ),
+            ),
+            # B10 — the three language-intelligence reads. Governed inside the
+            # service by the `language_intelligence` gate, exactly as the code
+            # map reads are governed by theirs.
+            "document_symbols": lambda args: document_symbols(
+                self.workspace_root,
+                str(args.get("path", "")),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "find_definition": lambda args: find_definition(
+                self.workspace_root,
+                str(args.get("name", "")),
+                args.get("from_path"),
+                store=self.store,
+                principal_id=self.principal_id,
+            ),
+            "diagnostics": lambda args: diagnostics(
+                self.workspace_root,
+                args.get("paths", []),
+                store=self.store,
+                principal_id=self.principal_id,
             ),
             "code_map_references": lambda args: code_map_references(
                 self.workspace_root,

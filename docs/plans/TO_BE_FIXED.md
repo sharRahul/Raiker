@@ -82,7 +82,7 @@ names.
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
 | [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
-| [BUG-227](#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Low | Plugins / language intelligence | Open — raised 2026-08-22 |
+| [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Low | Plugins / language intelligence | **Closed 2026-09-03 (FIXED-366)** — its first question was a scope decision, and the answer is no: Raiker does not want an LSP client. B10's tool set ships without one and both plugin specs state what that costs |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
 | [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
@@ -96,6 +96,8 @@ names.
 | [BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | **Closed 2026-08-30 (FIXED-323)** — one `anchors` column, built from the tool result the runtime read, and a link per exchange |
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
+| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — raised 2026-09-03. The round's supplied key is identity-linked ([FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)), so no provider turn could run; three scenarios are written and are waiting on a key that authenticates |
+| [BUG-271](#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one) | Low | Build / Approvals / code review | Open — raised 2026-09-03 while closing B14's remainder. An edit is a *different action*, not a smaller one, so it needs its own proposal path rather than a field on the decision |
 | [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced 2026-08-30 to twenty; seven converted and re-run, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
 | [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — raised 2026-08-30, the first thing found by actually running a round against one workspace |
@@ -108,7 +110,7 @@ names.
 | [BUG-266](FIXED_ITEMS.md#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | **Closed 2026-09-03 (FIXED-364)** — the reset waits for the process, not the response, and reads the directory back |
 | [BUG-267](FIXED_ITEMS.md#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | **Closed 2026-09-03 (FIXED-362)** — the boot question gets a route that answers it rather than refusing it |
 | [BUG-269](#bug-269--read-aloud-is-the-half-of-voice-that-is-still-not-local) | Low | Voice / privacy posture | Open — raised 2026-09-03 while closing BUG-256. Dictation can now run on this device; playback cannot |
-| [BUG-270](#bug-270--a-fresh-install-names-an-ollama-model-nobody-has) | Medium | Models / first-run default / owner decision | Open — raised 2026-09-03. The fix is known; which of two it should be is **an owner decision**, because one of them changes what pressing Send does on an unconfigured install |
+| [BUG-270](FIXED_ITEMS.md#fixed-365--a-fresh-install-named-a-model-nobody-had) | Medium | Models / first-run default | **Closed 2026-09-03 (FIXED-365)** — option **B**, detect before claiming: a PATH lookup cached in a row, never a connection. Option A was declined because it removes the runtime's out-of-box fallback |
 | [BUG-268](FIXED_ITEMS.md#fixed-361--the-folder-picker-handed-back-redacted_secret-instead-of-a-path) | High | Web UI / redaction | **Closed 2026-09-03 (FIXED-361)** — found by Linux CI; the picker returned `[REDACTED_SECRET]` for an ordinary folder |
 | [BUG-257](FIXED_ITEMS.md#fixed-355--a-rejected-key-was-reported-as-a-network-failure) | Medium | Models / provider errors | **Closed 2026-09-03 (FIXED-355)** — raised while verifying BUG-251 against live providers |
 | [BUG-258](FIXED_ITEMS.md#fixed-356--a-picker-offered-and-defaulted-to-a-model-that-cannot-answer) | High | Models / every picker | **Closed 2026-09-03 (FIXED-356)** — the default was `text-embedding-ada-002` |
@@ -116,8 +118,8 @@ names.
 | [BUG-260, BUG-263, BUG-264](FIXED_ITEMS.md#fixed-358--choosing-among-four-hundred-models-was-a-dropdown-with-no-search) | High | Models / web UI | **Closed 2026-09-03 (FIXED-358)** — no dropdown; one picker with a search, on both surfaces |
 | [BUG-261, BUG-262](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it) | Medium | Models / first run | **Closed 2026-09-03 (FIXED-359)** — install a runtime and choose a model without leaving first run |
 | [BUG-265](FIXED_ITEMS.md#fixed-360--a-policy-refusal-was-reported-as-a-wrong-password) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-360)** — "Authentication failed." for a one-owner-per-instance refusal |
-| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (16 complete, 3 partial, 1 open; B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, and B16 recorded as already closed by BUG-206 slice D) |
-| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (13 complete, 5 open; C17 recall visibility closed 2026-08-29 as FIXED-311) |
+| [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | — | Build — coding-agent parity | Analysis (18 complete, 1 partial, 1 open; B10 closed 2026-09-03 as FIXED-366 and B14 as FIXED-369, leaving edit-then-accept as [BUG-271](#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one); B13 closed 2026-08-30 as FIXED-321, B18 2026-08-29 as FIXED-315, B16 by BUG-206 slice D) |
+| [GAP-CHAT](GAP_BUILD_CHAT.md#gap-chat--what-chat-needs-to-work-as-a-class-leading---agentic-work-assistant) | — | Chat — work-assistant parity | Analysis (15 complete, 3 open; C11 closed 2026-09-03 as FIXED-367 and C18 as FIXED-368; C17 recall visibility 2026-08-29 as FIXED-311) |
 
 The memory audit of **2026-08-11** has its own document,
 [`MEMORY_RELIABILITY_PLAN.md`](MEMORY_RELIABILITY_PLAN.md), written to this
@@ -476,47 +478,6 @@ believing a guard is in place.
 
 ---
 
-## BUG-227 — There is no LSP surface for a plugin to contribute to
-
-**Severity: Low. Area: plugins / Build / language intelligence. Status: Open —
-raised 2026-08-22 while closing BUG-221 steps 2 and 3.**
-
-**Observed.** `docs/architecture/PLUGIN_MANIFEST_SCHEMA.md` and `docs/architecture/PLUGIN_SYSTEM_SPEC.md`
-both list **LSP servers** among what a plugin declares, and both say the
-declaration stays inert until trust and approval gates pass. Grepping the runtime
-for a language-server path returns nothing: there is no LSP client, no server
-lifecycle, and no consumer of a `contributes.lsp_servers` block. The other three
-deferred kinds each had a real surface waiting behind a gate; this one has a
-manifest field and no destination.
-
-Claude Code plugins do bundle LSP servers, and Build uses language intelligence
-for navigation and diagnostics. So this is a genuine Claude Code gap — it is just
-a *smaller* one than it looks, because Raiker's graph/codemap layer
-(`docs/architecture/GRAPH_MEMORY_AND_CODEMAP_SPEC.md`) already answers part of what an LSP
-would be asked for.
-
-**Root cause.** The manifest schema was written against the reference platform's
-component list rather than against Raiker's own surfaces, so it names a component
-kind Raiker has no surface for. That is the opposite of the rule BUG-221 settled
-on: a plugin contributes **through a surface that already governs the thing
-contributed**, and there is no such surface here to contribute through.
-
-**Proposed fix, and the order.**
-
-1. **Decide whether Raiker wants an LSP client at all**, or whether the codemap
-   plus the governed read tools already cover the need. This is a scope decision
-   and it comes first; building a client to satisfy a manifest field would be the
-   tail wagging the dog.
-2. If yes: an LSP server is a **long-running subprocess that reads the
-   workspace**, so it belongs behind the same execution boundary
-   `CommandService` already enforces, with its own capability and lifecycle —
-   not a new one.
-3. Only then a `contributes.lsp_servers` path, and it should be an **offer** in
-   the FIXED-260 sense rather than an install: a language server is a tool source.
-
-**Until then**, the manifest schema should say plainly that the field is
-accepted-and-inert *because there is no surface*, rather than *because a gate has
-not opened* — the two are different promises and only one of them is true.
 
 ---
 
@@ -883,75 +844,78 @@ configure anything.
 
 ---
 
-## BUG-270 — A fresh install names an Ollama model nobody has
+## BUG-271 — A reviewer can narrow a change, and cannot correct one
 
-**Severity: Medium. Area: models / first-run default. Status: Open — raised
-2026-09-03. The remainder is an owner decision.**
+**Severity: Low. Area: Build / Approvals / code review. Status: Open — raised
+2026-09-03 while closing GAP-BUILD B14's remainder as
+[FIXED-369](FIXED_ITEMS.md#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between).**
 
-**Observed.** On a machine with no `ollama` binary and nothing listening on
-`11434`, a brand-new workspace reports:
+**Observed.** Per-hunk accept and reject ship. *Edit then accept* — the reviewer
+changing a line in the proposed diff and approving the result — does not, and is
+still not offered rather than being shown as a control the server would refuse.
+
+**Why it did not come with the other half.** A narrowing and an edit are
+different kinds of thing, and the difference is exactly the one the approval
+boundary is built on:
+
+* A **narrowing** is a subset of what was approved. `select_hunks` copies bytes
+  out of the approved patch and copies nothing else in, so the A1 immutable-intent
+  hash still covers the whole approved change and the executed change is provably
+  inside it.
+* An **edit** is a *different action*. Its bytes were never approved, so it
+  cannot ride that hash — and the one thing the relay must never do is execute
+  arguments no human read. `ResolveApprovalRequest` sets `extra="forbid"`
+  precisely to stop an edited payload arriving on a resolve.
+
+**What it would take.** An edit has to become a **new proposal** rather than an
+amended one: the owner's edited patch is submitted as a fresh action, gets its
+own preview, its own hash and its own approval, and the original resolves as
+rejected-with-a-replacement so the audit trail says what happened. That is a
+proposal path, not a field on the decision — which is why it is a separate entry
+rather than the unfinished tail of FIXED-369.
+
+**Required user-interface outcome.** Either an edit control that produces a
+second decision the owner makes on their own text, or nothing. What must not
+appear is a control that looks like an amendment to the approval in front of it.
+
+---
+
+## BUG-273 — Three live scenarios of the 2026-09-03 round are written and unrun
+
+**Severity: Low. Area: live test harness / evidence. Status: Open — raised
+2026-09-03.**
+
+**Observed.** `priority-round-real-turn-live.spec.ts` covers the three claims of
+that round which need a model to actually answer:
+
+* the setup meter reading **1 model ready** once a provider is connected, which
+  is the other half of [FIXED-365](FIXED_ITEMS.md#fixed-365--a-fresh-install-named-a-model-nobody-had)
+  — the *no* case is proven, the *yes* case is not;
+* a routine's cycle running **inside its own conversation**
+  ([FIXED-367](FIXED_ITEMS.md#fixed-367--background-work-finished-into-a-status-line));
+* that same thread appearing on the board
+  ([FIXED-368](FIXED_ITEMS.md#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not)).
+
+None of the three ran. The key supplied for the round is identity-linked and
+cannot authenticate without a workspace id — which is
+[FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status),
+raised from this very attempt — so no turn could be sent.
+
+**What *is* proven meanwhile**, and it is not nothing: all three behaviours are
+covered by unit and API tests
+(`test_task_conversation_thread.py`, `test_work_threads.py`,
+`TasksView.test.ts`, `SearchChatView.test.ts`, `WorkbenchView.test.ts`), and the
+surfaces themselves were walked live at four widths with no console error. What
+is missing is the end-to-end evidence a FIXED entry is normally held to: a real
+turn, in a real thread, on a real provider.
+
+**The fix is not code.** Set `RAIKER_LIVE_ANTHROPIC_KEY` to a key that
+authenticates — a standard console key, or one scoped to a single workspace —
+and run:
 
 ```
-current_profile_id: ollama-local-openai-compatible
-current_model:      gemma4:31b-cloud
-selected=True  configured=True  ready=False  state=not_configured
+npx playwright test --project=live e2e/priority-round-real-turn-live.spec.ts
 ```
 
-Models reads **"5 models set up"** and the **Global model** is *Gemma 4:31B
-Cloud*; both composers offer it as the model for the next turn. Nothing named
-there exists on the machine. (`gemma4:31b-cloud` is not even a local model — the
-`cloud` suffix is Ollama's hosted tier.)
-
-**Root cause.** `raiker/config/model-profiles.json` hard-codes
-`"model": "gemma4:31b-cloud"` on `ollama-local-openai-compatible`. Thirteen of
-the eighteen shipped profiles use the `<model>` placeholder and correctly report
-*not configured*; four more name `local-gguf`…`local-gguf-4`, which are aliases
-**Raiker itself** creates when it deploys into a slot. The Ollama entry is the
-only one naming a **third-party** model that must already exist, and it is also
-the only `is_native_default`, so a fresh install selects it.
-
-`configured` is `effective_model != "<model>"` — *"this profile names a concrete
-model string"*. [FIXED-204](FIXED_ITEMS.md#fixed-204--the-first-screen-an-owner-sees-called-five-unreachable-backends-connected)
-already found that this is not a real check and fixed the **badges** to read
-`readiness_state` instead; the count, the global default and the composer chip
-still read the model string. The profile's own
-`"default_state": "disabled_until_provider_detected"` is declared and not
-honoured, because nothing detects the provider.
-
-**Why the obvious fix is not obviously right.** Changing the model to `<model>`
-makes every surface honest immediately — and it also removes the runtime's
-out-of-box fallback. Five tests encode that contract directly:
-
-```python
-def test_gateway_uses_native_default_without_selection(tmp_path):
-    assert AgentGateway(tmp_path).default_provider == ("ollama", "gemma4:31b-cloud")
-```
-
-So the decision is not cosmetic:
-
-* **A — the placeholder.** `"model": "<model>"`. Every surface stops claiming a
-  model. `gateway.default_provider` no longer resolves out of the box, so
-  pressing **Send** on an unconfigured install must fail closed with "choose a
-  model" rather than attempting a call. First-run setup already covers choosing
-  one ([FIXED-359](FIXED_ITEMS.md#fixed-359--first-run-could-detect-a-missing-runtime-and-not-offer-to-install-it)),
-  and `test_gateway_falls_back_when_placeholder_unresolved` and
-  `default-ollama-live.spec.ts` are asserting the current behaviour and would be
-  rewritten to assert the new one.
-* **B — detect before claiming.** Keep the concrete default, and make
-  `configured` mean what the profile already says: honour
-  `disabled_until_provider_detected`. Preserves the intended experience for
-  someone who *does* have Ollama. Needs a cached detection result rather than a
-  live probe, because a status read must not perform a connection
-  ([FIXED-357](FIXED_ITEMS.md#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)).
-
-**A separate, smaller half either way.** With the Ollama entry excluded, a fresh
-install still reads **"4 models set up"** — the four empty llama.cpp slots, whose
-`local-gguf*` aliases pass the same `!= "<model>"` test. FIXED-204's own text
-says `local-gguf` "is not a model at all: it is the placeholder for a GGUF file
-the owner has yet to supply." Deploying into a slot does not currently record a
-saved connection, so there is no field that tells a served slot from an empty
-one; giving the count an honest predicate needs one.
-
-**Required user-interface outcome.** A fresh install does not name a model that
-is not installed, in the meter, in the Global model control, or in either
-composer's model chip.
+The spec skips itself when the variable is unset, so it neither fails CI nor
+claims a scenario it did not run.

@@ -216,3 +216,89 @@ class TestReadFile:
         )
         assert response.status_code == 404
         assert response.json()["detail"]["reason_code"] == "repo_not_found"
+
+
+class TestDiagnostics:
+    """B10 — the workspace says whether the file it is showing still parses.
+
+    The route is the same service and the same ``language_intelligence`` gate the
+    agent's own ``diagnostics`` tool goes through, so the browser and the model
+    cannot disagree about one file.
+    """
+
+    def test_it_requires_authentication(self, client: TestClient, repo_id: str) -> None:
+        assert (
+            client.get(
+                f"/api/code/repos/{repo_id}/diagnostics", params={"path": "README.md"}
+            ).status_code
+            == 401
+        )
+
+    def test_a_clean_file_is_reported_as_checked_and_empty(
+        self, client: TestClient, headers: dict[str, str], repo_id: str
+    ) -> None:
+        body = client.get(
+            f"/api/code/repos/{repo_id}/diagnostics",
+            params={"path": "src/main.py"},
+            headers=headers,
+        ).json()
+        assert body["checked"] is True
+        assert body["diagnostics"] == []
+
+    def test_a_broken_file_reports_its_coordinate(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        (workspace / "project" / "src" / "broken.py").write_text(
+            "def oops(:\n", encoding="utf-8", newline=""
+        )
+        body = client.get(
+            f"/api/code/repos/{repo_id}/diagnostics",
+            params={"path": "src/broken.py"},
+            headers=headers,
+        ).json()
+        assert body["checked"] is True
+        assert body["diagnostics"][0]["line"] == 1
+        assert body["diagnostics"][0]["severity"] == "error"
+
+    def test_a_language_with_no_parser_is_not_checked_rather_than_clean(
+        self, client: TestClient, headers: dict[str, str], repo_id: str, workspace: Path
+    ) -> None:
+        """The contract the whole surface rests on.
+
+        Reporting an unparsed file as having no problems is a claim nothing
+        established, and it is trusted exactly as much as a real one.
+        """
+        (workspace / "project" / "src" / "ui.ts").write_text(
+            "export const x = 1;\n", encoding="utf-8", newline=""
+        )
+        body = client.get(
+            f"/api/code/repos/{repo_id}/diagnostics",
+            params={"path": "src/ui.ts"},
+            headers=headers,
+        ).json()
+        assert body["checked"] is False
+        assert body["reason_code"] == "language_not_parseable"
+        assert body["diagnostics"] == []
+
+    def test_it_cannot_reach_outside_the_repository(
+        self, client: TestClient, headers: dict[str, str], repo_id: str
+    ) -> None:
+        """The same second containment check the file read keeps."""
+        response = client.get(
+            f"/api/code/repos/{repo_id}/diagnostics",
+            params={"path": "../secret.txt"},
+            headers=headers,
+        )
+        assert response.status_code in (400, 403, 404)
+
+    def test_a_missing_file_is_not_found(
+        self, client: TestClient, headers: dict[str, str], repo_id: str
+    ) -> None:
+        assert (
+            client.get(
+                f"/api/code/repos/{repo_id}/diagnostics",
+                params={"path": "src/nope.py"},
+                headers=headers,
+            ).status_code
+            == 404
+        )

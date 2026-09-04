@@ -11,7 +11,7 @@ tablets, and a full sidebar on wider screens.
 | Home | **Workbench** | Live view of running work, agents, schedules, and decisions that need you |
 | Work | **Chat** | Conversations, attachments, sources, memory, and approvals |
 | Work | **Build** | Repository-aware planning, edits, commands, commits, and pushes |
-| Work | **Search chats** | Full-text conversation search with the matched exchange and turn |
+| Work | **Threads** | Everything you have going — chats and routines — and a full-text search across it |
 | Work | **Tasks** and **Projects** | One-off, scheduled, repeating, and organized work |
 | Knowledge | **Memory** | Review durable facts Raiker may recall, and approve additions or removals |
 | Knowledge | **Knowledge Map** | Explore indexed sources and the citations connecting them |
@@ -85,7 +85,7 @@ meaning-aware embedding model, so paraphrases without shared terms can be missed
 See [Known limits](known-limits.md).
 
 **Diagnostics → Memory integrity** compares every index and projection memory
-depends on — including the conversation index behind Search chats — against the
+depends on — including the conversation index behind Threads — against the
 table that owns the content. It reports `clean` or names the drift, **Rescan**
 runs it again on request, and the one repair it offers appears only beside the
 finding it repairs. See [Memory](memory.md#checking-the-indexes).

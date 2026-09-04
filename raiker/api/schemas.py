@@ -791,6 +791,16 @@ class ResolveApprovalRequest(BaseModel):
 
     approve: bool
     reason: str
+    # B14 — the hunks of a proposed change the owner accepted, when they accepted
+    # only some. `None` means the whole change set, which is what every approval
+    # meant before this existed.
+    #
+    # These are *positions* in the approved diff ("<file index>:<hunk index>"),
+    # never content, so this field cannot carry an edited payload — which is what
+    # `extra="forbid"` above exists to prevent. The server validates every id
+    # against the approval's own patch and refuses the decision if one names no
+    # hunk in it.
+    accepted_hunks: list[str] | None = None
 
 
 class ApprovalDecisionRequest(BaseModel):

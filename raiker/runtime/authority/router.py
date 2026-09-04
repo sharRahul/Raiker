@@ -117,6 +117,14 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "code_map_search": "code_map_indexing",
     "code_map_references": "code_map_indexing",
     "code_map_indexing": "code_map_indexing",
+    # B10 — language intelligence. Its own gate rather than a second meaning for
+    # `code_map_indexing`: that one governs *writing a derived index of the
+    # owner's machine*, and these three read a file `read_file` would already
+    # open. One switch meaning two postures is the defect this codebase keeps
+    # finding, so each says what it governs and nothing else.
+    "document_symbols": "language_intelligence",
+    "find_definition": "language_intelligence",
+    "diagnostics": "language_intelligence",
     "semantic_memory": "semantic_memory_runtime",
     "vector_embedding": "vector_embedding_runtime",
     "model_provider": "model_provider_runtime",

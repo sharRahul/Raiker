@@ -23,8 +23,9 @@
     type ProviderErrorGuidance,
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
-  import { readinessLabel } from "../modelReadinessLabels";
+  import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { isChoosableModel } from "../modelReadiness.svelte";
+  import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
@@ -295,6 +296,13 @@
   // providers answering when one did. Keyed by profile id, a card renders only
   // its own result and hosted cards keep their independent status.
   let testResults = $state<Record<string, string>>({});
+  // BUG-270 — the owner has just installed a runtime and wants the card to stop
+  // saying it is missing. One flag for the whole view: detection is a single
+  // pass over every runtime, not a per-provider operation.
+  let detecting = $state(false);
+  // Which provider's installer is being opened, and what to say afterwards.
+  let installing = $state<string | null>(null);
+  let installNotice = $state<string | null>(null);
   let detailsFor = $state<ModelProfile | null>(null);
   // Governed refusals are policy outcomes, not faults. Hold the reason code so
   // the dialog can render the control that unblocks it instead of a bare code.
@@ -441,8 +449,16 @@
         return `${name}'s model list was denied by provider policy — enable its gate first.`;
       case "unsupported":
         return `${name} does not support model listing. Type a model id instead.`;
-      default:
+      default: {
+        // BUG-272 — "could not be reached" is the FIXED-355 defect on the
+        // catalogue path: the server had already classified *why*, and this
+        // discarded it and sent the owner to debug their network. A code with
+        // guidance says what to do; only a genuinely unclassified failure falls
+        // back to reachability.
+        const guidance = providerErrorGuidance(list.reason_code);
+        if (guidance !== null) return `${name}: ${guidance.message} ${guidance.fix}`;
         return `${name} could not be reached. Check that it is running and reachable from this device.`;
+      }
     }
   }
 
@@ -454,6 +470,59 @@
   // the exact-model readiness check and reports (and records) that verdict;
   // profiles with no model pinned still get the catalogue reachability note,
   // which is the only honest answer available for them.
+  /**
+   * BUG-270 — whether this profile may be shown as *naming* a model.
+   *
+   * The `<model>` placeholder was never the only way a profile could fail to
+   * name a real model. A profile whose runtime is not on this machine names a
+   * string that resolves to nothing here, and printing it beside "Not installed
+   * on this machine" tells the owner two contradictory things at once. Both
+   * cases now take the same "no model" treatment, from one predicate.
+   */
+  function namesAModel(profile: ModelProfile): boolean {
+    return profile.model !== UNPINNED_MODEL && profile.configured !== false;
+  }
+
+  /**
+   * BUG-270 — offer the setup, rather than only reporting its absence.
+   *
+   * "Not installed on this machine" is a fact and half an answer: the owner
+   * then had to find the install panel further up the page and work out which
+   * of its cards matched the row that told them. This is the same governed
+   * vendor path that panel takes, offered where the absence is stated.
+   */
+  async function setUpRuntime(provider: string) {
+    const runtime = installerRuntimeFor(provider);
+    if (runtime === null) return;
+    installing = provider;
+    try {
+      await openRuntimeInstaller(runtime);
+      // Deliberately not "installed". Raiker opened a download; whether the
+      // owner ran it is theirs to say, and **Look again** is how they say it.
+      installNotice = `Opened the official ${providerName(provider)} download. Install it, then choose Look again.`;
+    } catch {
+      installNotice = `Could not open the ${providerName(provider)} download.`;
+    } finally {
+      installing = null;
+    }
+  }
+
+  async function redetectRuntimes() {
+    detecting = true;
+    try {
+      await api.detectLocalRuntimes();
+      await load();
+      // The instruction the notice carried has been followed, whatever the
+      // answer turned out to be.
+      installNotice = null;
+    } catch {
+      // A failed look leaves the last answer standing rather than replacing it
+      // with a claim this call did not establish.
+    } finally {
+      detecting = false;
+    }
+  }
+
   async function testConnection(profile: ModelProfile) {
     const id = profile.profile_id;
     testing = { ...testing, [id]: true };
@@ -748,10 +817,23 @@
   // Set up and usable, whether or not the last observation is still inside its
   // window. This is what an owner means by "I have models"; `readyCount` is
   // what Raiker has actually proven.
+  //
+  // BUG-270 — the local half of this is a fact the browser cannot see. Four
+  // empty llama.cpp slots carry `local-gguf…` model strings and the Ollama
+  // native default names a third-party model, so `model !== "<model>"` counted
+  // five models on a machine with none of them installed. The server now answers
+  // it from the deployment rows and the cached runtime detection; this reads
+  // that number and only falls back to the old client-side shape when an older
+  // backend sends no field.
   const usableCount = $derived(
-    (models?.profiles ?? []).filter(
-      (p) => p.model !== "<model>" && isChoosableModel(p) && (p.connection_configured || !p.off_machine),
-    ).length,
+    models?.usable_provider_count ??
+      (models?.profiles ?? []).filter(
+        (p) =>
+          p.configured !== false &&
+          p.model !== "<model>" &&
+          isChoosableModel(p) &&
+          (p.connection_configured || !p.off_machine),
+      ).length,
   );
 
   // Each provider's bar is its share of total spend across every provider, so
@@ -1132,12 +1214,51 @@
                           <h3>{providerName(p.provider)}</h3>
                         </div>
                         <p class="row-model">
-                          {#if p.model === "<model>"}<span
+                          {#if !namesAModel(p)}<span
                               class="model-unpinned"
                               >model chosen at selection</span
                             >{:else}<code>{modelName(p.model)}</code>{/if}
                         </p>
                         <p class="row-help">{providerHelp(p)}</p>
+                        <!-- BUG-270 — "On this device" is a section whose whole
+                             claim is about this device, so the one fact it can
+                             state without measuring anything belongs here:
+                             whether the runtime is installed at all. Rendered
+                             only when detection has an answer — `undefined`
+                             means nothing has looked, and silence is honest
+                             then. -->
+                        {#if p.provider_detected === false}
+                          <p class="posture-line runtime-missing">
+                            <Icon name="warning" size={14} />
+                            Not installed on this machine
+                            {#if installerRuntimeFor(p.provider)}
+                              <!-- The offer, not just the finding. Raiker opens
+                                   the vendor's own download and accepts nothing
+                                   on the owner's behalf. -->
+                              <button
+                                type="button"
+                                class="btn btn-sm"
+                                onclick={() => void setUpRuntime(p.provider)}
+                                disabled={installing !== null}
+                                >{installing === p.provider
+                                  ? "Opening…"
+                                  : `Set up ${providerName(p.provider)}`}</button
+                              >
+                            {/if}
+                            <button
+                              type="button"
+                              class="link-button"
+                              onclick={() => void redetectRuntimes()}
+                              disabled={detecting}
+                              >{detecting ? "Looking…" : "Look again"}</button
+                            >
+                          </p>
+                          {#if installNotice && installing === null}
+                            <p class="posture-line install-notice" role="status">
+                              {installNotice}
+                            </p>
+                          {/if}
+                        {/if}
                         <div class="chips">
                           <span class="chip"
                             >{endpointLabel(p.endpoint_kind)}</span
@@ -1266,7 +1387,7 @@
                         </div>
                       </div>
                       <p class="pc-model">
-                        {#if p.model === "<model>"}<span class="model-unpinned"
+                        {#if !namesAModel(p)}<span class="model-unpinned"
                             >no model pinned</span
                           >{:else}<code>{modelName(p.model)}</code>{/if}
                       </p>
@@ -1306,6 +1427,43 @@
                            the posture is one quiet line. -->
                       {#if posture(p) !== ""}
                         <p class="posture-line">{posture(p)}</p>
+                      {/if}
+                      <!-- BUG-270 — a local runtime that is not on this machine
+                           is the one thing the card can say without measuring
+                           anything, and it is exactly what an owner needs to
+                           read before wondering why a model they never
+                           installed is not answering. Only rendered when
+                           detection has an answer: `provider_detected` is null
+                           when nothing has looked, and silence is the honest
+                           output then. -->
+                      {#if p.provider_detected === false}
+                        <p class="posture-line runtime-missing">
+                          <Icon name="warning" size={14} />
+                          Not installed on this machine
+                          {#if installerRuntimeFor(p.provider)}
+                            <button
+                              type="button"
+                              class="btn btn-sm"
+                              onclick={() => void setUpRuntime(p.provider)}
+                              disabled={installing !== null}
+                              >{installing === p.provider
+                                ? "Opening…"
+                                : `Set up ${providerName(p.provider)}`}</button
+                            >
+                          {/if}
+                          <button
+                            type="button"
+                            class="link-button"
+                            onclick={() => void redetectRuntimes()}
+                            disabled={detecting}
+                            >{detecting ? "Looking…" : "Look again"}</button
+                          >
+                        </p>
+                        {#if installNotice && installing === null}
+                          <p class="posture-line install-notice" role="status">
+                            {installNotice}
+                          </p>
+                        {/if}
                       {/if}
                       <!-- Shown only where there is something to report: a
                            local runtime that cannot bill and a provider with no
@@ -1524,7 +1682,7 @@
             <option value="">Add a backend…</option>
             {#each addable as p (p.profile_id)}
               <option value={p.profile_id}
-                >{providerName(p.provider)}{p.model !== "<model>"
+                >{providerName(p.provider)}{namesAModel(p)
                   ? ` (${modelName(p.model)})`
                   : " (no model)"}</option
               >
@@ -2113,6 +2271,33 @@
     margin: 0.1rem 0 0;
     color: var(--text-3);
     font-size: 0.74rem;
+  }
+  /* BUG-270 — the one line on a provider card that is about this machine
+     rather than about a provider. It carries the warning tone because it is
+     the reason nothing on the card will answer, and it wraps rather than
+     truncating so the "Look again" action survives a narrow window. */
+  .runtime-missing {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    color: var(--warn, var(--text-2));
+  }
+  .runtime-missing .link-button {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: inherit;
+    font: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+  }
+  .runtime-missing .link-button:disabled {
+    cursor: default;
+    opacity: 0.6;
+  }
+  .install-notice {
+    color: var(--text-2);
   }
   .details-actions {
     display: flex;

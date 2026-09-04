@@ -112,6 +112,7 @@ not in this table is a documentation defect, not a hidden feature.
 | `project_assignment_runtime` | 1 | Moves the active conversation into a project. Local, reversible, relayed on approval. |
 | `git_push_execution` | 2 | Publishes a branch to an HTTPS GitHub remote. Its own gate, separate from `git_write_execution`, because a push is egress carrying repository content off the machine; requires the remote's host on `RAIKER_CONNECTOR_EGRESS_ALLOWLIST` and a credential lent for one command under an owner grant. Never forces, never deletes a branch. |
 | `code_map_indexing` | 3 | Builds and refreshes the repository symbol index Build points at — a real parser for Python, bounded patterns for fifteen other languages, each file recording which extractor produced it. Deliberately **not** `graph_codemap_indexing`: this is a derived cache, that is the governed durable graph store. A scan that hits a bound reports `partial` and names the bound. |
+| `language_intelligence` | 3 | Outlines a file, resolves an exact name to its declaration, and reports parse-level problems (GAP-BUILD B10). A sibling of `code_map_indexing` rather than part of it: the map **writes** a derived index of the machine, this writes nothing at all and every answer is a parse of a file `read_file` would already open. Diagnostics are parse-level, and a language with no parser here is reported as **not checked**, never as clean. |
 | `mcp_builder_runtime` | 4 | Writes a reviewed, dependency-free local stdio MCP server from a fixed template into the workspace. Interpreter allowlist, workspace-relative path, no network. |
 | `mcp_connector_runtime` | 4 | One bounded MCP session over `stdio` (interpreter allowlist, workspace-relative argument rule) or `http` (an owner-added remote endpoint with an optional owner token — monitored rather than allowlist-blocked, because adding the URL is the authorisation). Tool output returns as redacted metadata; the raw content and any owner token never enter artifacts or the audit event. A projected MCP tool is offered to the model only while the gate is enabled **and** the decision mode permits it. |
 | `email_runtime` | 6 | Local governed email store. No outbound send. |
@@ -234,7 +235,7 @@ things in the path that enforced a capability and the surface that described it:
 | Resolution | With nothing persisted | Used by |
 |---|---|---|
 | `off` (default) | Off. Nothing decided is not consent | Everything not named below |
-| `shipped_default_unscoped` | An account is fail-closed; a caller with no account gets the shipped table — what `RuntimeAuthority.check_capability_gate` does, and the posture the **Model** section above documents | `code_map_indexing`, `subagents` |
+| `shipped_default_unscoped` | An account is fail-closed; a caller with no account gets the shipped table — what `RuntimeAuthority.check_capability_gate` does, and the posture the **Model** section above documents | `code_map_indexing`, `language_intelligence`, `subagents` |
 | `shipped_default` | Any caller gets the shipped table. An owner who turns it off writes a row, and that row wins | `web_fetch` (RAIKER-2021) |
 
 Every path that reads a gate — enforcing or describing — calls

@@ -193,7 +193,13 @@ export async function checkModelReady(page: Page, card: Locator): Promise<void> 
   // reason it is not. "Not checked" is the state before the check answers, so it
   // is deliberately not one of the accepted outcomes.
   await expect(
-    card.getByText(/can reach|cannot execute|not reachable|rejected|no credit|no quota/i),
+    card.getByText(
+      // BUG-272 — `needs a workspace` joined this list the day the answer
+      // existed. The set is closed on purpose: an outcome missing from it does
+      // not fail the check, it hangs for two minutes and then blames the spec
+      // that was using the key rather than the key.
+      /can reach|cannot execute|not reachable|rejected|no credit|no quota|needs a workspace|identity-linked/i,
+    ),
   ).toBeVisible({ timeout: 120_000 });
 }
 

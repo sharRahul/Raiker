@@ -79,7 +79,7 @@ checkpoint's **Turn** field, and a turn opened from Observability → Sessions o
 the exchange the same way.
 
 A search names at most twenty exchanges here. Beyond that the list is a wall of
-links rather than a citation anybody checks; use **Search chats** for the rest.
+links rather than a citation anybody checks; use **Threads** for the rest.
 
 ## Approvals and execution
 

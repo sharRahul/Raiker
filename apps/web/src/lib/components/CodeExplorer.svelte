@@ -25,7 +25,11 @@
    */
   import { untrack } from "svelte";
   import { api, ApiError } from "../api";
-  import type { CodeRepoBrowseView, ProjectBrowseEntry } from "../apiTypes";
+  import type {
+    CodeRepoBrowseView,
+    CodeRepoDiagnosticsView,
+    ProjectBrowseEntry,
+  } from "../apiTypes";
   import { highlight, languageForFilename, languageLabel } from "../highlight";
   import Icon from "./Icon.svelte";
 
@@ -52,6 +56,11 @@
   let fileLoading = $state(false);
   let fileNotice = $state<string | null>(null);
   let fileTruncated = $state(false);
+  // B10 — what a parser sees in the open file. Null while nothing is known,
+  // which is deliberately distinct from "checked and clean": the strip renders
+  // nothing until the read comes back, rather than claiming a clean file it has
+  // not looked at.
+  let fileDiagnostics = $state<CodeRepoDiagnosticsView | null>(null);
 
   const root = $derived(listings[""] ?? null);
   const missing = $derived(root?.root_missing ?? false);
@@ -126,6 +135,23 @@
     } finally {
       fileLoading = false;
     }
+    // After the text, never instead of it: a repository the owner can read is
+    // worth more than a diagnostic, so a diagnostics failure must not take the
+    // file down with it. The strip simply stays silent.
+    if (fileNotice === null) {
+      await loadDiagnostics(entry.relative_path);
+    }
+  }
+
+  async function loadDiagnostics(path: string): Promise<void> {
+    try {
+      const view = await api.readCodeRepoDiagnostics(repoId, path);
+      // A slow read for a file the owner has since closed or moved past must
+      // not overwrite the current one's answer.
+      if (openPath === path) fileDiagnostics = view;
+    } catch {
+      if (openPath === path) fileDiagnostics = null;
+    }
   }
 
   const rendered = $derived(
@@ -143,6 +169,7 @@
       openPath = null;
       fileText = "";
       fileNotice = null;
+      fileDiagnostics = null;
       void loadDirectory("");
     });
   });
@@ -205,12 +232,38 @@
             type="button"
             class="icon-btn"
             aria-label="Close file"
-            onclick={() => (openPath = null)}
+            onclick={() => {
+              openPath = null;
+              fileDiagnostics = null;
+            }}
           >
             <Icon name="x" size={14} />
           </button>
         </span>
       </header>
+      <!-- B10 — the workspace could show a file and not say that it no longer
+           parses, which is the one thing an owner most wants to know about a
+           file the agent just edited. Three states, and the third is the point:
+           problems, checked-and-clean, and *not checked* for a language this
+           runtime has no parser for. "Not checked" is never rendered as
+           "no problems". -->
+      {#if fileDiagnostics !== null && fileDiagnostics.available}
+        {#if fileDiagnostics.diagnostics.length > 0}
+          <ul class="problems" aria-label={`Problems in ${openPath}`}>
+            {#each fileDiagnostics.diagnostics as problem (`${problem.line}:${problem.column}:${problem.message}`)}
+              <li>
+                <Icon name="warning" size={13} />
+                <span class="where">{problem.line}:{problem.column}</span>
+                <span class="what">{problem.message}</span>
+              </li>
+            {/each}
+          </ul>
+        {:else if fileDiagnostics.checked}
+          <p class="note clean">No syntax problems.</p>
+        {:else}
+          <p class="note">Not checked — no parser for this language here.</p>
+        {/if}
+      {/if}
       {#if fileLoading}
         <p class="note">Reading…</p>
       {:else if fileNotice !== null}
@@ -430,6 +483,38 @@
   }
   .child-note {
     padding-left: calc(var(--depth, 0) * 0.75rem + 1.1rem);
+  }
+  /* B10 — problems sit between the file's name and its text, where an editor
+     puts them, and scroll on their own so a file with many never pushes the
+     code off screen. */
+  .problems {
+    list-style: none;
+    margin: 0;
+    padding: 0.3rem 0.5rem;
+    max-height: 7rem;
+    overflow: auto;
+    border-bottom: 1px solid var(--border);
+    background: var(--warn-soft, var(--surface-2));
+  }
+  .problems li {
+    display: flex;
+    align-items: baseline;
+    gap: 0.4rem;
+    font-size: 0.76rem;
+    color: var(--warn, var(--text));
+    line-height: 1.5;
+  }
+  .problems .where {
+    flex: none;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+  }
+  .problems .what {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .note.clean {
+    color: var(--ok, var(--text-muted));
   }
   .note.error {
     color: var(--danger, var(--text-muted));

@@ -123,11 +123,13 @@ class TaskManager:
         model_profile: str | None = None,
         model: str | None = None,
         attachments: list[dict[str, object]] | None = None,
+        thread_session_id: str | None = None,
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
             task_id=new_id("task_"),
             session_id=session_id,
+            thread_session_id=thread_session_id,
             title=title,
             objective=objective,
             status="queued",

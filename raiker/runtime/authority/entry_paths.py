@@ -118,6 +118,7 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     _own("remote_execution_cap", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("cloud_execution_cap", ENTRY_MODEL_TOOL, ENTRY_APPROVAL_RELAY),
     _own("code_map_indexing", ENTRY_MODEL_TOOL, ENTRY_LOCAL_ADMISSION),
+    _own("language_intelligence", ENTRY_MODEL_TOOL, ENTRY_LOCAL_ADMISSION),
     _own("graph_indexing_runtime", ENTRY_MODEL_TOOL),
     _own("web_fetch", ENTRY_MODEL_TOOL, ENTRY_LOCAL_ADMISSION),
     # B7 — delegation answers to its own switch. The subagent's steps are still

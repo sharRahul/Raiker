@@ -42,6 +42,7 @@ from raiker.runtime.executors.tier2_web import WebFetchExecutor
 from raiker.runtime.executors.tier3_core import (
     CodeMapIndexExecutor,
     GraphIndexingExecutor,
+    LanguageIntelligenceExecutor,
     SemanticMemoryExecutor,
     VectorEmbeddingExecutor,
 )
@@ -80,7 +81,7 @@ __all__ = [
     "MemoryWriteExecutor", "MemoryForgetExecutor",
     "TaskManagementExecutor", "ProjectAssignmentExecutor",
     "ShellExecutor", "ProcessExecutor", "WebFetchExecutor",
-    "GraphIndexingExecutor", "CodeMapIndexExecutor",
+    "GraphIndexingExecutor", "CodeMapIndexExecutor", "LanguageIntelligenceExecutor",
     "SemanticMemoryExecutor", "VectorEmbeddingExecutor", "ModelProviderExecutor",
     "SubagentExecutor", "MultiAgentTeamExecutor",
     "PluginInstallExecutor", "PluginExecutionCapExecutor", "PluginRevocationExecutor",
@@ -159,6 +160,10 @@ REAL_EXECUTOR_CAPABILITIES: frozenset[str] = frozenset({
     # B9 — the repository code map. A local, read-derived symbol index the owner
     # switches on; it executes nothing outside the workspace and grants nothing.
     "code_map_indexing",
+    # B10 — the three language reads beside it. They write nothing at all, not
+    # even a derived index, and every answer is a parse of a file the agent may
+    # already open with `read_file`.
+    "language_intelligence",
     "semantic_memory_runtime",
     # Tier 3 — local deterministic embedding (hashing trick; no model download /
     # no network).
@@ -275,6 +280,7 @@ def build_default_executor_registry(
     registry.register("web_fetch", WebFetchExecutor(ws, store))
     registry.register("graph_indexing_runtime", GraphIndexingExecutor(ws))
     registry.register("code_map_indexing", CodeMapIndexExecutor(ws, store))
+    registry.register("language_intelligence", LanguageIntelligenceExecutor(ws, store))
     registry.register("semantic_memory_runtime", SemanticMemoryExecutor(ws))
     registry.register("vector_embedding_runtime", VectorEmbeddingExecutor(ws, store))
     registry.register("model_provider_runtime", ModelProviderExecutor(ws, store))

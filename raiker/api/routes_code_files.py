@@ -267,3 +267,79 @@ async def read_code_repo_file(
         "readable": True,
         "reason_code": "",
     }
+
+
+@router.get("/api/code/repos/{repo_id}/diagnostics")
+async def read_code_repo_diagnostics(
+    repo_id: str,
+    request: Request,
+    path: str = "",
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """Parse-level problems for one open file (GAP-BUILD B10).
+
+    The workspace could show an owner a file and not tell them it no longer
+    parses, which is the one thing they most want to know about a file the agent
+    just edited. This is the same read the agent's own ``diagnostics`` tool
+    performs, through the same service and the same ``language_intelligence``
+    gate, so the browser and the model see one answer rather than two.
+
+    A file whose language this runtime cannot parse comes back with
+    ``checked: false``. The UI must say *not checked* for it — never *no
+    problems* — for the same reason the tool does.
+    """
+    if not (path or "").strip():
+        raise _bad_request("path_required")
+    repo = _owned_repo(request, repo_id, auth_data[0].principal_id)
+    root = _repo_root(request, repo)
+    if root is None:
+        raise _not_found(
+            "repo_not_checked_out"
+            if str(repo.get("kind")) == "github"
+            else "repo_folder_missing"
+        )
+    # Resolved and contained the same way the file read above is, so this cannot
+    # become a second, weaker path boundary.
+    target = _resolved_target(request, root, path)
+    if not target.is_file():
+        raise _not_found("file_not_found")
+    relative = target.relative_to(root).as_posix()
+
+    from raiker.graph.language_service import LanguageIntelligenceService
+
+    service = LanguageIntelligenceService(
+        _ws(request),
+        SQLiteStore(_ws(request)),
+        principal_id=auth_data[0].principal_id,
+        # This route is looking at *this* connected repository, which is not
+        # necessarily the one a turn would index, and it has already resolved and
+        # contained the root above. Naming it here keeps the two answers about
+        # one file identical rather than depending on the owner's current
+        # repository selection.
+        repository_root=root,
+    )
+    result = service.diagnostics([relative])
+    if result.get("status") != "success":
+        error = result.get("error") or {}
+        return {
+            "path": relative,
+            "checked": False,
+            "available": False,
+            "reason_code": str(error.get("type") or "diagnostics_unavailable"),
+            "reason": str(error.get("message") or ""),
+            "diagnostics": [],
+        }
+    checked = relative in (result.get("checked") or [])
+    unsupported = result.get("unsupported") or []
+    return {
+        "path": relative,
+        "checked": checked,
+        "available": True,
+        "reason_code": "" if checked else "language_not_parseable",
+        "reason": (
+            ""
+            if checked
+            else str(unsupported[0].get("reason", "")) if unsupported else "This file was not checked."
+        ),
+        "diagnostics": result.get("diagnostics") or [],
+    }

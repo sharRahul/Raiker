@@ -110,6 +110,129 @@ describe("CodeExplorer", () => {
     expect(document.querySelectorAll("pre.code .tok-keyword").length).toBeGreaterThan(0);
   });
 
+  // B10 — the workspace could show a file and not say that it no longer parses.
+  //
+  // The third case is the one worth defending hardest: a language this runtime
+  // has no parser for must read as *not checked*, never as *no problems*. A
+  // clean bill from a check that did not happen is trusted the same as a real
+  // one and is wrong.
+  it("shows the parse problems in the file it just opened", async () => {
+    stubFetch({
+      "GET /api/code/repos/repo_1/browse": browse([file("main.py")]),
+      "GET /api/code/repos/repo_1/file?path=main.py": {
+        path: "main.py",
+        text: "def go(:\n",
+        truncated: false,
+        size_bytes: 9,
+        readable: true,
+        reason_code: "",
+      },
+      "GET /api/code/repos/repo_1/diagnostics?path=main.py": {
+        path: "main.py",
+        checked: true,
+        available: true,
+        reason_code: "",
+        reason: "",
+        diagnostics: [
+          {
+            path: "main.py",
+            line: 1,
+            column: 8,
+            severity: "error",
+            message: "invalid syntax.",
+            source: "python-ast",
+          },
+        ],
+      },
+    });
+    render(CodeExplorer, { props });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Read main.py" }));
+
+    expect(await screen.findByText("invalid syntax.")).toBeVisible();
+    expect(screen.getByText("1:8")).toBeVisible();
+  });
+
+  it("says a clean file is clean", async () => {
+    stubFetch({
+      "GET /api/code/repos/repo_1/browse": browse([file("main.py")]),
+      "GET /api/code/repos/repo_1/file?path=main.py": {
+        path: "main.py",
+        text: "x = 1\n",
+        truncated: false,
+        size_bytes: 6,
+        readable: true,
+        reason_code: "",
+      },
+      "GET /api/code/repos/repo_1/diagnostics?path=main.py": {
+        path: "main.py",
+        checked: true,
+        available: true,
+        reason_code: "",
+        reason: "",
+        diagnostics: [],
+      },
+    });
+    render(CodeExplorer, { props });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Read main.py" }));
+
+    expect(await screen.findByText("No syntax problems.")).toBeVisible();
+  });
+
+  it("never reports a language it cannot parse as having no problems", async () => {
+    stubFetch({
+      "GET /api/code/repos/repo_1/browse": browse([file("ui.ts")]),
+      "GET /api/code/repos/repo_1/file?path=ui.ts": {
+        path: "ui.ts",
+        text: "export const x = 1;\n",
+        truncated: false,
+        size_bytes: 20,
+        readable: true,
+        reason_code: "",
+      },
+      "GET /api/code/repos/repo_1/diagnostics?path=ui.ts": {
+        path: "ui.ts",
+        checked: false,
+        available: true,
+        reason_code: "language_not_parseable",
+        reason: "No parser for typescript on this runtime.",
+        diagnostics: [],
+      },
+    });
+    render(CodeExplorer, { props });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Read ui.ts" }));
+
+    expect(
+      await screen.findByText("Not checked — no parser for this language here."),
+    ).toBeVisible();
+    expect(screen.queryByText("No syntax problems.")).toBeNull();
+  });
+
+  it("still shows the file when the diagnostics read fails", async () => {
+    // A repository the owner can read is worth more than a diagnostic.
+    stubFetch({
+      "GET /api/code/repos/repo_1/browse": browse([file("main.py")]),
+      "GET /api/code/repos/repo_1/file?path=main.py": {
+        path: "main.py",
+        text: "x = 1\n",
+        truncated: false,
+        size_bytes: 6,
+        readable: true,
+        reason_code: "",
+      },
+    });
+    render(CodeExplorer, { props });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Read main.py" }));
+
+    await waitFor(() =>
+      expect(document.querySelector("pre.code")?.textContent).toContain("x = 1"),
+    );
+    expect(screen.queryByText("No syntax problems.")).toBeNull();
+  });
+
   it("says why a file cannot be shown instead of rendering an empty pane", async () => {
     stubFetch({
       "GET /api/code/repos/repo_1/browse": browse([file("logo.png")]),

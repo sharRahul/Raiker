@@ -65,6 +65,8 @@ from raiker.storage.migrations import (
     AGENT_PLANS_SQL,
     API_SESSIONS_MIGRATION_ID,
     API_SESSIONS_SQL,
+    APPROVAL_DECISION_SCOPE_MIGRATION_ID,
+    APPROVAL_DECISION_SCOPE_SQL,
     ATTACHMENT_STORE_MIGRATION_ID,
     ATTACHMENT_STORE_SQL,
     BRAIN_PREFERENCES_MIGRATION_ID,
@@ -125,6 +127,8 @@ from raiker.storage.migrations import (
     GIT_CREDENTIAL_GRANT_MIGRATION_ID,
     GIT_CREDENTIAL_GRANT_SQL,
     LEGACY_ACCOUNT_BOOTSTRAP_ROLES_MIGRATION_ID,
+    LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
+    LOCAL_RUNTIME_PRESENCE_SQL,
     LOCK_SCREEN_MIGRATION_ID,
     LOCK_SCREEN_SQL,
     MACHINE_ACTION_ATTRIBUTION_MIGRATION_ID,
@@ -349,6 +353,8 @@ from raiker.storage.migrations import (
     TASK_ATTACHMENTS_SQL,
     TASK_MODEL_CHOICES_MIGRATION_ID,
     TASK_MODEL_CHOICES_SQL,
+    TASK_THREAD_SESSION_MIGRATION_ID,
+    TASK_THREAD_SESSION_SQL,
     TEXT_SEARCH_FTS4,
     TEXT_SEARCH_FTS5,
     TEXT_SEARCH_FTS5_MIGRATION_ID,
@@ -1525,6 +1531,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 OWNER_QUESTION_ANSWER_MIGRATION_ID, OWNER_QUESTION_ANSWER_SQL, connection
             )
+            self._apply_migration(
+                LOCAL_RUNTIME_PRESENCE_MIGRATION_ID,
+                LOCAL_RUNTIME_PRESENCE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TASK_THREAD_SESSION_MIGRATION_ID,
+                TASK_THREAD_SESSION_SQL,
+                connection,
+            )
+            self._apply_migration(
+                APPROVAL_DECISION_SCOPE_MIGRATION_ID,
+                APPROVAL_DECISION_SCOPE_SQL,
+                connection,
+            )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
             self._apply_migration(
                 MEMORY_EMBEDDING_BACKEND_MIGRATION_ID,
@@ -2380,6 +2401,63 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                    ORDER BY LENGTH(name), path, line_start
                    LIMIT ?""",
                 (owner_principal_id, repo_path, like, like, like, limit),
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    def save_approval_decision_scope(self, approval_id: str, hunk_ids: list[str]) -> None:
+        """Record which hunks of an approved change set the owner accepted (B14).
+
+        Written before the relay runs, so what executes is decided by a row and
+        not by an argument travelling alongside a request. It narrows only: the
+        relay refuses anything not already in the approved patch.
+        """
+        with self.connect() as connection:
+            connection.execute(
+                "UPDATE approvals SET decision_scope_json = ? WHERE approval_id = ?",
+                (json.dumps({"accepted_hunks": list(hunk_ids)}, sort_keys=True), approval_id),
+            )
+
+    @staticmethod
+    def approval_accepted_hunks(approval: dict[str, Any]) -> list[str] | None:
+        """The hunks this approval was narrowed to, or ``None`` for all of them.
+
+        ``None`` and ``[]`` are different answers and both are real: nothing
+        recorded means the owner accepted the whole change set, which is what
+        every approval decided before B14 and what most still decide; an empty
+        list means they accepted no part of it.
+        """
+        raw = approval.get("decision_scope_json")
+        if not raw:
+            return None
+        try:
+            parsed = json.loads(str(raw))
+        except (TypeError, ValueError):
+            return None
+        if not isinstance(parsed, dict) or "accepted_hunks" not in parsed:
+            return None
+        value = parsed.get("accepted_hunks")
+        return [str(item) for item in value] if isinstance(value, list) else None
+
+    def find_code_map_symbols(
+        self, owner_principal_id: str, repo_path: str, name: str, *, limit: int = 40
+    ) -> list[dict[str, Any]]:
+        """Declarations of **exactly** *name* — the definition question (B10).
+
+        `match_code_map_symbols` is a substring search whose job is to rank a
+        fuzzy query; asking it "where is `Config` defined" returns every
+        `ConfigLoader` and `parse_config` too, which is right for a search box
+        and wrong for a definition lookup. This matches the name a caller wrote,
+        and lets the service above decide which of the real candidates is the
+        one they meant.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                """SELECT * FROM code_map_symbols
+                   WHERE owner_principal_id = ? AND repo_path = ?
+                     AND (name = ? OR qualified_name = ?)
+                   ORDER BY path, line_start
+                   LIMIT ?""",
+                (owner_principal_id, repo_path, name, name, limit),
             ).fetchall()
         return [dict(row) for row in rows]
 
@@ -5551,6 +5629,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             ).fetchall()
         return [dict(row) for row in rows]
 
+    def count_turns_by_session(self, session_ids: list[str]) -> dict[str, int]:
+        """How many turns each of these sessions holds (C11).
+
+        One query for a whole task list rather than one per card: the Tasks page
+        renders every task's thread link and each needs to know whether the
+        thread has anything in it yet.
+        """
+        wanted = [item for item in dict.fromkeys(session_ids) if item]
+        if not wanted:
+            return {}
+        placeholders = ",".join("?" for _ in wanted)
+        with self.connect() as connection:
+            rows = connection.execute(
+                f"""SELECT session_id, COUNT(*) AS turns FROM turns
+                    WHERE session_id IN ({placeholders})
+                    GROUP BY session_id""",  # noqa: S608 - placeholders only
+                tuple(wanted),
+            ).fetchall()
+        return {str(row["session_id"]): int(row["turns"]) for row in rows}
+
     def load_turn(self, turn_id: str) -> dict[str, Any] | None:
         with self.connect() as connection:
             row = connection.execute("SELECT * FROM turns WHERE turn_id = ?", (turn_id,)).fetchone()
@@ -7135,12 +7233,13 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, attachments_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, attachments_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
                     task.session_id,
+                    task.thread_session_id,
                     task.parent_turn_id,
                     task.parent_task_id,
                     task.title,
@@ -10868,6 +10967,47 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "DELETE FROM principal_surface_models WHERE principal_id = ? AND surface = ?",
                 (principal_id, surface),
             )
+
+    # ── Local runtime presence (BUG-270) ────────────────────────────────
+    #
+    # Whether a local model runtime exists on this machine is a fact about the
+    # host, not about a principal, so these rows are not owner-scoped.  They are
+    # written by an explicit detection pass and only ever read back here, which
+    # is what lets a status read answer "is Ollama installed" without a probe.
+
+    def save_local_runtime_presence(
+        self, runtime: str, *, present: bool, executable: str | None
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO local_runtime_presence
+                (runtime, present, executable, detected_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(runtime) DO UPDATE SET
+                  present = excluded.present,
+                  executable = excluded.executable,
+                  detected_at = excluded.detected_at""",
+                (runtime, 1 if present else 0, executable, utc_now()),
+            )
+
+    def load_local_runtime_presence(self) -> dict[str, dict[str, Any]]:
+        """Every detection result on record, keyed by runtime name.
+
+        A runtime absent from this mapping has never been detected, which is a
+        third answer distinct from present and absent: nothing has looked yet.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT runtime, present, executable, detected_at FROM local_runtime_presence"
+            ).fetchall()
+        return {
+            str(row["runtime"]): {
+                "present": bool(row["present"]),
+                "executable": (str(row["executable"]) if row["executable"] else None),
+                "detected_at": str(row["detected_at"]),
+            }
+            for row in rows
+        }
 
     def list_configured_models(self, principal_id: str) -> list[tuple[str, str]]:
         with self.connect() as connection:

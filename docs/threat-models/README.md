@@ -50,6 +50,7 @@ Raiker reaches the internet": [Web read](web-fetch.md).
 | `semantic_memory_runtime` | [Semantic memory search](semantic-memory.md) |
 | `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) |
 | `code_map_indexing` | [Repository code map](code-map-indexing.md) |
+| `language_intelligence` | [Language intelligence](language-intelligence.md) |
 | `task_management_runtime` | [Task creation](task-management.md) |
 | `project_assignment_runtime` | [Project assignment](project-assignment.md) |
 
@@ -148,6 +149,7 @@ Eleven documents close that:
 | `web_fetch` | [Web read](web-fetch.md) | Egress, and where untrusted external text enters a turn |
 | `graph_indexing_runtime` | [Knowledge-graph indexing](graph-indexing.md) | Reads the workspace and derives a durable index |
 | `code_map_indexing` | [Repository code map](code-map-indexing.md) | Reads the workspace and derives a durable symbol index |
+| `language_intelligence` | [Language intelligence](language-intelligence.md) | Parses workspace files for symbols and syntax problems; derives nothing durable |
 
 Two findings came out of writing them, and both are recorded in the pages
 themselves rather than smoothed over:

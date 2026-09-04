@@ -1243,6 +1243,44 @@ class ProjectDetailView:
 
 
 @dataclass(frozen=True)
+class WorkThreadView:
+    """One thread of the owner's work, whatever started it (GAP-CHAT C18).
+
+    Chat search covered titles and message text, which answers *"where did I say
+    that"* and not *"what am I working on"*. Those are different questions: the
+    second one spans conversations the owner typed **and** the threads a routine
+    is advancing on its own (C11), it wants the project each sits in, and it
+    wants to know which of them is blocked on the owner.
+
+    Every field here is read from a row that already existed. This view invents
+    no state; it is the join nothing was performing.
+    """
+
+    session_id: str
+    title: str
+    #: ``chat`` for a conversation the owner started, ``routine`` for a thread a
+    #: task is advancing. The distinction is what makes "resume the thread a
+    #: routine is advancing" possible at all — it used to be unreachable.
+    kind: str
+    updated_at: str
+    turn_count: int
+    project_id: str | None = None
+    project_name: str | None = None
+    #: Set only on a ``routine`` thread: the task advancing it.
+    task_id: str | None = None
+    task_status: str | None = None
+    cadence: str | None = None
+    next_run_at: str | None = None
+    #: What this thread is waiting on, in the owner's language, or None when it
+    #: is not waiting on anything. Only ever states a blocker the runtime
+    #: actually holds — never a guess about staleness.
+    waiting_on: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
 class TaskView:
     task_id: str
     session_id: str
@@ -1265,6 +1303,15 @@ class TaskView:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    # C11 — this task's own conversation, or None for a task created before
+    # threads existed. The card links to it, and every cycle runs in it, so
+    # "what did the overnight run find?" opens a transcript the owner can reply
+    # in rather than a status line they can only read.
+    thread_session_id: str | None = None
+    # How many turns that thread holds. It is the difference between a link
+    # worth pressing and one that opens an empty page, so the card can say so
+    # instead of the owner discovering it.
+    thread_turns: int = 0
     attachments: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
@@ -1294,6 +1341,9 @@ TOOL_LABELS: dict[str, str] = {
     "conversation_search": "Search chats",
     "code_map_search": "Search code map",
     "code_map_references": "Find references",
+    "document_symbols": "Outline file",
+    "find_definition": "Find definition",
+    "diagnostics": "Check for problems",
     "create_document": "Create document",
     "spawn_subagent": "Delegate",
     "update_plan": "Update plan",
@@ -1341,6 +1391,49 @@ def _task_detail(task: TaskView) -> str | None:
     return task.current_step
 
 
+#: Providers whose availability is a fact about *this machine* — the runtime has
+#: to be installed here before any surface may name a model it would serve.
+LOCAL_RUNTIME_PROVIDERS: frozenset[str] = frozenset({"ollama", "llama.cpp", "mlx", "vllm"})
+
+#: The declaration a profile carries when it is only meant to be offered once its
+#: provider has been found. Shipped on every managed local slot and on the Ollama
+#: native default; inert until BUG-270 gave it an enforcer.
+DETECT_FIRST_STATE = "disabled_until_provider_detected"
+
+
+def _names_an_available_model(
+    profile: Any,
+    effective_model: str,
+    presence: dict[str, bool | None],
+    deployed_profile_ids: frozenset[str],
+) -> bool:
+    """Whether a surface may name ``effective_model`` as a model this owner has.
+
+    Three questions in order, and each one is about a different kind of absence:
+
+    1. **Is there a model string at all?** The `<model>` placeholder means the
+       owner has not chosen one. This was the whole of the old predicate.
+    2. **Does the profile ask to be detected first?** Only profiles declaring
+       ``disabled_until_provider_detected`` do, and they are exactly the ones
+       whose model string is a promise about software on this machine — the
+       Ollama native default naming a third-party model, and the managed
+       llama.cpp/MLX slots naming the `local-gguf…` aliases Raiker itself
+       invents when a model is deployed into a slot.
+    3. **Has that promise been kept?** A saved connection or a completed
+       deployment is the owner's own evidence and settles it outright. Failing
+       that, the runtime must have been *detected present* — not merely
+       "not known to be absent", because an unknown answer about someone else's
+       machine is not a licence to claim a model they may not have.
+    """
+    if not effective_model or "<" in effective_model:
+        return False
+    if str(getattr(profile, "default_state", "")) != DETECT_FIRST_STATE:
+        return True
+    if profile.profile_id in deployed_profile_ids:
+        return True
+    return presence.get(profile.provider) is True
+
+
 @dataclass(frozen=True)
 class ModelProfileView:
     profile_id: str
@@ -1364,7 +1457,20 @@ class ModelProfileView:
     # unset for placeholder or provider-discovered models rather than guessed.
     context_window_tokens: int | None = None
     context_window_source: str | None = None
+    # BUG-270 — "does this profile name a model that exists here". It used to be
+    # `effective_model != "<model>"`, which is only "does this profile name a
+    # model string at all", and that is what let a fresh install print
+    # `gemma4:31b-cloud` on a host with no Ollama. A profile that declares
+    # `disabled_until_provider_detected` now has to earn this: the runtime is
+    # detected on this machine, or the owner has connected it or deployed into
+    # it. Everything else is unchanged.
     configured: bool = False
+    # Why `configured` came out the way it did, for the profiles whose answer
+    # depends on this host. `True`/`False` are detection results; `None` means
+    # either nothing has looked yet or the profile's availability does not
+    # depend on a local runtime, and the UI says nothing in that case rather
+    # than claiming an absence it has not established.
+    provider_detected: bool | None = None
     readiness_state: str = "not_configured"
     readiness_summary: str = "No readiness check exists for this exact model."
     readiness_reason_code: str = "model_not_checked"
@@ -1551,6 +1657,12 @@ class ModelsView:
     model_egress_allowlist_configured: bool
     remote_profile_count: int
     ready_provider_count: int = 0
+    # BUG-270 — how many models the owner actually has set up, counted where the
+    # facts are. The browser used to derive this from `model != "<model>"`, which
+    # counted the four empty llama.cpp slots (their `local-gguf…` aliases are
+    # model strings) and the undetected Ollama default, and printed
+    # "5 models set up" on a machine with none.
+    usable_provider_count: int = 0
     # User-owned ordered model fallback sequence (profile ids). When the selected
     # provider is unavailable, the runtime walks this list in order; each candidate
     # is still gated by provider policy, so hosted access is never granted silently.
@@ -1599,6 +1711,7 @@ class ModelsView:
             "model_egress_allowlist_configured": self.model_egress_allowlist_configured,
             "remote_profile_count": self.remote_profile_count,
             "ready_provider_count": self.ready_provider_count,
+            "usable_provider_count": self.usable_provider_count,
             "fallback_sequence": list(self.fallback_sequence),
             "no_silent_hosted_fallback": self.no_silent_hosted_fallback,
         }
@@ -5956,13 +6069,111 @@ class DashboardService:
         # inflate the open/scheduled/finished counters or appear as selectable
         # "Parent work" (FIX-06). Interrupts operate on the raw store list, so a
         # running chat turn can still be stopped.
-        return [
-            self._task_view(t)
+        rows = [
+            t
             for t in self.store.list_tasks(
                 session_id=session_id, status=status, user_id=user_id, project_id=project_id
             )
             if not getattr(t, "parent_turn_id", None)
         ]
+        # C11 — one query for the whole list. A card links to its task's own
+        # conversation, and whether that thread has anything in it yet is the
+        # difference between a link worth pressing and an empty page.
+        turns = self.store.count_turns_by_session(
+            [t.thread_session_id or "" for t in rows]
+        )
+        return [
+            self._task_view(t, thread_turns=turns.get(t.thread_session_id or "", 0))
+            for t in rows
+        ]
+
+    def list_work_threads(
+        self,
+        *,
+        user_id: str | None = None,
+        limit: int = 100,
+    ) -> list[WorkThreadView]:
+        """Every thread of this owner's work, newest first (GAP-CHAT C18).
+
+        Two kinds, in one list, because the owner has one head:
+
+        * **Chats** they started, with the project each sits in — which is the
+          "cross-project view" the gap named. It was absent not because projects
+          were unknown but because nothing joined them to the conversation list.
+        * **Routine threads** a task is advancing (C11). Before those existed
+          there was nothing to resume: a routine's cycles ran in a hidden Inbox
+          transcript. Now each routine owns a conversation, and this is where an
+          owner finds it without going through Tasks first.
+
+        ``waiting_on`` states only a blocker the runtime is actually holding —
+        an approval a task is parked on. A thread nobody is waiting on says so by
+        saying nothing, rather than by having a staleness heuristic invented for
+        it.
+        """
+        projects = {
+            project.project_id: project.name
+            for project in self.list_projects(user_id=user_id).projects
+        }
+        threads: list[WorkThreadView] = []
+        for session in self.store.list_sessions(
+            limit=limit, user_id=user_id, include_archived=False, origin="chat"
+        ):
+            session_id = str(session.get("session_id", ""))
+            project_id = session.get("project_id")
+            threads.append(
+                WorkThreadView(
+                    session_id=session_id,
+                    title=str(session.get("title") or "").strip() or "Untitled chat",
+                    kind="chat",
+                    updated_at=str(session.get("updated_at", "")),
+                    turn_count=int(session.get("turn_count") or 0),
+                    project_id=project_id,
+                    project_name=projects.get(str(project_id)) if project_id else None,
+                )
+            )
+        # A routine thread's identity comes from its task, not from its session:
+        # the task is what carries the cadence, the status and the next slot, and
+        # it is what the owner recognises the thread by.
+        tasks = [
+            task
+            for task in self.store.list_tasks(user_id=user_id)
+            if task.thread_session_id and not getattr(task, "parent_turn_id", None)
+        ]
+        turns = self.store.count_turns_by_session(
+            [str(task.thread_session_id) for task in tasks]
+        )
+        for task in tasks:
+            session_id = str(task.thread_session_id)
+            count = turns.get(session_id, 0)
+            if count == 0:
+                # A routine that has not run has no thread to resume. Listing it
+                # would put a link to an empty transcript in a list whose whole
+                # promise is that every row is somewhere to continue.
+                continue
+            threads.append(
+                WorkThreadView(
+                    session_id=session_id,
+                    title=task.title,
+                    kind="routine",
+                    updated_at=task.updated_at,
+                    turn_count=count,
+                    project_id=task.project_id,
+                    project_name=(
+                        projects.get(str(task.project_id)) if task.project_id else None
+                    ),
+                    task_id=task.task_id,
+                    task_status=task.status,
+                    cadence=task.recurrence,
+                    next_run_at=task.scheduled_at,
+                    waiting_on=(
+                        "Waiting for your approval"
+                        if task.status == "waiting_for_approval"
+                        else None
+                    ),
+                )
+            )
+        threads.sort(key=lambda thread: thread.updated_at, reverse=True)
+        return threads[:limit]
 
     def create_task(
         self,
@@ -6064,8 +6275,31 @@ class DashboardService:
             origin="task",
         )
         self.store.set_session_origin(inbox_session_id, "task")
+        # C11 — this task's own conversation. Background work used to run as an
+        # isolated turn whose output landed in a task record: "what did the
+        # overnight run find?" had no thread to be asked in, and every routine's
+        # cycles interleaved in one Inbox transcript Chat deliberately hides.
+        #
+        # Each task now gets a durable session of its own, titled after the task,
+        # which every cycle runs in. The owner opens it from the task card and
+        # replies there, and because the next cycle runs in the same session, the
+        # reply is context the next cycle reads — which is what makes a reply
+        # steer rather than merely be recorded.
+        #
+        # `origin="task"` keeps it out of RECENT CHATS: these are threads the
+        # owner opens *from their work*, not conversations they started.
+        thread_session_id = new_id("sess_")
+        self.store.create_session(
+            thread_session_id,
+            str(self.store.paths.workspace_root),
+            title=title,
+            user_id=user_id,
+            origin="task",
+        )
+        self.store.set_session_origin(thread_session_id, "task")
         task = TaskManager(self.store, EventLogWriter(self.store)).create_task(
             session_id=inbox_session_id,
+            thread_session_id=thread_session_id,
             title=title,
             objective=objective,
             priority=priority,
@@ -6147,10 +6381,43 @@ class DashboardService:
             ),
             None,
         )
+        # BUG-270 — what this machine actually has. Detection is a PATH lookup
+        # cached in a row, so this read never contacts anything; `detect` only
+        # re-probes a runtime whose row is missing or an hour old.
+        from raiker.models import local_presence
+
+        presence: dict[str, bool | None] = {
+            runtime: result.present
+            for runtime, result in local_presence.detect(self.store).items()
+        }
+        # A model the owner deployed into a managed slot, or connected. Either is
+        # the owner's own evidence that the profile serves something, and it
+        # outranks detection: a slot with a model in it is not "undetected".
+        configured_pairs = (
+            self.store.list_configured_models(acting_principal_id) if acting_principal_id else []
+        )
+        deployed_profile_ids = frozenset(profile_id for profile_id, _ in configured_pairs)
+        # The implicit native default is adopted only when it names a model this
+        # machine can actually serve. Before BUG-270 a fresh install adopted it
+        # unconditionally, which is how `gemma4:31b-cloud` reached the Global
+        # model control and both composer chips on a host with no Ollama. An
+        # *explicit* selection is still honoured whatever detection says — the
+        # owner is the authority on their own machine, and a selection they made
+        # is not Raiker's to quietly drop.
+        native_default_available = native_default is not None and _names_an_available_model(
+            native_default,
+            str(native_default.raw.get("model", "")),
+            presence,
+            deployed_profile_ids,
+        )
         current = (
             state.profile_id
             if state is not None
-            else (native_default.profile_id if native_default is not None else None)
+            else (
+                native_default.profile_id
+                if native_default is not None and native_default_available
+                else None
+            )
         )
         # The persisted per-profile model override (e.g. an Ollama/OpenAI model
         # picked at selection time) is what the runtime actually binds, so the
@@ -6269,7 +6536,14 @@ class DashboardService:
                 ),
                 context_window_tokens=facts.context_window_tokens,
                 context_window_source=facts.context_window_source,
-                configured=effective_model != "<model>",
+                configured=_names_an_available_model(
+                    profile, effective_model, presence, deployed_profile_ids
+                ),
+                provider_detected=(
+                    presence.get(profile.provider)
+                    if profile.provider in LOCAL_RUNTIME_PROVIDERS
+                    else None
+                ),
                 readiness_state=(readiness.state.value if readiness else "not_configured"),
                 readiness_summary=(
                     readiness.summary
@@ -6301,9 +6575,6 @@ class DashboardService:
                 **_usage_fields(profile),
             )
 
-        configured_pairs = (
-            self.store.list_configured_models(acting_principal_id) if acting_principal_id else []
-        )
         configured_by_profile: dict[str, list[str]] = {}
         for profile_id, configured_model in configured_pairs:
             configured_by_profile.setdefault(profile_id, []).append(configured_model)
@@ -6334,10 +6605,21 @@ class DashboardService:
             # picker on a machine with no GGUF served and nothing to serve it.
             # A slot earns a place here by being deployed, which is what writes
             # its configured model.
+            #
+            # BUG-270 — the same reasoning covers a profile that names a
+            # *third-party* model the machine may not have. `ollama-local` ships
+            # `gemma4:31b-cloud`, which is not a slot alias, so it passed the
+            # test above and reached every picker and both composer chips on a
+            # host with no Ollama. A profile that asks to be detected first only
+            # contributes its declared model once it has been.
             slot_alias = str(profile.raw.get("served_model_name") or "")
             declared = (
                 []
-                if profile.model == "<model>" or (slot_alias and profile.model == slot_alias)
+                if profile.model == "<model>"
+                or (slot_alias and profile.model == slot_alias)
+                or not _names_an_available_model(
+                    profile, profile.model, presence, deployed_profile_ids
+                )
                 else [profile.model]
             )
             choices = declared + configured_by_profile.get(profile.profile_id, [])
@@ -6369,6 +6651,7 @@ class DashboardService:
             ),
             remote_profile_count=sum(1 for p in profiles if p.off_machine),
             ready_provider_count=sum(1 for p in profiles if p.ready),
+            usable_provider_count=sum(1 for p in profiles if p.configured),
             fallback_sequence=tuple(
                 self.store.load_principal_model_fallback_sequence(scoped_principal)
                 if scoped_principal
@@ -6377,7 +6660,11 @@ class DashboardService:
             current_model=(
                 self._current_model(registry, state)
                 if state is not None
-                else (native_default.model if native_default is not None else None)
+                else (
+                    native_default.model
+                    if native_default is not None and native_default_available
+                    else None
+                )
             ),
             advisor_profile_id=(
                 self.store.load_principal_model_advisor(scoped_principal)
@@ -8329,7 +8616,7 @@ class DashboardService:
         return None, None, "arguments"
 
     @staticmethod
-    def _task_view(task: Any) -> TaskView:
+    def _task_view(task: Any, *, thread_turns: int = 0) -> TaskView:
         d = asdict(task) if not isinstance(task, dict) else task
         return TaskView(
             task_id=str(d["task_id"]),
@@ -8351,6 +8638,8 @@ class DashboardService:
             project_id=d.get("project_id"),
             model_profile=d.get("model_profile"),
             model=d.get("model"),
+            thread_session_id=d.get("thread_session_id"),
+            thread_turns=thread_turns,
             attachments=list(d.get("attachments") or []),
         )
 

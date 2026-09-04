@@ -1117,10 +1117,31 @@ appears in this repository.
    itself. `e2e/anthropic-key-live.spec.ts` connects it, opens the model picker,
    and asserts the dialog names the workspace requirement rather than
    reachability.
-3. The five items of this round — declared MCP tool schemas, streamable HTTP
-   conformance, the OTLP export, the `http` hook handler, and per-child surface
-   routing — each carry their own unit and API coverage, and the surfaces they
-   changed were walked at all four widths with no console error.
+3. **Declared MCP tool arguments, on the card.** The reviewed echo template was
+   built and connected through the interface; the card reads `echo · text` and
+   `workspace_ping · Takes no arguments`, negotiated on revision `2026-07-28`.
+   Before this round the same card was a row of name chips and the model had to
+   guess `text`. Evidence: `backlog-16-mcp-declared-arguments.png`.
+4. **Governed events reaching a real OpenTelemetry collector.** A local OTLP/HTTP
+   receiver on `127.0.0.1:4318` was added through **Observability → Overview**,
+   and three **Deliver now** runs landed **166 records**. The last run carried 5
+   — only what was new — which is the cursor doing its job. Every record carried
+   identifiers and an event type; the received bodies contain **no summary and no
+   path**, which is metadata-only asserted against the wire rather than against
+   the encoder. Evidence: `backlog-18-otlp-collector.png`.
+5. **An `http` hook, granted and refused, on one card.** The host ran with
+   `RAIKER_HOOK_EGRESS_ALLOWLIST=127.0.0.1:*` and a project rule declaring two
+   `http` handlers. Both parse and both match; the Hooks tab shows the granted
+   destination as `advisory` and says of the other *"this host is not in
+   RAIKER_HOOK_EGRESS_ALLOWLIST — it will refuse every time it matches"*. The
+   grant is read live, so revoking it needs no file edit and no restart.
+   Evidence: `bug-226-http-hook-grant.png`.
+6. **The working-method control appears only where Build can work.** On Tasks
+   outside a project there is no *How to work* group at all, because Build's
+   method is a repository it can read. Evidence:
+   `backlog-23-task-surface.png`.
+7. Each of the five items also carries its own unit and API coverage, and every
+   surface they changed was walked at all four widths with no console error.
 
 **What it found**, both fixed in this change rather than deferred:
 

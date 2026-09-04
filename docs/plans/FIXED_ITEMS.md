@@ -16365,6 +16365,11 @@ stored row re-bounded on the way out, unparseable storage yielding nothing, the
 card distinguishing declared from undeclared, and the budget rule carrying,
 deferring, revealing and searching.
 
+**Proven live, 2026-09-04.** The reviewed echo template was built and connected
+through the interface on a fresh workspace: the card reads `echo · text` and
+`workspace_ping · Takes no arguments`, negotiated on revision `2026-07-28`.
+Evidence: [`screenshots/working/backlog-16-mcp-declared-arguments.png`](screenshots/working/backlog-16-mcp-declared-arguments.png).
+
 **User-interface outcome.** Extensions → MCP lists one line per tool — its name
 and what it takes: `echo · text · optional: uppercase`. A tool that takes nothing
 says *Takes no arguments*; one whose server declared nothing says *No arguments
@@ -16498,6 +16503,13 @@ sending only what is new, a failed delivery re-sending rather than skipping, a
 rejection recorded on the destination with the cursor unmoved, and events written
 inside one second being neither skipped nor repeated.
 
+**Proven live, 2026-09-04.** A local OTLP/HTTP receiver on `127.0.0.1:4318` was
+added through the interface and three **Deliver now** runs landed **166 records**.
+The last run carried five — only what was new — and the received bodies contain
+**no summary and no path**, which is metadata-only asserted against the wire
+rather than against the encoder. Evidence:
+[`screenshots/working/backlog-18-otlp-collector.png`](screenshots/working/backlog-18-otlp-collector.png).
+
 **User-interface outcome.** Observability → Overview answers a fifth question,
 *"Can I see this outside Raiker?"*: the collectors, what each one gets
 (**Metadata only** or **With redacted content**), how many events it has had, how
@@ -16566,6 +16578,13 @@ becoming a policy, a remote responder unable to permit anything, advisory withou
 the opt-in, the other two types still refused at parse time, a URL-less or
 `file://` handler refused at parse time, and the Hooks page reading the grant live.
 
+**Proven live, 2026-09-04.** The host ran with
+`RAIKER_HOOK_EGRESS_ALLOWLIST=127.0.0.1:*` and a project rule declaring two
+`http` handlers — one destination the grant covers and one it does not. Both
+parse and both match; the tab shows the granted one as `advisory` and names the
+allowlist on the other. Evidence:
+[`screenshots/working/bug-226-http-hook-grant.png`](screenshots/working/bug-226-http-hook-grant.png).
+
 **User-interface outcome.** Extensions → Hooks lists an `http` handler with the
 URL it posts to — the host is the fact the owner has to act on — and, when the
 grant does not cover it, says *"this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST
@@ -16631,6 +16650,10 @@ thing the surface changes, a task thread resolving to its task, an ordinary chat
 session resolving to none, the broker deriving the parent and inheriting its
 project, a turn outside a task thread creating top-level work, and a parent with
 an unfinished build child still parking.
+
+**Proven live, 2026-09-04.** On Tasks outside a project there is no *How to
+work* group at all, because Build's method is a repository it can read. Evidence:
+[`screenshots/working/backlog-23-task-surface.png`](screenshots/working/backlog-23-task-surface.png).
 
 **User-interface outcome.** The Tasks composer's chip row says *when* — Task,
 Once, Routine, Background — and a second row inside a project says *how*: **Chat**

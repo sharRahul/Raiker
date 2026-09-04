@@ -14,10 +14,24 @@
   import { onMount } from "svelte";
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
+  import { runtimeBlock } from "../capabilityModel";
   import { relativeTime } from "../format";
-  import type { TelemetryDestination } from "../apiTypes";
+  import type { CapabilityGate, TelemetryDestination } from "../apiTypes";
 
   let destinations = $state<TelemetryDestination[] | null>(null);
+  // A delivery leaves the machine, so it answers to `telemetry_export` like
+  // every other Tier-2 capability. A closed gate returned the raw
+  // `disabled_by_capability_gate` from the Deliver button — a code where a
+  // sentence and a route belong, which is the FIXED-370 defect in miniature.
+  // Said before the press instead, through the same helper every other surface
+  // uses, so this page cannot word it differently from the rest of them.
+  let gates = $state<CapabilityGate[]>([]);
+  const block = $derived(
+    runtimeBlock(
+      gates.find((gate) => gate.capability === "telemetry_export"),
+      "Telemetry export",
+    ),
+  );
   let error = $state<string | null>(null);
   let notice = $state<string | null>(null);
   let busy = $state<string | null>(null);
@@ -40,6 +54,13 @@
     } catch (e) {
       destinations = [];
       error = reason(e);
+    }
+    // A failed gate read must not take the section down with it: the
+    // destinations are still readable and still worth showing.
+    try {
+      gates = await api.capabilityGates();
+    } catch {
+      gates = [];
     }
   }
 
@@ -107,6 +128,12 @@
     off unless a destination opts in, and is redacted the same way this screen is.
   </p>
 
+  {#if block.kind !== "none"}
+    <p class="notice" role="status">
+      {block.reason}
+      {#if block.href}<a href={block.href}>{block.linkLabel}</a>{/if}
+    </p>
+  {/if}
   {#if error}<p class="error" role="alert">{error}</p>{/if}
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 
@@ -133,7 +160,7 @@
               type="button"
               class="btn btn-sm"
               onclick={() => run(d)}
-              disabled={busy !== null}
+              disabled={busy !== null || block.kind !== "none"}
             >
               {busy === d.destination_id ? "Delivering…" : "Deliver now"}
             </button>
@@ -202,6 +229,7 @@
   .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
   .error { color: var(--danger); }
   .notice { color: var(--text-2); }
+  .notice a { margin-left: 0.35rem; }
   .add { display: grid; gap: var(--space-3); max-width: 32rem; }
   .add label { display: grid; gap: 0.25rem; font-size: 0.8rem; color: var(--text-2); }
   .add .check { display: flex; align-items: center; gap: 0.5rem; }

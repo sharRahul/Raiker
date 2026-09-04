@@ -383,6 +383,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-368](#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not) | — | Chat / cross-chat surface | Fixed 2026-09-03 (GAP-CHAT C18) |
 | [FIXED-369](#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between) | — | Build / Approvals / code review | Fixed 2026-09-03 (GAP-BUILD B14 remainder) |
 | [FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status) | Medium | Models / provider errors | Fixed 2026-09-03 (BUG-272, raised and closed in the same round) |
+| [FIXED-371](#fixed-371--two-controls-with-nothing-in-them-found-by-the-sweep) | Low | Web UI | Fixed 2026-09-03 (found by this round's own UI sweep) |
 
 ---
 
@@ -15862,3 +15863,38 @@ identity-linked, so the provider wants a workspace named with it. Use a standard
 API key from the provider's console, or one scoped to a single workspace, then
 connect again. The key you pasted is not broken — it is the wrong kind for this
 call."* Evidence: [`screenshots/working/bug-272-provider-answer-live.png`](screenshots/working/bug-272-provider-answer-live.png).
+
+---
+
+## FIXED-371 — Two controls with nothing in them, found by the sweep
+
+**Severity: Low. Area: web UI. Status: Fixed 2026-09-03, in the round that
+caused them.**
+
+Both were exposed rather than introduced by
+[FIXED-365](#fixed-365--a-fresh-install-named-a-model-nobody-had): a fresh
+install used to select a model unconditionally, so the *no model* state was
+almost never on screen. It now is, every time, until the owner chooses one.
+
+**The empty ring.** With no model selected there is no context window to report,
+so `ContextRing` drew its grey track and no arc — a bare circle beside **Send**,
+with no content and, since its label was the constant "Context window", no
+explanation either. It now draws a dash, which means *no measurement*, and both
+composers name the state: **"Context window — capacity unknown"**. That is what
+a screen reader hears too, rather than a window that sounds like it has a size.
+
+**Threads said its own name three times.** The topbar carries a destination's
+name and what it is for. `SearchChatView` repeated both underneath — a kicker
+and an intro that were the same sentence as the hint one line above them —
+which on an empty board was three lines of chrome over nothing. Removed; the
+search box is what the owner came for. The guide link beside it now says *"How
+threads and chat history work"*, because the destination stopped being only a
+search.
+
+**Guarded.** `ChatView.composerParity.test.ts` pins both states of the ring —
+unknown, and named once a model reports a window. `SearchChatView.test.ts` and
+the mocked desktop audit cover the header.
+
+**User-interface outcome.** No control on a fresh install renders as an
+unexplained shape, and no page repeats the sentence the topbar is already
+showing.

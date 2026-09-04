@@ -2090,9 +2090,13 @@
               <button
                 type="button"
                 class="context-trigger"
-                aria-label="Context window"
+                aria-label={activeProfile?.context_window_tokens
+                  ? "Context window"
+                  : "Context window — capacity unknown"}
                 aria-expanded={contextOpen}
-                title="Context window"
+                title={activeProfile?.context_window_tokens
+                  ? "Context window"
+                  : "Context window — capacity unknown"}
                 onclick={() => { contextOpen = !contextOpen; if (contextOpen) void refreshContextUsage(); }}
               >
                 <ContextRing

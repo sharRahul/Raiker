@@ -102,11 +102,10 @@
 </script>
 
 <section class="search-chat">
+  <!-- The topbar already carries this destination's name and what it is for.
+       Repeating both here was two lines of the same sentence above an empty
+       page; the search box is what the owner came for. -->
   <header>
-    <div>
-      <p class="kicker">Threads</p>
-      <p class="intro">Everything you have going, and a search across all of it.</p>
-    </div>
     <GuideLink route="search-chat" />
   </header>
   <label class="search-field">
@@ -232,14 +231,9 @@
   header {
     display: flex;
     align-items: flex-start;
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: var(--space-4);
-    margin-bottom: var(--space-4);
-  }
-  .intro {
-    max-width: var(--prose-measure);
-    margin: 0;
-    color: var(--text-2);
+    margin-bottom: var(--space-3);
   }
   .search-field {
     display: block;
@@ -356,9 +350,6 @@
     color: var(--warn);
   }
   @media (max-width: 42rem) {
-    header {
-      flex-direction: column;
-    }
     li a {
       grid-template-columns: 1fr;
     }

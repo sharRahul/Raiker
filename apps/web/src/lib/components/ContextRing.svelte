@@ -50,6 +50,22 @@
       stroke-dasharray={`${dash} ${C}`}
       transform="rotate(-90 8 8)"
     />
+  {:else}
+    <!-- Nothing is known about this model's capacity, so the ring has no arc to
+         draw. Without this it renders as a bare grey circle beside Send: a
+         control with no content and no explanation, which is what a fresh
+         install now sees every time (FIXED-365 stopped it selecting a model it
+         cannot serve). The dash says "no measurement", which is true, and is
+         what the popover behind it goes on to explain. -->
+    <line
+      x1="5"
+      y1="8"
+      x2="11"
+      y2="8"
+      stroke="var(--text-3)"
+      stroke-width="1.6"
+      stroke-linecap="round"
+    />
   {/if}
 </svg>
 

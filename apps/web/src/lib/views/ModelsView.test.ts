@@ -738,6 +738,7 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
             endpoint: null,
             api_key: "inference-key",
             admin_api_key: "usage-admin-key",
+            workspace_id: null,
           }),
         }),
       ),
@@ -886,6 +887,148 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     ).toBeInTheDocument();
   });
 
+  // BUG-274 — an identity-linked key acts inside one workspace. The old answer
+  // sent the owner to fetch a different key, which is a dead end for an owner
+  // who has only this one. The connection now carries the workspace itself.
+  describe("an identity-linked key", () => {
+    const identityLinked = () =>
+      profile({
+        profile_id: "anthropic-hosted",
+        provider: "anthropic",
+        model: "claude-haiku-4-5-20251001",
+        configured: true,
+        local_only: false,
+        requires_network: true,
+        off_machine: true,
+        endpoint_kind: "hosted",
+      });
+
+    it("sends the workspace alongside the key", async () => {
+      const mock = stubFetch({
+        "GET /api/models": models({
+          profiles: [identityLinked()],
+          chat_profiles: [identityLinked()],
+        }),
+        "PUT /api/models/anthropic-hosted/connection": {
+          ok: true,
+          connection_configured: true,
+        },
+      });
+      render(ModelsView, { props: { tab: "hosted" } });
+
+      await fireEvent.click(await screen.findByRole("button", { name: "Connect" }));
+      await fireEvent.input(screen.getByLabelText(/API key/i), {
+        target: { value: "sk-ant-test" },
+      });
+      // Behind Advanced: most keys need nothing here, and a box asking for a
+      // "workspace ID" on the default view is a question most owners cannot
+      // answer.
+      await fireEvent.click(screen.getByRole("button", { name: "Advanced" }));
+      await fireEvent.input(screen.getByLabelText(/Workspace ID/i), {
+        target: { value: "wrkspc_01" },
+      });
+      await fireEvent.click(document.querySelector(".signin-connect") as HTMLElement);
+
+      await waitFor(() =>
+        expect(mock).toHaveBeenCalledWith(
+          "/api/models/anthropic-hosted/connection",
+          expect.objectContaining({
+            method: "PUT",
+            body: JSON.stringify({
+              endpoint: null,
+              api_key: "sk-ant-test",
+              admin_api_key: null,
+              workspace_id: "wrkspc_01",
+            }),
+          }),
+        ),
+      );
+    });
+
+    // Found while proving BUG-274 against a live provider: Reconnect is reached
+    // through Details, and saving left that modal over the card it had just
+    // changed, so the next click hit an overlay.
+    it("closes Model details after saving from Reconnect", async () => {
+      const connected = profile({ ...identityLinked(), connection_configured: true });
+      stubFetch({
+        "GET /api/models": models({ profiles: [connected], chat_profiles: [connected] }),
+        "PUT /api/models/anthropic-hosted/connection": {
+          ok: true,
+          connection_configured: true,
+        },
+      });
+      render(ModelsView, { props: { tab: "hosted" } });
+
+      await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+      await fireEvent.click(await screen.findByRole("button", { name: "Reconnect" }));
+      await fireEvent.input(screen.getByLabelText(/API key/i), {
+        target: { value: "sk-ant-test" },
+      });
+      await fireEvent.click(document.querySelector(".signin-connect") as HTMLElement);
+
+      await waitFor(() =>
+        expect(screen.queryByRole("button", { name: "Close model details" })).toBeNull(),
+      );
+    });
+
+    // Found by the live run against a real identity-linked key: **Test** has
+    // two paths, and on a fresh connection with no model pinned it reads the
+    // catalogue rather than the readiness row — which is exactly where an owner
+    // first meets this refusal.
+    it("offers the field from where the refusal is read, with no model pinned", async () => {
+      // No model pinned — a fresh connection, which is where an owner first
+      // meets this refusal, and the path that reads the catalogue.
+      const unpinned = profile({
+        ...identityLinked(),
+        model: "<model>",
+        connection_configured: true,
+      });
+      stubFetch({
+        "GET /api/models": models({ profiles: [unpinned], chat_profiles: [unpinned] }),
+        "GET /api/models/anthropic-hosted/provider-models": {
+          profile_id: "anthropic-hosted",
+          provider: "anthropic",
+          status: "unavailable",
+          reason_code: "provider_workspace_required:http_400",
+          models: [],
+        },
+      });
+      render(ModelsView, { props: { tab: "hosted" } });
+
+      await fireEvent.click(await screen.findByRole("button", { name: "Test" }));
+      await fireEvent.click(
+        await screen.findByRole("button", { name: "Add workspace ID" }),
+      );
+
+      // Opened on the section that holds it, so the sentence points at
+      // something the owner can see rather than at a folded-away box.
+      expect(await screen.findByLabelText(/Workspace ID/i)).toBeVisible();
+    });
+
+    it("reports that a workspace is named, never which one", async () => {
+      const connected = profile({
+        ...identityLinked(),
+        connection_configured: true,
+        workspace_configured: true,
+      });
+      stubFetch({
+        "GET /api/models": models({
+          profiles: [connected],
+          chat_profiles: [connected],
+        }),
+      });
+      render(ModelsView, { props: { tab: "hosted" } });
+
+      // In Details, where credential management lives — the card carries
+      // readiness and nothing else by design.
+      await fireEvent.click(await screen.findByRole("button", { name: "Details" }));
+      expect(
+        await screen.findByText(/workspace named/i),
+      ).toBeInTheDocument();
+      expect(document.body.textContent).not.toContain("wrkspc_");
+    });
+  });
+
   it("lets the owner remove a connected provider credential", async () => {
     const anthropic = profile({
       profile_id: "anthropic-hosted",
@@ -921,7 +1064,12 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
         "/api/models/anthropic-hosted/connection",
         expect.objectContaining({
           method: "PUT",
-          body: JSON.stringify({ endpoint: null, api_key: null, admin_api_key: null }),
+          body: JSON.stringify({
+            endpoint: null,
+            api_key: null,
+            admin_api_key: null,
+            workspace_id: null,
+          }),
         }),
       ),
     );

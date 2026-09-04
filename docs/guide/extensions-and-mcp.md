@@ -80,6 +80,14 @@ A call's arguments stay out of the audit trail — the record keeps
 registered server runs code Raiker does not own, which is why the call carries
 the same risk band as a connector read.
 
+A connected server's tools are projected into the turn on top of Raiker's own
+core set. Raiker's built-in tools beyond that core are **deferred**: the model is
+told every name and fetches the schema it wants with `tool_search`, which keeps a
+long tool list from spending the context window before the turn starts. That is a
+context decision, not a permission one — a deferred tool is refused by nothing
+and reached in one call. The **Context** panel in either composer says how many
+are sent and how many are on request.
+
 ## Skills
 
 A skill is a `SKILL.md` document — instructions Raiker follows when the task

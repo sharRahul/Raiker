@@ -282,6 +282,11 @@
   let signInFor = $state<string | null>(null);
   let signInApiKey = $state("");
   let signInAdminApiKey = $state("");
+  // BUG-274 — where an identity-linked key acts. Not a credential, so it is a
+  // plain text field: an owner has to be able to read back what they typed to
+  // check it against the console, and masking it would hide the one thing the
+  // "workspace not recognised" answer asks them to compare.
+  let signInWorkspaceId = $state("");
   let signInEndpoint = $state("");
   let signInAdvanced = $state(false);
   let signInSaving = $state(false);
@@ -355,12 +360,15 @@
     }
   }
 
-  function openSignIn(profileId: string) {
+  function openSignIn(profileId: string, options: { advanced?: boolean } = {}) {
     signInFor = profileId;
     signInApiKey = "";
     signInAdminApiKey = "";
+    signInWorkspaceId = "";
     signInEndpoint = "";
-    signInAdvanced = false;
+    // BUG-274 — a readiness answer that says "add the workspace ID to this
+    // connection" has to land on the box, not three clicks away from it.
+    signInAdvanced = options.advanced === true;
     signInError = null;
     signInGuidance = null;
   }
@@ -368,6 +376,7 @@
     signInFor = null;
     signInApiKey = "";
     signInAdminApiKey = "";
+    signInWorkspaceId = "";
     signInEndpoint = "";
     signInError = null;
     signInGuidance = null;
@@ -386,15 +395,29 @@
         signInEndpoint.trim(),
         signInApiKey.trim(),
         signInAdminApiKey.trim(),
+        signInWorkspaceId.trim(),
       );
       signInApiKey = "";
       signInAdminApiKey = "";
+      signInWorkspaceId = "";
       signInEndpoint = "";
       signInFor = null;
+      // Found while proving BUG-274 live. **Reconnect** is reached through
+      // Details, and saving left that modal sitting over the card it had just
+      // changed — so the owner's next action (Test, Select models…) hit an
+      // overlay instead of the control they were aiming at. The live harness
+      // had been closing it by hand since FIXED-141, which made it look like a
+      // test concern rather than the interface defect it is.
+      detailsFor = null;
       await load();
     } catch (e) {
       signInGuidance =
         e instanceof ApiError ? providerErrorGuidance(e.reasonCode) : null;
+      // BUG-274 — the remediation names a field, so open the section holding
+      // it. An answer that says "add the workspace ID" while the box is folded
+      // away is the same dead end the old copy was.
+      if (signInGuidance?.code?.startsWith("provider_workspace") === true)
+        signInAdvanced = true;
       signInError =
         signInGuidance !== null
           ? null
@@ -529,6 +552,8 @@
     // Clear this provider's previous answer only. Another card's result is
     // that card's state and is not this test's to discard.
     testResults = without(testResults, id);
+    // BUG-274 — a previous answer about the workspace is this test's to replace.
+    workspaceRefused = without(workspaceRefused, id);
     let message: string;
     if (profile.model && profile.model !== "<model>") {
       try {
@@ -536,6 +561,7 @@
         message = readiness.remediation
           ? `${readiness.summary} ${readiness.remediation}`
           : readiness.summary;
+        noteWorkspaceRefusal(id, readiness.reason_code);
         await load();
       } catch (e) {
         message = throttled(e)
@@ -544,7 +570,9 @@
       }
     } else {
       try {
-        message = testNote(profile, await api.providerModels(id));
+        const list = await api.providerModels(id);
+        message = testNote(profile, list);
+        noteWorkspaceRefusal(id, list.reason_code);
       } catch (e) {
         message = throttled(e)
           ? THROTTLED
@@ -553,6 +581,34 @@
     }
     testing = without(testing, id);
     testResults = { ...testResults, [id]: message };
+  }
+
+  /**
+   * BUG-274 — this provider refused because of the workspace, not the key.
+   *
+   * Two sources, because **Test** has two paths and the live run found the
+   * second: with a model pinned it runs the readiness check and the verdict is
+   * on the profile; with none pinned it reads the catalogue, and that answer
+   * exists only in this view. Reading the readiness row alone offered the field
+   * on exactly the case an owner has *already* got past — a pinned model — and
+   * not on a fresh connection, which is where the refusal actually happens.
+   *
+   * Both are governed reason codes rather than message text, so the offer
+   * appears for those two codes and never because a sentence contained the word.
+   */
+  let workspaceRefused = $state<Record<string, true>>({});
+
+  function wantsWorkspace(profile: ModelProfile): boolean {
+    return (
+      workspaceRefused[profile.profile_id] === true ||
+      (profile.readiness_reason_code ?? "").startsWith("provider_workspace")
+    );
+  }
+
+  /** Remember a governed workspace refusal against the card that got it. */
+  function noteWorkspaceRefusal(profileId: string, reasonCode: string | null | undefined) {
+    if ((reasonCode ?? "").startsWith("provider_workspace"))
+      workspaceRefused = { ...workspaceRefused, [profileId]: true };
   }
 
   // A short chip label for the exact readiness state, so a card says what a
@@ -1602,6 +1658,21 @@
                           data-test-result={p.profile_id}
                         >
                           {testResults[p.profile_id]}
+                          <!-- BUG-274 — the readiness answer names the field;
+                               this is the field. Without it the owner reads
+                               "add the workspace ID to this connection" and
+                               then has to find it under Details → Reconnect →
+                               Advanced, which is a remediation pointing at
+                               nothing they can see. -->
+                          {#if wantsWorkspace(p)}
+                            <button
+                              type="button"
+                              class="link-button"
+                              onclick={() =>
+                                openSignIn(p.profile_id, { advanced: true })}
+                              >Add workspace ID</button
+                            >
+                          {/if}
                         </p>
                       {/if}
                       {#if isCodexSubscription(p) && codexSubscriptionNotice}
@@ -1891,6 +1962,13 @@
             {detailsFor.connection_configured
               ? "Encrypted instance connection saved"
               : "Not configured"}
+            <!-- BUG-274 — that a workspace is named, never which one. Here
+                 rather than on the card: the card carries readiness and nothing
+                 else by design (BUG-208 slice E), and this is credential
+                 management, which is what Details already holds. -->
+            {#if detailsFor.workspace_configured}
+              · workspace named
+            {/if}
           </dd>
         </div>
         <div>
@@ -2106,7 +2184,7 @@
         onclick={() => (signInAdvanced = !signInAdvanced)}
         aria-expanded={signInAdvanced}
       >
-        {signInAdvanced ? "Hide advanced" : "Advanced: custom endpoint"}
+        {signInAdvanced ? "Hide advanced" : "Advanced"}
       </button>
       {#if signInAdvanced}
         <label class="field">
@@ -2121,6 +2199,25 @@
             bind:value={signInEndpoint}
           />
         </label>
+        <!-- BUG-274 — an identity-linked key acts inside one workspace and the
+             provider refuses it without the id. Behind Advanced because most
+             keys need nothing here; the refusal opens this section itself. -->
+        {#if signInProfile.provider === "anthropic"}
+          <label class="field">
+            <span class="field-label"
+              >Workspace ID <small>(identity-linked keys only)</small></span
+            >
+            <input
+              class="input"
+              type="text"
+              placeholder="wrkspc_…"
+              spellcheck="false"
+              autocapitalize="off"
+              autocomplete="off"
+              bind:value={signInWorkspaceId}
+            />
+          </label>
+        {/if}
       {/if}
 
       <div class="signin-actions">
@@ -2131,6 +2228,7 @@
           disabled={signInSaving ||
             (signInEndpoint.trim() === "" &&
               signInApiKey.trim() === "" &&
+              signInWorkspaceId.trim() === "" &&
               !signInAdvanced)}
         >
           {signInSaving ? "Connecting…" : "Connect"}

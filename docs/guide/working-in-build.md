@@ -117,12 +117,28 @@ whose hunks you all declined is not touched at all. The count above the diff say
 where you are — *"2 of 5 hunks"* — with **Select all** and **Select none**.
 
 This is a *smaller* decision, never a different one. What you can accept is
-always some part of the change Raiker proposed and you read: there is no way to
-edit a line here and approve your own text, because those bytes would be an
-action nobody reviewed. Declining every hunk is refused rather than run as an
-empty change — reject the proposal instead, which says what happened. The
-checkbox appears only where all of that holds: a pending decision, on a diff the
-applier understands, with more than one hunk in it.
+always some part of the change Raiker proposed and you read. Declining every
+hunk is refused rather than run as an empty change — reject the proposal
+instead, which says what happened. The checkbox appears only where all of that
+holds: a pending decision, on a diff the applier understands, with more than one
+hunk in it.
+
+**You can also correct it — as your own proposal.** **Edit…** beside Accept and
+Reject opens the proposed diff for you to change. Pressing **Propose as a new
+change** denies what Raiker offered and raises *yours* in its place, with its own
+preview and its own approval. Nothing runs until you accept that.
+
+It works this way rather than as an edit box on the decision in front of you
+because an edit is a **different action**, not a smaller one. A narrowing is
+provably inside the change you already read; bytes you typed are not, and the
+one thing Raiker will never do is run arguments no human approved after seeing
+them. So you see them — the audit trail records the original as denied, names
+what replaced it, and the change that executes is the one you signed off.
+
+Raiker refuses a replacement that is empty, that is not a readable diff, that is
+identical to the proposal, or that reaches a file the original never named. The
+last is not about permission — the new approval would govern it — but a change
+to somewhere else is a change to propose on its own terms.
 
 **Matching is strict about which code you named, not about how you typed it.**
 The exact text is tried first; when that finds nothing, the same search runs

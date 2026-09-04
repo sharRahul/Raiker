@@ -243,19 +243,30 @@ def approval_outcome(
     capability: str = "",
     artifacts: dict[str, Any] | None = None,
     reason_code: str | None = None,
+    replaced: bool = False,
 ) -> dict[str, Any]:
     """The tool result the model is handed when the turn resumes.
 
-    Three genuinely different things happened, and the model has to be able to
-    tell them apart — a rejection it must not retry, an approval that ran, and an
-    approval that was recorded but deliberately not executed for this capability.
+    Four genuinely different things can have happened, and the model has to be
+    able to tell them apart — a rejection it must not retry, a rejection where
+    the owner wrote their own version instead (BUG-271), an approval that ran,
+    and an approval that was recorded but deliberately not executed for this
+    capability.
     """
     if not approved:
         return {
             "status": "rejected",
             "executed": False,
             "note": (
-                "The owner rejected this action, so it did not run. Do not propose "
+                # BUG-271 — "rejected, try something else" would be wrong here.
+                # The owner did not decline the work; they corrected it, and
+                # their version is waiting on their own approval. Proposing an
+                # alternative would compete with a change they have written.
+                "The owner replaced this change with their own edited version, "
+                "which is waiting for their approval. Do not propose this "
+                "action again and do not propose an alternative to it."
+                if replaced
+                else "The owner rejected this action, so it did not run. Do not propose "
                 "the same action again; explain the situation or take a different "
                 "approach."
             ),

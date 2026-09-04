@@ -81,6 +81,7 @@ from raiker.models.policy_state import (
 from raiker.models.registry import ModelProfileRegistry, profile_with_model
 from raiker.models.router import ModelRouter
 from raiker.models.session_state import TERMINAL_MODEL_SESSION_ID, ModelSessionState
+from raiker.models.tool_projection import ALWAYS_PROJECTED, DEFERRABLE_TOOL_NAMES
 from raiker.runtime.authority.models import PrincipalType
 from raiker.runtime.authority.router import CAPABILITY_GATE_MAP
 from raiker.runtime.executors.containers import container_image_allowlist
@@ -1450,6 +1451,7 @@ class ModelProfileView:
     selected: bool
     connection_configured: bool = False
     usage_admin_configured: bool = False
+    workspace_configured: bool = False
     # Prompt-cache TTL breakpoint the provider uses for this profile ("5m"/"1h"),
     # or None when the provider/profile does not cache. Read-only status.
     prompt_cache_ttl: str | None = None
@@ -1555,6 +1557,13 @@ class ContextUsageView:
     # metadata-only; the summary remains in the encrypted workspace store and
     # transcript turns are never rewritten.
     latest_compaction: dict[str, Any] | None = None
+    # Backlog #16 — how much of the tool catalogue this turn carries.
+    # `tools_deferred` is the count whose schemas are fetched on request rather
+    # than sent every time; both are stated because "25 of 50" is the honest
+    # form of a saving, and an owner should be able to see that a tool being
+    # absent from a request is not a tool being withheld.
+    tools_projected: int = 0
+    tools_deferred: int = 0
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -6529,6 +6538,12 @@ class DashboardService:
                 usage_admin_configured=bool(
                     saved_connection and saved_connection.get("admin_api_key")
                 ),
+                # BUG-274 — whether a workspace is named, never which one. The
+                # card needs to know the field is filled so it can say so and
+                # offer to clear it; the value itself stays in the vault.
+                workspace_configured=bool(
+                    saved_connection and saved_connection.get("workspace_id")
+                ),
                 prompt_cache_ttl=(
                     str(profile.raw.get("prompt_cache_ttl"))
                     if profile.raw.get("prompt_cache_ttl")
@@ -7145,6 +7160,12 @@ class DashboardService:
             price_effective_from=registered.effective_from if registered is not None else None,
             price_unknown=price_unknown,
             latest_compaction=latest_compaction,
+            # Backlog #16 — the built-in half of the catalogue. MCP tools are
+            # projected per turn from what the owner has connected and are not
+            # counted here: this is the fixed cost the deferral removes, and a
+            # figure that changed with a connection would not answer that.
+            tools_projected=len(ALWAYS_PROJECTED) + 1,
+            tools_deferred=len(DEFERRABLE_TOOL_NAMES),
         )
 
     # ── BUG-21: the pricing registry surface ─────────────────────────────

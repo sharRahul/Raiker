@@ -18,6 +18,7 @@ import pytest
 from cryptography.fernet import Fernet
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from httpx2 import Response
 
 from raiker.api.app import create_app
 from raiker.api.sessions import ApiSessionStore
@@ -366,3 +367,110 @@ def test_model_connection_survives_application_restart(
         "api_key": "restart-secret",
         "endpoint": "http://127.0.0.1:9000/v1",
     }
+
+
+class TestWorkspaceIdOnAConnection:
+    """BUG-274 — an identity-linked key acts inside one workspace.
+
+    The route has to be able to *add* that workspace to a connection that
+    already holds a key. A save otherwise replaces the whole stored payload, so
+    the field the remediation names would delete the credential it accompanies,
+    and the owner would have to re-paste a key to correct something that is not
+    one.
+    """
+
+    def _connect(self, client: TestClient, token: str, **fields: str) -> Response:
+        return client.put(
+            "/api/models/generic-openai-compatible/connection",
+            headers=_auth(token),
+            json=fields,
+        )
+
+    def test_a_workspace_alone_merges_into_the_saved_connection(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        first = self._connect(
+            client, owner_token, endpoint="http://127.0.0.1:9000/v1", api_key="the-key"
+        )
+        assert first.status_code == 200, first.text
+
+        added = self._connect(client, owner_token, workspace_id="wrkspc_01")
+        assert added.status_code == 200, added.text
+
+        stored = get_model_connection(
+            SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+        )
+        assert stored == {
+            "endpoint": "http://127.0.0.1:9000/v1",
+            "api_key": "the-key",
+            "workspace_id": "wrkspc_01",
+        }
+        profiles = client.get("/api/models", headers=_auth(owner_token)).json()["profiles"]
+        generic = next(
+            item for item in profiles if item["profile_id"] == "generic-openai-compatible"
+        )
+        # That one is named, never which one.
+        assert generic["workspace_configured"] is True
+        assert "wrkspc_01" not in client.get(
+            "/api/models", headers=_auth(owner_token)
+        ).text
+
+    def test_anything_else_still_replaces(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """The merge is the narrowest rule that closes it, and no wider.
+
+        A save carrying a key must not silently retain a workspace the owner
+        left blank — that would be a value they believed they had cleared.
+        """
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        self._connect(client, owner_token, api_key="the-key", workspace_id="wrkspc_01")
+        self._connect(client, owner_token, api_key="the-key")
+        stored = get_model_connection(
+            SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+        )
+        assert stored == {"api_key": "the-key"}
+
+    def test_a_workspace_alone_with_no_connection_is_a_connection(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        """Nothing to merge into is not an error; it stores what it was given."""
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        response = self._connect(client, owner_token, workspace_id="wrkspc_01")
+        assert response.status_code == 200, response.text
+        stored = get_model_connection(
+            SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+        )
+        assert stored == {"workspace_id": "wrkspc_01"}
+
+    def test_a_value_that_could_not_be_a_header_is_refused_before_storage(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        response = self._connect(
+            client, owner_token, api_key="the-key", workspace_id="wrkspc_1\nx-admin: yes"
+        )
+        assert response.status_code == 400, response.text
+        assert response.json()["detail"]["reason_code"] == "workspace_id_invalid_shape"
+        assert (
+            get_model_connection(
+                SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+            )
+            is None
+        )
+
+    def test_clearing_the_connection_still_clears_it(
+        self, client: TestClient, workspace: Path, owner_token: str
+    ) -> None:
+        write_vault_key(workspace, Fernet.generate_key().decode())
+        self._connect(client, owner_token, api_key="the-key", workspace_id="wrkspc_01")
+        cleared = self._connect(client, owner_token)
+        assert cleared.status_code == 200, cleared.text
+        assert cleared.json() == {"ok": True, "connection_configured": False}
+        assert (
+            get_model_connection(
+                SQLiteStore(workspace), "principal_owner", "generic-openai-compatible"
+            )
+            is None
+        )

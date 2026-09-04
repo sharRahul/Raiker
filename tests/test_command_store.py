@@ -128,7 +128,12 @@ def test_terminal_states_require_atomic_finalization() -> None:
     assert not can_transition(CommandState.SUCCEEDED, CommandState.FAILED)
 
 
-@pytest.mark.parametrize("terminal", TERMINAL_COMMAND_STATES)
+# Sorted, because `TERMINAL_COMMAND_STATES` is a frozenset and a frozenset's
+# iteration order depends on `PYTHONHASHSEED`. Unsorted, every pytest-xdist
+# worker collected these parameters in a different order and the whole run
+# aborted with "Different tests were collected between gw0 and gw1" — so the
+# suite could only ever be run serially, which is ~40 minutes rather than ~10.
+@pytest.mark.parametrize("terminal", sorted(TERMINAL_COMMAND_STATES, key=str))
 def test_terminal_transition_requires_receipt_in_same_transaction(
     store: CommandStore, terminal: CommandState
 ) -> None:

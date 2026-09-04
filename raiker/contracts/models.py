@@ -134,6 +134,13 @@ EVENT_TYPES = {
     "owner_question_answered",
     "approval_received",
     "approval_denied",
+    # BUG-271 — the reviewer corrected the proposed change rather than taking it
+    # or refusing it. Two records, not one: the original is `approval_denied`
+    # like any other refusal, and this says what took its place, so a reader of
+    # the trail sees a replacement rather than an amendment. Counts and ids
+    # only — the edited patch lives on its own action row, redacted by the path
+    # every proposal takes.
+    "approval_replaced_by_edit",
     # Composer-selected unattended approval policies. These attest that an
     # otherwise ordinary, governed action was executed under the owner's
     # persisted setting; they do not relax runtime gates or critical holds.

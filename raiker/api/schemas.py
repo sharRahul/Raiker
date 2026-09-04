@@ -365,6 +365,11 @@ class ModelConnectionRequest(BaseModel):
     # credentials. It is optional, encrypted with the connection, and never
     # substituted for the inference key.
     admin_api_key: str | None = None
+    # BUG-274 — an identity-linked key acts inside one workspace and the
+    # provider will not accept it without the id. Not a credential: it names
+    # where the key acts, and it is stored beside the key so the pair travels
+    # together.
+    workspace_id: str | None = None
 
 
 class ModelCatalogueRefreshRequest(BaseModel):
@@ -801,6 +806,27 @@ class ResolveApprovalRequest(BaseModel):
     # against the approval's own patch and refuses the decision if one names no
     # hunk in it.
     accepted_hunks: list[str] | None = None
+
+
+class ReplaceApprovalRequest(BaseModel):
+    """BUG-271 — the reviewer corrected a line, so this is a *different action*.
+
+    Deliberately not a field on :class:`ResolveApprovalRequest`. That model sets
+    ``extra="forbid"`` precisely so an edited payload cannot arrive on a
+    decision, and relaxing it would let the relay execute bytes no human read.
+    An edit is submitted as a fresh proposal instead: it gets its own preview,
+    its own immutable-intent hash and its own approval, and the approval it
+    replaces resolves as denied with the replacement named — so the audit trail
+    says what happened rather than showing an amendment.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    #: The reviewer's own unified diff. It replaces the proposed one entirely;
+    #: nothing from the original patch is merged into it.
+    patch: str
+    #: Why the proposed change was not taken as offered. Recorded on the denial.
+    reason: str = ""
 
 
 class ApprovalDecisionRequest(BaseModel):

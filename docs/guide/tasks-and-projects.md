@@ -105,6 +105,23 @@ is visual only — it does not mean the agent is working.
 **Observability → Audit log** is the append-only record of every governed step,
 filterable by session and event type.
 
+## Being told when background work ends
+
+A scheduled or recurring task that finishes — or fails — writes a notification,
+so a routine that ran overnight is not something you have to remember to go and
+check. It appears on the bell and in **Observability → Notifications**, with a
+link to **Tasks**, where the card carries the run's own conversation thread.
+
+If you have allowed browser notifications and turned **Settings → Notifications
+→ Desktop** on, the same notice reaches you outside the window — but only while
+Raiker is not the window you are looking at, and it never leaves this machine.
+
+**Only work you were not watching notifies.** An ordinary Chat turn is a task
+too, and a banner behind an answer you are reading is noise, so those are
+silent. The notice carries the task's title and whether it finished; what the
+run actually produced stays in its thread, because a notification can end up on
+a lock screen and the thread is one click away.
+
 ## Asking for a task in Chat
 
 You can also ask Raiker for a task instead of filling the form in. The model

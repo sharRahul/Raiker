@@ -116,3 +116,28 @@ def select_hunks(patch: str, selected: list[str]) -> str:
         for hunk in kept:
             out.extend(hunk)
     return "".join(out)
+
+
+def patch_target_paths(patch: str) -> list[str]:
+    """The `+++` targets of every file section, in order, `b/` prefix removed.
+
+    Used by the edit-then-propose path (BUG-271) to answer one question about a
+    patch the owner typed: does it change the same files the one they were
+    reading did? An edit is a *different action* and gets its own approval, so
+    this is not the authority boundary — it is the check that keeps a correction
+    a correction rather than an unrelated change wearing a review's clothes.
+    """
+    targets: list[str] = []
+    for header, _hunks in _sections(patch):
+        for line in header:
+            if not line.startswith("+++ "):
+                continue
+            value = line[4:].strip()
+            # Strip a trailing tab-separated timestamp, which some diff writers
+            # append, then the `b/` prefix `git diff` adds.
+            value = value.split("\t", 1)[0].strip()
+            if value.startswith("b/"):
+                value = value[2:]
+            targets.append(value)
+            break
+    return targets

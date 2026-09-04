@@ -742,3 +742,104 @@ describe("ApprovalsView per-hunk acceptance", () => {
     expect(screen.queryByRole("checkbox")).toBeNull();
   });
 });
+
+// BUG-271 — a reviewer could narrow a change and could not correct one.
+//
+// An edit is a *different action*, not a smaller one, so it must not appear as
+// a third state of the decision in front of the owner. It denies that proposal
+// and raises theirs, which they then approve like any other change.
+describe("ApprovalsView edit then propose", () => {
+  const PATCH_DETAIL = {
+    ...DETAIL,
+    preview_kind: "patch",
+    diff: "--- a/notes.txt\n+++ b/notes.txt\n@@ -1 +1 @@\n-a\n+A\n",
+  };
+
+  function routes(overrides: Record<string, unknown> = {}) {
+    return {
+      "GET /api/approvals": [PENDING],
+      "GET /api/approvals/appr_1": PATCH_DETAIL,
+      "POST /api/approvals/appr_1/replace": {
+        ok: true,
+        approval_id: "appr_1",
+        status: "denied",
+        replacement_approval_id: "appr_2",
+        action_id: "act_2",
+        executes_action: false,
+      },
+      "GET /api/approvals/appr_2": { ...PATCH_DETAIL, approval: { ...PENDING, approval_id: "appr_2" } },
+      ...overrides,
+    };
+  }
+
+  it("sends the reviewer's own patch to the replace route, never to resolve", async () => {
+    const fetchMock = stubFetch(routes());
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
+    const editor = await screen.findByLabelText("Your version of this change");
+    // It opens on the proposed diff, so a correction is an edit rather than a
+    // retype.
+    expect(editor).toHaveValue(PATCH_DETAIL.diff);
+    await fireEvent.input(editor, {
+      target: { value: PATCH_DETAIL.diff.replace("+A", "+Aa") },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Propose as a new change" }));
+
+    const post = await waitFor(() =>
+      fetchMock.mock.calls.find(([url]) => String(url).endsWith("/replace")),
+    );
+    expect(JSON.parse(String(post?.[1]?.body)).patch).toContain("+Aa");
+    expect(
+      fetchMock.mock.calls.some(([url]) => String(url).endsWith("/resolve")),
+    ).toBe(false);
+  });
+
+  it("says the change was denied and nothing ran", async () => {
+    stubFetch(routes());
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
+    await fireEvent.input(await screen.findByLabelText("Your version of this change"), {
+      target: { value: PATCH_DETAIL.diff.replace("+A", "+Aa") },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Propose as a new change" }));
+
+    expect(
+      await screen.findByText(/waiting for your approval. Nothing has run./),
+    ).toBeInTheDocument();
+  });
+
+  it("states a governed refusal in words rather than as a code", async () => {
+    stubFetch(
+      routes({
+        "POST /api/approvals/appr_1/replace": {
+          __status: 400,
+          detail: { ok: false, reason_code: "replacement_widens_targets" },
+        },
+      }),
+    );
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+    await fireEvent.click(await screen.findByRole("button", { name: "Edit…" }));
+    await fireEvent.input(await screen.findByLabelText("Your version of this change"), {
+      target: { value: PATCH_DETAIL.diff.replace("+A", "+Aa") },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: "Propose as a new change" }));
+
+    expect(
+      await screen.findByText(/touches a file this change did not/),
+    ).toBeInTheDocument();
+  });
+
+  it("offers no edit on a preview that is not a patch", async () => {
+    // A control with nothing behind it is worse than no control.
+    stubFetch({ "GET /api/approvals": [PENDING], "GET /api/approvals/appr_1": DETAIL });
+    render(ApprovalsView);
+    await fireEvent.click(await screen.findByRole("button", { name: /review/i }));
+
+    await screen.findByRole("button", { name: /approve/i });
+    expect(screen.queryByRole("button", { name: "Edit…" })).toBeNull();
+  });
+});

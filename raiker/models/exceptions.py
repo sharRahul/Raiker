@@ -21,6 +21,13 @@ class ProviderWorkspaceRequiredError(ModelProviderError):
     Its own class rather than a configuration error, because the two send the
     owner to different places: a misconfiguration is Raiker's settings, and this
     is the shape of the credential they pasted.
+
+    Carries two reason codes rather than two classes, because both are repaired
+    in the same place — the connection's *Workspace ID* field — and every caller
+    that catches one wants the other:
+
+    * ``provider_workspace_required`` — no workspace was named at all;
+    * ``provider_workspace_invalid`` — one was named and the provider refused it.
     """
 
 
@@ -138,6 +145,21 @@ _WORKSPACE_MARKERS: tuple[str, ...] = (
 )
 
 
+# BUG-274 — the owner named a workspace and the provider would not have it.
+#
+# The second half of the same conversation: once Raiker can send a workspace id,
+# it can send a wrong one, and that has to read as "fix this field" rather than
+# as the missing-workspace message, which would send the owner to add something
+# they have already added.
+_WORKSPACE_INVALID_MARKERS: tuple[str, ...] = (
+    "must be a valid workspace id",
+    "must be a valid workspace_id",
+    "invalid workspace id",
+    "invalid workspace_id",
+    "workspace not found",
+)
+
+
 def needs_workspace_id(status: int, body: str) -> bool:
     """True when the provider refused because no workspace was named.
 
@@ -149,7 +171,25 @@ def needs_workspace_id(status: int, body: str) -> bool:
     if status != 400:
         return False
     haystack = body.casefold()
+    if any(marker in haystack for marker in _WORKSPACE_INVALID_MARKERS):
+        # A rejected id is not a missing one. Checked first because the two
+        # bodies share vocabulary and only this one names a value the owner
+        # already supplied.
+        return False
     return any(marker in haystack for marker in _WORKSPACE_MARKERS)
+
+
+def workspace_id_rejected(status: int, body: str) -> bool:
+    """True when the provider refused the workspace the owner named.
+
+    Read under the same rule as :func:`needs_workspace_id`: the body decides the
+    classification and nothing from it survives the call, so a message naming an
+    organisation cannot reach an event or a readiness record.
+    """
+    if status != 400:
+        return False
+    haystack = body.casefold()
+    return any(marker in haystack for marker in _WORKSPACE_INVALID_MARKERS)
 
 
 def is_quota_exhausted(status: int, body: str) -> bool:
@@ -241,11 +281,20 @@ _PROVIDER_ERROR_SENTENCES: tuple[tuple[str, str], ...] = (
         "the provider is rate limiting this account right now. Wait a moment and try again.",
     ),
     (
+        # BUG-274 — the workspace the owner named was refused. Its own entry
+        # rather than a shared one, because asking again for a value already
+        # supplied is the answer that helps nobody.
+        "provider_workspace_invalid",
+        "the provider did not recognise the workspace named with this key. "
+        "Check the workspace ID on the connection in Models.",
+    ),
+    (
         # BUG-272 — the credential is fine and there is nothing to rotate.
+        # BUG-274 made it actionable: Raiker can send the workspace, so the
+        # remediation names the field rather than another key.
         "provider_workspace_required",
         "the provider needs a workspace named on every request for this kind of key. "
-        "This key is identity-linked, so use a standard API key from the provider's "
-        "console instead, or one scoped to a single workspace.",
+        "Add the workspace ID to the connection in Models; the key itself is fine.",
     ),
     (
         # BUG-76 — the circuit breaker, not a provider answer. Saying so is the

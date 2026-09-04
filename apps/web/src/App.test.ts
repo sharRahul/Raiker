@@ -31,7 +31,12 @@ describe("App shell", () => {
     expect(hiddenNavigation.inert).toBe(true);
     expect(localStorage.getItem("raiker.navigation.desktop")).toBe("false");
   });
-  it("routes a first owner into resumable model setup", async () => {
+  // The 20s is the test's own timeout, and it has to be larger than the 10s
+  // below or the wait can never be reached: vitest's default is 5s, so raising
+  // only the `findByRole` timeout left the intended fix inert and this test
+  // still failing at five seconds under a loaded machine. Found on 2026-09-04
+  // with the Python suite running beside it.
+  it("routes a first owner into resumable model setup", { timeout: 20_000 }, async () => {
     stubFetch({
       ...BOOTSTRAP_ROUTES,
       "GET /api/setup": { owner_principal_id: "prin_owner", status: "required", stage: "model", selected_profile_id: null, selected_model: null, model_deferred: false, privacy_mode: null, privacy_acknowledged_at: null, backup_mode: "later", backup_target: null, backup_verified_at: null, background_service_enabled: false, created_at: null, updated_at: null },

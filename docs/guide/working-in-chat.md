@@ -541,6 +541,19 @@ model — so the meter is correct for every model rather than assuming one numbe
 for a whole family. A model whose capacity nobody publishes says *"Context
 capacity is not configured for this model"* instead of guessing.
 
+**Tool schemas.** The panel also says how much of the tool catalogue this turn
+carries — *"25 tool schemas sent · 25 fetched on request"*. Sending all of them
+every turn cost several thousand tokens before a word of your prompt, most of it
+describing tools the turn would never call, so Raiker sends the ones a turn
+usually needs and lets the model ask for any of the others by name or by what
+they do.
+
+Nothing is withheld by this. The model is told every name that exists, gets the
+exact same schema the moment it asks, and keeps it for the rest of that turn — and
+a tool reached that way passes the identical permission, policy and approval
+checks as one that was in the request all along. Asking for a schema grants
+nothing; it is a description, not access.
+
 **Automatic compaction.** At 90 % of a known capacity, Raiker asks the selected
 model to summarize older completed exchanges in a separate request with tools
 and reasoning disabled. It keeps the newest two exchanges verbatim and carries

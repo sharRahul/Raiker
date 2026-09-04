@@ -1394,7 +1394,9 @@
   // about the decision moves — Accept and Reject still resolve the same record,
   // and per-hunk acceptance is not offered because the runtime has no such
   // decision to record.
-  let approvalDiffs = $state<Record<string, { diff: string | null; path: string | null }>>({});
+  let approvalDiffs = $state<
+    Record<string, { diff: string | null; path: string | null; kind: string }>
+  >({});
   /**
    * B14 — per decision, the hunks the reviewer has accepted, keyed by approval.
    *
@@ -1404,6 +1406,13 @@
    * belongs to the diff it was made on.
    */
   let approvalHunks = $state<Record<string, string[] | undefined>>({});
+  /**
+   * BUG-271 — the reviewer's own version of a proposed patch, per approval,
+   * while they are writing it. `undefined` is the resting state: correcting a
+   * change is the rarer thing to want, and an open editor under every patch
+   * would crowd a panel that has to stay a review surface.
+   */
+  let approvalEdits = $state<Record<string, string | undefined>>({});
 
   async function loadApprovals() {
     if (sessionId === null) return;
@@ -1431,7 +1440,12 @@
           // Only a change with a diff gets one. Everything else keeps the
           // inbox's own presentation rather than being forced into this shape.
           return shows
-            ? ([approval.approval_id, { diff: detail.diff, path: detail.diff_path }] as const)
+            ? ([
+                approval.approval_id,
+                // BUG-271 — `kind` decides whether the edit control is offered:
+                // only a proposed patch can be corrected as text.
+                { diff: detail.diff, path: detail.diff_path, kind: detail.preview_kind },
+              ] as const)
             : null;
         } catch {
           // The preview is a convenience on top of the decision. Losing it must
@@ -1444,6 +1458,39 @@
       ...approvalDiffs,
       ...Object.fromEntries(loaded.filter((entry) => entry !== null)),
     };
+  }
+
+  /**
+   * BUG-271 — propose the reviewer's own version instead of this one.
+   *
+   * The same route Approvals uses, so a correction means the same thing
+   * wherever it is made: the proposal in front of the reviewer is denied and
+   * theirs is raised as a new one with its own preview and its own hash.
+   * Nothing runs until they accept that.
+   */
+  async function proposeEdit(approval: ApprovalView) {
+    const patch = approvalEdits[approval.approval_id];
+    if (patch === undefined || approvalBusy !== null) return;
+    approvalBusy = approval.approval_id;
+    approvalNotice = null;
+    try {
+      await api.replaceApproval(approval.approval_id, {
+        patch,
+        reason: "edited in the Build workspace",
+      });
+      approvalEdits = { ...approvalEdits, [approval.approval_id]: undefined };
+      approvalNotice =
+        "The proposed change was denied and yours is waiting for your approval. Nothing has run.";
+      approvalDiffs = {};
+      await loadApprovals();
+    } catch (error) {
+      approvalNotice =
+        error instanceof ApiError && error.reasonCode
+          ? `That version was not accepted (${error.reasonCode}).`
+          : "That version was not accepted.";
+    } finally {
+      approvalBusy = null;
+    }
   }
 
   async function resolve(approval: ApprovalView, approve: boolean) {
@@ -1931,25 +1978,82 @@
                   bind:selection={approvalHunks[approval.approval_id]}
                 />
               {/if}
-              <div class="decision-actions">
-                <button
-                  type="button"
-                  class="btn btn-primary btn-sm"
-                  disabled={approvalBusy === approval.approval_id}
-                  onclick={() => resolve(approval, true)}
-                >
-                  Accept
-                </button>
-                <button
-                  type="button"
-                  class="btn btn-ghost btn-sm"
-                  disabled={approvalBusy === approval.approval_id}
-                  onclick={() => resolve(approval, false)}
-                >
-                  Reject
-                </button>
-                <a class="btn btn-ghost btn-sm" href="#/approvals">Open in Approvals</a>
-              </div>
+              <!-- BUG-271 — the reviewer can correct the change as well as
+                   narrow it. An edit is a different action, so it denies this
+                   proposal and raises theirs; the copy says so rather than
+                   letting it read as an amendment. -->
+              {#if approvalEdits[approval.approval_id] !== undefined}
+                <div class="decision-edit">
+                  <label class="sr-only" for={`edit-${approval.approval_id}`}>
+                    Your version of this change
+                  </label>
+                  <textarea
+                    id={`edit-${approval.approval_id}`}
+                    class="textarea"
+                    rows="10"
+                    spellcheck="false"
+                    disabled={approvalBusy === approval.approval_id}
+                    bind:value={approvalEdits[approval.approval_id]}
+                  ></textarea>
+                  <p class="decision-meta">
+                    Denies the change above and proposes yours. You will be asked to accept it.
+                  </p>
+                  <div class="decision-actions">
+                    <button
+                      type="button"
+                      class="btn btn-primary btn-sm"
+                      disabled={approvalBusy === approval.approval_id}
+                      onclick={() => proposeEdit(approval)}
+                    >
+                      Propose as a new change
+                    </button>
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      disabled={approvalBusy === approval.approval_id}
+                      onclick={() =>
+                        (approvalEdits = { ...approvalEdits, [approval.approval_id]: undefined })}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              {:else}
+                <div class="decision-actions">
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-sm"
+                    disabled={approvalBusy === approval.approval_id}
+                    onclick={() => resolve(approval, true)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    type="button"
+                    class="btn btn-ghost btn-sm"
+                    disabled={approvalBusy === approval.approval_id}
+                    onclick={() => resolve(approval, false)}
+                  >
+                    Reject
+                  </button>
+                  {#if approval.status === "pending" && approvalDiffs[approval.approval_id]?.kind === "patch" && approvalDiffs[approval.approval_id]?.diff}
+                    <button
+                      type="button"
+                      class="btn btn-ghost btn-sm"
+                      disabled={approvalBusy === approval.approval_id}
+                      onclick={() =>
+                        (approvalEdits = {
+                          ...approvalEdits,
+                          [approval.approval_id]:
+                            approvalDiffs[approval.approval_id]?.diff ?? "",
+                        })}
+                    >
+                      Edit…
+                    </button>
+                  {/if}
+                  <a class="btn btn-ghost btn-sm" href="#/approvals">Open in Approvals</a>
+                </div>
+              {/if}
             </div>
           {/each}
           {#if approvalNotice}<p class="line-notice" role="status">{approvalNotice}</p>{/if}
@@ -2598,6 +2702,20 @@
     display: flex;
     gap: 0.35rem;
     flex-wrap: wrap;
+  }
+  /* BUG-271 — the reviewer's own diff, monospaced because it is one, and kept
+     inside the panel's width so a long line scrolls rather than widening it. */
+  .decision-edit {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.5rem;
+  }
+  .decision-edit .textarea {
+    width: 100%;
+    font-family: var(--font-mono, ui-monospace, monospace);
+    font-size: 0.78rem;
+    white-space: pre;
+    overflow-x: auto;
   }
 
   .turn-attachments { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.4rem; }

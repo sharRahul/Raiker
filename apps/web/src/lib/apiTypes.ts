@@ -673,6 +673,8 @@ export interface ModelProfile {
   connection_configured?: boolean;
   /** A separate organization-usage credential is stored; never its value. */
   usage_admin_configured?: boolean;
+  /** BUG-274 — a workspace is named on this connection. Never which one. */
+  workspace_configured?: boolean;
   prompt_cache_ttl: string | null;
   context_window_tokens?: number | null;
   /** "provider" | "config" — which source supplied the capacity above. */
@@ -756,6 +758,10 @@ export interface ContextUsage {
   /** True on a billable provider with no exact rate for this model. The popover
    *  states **Unknown** and offers Configure → rather than implying it was free. */
   price_unknown?: boolean;
+  /** Backlog #16 — built-in tool schemas this turn carries, and how many are
+   *  fetched on request instead. Absent on an older server. */
+  tools_projected?: number;
+  tools_deferred?: number;
   /** Most recent automatic context-compaction outcome. Transcript turns stay
    *  unchanged; this describes only provider-context replay. */
   latest_compaction?: {

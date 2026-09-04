@@ -21,6 +21,61 @@ Rounds are newest-first within each group, as they were written.
 
 ---
 
+## 2026-09-04 review — a credential the product refused to accept, and what a turn pays before it starts
+
+Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,
+DeepSeek Harness and Hermes Agent. Scope: what a product owes an owner whose
+valid credential it cannot use; whether a review surface can take a correction;
+what a turn is charged for its own tool catalogue; and whether background work
+can reach the person who asked for it.
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| A connection that can name the workspace an identity-linked key acts in ([FIXED-372](../plans/FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)) | **No — parity, and Raiker was under the bar.** Every compared platform that takes an API key takes whatever scoping that key needs; none tells the owner to go and get a different kind | This is catching up, and it is worth saying plainly: FIXED-370 correctly *classified* the refusal and then handed the owner a dead end, which is a worse failure than the bare status code it replaced — a wrong answer that reads as a confident one. What is worth stating is the shape of the field: the check is a **header-safety** rule (printable, bounded, nothing that could start a second header) rather than a guess at the provider's id format, refused before storage and again fail-closed at build time. A rule written to `wrkspc_` would refuse a valid id the day the provider changes it. |
+| Two answers for one field, told apart before the owner reads either | **Yes — improvement** | *Nothing is named* and *what you named was refused* have opposite repairs, and the references collapse both into the provider's raw message. Classifying them from the body into two fixed reason codes — while keeping **nothing** from that body, so a provider naming an organisation cannot carry it into an event — is the control, not the sentence. |
+| A reviewer who can correct a proposed change, as a second proposal ([FIXED-375](../plans/FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one)) | **Yes — differentiator** | Editing an agent's diff before accepting it is parity: Claude Code, Codex and Cursor all let a reviewer change a line and take the result. **Doing it without ever executing bytes no human approved is not.** In those products the edit rides the same approval; here it cannot — an edit's bytes were never covered by the immutable-intent hash — so it becomes a new proposal with its own preview, its own hash and its own approval, and the original resolves as *denied, replaced by*. The audit trail therefore carries two records where the references carry one amended one, and the executed change is provably the one a human read. |
+| A finished background task that reaches the owner ([FIXED-374](../plans/FIXED_ITEMS.md#fixed-374--a-routine-ran-all-night-and-told-nobody)) | **No — parity.** Cowork, ChatGPT tasks and Codex all notify when scheduled work finishes | Raiker had ten declared channels and notified on approvals, integrity findings, containment and injection scans — and on nothing a *task* did. A routine that runs overnight and leaves only a card is a routine nobody reads. The half worth stating is the discrimination: **only work the owner was not watching** notifies, because every Chat turn is a task too, and a banner behind an answer being read is the noise that makes people turn notifications off. |
+| A notice that carries the title and the outcome and none of the run's output | **Yes — improvement** | A notification can be rendered on a lock screen by an operating system Raiker does not control. The compared products put the result in the notice; Raiker puts the *fact* in it and leaves the result in the thread, which is one click away. This is the same rule the audit log already follows, applied to the one surface that leaves the machine's own window. |
+| A turn that carries the tool schemas it needs and fetches the rest ([FIXED-376](../plans/FIXED_ITEMS.md#fixed-376--every-turn-paid-for-forty-nine-tool-schemas-to-call-two)) | **Yes — improvement**, over a mechanism that is itself parity | Claude Code defers tool schemas behind `ToolSearch`; the mechanism is not new. Three properties around it are. **Deferring is provably not gating**: every deferred name rides on the search tool's own description, so the model is told what exists rather than left to infer it from absence. **The search grants nothing**: it reads a registry in-process — no store, no network — and the tool it describes still passes its own gate, decision mode, policy review and approval, so `tool_search` is `low` with no capability of its own. And **the reveal is read from the result, never from the query**, so a model cannot widen its own catalogue by naming something that does not exist. Measured: 6,494 → 3,726 tokens before a word of the owner's prompt. |
+| A split derived from the registry rather than remembered | **Yes — improvement** | The failure mode of a two-list design is a tool that falls out of both and is silently unreachable. The core set is one declaration checked against `MODEL_EXPOSED_TOOLS` at import — a name that is not a real tool fails the import — and everything else is the complement, so a tool added tomorrow is deferred by default rather than lost. |
+
+### Assessed and deliberately not built
+
+| Considered | Decision |
+|---|---|
+| Deferring **MCP** tool schemas too | **Not this round.** A projected MCP tool is already one generic `arguments` object, so the saving is small, and the set changes between turns with what the owner has connected — a deferred name index would have to be rebuilt per turn from a live discovery read. Stated as a known limit rather than implied by the built-in behaviour. |
+| A **local speech-synthesis runtime** for read aloud (Piper or equivalent) | **Not needed.** BUG-269 proposed the filter first and the runtime only if the filter proved insufficient. `voice.localService` answers the question the runtime was for, so read aloud is on-device with nothing for the owner to install. A refusal names the language rather than the feature. |
+| Dragging a file **out** of the transcript (GAP-CHAT C15) | **Refused.** It needs the File System Access API or a `DownloadURL` drag payload, neither available in every browser Raiker supports, and **Download** already does the thing. A control that works in one browser and silently does nothing in another is worse than the button beside it. |
+| Turning `external_channels_enabled` on to close C10 | **Refused.** The notification half is real work and is done; the external-channel half stays behind its fifteen pre-enablement gates. Flipping a readiness flag to make a row green is the defect this document exists to prevent. |
+
+### Found by running it rather than by reading it
+
+Five, all fixed in the same change:
+
+* The workspace-refusal guidance was wired to the **save**, which contacts
+  nothing. The refusal arrives on the next read, so the fresh-connection case —
+  where an owner meets it first — was the one not covered.
+* The first-run provider list reported a *classified* refusal as "could not be
+  reached. Check this device's network access" — the FIXED-355/FIXED-370 defect,
+  alive on the screen a new owner meets first, because a catalogue refusal
+  arrives as a 200 whose body says `unavailable` rather than as a thrown error.
+* **Reconnect** left **Model details** open over the card it had just changed.
+  The live harness had been closing it by hand since FIXED-141 *with a comment
+  saying so*, which is how an interface defect passes for a test concern.
+* `TERMINAL_COMMAND_STATES` is a frozenset, and parametrising over it made every
+  `pytest-xdist` worker collect in a different order and abort the run. The suite
+  could only be run serially, which is the difference between a ten-minute gate
+  and a forty-minute one.
+* `App.test.ts`'s model-setup route waits on a lazily imported chunk with a 10s
+  `findByRole` timeout — inside an `it()` left on vitest's 5s default, which
+  caps it. The comment beside it described a fix that had never been able to
+  take effect, and the test failed at five seconds whenever the machine was
+  busy. That is a flaky gate, which is worse than a failing one.
+
+---
+
 ## 2026-08-30 review (second pass) — what a governed record must survive
 
 Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,

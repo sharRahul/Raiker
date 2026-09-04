@@ -197,14 +197,50 @@ export const browserRecognitionAdapter: VoiceRecognitionAdapter = {
   },
 };
 
-type PlaybackHandlers = { end(): void; error(): void };
+// ── Read aloud, on this device (BUG-269) ─────────────────────────────────────
+//
+// Dictation was made local by BUG-256. Playback was the half left behind, and
+// the asymmetry is its own defect: an owner who has just pointed the microphone
+// at a runtime on their own machine has no reason to expect the other direction
+// to behave differently, and nothing told them it did.
+//
+// What crosses the boundary here is the response text rather than a recording
+// of the owner, which is why this is smaller than BUG-256 was. But it does
+// cross: Chrome ships remote voices for several languages and picks one without
+// saying so, and the page cannot tell afterwards which kind it got.
+//
+// `voice.localService` can tell it beforehand. So the rule is one line and
+// needs no setting, exactly as dictation now needs none: **Raiker speaks only
+// with a voice it can see is on this device, and says so when there is none.**
+// Refusing is the honest half of that promise — speaking with a voice whose
+// locality could not be established would make the claim untrue in precisely
+// the case the claim matters.
+type PlaybackHandlers = {
+  end(): void;
+  error(): void;
+  /** No on-device voice could be found for this language. */
+  noLocalVoice?(language: string): void;
+};
+export interface SpeechVoice {
+  name: string;
+  lang: string;
+  /** True when the platform synthesises this voice without leaving the device. */
+  localService: boolean;
+}
 type SpeechUtterance = {
   text: string;
   lang: string;
+  voice?: SpeechVoice | null;
   onend: (() => void) | null;
   onerror: (() => void) | null;
 };
-type SpeechSynth = { speak(utterance: SpeechUtterance): void; cancel(): void };
+type SpeechSynth = {
+  speak(utterance: SpeechUtterance): void;
+  cancel(): void;
+  getVoices?(): SpeechVoice[];
+  addEventListener?(type: string, listener: () => void): void;
+  removeEventListener?(type: string, listener: () => void): void;
+};
 
 export interface VoicePlayback {
   supported(): boolean;
@@ -219,17 +255,87 @@ function makeUtterance(text: string): SpeechUtterance {
   return { text, lang: "", onend: null, onerror: null };
 }
 
+/** `en-GB` and `en_US` both reduce to `en`. */
+function primaryLanguage(tag: string): string {
+  return tag.trim().toLowerCase().replace(/_/g, "-").split("-")[0] ?? "";
+}
+
+/**
+ * The best voice for *language* that stays on this machine, or `null`.
+ *
+ * Exact region first, then the same language in another region — an owner
+ * asking for `en-GB` is better served by a local `en-US` voice than by a remote
+ * `en-GB` one, because the thing being chosen here is the boundary, not the
+ * accent. A voice the platform has not marked local is never a candidate: the
+ * flag is the only evidence available, and treating "unmarked" as local would
+ * make the claim rest on nothing.
+ */
+export function pickOnDeviceVoice(
+  voices: readonly SpeechVoice[],
+  language: string,
+): SpeechVoice | null {
+  const local = voices.filter((voice) => voice.localService === true);
+  const wanted = language.trim().toLowerCase().replace(/_/g, "-");
+  const exact = local.find((voice) => voice.lang.toLowerCase().replace(/_/g, "-") === wanted);
+  if (exact) return exact;
+  const base = primaryLanguage(language);
+  return local.find((voice) => primaryLanguage(voice.lang) === base) ?? null;
+}
+
+/**
+ * The voice list, which several browsers populate asynchronously.
+ *
+ * A first call commonly returns an empty array and a `voiceschanged` event
+ * follows. Reading it once would report "no on-device voice" on the owner's
+ * first click and a working voice on their second, so this waits — briefly,
+ * because a platform that never fires the event must not leave the button
+ * spinning.
+ */
+export function voicesWhenReady(
+  synth: SpeechSynth,
+  timeoutMs = 1000,
+): Promise<readonly SpeechVoice[]> {
+  const read = () => (synth.getVoices?.() ?? []) as SpeechVoice[];
+  const first = read();
+  if (first.length > 0 || synth.addEventListener === undefined) {
+    return Promise.resolve(first);
+  }
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      synth.removeEventListener?.("voiceschanged", finish);
+      clearTimeout(timer);
+      resolve(read());
+    };
+    const timer = setTimeout(finish, timeoutMs);
+    synth.addEventListener?.("voiceschanged", finish);
+  });
+}
+
 export function createVoicePlayback(synth: SpeechSynth | undefined): VoicePlayback {
   return {
     supported: () => synth !== undefined,
     speak(_ownerId, text, language, handlers) {
       if (!synth) throw new Error("speech_synthesis_unavailable");
       synth.cancel();
-      const utterance = makeUtterance(text);
-      utterance.lang = resolveSpeechLanguage(language, globalThis.navigator?.language ?? "");
-      utterance.onend = handlers.end;
-      utterance.onerror = handlers.error;
-      synth.speak(utterance);
+      const tag = resolveSpeechLanguage(language, globalThis.navigator?.language ?? "");
+      void voicesWhenReady(synth).then((voices) => {
+        const voice = pickOnDeviceVoice(voices, tag);
+        if (!voice) {
+          // Nothing is spoken. The alternative is a voice that may synthesise
+          // off the device, which is the thing this exists to prevent.
+          handlers.noLocalVoice?.(tag);
+          return;
+        }
+        const utterance = makeUtterance(text);
+        utterance.lang = tag;
+        utterance.voice = voice;
+        utterance.onend = handlers.end;
+        utterance.onerror = handlers.error;
+        synth.speak(utterance);
+      });
     },
     stop() {
       synth?.cancel();

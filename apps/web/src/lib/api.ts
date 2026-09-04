@@ -1109,11 +1109,15 @@ export const api = {
         body: JSON.stringify({ profile_id, model: model || null }),
       },
     ),
+  // `workspaceId` names where an identity-linked key acts (BUG-274). It is not
+  // a credential and is sent as an ordinary field; the server refuses a value
+  // that could not safely become a header before it stores anything.
   saveModelConnection: (
     profileId: string,
     endpoint: string,
     apiKey: string,
     adminApiKey = "",
+    workspaceId = "",
   ) =>
     request<{ ok: boolean; connection_configured: boolean }>(
       `/api/models/${encodeURIComponent(profileId)}/connection`,
@@ -1124,6 +1128,7 @@ export const api = {
           endpoint: endpoint || null,
           api_key: apiKey || null,
           admin_api_key: adminApiKey || null,
+          workspace_id: workspaceId || null,
         }),
       },
     ),
@@ -2194,6 +2199,19 @@ export const api = {
       `/api/approvals/${encodeURIComponent(id)}/resolve`,
       body,
     ),
+  // BUG-271 — the reviewer corrected a line rather than narrowing the change.
+  // An edit is a *different action*, so this is not a field on the decision: it
+  // denies the proposal in front of the owner and raises theirs in its place,
+  // with its own preview, its own hash and its own approval. Nothing executes.
+  replaceApproval: (id: string, body: { patch: string; reason?: string }) =>
+    postJson<{
+      ok: boolean;
+      approval_id: string;
+      status: string;
+      replacement_approval_id: string;
+      action_id: string;
+      executes_action: boolean;
+    }>(`/api/approvals/${encodeURIComponent(id)}/replace`, body),
   // B2 — non-streaming continuation of a turn that was parked for this approval.
   resumeAfterApproval: (id: string) =>
     postJson<AgentResponse>(

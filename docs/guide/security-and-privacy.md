@@ -110,6 +110,13 @@ microphone says which one is in use, and nothing is contacted until you dictate.
 Raiker refuses a runtime address that is not on this machine, and never writes
 the recording to disk on either path.
 
+Read aloud goes the same way, without a runtime to install. Some browsers ship
+remote voices alongside the operating system's own and pick one without saying
+so, so Raiker chooses only from voices the browser reports as local and refuses
+to speak rather than use one it cannot vouch for. What crosses the boundary
+there would be the *answer text* rather than a recording of you — smaller than
+dictation, and still yours.
+
 Back up or export the instance deliberately: local ownership also means you are
 responsible for preserving its conversations, audit records, configuration, and
 vault material. Run `raiker-app --print-paths` before backup or uninstall.

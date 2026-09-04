@@ -127,6 +127,10 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     "ask_owner_question": FAMILY_PLAN,
     "create_task": FAMILY_PLAN,
     "assign_session_project": FAMILY_PLAN,
+    # Backlog #16 — fetching a tool's schema is the turn working out what it can
+    # do next, which is what the plan family already means. It reaches nothing
+    # and changes nothing, so it must not sit in a family that implies either.
+    "tool_search": FAMILY_PLAN,
 }
 
 _LABEL_BY_TOOL: dict[str, str] = {
@@ -180,6 +184,7 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "ask_owner_question": "Ask you a question",
     "create_task": "Create task",
     "assign_session_project": "Assign to project",
+    "tool_search": "Look up a tool",
 }
 
 # How long a phrase may be before it stops being a summary. A path is trimmed
@@ -338,6 +343,10 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
         "web_search",
         "memory_search",
         "code_map_search",
+        # What the model went looking for, in its own words — the same shape as
+        # every other query row, and the reason a `tool_search` row is legible
+        # at all ("Look up a tool · commit my work").
+        "tool_search",
         "conversation_search",
     }:
         return _quoted(args, "query")

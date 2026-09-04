@@ -111,6 +111,10 @@ confinement, sandboxing, or critical holds.
 - Raiker negotiates MCP revision `2026-07-28` and accepts three older revisions,
   but implements a bounded subset. Streamable-HTTP behavior, remote OAuth,
   `server/discover`, and MCP Apps are not available.
+- Raiker's own built-in tools beyond a core set are deferred: the model is told
+  every name and fetches the schema with `tool_search`. A connected MCP server's
+  tools are **not** deferred — they are projected in full, so a server with a
+  very large catalogue still costs the turn its whole tool list.
 
 ## Voice and interaction
 
@@ -122,8 +126,12 @@ On-device dictation needs a transcription server you install and run yourself �
 Raiker does not bundle one, and it shows no words until the recording stops,
 because a local runtime hears the whole clip before transcribing it. Without one,
 dictation falls back to the browser; there is no setting to force it either way.
-Read-aloud still uses the browser's own voice; there is no local speech
-*synthesis*.
+
+Read aloud speaks only with a voice the browser reports as being on this device,
+and says *"No on-device voice for &lt;language&gt;."* when there is none — it will
+not quietly use a voice that synthesises elsewhere. Raiker bundles no local
+speech *synthesis* runtime, so a language your operating system has no voice for
+cannot be read aloud at all.
 
 Raiker can ask a structured clarification question mid-turn: it parks the turn,
 offers the options it wrote, and continues on the one you pick. A question

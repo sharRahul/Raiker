@@ -53,6 +53,7 @@ from raiker.models.connections import (
     clear_model_connection,
     get_model_connection,
     put_model_connection,
+    validated_workspace_id,
 )
 from raiker.models.exceptions import (
     ModelProviderError,
@@ -2231,9 +2232,33 @@ async def set_model_connection(
             "endpoint": body.endpoint or "",
             "api_key": body.api_key or "",
             "admin_api_key": body.admin_api_key or "",
+            "workspace_id": body.workspace_id or "",
         }.items()
         if value.strip()
     }
+    # BUG-274 — refused here, where the owner can still see what they typed,
+    # rather than at the point a turn needs it. The shape check is a header
+    # safety rule, not a guess at the provider's id format.
+    if "workspace_id" in values:
+        try:
+            values["workspace_id"] = validated_workspace_id(values["workspace_id"])
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail={"reason_code": str(exc)},
+            ) from exc
+    # BUG-274 — "add the workspace ID to this connection" has to mean exactly
+    # that. A save replaces the stored payload, so a workspace sent on its own
+    # would otherwise delete the key it is meant to accompany, and the owner
+    # would have to re-paste a credential to correct a field that is not one.
+    # The merge is deliberately the narrowest rule that closes it: *only* a
+    # workspace id, *only* when a connection already exists. Any other
+    # combination still replaces, so nothing else silently retains a value the
+    # owner thought they had cleared.
+    if set(values) == {"workspace_id"}:
+        existing = get_model_connection(store, session.principal_id, profile_id)
+        if existing:
+            values = {**existing, **values}
     if not values:
         clear_model_connection(store, session.principal_id, profile_id)
         store.invalidate_model_readiness(

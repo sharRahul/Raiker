@@ -33,6 +33,7 @@ from raiker.hooks.contracts import HookInput, HookOutcome
 from raiker.hooks.dispatcher import HookDispatcher
 from raiker.memory.capture import capture_tool_observation
 from raiker.memory.governance import GovernedMemoryService
+from raiker.models.tool_projection import search_tools
 from raiker.policy.engine import PolicyEngine
 from raiker.runtime.alignment import AlignmentVerdict, check_alignment
 from raiker.runtime.identity.contracts import (
@@ -227,6 +228,10 @@ class ToolBroker:
             "stat_path": lambda args: stat_path(
                 self.workspace_root, str(args.get("path", ".")), authority=self.path_authority
             ),
+            # Backlog #16 — the schema of a tool this request did not carry.
+            # In-process, store-free and network-free: it reads the registry
+            # Raiker ships. It grants nothing, so it needs nothing.
+            "tool_search": lambda args: search_tools(str(args.get("query", ""))),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
                 str(args.get("before_path", ".")),

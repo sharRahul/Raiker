@@ -47,11 +47,26 @@ describe("providerErrorGuidance", () => {
 // "could not be reached". Both send the owner to debug the wrong thing — the
 // same shape FIXED-355 removed from a rejected key.
 describe("an identity-linked key", () => {
-  it("says the key is the wrong kind rather than telling you to rotate it", () => {
+  // BUG-274 — the fix used to be "go and get a different key", which is a dead
+  // end for an owner who has only this one. Raiker can send the workspace now,
+  // so the fix names the field instead.
+  it("asks for the workspace rather than for another key", () => {
     const guidance = providerErrorGuidance("provider_workspace_required");
     expect(guidance).not.toBeNull();
     expect(guidance?.message).toMatch(/identity-linked/i);
-    expect(guidance?.fix).toMatch(/not broken/i);
+    expect(guidance?.fix).toMatch(/workspace ID/i);
+    expect(guidance?.fix).not.toMatch(/standard API key/i);
+  });
+
+  it("does not ask again for a workspace that was already given", () => {
+    // The two codes share a prefix and have opposite repairs: one asks for a
+    // value, the other says the value is wrong.
+    const invalid = providerErrorGuidance("provider_workspace_invalid:http_400");
+    expect(invalid?.message).toMatch(/did not recognise/i);
+    expect(invalid?.fix).toMatch(/Check the workspace ID/i);
+    expect(invalid?.message).not.toEqual(
+      providerErrorGuidance("provider_workspace_required")?.message,
+    );
   });
 
   it("matches through the status detail the provider code carries", () => {

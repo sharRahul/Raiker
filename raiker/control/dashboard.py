@@ -64,6 +64,7 @@ from raiker.execution.profiles import (
     probe_execution_profile,
     validate_execution_profile,
 )
+from raiker.hooks.handlers.http import egress_granted
 from raiker.memory.store import get_memory, list_memory
 from raiker.models.endpoint_policy import MODEL_EGRESS_ALLOWLIST_ENV
 from raiker.models.exceptions import (
@@ -108,6 +109,7 @@ from raiker.tools.git import (
     selected_repository_subpath,
 )
 from raiker.tools.graph_tools import reference_resolution
+from raiker.tools.mcp_schema import unsupported_feature_notes
 
 # Capability states that mean the gate is off / fail-closed.
 _DISABLED_STATES = {"disabled", "planned"}
@@ -252,6 +254,57 @@ class SessionView:
         return asdict(self)
 
 
+def _handler_target(handler: Any) -> str:
+    """What a hook handler points at, in one line for the rule's card.
+
+    An `http` handler's destination is the URL it posts to — the fact an owner
+    needs when the grant does not cover it, because the host in that URL is what
+    they have to add.
+    """
+    if handler.type == "command" and handler.command:
+        return " ".join(handler.command)
+    if handler.type == "builtin":
+        return handler.builtin or ""
+    if handler.type == "http":
+        return handler.url or ""
+    return handler.model or "owner-selected model"
+
+
+def _declaration_summaries(stored: Any) -> tuple[dict[str, Any], ...]:
+    """The owner-facing summary of what a server declared for each of its tools.
+
+    Backlog #16 (MCP half). The card used to show a row of tool-name chips and
+    nothing else, so a server whose tools had no declared arguments looked
+    identical to one whose tools were fully described — and the owner could not
+    tell whether the model was calling them with real arguments or guesses.
+
+    Re-bounded on the way out (`decode_declarations`), so an older row written
+    before those bounds existed is still safe to render, and the *argument
+    names* are carried rather than the whole schema: the card answers "what does
+    this tool take", not "paste me a JSON Schema".
+    """
+    from raiker.tools.mcp_schema import decode_declarations
+
+    summaries: list[dict[str, Any]] = []
+    for declaration in decode_declarations(stored):
+        schema = declaration.input_schema or {}
+        properties = schema.get("properties") if isinstance(schema, dict) else None
+        argument_names = sorted(properties) if isinstance(properties, dict) else []
+        required = schema.get("required") if isinstance(schema, dict) else None
+        summaries.append(
+            {
+                "name": declaration.name,
+                "title": declaration.title,
+                "description": declaration.description,
+                "has_schema": declaration.input_schema is not None,
+                "schema_reason": declaration.schema_reason,
+                "arguments": argument_names,
+                "required": sorted(str(item) for item in required) if isinstance(required, list) else [],
+            }
+        )
+    return tuple(summaries)
+
+
 @dataclass(frozen=True)
 class McpServerView:
     """Owner-scoped view of one local stdio MCP server profile (Control Deck
@@ -271,6 +324,17 @@ class McpServerView:
     # never arguments or output).
     tools: tuple[str, ...] = ()
     tool_count: int = 0
+    # Backlog #16 (MCP half) — what each of those tools said it takes, bounded
+    # by `raiker.tools.mcp_schema` before it was stored. One entry per tool that
+    # declared something: its name, the server's own sentence, and whether the
+    # declared argument schema is carried or why it is not. Still never
+    # arguments a call passed or output it returned.
+    tool_declarations: tuple[dict[str, Any], ...] = ()
+    # BUG-234 — what this server offers that Raiker does not use, one sentence
+    # each: capabilities it declared beyond `tools`, and what the transport was
+    # observed doing. Empty when a server offers only what Raiker uses. The rule
+    # is "supported, or named as unsupported" — never silently degraded.
+    unsupported_features: tuple[dict[str, str], ...] = ()
     # Remote (http) connection details. `endpoint_url` is the owner-added URL;
     # `auth_ref` names where the owner token lives (an env var name) — never the
     # token itself. Both are null for a local stdio connection.
@@ -1304,6 +1368,10 @@ class TaskView:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    # Backlog #23 — the working method this task's cycles run under: `chat` or
+    # `build`. A delegating parent chooses it per child, so one brief can put
+    # the reading half in Chat and the change-and-test half in Build.
+    surface: str = "chat"
     # C11 — this task's own conversation, or None for a task created before
     # threads existed. The card links to it, and every cycle runs in it, so
     # "what did the overnight run find?" opens a transcript the owner can reply
@@ -3663,6 +3731,10 @@ class DashboardService:
                 last_connected_at=row.get("last_connected_at"),
                 tools=tuple(str(t) for t in row.get("tools", [])),
                 tool_count=int(row.get("tool_count", 0) or 0),
+                tool_declarations=_declaration_summaries(row.get("tool_schemas")),
+                unsupported_features=tuple(
+                    unsupported_feature_notes(row.get("server_features"))
+                ),
                 endpoint_url=row.get("endpoint_url"),
                 auth_ref=row.get("auth_ref"),
                 monitor_state=str(row.get("monitor_state") or "active"),
@@ -3913,8 +3985,18 @@ class DashboardService:
             # the rule matches, and nothing happens — so it is the same class of
             # dead rule as an event that is never emitted, and is reported the
             # same way rather than being left to look enforcing.
+            # BUG-226 — the same is true of an `http` handler whose destination
+            # the owner's egress grant does not cover: the rule parses, matches,
+            # and refuses at dispatch. Read live rather than at parse time,
+            # because the grant is revocable *without* editing any hooks file —
+            # that is the whole point of it being one variable rather than a
+            # field per rule.
             def _available(handler: HookHandler) -> bool:
-                return handler.type != "builtin" or (handler.builtin or "") in BUILTIN_HANDLERS
+                if handler.type == "builtin":
+                    return (handler.builtin or "") in BUILTIN_HANDLERS
+                if handler.type == "http":
+                    return egress_granted(handler.url)
+                return True
 
             authoritative = any(
                 (handler.decision_authority or handler.type == "builtin") and _available(handler)
@@ -3939,15 +4021,7 @@ class DashboardService:
                         {
                             "id": handler.id,
                             "type": handler.type,
-                            "target": (
-                                " ".join(handler.command)
-                                if handler.type == "command" and handler.command
-                                else (
-                                    handler.builtin or ""
-                                    if handler.type == "builtin"
-                                    else (handler.model or "owner-selected model")
-                                )
-                            ),
+                            "target": _handler_target(handler),
                             "timeout_ms": handler.timeout_ms,
                             # A builtin is Raiker's own code and always carries
                             # authority; a command carries it only when the owner
@@ -3956,10 +4030,23 @@ class DashboardService:
                                 handler.decision_authority or handler.type == "builtin"
                             )
                             and _available(handler),
-                            # False only for a builtin this build does not ship.
-                            # A command's program is resolved at dispatch time
-                            # inside the workspace, so it is not checked here.
+                            # False for a builtin this build does not ship, and
+                            # for an `http` destination the egress grant does not
+                            # cover. A command's program is resolved at dispatch
+                            # time inside the workspace, so it is not checked here.
                             "available": _available(handler),
+                            # BUG-226 — why an unavailable handler is unavailable,
+                            # so the page can say "add this host to the grant"
+                            # rather than only "this will not run".
+                            "unavailable_reason": (
+                                ""
+                                if _available(handler)
+                                else (
+                                    "egress_not_granted"
+                                    if handler.type == "http"
+                                    else "builtin_not_in_this_build"
+                                )
+                            ),
                         }
                         for handler in rule.handlers
                     ],
@@ -6199,6 +6286,7 @@ class DashboardService:
         project_id: str | None = None,
         model_profile: str | None = None,
         model: str | None = None,
+        surface: str = "chat",
         attachments: list[dict[str, Any]] | None = None,
         start_immediately: bool = True,
     ) -> TaskView:
@@ -6208,9 +6296,19 @@ class DashboardService:
         given, else with the active project, so a schedule created inside a
         project stays scoped to it. The stamp is an organizing label — it
         grants nothing.
+
+        ``surface`` (backlog #23) chooses the working method this task's cycles
+        run under. A `build` task needs a project, because Build's whole method
+        is a repository it can read: without one it would be Chat wearing the
+        wrong standing instructions, so it is refused with a stated reason
+        rather than accepted and quietly downgraded.
         """
         if recurrence is not None and recurrence not in TASK_RECURRENCES:
             raise ValueError(f"invalid_recurrence:{recurrence}")
+        from raiker.contracts.models import PROMPT_SURFACES
+
+        if surface not in PROMPT_SURFACES:
+            raise ValueError(f"invalid_surface:{surface}")
         if bool(model_profile) != bool(model):
             raise ValueError("task_model_pair_required")
         if model_profile and model:
@@ -6261,6 +6359,12 @@ class DashboardService:
             project_id = self.store.get_active_project(user_id)
         elif self.store.load_project(project_id, user_id) is None:
             raise ValueError(f"unknown_project:{project_id}")
+        # Backlog #23 — Build's method is a repository it can read. A build task
+        # with no project would run Build's standing instructions over Chat's
+        # scope, which is the kind of half-configured state this product refuses
+        # rather than accepts and explains later.
+        if surface == "build" and not project_id:
+            raise ValueError("build_task_requires_project")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
             parent_session = (
@@ -6309,6 +6413,7 @@ class DashboardService:
         task = TaskManager(self.store, EventLogWriter(self.store)).create_task(
             session_id=inbox_session_id,
             thread_session_id=thread_session_id,
+            surface=surface,
             title=title,
             objective=objective,
             priority=priority,
@@ -8659,6 +8764,7 @@ class DashboardService:
             project_id=d.get("project_id"),
             model_profile=d.get("model_profile"),
             model=d.get("model"),
+            surface=str(d.get("surface") or "chat"),
             thread_session_id=d.get("thread_session_id"),
             thread_turns=thread_turns,
             attachments=list(d.get("attachments") or []),

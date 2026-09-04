@@ -76,6 +76,7 @@ function rule(partial: Partial<HooksView["rules"][number]>): HooksView["rules"][
         timeout_ms: 5000,
         decision_authority: true,
         available: true,
+        unavailable_reason: "",
       },
     ],
     ...partial,
@@ -144,6 +145,7 @@ describe("Extensions → Hooks", () => {
                   timeout_ms: 5000,
                   decision_authority: false,
                   available: true,
+                  unavailable_reason: "",
                 },
               ],
             }),
@@ -178,6 +180,7 @@ describe("Extensions → Hooks", () => {
                   timeout_ms: 1500,
                   decision_authority: false,
                   available: true,
+                  unavailable_reason: "",
                 },
               ],
             }),
@@ -207,6 +210,7 @@ describe("Extensions → Hooks", () => {
                   timeout_ms: 5000,
                   decision_authority: false,
                   available: false,
+                  unavailable_reason: "builtin_not_in_this_build",
                 },
               ],
             }),
@@ -292,6 +296,7 @@ describe("Extensions → Hooks", () => {
                   timeout_ms: 2500,
                   decision_authority: false,
                   available: true,
+                  unavailable_reason: "",
                 },
               ],
             }),
@@ -302,7 +307,9 @@ describe("Extensions → Hooks", () => {
     render(ExtensionsView, { tab: "hooks" });
 
     expect(await screen.findByText("tool-free model advisory")).toBeInTheDocument();
-    expect(screen.getByText(/per-handler timeout and token budget/i)).toBeInTheDocument();
+    // The handler-types card says the same thing in a clause rather than in a
+    // paragraph; what has to survive is that a prompt handler reads as advisory.
+    expect(screen.getByText(/one tool-free model call; advisory only/i)).toBeInTheDocument();
     expect(screen.queryByText("Can deny or ask")).not.toBeInTheDocument();
   });
 
@@ -350,5 +357,41 @@ describe("Extensions → Hooks", () => {
 
     await waitFor(() => expect(screen.getByText("failed")).toBeInTheDocument());
     expect(screen.getByText("record-tool-use")).toBeInTheDocument();
+  });
+
+  // BUG-226 — an `http` rule whose destination the owner's egress grant does not
+  // cover parses, matches, and refuses. Saying only "it will fail" leaves the
+  // owner to guess; the host is the thing they have to add.
+  it("says an http handler is refused because the host is not granted", async () => {
+    stubFetch(
+      routes(
+        hooks({
+          rule_count: 1,
+          rules: [
+            rule({
+              can_decide: false,
+              handlers: [
+                {
+                  id: "notify",
+                  type: "http",
+                  target: "https://hooks.internal.example.com/raiker",
+                  timeout_ms: 5000,
+                  decision_authority: false,
+                  available: false,
+                  unavailable_reason: "egress_not_granted",
+                },
+              ],
+            }),
+          ],
+        }),
+      ),
+    );
+    render(ExtensionsView, { tab: "hooks" });
+
+    expect(
+      await screen.findByText(/this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST/),
+    ).toBeInTheDocument();
+    // The host is the fact the owner has to act on, so the URL is on the row.
+    expect(screen.getByText("https://hooks.internal.example.com/raiker")).toBeInTheDocument();
   });
 });

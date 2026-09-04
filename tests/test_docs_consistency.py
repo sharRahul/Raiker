@@ -116,6 +116,46 @@ def test_every_real_executor_capability_has_a_threat_model() -> None:
     )
 
 
+def test_every_real_executor_capability_is_described_on_the_permissions_page() -> None:
+    """A capability the owner can switch has to read as something.
+
+    `CAPABILITY_COPY` in `capabilityModel.ts` is what gives a gate its name and
+    the sentence explaining what turning it on permits. It is not derived from
+    the registry and cannot be — a description is prose — so it is exactly the
+    pair this codebase keeps finding drifted apart. Without an entry a gate falls
+    back to `humanize()` of its identifier and to "Governed capability.", which
+    is a governed switch rendered as a bare name and no explanation at all.
+
+    It drifted the day `telemetry_export` was added, and was caught by reading
+    the page. Asserted here so the next one is caught by the suite.
+
+    The per-service connectors are the one deliberate exception: they are
+    registered dynamically, so `capabilityLabel` resolves them by pattern.
+    """
+    from raiker.runtime.executors import REAL_EXECUTOR_CAPABILITIES
+
+    model = (
+        Path(__file__).resolve().parents[1]
+        / "apps"
+        / "web"
+        / "src"
+        / "lib"
+        / "capabilityModel.ts"
+    ).read_text(encoding="utf-8")
+    copy_block = model[model.index("CAPABILITY_COPY") :]
+    connector = re.compile(r"^connector_.+_runtime$")
+    missing = sorted(
+        cap
+        for cap in REAL_EXECUTOR_CAPABILITIES
+        if not connector.match(cap)
+        and re.search(rf"(?m)^\s*{re.escape(cap)}:\s*\{{", copy_block) is None
+    )
+    assert missing == [], (
+        "capabilities with a real executor and no entry in CAPABILITY_COPY, so "
+        f"Permissions renders their identifier and no description: {missing}"
+    )
+
+
 def test_documentation_links_and_anchors_resolve() -> None:
     link = re.compile(r"\[[^\]]*\]\(([^)\s]+)(?:\s+\"[^\"]*\")?\)")
     anchors_by_file: dict[Path, set[str]] = {}

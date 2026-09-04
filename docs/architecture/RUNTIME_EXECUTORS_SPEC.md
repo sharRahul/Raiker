@@ -69,7 +69,7 @@ prohibited and guarded by tests (`tests/test_executor_default_registry.py`).
 
 ### Real executors — governed-flippable (`REAL_EXECUTOR_CAPABILITIES`)
 
-This table covers all 45 members of `REAL_EXECUTOR_CAPABILITIES`
+This table covers all 46 members of `REAL_EXECUTOR_CAPABILITIES`
 (`raiker/runtime/executors/__init__.py`). A capability that is in that set and
 not in this table is a documentation defect, not a hidden feature.
 
@@ -85,6 +85,7 @@ not in this table is a documentation defect, not a hidden feature.
 | `shell_execution` | 2 | Runs an allowlisted command in the sandbox. |
 | `process_execution` | 2 | Sandboxed subprocess through the same `CommandService` lifecycle `shell_execution` uses. An approved `process` action is **not** relayed — it records the decision only. |
 | `web_fetch` | 2 | Fetch one page under the owner **blocklist** (`RAIKER_WEB_EGRESS_BLACKLIST` plus the rules stored in Settings → Web access) and a non-optional public-address guard: HTTPS only, no credential in the URL, every resolved address public, re-checked on each redirect and pinned. |
+| `telemetry_export` | 2 | Delivers governed events to an owner-named OpenTelemetry collector as OTLP log records (compatibility backlog #18). Its own gate rather than a corner of `audit_export`, because that writes a file beside the log and this leaves the machine. **Metadata by default** — the identifiers and the type, every one a column on `events_index`, and never the summary, which names the object an action acted on. Redacted content is one explicit per-destination opt-in, through the same `redact_event_payload` the screen passes. The credential is an environment-variable *name*, read at send time and never stored; a named-but-absent variable fails closed. The cursor advances only on a delivery that landed, and is insertion order rather than the event id, so nothing is skipped or repeated inside one second. Inert until the owner names a destination. |
 | `graph_indexing_runtime` | 3 | Builds the local code graph index. |
 | `semantic_memory_runtime` | 3 | Local semantic memory search. |
 | `vector_embedding_runtime` | 3 | Local deterministic embedding (hashing trick; no model download / no network): `embed` persists a `vector_records` row, `list` counts, `search` ranks stored local-model vectors by cosine (returns ids+scores). Metadata-only artifacts; source text/query never emitted. |
@@ -166,14 +167,17 @@ that has no installed supervisor still fails closed.*
 
 ### Governance capabilities
 
-`admin_mutation`, `policy_mutation`, `role_mutation`, `audit_export` have no separate
-executor; they are governed mutations handled through the authority path.
+`admin_mutation`, `policy_mutation` and `role_mutation` have no separate executor;
+they are governed mutations handled through the authority path.
 
-`audit_export` is worth naming separately: `raiker/events/export.py` produces a
-redacted export manifest and the store keeps it, but **no REST route surfaces
-it**, so an owner cannot take the audit out of the product from the dashboard
-today. Recorded as high-priority, low-effort work in
-[Reference platform compatibility §5](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-low-effort).
+`audit_export` is worth naming separately: it **does** have an executor and a
+route now (`AuditExportExecutor`, `POST /api/audit/export`), so it appears in the
+real-executor table above. `raiker/events/export.py` produces the redacted export
+manifest the executor writes.
+
+Its sibling `telemetry_export` sends the same governed record over OTLP to an
+owner-named collector instead of writing a file beside the log — see
+[the telemetry-export threat model](../threat-models/telemetry-export.md).
 
 ### Gate names that are not executor capabilities
 
@@ -212,7 +216,7 @@ switches an owner could hold on or off changed nothing at all
 ([FIXED-280](../plans/FIXED_ITEMS.md)).
 
 [`raiker/runtime/authority/entry_paths.py`](../../raiker/runtime/authority/entry_paths.py)
-records the answer for all forty-five, and it is the source the DTO and the web
+records the answer for all forty-six, and it is the source the DTO and the web
 UI read:
 
 | Value | Meaning | Example |

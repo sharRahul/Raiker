@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
@@ -11,6 +12,7 @@
     McpOffer,
     McpServer,
     McpSession,
+    McpToolDeclaration,
     Notification,
   } from "../apiTypes";
 
@@ -99,6 +101,31 @@
       action: "Change the decision mode in",
     };
   });
+
+  /**
+   * One line for what a tool takes. Required names first, optional after the
+   * separator, so the shape reads without a legend.
+   *
+   * The three ways a tool can have no declared arguments are three different
+   * facts and are worded as three, because "no arguments" for a tool that takes
+   * two is the kind of quiet wrongness this whole surface exists to avoid.
+   */
+  function declaredArguments(s: McpServer, tool: string): string {
+    const d: McpToolDeclaration | undefined = s.tool_declarations.find((e) => e.name === tool);
+    if (!d) return "Run Test to read what this takes";
+    if (!d.has_schema) {
+      if (d.schema_reason === "too_large") return "Declaration too large to carry";
+      if (d.schema_reason === "not_an_object_schema") return "Declaration not usable";
+      return "No arguments declared";
+    }
+    const required = d.required.filter((name) => d.arguments.includes(name));
+    const optional = d.arguments.filter((name) => !d.required.includes(name));
+    if (!required.length && !optional.length) return "Takes no arguments";
+    const parts: string[] = [];
+    if (required.length) parts.push(required.join(", "));
+    if (optional.length) parts.push(`optional: ${optional.join(", ")}`);
+    return parts.join(" · ");
+  }
 
   function reason(e: unknown): string {
     if (e instanceof ApiError) {
@@ -274,11 +301,12 @@
   });
 </script>
 
+<!-- The tab strip above already says "MCP servers", and the panel is named by
+     it, so a heading here said the page's own name a second time and a
+     paragraph explained it a third. What an MCP server is belongs in the guide;
+     this page opens with its own state. -->
 <div class="header">
-  <div>
-    <h2>MCP Servers</h2>
-    <p>Build, connect, and monitor governed local or remote MCP servers for this workspace.</p>
-  </div>
+  <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
   <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
 </div>
 
@@ -442,7 +470,6 @@
         <div class="tools">
           <span class="tools-label">Tools ({s.tool_count})</span>
           {#if s.tools.length}
-            {#each s.tools as tool (tool)}<span class="chip">{tool}</span>{/each}
             <!-- The one thing the card could not previously say: whether the
                  agent can actually call these. -->
             {#if s.status === "connected" && s.monitor_state === "active"}
@@ -456,6 +483,30 @@
             <span class="muted">Run Test to discover this server's tools.</span>
           {/if}
         </div>
+        <!-- BUG-234 — Raiker speaks the current revision and uses one part of
+             it. A server offering more used to be connected with none of that
+             said anywhere, which is the one thing this surface must not do. -->
+        {#if s.unsupported_features.length}
+          <ul class="unsupported">
+            {#each s.unsupported_features as f (f.feature)}
+              <li><span class="feature">{f.feature}</span> {f.note}</li>
+            {/each}
+          </ul>
+        {/if}
+        <!-- Backlog #16 (MCP half) — the name and what it takes, on one line
+             each. This replaced a row of name chips: the chips said what was
+             here and could not say what any of it took, so a server whose tools
+             declare their arguments looked identical to one whose tools do not. -->
+        {#if s.tools.length}
+          <dl class="declared">
+            {#each s.tools as tool (tool)}
+              <div>
+                <dt>{tool}</dt>
+                <dd>{declaredArguments(s, tool)}</dd>
+              </div>
+            {/each}
+          </dl>
+        {/if}
         <div class="monitor">
           <span class="tools-label">Recent sessions</span>
           {#if sessions[s.server_id]?.length}
@@ -477,8 +528,6 @@
 
 <style>
   .header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
-  .header h2 { font-size: 1.25rem; margin: 0; }
-  .header p { color: var(--text-2); margin: 0.2rem 0 0; }
   .icon { display: grid; place-items: center; border: 0; background: transparent; color: var(--text-2); padding: 0.45rem; cursor: pointer; }
   .notice { display: flex; align-items: center; gap: 0.5rem; margin-bottom: var(--space-3); }
   .notice a { color: var(--accent); font-weight: 600; }
@@ -506,6 +555,13 @@
   .monitor { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
   .monitor-banner { margin: var(--space-3) 0 0; }
   .finding { font-size: .75rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--danger-soft); color: var(--danger); border: 1px solid var(--danger-border); }
+  .unsupported { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: grid; gap: 0.2rem; }
+  .unsupported li { font-size: 0.76rem; color: var(--text-3); }
+  .unsupported .feature { font-family: var(--font-mono, monospace); color: var(--text-2); }
+  .declared { margin: var(--space-2) 0 0; display: grid; gap: 0.25rem; }
+  .declared div { display: flex; gap: 0.5rem; flex-wrap: wrap; font-size: 0.78rem; }
+  .declared dt { font-family: var(--font-mono, monospace); color: var(--text-2); }
+  .declared dd { margin: 0; color: var(--text-3); }
   .tools-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
   .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
   .muted { color: var(--text-3); font-size: 0.8rem; }

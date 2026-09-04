@@ -131,6 +131,7 @@ _ENTRIES: tuple[CapabilityEntry, ...] = (
     # ── Reached by the control plane ───────────────────────────────────────
     _own("approval_execution_relay", ENTRY_CONTROL_PLANE),
     _own("audit_export", ENTRY_CONTROL_PLANE),
+    _own("telemetry_export", ENTRY_CONTROL_PLANE),
     _own("mcp_builder_runtime", ENTRY_CONTROL_PLANE),
     _own("mcp_connector_runtime", ENTRY_CONTROL_PLANE, ENTRY_LOCAL_ADMISSION),
     _own("external_channel_runtime", ENTRY_CONTROL_PLANE),

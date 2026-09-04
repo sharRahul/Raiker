@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
 | 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
 | 2026-09-03 | Targeted + full responsive sweep | `bug-256-`, `pages/` | Anthropic, key entered through the interface | Dictation running with nothing leaving the machine, a locked load that refuses nothing, and every page measured at four widths in both themes |
 | 2026-08-30 | Targeted + measured responsive sweep | `b13-`, `bug-239-`, `bug-245-`, `ui-sweep-` | Anthropic (`claude-haiku-4-5-20251001`), key entered through the interface | The repository on screen in Build, Permissions telling the truth about an untouched gate, a cited exchange that opens — and every route *measured* at three widths rather than photographed |
@@ -1098,6 +1099,102 @@ chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
 ---
 
+## 2026-09-04 (second) — Five priority items, and two defects the sweep found in itself
+
+**Tier: targeted + measured four-width sweep.** Production web build, a workspace
+reset through `scripts/reset_live_workspace.py`, and one provider: Anthropic,
+with the same **identity-linked** key entered through the Connect dialog. No key
+appears in this repository.
+
+**What it proved.**
+
+1. **Every route at 390, 768, 1280 and 1920**, measured rather than photographed
+   — and the check learned one thing about its own scope on the way: SVG has its
+   own layout model, so `clientWidth` on a graph label is not a content box and
+   comparing it to `scrollWidth` reported the knowledge map's own rendering as a
+   page-layout defect. The bleed check is HTML-only, stated in the spec:
+   the document never scrolls sideways, no element bleeds out of a `visible` box,
+   every control has an accessible name, and — new this round — **no control
+   draws nothing**. `e2e/ui-sweep-widths-live.spec.ts` is that check; the two
+   extremes are captured to [`screenshots/widths/`](screenshots/widths).
+2. **The round's key connected through the interface**, and the refusal read as
+   itself. `e2e/anthropic-key-live.spec.ts` connects it, opens the model picker,
+   and asserts the dialog names the workspace requirement rather than
+   reachability.
+3. **Declared MCP tool arguments, on the card.** The reviewed echo template was
+   built and connected through the interface; the card reads `echo · text` and
+   `workspace_ping · Takes no arguments`, negotiated on revision `2026-07-28`.
+   Before this round the same card was a row of name chips and the model had to
+   guess `text`. Evidence: `backlog-16-mcp-declared-arguments.png`.
+4. **Governed events reaching a real OpenTelemetry collector.** A local OTLP/HTTP
+   receiver on `127.0.0.1:4318` was added through **Observability → Overview**,
+   and three **Deliver now** runs landed **166 records**. The last run carried 5
+   — only what was new — which is the cursor doing its job. Every record carried
+   identifiers and an event type; the received bodies contain **no summary and no
+   path**, which is metadata-only asserted against the wire rather than against
+   the encoder. Evidence: `backlog-18-otlp-collector.png`.
+5. **An `http` hook, granted and refused, on one card.** The host ran with
+   `RAIKER_HOOK_EGRESS_ALLOWLIST=127.0.0.1:*` and a project rule declaring two
+   `http` handlers. Both parse and both match; the Hooks tab shows the granted
+   destination as `advisory` and says of the other *"this host is not in
+   RAIKER_HOOK_EGRESS_ALLOWLIST — it will refuse every time it matches"*. The
+   grant is read live, so revoking it needs no file edit and no restart.
+   Evidence: `bug-226-http-hook-grant.png`.
+6. **The working-method control appears only where Build can work.** On Tasks
+   outside a project there is no *How to work* group at all, because Build's
+   method is a repository it can read. Evidence:
+   `backlog-23-task-surface.png`.
+7. Each of the five items also carries its own unit and API coverage, and every
+   surface they changed was walked at all four widths with no console error.
+
+**What it found**, all fixed in this change rather than deferred:
+
+* **The model picker said "Provider unreachable" about a provider that had just
+  answered in full.** `testNote` has read the server's classification since
+  BUG-272; `pickerNote` switched on status alone and threw it away — and the
+  picker is the control on the path an owner actually walks. Closed as
+  [FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered).
+* **Settings named itself twice, and the round's own new switch named itself not
+  at all.** Settings opened with a heading and a sentence the topbar had already
+  said; `telemetry_export` landed on Permissions with no `CAPABILITY_COPY` entry,
+  so a gate that reaches the network read as *"Governed capability."* in **Other
+  tools**. Both closed as
+  [FIXED-385](FIXED_ITEMS.md#fixed-385--two-surfaces-named-themselves-twice-and-a-new-switch-named-itself-not-at-all),
+  the second with a test: the label map is prose and cannot be derived from the
+  registry, so it is the pair that drifts, and the first capability added after
+  the pair existed drifted it.
+* **A hook rule pushed its own card past a 390px window.** A grid item's default
+  `min-width: auto` refuses to shrink below its content, so one unbreakable
+  string — an `http` handler's URL — carried the card four pixels wide. Found by
+  the sweep on the very rule this round added, which is the sweep doing its job
+  on new work rather than on old.
+* **Two path fields taught a shape that cannot exist on this host.** `D:\Models`
+  and `D:\Raiker Backups` were hardcoded placeholders on a product that ships for
+  three platforms. Caught by reading the sweep's own screenshots, which is what
+  capturing them is for — no assertion can tell a wrong example from a right one.
+  Closed as
+  [FIXED-384](FIXED_ITEMS.md#fixed-384--two-path-fields-taught-a-shape-that-cannot-exist-on-two-of-three-platforms).
+* **The composer's model control was a blank circle below 1024px whenever no
+  model was chosen** — which is the state a fresh install is always in. The
+  narrow-width rule hides the label and the chevron and leaves the provider logo;
+  with no model there is no logo. Closed as
+  [FIXED-383](FIXED_ITEMS.md#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen),
+  and the sweep now fails on the whole class rather than on this instance:
+  reverting the one-line fix makes it fail on Chat and Build at 390 and 768.
+
+**What it could not prove.** A real provider *turn*. The key is identity-linked
+and authenticating needs the workspace id itself, which only the key's owner has
+— and the key cannot be asked for it: `/v1/organizations/*` answers a key of this
+kind with `403`.
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+stays open for that reason, unchanged: it is waiting on a value, not on code.
+
+**Screenshots:** [`screenshots/widths/`](screenshots/widths) — every route at 390
+and 1920 — and `anthropic-identity-linked-key.png` in
+[`screenshots/working/`](screenshots/working).
+
+---
+
 ## 2026-09-04 — Identity-linked key, and the sweep at four widths
 
 **Tier: targeted + full responsive sweep.** Production web build, a workspace
@@ -1127,7 +1224,7 @@ dialog. No key appears in this repository.
 6. Every route captured and rendered in explicit light and dark themes, no
    console error, no page repeating the topbar's own sentence.
 
-**What it found**, both fixed in this change rather than deferred:
+**What it found**, all fixed in this change rather than deferred:
 
 * The guidance for a workspace refusal was wired to the *save*, which never
   contacts the provider. Two paths actually meet it — the readiness check with a

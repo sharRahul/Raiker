@@ -88,7 +88,7 @@ from raiker.security.containment import (
 )
 from raiker.security.injection_scan import InjectionScanner
 from raiker.tools.broker import ToolBroker
-from raiker.tools.mcp_tools import mcp_tool_specs
+from raiker.tools.mcp_tools import is_mcp_tool, mcp_tool_specs
 from raiker.tools.presentation import tool_row
 from raiker.verification.models import VerificationResult
 from raiker.verification.verifier import Verifier
@@ -337,10 +337,11 @@ class RuntimeOrchestrator:
         always did. What changes is only what every request has to pay for.
         """
         store = getattr(self.tool_broker, "store", None)
-        return [
-            *project_specs(self.tool_specs, revealed=frozenset(self._revealed_tools)),
-            *mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
-        ]
+        return project_specs(
+            self.tool_specs,
+            revealed=frozenset(self._revealed_tools),
+            mcp_specs=mcp_tool_specs(self.workspace_root, store, self.tool_broker.principal_id),
+        )
 
     def _reveal_searched_tools(self, action: ToolAction, result: ToolResult) -> None:
         """Keep what a `tool_search` returned callable for the rest of the turn.
@@ -354,7 +355,10 @@ class RuntimeOrchestrator:
             return
         for entry in (result.output or {}).get("tools", []) or []:
             name = str(entry.get("name", "")) if isinstance(entry, dict) else ""
-            if name in DEFERRABLE_TOOL_NAMES:
+            # A projected MCP tool is revealable on the same terms: the name
+            # came back from the search's own result, and calling it still
+            # passes the connector gate, the decision mode and containment.
+            if name in DEFERRABLE_TOOL_NAMES or is_mcp_tool(name):
                 self._revealed_tools.add(name)
 
     # ── C6/C4: the turn's source ledger ──────────────────────────────────────

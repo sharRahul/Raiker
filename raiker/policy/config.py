@@ -60,6 +60,10 @@ class StaticPolicyConfig:
             "checkpoint_restore", "checkpoint_restore_execution",
             # BUG-231 — the redacted, account-scoped audit export.
             "audit_export",
+            # Backlog #18 — the same record, over OTLP, to a collector the owner
+            # named. Listed here for the same reason every other capability is:
+            # one in neither set is hard-denied on its way to its own executor.
+            "telemetry_export",
             "process",
             "graph_indexing", "semantic_memory", "vector_embedding", "model_provider",
             "plugin_install", "plugin_execution_cap", "plugin_revocation_cap",

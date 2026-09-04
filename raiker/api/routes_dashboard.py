@@ -1677,6 +1677,7 @@ async def create_task(
             project_id=body.project_id,
             model_profile=body.model_profile,
             model=body.model,
+            surface=body.surface,
             attachments=body.attachments,
         )
     except ValueError as exc:

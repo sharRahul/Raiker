@@ -98,6 +98,11 @@ RUNTIME_DOMAIN_CAPABILITIES = {
     "mcp_builder_runtime",
     "mcp_connector_runtime",
     "audit_export",
+    # Compatibility backlog #18 — governed events over OTLP to an owner-named
+    # collector. Its own capability rather than a corner of `audit_export`,
+    # because the two differ in the one way that matters: an export writes a file
+    # beside the log, and this one reaches the network.
+    "telemetry_export",
     # B9 — the repository code map: a local, derived symbol index over the
     # repository Build points at.
     #
@@ -196,7 +201,10 @@ def default_capability_gates() -> dict[str, CapabilityGate]:
     # Tier-2 capability is: it reaches the network. The branch and the commit
     # beside it stay local and stay Tier 1.
     _TIER2_EXECUTED_CAPS = ("shell_execution", "process_execution", "web_fetch",
-                            "git_push_execution")
+                            "git_push_execution",
+                            # Backlog #18 — Tier 2 for the reason the rest are:
+                            # it leaves the machine.
+                            "telemetry_export")
     for name in _TIER2_EXECUTED_CAPS:
         gates[name] = CapabilityGate(
             name, 2, CapabilityState.DISABLED,

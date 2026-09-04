@@ -68,6 +68,28 @@ Raiker warns before approval that the particular change cannot be rewound. Git
 commits and pushes are recovered with Git or the remote host, not with Raiker's
 file checkpoint mechanism.
 
+### Sending the record to your own tools
+
+**Overview → Can I see this outside Raiker?** sends governed events to an
+OpenTelemetry collector you name — the same record you read on this page, on a
+wire your existing dashboards already watch.
+
+Add a collector with its OTLP endpoint (`http://127.0.0.1:4318`). By default a
+record carries identifiers and an event type and nothing else; **Send redacted
+event payloads too** adds the payload, redacted exactly as this screen is. If
+your collector needs an `Authorization` header, give the **name** of an
+environment variable holding it — never the value, which Raiker will not accept
+or store.
+
+**Deliver now** sends everything that collector has not had yet. There is no
+background sender: nothing leaves until you ask, so the card's *Last run* is the
+only thing that says how current your collector is. A run that fails re-sends next
+time rather than skipping what it could not deliver, and the card says how many
+events have gone and how the last run went.
+
+Turning the payload option off stops future payloads. It cannot reach into a
+collector and remove what already went.
+
 ## Memory and knowledge
 
 Durable memory changes are proposed from Chat or Build. You see the exact text

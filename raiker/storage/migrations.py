@@ -3672,3 +3672,96 @@ APPROVAL_DECISION_SCOPE_MIGRATION_ID = "RAIKER-2050-approval-decision-scope"
 APPROVAL_DECISION_SCOPE_SQL = """
 ALTER TABLE approvals ADD COLUMN decision_scope_json TEXT;
 """
+
+
+# Backlog #16 (MCP half) — a projected MCP tool had no arguments.
+#
+# Discovery stored tool *names* and dropped the rest of `tools/list`, so every
+# `mcp__server__tool` reached the model as one untyped `arguments` object and a
+# sentence Raiker wrote itself. The model had to guess field names, and the
+# server's own account of what its tool does never entered the turn.
+#
+# This column carries the bounded declaration — title, description and the
+# sanitised `inputSchema` — one JSON array per server, written by the same
+# handshake that already writes `tools`. It is deliberately a separate column
+# rather than a richer `tools`: `tools` is the projection's membership check and
+# is read on every turn, and a build that has not run this migration must keep
+# working from it.
+MCP_TOOL_SCHEMAS_MIGRATION_ID = "RAIKER-2051-mcp-tool-schemas"
+
+MCP_TOOL_SCHEMAS_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN tool_schemas TEXT;
+"""
+
+
+# BUG-234 — a connected server could offer more than Raiker uses, silently.
+#
+# Raiker speaks the current MCP revision and uses one part of it: tools. A
+# server that also offers resources, prompts, logging or completions — or that
+# answers over an SSE stream, or requires an OAuth authorisation Raiker does not
+# perform — was connected with none of that said anywhere. "Either supported or
+# named on its card as unsupported, never silently degraded" is the rule this
+# column exists to keep.
+#
+# It holds names and observations only: the capability keys the server declared
+# in its own `initialize` result, plus what the transport was seen doing. Never
+# a payload, a resource, or a token.
+MCP_SERVER_FEATURES_MIGRATION_ID = "RAIKER-2052-mcp-server-features"
+
+MCP_SERVER_FEATURES_SQL = """
+ALTER TABLE mcp_servers ADD COLUMN server_features TEXT;
+"""
+
+
+# Compatibility backlog #18 — the record had nowhere to go.
+#
+# Raiker records strictly more per governed action than the reference platforms
+# export: the decision, its source, the gate that admitted it, the approval that
+# carried it. All of it stayed inside the product. Cowork exports six event types
+# over OpenTelemetry; Raiker exported none, because it had no wire — not because
+# it had nothing to say.
+#
+# One row per owner-configured destination. It holds where to send, a *name* for
+# where the credential lives, whether the owner opted into content, and how far
+# the export has got. It never holds a credential, and never holds an event.
+TELEMETRY_DESTINATIONS_MIGRATION_ID = "RAIKER-2053-telemetry-destinations"
+
+TELEMETRY_DESTINATIONS_SQL = """
+CREATE TABLE IF NOT EXISTS telemetry_destinations (
+  destination_id TEXT PRIMARY KEY,
+  principal_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  endpoint_url TEXT NOT NULL,
+  header_ref TEXT,
+  include_content INTEGER NOT NULL DEFAULT 0,
+  enabled INTEGER NOT NULL DEFAULT 1,
+  cursor_timestamp TEXT,
+  cursor_event_id TEXT,
+  cursor_seq INTEGER,
+  last_status TEXT,
+  last_attempt_at TEXT,
+  exported_count INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_telemetry_destinations_owner_name
+  ON telemetry_destinations(principal_id, name);
+"""
+
+
+# Compatibility backlog #23 — a delegating parent could not say where a child runs.
+#
+# BUG-220 gave a parent ownership of its children's terminal states: it parks as
+# `waiting_for_children` and settles when the last one lands. What it could not
+# do is say *how* a child should work. Every task cycle ran with Chat's standing
+# instructions, so a child whose job is "read this repository, make the change,
+# run the tests" was given the assistant's working method for it.
+#
+# `surface` is the missing half: `chat` or `build`, per task, chosen by whoever
+# created it — the owner on the Tasks board, or the parent's own turn through
+# `create_task`. It selects the standing instructions the cycle runs under and
+# nothing else: the same runtime, the same tools, the same governance.
+TASK_SURFACE_MIGRATION_ID = "RAIKER-2054-task-surface"
+
+TASK_SURFACE_SQL = """
+ALTER TABLE tasks ADD COLUMN surface TEXT NOT NULL DEFAULT 'chat';
+"""

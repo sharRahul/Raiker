@@ -152,10 +152,14 @@ from raiker.storage.migrations import (
     MCP_PROTOCOL_VERSION_SQL,
     MCP_REMOTE_ENDPOINT_MIGRATION_ID,
     MCP_REMOTE_ENDPOINT_SQL,
+    MCP_SERVER_FEATURES_MIGRATION_ID,
+    MCP_SERVER_FEATURES_SQL,
     MCP_SERVER_RUNTIME_MIGRATION_ID,
     MCP_SERVER_RUNTIME_SQL,
     MCP_SERVERS_MIGRATION_ID,
     MCP_SERVERS_SQL,
+    MCP_TOOL_SCHEMAS_MIGRATION_ID,
+    MCP_TOOL_SCHEMAS_SQL,
     MEMORY_ARCHIVE_MIGRATION_ID,
     MEMORY_ARCHIVE_SQL,
     MEMORY_AUDIT_RATE_LIMIT_MIGRATION_ID,
@@ -353,8 +357,12 @@ from raiker.storage.migrations import (
     TASK_ATTACHMENTS_SQL,
     TASK_MODEL_CHOICES_MIGRATION_ID,
     TASK_MODEL_CHOICES_SQL,
+    TASK_SURFACE_MIGRATION_ID,
+    TASK_SURFACE_SQL,
     TASK_THREAD_SESSION_MIGRATION_ID,
     TASK_THREAD_SESSION_SQL,
+    TELEMETRY_DESTINATIONS_MIGRATION_ID,
+    TELEMETRY_DESTINATIONS_SQL,
     TEXT_SEARCH_FTS4,
     TEXT_SEARCH_FTS5,
     TEXT_SEARCH_FTS5_MIGRATION_ID,
@@ -1544,6 +1552,26 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 APPROVAL_DECISION_SCOPE_MIGRATION_ID,
                 APPROVAL_DECISION_SCOPE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MCP_TOOL_SCHEMAS_MIGRATION_ID,
+                MCP_TOOL_SCHEMAS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                MCP_SERVER_FEATURES_MIGRATION_ID,
+                MCP_SERVER_FEATURES_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TELEMETRY_DESTINATIONS_MIGRATION_ID,
+                TELEMETRY_DESTINATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TASK_SURFACE_MIGRATION_ID,
+                TASK_SURFACE_SQL,
                 connection,
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
@@ -4050,7 +4078,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
     @staticmethod
     def _mcp_row(row: sqlite3.Row) -> dict[str, Any]:
         data = dict(row)
-        for key in ("command", "tools"):
+        for key in ("command", "tools", "tool_schemas", "server_features"):
             raw = data.get(key)
             try:
                 data[key] = json.loads(raw) if isinstance(raw, str) else []
@@ -4070,6 +4098,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         status: str = "created",
         last_connected_at: str | None = None,
         tools: list[str] | None = None,
+        tool_schemas: list[dict[str, Any]] | None = None,
+        server_features: list[str] | None = None,
         endpoint_url: str | None = None,
         auth_ref: str | None = None,
         protocol_version: str | None = None,
@@ -4085,13 +4115,15 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         the owner token lives (never the token itself).
         """
         tool_list = list(tools) if tools is not None else None
+        declarations = list(tool_schemas) if tool_schemas is not None else None
         with self.connect() as connection:
             connection.execute(
                 """INSERT OR REPLACE INTO mcp_servers
                    (server_id, principal_id, name, command, template, transport,
                     status, created_at, last_connected_at, tools, tool_count,
-                    endpoint_url, auth_ref, protocol_version)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    endpoint_url, auth_ref, protocol_version, tool_schemas,
+                    server_features)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     server_id,
                     principal_id,
@@ -4107,6 +4139,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     endpoint_url,
                     auth_ref,
                     protocol_version,
+                    json.dumps(declarations) if declarations is not None else None,
+                    json.dumps(list(server_features)) if server_features is not None else None,
                 ),
             )
         return server_id
@@ -4118,6 +4152,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         *,
         status: str,
         tools: list[str] | None = None,
+        tool_schemas: list[dict[str, Any]] | None = None,
+        server_features: list[str] | None = None,
         last_connected_at: str | None = None,
         protocol_version: str | None = None,
     ) -> bool:
@@ -4134,6 +4170,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         the projected tool set, which is built from exactly that list (BUG-12).
         """
         tool_list = list(tools) if tools is not None else None
+        declarations = list(tool_schemas) if tool_schemas is not None else None
         with self.connect() as connection:
             cursor = connection.execute(
                 """UPDATE mcp_servers
@@ -4141,6 +4178,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                        last_connected_at = ?,
                        tools = COALESCE(?, tools),
                        tool_count = COALESCE(?, tool_count),
+                       tool_schemas = COALESCE(?, tool_schemas),
+                       server_features = COALESCE(?, server_features),
                        protocol_version = COALESCE(?, protocol_version)
                    WHERE server_id = ? AND principal_id = ?""",
                 (
@@ -4148,6 +4187,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     last_connected_at,
                     json.dumps(tool_list) if tool_list is not None else None,
                     len(tool_list) if tool_list is not None else None,
+                    json.dumps(declarations) if declarations is not None else None,
+                    json.dumps(list(server_features)) if server_features is not None else None,
                     protocol_version,
                     server_id,
                     principal_id,
@@ -7233,8 +7274,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, attachments_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -7257,6 +7298,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.project_id,
                     task.model_profile,
                     task.model,
+                    task.surface,
                     json.dumps(task.attachments, sort_keys=True),
                 ),
             )
@@ -7271,6 +7313,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             attachments = []
         data["attachments"] = attachments if isinstance(attachments, list) else []
         return TaskRecord(**data)
+
+    def load_task_for_thread_session(self, session_id: str) -> TaskRecord | None:
+        """The task whose own conversation is *session_id*, if there is one.
+
+        Backlog #23 — this is how a delegating turn's parent is *derived* rather
+        than supplied. A cycle runs in its task's thread (C11), so the running
+        task is a fact about the session the broker already trusts; taking a
+        `parent_task_id` from the model instead would let one turn attach work to
+        somebody else's tree.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM tasks WHERE thread_session_id = ? LIMIT 1", (session_id,)
+            ).fetchone()
+        return self._task_from_row(row) if row is not None else None
 
     def load_task(self, task_id: str) -> TaskRecord | None:
         with self.connect() as connection:
@@ -9338,6 +9395,156 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 "SELECT * FROM audit_exports WHERE export_id = ?", (export_id,)
             ).fetchone()
         return dict(row) if row else None
+
+    # ── Telemetry destinations (compatibility backlog #18) ───────────────
+    #
+    # Owner-scoped rows describing where governed events may be exported to.
+    # A row holds an endpoint, the *name* of the environment variable an auth
+    # header lives in, whether the owner opted into content, and how far the
+    # export has got. It never holds a credential, and never holds an event.
+
+    def create_telemetry_destination(
+        self,
+        *,
+        destination_id: str,
+        principal_id: str,
+        name: str,
+        endpoint_url: str,
+        header_ref: str | None = None,
+        include_content: bool = False,
+    ) -> str:
+        with self.connect() as connection:
+            connection.execute(
+                """INSERT INTO telemetry_destinations
+                   (destination_id, principal_id, name, endpoint_url, header_ref,
+                    include_content, enabled, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, 1, ?)""",
+                (
+                    destination_id,
+                    principal_id,
+                    name,
+                    endpoint_url,
+                    header_ref,
+                    1 if include_content else 0,
+                    utc_now(),
+                ),
+            )
+        return destination_id
+
+    @staticmethod
+    def _telemetry_row(row: sqlite3.Row) -> dict[str, Any]:
+        data = dict(row)
+        data["include_content"] = bool(data.get("include_content", 0))
+        data["enabled"] = bool(data.get("enabled", 1))
+        return data
+
+    def list_telemetry_destinations(self, principal_id: str) -> list[dict[str, Any]]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM telemetry_destinations WHERE principal_id = ?"
+                " ORDER BY created_at DESC",
+                (principal_id,),
+            ).fetchall()
+        return [self._telemetry_row(row) for row in rows]
+
+    def get_telemetry_destination(
+        self, destination_id: str, principal_id: str
+    ) -> dict[str, Any] | None:
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM telemetry_destinations"
+                " WHERE destination_id = ? AND principal_id = ?",
+                (destination_id, principal_id),
+            ).fetchone()
+        return self._telemetry_row(row) if row else None
+
+    def set_telemetry_destination_enabled(
+        self, destination_id: str, principal_id: str, enabled: bool
+    ) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE telemetry_destinations SET enabled = ?"
+                " WHERE destination_id = ? AND principal_id = ?",
+                (1 if enabled else 0, destination_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_telemetry_destination(self, destination_id: str, principal_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM telemetry_destinations"
+                " WHERE destination_id = ? AND principal_id = ?",
+                (destination_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def record_telemetry_attempt(
+        self,
+        destination_id: str,
+        principal_id: str,
+        *,
+        status: str,
+        exported: int = 0,
+        cursor_timestamp: str | None = None,
+        cursor_event_id: str | None = None,
+        cursor_seq: int | None = None,
+    ) -> bool:
+        """Record the outcome of one export run.
+
+        The cursor only moves on a delivery that actually landed, so a failed
+        run re-sends rather than skipping the events it could not deliver.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                """UPDATE telemetry_destinations
+                   SET last_status = ?,
+                       last_attempt_at = ?,
+                       exported_count = exported_count + ?,
+                       cursor_timestamp = COALESCE(?, cursor_timestamp),
+                       cursor_event_id = COALESCE(?, cursor_event_id),
+                       cursor_seq = COALESCE(?, cursor_seq)
+                   WHERE destination_id = ? AND principal_id = ?""",
+                (
+                    status,
+                    utc_now(),
+                    max(0, exported),
+                    cursor_timestamp,
+                    cursor_event_id,
+                    cursor_seq,
+                    destination_id,
+                    principal_id,
+                ),
+            )
+            return cursor.rowcount > 0
+
+    def events_after_cursor(
+        self, *, after_timestamp: str | None, after_seq: int | None, limit: int
+    ) -> list[dict[str, Any]]:
+        """Indexed events newer than the cursor, oldest first, each with a ``seq``.
+
+        Ordered by ``(timestamp, rowid)`` and **not** by timestamp alone.
+        ``utc_now()`` truncates to whole seconds, so a busy turn writes several
+        events inside one; a cursor on the timestamp alone would either re-send
+        that whole second every run or skip the part of it that arrived after
+        the cursor was written. The rowid is insertion order, which is exactly
+        the order the append-only log was written in, so it breaks the tie the
+        way the log itself does.
+
+        The event id is deliberately *not* the tie-breaker: it is a random
+        UUID, so an event appended a moment later inside the same second could
+        sort before the cursor and be silently skipped. An export that quietly
+        loses events is the one failure this whole surface exists to avoid.
+        """
+        query = "SELECT rowid AS seq, * FROM events_index"
+        params: list[Any] = []
+        if after_timestamp:
+            query += " WHERE (timestamp > ? OR (timestamp = ? AND rowid > ?))"
+            params.extend([after_timestamp, after_timestamp, after_seq or 0])
+        query += " ORDER BY timestamp ASC, rowid ASC LIMIT ?"
+        params.append(max(1, limit))
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
 
     def get_last_event_sha256(self, session_id: str) -> str | None:
         """The hash of the event this session's next event follows.

@@ -74,7 +74,7 @@ from raiker.tools.git import (
 )
 from raiker.tools.graph_tools import knowledge_graph
 from raiker.tools.language_tools import diagnostics, document_symbols, find_definition
-from raiker.tools.mcp_tools import is_mcp_tool, mcp_call
+from raiker.tools.mcp_tools import is_mcp_tool, mcp_call, mcp_tool_specs
 from raiker.tools.memory_tools import (
     memory_get,
     memory_list,
@@ -231,7 +231,13 @@ class ToolBroker:
             # Backlog #16 — the schema of a tool this request did not carry.
             # In-process, store-free and network-free: it reads the registry
             # Raiker ships. It grants nothing, so it needs nothing.
-            "tool_search": lambda args: search_tools(str(args.get("query", ""))),
+            "tool_search": lambda args: search_tools(
+                str(args.get("query", "")),
+                # This turn's projected MCP tools are searchable too, resolved
+                # from the same discovery the projection uses so a search can
+                # never return a tool the turn could not have been offered.
+                mcp_specs=mcp_tool_specs(self.workspace_root, self.store, self.principal_id),
+            ),
             "diff_files": lambda args: diff_files(
                 self.workspace_root,
                 str(args.get("before_path", ".")),
@@ -717,6 +723,23 @@ class ToolBroker:
         # is created, so they must agree on what a title-only proposal means:
         # a task to do what its title says.
         objective = str(args.get("description", "")).strip() or title
+        surface = str(args.get("surface", "chat")).strip().lower() or "chat"
+        # Backlog #23 — the parent is *derived* from the session this turn is
+        # running in, never taken from the model's arguments. A task's cycles run
+        # in its own thread (C11), so "which task is running" is a fact the
+        # broker already trusts; accepting a `parent_task_id` from a tool call
+        # would let one turn attach work to somebody else's tree.
+        parent = (
+            self.store.load_task_for_thread_session(context.session_id)
+            if self.store is not None
+            else None
+        )
+        # A build child inherits its parent's project, because that is the
+        # repository the brief is about. Naming another one is not the model's
+        # to do.
+        project_id = str(args["project_id"]) if args.get("project_id") else None
+        if parent is not None and project_id is None:
+            project_id = parent.project_id
         try:
             task = service.create_task(
                 title=title,
@@ -726,7 +749,9 @@ class ToolBroker:
                 scheduled_at=str(args["scheduled_at"]) if args.get("scheduled_at") else None,
                 reminder_at=str(args["reminder_at"]) if args.get("reminder_at") else None,
                 recurrence=str(args["recurrence"]) if args.get("recurrence") else None,
-                project_id=str(args["project_id"]) if args.get("project_id") else None,
+                project_id=project_id,
+                parent_task_id=parent.task_id if parent is not None else None,
+                surface=surface,
                 start_immediately=False,
             )
         except ValueError as exc:
@@ -735,6 +760,8 @@ class ToolBroker:
             "status": "success",
             "receipt": {"kind": "task", "title": task.title, "href": "#/tasks", "label": "Review in Tasks"},
             "task_id": task.task_id,
+            "surface": task.surface,
+            "parent_task_id": task.parent_task_id,
         }
 
     def _execution_profiles(self) -> list[ExecutionProfile]:

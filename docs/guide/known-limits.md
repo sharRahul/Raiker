@@ -109,12 +109,21 @@ confinement, sandboxing, or critical holds.
   hook rules, disabled-by-default skills, and offered—not automatically
   connected—MCP servers.
 - Raiker negotiates MCP revision `2026-07-28` and accepts three older revisions,
-  but implements a bounded subset. Streamable-HTTP behavior, remote OAuth,
-  `server/discover`, and MCP Apps are not available.
-- Raiker's own built-in tools beyond a core set are deferred: the model is told
-  every name and fetches the schema with `tool_search`. A connected MCP server's
-  tools are **not** deferred — they are projected in full, so a server with a
-  very large catalogue still costs the turn its whole tool list.
+  but implements a bounded subset. A response sent as an event stream is read
+  whole rather than streamed, and there is no resumability, no server-initiated
+  message, no remote OAuth flow, no `server/discover`, and no MCP Apps. A server
+  offering any of those is **named on its card** as offering something Raiker
+  does not use, rather than connecting as though it were fully supported.
+- Tools beyond a core set are deferred: the model is told every name and fetches
+  the schema with `tool_search`. A connected MCP server's tools join the same
+  rule under a size budget — a small catalogue is carried, a large one is
+  deferred whole and still named, so nothing is hidden and no server costs a turn
+  its entire tool list.
+- What an MCP tool takes is whatever its server declared, bounded before Raiker
+  carries it: a declaration deeper than six levels, wider than 48 properties, or
+  larger than 8 KB is dropped whole and the tool falls back to an open object,
+  which the server's card says. A `$ref` pointing outside its own document is
+  dropped.
 
 ## Voice and interaction
 

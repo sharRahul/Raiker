@@ -16,6 +16,27 @@ function server(partial: Partial<McpServer> = {}): McpServer {
     last_connected_at: "2026-07-17T01:00:00Z",
     tools: ["echo", "workspace_ping"],
     tool_count: 2,
+    unsupported_features: [],
+    tool_declarations: [
+      {
+        name: "echo",
+        title: "Echo",
+        description: "Return the text it was given.",
+        has_schema: true,
+        schema_reason: "",
+        arguments: ["text", "uppercase"],
+        required: ["text"],
+      },
+      {
+        name: "workspace_ping",
+        title: "",
+        description: "",
+        has_schema: false,
+        schema_reason: "not_declared",
+        arguments: [],
+        required: [],
+      },
+    ],
     endpoint_url: null,
     auth_ref: null,
     monitor_state: "active",
@@ -66,6 +87,56 @@ describe("McpView", () => {
     expect(screen.getByText("Connected")).toBeInTheDocument();
     expect(screen.getByText("workspace_ping")).toBeInTheDocument();
     expect(screen.getByText(/python .raiker\/mcp\/servers\/echo.py/)).toBeInTheDocument();
+  });
+
+  // Backlog #16 (MCP half) — the card showed a row of tool-name chips and
+  // nothing else, so a server whose tools declare their arguments looked
+  // identical to one whose tools do not, and the owner could not tell whether
+  // the model was calling them with real arguments or with guesses.
+  it("says what each connected tool takes, and which declared nothing", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server()],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await screen.findByText("echo-server");
+
+    expect(screen.getByText("text · optional: uppercase")).toBeInTheDocument();
+    expect(screen.getByText("No arguments declared")).toBeInTheDocument();
+  });
+
+  it("says a connection has not been tested rather than implying no arguments", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [server({ tool_declarations: [] })],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await screen.findByText("echo-server");
+
+    expect(screen.getAllByText("Run Test to read what this takes")).toHaveLength(2);
+  });
+
+  // BUG-234 — a server offering more of the protocol than Raiker uses was
+  // connected with none of that said anywhere.
+  it("names what a connected server offers that Raiker does not use", async () => {
+    stubFetch({
+      "GET /api/mcp/servers": [
+        server({
+          unsupported_features: [
+            { feature: "resources", note: "Raiker reads this server's tools only." },
+          ],
+        }),
+      ],
+      "GET /api/capability-gates": ENABLED_GATES,
+      ...monitorRoutes(),
+    });
+    render(McpView);
+    await screen.findByText("echo-server");
+
+    expect(screen.getByText("resources")).toBeInTheDocument();
+    expect(screen.getByText(/reads this server's tools only/)).toBeInTheDocument();
   });
 
   // A closed connector gate produced two amber notices one under the other,

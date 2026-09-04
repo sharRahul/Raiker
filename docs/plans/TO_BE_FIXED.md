@@ -81,11 +81,11 @@ names.
 | [MEM-08](FIXED_ITEMS.md#fixed-316--every-turn-coordinate-was-a-dead-end) | Medium | Memory reliability | **Closed 2026-08-29 (FIXED-316)** — a turn coordinate opens the exchange. With it, every MEM entry raised by the 2026-08-11 memory audit is closed: MEM-06 as FIXED-241, MEM-07 as FIXED-284, MEM-09 as FIXED-310, MEM-10 as FIXED-283/292/293/294. |
 | [BUG-220](FIXED_ITEMS.md#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open) | Medium | Tasks / delegation | **Closed 2026-08-25 (FIXED-286)** — a parent parks as `waiting_for_children` and settles on the last child. Its routing half is now [backlog #23](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) |
 | [BUG-225](FIXED_ITEMS.md#fixed-298--a-paired-channel-could-still-only-record-a-message) | Medium → Low | Channels / extensibility | **Closed 2026-08-27 (FIXED-298)** — owner-stored routing and exact, single-use approval responses now ship; record-only remains the default |
-| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced 2026-08-28; `prompt` closed as FIXED-303, while `http`, `mcp_tool` and `agent` remain refused |
+| [BUG-226](#bug-226--three-of-the-five-hook-handler-types-do-not-exist) | Low | Hooks / handlers | Open remainder — reduced again 2026-09-04; `prompt` closed as FIXED-303 and `http` as [FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two), while `mcp_tool` and `agent` stay refused with their reasons |
 | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Low | Plugins / language intelligence | **Closed 2026-09-03 (FIXED-366)** — its first question was a scope decision, and the answer is no: Raiker does not want an LSP client. B10's tool set ships without one and both plugin specs state what that costs |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced 2026-08-23 (FIXED-274). The revision is current; streamable HTTP, remote OAuth, MCP Apps and `server/discover` remain |
+| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced again 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)). The transport conforms and the card names what a server offers and Raiker does not use; SSE streaming, remote OAuth, MCP Apps and `server/discover` remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
@@ -96,6 +96,7 @@ names.
 | [BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | **Closed 2026-08-30 (FIXED-323)** — one `anchors` column, built from the tool result the runtime read, and a link per exchange |
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
+| [BUG-276](#bug-276--governed-events-only-leave-when-somebody-presses-a-button) | Low | Observability / telemetry export | Open — raised 2026-09-04 while closing backlog item 18. The export is on-demand only; the honest shape for a cadence is a routine over the scheduler that already exists, not a second daemon beside it |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — raised 2026-09-03. The round's supplied key is identity-linked ([FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)), so no provider turn could run; three scenarios are written and are waiting on a key that authenticates |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -432,12 +433,14 @@ and evidence moved to the closed-work ledger.
 **Observed.** The hooks reference Raiker maps itself against documents five
 handler types: `command`, `http`, `mcp_tool`, `prompt` and `agent`. Before
 FIXED-303, `HANDLER_TYPES` accepted only `command` and Raiker's own `builtin`.
-It now also accepts a bounded `prompt`; a rule naming `http`, `mcp_tool` or
-`agent` is still refused at parse time, which is the right failure until each
-has a governed resource path.
+It now also accepts a bounded `prompt` and, since
+[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two),
+an `http` handler behind a named, revocable egress grant. A rule naming
+`mcp_tool` or `agent` is still refused at parse time, which is the right failure
+until each has a governed resource path.
 
-The title originally undercounted four missing types. After FIXED-303 it is now
-accurate: three remain — `http`, `mcp_tool` and `agent`.
+The title has undercounted twice and is kept as raised. After FIXED-303 three
+remained; after FIXED-380, **two** — `mcp_tool` and `agent`.
 
 **Corrected 2026-08-22.** This entry used to say `command` is the only handler
 type Claude Code's own hooks have, and that the gap was therefore against
@@ -467,10 +470,19 @@ does not have:
 
 **Completed first slice.** FIXED-303 adds `prompt` with a per-handler token
 budget and timeout, the owner-selected governed provider, no tools, no nesting,
-redacted bounded event data and advisory-only output. `http` follows only once a
-hook can be given a named, revocable egress grant of the kind the container work
-already built. `mcp_tool` and `agent` should stay refused until there is a stated
-answer to a hook reaching authority the turn did not have.
+redacted bounded event data and advisory-only output.
+
+**Completed second slice (2026-09-04).**
+[FIXED-380](FIXED_ITEMS.md#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two)
+adds `http` behind exactly the grant this entry named:
+`RAIKER_HOOK_EGRESS_ALLOWLIST`, empty by default, revoking every `http` rule at
+once when cleared, read live by the Hooks page, and refusing with the host in the
+reason. It sends the same bounded, redacted event body the `prompt` handler
+already sends, from the same function; a remote responder can deny or ask and can
+never permit, and a non-2xx is not a deny.
+
+`mcp_tool` and `agent` stay refused until there is a stated answer to a hook
+reaching authority the turn did not have.
 
 **Not a regression, and visible today.** A rule naming an unsupported type is
 refused at parse time rather than accepted and ignored, and the Hooks tab reports
@@ -552,13 +564,23 @@ refuses a revision it does not implement rather than continuing on a framing it
 cannot trust. **Extensions → MCP** states the revision each server negotiated.
 Closed as [FIXED-274](FIXED_ITEMS.md).
 
+**Reduced again 2026-09-04**
+([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)).
+The transport now conforms where a real server would have refused it: `Accept`
+carries both framings (a conformant server may answer 406 to a POST offering only
+JSON), a session is released with `DELETE`, a dropped session re-handshakes once,
+and a `401` with `WWW-Authenticate` is named as the OAuth requirement it is
+rather than as a network failure. **The interface outcome below is met**: what a
+connected server offers and Raiker does not use is named on its card.
+
 **What is left.** Negotiating a revision is not implementing it. Each of the
 following was previously *blocked* by the version pin and is now ordinary work:
 
-* **Streamable HTTP session semantics.** Raiker's `http` transport is its own
-  bounded JSON-RPC client. It carries `Mcp-Session-Id` and the
-  `MCP-Protocol-Version` header, and it is not the specification's transport: no
-  SSE stream, no resumability, no server-initiated messages.
+* **Streamable HTTP streaming.** Raiker's `http` transport is its own bounded
+  JSON-RPC client. It reads an `text/event-stream` answer whole rather than
+  streaming it, and holds no open connection between turns: no incremental
+  delivery, no resumability, no server-initiated messages. A server that answers
+  this way is **named as such on its card** rather than silently degraded.
 * **Remote OAuth.** The authorisation flow the current revision defines. Raiker's
   remote transport takes an owner token from an env var named by `auth_ref`.
 * **MCP Apps ([SEP-1865](https://modelcontextprotocol.io/seps/1865-mcp-apps-interactive-user-interfaces-for-mcp)).**
@@ -577,7 +599,10 @@ rather than implied.
 **Interface outcome that has to be true before this closes.** A connected server
 that offers a `ui://` resource, an SSE stream, or an OAuth authorisation
 requirement is either supported or **named on its card as unsupported** — never
-silently degraded.
+silently degraded. **Met 2026-09-04 (FIXED-378):** the server's own `initialize`
+capabilities and what its transport was observed doing are stored as feature
+names and rendered as one sentence each, and a capability Raiker has never heard
+of is still named by its own key rather than dropped for not being on a list.
 
 ---
 
@@ -911,6 +936,15 @@ surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
 
+**Re-attempted 2026-09-04 (second round), and still blocked on the same value.**
+The key was connected through the interface again and the refusal now reads as
+itself on the picker as well as under **Test**
+([FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered)).
+What was also established this round is that **the id cannot be recovered from
+the key**: `/v1/organizations/me` and `/v1/organizations/workspaces` answer a key
+of this kind with `403`, so there is no path from the credential to the workspace
+it acts in. Nothing further is Raiker's to build.
+
 **Reduced 2026-09-04.** The fix is still not code *in the product* — that half
 is done. [FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)
 gives the connection a **Workspace ID**, so the identity-linked key supplied for
@@ -925,3 +959,45 @@ npx playwright test --project=live e2e/priority-round-real-turn-live.spec.ts
 
 The spec skips itself when the variable is unset, so it neither fails CI nor
 claims a scenario it did not run.
+
+---
+
+## BUG-276 — Governed events only leave when somebody presses a button
+
+**Severity: Low. Area: Observability / telemetry export. Status: Open — raised
+2026-09-04, while closing
+[backlog item 18](FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it).**
+
+**Observed.** `telemetry_export` delivers governed events to an owner-named OTLP
+collector, and it delivers them **only on demand**: **Deliver now** on the
+destination's card, or `POST /api/telemetry/destinations/{id}/export`. There is
+no background sender. Events accumulate behind the cursor until someone looks,
+which the card states honestly (`N delivered`, `Last run …`) rather than implying
+a live feed.
+
+For the use this exists for that is half a wire. An owner running Raiker beside
+a dashboard wants the record to *arrive*, and a collector that receives only
+while its operator is watching is not something a dashboard can be built on.
+
+**Why it shipped this way, and why that was right.** The alternative on the table
+was a daemon, and this codebase has refused one before for the same reason:
+`scheduled_routines` is an on-demand runner and the retention sweep
+([FIXED-284](FIXED_ITEMS.md)) is an owner-confirmed action, both deliberately.
+A background process that reaches the network on a timer is a different security
+object from a button, and it needs its own answer to: what happens when the
+collector is unreachable for a day, what bounds the retry, and what the owner
+sees while it is failing. None of those were worth guessing at to make a first
+version feel finished.
+
+**Proposed fix.** The scheduler already exists and already runs governed work on
+a cadence a task carries. A delivery is a governed action with an executor, so
+the honest shape is a **routine** — an owner-created schedule that runs the
+export, visible on the Tasks board like every other recurring thing, with its
+failures landing in the same places every other task's do. That reuses the
+cadence, the pause switch, the notifications and the audit trail rather than
+inventing a second scheduler beside them.
+
+**Interface outcome that has to be true before this closes.** A destination
+either states the cadence it is delivered on, or states that it is delivered only
+on demand. It must never be possible to read the card and believe events are
+flowing when nothing has run since the owner last pressed the button.

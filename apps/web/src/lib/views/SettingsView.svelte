@@ -13,6 +13,7 @@
   import WebAccess from "./settings/WebAccess.svelte";
   import GitCredential from "./settings/GitCredential.svelte";
   import Updates from "./settings/Updates.svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import { SETTINGS_SECTIONS as SECTIONS } from "../settingsSections";
 
@@ -111,7 +112,15 @@
   onMount(load);
 </script>
 
-<header class="settings-header"><h2>Settings</h2><p>Manage your preferences, notifications, security, account, and runtime configuration.</p></header>
+<!-- The topbar already says "Settings" and lists what is here. Repeating both
+     as a heading and a sentence made this the one page that named itself twice
+     before showing anything — Models, Tasks and Extensions all open with a
+     single guide link instead, and this now matches them. The heading stays for
+     the landmark; the sentence's job belongs to the guide. -->
+<header class="settings-header">
+  <h2 class="sr-only">Settings</h2>
+  <GuideLink route="settings" />
+</header>
 
 {#if loadError}
   <PageState state="error" title="Couldn't load settings" detail={loadError} />
@@ -179,9 +188,7 @@
 </div>
 
 <style>
-  .settings-header { margin-bottom: var(--space-5); }
-  .settings-header h2 { margin: 0 0 .25rem; font-size: var(--text-display); }
-  .settings-header p { margin: 0; color: var(--text-2); }
+  .settings-header { margin-bottom: var(--space-4); }
   .save-status {
     min-height: 0;
     margin-bottom: var(--space-3);

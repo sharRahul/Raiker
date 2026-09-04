@@ -78,6 +78,7 @@ CAPABILITY_GATE_MAP: dict[str, str] = {
     "memory_write": "memory_write_execution",
     "memory_forget": "memory_forget_execution",
     "audit_export": "audit_export",
+    "telemetry_export": "telemetry_export",
     "checkpoint_restore": "checkpoint_restore_execution",
     "checkpoint_restore_execution": "checkpoint_restore_execution",
     # BUG-62 — the two local planning mutations. Naming them here is what gives

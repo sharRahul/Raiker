@@ -51,10 +51,20 @@ To create one:
 4. **Test** connects and discovers tools. The echo template exposes `echo` and
    `workspace_ping`.
 
-Each server card shows its command, template, last connection, discovered tools,
-and recent monitored sessions. Controls: **Test**, **Stop** / **Resume**,
-**Rename**, **Delete**. Stop is an instant containment switch — it refuses all
-sessions for that connection and is revocable.
+Each server card shows its command, template, last connection, and recent
+monitored sessions. It lists each discovered tool on a line with what that tool
+takes — `echo · text · optional: uppercase` — read from the server's own
+declaration. A tool that takes nothing says so; one whose server declared nothing
+says *No arguments declared*, which is a different fact and is worded as one.
+
+The card also names anything that server offers and Raiker does not use —
+resources (including any `ui://` interface), prompt templates, a log stream, or
+an event-stream transport Raiker reads whole rather than streaming. A server
+offering only tools shows nothing there.
+
+Controls: **Test**, **Stop** / **Resume**, **Rename**, **Delete**. Stop is an
+instant containment switch — it refuses all sessions for that connection and is
+revocable.
 
 ### Can Raiker actually call it?
 
@@ -81,12 +91,15 @@ registered server runs code Raiker does not own, which is why the call carries
 the same risk band as a connector read.
 
 A connected server's tools are projected into the turn on top of Raiker's own
-core set. Raiker's built-in tools beyond that core are **deferred**: the model is
-told every name and fetches the schema it wants with `tool_search`, which keeps a
-long tool list from spending the context window before the turn starts. That is a
-context decision, not a permission one — a deferred tool is refused by nothing
-and reached in one call. The **Context** panel in either composer says how many
-are sent and how many are on request.
+core set, each with the arguments its server declared. Tools beyond that core are
+**deferred**: the model is told every name and fetches the schema it wants with
+`tool_search`, which keeps a long tool list from spending the context window
+before the turn starts. Your MCP tools follow the same rule under a size budget —
+a small catalogue rides along, a large one is deferred whole and still named, so
+one server with two hundred tools cannot crowd out your prompt. That is a context
+decision, not a permission one: a deferred tool is refused by nothing and reached
+in one call. The **Context** panel in either composer says how many are sent and
+how many are on request.
 
 ## Skills
 
@@ -283,6 +296,38 @@ action stricter and can never loosen one you set.
 optional `"if"` narrows further on the arguments — `"shell(rm -rf *)"` fires only
 for a command matching that glob. A malformed guard fails closed rather than
 widening the rule.
+
+### Handler types
+
+| Type | What it does |
+|---|---|
+| `builtin` | Raiker's own reviewed logic, so it always carries decision authority |
+| `command` | A bounded program inside your workspace, under a timeout |
+| `prompt` | One tool-free call to your selected model. Advisory context only — never a decision |
+| `http` | Posts the event to a URL you name, and reads a decision back |
+
+An `http` handler needs one more thing than a URL: the host must be in
+`RAIKER_HOOK_EGRESS_ALLOWLIST`.
+
+```json
+{ "id": "notify", "type": "http", "url": "https://hooks.example.com/raiker" }
+```
+
+```
+RAIKER_HOOK_EGRESS_ALLOWLIST=hooks.example.com,127.0.0.1:*
+```
+
+The list is empty until you set it, so adding an `http` rule — including one a
+plugin contributed — cannot by itself make a request leave your machine. Clearing
+it revokes every `http` rule at once without editing any hooks file, and the
+Hooks tab says which rules the grant does not cover. What leaves is the bounded,
+redacted event: the same thing a `prompt` handler sends to a model, with no
+credential and no identity attached. What comes back can deny or ask; it can
+never allow, and a failing endpoint is not a deny.
+
+`mcp_tool` and `agent` handlers are refused: reaching an MCP tool from a hook
+would let it use authority the turn itself might have been denied, and an agent
+handler needs its own budget and permissions before it could be governed at all.
 
 ### Turning them off
 

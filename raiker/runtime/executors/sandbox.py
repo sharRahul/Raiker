@@ -268,7 +268,15 @@ def post_json_rpc(
     if parsed.scheme not in ("http", "https") or not parsed.netloc:
         raise SandboxError("mcp_remote_invalid_endpoint")
     body = _json.dumps(payload).encode("utf-8")
-    merged = {"Content-Type": "application/json", "Accept": "application/json"}
+    # BUG-234 — the streamable HTTP transport requires a client to accept both
+    # framings on every POST. Raiker sent `application/json` alone for five
+    # revisions, which a conformant server is entitled to answer with 406 before
+    # reading the request at all: an owner adding a current server watched it
+    # fail with a bare status and nothing saying why.
+    merged = {
+        "Content-Type": "application/json",
+        "Accept": "application/json, text/event-stream",
+    }
     merged.update(headers or {})
     request = urllib.request.Request(  # noqa: S310 - scheme checked above
         url, data=body, method="POST", headers=merged,
@@ -293,6 +301,38 @@ def post_json_rpc(
         "headers": resp_headers,
         "truncated": truncated,
     }
+
+
+def delete_mcp_session(
+    url: str, *, headers: dict[str, str] | None = None, timeout: float = 15.0
+) -> int:
+    """End a streamable-HTTP MCP session (BUG-234).
+
+    The specification says a client SHOULD send `DELETE` with its
+    `Mcp-Session-Id` when it is finished, so the server can release what it held
+    for that session. Raiker never did, so every bounded session it opened
+    against a remote server leaked one server-side session record.
+
+    Best-effort by design: the governed read already succeeded by the time this
+    runs, and a server that answers 405 (it does not allow clients to end
+    sessions) is behaving exactly as the specification permits. Returns the
+    status, or 0 when the request could not be made at all.
+    """
+    import urllib.error
+    import urllib.request
+    from urllib.parse import urlparse
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return 0
+    request = urllib.request.Request(url, method="DELETE", headers=headers or {})  # noqa: S310
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as resp:  # noqa: S310
+            return int(resp.status if hasattr(resp, "status") else 200)
+    except urllib.error.HTTPError as exc:
+        return int(exc.code)
+    except Exception:  # noqa: BLE001 - ending a session must never fail the read
+        return 0
 
 
 def post_json_url(

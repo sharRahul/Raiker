@@ -18,6 +18,7 @@ acknowledging.
 |---|---|
 | `approval_execution_relay` | [Approval execution relay](approval-execution-relay.md) |
 | `audit_export` | [Audit export](audit-export.md) |
+| `telemetry_export` | [Telemetry export](telemetry-export.md) |
 | Critical approvals (human-only, step-up verified) | [Critical approval lifecycle](critical-approval-lifecycle.md) |
 | `file_write_execution`, `patch_apply_execution` | [Workspace file mutation](workspace-file-mutation.md) |
 | `checkpoint_restore_execution` | [Checkpoint restore and rewind](checkpoint-restore.md) |
@@ -116,13 +117,17 @@ nothing to model until one is proposed. See
 ## Coverage — every capability with a real executor has one
 
 Re-derived **2026-08-23** by comparing `REAL_EXECUTOR_CAPABILITIES`
-(`raiker/runtime/executors/__init__.py`) against the index above.
-**All forty-five are covered**, and every one is reachable from a table on this
-page rather than only by knowing a filename.
+(`raiker/runtime/executors/__init__.py`) against the index above, and again
+**2026-09-04** when `telemetry_export` made it forty-six.
+**All forty-six are covered**, and every one is reachable from a table on this
+page rather than only by knowing a filename. The count is not maintained by
+care: `test_every_real_executor_capability_has_a_threat_model` fails the suite
+for a capability added without one, which is how the forty-sixth got its
+document the same day it got its executor.
 
 **A threat model is not the same as a reachable path**, and the 2026-08-24 trace
 ([GEP-04](../plans/GOVERNANCE_ENTRY_PATHS.md)) is what made the difference
-checkable: nine of the forty-five have a real executor that no product path
+checkable: nine of them have a real executor that no product path
 reaches, and five more have their work governed by a control other than their own
 gate. Each keeps its threat model for the reason it keeps its gate — the day
 something reaches one of them, the analysis is what is already there.

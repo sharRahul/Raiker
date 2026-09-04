@@ -124,6 +124,7 @@ class TaskManager:
         model: str | None = None,
         attachments: list[dict[str, object]] | None = None,
         thread_session_id: str | None = None,
+        surface: str = "chat",
     ) -> TaskRecord:
         now = utc_now()
         task = TaskRecord(
@@ -144,6 +145,7 @@ class TaskManager:
             project_id=project_id,
             model_profile=model_profile,
             model=model,
+            surface=surface,
             attachments=list(attachments or []),
         )
         self.store.insert_task(task)
@@ -158,12 +160,18 @@ class TaskManager:
                 "title": title,
                 "objective": objective,
                 "status": task.status,
+                # Backlog #23 — which working method this task's cycles run
+                # under, recorded so the audit trail states it rather than
+                # leaving it to be inferred from the standing instructions.
+                "surface": task.surface,
                 "attachments": task.attachments,
             },
         )
         self.writer.append(event)
         self._dispatch_task_hook(
-            "TaskCreated", task, {"parent_task_id": task.parent_task_id}
+            "TaskCreated",
+            task,
+            {"parent_task_id": task.parent_task_id, "surface": task.surface},
         )
         return task
 

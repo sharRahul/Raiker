@@ -129,7 +129,7 @@ kept out of the interactive list and reported in Diagnostics instead.
 |---|---|
 | Workspace | Audit export, Code map, Language intelligence, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
-| Network | Web fetch, Git push, External channels, Channel approval relay |
+| Network | Web fetch, Git push, Telemetry export, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
 | Connectors | GitHub, Gmail, Google Calendar, Slack, Calendar (local), Email drafts, Reminders, plugin lifecycle |
 | MCP | MCP builder, MCP connector |
@@ -212,7 +212,10 @@ entry landed with **FIXED-106**, so it turns on like any other Tier-1 capability
 Since **FIXED-270** it also has callers: Observability → Checkpoints, and
 `/checkpoints restore <id> --confirm`. **Audit export** is beside it for the same
 reason — a capability that had no executor at all until **FIXED-271**, and now
-answers to Observability → Audit log → Export.
+answers to Observability → Audit log → Export. **Telemetry export** is its
+sibling and sits in **Network** rather than beside it: they carry the same
+record, and an audit export writes a file beside the log while a telemetry
+export leaves the machine.
 Observability → Diagnostics lists them under *"Disabled / deferred
 capabilities"*.
 

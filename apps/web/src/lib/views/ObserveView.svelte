@@ -14,6 +14,7 @@
   import DiagnosticsView from "./DiagnosticsView.svelte";
   import WorkInActionView from "./WorkInActionView.svelte";
   import SessionsView from "./SessionsView.svelte";
+  import EmptyState from "../components/EmptyState.svelte";
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
@@ -371,7 +372,15 @@
     {#if notifications === null}
       <PageState state="loading" title="Loading notifications…" />
     {:else if notifications.length === 0}
-      <p class="quiet">Nothing has been raised yet.</p>
+      <!-- BUG-280 — the one tab in this hub that answered an empty list with a
+           bare grey line. Its five siblings, and every other list surface in the
+           product, use the shared empty state; this read as an unfinished page
+           rather than as a quiet one. Same component, same icon vocabulary. -->
+      <EmptyState
+        icon="bell"
+        title="Nothing has been raised"
+        body="Approvals, background work and containment write here when they need you."
+      />
     {:else}
       <ul class="notifications">
         {#each notifications as notification (notification.notification_id)}

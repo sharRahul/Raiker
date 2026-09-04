@@ -85,7 +85,7 @@ names.
 | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Low | Plugins / language intelligence | **Closed 2026-09-03 (FIXED-366)** — its first question was a scope decision, and the answer is no: Raiker does not want an LSP client. B10's tool set ships without one and both plugin specs state what that costs |
 | [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract) | Low | Plugins / web UI | Open — raised 2026-08-22, split out of BUG-221 |
 | [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in) | Low | Live test harness | **Closed 2026-08-30 (FIXED-324)** — every live spec with a sign-in function delegates to the shared helper. The per-spec password that stops two specs sharing a workspace is a different defect, [BUG-247](#bug-247--every-live-spec-brings-its-own-owner-password) |
-| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced again 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)). The transport conforms and the card names what a server offers and Raiker does not use; SSE streaming, remote OAuth, MCP Apps and `server/discover` remain |
+| [BUG-234](#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) | Medium → Low | MCP / interoperability | Open — reduced twice on 2026-09-04 ([FIXED-378](FIXED_ITEMS.md#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport), [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)). The transport conforms, the card names what a server offers and Raiker does not use, and every content-block shape a result may carry now reaches the model; SSE **streaming**, remote OAuth, MCP Apps and elicitation remain |
 | [GEP-02](GOVERNANCE_ENTRY_PATHS.md#gep-02--the-stop-switchs-scope-is-undefined-for-read-paths), [GEP-03](GOVERNANCE_ENTRY_PATHS.md#gep-03--nested_boundaries_architecturemd278-overstates-the-architecture) | Low | Governance architecture / documentation | Open — not duplicated here. GEP-02 is **an owner decision** and the helper now carries the answer at no cost |
 | [BUG-239](#bug-239--an-empty-gate-table-means-three-different-things) | Low | Capability gates / owner decision | Open remainder — the live half closed 2026-08-30 as [FIXED-322](FIXED_ITEMS.md#fixed-322--permissions-said-off-about-a-capability-that-would-have-run): Permissions now reports what the enforcing path answers. Unifying the three resolutions is still **an owner decision** |
 | [BUG-240](FIXED_ITEMS.md#fixed-292--semantic-memory-built-a-space-the-question-never-entered) | Medium → Low | Memory / retrieval | **Closed 2026-08-26 (FIXED-292, FIXED-294)** — both the provider half and the managed-file half ship; the row is kept so a reader arriving with the number is not left wondering |
@@ -96,13 +96,19 @@ names.
 | [BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | **Closed 2026-08-30 (FIXED-323)** — one `anchors` column, built from the tool result the runtime read, and a link per exchange |
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
-| [BUG-276](#bug-276--governed-events-only-leave-when-somebody-presses-a-button) | Low | Observability / telemetry export | Open — raised 2026-09-04 while closing backlog item 18. The export is on-demand only; the honest shape for a cadence is a routine over the scheduler that already exists, not a second daemon beside it |
-| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — raised 2026-09-03. The round's supplied key is identity-linked ([FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)), so no provider turn could run; three scenarios are written and are waiting on a key that authenticates |
+| [BUG-276](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button) | Low | Observability / telemetry export | **Closed 2026-09-04 ([FIXED-386](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button))** — a cadence on the host tick, under the same pause switch and the same governed route as the button. The entry's *routine* half was declined with a reason: a task cycle is a model turn, and delivery is not a model's judgement |
+| [BUG-277](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network) | **High** | Models / provider errors | **Closed 2026-09-04 ([FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network))** — raised on this round's first live press of **Test**. The identity-linked classifier matched three sentences the provider does not send, so FIXED-370 and FIXED-372 were both unreachable |
+| [BUG-278](FIXED_ITEMS.md#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were) | Medium | Extensions / accessibility | **Closed 2026-09-04 ([FIXED-389](FIXED_ITEMS.md#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were))** — met/unmet was carried by colour alone, so the rows contradicted their own counters and said nothing at all in greyscale |
+| [BUG-279](FIXED_ITEMS.md#fixed-390--three-surfaces-said-next-and-printed-a-full-timestamp) | Low | Web UI / time formatting | **Closed 2026-09-04 ([FIXED-390](FIXED_ITEMS.md#fixed-390--three-surfaces-said-next-and-printed-a-full-timestamp))** — `relativeTime` is a past formatter; three surfaces showing a future instant printed a locale string |
+| [BUG-280](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line) | Low | Web UI / consistency | **Closed 2026-09-04 ([FIXED-391](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line))** — the one list surface in the product that did not use the shared empty state |
+| [BUG-281](FIXED_ITEMS.md#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off) | Low | Documentation / capability defaults | **Closed 2026-09-04 ([FIXED-392](FIXED_ITEMS.md#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off))** — a docstring described the shipped gate table and called it the product; the account resolves `unset` to off |
+| [BUG-282](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | **Closed 2026-09-04 ([FIXED-393](FIXED_ITEMS.md#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier))** — the guide told owners semantic recall was half-built, nine days after FIXED-292 finished it |
+| [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — **a third round blocked on the same value, 2026-09-04**. The key supplied for this round is identity-linked too, and re-establishing that found [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network): Raiker had been answering the provider's actual refusal with "check your network" |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
-| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced 2026-08-30 to twenty; seven converted and re-run, three must keep their own |
+| [BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body) | Low | Live test harness | Open remainder — reduced again 2026-09-04 to **twelve**; eight more converted and each re-run against a used workspace, three must keep their own |
 | [BUG-249](FIXED_ITEMS.md#fixed-326--a-fixed_items-link-pointed-at-a-heading-that-does-not-exist) | Low | Documentation / CI | **Closed 2026-08-30 (FIXED-326)** — one line, and `test_docs_consistency` is green |
-| [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — raised 2026-08-30, the first thing found by actually running a round against one workspace |
+| [BUG-250](#bug-250--a-shared-live-workspace-carries-state-between-specs) | Low | Live test harness | Open — reduced 2026-09-04. Both halves of its proposal now exist: `requireFirstRunWorkspace` marks the four specs that need their own instance, and three re-runnability defects were found and fixed by running the round against one workspace |
 | [BUG-251](FIXED_ITEMS.md#fixed-352--every-path-an-owner-typed-was-a-path-they-had-to-know) | Medium | Web UI / file and folder selection | **Closed 2026-09-03 (FIXED-352)** — the host lists directory names and one `PathPicker` serves all four fields |
 | [BUG-252](FIXED_ITEMS.md#fixed-350--dropping-a-file-worked-in-one-place-and-was-ignored-in-four) | Low | Web UI / attachments | **Closed 2026-09-03 (FIXED-350)** — one drop target, on every surface that already accepted an upload |
 | [BUG-253](FIXED_ITEMS.md#fixed-353--reloading-the-page-signed-the-owner-out) | Medium | Authentication / web UI | **Closed 2026-09-03 (FIXED-353)** — an HttpOnly session cookie with a double-submit CSRF token and an origin check |
@@ -553,7 +559,8 @@ its own owner password, so two specs cannot share one workspace. That is
 ## BUG-234 — The remainder: what Raiker does not use of the MCP revision it now speaks
 
 **Severity: Low (was Medium). Area: MCP / interoperability.
-Status: Open — reduced 2026-08-23.**
+Status: Open — reduced 2026-08-23, again 2026-09-04 (transport), and again
+2026-09-04 (result shapes).**
 
 **What changed.** Raiker negotiated revision `2024-11-05` for five revisions,
 which meant a server implementing only the current one could not be connected at
@@ -587,9 +594,22 @@ following was previously *blocked* by the version pin and is now ordinary work:
   Sandboxed server-contributed UI, and the better answer to
   [BUG-228](#bug-228--a-plugin-panel-has-no-route-permission-or-accessibility-contract).
   Carried as [ADD-24](TO_BE_ADDED.md).
-* **Structured tool output, resource links, elicitation, `server/discover`.**
-  Elicitation in particular has nowhere to land until the mid-turn question
-  surface exists ([ADD-22](TO_BE_ADDED.md)).
+* ~~**Structured tool output and resource links.**~~ **Done 2026-09-04 —
+  [FIXED-387](FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six).**
+  Raiker read one of the six shapes a result may carry: the `text` of every
+  block. All five block types and `structuredContent` now reach the model, with
+  two rules that are governance rather than formatting — a `resource_link` is
+  *named and never followed*, because a tool result must not cause a read the
+  owner's policy never saw; and an inline image is named by media type and size
+  rather than decoded into the turn.
+* **Elicitation.** Its blocker is gone — the mid-turn question surface shipped as
+  [FIXED-308](FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant)
+  — and it is still not built. What it needs is an answer to *whose* question a
+  server's elicitation is: `ask_owner_question` carries no authority because
+  Raiker's own runtime raised it, and a question a connected server composes is a
+  different object.
+* **`server/discover`.** Not implemented, and not urgent: every server an owner
+  can add today is added by the owner naming it.
 
 **Why Low.** Nothing is broken and nothing is unreachable: every server Raiker
 could talk to before, it can still talk to, and a current-revision server now
@@ -665,7 +685,38 @@ a shared helper that knew one of the setup wizard's five stages.
 **Severity: Low. Area: live test harness. Status: Open remainder — raised
 2026-08-30 while closing [BUG-229](FIXED_ITEMS.md#fixed-324--thirty-seven-live-specs-each-carried-their-own-sign-in),
 reduced from twenty-seven to twenty the same day
-([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)).**
+([FIXED-328](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite)), and
+to **twelve** on 2026-09-04.**
+
+**2026-09-04 — eight more, each re-run against a *used* workspace.**
+`guide-surface`, `review-chat-surface`, `containment-surface`, `visual-refresh`,
+`knowledge-map-work`, `reference-graph`, `bug-69-local-model-library` and
+`bug-69-huggingface`. Re-running each against a workspace that already had an
+owner, a scan and a connection is what made the conversions evidence rather than
+substitutions: three of the eight failed *after* the sign-in, for reasons that
+were nothing to do with it, and each of those is a defect this round fixed rather
+than an assertion it relaxed —
+
+* `containment-surface` documented its seeding as a shell block for a person to
+  run by hand, so a round that did not run it met a red assertion about a list
+  that was empty *because the product was behaving correctly*. It now performs
+  its own precondition and skips with the reason when it cannot.
+* `bug-69-local-model-library` asserted `getByText("Raiker Live GGUF")` against
+  the whole page. Its own scan puts that name into every model picker on the
+  screen, so the assertion passed exactly once — on a workspace where nothing had
+  been scanned before — and then failed as a strict-mode violation naming four
+  elements. Scoped to the inventory the test is about.
+* `bug-69-huggingface` answered "no network to huggingface.co" with a
+  three-minute timeout on a click, and blamed the click. It now states the
+  precondition after the sign-in and the search have both actually happened, so
+  what it still verifies on such a host is real.
+
+**One conversion was reverted rather than committed unverified.**
+`c17-b14-recall-and-inline-diff-live` needs a provider that answers, and this
+round's key does not ([BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)).
+The rule this entry states — *a blind bulk edit would replace verified sign-ins
+with unverified ones* — applies to a careful edit that cannot be re-run just as
+much as to a blind one.
 
 **Observed.** Thirty-seven live specs delegate to `signInAsOwner`. Twenty-seven
 others sign in *inline* in a test body, and those copies are the ones BUG-229
@@ -675,7 +726,7 @@ described: several still key on the empty-workspace greeting.
 `all-pages-theme`, `observability`, `default-ollama`, `memory-knowledge-context`,
 `memory-semantic` and `memory-vector-index`. That found three pieces of drift
 nothing else would have, including a spec still driving a Vite dev server on port
-5174; they are recorded in FIXED-328. **Twenty are left**, and the reason they
+5174; they are recorded in FIXED-328. **Twelve are left** after the 2026-09-04 pass, and the reason they
 are left is unchanged.
 
 **Why they were left.** They vary in a way the function-shaped ones did not —
@@ -708,9 +759,38 @@ written from memory is exactly the drift it exists to catch.
 
 ## BUG-250 — A shared live workspace carries state between specs
 
-**Severity: Low. Area: live test harness. Status: Open — raised 2026-08-30, and
-it is the first thing found by actually running a round against one workspace
-rather than re-seeding one per spec.**
+**Severity: Low. Area: live test harness. Status: Open — reduced 2026-09-04.
+Raised 2026-08-30, and it is the first thing found by actually running a round
+against one workspace rather than re-seeding one per spec.**
+
+**2026-09-04 — both halves of the proposal below now exist.**
+
+**Half one: the specs that need their own instance say so.**
+`requireFirstRunWorkspace` in `hosted-provider.ts` reads the signal that *is*
+freshness rather than a proxy for it — a workspace with no owner offers "Confirm
+password" on the sign-in form, because the form is creating an account rather
+than unlocking one — and skips with a stated reason otherwise. Nothing is
+inferred from a file, a timestamp, or an environment variable a runner has to
+remember to set. It is on `bug-58-known-limits`, `workbench` and
+`review-first-run-honesty`; `wizard-workbench-composer` asks it once in a
+`beforeAll` instead, because its three tests share one owner and asking per test
+would answer *yes* once and *no* twice, skipping the two tests the file exists to
+run. `default-ollama` was re-read this pass and is **not** on the list: its
+assertions are that a runtime which is not installed is not named, which is as
+true on the fifth run as on the first.
+
+**Half two: three assertions were made re-runnable, and finding them was the
+point.** Each is recorded under
+[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
+because that is where the conversion that surfaced it lives: a seeding step that
+was a comment, an assertion scoped to the page instead of to the inventory it was
+about, and a missing network precondition reported as a three-minute timeout on a
+click.
+
+**What is left.** The same work, spec by spec, for the twelve files
+[BUG-248](#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
+still names — each of which has to be re-run against a used workspace to be
+worth anything, which is what makes this slow rather than difficult.
 
 **Observed.** With
 [FIXED-327](FIXED_ITEMS.md#fixed-327--the-setup-wizard-trapped-every-live-spec-after-the-first-one)
@@ -936,6 +1016,20 @@ surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
 
+**Re-attempted 2026-09-04 (third round), and still blocked on the same value —
+but the attempt was not wasted.** The key supplied for this round is
+identity-linked too: `/v1/models` answers it `400` with *"This API key is not
+scoped to a workspace…"*, and `/v1/organizations/me`, `/v1/organizations/workspaces`
+and `/v1/organizations/api_keys` all answer `403`, so the id is again not
+recoverable from the credential. What the attempt *did* find is
+[FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network):
+Raiker had been answering that exact refusal with *"Anthropic could not be
+reached. Check that it is running and reachable from this device."* Two rounds of
+repair — the classification (FIXED-370) and the Workspace ID field (FIXED-372) —
+were sitting behind three string literals the provider does not send, and only a
+third live attempt with a third key was ever going to show that. **The blocked
+scenario is expensive; the attempt is not.**
+
 **Re-attempted 2026-09-04 (second round), and still blocked on the same value.**
 The key was connected through the interface again and the refusal now reads as
 itself on the picker as well as under **Test**
@@ -963,6 +1057,27 @@ claims a scenario it did not run.
 ---
 
 ## BUG-276 — Governed events only leave when somebody presses a button
+
+**Closed 2026-09-04 as
+[FIXED-386](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button).**
+A destination carries a cadence drawn from the scheduler's own interval table,
+claimed exactly once on the host tick, under the same pause switch and the same
+governed route as **Deliver now**. The card states the cadence and the next run,
+or states that it is on demand only.
+
+**The entry's proposal was followed half way, and the other half was declined
+with a reason.** It asked for a *routine* on the Tasks board. The cadence, the
+pause switch and the audit trail are indeed the ones that already exist — that is
+what shipped. But a task cycle is a governed **turn**: a model reads a prompt and
+decides what to call. Putting a model in the path of "did the record leave the
+machine" makes delivery a judgement where it is arithmetic over a cursor, and
+every other authority path in this product keeps the model out. The record of
+that decision is in `deliver_due_telemetry`'s own docstring, where the next
+reader will be.
+
+The original entry follows, unchanged.
+
+---
 
 **Severity: Low. Area: Observability / telemetry export. Status: Open — raised
 2026-09-04, while closing

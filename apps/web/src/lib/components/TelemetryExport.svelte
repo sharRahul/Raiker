@@ -15,7 +15,7 @@
   import Icon from "./Icon.svelte";
   import { api, ApiError } from "../api";
   import { runtimeBlock } from "../capabilityModel";
-  import { relativeTime } from "../format";
+  import { relativeFuture, relativeTime } from "../format";
   import type { CapabilityGate, TelemetryDestination } from "../apiTypes";
 
   let destinations = $state<TelemetryDestination[] | null>(null);
@@ -104,6 +104,40 @@
     }
   }
 
+  /**
+   * BUG-276 — a card must never let you believe events are flowing when
+   * nothing has run since you last pressed the button. Either it names the
+   * cadence it is delivered on, or it says it is on demand only.
+   */
+  const CADENCES: readonly { id: string; label: string }[] = [
+    { id: "off", label: "On demand only" },
+    { id: "continuous", label: "Every 20 minutes" },
+    { id: "hourly", label: "Hourly" },
+    { id: "daily", label: "Daily" },
+    { id: "weekly", label: "Weekly" },
+  ];
+
+  function cadenceLabel(id: string): string {
+    // An unrecognised cadence is shown verbatim rather than read as "off": a
+    // schedule this build does not know is still a schedule the host is running.
+    return CADENCES.find((c) => c.id === id)?.label ?? `Every ${id}`;
+  }
+
+  async function setCadence(destination: TelemetryDestination, cadence: string) {
+    if (cadence === destination.delivery_cadence) return;
+    busy = destination.destination_id;
+    error = null;
+    notice = null;
+    try {
+      await api.setTelemetryCadence(destination.destination_id, cadence);
+      await load();
+    } catch (e) {
+      error = reason(e);
+    } finally {
+      busy = null;
+    }
+  }
+
   async function remove(destination: TelemetryDestination) {
     if (!confirm(`Remove “${destination.name}”? Nothing already delivered is affected.`)) return;
     busy = destination.destination_id;
@@ -124,8 +158,9 @@
 <section aria-labelledby="otlp-h" class="otlp">
   <h2 id="otlp-h" class="section-h">Can I see this outside Raiker?</h2>
   <p>
-    Governed events go to an OpenTelemetry collector as identifiers and an event type. Content is
-    off unless a destination opts in, and is redacted the same way this screen is.
+    Governed events go to an OpenTelemetry collector as identifiers and an event type — on a
+    cadence, or on demand. Content is off unless a destination opts in, and is redacted the same
+    way this screen is.
   </p>
 
   {#if block.kind !== "none"}
@@ -153,9 +188,27 @@
             {:else}
               <span>Never run</span>
             {/if}
+            {#if d.delivery_cadence !== "off" && d.next_delivery_at}
+              <span>Next {relativeFuture(d.next_delivery_at)}</span>
+            {/if}
             {#if d.header_ref}<span>Credential: ${d.header_ref}</span>{/if}
           </div>
           <div class="row">
+            <label class="cadence">
+              <span class="sr-only">Delivery cadence for {d.name}</span>
+              <select
+                value={d.delivery_cadence}
+                onchange={(e) => setCadence(d, (e.currentTarget as HTMLSelectElement).value)}
+                disabled={busy !== null || block.kind !== "none"}
+              >
+                {#each CADENCES as c (c.id)}
+                  <option value={c.id}>{c.label}</option>
+                {/each}
+                {#if !CADENCES.some((c) => c.id === d.delivery_cadence)}
+                  <option value={d.delivery_cadence}>{cadenceLabel(d.delivery_cadence)}</option>
+                {/if}
+              </select>
+            </label>
             <button
               type="button"
               class="btn btn-sm"
@@ -227,6 +280,7 @@
   .name { font-weight: 600; }
   .muted { color: var(--text-3); font-size: 0.78rem; }
   .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
+  .cadence select { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
   .error { color: var(--danger); }
   .notice { color: var(--text-2); }
   .notice a { margin-left: 0.35rem; }

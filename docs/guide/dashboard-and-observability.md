@@ -81,11 +81,17 @@ your collector needs an `Authorization` header, give the **name** of an
 environment variable holding it — never the value, which Raiker will not accept
 or store.
 
-**Deliver now** sends everything that collector has not had yet. There is no
-background sender: nothing leaves until you ask, so the card's *Last run* is the
-only thing that says how current your collector is. A run that fails re-sends next
-time rather than skipping what it could not deliver, and the card says how many
-events have gone and how the last run went.
+**Deliver now** sends everything that collector has not had yet. The cadence
+select beside it sends the same thing on a schedule — every 20 minutes, hourly,
+daily or weekly — and **On demand only** is the default. A card always says which
+it is on, and names its next run when it has one, so it can never let you believe
+events are flowing while nothing has run since you last pressed the button.
+
+A scheduled delivery is the same governed action the button is, so it answers to
+the same capability gate and appears in the log it exported. Pausing the host
+stops it, like every other kind of background work. A run that fails re-sends
+next time rather than skipping what it could not deliver, and you are told once
+when a collector starts failing and once when it recovers — not once per cycle.
 
 Turning the payload option off stops future payloads. It cannot reach into a
 collector and remove what already went.

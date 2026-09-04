@@ -43,6 +43,24 @@ MISSING_BODY = (
     'API key; send the id of the workspace this request acts in."},"request_id":null}'
 )
 
+# BUG-277 — what the provider *actually* sends, captured from a live 400 on
+# 2026-09-04. `MISSING_BODY` above was written from the header name and the
+# concept rather than from a response, and it shares not one phrase with this:
+# no "is required", no "identity-linked". Every literal the classifier matched
+# was therefore matched only by the test that invented it, and the real refusal
+# fell through to `provider_http_error:http_400` — which the Models page renders
+# as "could not be reached", sending the owner to debug a working network.
+#
+# Kept as the first fixture any change to this classification is measured
+# against. A body a provider was observed sending outranks one this repository
+# wrote down.
+LIVE_MISSING_BODY = (
+    '{"type":"error","error":{"type":"invalid_request_error","message":'
+    '"This API key is not scoped to a workspace, so this request must include the '
+    "anthropic-workspace-id header with the ID of the workspace to use. Add the header, "
+    'or use an API key that is scoped to a workspace."},"request_id":null}'
+)
+
 
 def _anthropic_profile() -> ModelProfile:
     return ModelProfile(
@@ -190,3 +208,75 @@ class TestTheOwnerIsToldWhichRepairToMake:
         from raiker.models.readiness import _is_workspace_invalid
 
         assert not _is_workspace_invalid(None)
+
+
+class TestTheRefusalIsClassifiedByWhatItMeansNotHowItIsWorded:
+    """BUG-277 — the classifier matched three sentences, and the provider sends
+    a fourth.
+
+    A live round pasted an identity-linked key into the Models page and was told
+    *"Anthropic could not be reached. Check that it is running and reachable from
+    this device."* The provider had answered in full and precisely; Raiker had
+    matched none of its literals and fallen back to `provider_http_error:http_400`,
+    for which no guidance exists.
+
+    Every repair FIXED-370 and FIXED-372 built was downstream of that match, so
+    the whole of it — the classification, the Workspace ID field, the remediation
+    naming that field — was unreachable for the message the provider sends.
+
+    A list of exact sentences is a bet that a message Raiker does not control
+    will keep its wording. The bet has been lost once, so the classification is
+    now the conjunction that survives rewording: the body names a workspace,
+    **and** says one is absent.
+    """
+
+    def test_the_body_the_provider_actually_sends_is_classified(self) -> None:
+        assert needs_workspace_id(400, LIVE_MISSING_BODY) is True
+        assert workspace_id_rejected(400, LIVE_MISSING_BODY) is False
+
+    def test_it_reaches_the_owner_as_a_repair_rather_than_a_status(self) -> None:
+        from raiker.models.providers.anthropic_messages import _map_status
+
+        exc = _map_status(400, model="m", body=LIVE_MISSING_BODY)
+        assert isinstance(exc, ProviderWorkspaceRequiredError)
+        assert provider_error_code(exc) == "provider_workspace_required:http_400"
+
+    @pytest.mark.parametrize("module", ["anthropic_messages", "openai_compatible"])
+    def test_both_providers_classify_it(self, module: str) -> None:
+        mapper = __import__(
+            f"raiker.models.providers.{module}", fromlist=["_map_status"]
+        )._map_status
+        assert isinstance(
+            mapper(400, model="m", body=LIVE_MISSING_BODY), ProviderWorkspaceRequiredError
+        )
+
+    def test_the_wording_it_used_to_match_still_matches(self) -> None:
+        """Widened, not replaced. A provider that goes back to the old phrasing,
+        or another that borrows it, is classified exactly as before."""
+        assert needs_workspace_id(400, MISSING_BODY) is True
+
+    def test_naming_a_workspace_is_not_enough_on_its_own(self) -> None:
+        """The conjunction is what keeps this from swallowing ordinary 400s.
+
+        Widening a match is normally the wrong direction; it is right here only
+        because both halves have to hold, so a 400 that merely mentions a
+        workspace keeps its own classification.
+        """
+        assert needs_workspace_id(400, '{"error":{"message":"your workspace is archived"}}') is False
+        assert needs_workspace_id(400, '{"error":{"message":"max_tokens is required"}}') is False
+
+    def test_a_rejected_id_still_wins_over_a_missing_one(self) -> None:
+        """The invalid body says "must be a valid workspace ID", which now
+        satisfies both halves of the missing test too. It is checked first, and
+        this is the test that keeps it checked first — asking again for a value
+        the owner already supplied is the one answer that helps nobody."""
+        assert needs_workspace_id(400, INVALID_BODY) is False
+        assert workspace_id_rejected(400, INVALID_BODY) is True
+
+    def test_nothing_from_the_live_body_reaches_the_code(self) -> None:
+        from raiker.models.providers.anthropic_messages import _map_status
+
+        body = LIVE_MISSING_BODY.replace("a workspace", "workspace wrkspc_secret9")
+        code = provider_error_code(_map_status(400, model="m", body=body))
+        assert code == "provider_workspace_required:http_400"
+        assert "secret9" not in code

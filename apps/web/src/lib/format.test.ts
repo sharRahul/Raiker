@@ -5,6 +5,7 @@ import {
   humanize,
   isRedacted,
   providerName,
+  relativeFuture,
   relativeTime,
   shortId,
 } from "./format";
@@ -18,6 +19,36 @@ describe("format helpers", () => {
     expect(relativeTime("2026-07-05T12:00:00Z", now)).toBe("2d ago");
     expect(relativeTime(null, now)).toBe("—");
     expect(relativeTime("not-a-date", now)).toBe("not-a-date");
+  });
+
+  // BUG-279 — `relativeTime` is a past formatter and says so honestly: a future
+  // instant fell through to a full locale string, so three surfaces showing a
+  // *next* run read "next cycle 9/4/2026, 7:17:29 PM" beside a "2m ago".
+  it("renders compact times that have not happened yet", () => {
+    const now = new Date("2026-07-07T12:00:00Z");
+    expect(relativeFuture("2026-07-07T12:00:30Z", now)).toBe("in under a minute");
+    expect(relativeFuture("2026-07-07T12:05:00Z", now)).toBe("in 5m");
+    expect(relativeFuture("2026-07-07T15:00:00Z", now)).toBe("in 3h");
+    expect(relativeFuture("2026-07-09T12:00:00Z", now)).toBe("in 2d");
+    expect(relativeFuture(null, now)).toBe("—");
+    expect(relativeFuture("not-a-date", now)).toBe("not-a-date");
+  });
+
+  it("calls a moment that has passed due rather than counting backwards", () => {
+    // A run whose slot has gone by and which has not happened yet is *due*.
+    // "in -3m" is not a thing anyone should read.
+    const now = new Date("2026-07-07T12:00:00Z");
+    expect(relativeFuture("2026-07-07T12:00:00Z", now)).toBe("due now");
+    expect(relativeFuture("2026-07-07T11:57:00Z", now)).toBe("due now");
+  });
+
+  it("mirrors relativeTime's thresholds exactly", () => {
+    // The two answer opposite questions and must not drift apart: a reader
+    // comparing "3h ago" with "in 3h" is comparing the same unit.
+    const now = new Date("2026-07-07T12:00:00Z");
+    expect(relativeFuture("2026-07-14T12:00:01Z", now)).toBe(
+      new Date("2026-07-14T12:00:01Z").toLocaleDateString(),
+    );
   });
 
   it("treats naive timestamps as UTC", () => {

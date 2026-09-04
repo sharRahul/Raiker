@@ -385,11 +385,18 @@
           {/if}
         </span>
       </p>
+      <!--
+        The mechanics of the index used to be three lines here: how many vectors
+        are ranked exactly, what happens past that, and when it rebuilds. None of
+        it is a decision the owner makes on this page, and the page already says
+        the only thing they act on — whether recall is matching meaning or words.
+        The full account moved to the guide's *Recall backend and token budget*,
+        which is where the rest of this page's reasoning already lives; what
+        stays is the one number a reader might want to check.
+      -->
       {#if settings.vector_search_strategy === "exact_then_approximate"}
         <p class="control-note">
-          Recall keeps a revision-checked index: it ranks up to {settings.vector_search_exact_limit ?? 512}
-          vectors exactly, then uses bounded approximate lookup with exact score re-ranking. The index
-          rebuilds whenever an eligible memory changes.
+          Ranks {settings.vector_search_exact_limit ?? 512} vectors exactly, then approximates.
         </p>
       {/if}
       <!-- MEM-10 — the select opposite can only offer spaces that already hold

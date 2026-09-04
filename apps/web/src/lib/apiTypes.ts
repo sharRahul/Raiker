@@ -3001,4 +3001,12 @@ export interface TelemetryDestination {
   last_attempt_at: string | null;
   exported_count: number;
   created_at: string;
+  /**
+   * BUG-276 — how often this destination is delivered to. `off` means on
+   * demand only, and is what every destination created before this field
+   * existed reads as. Every other value is a cadence the task scheduler
+   * honours, so the card can never claim one the host will not run.
+   */
+  delivery_cadence: string;
+  next_delivery_at: string | null;
 }

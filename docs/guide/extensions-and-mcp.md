@@ -15,8 +15,13 @@ call anything:
 | Enabled | Switched on for this session |
 | Usable | Every condition confirmed by the server |
 
+Each row carries all four, marked `✓` when the condition is met and `○` when it
+is not, so a row can be read at a glance and in greyscale.
+
 A connector appearing in the catalogue means nothing on its own. The readiness
-counters at the top read `0 usable` on a fresh workspace, which is correct.
+counters at the top read `0 usable` on a fresh workspace, which is correct — and
+every row underneath them will show four `○`, which is the same fact said per
+connector.
 
 Reference connectors with real, governed read paths: **GitHub**, **Gmail**,
 **Google Calendar**, **Slack**. Each needs, at minimum:

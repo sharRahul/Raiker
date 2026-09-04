@@ -1025,7 +1025,17 @@ def _extract_declarations(responses: dict[Any, dict[str, Any]]) -> list[dict[str
 def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int, int]:
     """Interpret an initialize + tools/call exchange. Returns
     (error_reason_or_None, content_block_count, content_length). The tool's raw
-    content never leaves this function — only its size."""
+    content never leaves this function — only its size.
+
+    BUG-234 — the count and the length are taken from the same rendering the
+    calling model reads (`render_call_result`), not from a second reading of the
+    payload. They previously summed the `text` field of every block, which meant
+    an artifact could record ``3 blocks, 0 chars`` for a result the model was
+    handed nothing of, and no surface could tell that from a tool that genuinely
+    answered with an empty string.
+    """
+    from raiker.tools.mcp_schema import render_call_result
+
     init = responses.get(1)
     if init is None or "result" not in init:
         return "mcp_initialize_failed", 0, 0
@@ -1040,9 +1050,8 @@ def _extract_call(responses: dict[Any, dict[str, Any]]) -> tuple[str | None, int
     result = call.get("result") or {}
     if result.get("isError"):
         return "mcp_tool_reported_error", 0, 0
-    content = result.get("content") or []
-    length = sum(len(str(b.get("text", ""))) for b in content if isinstance(b, dict))
-    return None, len(content), length
+    _text, blocks, length = render_call_result(result)
+    return None, blocks, length
 
 
 def _safe_json(value: Any) -> str:
@@ -1056,19 +1065,27 @@ def _safe_json(value: Any) -> str:
 
 
 def _call_result_text(responses: dict[Any, dict[str, Any]]) -> str:
-    """Concatenate a tools/call result's text blocks.
+    """A tools/call result, as the calling model should read it.
 
     Used for transient shape classification, and — when the caller supplied a
     ``content_sink`` — handed to that caller so a model can read what the tool
     it called returned (BUG-12). It is never stored: artifacts, the audit event,
     and the session log keep carrying counts and labels only.
+
+    BUG-234 — this used to concatenate the ``text`` field of every block, which
+    is one of the five content shapes the current revision defines. A result made
+    of `resource_link`s, an embedded resource, an image, or nothing but
+    ``structuredContent`` reached the model as an empty string, and nothing said
+    so. `render_call_result` handles every shape and names the ones that are
+    references rather than text — including a link, which it never follows.
     """
+    from raiker.tools.mcp_schema import render_call_result
+
     call = responses.get(3)
     if not isinstance(call, dict):
         return ""
-    result = call.get("result") or {}
-    content = result.get("content") or []
-    return "".join(str(b.get("text", "")) for b in content if isinstance(b, dict))
+    text, _blocks, _length = render_call_result(call.get("result") or {})
+    return text
 
 
 def _parse_jsonrpc_body(body: str) -> list[dict[str, Any]]:

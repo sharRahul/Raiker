@@ -38,7 +38,7 @@
   import Icon from "../components/Icon.svelte";
   import PageState from "../components/PageState.svelte";
   import StatTile from "../components/StatTile.svelte";
-  import { relativeTime } from "../format";
+  import { relativeFuture, relativeTime } from "../format";
   import { cadenceLabel } from "../agentCadence";
   import GuideLink from "../components/GuideLink.svelte";
   import { isActiveTask, taskBadge, taskStatusLabel } from "../statusMaps";
@@ -281,7 +281,7 @@
                   <div class="row-meta">
                     <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
                     <span class="kind">{cadenceLabel(task.recurrence ?? "")}</span>
-                    {#if task.scheduled_at}<span class="since">next cycle {relativeTime(task.scheduled_at)}</span>{/if}
+                    {#if task.scheduled_at}<span class="since">next cycle {relativeFuture(task.scheduled_at)}</span>{/if}
                     <span class="since">last moved {relativeTime(task.updated_at)}</span>
                   </div>
                   <div class="row-actions">
@@ -317,7 +317,7 @@
                   </div>
                   <div class="row-meta">
                     <Badge variant={taskBadge(task.status)} label={taskStatusLabel(task.status)} />
-                    <span class="kind">fires {relativeTime(task.scheduled_at ?? task.created_at)}</span>
+                    <span class="kind">fires {relativeFuture(task.scheduled_at ?? task.created_at)}</span>
                   </div>
                   <div class="row-actions">
                     <button

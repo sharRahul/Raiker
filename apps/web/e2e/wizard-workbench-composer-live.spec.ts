@@ -131,6 +131,43 @@ async function proveModelReady(page: Page): Promise<boolean> {
 
 test.describe.configure({ mode: "serial" });
 
+/**
+ * BUG-250 — this file needs an instance nothing has signed into, and it needs
+ * that answered **once**, before the first test.
+ *
+ * Its three tests run in serial and share one owner: the first registers the
+ * account, the two after it unlock the account the first one made. Asking "is
+ * this a first run?" per test would therefore be true once and false twice, and
+ * skip the two tests the file exists to run. Asked once, before anything, it
+ * says the thing that is actually true of the file: it brings its own owner, so
+ * it cannot run against a workspace another spec already signed into.
+ */
+let freshWorkspace = false;
+
+test.beforeAll(async ({ browser }) => {
+  const page = await browser.newPage();
+  try {
+    await page.goto(`${BASE}/#/workbench`);
+    await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 120_000 });
+    await expect(page.getByLabel("Username")).toBeEnabled({ timeout: 60_000 });
+    freshWorkspace = await page
+      .getByLabel("Confirm password")
+      .isVisible()
+      .catch(() => false);
+  } finally {
+    await page.close();
+  }
+});
+
+test.beforeEach(() => {
+  test.skip(
+    !freshWorkspace,
+    "This file registers its own owner and walks the first-run wizard. " +
+      "This workspace already has an owner account, so it is not a first run. " +
+      "Point RAIKER_LIVE_BASE at a new instance to run it.",
+  );
+});
+
 test("the first-run wizard answers the model question on its own screen", async ({ page }) => {
   test.setTimeout(900_000);
   await register(page);

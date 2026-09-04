@@ -22,6 +22,7 @@ owner. Nothing is resumed on the strength of what was true when it parked.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -37,6 +38,10 @@ from raiker.contracts.models import (
 )
 from raiker.events.writer import EventLogWriter
 from raiker.gateway.agent_gateway import AgentGateway
+from raiker.notify.approval_notifier import (
+    dispatch_notification_hook,
+    fire_os_notification,
+)
 from raiker.runtime.turn_suspension import TurnSuspensionError
 from raiker.storage.sqlite import SQLiteStore
 from raiker.tasks.manager import TaskManager
@@ -44,6 +49,11 @@ from raiker.tasks.manager import TaskManager
 # A task in one of these states must never be continued: the owner has stopped
 # it, or it has already reached a terminal state through some other path.
 NON_RESUMABLE_TASK_STATES = frozenset({"cancelled", "cancelling", "completed", "failed"})
+
+#: BUG-276 — a scheduled telemetry delivery changed its mind about working. Its
+#: own kind so the notification centre can group it and an owner can tell it from
+#: a task that finished or an approval that needs a decision.
+TELEMETRY_DELIVERY_KIND = "telemetry_delivery"
 
 
 class TaskScheduler:
@@ -71,6 +81,119 @@ class TaskScheduler:
             return 0
         profiles = result.data.get("profiles", [])
         return len(profiles) if isinstance(profiles, list) else 0
+
+    # ── delivering the record on a cadence (BUG-276) ─────────────────────
+
+    async def deliver_due_telemetry(self) -> int:
+        """Deliver to every telemetry destination whose next run has come.
+
+        BUG-276. The wire backlog #18 built delivered only when the owner
+        pressed **Deliver now**, and a collector that receives while its
+        operator is watching is not something a dashboard can be built on.
+
+        **This is not a second scheduler, and it is deliberately not a routine
+        that prompts a model.** The entry proposed an owner-created task on the
+        Tasks board, and half of that was right: the cadence, the pause switch
+        and the audit trail should be the ones that already exist, which is why
+        this pass runs on the host tick beside :meth:`run_due` and answers to
+        the same ``is_paused``. The other half was not. A task cycle is a
+        governed *turn* — a model reads a prompt and decides what to call — and
+        putting a model in the path of "did the record leave the machine" makes
+        delivery a judgement where it is currently an arithmetic fact about a
+        cursor. Every other authority path in this product keeps the model out;
+        the observability wire is the last place to make an exception.
+
+        What the owner gets instead is the same thing by the same means: a
+        cadence chosen from the scheduler's own interval table, a claim the host
+        advances exactly once, delivery through ``route_action`` so the export
+        is an event in the log it exported, and a card that states the cadence
+        and the next run rather than implying a feed.
+
+        Returns how many deliveries this pass ran.
+        """
+        # Pause means "start no new background work", and a delivery reaches the
+        # network. A paused host leaves the claim where it is; the destination
+        # becomes due again the moment the owner resumes.
+        if HostControl(self.workspace_root).is_paused():
+            return 0
+        claimed = self.store.claim_due_telemetry_destinations(utc_now(), _next_delivery)
+        if not claimed:
+            return 0
+        # Local import: the control service builds an executor registry, and
+        # importing it at module scope would make every scheduler import pay for
+        # one. It is the same facade the Deliver-now route uses, so a scheduled
+        # delivery cannot take a shorter path through governance than a pressed
+        # one — the gate, the policy review, the approval and the audit event
+        # are all the same code.
+        from raiker.control.service import RuntimeControlService
+
+        service = RuntimeControlService(self.workspace_root)
+        delivered = 0
+        for destination in claimed:
+            destination_id = str(destination.get("destination_id", ""))
+            owner = str(destination.get("principal_id", ""))
+            previous = str(destination.get("last_status") or "")
+            try:
+                result = service.run_telemetry_export(owner, destination_id)
+            except Exception as error:  # noqa: BLE001 — one collector must not stop the rest
+                self._report_delivery(
+                    destination, previous, f"telemetry_delivery_failed:{type(error).__name__}"
+                )
+                continue
+            if result.ok:
+                delivered += 1
+            self._report_delivery(
+                destination, previous, "ok" if result.ok else (result.reason_code or "failed")
+            )
+        return delivered
+
+    def _report_delivery(
+        self, destination: Mapping[str, object], previous: str, status: str
+    ) -> None:
+        """Tell the owner when a scheduled wire starts failing, and when it recovers.
+
+        Only on the *transition*. A collector that has been unreachable for a
+        day should not produce seventy-two identical notices, and one that has
+        been fine for a week should not produce any: what an owner needs to know
+        is that the answer changed. The card carries the standing state either
+        way, so nothing is only in a notice.
+        """
+        if status == previous or (status != "ok" and previous not in ("", "ok")):
+            return
+        name = str(destination.get("name", "")) or "a collector"
+        owner = str(destination.get("principal_id", ""))
+        subject = str(destination.get("destination_id", ""))
+        if not owner:
+            return
+        recovered = status == "ok"
+        title = (
+            "Telemetry delivery recovered" if recovered else "Telemetry delivery is failing"
+        )
+        body = (
+            f"“{name}” delivered again."
+            if recovered
+            # The reason code, never the collector's answer body: a rejection
+            # from an outside service is text this product did not write.
+            else f"“{name}” could not be delivered to ({status}). Events are still queued."
+        )
+        try:
+            notification_id = self.store.insert_notification(
+                principal_id=owner,
+                kind=TELEMETRY_DELIVERY_KIND,
+                title=title,
+                body=body,
+                subject_id=subject or None,
+            )
+        except Exception:  # noqa: BLE001 — a notice must not fail the delivery pass
+            return
+        fire_os_notification(title, body)
+        dispatch_notification_hook(
+            self.store,
+            owner_principal_id=owner,
+            kind=TELEMETRY_DELIVERY_KIND,
+            notification_id=notification_id,
+            subject_id=subject,
+        )
 
     # ── continuing approved work (BUG-25) ────────────────────────────────
 
@@ -330,3 +453,29 @@ def next_run_after(iso: str, interval: timedelta) -> str:
 
 def _next_daily(iso: str) -> str:
     return next_run_after(iso, RECURRING_INTERVALS["daily"])
+
+
+#: BUG-276 — the cadences a telemetry destination may be delivered on, plus the
+#: one that means it is not. Drawn from `RECURRING_INTERVALS` rather than
+#: redeclared beside it, so the product has one cadence vocabulary: a name the
+#: Tasks board offers is a name a collector offers, with the same meaning.
+TELEMETRY_CADENCES: tuple[str, ...] = ("off", *RECURRING_INTERVALS)
+
+
+def _next_delivery(destination: Mapping[str, object]) -> str:
+    """When a just-claimed destination becomes due again.
+
+    Anchored to the slot that was claimed rather than to "now", so a delivery
+    that took ninety seconds does not drift the schedule by ninety seconds every
+    run, and a host that was asleep does not wake up owing a queue of identical
+    deliveries. That is `next_run_after`'s contract, and it is why this reads the
+    claimed value instead of the clock.
+
+    A row whose cadence is unrecognised — written by a newer version, or edited
+    outside the product — falls back to daily rather than to a crash or to a
+    tight loop. Slower than asked for is the safe direction for something that
+    reaches the network.
+    """
+    cadence = str(destination.get("delivery_cadence") or "off")
+    interval = RECURRING_INTERVALS.get(cadence, RECURRING_INTERVALS["daily"])
+    return next_run_after(str(destination.get("next_delivery_at") or utc_now()), interval)

@@ -290,6 +290,12 @@ def create_app(
                     await resume_approved(scheduler)
                 with suppress(Exception):
                     await scheduler.refresh_model_capacities()
+                # BUG-276 — the governed record leaves on the cadence its
+                # destination carries, not only when somebody presses a button.
+                # Suppressed on its own like every pass above it: a collector
+                # that is down must not stop due work from starting.
+                with suppress(Exception):
+                    await scheduler.deliver_due_telemetry()
                 with suppress(TimeoutError):
                     await asyncio.wait_for(stop.wait(), timeout=15)
 

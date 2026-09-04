@@ -9,14 +9,26 @@ Raiker exported none — for want of a wire, not for want of a record.
 
 This is that wire, and it is deliberately the *narrow* one:
 
-* **Its own capability.** `telemetry_export` is Tier 2 for the reason every
-  Tier-2 capability is: it reaches the network. It takes the threat-model
-  acknowledgement and the human confirmation that tier requires, and the owner's
-  decision mode still governs each run. Like every capability with a real
-  executor it ships enabled, and that is safe here for a reason worth stating
-  rather than assuming: **it is inert until the owner names a collector.** With
-  no destination configured there is nowhere for a record to go, and adding one
-  is a human-only act.
+* **Its own capability, and off until the owner turns it on.** `telemetry_export`
+  is Tier 2 for the reason every Tier-2 capability is: it reaches the network. It
+  takes the threat-model acknowledgement and the human confirmation that tier
+  requires, and the owner's decision mode still governs each run.
+
+  **BUG-281 — this used to say the gate "ships enabled".** The *shipped table*
+  does set every real-executor capability to `enabled_runtime`, which is where
+  that sentence came from; what an account actually meets is
+  `unset_resolution_for("telemetry_export")`, and `telemetry_export` is not in
+  `CAPABILITY_UNSET_RESOLUTION`, so an account with nothing persisted resolves
+  **off**. A live round confirmed it: Observability said *"Telemetry export is
+  turned off. Turn it on in Permissions."* on a fresh install. The behaviour is
+  right — a capability that reaches the network should be the owner's explicit
+  yes — and the sentence describing it was not.
+
+  Two things are therefore true and are worth keeping apart, because the second
+  is the one that would still matter if the first ever changed: the owner turns
+  this on, **and** it is inert until they also name a collector. With no
+  destination configured there is nowhere for a record to go, and adding one is a
+  human-only act.
 * **Metadata by default.** A record carries the identifiers and the type — the
   fields the event index keeps as columns because they are already metadata by
   construction — and not the summary, which names the object an action acted on

@@ -2,10 +2,9 @@ import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
-const PASSWORD = OWNER_CREDENTIALS.password;
 const ROOT = join(
   import.meta.dirname,
   "..",
@@ -56,22 +55,27 @@ test("BUG-69 approved local root detects a GGUF without a system-wide scan", asy
       ggufString("llama"),
     ]),
   );
+  // BUG-248 — the shared sign-in. The copy this replaced only ever pressed
+  // Unlock, so it could not run against a workspace with no owner, and it left
+  // the setup wizard modal over the tab it then tried to click.
+  await signInAsOwner(page, BASE);
   await page.goto(`${BASE}/#/models?tab=local`);
-  if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
-    await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-    await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-    await page.getByRole("button", { name: /Unlock Raiker/i }).click();
-    await page.goto(`${BASE}/#/models?tab=local`);
-  }
   await page.getByRole("tab", { name: "Local" }).click();
   await page.getByLabel("Absolute model folder").fill(ROOT);
   await page.getByRole("button", { name: "Add and scan" }).click();
-  await expect(page.getByText("Raiker Live GGUF")).toBeVisible({
+  // BUG-250 — scoped to the inventory this test is about, not to the page.
+  // Unscoped, "Raiker Live GGUF" also matches the `<option>` this very scan puts
+  // into every model picker on the screen, so the assertion passed exactly once
+  // — on a workspace where nothing had been scanned before — and then failed as
+  // a strict-mode violation naming four elements. The behaviour was correct both
+  // times; only the locator was.
+  const inventory = page.getByRole("region", { name: "Detected GGUF models" });
+  await expect(inventory.getByRole("heading", { name: "Raiker Live GGUF" })).toBeVisible({
     timeout: 30_000,
   });
   await expect(
     page.getByText(/will not search the rest of your computer/i),
   ).toHaveCount(0);
-  await expect(page.getByText("llama · Q4_K_M")).toBeVisible();
+  await expect(inventory.getByText("llama · Q4_K_M").first()).toBeVisible();
   await capture(page, SHOT);
 });

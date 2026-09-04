@@ -73,19 +73,34 @@ describe("MemoryView", () => {
     );
   });
 
-  it("states how recall scales without implying an unearned warm cache", async () => {
+  // The three lines that used to describe the index — the exact limit, the
+  // approximate lookup past it, and when it rebuilds — moved to the guide's
+  // *Recall backend and token budget*: none of them is a decision made on this
+  // page. What stays is the one number a reader might want to check, and it is
+  // still read from the runtime rather than written into the markup.
+  it("names the exact-ranking limit the runtime is actually using", async () => {
     stubFetch({
       "GET /api/memory": [],
       "GET /api/memory/settings": {
         incognito: false,
         vector_search_strategy: "exact_then_approximate",
-        vector_search_exact_limit: 512,
+        vector_search_exact_limit: 128,
       },
     });
     render(MemoryView);
 
-    expect(await screen.findByText(/recall keeps a revision-checked index/i)).toBeInTheDocument();
-    expect(screen.getByText(/exact score re-ranking/i)).toBeInTheDocument();
+    expect(await screen.findByText(/ranks 128 vectors exactly/i)).toBeInTheDocument();
+  });
+
+  it("says nothing about ranking when the runtime is not on that strategy", async () => {
+    stubFetch({
+      "GET /api/memory": [],
+      "GET /api/memory/settings": { incognito: false, vector_search_strategy: "exact" },
+    });
+    render(MemoryView);
+
+    await screen.findByRole("heading", { name: /recall backend/i });
+    expect(screen.queryByText(/vectors exactly/i)).toBeNull();
   });
 
   it("distinguishes a permission check in progress from a failed permission read", async () => {

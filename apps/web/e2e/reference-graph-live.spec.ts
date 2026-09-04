@@ -19,11 +19,10 @@ import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup, OWNER_CREDENTIALS } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = "../../docs/plans/screenshots/working";
-const PASSWORD = OWNER_CREDENTIALS.password;
 const WORKSPACE = process.env.RAIKER_LIVE_WORKSPACE ?? "";
 
 test("a cited file that no longer exists is drawn as Missing", async ({ page }) => {
@@ -34,24 +33,11 @@ test("a cited file that no longer exists is drawn as Missing", async ({ page }) 
     if (message.type() === "error") consoleErrors.push(message.text());
   });
 
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /Sign in|Unlock/ }).click();
-  }
-  await expect(
-    page
-      .getByRole("button", { name: "Decide later" })
-      .or(page.getByRole("heading", { name: "Welcome to your Work Dashboard" }))
-      .first(),
-  ).toBeVisible({ timeout: 60_000 });
-  await dismissFirstRunModelSetup(page);
+  // BUG-248 — the shared sign-in. The copy this replaced waited for either
+  // "Decide later" or the empty-workspace greeting, and a used workspace shows
+  // neither: the wizard resumes on whichever of its five stages it stopped at,
+  // and the Workbench says "Welcome back" once anything has run.
+  await signInAsOwner(page, BASE);
 
   // Now that the owner exists, plant the pair: one cited file still on disk,
   // one cited file deleted since.

@@ -398,6 +398,14 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-383](#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen) | Low | Web UI / composer | Fixed 2026-09-04 (found by this round's width sweep) |
 | [FIXED-384](#fixed-384--two-path-fields-taught-a-shape-that-cannot-exist-on-two-of-three-platforms) | Low | Web UI / model library | Fixed 2026-09-04 (found by this round's width sweep) |
 | [FIXED-385](#fixed-385--two-surfaces-named-themselves-twice-and-a-new-switch-named-itself-not-at-all) | Low | Web UI / Settings and Permissions | Fixed 2026-09-04 (found by this round's width sweep) |
+| [FIXED-386](#fixed-386--governed-events-only-left-when-somebody-pressed-a-button) | Low | Observability / telemetry export | Fixed 2026-09-04 (BUG-276; completes backlog #18) |
+| [FIXED-387](#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six) | Low | MCP / interoperability | Fixed 2026-09-04 (reduces BUG-234) |
+| [FIXED-388](#fixed-388--a-valid-key-was-answered-with-check-your-network) | **High** | Models / provider errors | Fixed 2026-09-04 (BUG-277, raised and closed in this round) |
+| [FIXED-389](#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were) | Medium | Extensions / accessibility | Fixed 2026-09-04 (BUG-278, raised by this round's page sweep) |
+| [FIXED-390](#fixed-390--three-surfaces-said-next-and-printed-a-full-timestamp) | Low | Web UI / time formatting | Fixed 2026-09-04 (BUG-279, raised while verifying FIXED-386) |
+| [FIXED-391](#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line) | Low | Web UI / consistency | Fixed 2026-09-04 (BUG-280, raised by this round's page sweep) |
+| [FIXED-392](#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off) | Low | Documentation / capability defaults | Fixed 2026-09-04 (BUG-281, raised while verifying FIXED-386 live) |
+| [FIXED-393](#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | Fixed 2026-09-04 (BUG-282, raised by this round's page sweep) |
 
 ---
 
@@ -16839,3 +16847,440 @@ Removing the new entry makes it fail, which is how it was verified.
 **User-interface outcome.** Settings opens with its own state. Permissions names
 the telemetry switch, groups it with the other things that leave the machine, and
 says in one sentence what a destination receives.
+
+---
+
+## FIXED-386 — Governed events only left when somebody pressed a button
+
+**Severity: Low. Area: Observability / telemetry export. Status: Fixed
+2026-09-04. Closes [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+and completes [backlog #18](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort).**
+
+**Observed.** `telemetry_export` delivered governed events to an owner-named OTLP
+collector, and it delivered them **only on demand**: **Deliver now** on the
+destination's card, or `POST /api/telemetry/destinations/{id}/export`. Events
+accumulated behind the cursor until someone looked. For the use this exists for
+that is half a wire — an owner running Raiker beside a dashboard wants the record
+to *arrive*, and a collector that receives only while its operator is watching is
+not something a dashboard can be built on.
+
+**Fixed, and the entry's own proposal was followed only half way — deliberately.**
+BUG-276 proposed a *routine*: an owner-created task on the Tasks board that runs
+the export. Half of that was right and is what shipped; the other half was not,
+and refusing it is the substance of this entry.
+
+* **What was right, and is what shipped.** The cadence, the pause switch and the
+  audit trail should be the ones that already exist rather than a second
+  scheduler beside them. `TaskScheduler.deliver_due_telemetry` runs on the host
+  tick beside `run_due`, answers to the same `HostControl.is_paused` — a delivery
+  reaches the network, which is exactly the background work Pause exists to stop
+  — and routes through `RuntimeControlService.run_telemetry_export`, the same
+  facade the button uses, so a scheduled delivery cannot take a shorter path
+  through governance than a pressed one. The cadence names are
+  `RECURRING_INTERVALS`' own, so the product has one cadence vocabulary.
+* **What was not, and why.** A task cycle is a governed **turn**: a model reads a
+  prompt and decides what to call. Putting a model in the path of *"did the
+  record leave the machine"* makes delivery a judgement where it is currently an
+  arithmetic fact about a cursor. Every other authority path in this product
+  keeps the model out of the decision; the observability wire is the last place
+  to make an exception. The reasoning is in `deliver_due_telemetry`'s docstring
+  rather than only here, because that is where the next reader will be.
+
+**Claimed exactly once, and anchored to the slot.**
+`claim_due_telemetry_destinations` advances `next_delivery_at` inside the same
+statement that selects it, conditioned on the value it read — the shape
+`claim_due_tasks` uses, for the same reason: the host runs a tick worker and a
+nudged worker, and two of them seeing one due destination must produce one
+delivery. `_next_delivery` steps forward from the claimed slot rather than from
+the clock, so a delivery that took ninety seconds does not drift the schedule by
+ninety seconds every run, and a host that was asleep does not wake owing a queue
+of identical deliveries. A row whose cadence is unrecognised falls back to daily
+rather than to a tight loop: slower than asked for is the safe direction for
+something that reaches the network.
+
+**A failing wire says so once, not seventy-two times.** `_report_delivery`
+notifies only on the *transition* — working to failing, and back — through the
+owner-scoped notification centre C10 built. A collector that has been unreachable
+for a day produces one notice; one that has been fine for a week produces none.
+The body carries the reason code and never the collector's own answer, which is
+text this product did not write.
+
+**Guarded.** `tests/test_telemetry_export.py::TestItLeavesWithoutSomebodyPressingAButton`
+— eleven tests: one vocabulary shared with the scheduler, arming and disarming,
+an unknown cadence refused rather than stored, the claim taken exactly once, an
+off or disabled destination never claimed, the anchor, the unrecognised-cadence
+fallback, a paused host leaving the claim where it is, the notification
+transition rule, and the whole path end to end on the tick.
+
+**Live evidence, and it is the wire rather than the screen.**
+[`screenshots/working/bug-276-delivery-cadence.png`](screenshots/working/bug-276-delivery-cadence.png)
+from `e2e/round-2026-09-04b-priority-live.spec.ts` shows the control; the
+measurement behind it was taken against a real OTLP/HTTP receiver on
+`127.0.0.1:4318` with the destination's next run moved into the past, and both
+halves were watched on the running host with no browser open:
+
+* **Nothing listening.** `telemetry_delivery_failed:fetch_failed:URLError`
+  recorded, the **cursor unmoved** so nothing was lost, the schedule advanced to
+  the next whole hour *anchored to the claimed slot* (`20:00:00Z`, not an hour
+  from the failure), and one notice: *"Telemetry delivery is failing."*
+* **Receiver up.** The next tick delivered **247 governed events**, moved the
+  cursor, and raised one more: *"Telemetry delivery recovered."* The received
+  records carry `event_id`, `event_type`, `actor` and `session_id` and **no
+  summary and no path** — metadata-only asserted against the wire rather than
+  against the encoder.
+
+Two notices across four ticks, for two transitions. The rule that a failing wire
+says so once rather than once per cycle is the part a unit test can only assert;
+this is it happening.
+
+**User-interface outcome.** The interface outcome BUG-276 named is met: a
+destination either states the cadence it is delivered on and when the next run
+is, or states that it is delivered **On demand only**. The shipped default is a
+sentence rather than a blank, and nothing claims a next run while there is no
+cadence. The section's own lead says "on a cadence, or on demand" so the choice
+is visible before a collector exists.
+
+---
+
+## FIXED-387 — A tool result had one shape, and the revision defines six
+
+**Severity: Low. Area: MCP / interoperability. Status: Fixed 2026-09-04. Reduces
+[BUG-234](TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks).**
+
+**Observed.** Raiker negotiates the current MCP revision and read exactly one
+thing out of a `tools/call` answer: the `text` field of every content block,
+concatenated (`_call_result_text`). The revision defines five block types —
+`text`, `image`, `audio`, `resource_link` and an embedded `resource` — and a
+typed `structuredContent` field beside them. A server answering the way the
+specification tells it to was therefore **silently degraded**: an image block
+contributed an empty string, a resource link contributed an empty string, and a
+tool whose whole answer was `structuredContent` returned *nothing at all* to the
+model that called it.
+
+Silent degradation is the one failure mode the MCP surface is built to refuse.
+"Either supported or named as unsupported, never silently degraded" is the rule
+[FIXED-378](#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport)
+built the server card on, and a result falling through it without a word was the
+last place it did not hold.
+
+**Fixed.** `render_call_result` in `raiker/tools/mcp_schema.py` handles every
+shape, and both readers of a result — the model-facing text and the artifact's
+counts — come from that one function, so the record cannot describe a different
+reading than the one that happened. The old counts summed `text` fields, which
+meant an artifact could record *three blocks, zero characters* for a result the
+model was handed nothing of, and nothing on any surface could tell that from a
+tool that genuinely answered with an empty string.
+
+**Two rules decide what a block becomes, and both are governance rather than
+formatting.**
+
+* **A link is not a read.** A `resource_link` names an address the server would
+  like read. Raiker renders the name, the URI, the media type and the
+  description, and **never fetches it**. Following it is a separate governed
+  action — `web_fetch`, or a `resources/read` Raiker does not perform — and a
+  tool result must not be able to cause a read the owner's policy never saw.
+  That is the whole difference between carrying a link and obeying one.
+* **Bytes are named, never carried.** An `image` or `audio` block is base64 on
+  the wire. Its media type and decoded size cost a line; the bytes would cost the
+  turn's context and tell the model nothing it can use. The size is computed from
+  the base64 length rather than by decoding, so an inline megabyte is never
+  materialised just to say how big it was.
+
+An embedded `resource` carries its `text` when the server embedded one — the one
+case where a non-text block genuinely holds something to read — and is named when
+it embedded a `blob`. A block type Raiker has never heard of is named by its own
+type rather than dropped: the model reading *there was a block of this kind here*
+is better informed than the model reading nothing.
+
+**`structuredContent` is carried once.** The specification tells a server that
+returns one to also serialise it into a text block for compatibility, and most
+do; carrying both would spend the turn's context twice on one answer. It is
+appended only when the text blocks did not already carry it, compared on the
+canonical encoding of both sides so a server that pretty-prints its compatibility
+copy is still recognised as having sent the same object.
+
+**Still bounded, and still never stored.** One block may contribute
+`MAX_BLOCK_CHARS`, one result `MAX_RESULT_CHARS`, and a cut says so with a
+marker rather than reading as a complete answer. Truncating the block rather than
+the result is what leaves room for the blocks behind it. Artifacts, the audit
+event and the session log keep carrying counts and labels exactly as before.
+
+**Guarded.** `tests/test_mcp_content_blocks.py` — twelve tests across four
+classes: every shape reaching the model as something, the link that is named and
+not fetched, bytes named rather than carried, an unknown type named by its own
+type, structured content carried once and not twice, the record agreeing with
+what the model read, and both ceilings.
+
+**What is left of BUG-234.** Streamable-HTTP *streaming* (Raiker reads an
+`text/event-stream` answer whole), remote OAuth, MCP Apps and elicitation. Each
+is still named on the server's card rather than silently degraded.
+
+**User-interface outcome.** None required — this is what a *model* reads. The
+surface that could have gone wrong is the transcript's tool row, and it is now
+correct where it was not: "returned N char(s)" describes what actually reached
+the model rather than the sum of a field most block types do not have.
+
+---
+
+## FIXED-388 — A valid key was answered with "check your network"
+
+**Severity: High. Area: Models / provider errors. Status: Fixed 2026-09-04.
+Raised as BUG-277 by this round's first live press of **Test**.**
+
+**Observed.** The Anthropic key supplied for this round was pasted into the
+Models page and **Test** pressed. The card answered:
+
+> Anthropic could not be reached. Check that it is running and reachable from
+> this device.
+
+The provider had answered in full, in under a second, and precisely:
+
+> This API key is not scoped to a workspace, so this request must include the
+> anthropic-workspace-id header with the ID of the workspace to use. Add the
+> header, or use an API key that is scoped to a workspace.
+
+The network was working. The key was valid. The owner was sent to debug a device
+that had nothing wrong with it.
+
+**Root cause, and it is the more interesting half.** `needs_workspace_id`
+classified this refusal by matching one of three exact strings:
+`workspace-id is required`, `workspace_id is required`, `identity-linked api key`.
+The body above contains **none** of them. They had been written from the header
+name and the concept rather than from a response, and the fixture that exercised
+them (`MISSING_BODY`) was written the same way — so every literal the classifier
+matched was matched only by the test that invented it.
+
+Everything downstream of that match was therefore unreachable for the message the
+provider actually sends: [FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)'s
+classification, [FIXED-372](#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)'s
+Workspace ID field, and the remediation that names it. Two rounds of work sat
+behind a string comparison that had never met a real body.
+
+**Fixed — as a conjunction, not a fourth literal.** A list of sentences is a bet
+that a message Raiker does not control will keep its wording, and that bet has
+now been lost once. The classification is: the body names a workspace
+(`_WORKSPACE_SUBJECTS`) **and** says one is absent (`_WORKSPACE_ABSENT_MARKERS` —
+"is required", "must include", "not scoped", "identity-linked", and the rest).
+Both halves have to hold, which is what keeps it from swallowing an ordinary 400:
+a body that merely mentions a workspace keeps its own classification, and a body
+that says something is required but never names a workspace is about another
+field. The rejected-id case is still checked first, so an owner who has supplied
+an id is never asked for one again.
+
+Widening a match is normally the wrong direction. It is right here for one reason
+worth stating: the alternative it replaces is not a stricter answer, it is **no**
+answer — the fall-through to `provider_http_error:http_400`, for which no
+guidance exists, which the Models page renders as a reachability failure.
+
+**Guarded.** `tests/test_provider_workspace_named.py::TestTheRefusalIsClassifiedByWhatItMeansNotHowItIsWorded`
+— seven tests, built on `LIVE_MISSING_BODY`, the body captured from the live 400.
+It is kept as the first fixture any change to this classification is measured
+against: **a body a provider was observed sending outranks one this repository
+wrote down.** The old wording still matches, both providers classify it, an
+ordinary 400 is untouched, a rejected id still wins, and nothing from the body
+reaches the reason code.
+
+**Live evidence.**
+[`screenshots/working/bug-277-workspace-repair-live.png`](screenshots/working/bug-277-workspace-repair-live.png)
+and [`screenshots/working/bug-274-workspace-answer-live.png`](screenshots/working/bug-274-workspace-answer-live.png),
+from `e2e/round-2026-09-04b-priority-live.spec.ts` and
+`e2e/identity-linked-key-live.spec.ts` against the round's own key.
+
+**User-interface outcome.** The card says *"This key is identity-linked, so it
+acts inside one workspace. Add the workspace ID to this connection — it is beside
+the key in the provider's console — then connect again. The key you pasted is
+fine."*, with an **Add workspace ID** button that opens the connection on the
+field that holds it. It no longer contains the words "could not be reached".
+
+---
+
+## FIXED-389 — Twenty-six connectors said they were installed under a card saying none were
+
+**Severity: Medium. Area: Extensions / accessibility. Status: Fixed 2026-09-04.
+Raised as BUG-278 by this round's page sweep.**
+
+**Observed.** Extensions → Connectors opens with a readiness card reading
+**USABLE NOW 0 · INSTALLED 0 · CONNECTED 0**, and immediately under it a list of
+twenty-six rows, each ending in four pills: `installed connected enabled usable`.
+The screen contradicted itself. A reader looking at *"GitHub … installed
+connected enabled usable"* concludes GitHub is installed and connected; it is
+not, and the catalogue lower down offers **Install**.
+
+**Root cause.** The four pills are the same four conditions the side panel's
+`LifecycleTrack` renders, and met/unmet was carried by **colour alone** —
+`.fact.on` gets an ok-tinted background, and an unmet pill is grey. On a
+workspace where nothing is installed, twenty-six rows of grey pills read as
+twenty-six statements of fact.
+
+Two things follow, and the second is worse than the first. The screen disagrees
+with its own counters unless the reader decodes a colour; and in greyscale, or to
+a colour-blind owner, there is **no other channel at all** — the row says
+"installed" and nothing anywhere says whether it is. That is WCAG 1.4.1 (Use of
+Colour) failing on a governance surface, which is the worst place for it: this
+list is how an owner answers "what can reach my data".
+
+**Fixed.** Each pill carries the marker the side panel already uses — `✓` met,
+`○` not — and a screen-reader `: yes` / `: no`. Not a new vocabulary: the same
+one, two components apart, which is what it should have been. The marker sits
+inside the pill so a row stays one line at every width the list is used at.
+
+**Live evidence.**
+[`screenshots/working/bug-278-connector-facts.png`](screenshots/working/bug-278-connector-facts.png),
+from `e2e/round-2026-09-04b-priority-live.spec.ts`, which asserts every pill
+starts with one of the two markers and that the words are present for a screen
+reader.
+
+**User-interface outcome.** A connector row can no longer be read as installed
+when it is not, on any display, by any reader. The rows and the counters above
+them say the same thing.
+
+---
+
+## FIXED-390 — Three surfaces said "next" and printed a full timestamp
+
+**Severity: Low. Area: Web UI / time formatting. Status: Fixed 2026-09-04.
+Raised as BUG-279 while verifying FIXED-386.**
+
+**Observed.** A collector on an hourly cadence read *"Next 9/4/2026, 7:17:29 PM"*
+beside *"Last run ok · 2m ago"*. A standing agent's Workbench card read *"next
+cycle 9/4/2026, 7:17:29 PM"* beside *"last moved 2m ago"*. Two vocabularies for
+one kind of fact, and the longer one on the smaller card.
+
+**Root cause.** `relativeTime` is a **past** formatter, and it says so honestly:
+`if (seconds < 0) return formatTimestamp(iso)`. Three call sites pass it an
+instant that has not happened yet. Nothing in this codebase could say "in 58m",
+so every future time in the product rendered as a locale string.
+
+**Fixed.** `relativeFuture` mirrors `relativeTime` exactly — the same thresholds,
+the same units, the same fall-through to a plain date once "in N days" stops
+being useful — and is a separate function rather than a branch inside
+`relativeTime`, because the two answer different questions: a caller that means
+"when did this happen" should not silently start saying "in 58m" when a clock
+drifts. A moment that has passed and has not happened reads **due now** rather
+than counting backwards.
+
+**Guarded.** `apps/web/src/lib/format.test.ts` — three cases: the compact future
+scale, "due now" for a passed slot, and the threshold mirror.
+
+**User-interface outcome.** "Next in 58m", "next cycle in 20m", "fires in 3h".
+One vocabulary for time on every card that shows it.
+
+---
+
+## FIXED-391 — One tab in the Observability hub answered an empty list with a grey line
+
+**Severity: Low. Area: Web UI / consistency. Status: Fixed 2026-09-04. Raised as
+BUG-280 by this round's page sweep.**
+
+**Observed.** Observability → Notifications, with nothing raised, is a heading, a
+sentence, and the words *"Nothing has been raised yet."* in grey. Its five
+sibling tabs — and eleven views across the product — answer an empty list with
+the shared `EmptyState`: a tinted mark, a title in display type, and a sentence
+saying what will appear there. The one tab that did not read as an unfinished
+page rather than a quiet one.
+
+**Fixed.** The same component, the `bell` icon the context bar uses for the same
+record, and a body that says what writes there — approvals, background work and
+containment — so the empty state names what is missing rather than only reporting
+its absence, which is the rule `EmptyState`'s own header states.
+
+**User-interface outcome.** Every list surface in the product answers an empty
+list the same way.
+
+---
+
+## FIXED-392 — The source said a gate ships enabled; the product said it was off
+
+**Severity: Low. Area: Documentation / capability defaults. Status: Fixed
+2026-09-04. Raised as BUG-281 while verifying FIXED-386 live.**
+
+**Observed.** `tier2_telemetry.py`'s module docstring — the place a reader goes
+to learn what `telemetry_export` is — said:
+
+> Like every capability with a real executor it ships enabled, and that is safe
+> here for a reason worth stating rather than assuming: **it is inert until the
+> owner names a collector.**
+
+On a fresh install, Observability → *Can I see this outside Raiker?* says
+*"Telemetry export is turned off. Turn it on in Permissions."*, the **Deliver
+now** button is disabled, and `GET /api/capability-gates` reports
+`"enforced_enabled": false`. The live round for FIXED-386 had to open the gate
+through Permissions before a cadence could be set at all. The compatibility
+matrix repeated the same claim in its own words.
+
+**Root cause, and it is a distinction worth keeping.** `default_capability_gates()`
+*does* set every capability in `REAL_EXECUTOR_CAPABILITIES` to
+`ENABLED_RUNTIME` — that is the **shipped table**, and it is where the sentence
+came from. What an account actually meets is `unset_resolution_for(capability)`,
+and `telemetry_export` is not in `CAPABILITY_UNSET_RESOLUTION`, so an account
+with nothing persisted resolves `UNSET_OFF`. Four capabilities are in that map
+and are therefore genuinely on out of the box; the other forty-odd are not. The
+docstring described the table and called it the product.
+
+This is the shape [BUG-239](TO_BE_FIXED.md#bug-239--an-empty-gate-table-means-three-different-things)
+names — *an empty gate table means three different things* — showing up not as a
+behaviour defect but as a **claim** defect: the code is right and conservative,
+and the sentence next to it was neither.
+
+**Fixed, and deliberately by correcting the sentence rather than the behaviour.**
+A capability that reaches the network being the owner's explicit *yes* is the
+right posture, and nothing about it should change to make a docstring true. The
+docstring now says the owner turns it on, states where the "ships enabled"
+reading came from so the next reader does not re-derive it, and keeps the second
+guarantee **separate** — it is inert until a collector is named — because that is
+the one that would still matter if the first ever changed. The matrix row says
+the same thing in its own words: *two separate refusals in front of one wire*.
+
+**User-interface outcome.** None — the interface was the accurate half all along.
+That is the point: a surface and a source disagreed about the product, and the
+surface was right.
+
+---
+
+## FIXED-393 — The guide described a boundary the product removed nine days earlier
+
+**Severity: Medium. Area: Documentation / memory. Status: Fixed 2026-09-04.
+Raised as BUG-282 by this round's page sweep.**
+
+**Observed.** `docs/guide/memory.md` → *Recall backend and token budget* said:
+
+> Current boundary: storing learned vectors is implemented, but **embedding
+> every new question against that provider space is not yet connected**. Until
+> that read path has its own governed permission, the Memory page states that
+> recall still matches words. Raiker does not claim semantic recall when only
+> the stored side of the index exists.
+
+That has not been true since **2026-08-26**. The read half closed as
+[FIXED-292](#fixed-292--semantic-memory-built-a-space-the-question-never-entered):
+a question is embedded once per turn through the same governed provider action
+the write side uses, and both ambient recall and `memory_search` search the space
+with it. `raiker/memory/` has the paths and `tests/` has the coverage; only the
+guide still said otherwise.
+
+**Why this is Medium and not Low.** The guide is what an owner reads to decide
+whether Raiker's memory is worth using, and it was telling them the product's
+headline memory feature is half-built. A document that understates the product
+misleads exactly as much as one that overstates it, and this repository has a
+standing rule about the second — *"a backlog that lists finished work is the same
+defect as a document that claims unfinished work is done"*. This is that rule's
+other direction, and it had never been written down.
+
+**Fixed.** The section now states what actually happens, including the fallback:
+when the space cannot be reached, or the capability is set to ask or deny, recall
+falls back to matching words rather than parking the turn — and the Memory page
+states which of the three cases is in force on every load, read from the runtime
+rather than asserted.
+
+**And the page gave up three lines to it.** Memory rendered the index's mechanics
+inline — the exact-ranking limit, the approximate lookup past it, and when it
+rebuilds. None of that is a decision made on that page. The full account is now
+in the guide beside the rest of this page's reasoning; what stays on screen is
+the one number a reader might want to check, still read from the runtime:
+*"Ranks 512 vectors exactly, then approximates."*
+
+**Guarded.** `MemoryView.test.ts` — the limit is read from the settings payload
+(asserted with a non-default `128`, so a hard-coded 512 fails), and the line is
+absent entirely when the runtime is not on that strategy.
+
+**User-interface outcome.** The Memory page is three lines shorter and says the
+same thing. The guide says what the product does.

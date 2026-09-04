@@ -96,6 +96,7 @@ names.
 | [BUG-245](FIXED_ITEMS.md#fixed-323--a-cited-past-conversation-named-its-exchanges-and-could-not-open-one) | Low | Memory / citations | **Closed 2026-08-30 (FIXED-323)** — one `anchors` column, built from the tool result the runtime read, and a link per exchange |
 | [BUG-246](FIXED_ITEMS.md#fixed-320--the-authority-matrix-hid-its-own-verdicts-on-a-phone) | Low | Permissions / web UI | **Closed 2026-08-29 (FIXED-320)** — raised and closed in the same run; a narrow window gets the same verdicts as stacked cards |
 | [BUG-247](FIXED_ITEMS.md#fixed-328--one-owner-for-the-whole-live-suite) | Low | Live test harness | **Closed 2026-08-30 (FIXED-328)** — `OWNER_CREDENTIALS` is the only owner credential in the suite |
+| [BUG-276](#bug-276--governed-events-only-leave-when-somebody-presses-a-button) | Low | Observability / telemetry export | Open — raised 2026-09-04 while closing backlog item 18. The export is on-demand only; the honest shape for a cadence is a routine over the scheduler that already exists, not a second daemon beside it |
 | [BUG-273](#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun) | Low | Live test harness / evidence | Open — raised 2026-09-03. The round's supplied key is identity-linked ([FIXED-370](FIXED_ITEMS.md#fixed-370--a-valid-key-was-reported-as-a-bare-http-status)), so no provider turn could run; three scenarios are written and are waiting on a key that authenticates |
 | [BUG-271](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one) | Low | Build / Approvals / code review | **Closed 2026-09-04 ([FIXED-375](FIXED_ITEMS.md#fixed-375--a-reviewer-could-narrow-a-change-and-could-not-correct-one))** — an edit is a new proposal with its own preview, hash and approval; the original resolves as denied with the replacement named. Closes GAP-BUILD B14 |
 | [BUG-274](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one) | Medium | Models / provider connection | **Closed 2026-09-04 ([FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one))** — raised and closed in this round: FIXED-370 classified the refusal and left the owner a dead end. The connection now carries the workspace |
@@ -958,3 +959,45 @@ npx playwright test --project=live e2e/priority-round-real-turn-live.spec.ts
 
 The spec skips itself when the variable is unset, so it neither fails CI nor
 claims a scenario it did not run.
+
+---
+
+## BUG-276 — Governed events only leave when somebody presses a button
+
+**Severity: Low. Area: Observability / telemetry export. Status: Open — raised
+2026-09-04, while closing
+[backlog item 18](FIXED_ITEMS.md#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it).**
+
+**Observed.** `telemetry_export` delivers governed events to an owner-named OTLP
+collector, and it delivers them **only on demand**: **Deliver now** on the
+destination's card, or `POST /api/telemetry/destinations/{id}/export`. There is
+no background sender. Events accumulate behind the cursor until someone looks,
+which the card states honestly (`N delivered`, `Last run …`) rather than implying
+a live feed.
+
+For the use this exists for that is half a wire. An owner running Raiker beside
+a dashboard wants the record to *arrive*, and a collector that receives only
+while its operator is watching is not something a dashboard can be built on.
+
+**Why it shipped this way, and why that was right.** The alternative on the table
+was a daemon, and this codebase has refused one before for the same reason:
+`scheduled_routines` is an on-demand runner and the retention sweep
+([FIXED-284](FIXED_ITEMS.md)) is an owner-confirmed action, both deliberately.
+A background process that reaches the network on a timer is a different security
+object from a button, and it needs its own answer to: what happens when the
+collector is unreachable for a day, what bounds the retry, and what the owner
+sees while it is failing. None of those were worth guessing at to make a first
+version feel finished.
+
+**Proposed fix.** The scheduler already exists and already runs governed work on
+a cadence a task carries. A delivery is a governed action with an executor, so
+the honest shape is a **routine** — an owner-created schedule that runs the
+export, visible on the Tasks board like every other recurring thing, with its
+failures landing in the same places every other task's do. That reuses the
+cadence, the pause switch, the notifications and the audit trail rather than
+inventing a second scheduler beside them.
+
+**Interface outcome that has to be true before this closes.** A destination
+either states the cadence it is delivered on, or states that it is delivered only
+on demand. It must never be possible to read the card and believe events are
+flowing when nothing has run since the owner last pressed the button.

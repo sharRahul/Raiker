@@ -16511,6 +16511,14 @@ The last run carried five — only what was new — and the received bodies cont
 rather than against the encoder. Evidence:
 [`screenshots/working/backlog-18-otlp-collector.png`](screenshots/working/backlog-18-otlp-collector.png).
 
+**What is deliberately not built, and is now an open entry.** There is no
+background sender: a delivery happens when the owner asks for one. That is stated
+on the card (`N delivered`, `Last run …`) rather than implied away, and it is
+raised as [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+rather than left as a footnote — a collector that receives only while its
+operator is watching is half a wire, and the honest shape for the other half is a
+routine over the scheduler that already exists.
+
 **User-interface outcome.** Observability → Overview answers a fifth question,
 *"Can I see this outside Raiker?"*: the collectors, what each one gets
 (**Metadata only** or **With redacted content**), how many events it has had, how

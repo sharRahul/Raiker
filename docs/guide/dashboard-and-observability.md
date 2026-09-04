@@ -82,7 +82,8 @@ environment variable holding it — never the value, which Raiker will not accep
 or store.
 
 **Deliver now** sends everything that collector has not had yet. There is no
-background sender: nothing leaves until you ask. A run that fails re-sends next
+background sender: nothing leaves until you ask, so the card's *Last run* is the
+only thing that says how current your collector is. A run that fails re-sends next
 time rather than skipping what it could not deliver, and the card says how many
 events have gone and how the last run went.
 

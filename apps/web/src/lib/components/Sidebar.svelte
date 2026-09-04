@@ -1,11 +1,11 @@
 <script lang="ts">
   import Icon from "./Icon.svelte";
   import Logo from "./Logo.svelte";
-  import { NAV_GROUPS, type NavGroup, type NavGroupId } from "../nav";
+  import { SIDEBAR_GROUPS, type NavGroup, type NavGroupId } from "../nav";
   import { activateModalDrawer, type DeactivateModalDrawer } from "../modalDrawer";
 
   const STORAGE_KEY = "raiker.navigation.groups";
-  const COLLAPSIBLE_IDS = new Set<NavGroupId>(["knowledge", "manage", "observe", "support"]);
+  const COLLAPSIBLE_IDS = new Set<NavGroupId>(["knowledge"]);
 
   let { current, desktopOpen = true, drawerOpen = false, compact = false, returnFocusTo = null,
     backgroundElement = undefined, onDrawerClose = () => {} }: {
@@ -29,9 +29,14 @@
   let expanded = $state<NavGroupId[]>(readExpanded());
   let navigationElement = $state<HTMLElement>();
   let deactivate: DeactivateModalDrawer | null = null;
-  const activeGroup = $derived(NAV_GROUPS.find((group) => group.items.some((item) => item.id === current)));
+  const activeGroup = $derived(SIDEBAR_GROUPS.find((group) => group.items.some((item) => item.id === current)));
 
+  /** True while the desktop sidebar is showing only icons. */
+  const rail = $derived(!compact && !desktopOpen);
   function isOpen(group: NavGroup): boolean {
+    // A rail hides the group headers, so a folded group would hide its icons
+    // with nothing left to unfold it. Everything is open at rail width.
+    if (rail) return true;
     return !group.collapsible || activeGroup?.id === group.id || expanded.includes(group.id);
   }
   function toggleGroup(group: NavGroup) {
@@ -53,14 +58,17 @@
 
 {#if compact && drawerOpen}<button type="button" class="drawer-scrim" aria-label="Close navigation" onclick={() => closeNavigation()}></button>{/if}
 
+<!-- `inert`/`aria-hidden` used to include the collapsed desktop case, because
+     collapsed meant the sidebar was translated off screen. A rail is on screen
+     and clickable, so only the closed mobile drawer is hidden from anyone. -->
 <nav id="all-navigation" class="sidebar" class:open={drawerOpen} class:desktop-hidden={!compact && !desktopOpen}
-  aria-label="All navigation" aria-hidden={(compact && !drawerOpen) || (!compact && !desktopOpen) ? "true" : undefined}
-  inert={(compact && !drawerOpen) || (!compact && !desktopOpen)} bind:this={navigationElement}>
+  aria-label="All navigation" aria-hidden={compact && !drawerOpen ? "true" : undefined}
+  inert={compact && !drawerOpen} bind:this={navigationElement}>
   <button type="button" class="drawer-close btn btn-ghost" onclick={() => closeNavigation()}>Close</button>
   <a class="brand" href="#/home"><Logo size={30} /><span class="brand-text"><span class="brand-name">Raiker</span><span class="brand-sub">Governed agent</span></span></a>
 
   <div class="navigation-sections">
-    {#each NAV_GROUPS as group (group.id)}
+    {#each SIDEBAR_GROUPS as group (group.id)}
       <section class="group" class:contains-active={activeGroup?.id === group.id}>
         {#if group.collapsible}
           <button type="button" class="group-toggle" aria-label={group.label} aria-expanded={isOpen(group)} aria-controls={`navigation-group-${group.id}`} onclick={() => toggleGroup(group)}>
@@ -87,8 +95,24 @@
 </nav>
 
 <style>
-  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
-  .sidebar.desktop-hidden { width:0; padding-inline:0; border-right-width:0; overflow:hidden; transform:translateX(-100%); }
+  .sidebar { width:var(--sidebar-w); flex-shrink:0; display:flex; flex-direction:column; min-height:0; overflow-y: auto; overflow-x:hidden; padding:var(--space-4) var(--space-3); border-right:1px solid var(--border); background:var(--surface); position: relative; transition:width var(--motion-shell) var(--ease-shell),padding var(--motion-shell) var(--ease-shell),transform var(--motion-shell) var(--ease-shell); }
+
+  /* Collapsed used to mean *gone* — width 0 and translated off screen — so the
+     only way to see where you were was to bring the whole 256px back. It is a
+     rail now: the icons stay, the active row stays marked, and the labels are
+     what the width buys you. Same control, same toggle; what changes is that
+     collapsing costs you the words rather than the navigation. */
+  .sidebar.desktop-hidden { width:var(--sidebar-rail-w); padding-inline:var(--space-2); }
+  .sidebar.desktop-hidden .brand-text,
+  .sidebar.desktop-hidden .group-label,
+  .sidebar.desktop-hidden .group-toggle,
+  .sidebar.desktop-hidden .scope-notes,
+  .sidebar.desktop-hidden .nav-link span { display:none; }
+  .sidebar.desktop-hidden .brand { justify-content:center; padding-inline:0; }
+  .sidebar.desktop-hidden .nav-link { justify-content:center; padding-inline:0; }
+  /* The group's active bar is positioned into the old padding, which the rail
+     does not have; without this it is clipped by `overflow-x`. */
+  .sidebar.desktop-hidden .group.contains-active::before { inset-inline:auto; left:-.35rem; }
   .drawer-scrim,.drawer-close { display:none; }
   .brand { display:flex; align-items:center; gap:.6rem; padding:.25rem .5rem var(--space-3); text-decoration:none; }
   .brand:hover { text-decoration:none; }

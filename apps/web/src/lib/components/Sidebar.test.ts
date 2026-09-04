@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, within } from "@testing-library/svelte";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import Sidebar from "./Sidebar.svelte";
-import { NAV_ITEMS } from "../nav";
+import { NAV_ITEMS, SIDEBAR_GROUPS } from "../nav";
 import { stubFetch } from "../test-helpers";
 
 afterEach(() => {
@@ -16,24 +16,47 @@ describe("Sidebar navigation", () => {
     render(Sidebar, { current: "new-chat" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
     expect(nav).toBeInTheDocument();
-    for (const item of NAV_ITEMS) {
+    // The rail carries the work you open many times an hour. Manage, Observe
+    // and Support moved behind the gear — `NAV_GROUPS` still holds every one of
+    // them, because routing resolves against that list, but a link to them is
+    // drawn in the window rather than here.
+    for (const item of SIDEBAR_GROUPS.flatMap((group) => group.items)) {
       expect(within(nav).getByRole("link", { name: item.label })).toBeInTheDocument();
+    }
+    const moved = NAV_ITEMS.filter(
+      (item) => !SIDEBAR_GROUPS.some((g) => g.items.some((i) => i.id === item.id)),
+    );
+    expect(moved.map((item) => item.id)).toContain("models");
+    for (const item of moved) {
+      expect(within(nav).queryByRole("link", { name: item.label })).toBeNull();
     }
   });
 
   it("marks the active route for assistive tech", () => {
-    render(Sidebar, { current: "observe" });
-    const active = within(screen.getByRole("navigation", { name: "All navigation" })).getByRole("link", { name: "Observability" });
+    render(Sidebar, { current: "memory" });
+    const active = within(screen.getByRole("navigation", { name: "All navigation" })).getByRole("link", { name: "Memory" });
     expect(active).toHaveAttribute("aria-current", "page");
   });
 
-  it("keeps Core visible and exposes the other sections as disclosures", () => {
-    render(Sidebar, { current: "models" });
+  it("keeps Core visible and exposes Knowledge as a disclosure", () => {
+    render(Sidebar, { current: "memory" });
     const nav = screen.getByRole("navigation", { name: "All navigation" });
     expect(within(nav).getByRole("link", { name: "Threads" })).toBeVisible();
-    expect(within(nav).getByRole("button", { name: "Manage" })).toHaveAttribute("aria-expanded", "true");
     expect(within(nav).getByRole("button", { name: "Knowledge" })).toHaveAttribute("aria-expanded", "true");
-    expect(within(nav).getByRole("link", { name: "Models" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Memory" })).toHaveAttribute("aria-current", "page");
+    // Manage was a group here and is not one any more.
+    expect(within(nav).queryByRole("button", { name: "Manage" })).toBeNull();
+  });
+
+  // Collapsed used to mean gone. It is a rail now, so every destination the
+  // sidebar carries is still reachable without bringing the labels back.
+  it("keeps every link reachable at rail width", () => {
+    render(Sidebar, { current: "memory", desktopOpen: false });
+    const nav = screen.getByRole("navigation", { name: "All navigation" });
+    expect(nav).not.toHaveAttribute("inert");
+    for (const item of SIDEBAR_GROUPS.flatMap((group) => group.items)) {
+      expect(within(nav).getByRole("link", { name: item.label })).toBeInTheDocument();
+    }
   });
 
   it("toggles and persists an inactive navigation group", async () => {

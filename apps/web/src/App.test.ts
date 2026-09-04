@@ -22,13 +22,16 @@ describe("App shell", () => {
     stubFetch(BOOTSTRAP_ROUTES);
     render(App);
     await signIn();
-    const toggle = await screen.findByRole("button", { name: "Hide navigation" });
+    const toggle = await screen.findByRole("button", { name: "Collapse navigation" });
     await fireEvent.click(toggle);
-    expect(screen.getByRole("button", { name: "Show navigation" })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.getByRole("button", { name: "Expand navigation" })).toHaveAttribute("aria-expanded", "false");
     expect(document.querySelector(".app-shell")).toHaveAttribute("data-navigation-open", "false");
-    const hiddenNavigation = document.getElementById("all-navigation") as HTMLElement;
-    expect(hiddenNavigation).toHaveAttribute("aria-hidden", "true");
-    expect(hiddenNavigation.inert).toBe(true);
+    // Collapsed is a rail, not a disappearance: the icons stay on screen and
+    // stay clickable, so nothing here may be hidden from assistive tech.
+    const railNavigation = document.getElementById("all-navigation") as HTMLElement;
+    expect(railNavigation).not.toHaveAttribute("aria-hidden");
+    expect(railNavigation.inert).toBe(false);
+    expect(railNavigation.className).toContain("desktop-hidden");
     expect(localStorage.getItem("raiker.navigation.desktop")).toBe("false");
   });
   // The 20s is the test's own timeout, and it has to be larger than the 10s
@@ -72,13 +75,19 @@ describe("App shell", () => {
       "Threads",
       "Approvals",
       "Tasks",
-      "Permissions",
-      "Models",
-      "Extensions",
-      "Observability",
-      "Settings",
     ]) {
       expect(within(nav).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
+    }
+    // Manage, Observe and Support left the rail for the gear's window. They are
+    // still routes — `nav.ts` still holds them — but the sidebar no longer
+    // carries a standing row for work that happens on a handful of days.
+    for (const label of ["Permissions", "Models", "Extensions", "Observability", "Settings"]) {
+      expect(within(nav).queryByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeNull();
+    }
+    await fireEvent.click(screen.getByRole("button", { name: "Settings and pages" }));
+    const pages = await screen.findByRole("dialog", { name: /settings & pages/i });
+    for (const label of ["Permissions", "Models", "Extensions", "Observability"]) {
+      expect(within(pages).getByRole("link", { name: new RegExp(`^${label}$`, "i") })).toBeInTheDocument();
     }
     // The acting principal and mode are surfaced, honestly, from the API — the runtime
     // mode identifier is shown as a plain-English name, not the raw code.
@@ -97,8 +106,8 @@ describe("App shell", () => {
     const prompt = await screen.findByLabelText("Prompt");
     await fireEvent.input(prompt, { target: { value: "Keep this draft" } });
 
-    await fireEvent.click(within(nav).getByRole("link", { name: "Settings" }));
-    await screen.findByText(/appearance/i);
+    await fireEvent.click(within(nav).getByRole("link", { name: "Memory" }));
+    await screen.findByRole("heading", { name: /memory/i });
 
     await fireEvent.click(within(nav).getByRole("link", { name: "Chat" }));
     expect(await screen.findByLabelText("Prompt")).toHaveValue("Keep this draft");
@@ -136,8 +145,8 @@ describe("App shell", () => {
     const nav = await screen.findByRole("navigation", { name: /all navigation/i });
     await fireEvent.click(within(nav).getByRole("link", { name: "Chat" }));
     await screen.findByLabelText("Prompt");
-    await fireEvent.click(within(nav).getByRole("link", { name: "Settings" }));
-    await screen.findByText(/appearance/i);
+    await fireEvent.click(within(nav).getByRole("link", { name: "Memory" }));
+    await screen.findByRole("heading", { name: /memory/i });
 
     window.location.hash = "#/new-chat?session=sess_hist";
     expect(await screen.findByText("saved session prompt")).toBeInTheDocument();

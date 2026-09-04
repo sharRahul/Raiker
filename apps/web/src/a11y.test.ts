@@ -35,8 +35,11 @@ describe("accessibility landmarks", () => {
     window.location.hash = "#/capabilities";
     render(App);
     await signIn();
+    await fireEvent.click(await screen.findByRole("button", { name: "Settings and pages" }));
     await waitFor(() => {
-      expect(screen.getByRole("link", { name: /permissions/i })).toHaveAttribute("aria-current", "page");
+      // Permissions moved behind the gear, so the marked link lives in that
+      // window rather than the rail.
+      expect(screen.getByRole("link", { name: /^permissions$/i })).toHaveAttribute("aria-current", "page");
     });
   });
 

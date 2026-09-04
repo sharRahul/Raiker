@@ -95,6 +95,10 @@
   --space-6: 2rem;
 
   --sidebar-w: 256px;
+  /* Collapsed the sidebar keeps its icons. 56px is a 20px icon in a 2.35rem row
+     with the row's own padding either side — wide enough that the target is the
+     same one you hit at full width, narrow enough to be worth collapsing for. */
+  --sidebar-rail-w: 56px;
   --topbar-h: 56px;
   --ease-shell: cubic-bezier(0.22, 1, 0.36, 1);
   --motion-shell: 240ms;

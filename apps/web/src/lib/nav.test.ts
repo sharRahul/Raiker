@@ -51,6 +51,7 @@ describe("nav model", () => {
       "search-chat",
       "tasks",
       "projects",
+      "approvals",
     ]);
   });
 
@@ -71,8 +72,10 @@ describe("nav model", () => {
   });
 
   it("consolidates connectors and MCP into one Extensions destination", () => {
+    // Approvals left this group for Core when Manage moved behind the gear: a
+    // decision waiting on you arrives many times a day, while Permissions and
+    // Models are configured once.
     expect(NAV_GROUPS[2].items.map((i) => i.id)).toEqual([
-      "approvals",
       "capabilities",
       "models",
       "extensions",

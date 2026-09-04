@@ -13,13 +13,16 @@
   // belongs. A global selector that silently retargeted every surface was the
   // thing worth removing: nothing about a page told you which project it meant.
   let { title, hint, connecting = false,
-    navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {} }: {
+    navigationOpen = true, compactNavigation = false, onNavigationToggle = () => {},
+    onOpenAllPages = () => {} }: {
     title: string;
     hint: string;
     connecting?: boolean;
     navigationOpen?: boolean;
     compactNavigation?: boolean;
     onNavigationToggle?: (trigger: HTMLElement) => void;
+    /** Opens the window holding Settings and every page not on the rail. */
+    onOpenAllPages?: (trigger: HTMLElement) => void;
   } = $props();
 
   // Owner-scoped notifications, reachable from every route. Reads are
@@ -77,11 +80,13 @@
 </script>
 
 <header class="topbar">
+  <!-- On desktop this collapses to a rail rather than hiding: the icons stay,
+       so "Hide"/"Show" described a behaviour the control no longer has. -->
   <div class="navigation-reveal-zone" data-navigation-open={navigationOpen}>
     <button
       type="button"
       class="btn btn-ghost navigation-toggle"
-      aria-label={compactNavigation ? (navigationOpen ? "Close navigation" : "Open navigation") : (navigationOpen ? "Hide navigation" : "Show navigation")}
+      aria-label={compactNavigation ? (navigationOpen ? "Close navigation" : "Open navigation") : (navigationOpen ? "Collapse navigation" : "Expand navigation")}
       aria-controls="all-navigation"
       aria-expanded={navigationOpen}
       onclick={(event) => onNavigationToggle(event.currentTarget)}
@@ -137,6 +142,16 @@
         </section>
       {/if}
     </div>
+    <!-- Settings, and with it every destination that left the sidebar. The gear
+         is the last thing before the host controls because it is the one an
+         owner reaches for least often and knows where to find. -->
+    <button
+      type="button"
+      class="btn btn-ghost"
+      aria-label="Settings and pages"
+      aria-haspopup="dialog"
+      onclick={(event) => onOpenAllPages(event.currentTarget)}
+    ><Icon name="settings" size="md" /></button>
     <HostControl />
     <StopSwitch />
   </div>

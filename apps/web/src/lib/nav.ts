@@ -18,13 +18,17 @@ export const NAV_GROUPS: NavGroup[] = [
     { id: "search-chat", label: "Threads", icon: "search", hint: "Everything you have going, and a search across it" },
     { id: "tasks", label: "Tasks", icon: "tasks", hint: "Agent tasks and progress" },
     { id: "projects", label: "Projects", icon: "projects", hint: "Named scopes for ongoing work" },
+    // Approvals sat under Manage with the setup pages, and it is not one: a
+    // decision waiting on you is the work, arriving many times a day, while
+    // Permissions and Models are configured once and revisited. It moved here
+    // when Manage left the sidebar for the gear.
+    { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
   ] },
   { id: "knowledge", label: "Knowledge", collapsible: true, items: [
     { id: "memory", label: "Memory", icon: "activity", hint: "Approved memories the agent can recall" },
     { id: "brain", label: "Knowledge Map", icon: "spark", hint: "Governed workspace relationships and sources" },
   ] },
   { id: "manage", label: "Manage", collapsible: true, items: [
-    { id: "approvals", label: "Approvals", icon: "approvals", hint: "Decisions waiting on you" },
     { id: "capabilities", label: "Permissions", icon: "capabilities", hint: "What the agent may do, and how it must ask" },
     { id: "models", label: "Models", icon: "models", hint: "Model profiles and provider gates" },
     { id: "extensions", label: "Extensions", icon: "connections", hint: "Connectors, MCP servers, skills, hooks and plugins" },
@@ -39,6 +43,29 @@ export const NAV_GROUPS: NavGroup[] = [
 ];
 export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((group) => group.items);
 export const DEFAULT_ROUTE = "home";
+
+/**
+ * Which groups the sidebar carries, and which live behind the gear.
+ *
+ * `NAV_GROUPS` stays the complete route registry — `routeFromHash` resolves
+ * against `NAV_ITEMS`, so a destination dropped from that list stops being
+ * reachable at all rather than merely moving. These two arrays only decide
+ * *where a link to it is drawn*.
+ *
+ * The split is by how often you go there. Core and Knowledge are the work: you
+ * open them many times an hour and they earn a permanent rail. Manage, Observe
+ * and Support are the things you set up once and revisit when something needs
+ * changing — a standing sidebar row for each was eight rows of furniture for
+ * work that happens on a handful of days.
+ */
+export const SIDEBAR_GROUP_IDS: NavGroupId[] = ["core", "knowledge"];
+export const SIDEBAR_GROUPS: NavGroup[] = NAV_GROUPS.filter((g) =>
+  SIDEBAR_GROUP_IDS.includes(g.id),
+);
+/** Everything the gear's window lists, in the order it lists them. */
+export const HUB_GROUPS: NavGroup[] = NAV_GROUPS.filter(
+  (g) => !SIDEBAR_GROUP_IDS.includes(g.id),
+);
 
 /**
  * Tabs inside a consolidated destination. The hub owns the tab list so a deep

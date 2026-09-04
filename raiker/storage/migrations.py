@@ -3746,3 +3746,22 @@ CREATE TABLE IF NOT EXISTS telemetry_destinations (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_telemetry_destinations_owner_name
   ON telemetry_destinations(principal_id, name);
 """
+
+
+# Compatibility backlog #23 — a delegating parent could not say where a child runs.
+#
+# BUG-220 gave a parent ownership of its children's terminal states: it parks as
+# `waiting_for_children` and settles when the last one lands. What it could not
+# do is say *how* a child should work. Every task cycle ran with Chat's standing
+# instructions, so a child whose job is "read this repository, make the change,
+# run the tests" was given the assistant's working method for it.
+#
+# `surface` is the missing half: `chat` or `build`, per task, chosen by whoever
+# created it — the owner on the Tasks board, or the parent's own turn through
+# `create_task`. It selects the standing instructions the cycle runs under and
+# nothing else: the same runtime, the same tools, the same governance.
+TASK_SURFACE_MIGRATION_ID = "RAIKER-2054-task-surface"
+
+TASK_SURFACE_SQL = """
+ALTER TABLE tasks ADD COLUMN surface TEXT NOT NULL DEFAULT 'chat';
+"""

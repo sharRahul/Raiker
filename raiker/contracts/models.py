@@ -1021,6 +1021,15 @@ class TaskRecord:
     # `session_id` stays the inbox: it is where the owner principal is carried,
     # and a task created before this existed has no thread and still works.
     thread_session_id: str | None = None
+    #: Compatibility backlog #23 — which working method this task's cycles run
+    #: under: ``chat`` or ``build``. BUG-220 gave a parent ownership of its
+    #: children's terminal states and no way to say *how* a child should work, so
+    #: every cycle ran with Chat's standing instructions — including one whose
+    #: job is "read the repository, make the change, run the tests".
+    #:
+    #: It selects the standing instructions and nothing else: the same runtime,
+    #: the same tools, the same governance, the same approvals.
+    surface: str = "chat"
     attachments: list[dict[str, Any]] = field(default_factory=list)
     schema_version: str = SCHEMA_VERSION
 
@@ -1038,6 +1047,9 @@ class TaskRecord:
         _require(self.title, "title")
         _require(self.objective, "objective")
         _one_of(self.status, TASK_STATUSES, "task_status")
+        # The same set the composer's own surface is validated against, so a
+        # task cannot name a working method a turn does not have.
+        _one_of(self.surface, PROMPT_SURFACES, "task_surface")
 
 
 SIDE_QUESTION_STATUSES = {"answered"}

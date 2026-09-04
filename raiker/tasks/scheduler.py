@@ -230,7 +230,16 @@ class TaskScheduler:
                 PromptEnvelope(
                     request_id=new_id("req_"), session_id=run_session_id, turn_id=turn_id,
                     client=ClientMetadata(type="dashboard", name="raiker-scheduler", version="1"),
-                    user=UserMetadata(id=principal_id), prompt=PromptPayload(text=prompt, attachments=task.attachments),
+                    user=UserMetadata(id=principal_id),
+                    prompt=PromptPayload(
+                        text=prompt,
+                        attachments=task.attachments,
+                        # Backlog #23 — the working method this task was created
+                        # for. Every cycle ran as Chat before this, so a task
+                        # whose job is "read the repository, make the change, run
+                        # the tests" was given the assistant's method for it.
+                        metadata={"surface": task.surface},
+                    ),
                     options=PromptOptions(
                         model_profile=task.model_profile or "",
                         model=task.model or "",

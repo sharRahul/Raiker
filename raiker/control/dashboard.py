@@ -1368,6 +1368,10 @@ class TaskView:
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    # Backlog #23 — the working method this task's cycles run under: `chat` or
+    # `build`. A delegating parent chooses it per child, so one brief can put
+    # the reading half in Chat and the change-and-test half in Build.
+    surface: str = "chat"
     # C11 — this task's own conversation, or None for a task created before
     # threads existed. The card links to it, and every cycle runs in it, so
     # "what did the overnight run find?" opens a transcript the owner can reply
@@ -6282,6 +6286,7 @@ class DashboardService:
         project_id: str | None = None,
         model_profile: str | None = None,
         model: str | None = None,
+        surface: str = "chat",
         attachments: list[dict[str, Any]] | None = None,
         start_immediately: bool = True,
     ) -> TaskView:
@@ -6291,9 +6296,19 @@ class DashboardService:
         given, else with the active project, so a schedule created inside a
         project stays scoped to it. The stamp is an organizing label — it
         grants nothing.
+
+        ``surface`` (backlog #23) chooses the working method this task's cycles
+        run under. A `build` task needs a project, because Build's whole method
+        is a repository it can read: without one it would be Chat wearing the
+        wrong standing instructions, so it is refused with a stated reason
+        rather than accepted and quietly downgraded.
         """
         if recurrence is not None and recurrence not in TASK_RECURRENCES:
             raise ValueError(f"invalid_recurrence:{recurrence}")
+        from raiker.contracts.models import PROMPT_SURFACES
+
+        if surface not in PROMPT_SURFACES:
+            raise ValueError(f"invalid_surface:{surface}")
         if bool(model_profile) != bool(model):
             raise ValueError("task_model_pair_required")
         if model_profile and model:
@@ -6344,6 +6359,12 @@ class DashboardService:
             project_id = self.store.get_active_project(user_id)
         elif self.store.load_project(project_id, user_id) is None:
             raise ValueError(f"unknown_project:{project_id}")
+        # Backlog #23 — Build's method is a repository it can read. A build task
+        # with no project would run Build's standing instructions over Chat's
+        # scope, which is the kind of half-configured state this product refuses
+        # rather than accepts and explains later.
+        if surface == "build" and not project_id:
+            raise ValueError("build_task_requires_project")
         if parent_task_id is not None:
             parent = self.store.load_task(parent_task_id)
             parent_session = (
@@ -6392,6 +6413,7 @@ class DashboardService:
         task = TaskManager(self.store, EventLogWriter(self.store)).create_task(
             session_id=inbox_session_id,
             thread_session_id=thread_session_id,
+            surface=surface,
             title=title,
             objective=objective,
             priority=priority,
@@ -8742,6 +8764,7 @@ class DashboardService:
             project_id=d.get("project_id"),
             model_profile=d.get("model_profile"),
             model=d.get("model"),
+            surface=str(d.get("surface") or "chat"),
             thread_session_id=d.get("thread_session_id"),
             thread_turns=thread_turns,
             attachments=list(d.get("attachments") or []),

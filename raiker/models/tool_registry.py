@@ -432,9 +432,30 @@ TOOL_DEFINITIONS: tuple[ToolDefinition, ...] = (
         read_shaped=False,
         required_args=("title",),
         required_list_args=(),
-        optional_args=(),
-        arg_schemas=(),
-        description="Create a local task or reminder. Requires title; optional description, scheduled_at, reminder_at, recurrence, and project_id.",
+        # Backlog #23 — `surface` is how a delegating turn says *how* a child
+        # should work. The parent is derived from the running session rather than
+        # named here, so a turn can attach work to its own tree and no other.
+        optional_args=("surface",),
+        arg_schemas=(
+            (
+                "surface",
+                {
+                    "type": "string",
+                    "enum": ["chat", "build"],
+                    "description": (
+                        "The working method the task runs under. 'build' for work that "
+                        "reads a repository, changes it and runs its tests, and needs a "
+                        "project; 'chat' (the default) for everything else."
+                    ),
+                },
+            ),
+        ),
+        description=(
+            "Create a local task or reminder. Requires title; optional description, "
+            "scheduled_at, reminder_at, recurrence, project_id, and surface "
+            "('chat' or 'build'). Created inside a task's own thread, the new task "
+            "becomes that task's child and the parent waits for it."
+        ),
     ),
     ToolDefinition(
         name="diff_files",

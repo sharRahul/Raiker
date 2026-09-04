@@ -51,6 +51,13 @@ Common fields:
 - **Parent work** — nest under an existing task. A child of a task is a subtask;
   a child of a routine is a subroutine.
 - **Priority** — Low / Normal / High.
+- **How to work** — **Chat** or **Build**, offered inside a project. It picks the
+  working method the cycles run under and nothing else: same tools, same
+  permissions, same approvals. Choose **Build** when the work is *read this
+  repository, change it, run the tests*; leave it on **Chat** for everything
+  else. A Build task needs a project, which is why the control appears only in
+  one. On the board a task says `· Build` when that is what it is, and says
+  nothing when it is the ordinary case.
 
 **A parent owns its children's outcomes.** A task that delegated work does not
 report *completed* while a child is still open: when its own run finishes it
@@ -59,6 +66,13 @@ completed if every child completed, failed if any failed or was cancelled. The
 ownership runs one way only. A child carries its own approvals, because one
 decision standing in for an unbounded number of later ones is exactly what the
 per-turn permission envelope exists to prevent.
+
+**Raiker can split its own brief.** A task working in its own conversation can
+create children there, and each one picks the working method its part needs — the
+reading half in Chat, the change-and-test half in Build. The parent is taken from
+the conversation the work is running in, never named in the request, so a task can
+only ever add to its own tree. Nothing is auto-denied for taking too long: a
+delegated child waits for you, as every other decision does.
 
 The list splits into **Open work** and **Completed work**, with counters for
 open, scheduled, and finished. Each running item has a **Stop** button; a task

@@ -393,6 +393,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-378](#fixed-378--raiker-spoke-the-current-mcp-revision-and-did-not-use-its-transport) | Low | MCP / interoperability | Fixed 2026-09-04 (the transport half of BUG-234) |
 | [FIXED-379](#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) | Medium | Observability / governed events | Fixed 2026-09-04 (compatibility backlog item 18) |
 | [FIXED-380](#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two) | Low | Hooks / handlers | Fixed 2026-09-04 (the `http` slice of BUG-226) |
+| [FIXED-381](#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) | Medium | Tasks / delegation | Fixed 2026-09-04 (compatibility backlog item 23) |
 
 ---
 
@@ -16570,3 +16571,67 @@ grant does not cover it, says *"this host is not in RAIKER_HOOK_EGRESS_ALLOWLIST
 to borrow. The **Handler types** card now describes four of five and states that
 MCP tool and agent handlers remain refused rather than gaining an ungoverned
 execution path.
+
+---
+
+## FIXED-381 — A parent owned its children's outcomes and could not say how they work
+
+**Severity: Medium. Area: Tasks / delegation. Status: Fixed 2026-09-04
+(compatibility backlog item 23).**
+
+**Observed.** BUG-220 gave a parent task real ownership of its children: it parks
+as `waiting_for_children` and settles when the last one lands
+([FIXED-286](#fixed-286--a-task-reported-done-while-the-work-it-delegated-was-still-open)).
+What it could not do is say *how* a child should work. Every task cycle ran with
+Chat's standing instructions, because the scheduler's prompt envelope carried no
+`surface` and `_system_messages()` defaults to Chat — so a child whose job is
+"read this repository, make the change, run the tests until they pass" was given
+the assistant's working method for it, and had to find the coding method on its
+own each cycle.
+
+That is the difference between *"tasks nest"* and *"one brief becomes finished
+work"*. [Cowork's Dispatch](https://claude.com/docs/cowork/guide/dispatch) routes
+each piece of a brief to the surface it belongs on. Raiker already has both
+surfaces under one governed turn contract, so this is scheduling rather than a
+new execution path — and it is deliberately **without** Dispatch's ten-minute
+auto-deny, which Raiker refuses: a decision nobody made is not a decision.
+
+**Fixed.** A task carries a `surface` — `chat` or `build` — validated against
+`PROMPT_SURFACES`, the same set a composer's own surface is validated against, so
+a task cannot name a working method a turn does not have. The scheduler puts it in
+the cycle's prompt metadata, which is what selects the standing instructions. It
+selects that and nothing else: the same runtime, the same tools, the same
+capability gates, the same approvals, the same audit trail.
+
+Three properties it is built on:
+
+* **A Build task needs a project.** Build's method is a repository it can read;
+  without one it would be Chat wearing the wrong standing instructions. It is
+  refused with `build_task_requires_project` rather than accepted and quietly
+  downgraded, and the composer offers the control only inside a project so the
+  refusal is rarely reached at all.
+* **A delegating turn's parent is derived, never supplied.** A task's cycles run
+  in its own thread (C11), so "which task is running" is a fact about the session
+  the broker already trusts. `create_task` resolves the parent from that session;
+  it does **not** accept a `parent_task_id` from the model, because that would let
+  one turn attach work to somebody else's tree. A child inherits its parent's
+  project for the same reason — that is the repository the brief is about.
+* **The ownership is untouched.** A parent with an unfinished Build child still
+  parks and still settles on the last one. Nothing is inherited downward: a child
+  carries its own approvals, because a parent's decision standing in for its
+  children's is exactly what the per-turn capability envelope exists to prevent.
+
+**Guarded.** `tests/test_task_surface_routing.py` — the default being chat, a
+build task recording build, the surface validated against the composer's own set,
+an unknown surface refused with a stated reason, a build task with no project
+refused, a chat task needing nothing, Build's standing instructions being the one
+thing the surface changes, a task thread resolving to its task, an ordinary chat
+session resolving to none, the broker deriving the parent and inheriting its
+project, a turn outside a task thread creating top-level work, and a parent with
+an unfinished build child still parking.
+
+**User-interface outcome.** The Tasks composer's chip row says *when* — Task,
+Once, Routine, Background — and a second row inside a project says *how*: **Chat**
+or **Build**. On the board, a task's footer says `· Build` when that is what it
+is, and says nothing when it is the default, so the common case stays quiet and a
+delegated Build child stands out in the tree it is nested in.

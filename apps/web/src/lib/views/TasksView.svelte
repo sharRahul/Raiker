@@ -176,6 +176,17 @@
     try { approvals = await api.approvals(); } catch { approvals = []; }
   }
 
+  // Backlog #23 — which working method this task's cycles run under. Named
+  // `workMethod` rather than `surface` because `surface` above already means
+  // which *model picker* is being composed ("tasks" or "schedule"), and one word
+  // meaning two things in one file is how the wrong one gets read.
+  //
+  // Build's method is a repository it can read, so it needs a project; the
+  // control appears only inside one rather than letting the request come back
+  // refused.
+  let workMethod = $state("chat");
+  const buildAvailable = $derived(Boolean(projectId));
+
   async function createTask() {
     if (!title.trim() || !objective.trim() || modelBlocked || attachStore.uploading || (wantsStartTime && !scheduledAt)) return;
     creating = true; notice = null;
@@ -187,10 +198,11 @@
         ...(wantsStartTime ? { scheduled_at: new Date(scheduledAt).toISOString() } : {}),
         ...(cadence === "routine" ? { recurrence: routineEvery } : cadence === "background" ? { recurrence: "background" } : {}),
         ...(projectId ? { project_id: projectId } : {}),
+        ...(workMethod === "build" ? { surface: "build" } : {}),
         ...(modelProfile && model ? { model_profile: modelProfile, model } : {}),
         ...(attachments ? { attachments } : {}),
       });
-      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = "";
+      title = ""; objective = ""; parentTaskId = ""; priority = "normal"; cadence = "now"; routineEvery = "daily"; scheduledAt = ""; modelProfile = ""; model = ""; workMethod = "chat";
       notice = "Saved to your work queue.";
       attachStore.clear();
       await load();
@@ -293,6 +305,14 @@
     onsubmit={(event) => { event.preventDefault(); void createTask(); }}
   >
     <div class="composer-heading"><div><h3>Plan work</h3></div><div class="cadence chip-row" role="group" aria-label="When to run"><button type="button" class="chip" aria-pressed={cadence === "now"} onclick={() => cadence = "now"}>Task</button><button type="button" class="chip" aria-pressed={cadence === "once"} onclick={() => cadence = "once"}>Once</button><button type="button" class="chip" aria-pressed={cadence === "routine"} onclick={() => cadence = "routine"}>Routine</button><button type="button" class="chip" aria-pressed={cadence === "background"} onclick={() => cadence = "background"}>Background</button></div></div>
+    <!-- Backlog #23 — the chip row above says *when*; this says *how*. Build's
+         method is a repository it can read, so it appears only inside a project. -->
+    {#if buildAvailable}
+      <div class="chip-row" role="group" aria-label="How to work">
+        <button type="button" class="chip" aria-pressed={workMethod === "chat"} onclick={() => workMethod = "chat"}>Chat</button>
+        <button type="button" class="chip" aria-pressed={workMethod === "build"} onclick={() => workMethod = "build"}>Build</button>
+      </div>
+    {/if}
     <label>Title<input class="input" aria-label="Task title" bind:this={titleEl} bind:value={title} required maxlength="240" placeholder={cadence === "background" ? "e.g. Research local AI news" : cadence === "routine" ? "e.g. Review today’s priorities" : "What should Raiker work on?"} /></label>
     <label>Instructions *<textarea class="textarea" aria-label="Instructions" aria-invalid={Boolean(title.trim() && !objective.trim())} aria-describedby={title.trim() && !objective.trim() ? "instructions-error" : undefined} bind:value={objective} required placeholder="Add the outcome, context, or constraints for this work."></textarea></label>
     {#if title.trim() && !objective.trim()}<p id="instructions-error" class="field-error" role="alert">Instructions are required.</p>{/if}
@@ -381,7 +401,13 @@
               <div class="progress" role="progressbar" aria-valuenow={task.progress_percent} aria-valuemin="0" aria-valuemax="100"><div style={`width:${task.progress_percent}%`}></div></div>
             {/if}
             <footer>
-              <span title={task.scheduled_at ?? task.updated_at}>{scheduleLabel(task)} · updated {relativeTime(task.updated_at)}</span>
+              <span title={task.scheduled_at ?? task.updated_at}>
+                {scheduleLabel(task)} · updated {relativeTime(task.updated_at)}
+                <!-- Backlog #23 — which working method this task's cycles run
+                     under. Only said when it is not the default, so the common
+                     case stays quiet and a Build child stands out on the board. -->
+                {#if task.surface === "build"} · Build{/if}
+              </span>
               <span class="task-actions">
                 <!-- C11 — background work used to finish into a status line.
                      Each task now runs its cycles in a conversation of its own,

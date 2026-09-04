@@ -460,4 +460,36 @@ describe("TasksView blocked-on-approval pointer", () => {
     );
     expect(screen.queryByText(/waiting on/i)).not.toBeInTheDocument();
   });
+
+  // Backlog #23 — a parent that owns its children's outcomes could not say how
+  // a child should work, so a task whose job is "read the repository, make the
+  // change, run the tests" ran with the assistant's method for it.
+  it("says which work runs as Build, and stays quiet about the default", async () => {
+    stubFetch({
+      "GET /api/tasks": [
+        { ...TASK, task_id: "task_read", title: "Read the issue", surface: "chat" },
+        { ...TASK, task_id: "task_fix", title: "Fix the failing test", surface: "build" },
+      ],
+      "GET /api/approvals": [],
+    });
+    render(TasksView);
+
+    await screen.findByRole("heading", { name: "Fix the failing test" });
+    // Said once, on the one that is not the default.
+    expect(screen.getAllByText(/· Build/)).toHaveLength(1);
+  });
+
+  // The control is offered only where Build's method can work: a repository.
+  it("offers the working method only inside a project", async () => {
+    stubFetch({ "GET /api/tasks": [], "GET /api/approvals": [] });
+    const { unmount } = render(TasksView);
+    await waitFor(() => expect(screen.getByText("Plan work")).toBeInTheDocument());
+    expect(screen.queryByRole("group", { name: "How to work" })).not.toBeInTheDocument();
+    unmount();
+
+    stubFetch({ "GET /api/tasks": [], "GET /api/approvals": [] });
+    render(TasksView, { projectId: "proj_1" });
+    await waitFor(() => expect(screen.getByText("Plan work")).toBeInTheDocument());
+    expect(screen.getByRole("group", { name: "How to work" })).toBeInTheDocument();
+  });
 });

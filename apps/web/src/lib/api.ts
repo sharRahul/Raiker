@@ -2168,6 +2168,8 @@ export const api = {
     project_id?: string | null;
     model_profile?: string;
     model?: string;
+    /** "chat" (the default) or "build". A build task needs a project. */
+    surface?: string;
     attachments?: PromptAttachment[];
   }) => postJson<TaskView>("/api/tasks", body),
   // BUG-64 — creation alone does not execute model-proposed work. This is the

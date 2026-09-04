@@ -1821,6 +1821,13 @@ export interface TaskView {
   model_profile?: string | null;
   model?: string | null;
   /**
+   * Backlog #23 — the working method this task's cycles run under: "chat" or
+   * "build". A delegating parent chooses it per child, so one brief can put the
+   * reading half in Chat and the change-and-test half in Build. A build task
+   * needs a project.
+   */
+  surface?: string;
+  /**
    * C11 — this task's own conversation. Every cycle runs in it, so a routine
    * accumulates a readable thread rather than interleaving its turns with every
    * other task's in one hidden Inbox transcript. Null for a task created before

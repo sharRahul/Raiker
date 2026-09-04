@@ -202,6 +202,10 @@ class TaskCreateRequest(BaseModel):
     project_id: str | None = None
     model_profile: str | None = None
     model: str | None = None
+    # Backlog #23 — the working method this task's cycles run under. A `build`
+    # task needs a project, and is refused with `build_task_requires_project`
+    # rather than accepted and quietly run as Chat.
+    surface: Literal["chat", "build"] = "chat"
     attachments: list[dict[str, Any]] | None = None
 
 

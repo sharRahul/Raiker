@@ -357,6 +357,8 @@ from raiker.storage.migrations import (
     TASK_ATTACHMENTS_SQL,
     TASK_MODEL_CHOICES_MIGRATION_ID,
     TASK_MODEL_CHOICES_SQL,
+    TASK_SURFACE_MIGRATION_ID,
+    TASK_SURFACE_SQL,
     TASK_THREAD_SESSION_MIGRATION_ID,
     TASK_THREAD_SESSION_SQL,
     TELEMETRY_DESTINATIONS_MIGRATION_ID,
@@ -1565,6 +1567,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TELEMETRY_DESTINATIONS_MIGRATION_ID,
                 TELEMETRY_DESTINATIONS_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TASK_SURFACE_MIGRATION_ID,
+                TASK_SURFACE_SQL,
                 connection,
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
@@ -7267,8 +7274,8 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             connection.execute(
                 """
                 INSERT OR IGNORE INTO tasks
-                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, attachments_json)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (task_id, session_id, thread_session_id, parent_turn_id, parent_task_id, title, objective, status, current_step, progress_percent, created_at, updated_at, completed_at, priority, scheduled_at, recurrence, reminder_at, project_id, model_profile, model, surface, attachments_json)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     task.task_id,
@@ -7291,6 +7298,7 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                     task.project_id,
                     task.model_profile,
                     task.model,
+                    task.surface,
                     json.dumps(task.attachments, sort_keys=True),
                 ),
             )
@@ -7305,6 +7313,21 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             attachments = []
         data["attachments"] = attachments if isinstance(attachments, list) else []
         return TaskRecord(**data)
+
+    def load_task_for_thread_session(self, session_id: str) -> TaskRecord | None:
+        """The task whose own conversation is *session_id*, if there is one.
+
+        Backlog #23 — this is how a delegating turn's parent is *derived* rather
+        than supplied. A cycle runs in its task's thread (C11), so the running
+        task is a fact about the session the broker already trusts; taking a
+        `parent_task_id` from the model instead would let one turn attach work to
+        somebody else's tree.
+        """
+        with self.connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM tasks WHERE thread_session_id = ? LIMIT 1", (session_id,)
+            ).fetchone()
+        return self._task_from_row(row) if row is not None else None
 
     def load_task(self, task_id: str) -> TaskRecord | None:
         with self.connect() as connection:

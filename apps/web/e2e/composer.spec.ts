@@ -445,13 +445,12 @@ test("desktop view audit covers every route, Models tab, and Settings section", 
     ["observe?tab=sessions", "Observability", "operational"],
     ["observe?tab=activity", "Observability", "operational"],
     ["observe?tab=checkpoints", "Observability", "operational"],
-    ["observe?tab=diagnostics", "Observability", "operational"],
     ["observe?tab=work", "Observability", "operational"],
     ["observe?tab=notifications", "Observability", "operational"],
     ["guide", "Guide", "reading"],
     ["settings?tab=general", "Settings", "workspace"],
   ] as const;
-  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing", "posture"] as const;
+  const modelTabs = ["hosted", "huggingface", "activity", "routing", "pricing"] as const;
   const settingsSections = [
     "notification", "personalisation", "security", "privacy", "account",
     "web-access", "git-credential", "runtime",

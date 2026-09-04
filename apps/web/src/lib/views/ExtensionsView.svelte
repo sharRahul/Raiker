@@ -570,9 +570,8 @@
                 {/if}
               </dl>
               <p class="note">
-                Changing any of these goes through the governed control plane — the capability gate,
-                the credential vault, and the approval path. This panel reports state; it never
-                grants it.
+                This panel reports state; it never grants it.
+                <GuideLink section="extensions-and-mcp" label="How a server is governed" />
               </p>
             {/if}
           </SidePanel>
@@ -616,10 +615,7 @@
           />
           <span>Turn every hook off</span>
         </label>
-        <p class="note">
-          Your setting, not a fourth configuration file — a file a project ships cannot re-enable
-          itself. Rules stay listed while this is on, so you can see what would run.
-        </p>
+        <p class="note">Rules stay listed while this is on, so you can see what would run.</p>
 
         <p class="posture" class:posture-warn={hooks.disabled || hooks.failed_sources.length > 0}>
           {#if hooks.disabled}
@@ -763,7 +759,7 @@
 
       <section class="card">
         <h2>Built-in handlers</h2>
-        <p class="note">Raiker's own code, so a builtin always carries decision authority.</p>
+        <p class="note">Raiker's own code.</p>
         <ul class="event-list">
           {#each hooks.builtins as builtin (builtin)}
             <li><strong>{builtin}</strong></li>
@@ -812,7 +808,6 @@
         <li><code>.raiker/plugins/</code> <span class="note">plugin — lowest, so it can only make an action stricter</span></li>
       </ul>
       <p class="note">
-        This page reports what the runtime loaded; it does not edit those files.
         <GuideLink section="extensions-and-mcp" label="How hooks are configured" />
       </p>
     </section>
@@ -833,8 +828,7 @@
         {/if}
         {#if plugins.plugins.length === 0}
           <p class="note">
-            Nothing is installed, and no plugin code runs in this browser. The
-            posture above is what a plugin installed today would meet.
+            Nothing is installed, and no plugin code runs in this browser.
           </p>
         {:else}
           <ul class="plugin-list">
@@ -885,9 +879,8 @@
       <section class="card">
         <h2>What a plugin may contribute</h2>
         <p class="note">
-          A plugin runs no code of its own. It contributes through a surface that already governs
-          the thing contributed — which is why hooks came first, and why a kind with no such
-          surface yet is marked unavailable rather than quietly listed.
+          A plugin runs no code of its own.
+          <GuideLink section="extensions-and-mcp" label="Why a kind can be unavailable" />
         </p>
         <ul class="event-list">
           {#each plugins.contribution_kinds ?? [] as kind (kind.kind)}
@@ -1111,7 +1104,12 @@
                       <button class="btn btn-sm btn-primary" type="submit" disabled={channelBusy !== null}>Save routing</button>
                       <button class="btn btn-sm" type="button" onclick={() => (routingFor = null)}>Cancel</button>
                     </div>
-                    <p class="note">Messages cannot choose their route. Side questions have no tool budget; approvals require the exact relay and action identity.</p>
+                    <p class="note">
+                      Record only is the default, and messages cannot choose their route. Side
+                      questions have no tool budget; approvals require the exact relay and action
+                      identity.
+                      <GuideLink section="extensions-and-mcp" label="The routing contract" />
+                    </p>
                   </form>
                 {/if}
               {:else}
@@ -1164,10 +1162,6 @@
       {/if}
     </section>
 
-    <section class="card deferred">
-      <h2>Routing contract</h2>
-      <p class="note">Record only is the default. Active routes come only from the pairing above; message content cannot select one. Owner turns keep normal governance, side questions cannot use tools, and an approval response must match one pending relay exactly.</p>
-    </section>
   </div>
 {/if}
 
@@ -1462,10 +1456,6 @@
   }
   .note { color: var(--text-3); font-size: 0.78rem; margin: 0; }
   hr { border: 0; border-top: 1px solid var(--border); margin: var(--space-5) 0; }
-  .deferred { max-width: 46rem; }
-  /* A reading measure for one prose paragraph, without borrowing `deferred`'s
-     meaning to get it. */
-  .deferred h2 { margin-top: 0; }
 
   /* A connector row: identity and state on one line, the controls under it, and
      the form under those — so the row reads the same whether it is 1440px wide

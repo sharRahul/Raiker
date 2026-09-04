@@ -1350,7 +1350,6 @@ describe("ModelsView action-category tabs", () => {
       "Activity",
       "Routing",
       "Pricing",
-      "Posture",
     ]);
   });
 
@@ -1383,14 +1382,30 @@ describe("ModelsView action-category tabs", () => {
     expect(screen.queryByText("Your hosted providers")).toBeNull();
   });
 
-  it("puts the read-only posture on its own tab", async () => {
+  // Posture was a top-level tab holding four read-only facts and a paragraph.
+  // The facts belong above the cards whose refusals they explain, and the
+  // paragraph belongs in the guide; a whole destination for seven words of state
+  // put the answer one click away from the question.
+  it("reads the off-machine posture above the hosted cards it explains", async () => {
     stubFetch({ "GET /api/models": models({}) });
-    render(ModelsView, { props: { tab: "posture" } });
-    expect(
-      await screen.findByText("Off-machine provider posture"),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("On this device")).toBeNull();
-    expect(screen.queryByText("Your hosted providers")).toBeNull();
+    render(ModelsView, { props: { tab: "hosted" } });
+    const posture = await screen.findByLabelText("Off-machine provider posture");
+    expect(within(posture).getByText("Hosted model gate")).toBeInTheDocument();
+    expect(within(posture).getByText("Private-network gate")).toBeInTheDocument();
+    expect(within(posture).getByText("Egress allowlist")).toBeInTheDocument();
+    expect(within(posture).getByText("Off-machine profiles")).toBeInTheDocument();
+    // On the tab it is about, not on one of its own.
+    expect(screen.getByRole("tab", { name: "Hosted" })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("does not read the posture on the local tab, which is not about it", async () => {
+    stubFetch({ "GET /api/models": models({}) });
+    render(ModelsView, { props: { tab: "local" } });
+    await screen.findByText("On this device");
+    expect(screen.queryByLabelText("Off-machine provider posture")).toBeNull();
   });
 
   it("marks the selected tab and links each panel back to it", async () => {

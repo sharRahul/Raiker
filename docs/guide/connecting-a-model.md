@@ -105,7 +105,8 @@ for offers no button rather than one that cannot work.
 **Connect**. (The Models page is split by what you came to do: **Local** for
 on-device runtimes, **Hosted** for accounts and advanced endpoints, **Hugging
 Face** for discovery, **Activity** for usage, **Routing** for fallback and the
-advisor, **Pricing** for rates, and **Posture** for read-only gate status.)
+advisor, and **Pricing** for rates. The off-machine gate status reads at the
+top of **Hosted**, above the cards it explains.)
 
 That is the whole flow. Behind it:
 
@@ -293,8 +294,43 @@ than silently choosing a backend you did not pick.
 
 ## Advisor model
 
-An optional second-opinion model, gated by `advisor_model_runtime`. Its answer
-is always treated as untrusted data, never as instructions.
+When you run a local model, it can consult one advisor — typically a hosted
+model — through the governed `consult_advisor` tool. It is the way to keep a
+small local model as your default and still reach for a larger one on the
+questions that need it.
+
+**Picking an advisor grants nothing on its own.** Every consult is gated at call
+time by all of:
+
+- the `advisor_model_runtime` capability;
+- its decision mode, which is **ask** by default and withholds the consult until
+  you allow it;
+- the advisor provider's own policy — its hosted gate, the egress allowlist and
+  its API key.
+
+Miss any one and the consult is refused with its own named reason, exactly as
+any other governed action is.
+
+The advisor's answer is **always treated as untrusted data**, never as
+instructions: it reaches the local model as material to consider, and it cannot
+propose an action, widen an approval, or change what the turn is allowed to do.
+Neither the question nor the answer enters the audit log — only their lengths
+do, so the record shows that a consult happened and how large it was without
+keeping either side of it.
+
+## Off-machine provider posture
+
+**Models → Hosted** opens with four read-only facts about everything that would
+leave this machine: the hosted model gate, the private-network gate, whether an
+egress allowlist is configured, and how many off-machine profiles exist. It is
+status, not a control — allowlist values and API keys are never displayed
+anywhere in the product, including here.
+
+A hosted provider fails closed unless **all** of the following are present: the
+runtime gate, the threat-model acknowledgement, the confirmation token, the
+egress allowlist, and the provider key. There is no silent fallback to a hosted
+model: if the model you chose cannot run, the turn fails with the reason rather
+than quietly reaching for one that costs money and leaves the machine.
 
 ---
 

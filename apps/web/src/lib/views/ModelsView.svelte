@@ -65,7 +65,6 @@
     { id: "activity", label: "Activity" },
     { id: "routing", label: "Routing" },
     { id: "pricing", label: "Pricing" },
-    { id: "posture", label: "Posture" },
   ];
 
   // Which provider sections each tab owns. The three groups already existed as
@@ -1111,7 +1110,7 @@
 {#if catalogueNotice}<p class="catalogue-notice" role="status">{catalogueNotice}</p>{/if}
 
 <!-- Readiness and the global default describe the page, not one panel, so
-     they sit above the strip: an owner on Pricing or Posture can still see
+     they sit above the strip: an owner on Pricing or Routing can still see
      whether anything can run and change what runs by default. -->
 {#if models !== null && models.profiles.length > 0}
   <section
@@ -1228,6 +1227,33 @@
           in the terminal client (<code>/model use …</code>).
         {/if}
       </p>
+      <!--
+        The four off-machine facts, on the tab they are about. They were their
+        own top-level tab — seven words of state and a paragraph, one click away
+        from the cards they explain. Read here, they answer the question the
+        Hosted tab actually raises: why did this provider refuse. The paragraph
+        that sat under them is the guide's *Off-machine provider posture*.
+      -->
+      {#if tab === "hosted"}
+        <dl class="gates" aria-label="Off-machine provider posture">
+          <div>
+            <dt>Hosted model gate</dt>
+            <dd>{gateStateLabel(models.hosted_model_gate_state)}</dd>
+          </div>
+          <div>
+            <dt>Private-network gate</dt>
+            <dd>{gateStateLabel(models.private_network_model_gate_state)}</dd>
+          </div>
+          <div>
+            <dt>Egress allowlist</dt>
+            <dd><code>{models.model_egress_allowlist_configured ? "configured" : "not configured"}</code></dd>
+          </div>
+          <div>
+            <dt>Off-machine profiles</dt>
+            <dd><code>{models.remote_profile_count}</code></dd>
+          </div>
+        </dl>
+      {/if}
       {#if tab === "local"}<ProvidersPanel onCatalogueChanged={refreshProviderCatalogues} />{/if}
       {#if models.profiles.length === 0}
         <div class="card">
@@ -1803,14 +1829,10 @@
       <section class="card advisor" aria-labelledby="advisor-h">
         <h2 id="advisor-h">Advisor model</h2>
         <p class="sub">
-          When you run a local model, it can consult one advisor — typically a
-          hosted model — through the governed <code>consult_advisor</code> tool.
-          Picking an advisor grants nothing on its own: the consult is gated by
-          the <code>advisor_model_runtime</code> capability, its decision mode
-          (default <strong>ask</strong>, which withholds the consult), and the
-          provider's own policy (hosted gate, egress allowlist, API key) at call
-          time. The advisor's answer is always treated as untrusted data, and
-          the question/answer never enter the audit log — only lengths do.
+          A local model can consult one advisor through the governed
+          <code>consult_advisor</code> tool. Picking one grants nothing: every
+          consult is still gated at call time.
+          <GuideLink section="connecting-a-model" label="How an advisor is governed" />
         </p>
         <div class="advisor-row">
           <select bind:value={advisorChoice} aria-label="Advisor model profile">
@@ -1885,50 +1907,6 @@
     </div>
   {/if}
 
-  {#if tab === "posture"}
-    <div
-      class="panel"
-      role="tabpanel"
-      id="panel-posture"
-      aria-labelledby="tab-posture"
-    >
-      <section class="card gate-status" aria-labelledby="model-gates-h">
-        <h2 id="model-gates-h">Off-machine provider posture</h2>
-        <dl class="gates">
-          <div>
-            <dt>Hosted model gate</dt>
-            <dd>{gateStateLabel(models.hosted_model_gate_state)}</dd>
-          </div>
-          <div>
-            <dt>Private-network gate</dt>
-            <dd>{gateStateLabel(models.private_network_model_gate_state)}</dd>
-          </div>
-          <div>
-            <dt>Egress allowlist</dt>
-            <dd>
-              <code
-                >{models.model_egress_allowlist_configured
-                  ? "configured"
-                  : "not configured"}</code
-              >
-            </dd>
-          </div>
-          <div>
-            <dt>Off-machine profiles</dt>
-            <dd><code>{models.remote_profile_count}</code></dd>
-          </div>
-        </dl>
-        <p class="sub">
-          Read-only status. Allowlist values and API keys are never displayed.
-          Hosted providers fail closed unless the runtime gate, threat-model
-          acknowledgement, confirmation token, egress allowlist, and provider
-          key are all present{models.no_silent_hosted_fallback
-            ? " — and there is no silent fallback to hosted models"
-            : ""}.
-        </p>
-      </section>
-    </div>
-  {/if}
 {/if}
 
 
@@ -2994,14 +2972,16 @@
     max-width: 22rem;
     font-size: 0.86rem;
   }
-  .gate-status {
-    margin-top: var(--space-4);
-  }
+  /* The four off-machine facts, read as a strip above the Hosted cards rather
+     than as a card of their own on a tab of their own. */
   .gates {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
     gap: 0.5rem 1rem;
-    margin: 0 0 var(--space-3);
+    margin: 0 0 var(--space-4);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-2);
   }
   .gates dt {
     font-size: 0.72rem;

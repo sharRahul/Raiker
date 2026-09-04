@@ -215,6 +215,12 @@
   .library-layout {
     --text-muted: var(--text-2);
     display: grid;
+    /* BUG-284 — an implicit grid column is `auto`, which sizes to the widest
+       item's max-content and refuses to shrink below its min-content. One long
+       row inside therefore made this 450px wide in a 366px phone and the whole
+       panel drew over the page. `minmax(0, 1fr)` is the same single column that
+       is allowed to be narrower than its contents want. */
+    grid-template-columns: minmax(0, 1fr);
     gap: 18px;
   }
   .slot-note {
@@ -290,7 +296,11 @@
   }
   .model-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    /* BUG-284 — `minmax(300px, 1fr)` has a hard floor: on a 390px phone the
+       track stays 300px inside a ~290px column and the grid bleeds out of the
+       panel. `min(300px, 100%)` keeps the 300px preference where there is room
+       and lets the track shrink where there is not. */
+    grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
     gap: 12px;
   }
   .model-card {

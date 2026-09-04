@@ -490,13 +490,51 @@ describe("ExtensionsView", () => {
     ).toBeInTheDocument();
   });
 
-  it("explains the completed owner-safe routing contract", async () => {
+  // The contract used to be a standalone "Routing contract" card at the foot of
+  // the tab, restating in different words a note already sitting inside the
+  // routing form. Two statements of one contract on one page, and the card was
+  // the copy nobody read at a decision point. It is asserted here where the
+  // choice is actually made, which is the only place it changes an outcome.
+  it("states the routing contract where the route is chosen", async () => {
+    stubFetch({
+      "GET /api/channels": channelsView({
+        profiles: [
+          {
+            connector_id: "channel.webhooks",
+            channel_type: "webhooks",
+            display_name: "Webhooks",
+            transport: "signed_http_callback",
+            auth_method: "shared_secret",
+            default_state: "disabled",
+            requires_pairing: true,
+            requires_sender_allowlist: true,
+            requires_network: true,
+            linked: true,
+            enabled: false,
+            pairing_id: "chp_1",
+            display_label: "Webhooks",
+            sender_count: 1,
+            senders: ["ops@example.com"],
+          },
+        ],
+      }),
+    });
+    render(ExtensionsView, { props: { tab: "channels" } });
+    await fireEvent.click(await screen.findByRole("button", { name: "Routing" }));
+
+    expect(await screen.findByText(/Record only is the default/i)).toBeInTheDocument();
+    expect(screen.getByText(/messages cannot choose their route/i)).toBeInTheDocument();
+    expect(screen.getByText(/side questions have no tool budget/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/approvals require the exact relay and action identity/i),
+    ).toBeInTheDocument();
+  });
+
+  it("does not restate that contract a second time on the same tab", async () => {
     stubFetch({ "GET /api/channels": channelsView() });
     render(ExtensionsView, { props: { tab: "channels" } });
-    await screen.findByRole("heading", { name: "Routing contract" });
-    expect(screen.getByText(/Record only is the default/i)).toBeInTheDocument();
-    expect(screen.getByText(/side questions cannot use tools/i)).toBeInTheDocument();
-    expect(screen.getByText(/approval response must match one pending relay exactly/i)).toBeInTheDocument();
+    await screen.findByText(/untrusted content with a named sender who is not you/i);
+    expect(screen.queryByRole("heading", { name: "Routing contract" })).toBeNull();
   });
 
   it("mounts the Skills tab as its own destination", async () => {

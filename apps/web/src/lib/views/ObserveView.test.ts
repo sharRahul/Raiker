@@ -114,10 +114,11 @@ describe("ObserveView", () => {
     expect(screen.getByText("Is anything waiting for me?")).toBeInTheDocument();
     expect(screen.getByText("What changed?")).toBeInTheDocument();
     expect(screen.getByText("Can I safely share this?")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /open diagnostics/i })).toHaveAttribute(
-      "href",
-      "#/observe?tab=diagnostics",
-    );
+    // Diagnostics was a seventh tab reading this same object and restating four
+    // of its six cards from it. Its unique half is a section of this page now,
+    // so the Runtime tile no longer links away to a copy of itself.
+    expect(screen.getByText("Is the runtime itself healthy?")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /open diagnostics/i })).toBeNull();
     expect(screen.getByRole("link", { name: /open the decision queue/i })).toHaveAttribute(
       "href",
       "#/approvals",

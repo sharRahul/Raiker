@@ -662,7 +662,15 @@
   .due-row :global(svg) { flex:none; color:var(--warn,var(--text-3)); }
   .due-row[role="status"] :global(svg) { color:var(--ok,var(--text-3)); }
   .index-row { display:flex; gap:var(--space-2); align-items:center; margin-top:var(--space-2); flex-wrap:wrap; }
+  /* BUG-284 — two mobile bleeds this page had as soon as it held anything.
+     `min-width:0` lets the label shrink; the select inside it still claims the
+     width of its longest option unless it is told otherwise. And an approved
+     memory offers seven controls in a row that could not wrap, so at 390px the
+     card bled 145px past its own edge and over the one beside it. Neither was
+     visible on an empty workspace, which is why the width sweep went green on a
+     fresh instance and red on a used one. */
   .index-field { flex:1 1 14rem; min-width:0; }
+  .index-field select { width:100%; min-width:0; }
   /* BUG-71 — the posture strip states what this page can actually promise. It
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able
@@ -695,7 +703,7 @@
      observations count. A short count still sits inline. */
   .section-head > :last-child:not(:first-child) { flex:none; max-width:100%; } .memory-grid { display:grid; gap:var(--space-3); }
   .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warning-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
-  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
+  .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; flex-wrap:wrap; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
   /* MEM-04 — an observation reads as a memory card with one difference: a
      refused one is drawn in the warning tone the pending proposals already use,
      because both are "here is something Raiker did not act on by itself". */

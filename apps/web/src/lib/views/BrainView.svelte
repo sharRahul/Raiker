@@ -585,7 +585,7 @@
        the places Raiker holds an owner's work plus the folders they granted —
        it never lists the workspace root, which is what made it offer Raiker's
        whole installation as something to index. -->
-  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Knowledge boundary</span><h2 id="source-title">Add a source</h2><p>Raiker can read the places it keeps your work, and any folder you grant it. Nothing else on this computer is visible here. Review what would be indexed, then confirm — sources never become approved memory automatically.</p>
+  {#if sourceOpen}<dialog use:modal class="source-modal" aria-labelledby="source-title" oncancel={closeSourceDialog} onclick={(event) => { if (event.target === event.currentTarget) closeSourceDialog(); }}><button class="close" aria-label="Close add source" onclick={() => closeSourceDialog()}>×</button><span class="eyebrow">Knowledge boundary</span><h2 id="source-title">Add a source</h2><p>Nothing else on this computer is visible here. Review what would be indexed, then confirm — sources never become approved memory automatically.</p>
     {#if sourceBrowse}
       <nav class="source-browser" aria-label="Knowledge source browser">
         {#if sourceBrowse.parent !== null || sourceBrowse.path}<button onclick={() => void browseSource(sourceBrowse!.parent ?? "")}>← {sourceBrowse.parent ? "Up one folder" : "All places"}</button>{/if}

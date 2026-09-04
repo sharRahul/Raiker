@@ -197,8 +197,6 @@
               ? `Running in ${humanize(diagnostics.runtime_mode)} mode with its readiness checks met.`
               : `Running in ${humanize(diagnostics.runtime_mode)} mode with unmet readiness checks.`}
             tone={ready ? "ok" : "warn"}
-            href="#/observe?tab=diagnostics"
-            linkLabel="Open diagnostics"
           />
           <StatTile
             label="Closed capability gates"
@@ -337,6 +335,21 @@
         {/if}
       </section>
 
+      <!--
+        Diagnostics was a seventh tab on this hub reading the *same* `diagnostics`
+        object this page already reads. Four of its six cards restated the three
+        tiles at the top: the readiness tick list said "Runtime: Ready", the
+        configuration-gaps card rendered the identical `missing_config`, the
+        capability chips expanded the closed-gates count, and the provider table
+        was a thinner copy of Models. What only it had is here — the runtime's
+        own health transitions, the memory integrity report and its repair, and
+        any readiness check that actually failed.
+      -->
+      <section aria-labelledby="health-h">
+        <h2 id="health-h" class="section-h">Is the runtime itself healthy?</h2>
+        <DiagnosticsView />
+      </section>
+
       <!-- Backlog #18 — the record Raiker keeps is more than any compared
            product exports, and until now it could not leave the machine on a
            wire. This is the fifth question the overview answers. -->
@@ -354,10 +367,6 @@
 {:else if tab === "checkpoints"}
   <div id="panel-checkpoints" role="tabpanel" aria-labelledby="tab-checkpoints">
     <CheckpointsView {projectId} {sessionId} />
-  </div>
-{:else if tab === "diagnostics"}
-  <div id="panel-diagnostics" role="tabpanel" aria-labelledby="tab-diagnostics">
-    <DiagnosticsView />
   </div>
 {:else if tab === "work"}
   <div id="panel-work" role="tabpanel" aria-labelledby="tab-work">

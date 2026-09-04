@@ -65,7 +65,6 @@ describe("nav model", () => {
       "sessions",
       "activity",
       "checkpoints",
-      "diagnostics",
       "work",
       "notifications",
     ]);
@@ -120,8 +119,11 @@ describe("nav model", () => {
     expect(tabFromHash("#/activity")).toBe("activity");
     expect(routeFromHash("#/work")).toBe("observe");
     expect(tabFromHash("#/work")).toBe("work");
+    // Diagnostics was folded into Overview: four of its six cards restated the
+    // tiles there from the same object, and the rest is an Overview section now.
+    // The route still resolves rather than falling through to the Workbench.
     expect(routeFromHash("#/diagnostics?session=sess_1")).toBe("observe");
-    expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("diagnostics");
+    expect(tabFromHash("#/diagnostics?session=sess_1")).toBe("overview");
     expect(routeFromHash("#/sessions?session=sess_1")).toBe("observe");
     expect(tabFromHash("#/sessions?session=sess_1")).toBe("sessions");
     expect(routeFromHash("#/mcp")).toBe("extensions");
@@ -145,13 +147,16 @@ describe("nav model", () => {
     expect(tabFromHash("#/models?tab=activity")).toBe("activity");
     expect(tabFromHash("#/models?tab=routing")).toBe("routing");
     expect(tabFromHash("#/models?tab=pricing")).toBe("pricing");
-    expect(tabFromHash("#/models?tab=posture")).toBe("posture");
   });
 
   // Bookmarks and older builds still emit the pre-split ids. They must land on
   // the panel that now owns their content, not on the default tab.
   it("maps a superseded Models tab id onto the panel that replaced it", () => {
     expect(tabFromHash("#/models?tab=providers")).toBe("local");
+    // Posture held four read-only facts and a paragraph. The facts are a strip
+    // at the top of Hosted, where they explain the cards beneath them; the
+    // paragraph is in the guide.
+    expect(tabFromHash("#/models?tab=posture")).toBe("hosted");
     expect(tabFromHash("#/models?tab=library")).toBe("local");
     expect(tabFromHash("#/models?tab=discover")).toBe("huggingface");
     expect(tabFromHash("#/models?tab=downloads")).toBe("activity");

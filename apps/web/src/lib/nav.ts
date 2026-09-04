@@ -57,10 +57,9 @@ export const HUB_TABS: Record<string, string[]> = {
     "activity",
     "routing",
     "pricing",
-    "posture",
   ],
   extensions: ["connectors", "mcp", "skills", "hooks", "plugins", "channels"],
-  observe: ["overview", "sessions", "activity", "checkpoints", "diagnostics", "work", "notifications"],
+  observe: ["overview", "sessions", "activity", "checkpoints", "work", "notifications"],
   // Every section the settings rail renders, in rail order. The two lists have
   // to agree: a section the rail shows but this list omits is a deep link that
   // silently opens General instead, which reads as a working link to the wrong
@@ -92,7 +91,7 @@ const ROUTE_ALIASES: Record<string, { route: string; tab: string }> = {
   mcp: { route: "extensions", tab: "mcp" },
   activity: { route: "observe", tab: "activity" },
   checkpoints: { route: "observe", tab: "checkpoints" },
-  diagnostics: { route: "observe", tab: "diagnostics" },
+  diagnostics: { route: "observe", tab: "overview" },
   work: { route: "observe", tab: "work" },
   notifications: { route: "observe", tab: "notifications" },
   sessions: { route: "observe", tab: "sessions" },
@@ -114,6 +113,18 @@ const HUB_TAB_ALIASES: Record<string, Record<string, string>> = {
     library: "local",
     discover: "huggingface",
     downloads: "activity",
+    // "Posture" was a tab holding four read-only facts and a paragraph. The
+    // facts moved onto Hosted, where they explain the cards under them; the
+    // paragraph moved to the guide. The alias keeps every link that named the
+    // tab working, which is what this map is for.
+    posture: "hosted",
+  },
+  // "Diagnostics" read the same `diagnostics` object Overview reads and restated
+  // four of its six cards from it. What was unique — runtime health transitions,
+  // memory integrity and its repair, and a failed readiness check's remediation —
+  // is a section of Overview now.
+  observe: {
+    diagnostics: "overview",
   },
 };
 

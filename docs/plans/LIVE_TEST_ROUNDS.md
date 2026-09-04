@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 (fourth) | Targeted + measured four-width sweep | `pages/` | — (no model needed) | Two tabs folded out of the nav, 244 words moved to the guide, and three mobile bleeds the width sweep found only because the workspace had been worked in |
 | 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
 | 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
 | 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
@@ -1098,6 +1099,47 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 [`screenshots/working/`](screenshots/working). The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
+---
+
+## 2026-09-04 (fourth) — Two tabs that were copies, and three bleeds an empty page hid
+
+**Tier: targeted + measured four-width sweep.** Production web build, the same
+workspace the third round used — which is the whole reason this round found
+anything.
+
+**What it proved.**
+
+1. **Every route still fits at 390, 768, 1280 and 1920**, and every page renders,
+   after two hub tabs were folded away. `#/models?tab=posture` opens Hosted,
+   `#/diagnostics` and `#/observe?tab=diagnostics` open Overview; `nav.test.ts`
+   asserts each, so a bookmark that named either lands on the panel that owns its
+   content rather than on the hub's first tab.
+2. **Four read-only facts read above the cards they explain.** The off-machine
+   posture is a strip at the top of Models → Hosted, where it answers *why did
+   this provider refuse*, instead of a tab of its own one click away.
+3. **Observability lost a tab and kept everything it said.** *Is the runtime
+   itself healthy?* carries the health transitions, the memory integrity report
+   and its Rescan; the four cards that restated Overview's own tiles are gone.
+
+**What it found, and it is the more useful half.** The width sweep had passed
+that morning and failed that afternoon at 390px. Stashing every source change and
+rebuilding reproduced it identically on unmodified `main` — so it was never the
+day's work. Three genuine mobile bleeds, each needing *content* to exist:
+
+* seven controls on an approved memory in a flex row that could not wrap
+  (511px in a 366px card);
+* a `<select>` claiming the width of its longest option inside a label that was
+  allowed to shrink;
+* a `display:grid` whose implicit `auto` column sized to max-content and refused
+  to shrink below it, plus a `minmax(300px, 1fr)` with a hard floor.
+
+The morning run had none of them because the workspace had no memory and no
+indexed model. **A responsive check against an empty page is a check of the empty
+state.** That is the layer under [BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs):
+not that a spec can re-run against a used workspace, but that running against one
+finds what an empty one hides. Closed as
+[FIXED-395](FIXED_ITEMS.md#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything).
+
 ---
 
 ## 2026-09-04 (third) — A wire with a clock, and three defects found by using the product

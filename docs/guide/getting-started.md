@@ -233,7 +233,7 @@ The sidebar groups every destination:
 complete record of every conversation *and* every task run, which is why the
 sidebar's RECENT CHATS list stays conversations only. **Models** and
 **Extensions** are tabbed the same way — Models by Local / Hosted / Hugging
-Face / Activity / Routing / Pricing / Posture, Extensions by Connectors / MCP
+Face / Activity / Routing / Pricing, Extensions by Connectors / MCP
 servers / Skills / Plugins / Channels. Old links to the pages these absorbed
 still resolve and open the right tab.
 

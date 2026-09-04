@@ -406,6 +406,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-391](#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line) | Low | Web UI / consistency | Fixed 2026-09-04 (BUG-280, raised by this round's page sweep) |
 | [FIXED-392](#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off) | Low | Documentation / capability defaults | Fixed 2026-09-04 (BUG-281, raised while verifying FIXED-386 live) |
 | [FIXED-393](#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | Fixed 2026-09-04 (BUG-282, raised by this round's page sweep) |
+| [FIXED-394](#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | Fixed 2026-09-04 (BUG-283, raised by the owner) |
+| [FIXED-395](#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | Fixed 2026-09-04 (BUG-284, found by the width sweep on a *used* workspace) |
 
 ---
 
@@ -17284,3 +17286,113 @@ absent entirely when the runtime is not on that strategy.
 
 **User-interface outcome.** The Memory page is three lines shorter and says the
 same thing. The guide says what the product does.
+
+---
+
+## FIXED-394 — Thirty destinations, and two of them were copies of the others
+
+**Severity: Low. Area: Web UI / information architecture. Status: Fixed
+2026-09-04. Raised as BUG-283 from an owner observation: *"a lot of pages and
+information can be moved to settings and guide docs."***
+
+**Measured before anything was moved**, because "too much text" is a feeling and
+this document only takes evidence:
+
+| | Before | After |
+|---|---|---|
+| Static prose words on screen | 4,457 | 4,213 |
+| …of it explaining how Raiker works in general | 610 | 453 |
+| Hub tab destinations | 30 | 28 |
+
+**What the survey actually found**, and it is not what the observation assumed.
+Most on-screen prose is **not** teaching: it is state (*"No hooks are
+configured"*) or a consequence stated at the point of a decision (*"deleting the
+project later will not delete the folder"*). Those must stay, and the owner
+confirmed that rule when asked. The teaching prose was concentrated, and one page
+held a quarter of it.
+
+**Extensions, 151 words.** The Plugins tab opened with a design-rationale essay —
+*"which is why hooks came first, and why a kind with no such surface yet is
+marked unavailable rather than quietly listed"* — whose first sentence is already
+the guide's Plugins section, verbatim. The MCP side panel explained the governed
+control plane. The Hooks tab explained why the off switch is an owner setting
+rather than a fourth config file, which the guide's *Turning them off* already
+says. Each is now a `GuideLink`, the component built for exactly this and whose
+own header states the rule: *"what it must never become is a second place to
+write prose."*
+
+**And the same contract, twice on one page.** Channels carried a standalone
+**Routing contract** card restating, in different words, a note already inside
+the routing form. One of the two is at the decision; the other was at the foot of
+the tab where nobody reads it before choosing. The card is gone, the note gained
+the one fact only the card had, and the guide carries the full contract.
+
+**Models → Posture was a tab holding four read-only facts and a paragraph.** The
+facts now read as a strip at the top of **Hosted** — above the provider cards
+whose refusals they explain, rather than one click away from them — and the
+paragraph is the guide's *Off-machine provider posture*.
+
+**Observability → Diagnostics was a seventh tab reading the same object as the
+first one.** `ObserveView` and `DiagnosticsView` both call `GET /api/diagnostics`,
+and four of Diagnostics' six cards restated what Overview's three tiles already
+say from that payload: a tick list reading "ready" beside a tile reading
+**Ready**, the identical `missing_config` list, an expansion of the closed-gate
+count that Permissions lists *with controls*, and a provider table thinner than
+the one on Models. What only it had — the runtime's own health transitions, the
+memory integrity report and its repair, and a **failed** readiness check's reason
+code and remediation — is a section of Overview: *Is the runtime itself healthy?*
+`DiagnosticsView.svelte` went 467 → 314 lines and the tick list of passing checks
+is gone, because a check that is fine needs no words at all.
+
+**No link was broken.** `#/models?tab=posture` resolves to Hosted and
+`#/diagnostics` and `#/observe?tab=diagnostics` to Overview, through the
+`HUB_TAB_ALIASES` map that exists for this, and `nav.test.ts` asserts each.
+
+**One thing was put back after being cut.** *"No plugin code runs in this
+browser"* is a claim about the product's boundary that appears nowhere else — not
+on another surface and not in the guide — and a test guarded it. Eight words that
+are the most reassuring fact on the Plugins tab is not prose to move; trimming it
+was the wrong call and it was restored before it shipped.
+
+**User-interface outcome.** Two fewer destinations, 244 fewer words to read past,
+and nothing an owner acts on moved further from the action. Every consequence
+still sits beside the control that causes it.
+
+---
+
+## FIXED-395 — Three mobile bleeds that only existed once the workspace held anything
+
+**Severity: Medium. Area: Web UI / responsive layout. Status: Fixed 2026-09-04.
+Raised as BUG-284 by the width sweep, on the second run of the day.**
+
+**Observed.** `ui-sweep-widths-live.spec.ts` passed at 390/768/1280/1920 in the
+morning and failed at 390 in the afternoon, on a build whose only changes were
+elsewhere. Stashing every source change and rebuilding reproduced the failure
+identically on unmodified `main`, which is what proved it was not the day's work:
+
+* **`.card-actions` on an approved memory** — seven controls in a `display:flex`
+  row with no `flex-wrap`. 511px of buttons in a 366px card, drawn over the card
+  beside it.
+* **`.index-field` on Memory** — `min-width:0` lets the *label* shrink; the
+  `<select>` inside it still claims the width of its longest option. 292 in 248.
+* **`.library-layout` on Models → Local** — a `display:grid` with no
+  `grid-template-columns`, so its single implicit column is `auto`: it sizes to
+  the widest item's max-content and **refuses to shrink below min-content**. 450
+  in 366. `minmax(0, 1fr)` is the same one column, allowed to be narrower than
+  its contents want.
+* **`.model-grid`** — `repeat(auto-fill, minmax(300px, 1fr))` has a hard 300px
+  floor inside a ~290px column. Fixed as `minmax(min(300px, 100%), 1fr)`.
+
+**Why it went green and then red, and this is the part worth keeping.** Every one
+of these needs *content* to appear: an approved memory, an indexed local model.
+The morning's sweep ran on a workspace that had neither. **A responsive check
+against an empty page is a check of the empty state**, and this suite has spent
+three rounds ([BUG-229](TO_BE_FIXED.md#bug-229--most-live-specs-sign-in-only-on-an-empty-workspace),
+[BUG-247](TO_BE_FIXED.md#bug-247--every-live-spec-brings-its-own-owner-password),
+[BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs))
+peeling away that same assumption one layer at a time. This is the layer under
+BUG-250: not that a spec cannot re-run against a used workspace, but that running
+against a used one **finds defects an empty one hides**.
+
+**User-interface outcome.** Nothing draws over its neighbour at 390px on any
+route, with a workspace that has been worked in.

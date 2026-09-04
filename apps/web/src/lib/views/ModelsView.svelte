@@ -25,6 +25,7 @@
   import { modelName } from "../modelPresentation";
   import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { isChoosableModel } from "../modelReadiness.svelte";
+  import { installerRuntimeFor, openRuntimeInstaller } from "../runtimeInstall";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
   import HuggingFacePanel from "./models/HuggingFacePanel.svelte";
@@ -299,6 +300,9 @@
   // saying it is missing. One flag for the whole view: detection is a single
   // pass over every runtime, not a per-provider operation.
   let detecting = $state(false);
+  // Which provider's installer is being opened, and what to say afterwards.
+  let installing = $state<string | null>(null);
+  let installNotice = $state<string | null>(null);
   let detailsFor = $state<ModelProfile | null>(null);
   // Governed refusals are policy outcomes, not faults. Hold the reason code so
   // the dialog can render the control that unblocks it instead of a bare code.
@@ -479,11 +483,38 @@
     return profile.model !== UNPINNED_MODEL && profile.configured !== false;
   }
 
+  /**
+   * BUG-270 — offer the setup, rather than only reporting its absence.
+   *
+   * "Not installed on this machine" is a fact and half an answer: the owner
+   * then had to find the install panel further up the page and work out which
+   * of its cards matched the row that told them. This is the same governed
+   * vendor path that panel takes, offered where the absence is stated.
+   */
+  async function setUpRuntime(provider: string) {
+    const runtime = installerRuntimeFor(provider);
+    if (runtime === null) return;
+    installing = provider;
+    try {
+      await openRuntimeInstaller(runtime);
+      // Deliberately not "installed". Raiker opened a download; whether the
+      // owner ran it is theirs to say, and **Look again** is how they say it.
+      installNotice = `Opened the official ${providerName(provider)} download. Install it, then choose Look again.`;
+    } catch {
+      installNotice = `Could not open the ${providerName(provider)} download.`;
+    } finally {
+      installing = null;
+    }
+  }
+
   async function redetectRuntimes() {
     detecting = true;
     try {
       await api.detectLocalRuntimes();
       await load();
+      // The instruction the notice carried has been followed, whatever the
+      // answer turned out to be.
+      installNotice = null;
     } catch {
       // A failed look leaves the last answer standing rather than replacing it
       // with a claim this call did not establish.
@@ -1200,6 +1231,20 @@
                           <p class="posture-line runtime-missing">
                             <Icon name="warning" size={14} />
                             Not installed on this machine
+                            {#if installerRuntimeFor(p.provider)}
+                              <!-- The offer, not just the finding. Raiker opens
+                                   the vendor's own download and accepts nothing
+                                   on the owner's behalf. -->
+                              <button
+                                type="button"
+                                class="btn btn-sm"
+                                onclick={() => void setUpRuntime(p.provider)}
+                                disabled={installing !== null}
+                                >{installing === p.provider
+                                  ? "Opening…"
+                                  : `Set up ${providerName(p.provider)}`}</button
+                              >
+                            {/if}
                             <button
                               type="button"
                               class="link-button"
@@ -1208,6 +1253,11 @@
                               >{detecting ? "Looking…" : "Look again"}</button
                             >
                           </p>
+                          {#if installNotice && installing === null}
+                            <p class="posture-line install-notice" role="status">
+                              {installNotice}
+                            </p>
+                          {/if}
                         {/if}
                         <div class="chips">
                           <span class="chip"
@@ -1390,6 +1440,17 @@
                         <p class="posture-line runtime-missing">
                           <Icon name="warning" size={14} />
                           Not installed on this machine
+                          {#if installerRuntimeFor(p.provider)}
+                            <button
+                              type="button"
+                              class="btn btn-sm"
+                              onclick={() => void setUpRuntime(p.provider)}
+                              disabled={installing !== null}
+                              >{installing === p.provider
+                                ? "Opening…"
+                                : `Set up ${providerName(p.provider)}`}</button
+                            >
+                          {/if}
                           <button
                             type="button"
                             class="link-button"
@@ -1398,6 +1459,11 @@
                             >{detecting ? "Looking…" : "Look again"}</button
                           >
                         </p>
+                        {#if installNotice && installing === null}
+                          <p class="posture-line install-notice" role="status">
+                            {installNotice}
+                          </p>
+                        {/if}
                       {/if}
                       <!-- Shown only where there is something to report: a
                            local runtime that cannot bill and a provider with no
@@ -2229,6 +2295,9 @@
   .runtime-missing .link-button:disabled {
     cursor: default;
     opacity: 0.6;
+  }
+  .install-notice {
+    color: var(--text-2);
   }
   .details-actions {
     display: flex;

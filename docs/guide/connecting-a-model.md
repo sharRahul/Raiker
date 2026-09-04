@@ -64,8 +64,14 @@ software you have not installed.
 A local provider card says **"Not installed on this machine"** when Raiker looked
 and did not find it, and says nothing when it has not looked. Detection is a
 lookup of your `PATH` — never a connection to anything — and the answer is
-remembered, so opening Models does not re-scan. **Look again** on the card is
-there for the minute after you install something.
+remembered, so opening Models does not re-scan.
+
+The card offers the fix rather than leaving you to find it: **Set up
+&lt;Provider&gt;** opens that vendor's own download page. Raiker does not install
+anything, bundle an installer, or accept anyone's terms for you — it opens the
+page, you decide. When you have installed it, **Look again** re-runs the lookup
+and the card stops saying it is missing. A runtime Raiker has no reviewed source
+for offers no button rather than one that cannot work.
 
 ## Local discovery and acquisition
 

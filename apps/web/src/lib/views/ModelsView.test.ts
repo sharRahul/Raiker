@@ -93,6 +93,114 @@ describe("BUG-270 — a card never claims a runtime that is not here", () => {
     );
   });
 
+  it("offers to set the runtime up, not just to look again", async () => {
+    // Reporting the absence was half an answer: the owner then had to find the
+    // install panel further up the page and match its cards to the row that
+    // told them.
+    const mock = stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            configured: false,
+            provider_detected: false,
+          }),
+        ],
+        usable_provider_count: 0,
+      }),
+      "POST /api/model-operations/preview": {
+        runtime: "ollama",
+        action: "download_official_installer",
+        source_url: "https://ollama.com/download",
+        argv: [],
+        requires_elevation: false,
+        terms_url: "https://github.com/ollama/ollama/blob/main/LICENSE",
+        redistribution: false,
+      },
+    });
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    render(ModelsView, { tab: "local" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
+
+    await waitFor(() =>
+      expect(mock).toHaveBeenCalledWith(
+        "/api/model-operations/preview",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    // The vendor's own download, in a new tab, with the opener severed.
+    await waitFor(() =>
+      expect(open).toHaveBeenCalledWith(
+        "https://ollama.com/download",
+        "_blank",
+        "noopener,noreferrer",
+      ),
+    );
+    // Not "installed": Raiker opened a download, and whether it was run is the
+    // owner's to say.
+    expect(await screen.findByText(/Install it, then choose Look again/)).toBeTruthy();
+  });
+
+  it("refuses a plan that does not name an https source", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "ollama-local-openai-compatible",
+            provider: "ollama",
+            model: "gemma4:31b-cloud",
+            configured: false,
+            provider_detected: false,
+          }),
+        ],
+      }),
+      "POST /api/model-operations/preview": {
+        runtime: "ollama",
+        action: "download_official_installer",
+        source_url: "http://ollama.com/download",
+        argv: [],
+        requires_elevation: false,
+        terms_url: "",
+        redistribution: false,
+      },
+    });
+    const open = vi.fn();
+    vi.stubGlobal("open", open);
+    render(ModelsView, { tab: "local" });
+
+    await fireEvent.click(await screen.findByRole("button", { name: "Set up Ollama" }));
+
+    expect(await screen.findByText(/Could not open the Ollama download/)).toBeTruthy();
+    expect(open).not.toHaveBeenCalled();
+  });
+
+  it("offers no setup for a runtime with no reviewed vendor source", async () => {
+    // vLLM is a Python package and MLX ships with its own toolchain, so
+    // Raiker has no reviewed vendor download for either. A button here would
+    // be one that cannot work.
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "vllm-local",
+            provider: "vllm",
+            model: "served-model",
+            configured: false,
+            provider_detected: false,
+          }),
+        ],
+      }),
+    });
+    render(ModelsView, { tab: "local" });
+
+    expect(await screen.findByText(/Not installed on this machine/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /^Set up / })).toBeNull();
+  });
+
   it("says nothing about a machine nothing has looked at", async () => {
     // `provider_detected` absent means either no detector ran or the profile
     // does not depend on a local runtime. Neither licenses claiming an absence.

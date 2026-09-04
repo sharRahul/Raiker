@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onDestroy } from "svelte";
   import { api } from "../../api";
-  import type { RuntimeInstallPlan } from "../../apiTypes";
+  import { openRuntimeInstaller } from "../../runtimeInstall";
   import ProviderLogo from "../../components/ProviderLogo.svelte";
   let {
     onCatalogueChanged,
@@ -49,13 +49,9 @@
     busy = runtime;
     error = null;
     try {
-      const plan = (await api.previewModelOperation(
-        "install",
-        runtime,
-      )) as RuntimeInstallPlan;
-      if (!plan.source_url.startsWith("https://"))
-        throw new Error("unsafe source");
-      window.open(plan.source_url, "_blank", "noopener,noreferrer");
+      // BUG-270 — the provider row offers this too, so the scheme check that
+      // guards `window.open` lives in one place rather than in two that drift.
+      await openRuntimeInstaller(runtime);
       message = `Opened the official ${runtime === "ollama" ? "Ollama" : "LM Studio"} download. Return here after installation.`;
     } catch {
       error = "Could not open the reviewed vendor download.";

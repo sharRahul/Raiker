@@ -15570,9 +15570,18 @@ and asserts none of them names the model.
 
 **User-interface outcome.** A fresh install does not name a model that is not
 installed — not in the setup meter, not in the Global model control, not in
-either composer's model chip. The provider card says **"Not installed on this
-machine"** with a **Look again**, and says nothing at all when detection has no
-answer.
+either composer's model chip.
+
+**And it offers the fix rather than only the finding.** A row whose runtime was
+not found says **"Not installed on this machine"** and carries **Set up
+&lt;Provider&gt;** beside it, which opens that vendor's own reviewed download —
+the same governed path the install panel above it takes, now shared so the
+`https://` check on the plan lives in one place instead of two. It is deliberately
+not called "Install": Raiker opened a download, and whether the owner ran it is
+theirs to say, which is what **Look again** is for. A provider Raiker has no
+reviewed source for — MLX ships its own toolchain, vLLM is a Python package —
+gets no button rather than one that cannot work. A runtime detection has no
+answer about says nothing at all.
 
 ---
 

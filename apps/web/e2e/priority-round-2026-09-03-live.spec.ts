@@ -58,6 +58,10 @@ test.describe("the 2026-09-03 priority round", () => {
     });
     await expect(page.getByText("Gemma 4:31B Cloud", { exact: true })).toHaveCount(0);
     await expect(page.getByText("Not installed on this machine").first()).toBeVisible();
+    // Stating the absence is half an answer. The row offers the setup itself,
+    // rather than leaving the owner to find the install panel further up the
+    // page and match its cards to the row that told them.
+    await expect(page.getByRole("button", { name: "Set up Ollama" })).toBeVisible();
     // The other half: four empty llama.cpp slots used to count as models set up.
     await expect(page.getByText(/models set up/)).toHaveCount(0);
     await capture(page, join(SHOTS, "fixed-365-models-honest-meter-live.png"));

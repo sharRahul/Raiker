@@ -396,6 +396,7 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-381](#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) | Medium | Tasks / delegation | Fixed 2026-09-04 (compatibility backlog item 23) |
 | [FIXED-382](#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered) | Medium | Models / provider errors / web UI | Fixed 2026-09-04 (BUG-275, raised and closed in this round) |
 | [FIXED-383](#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen) | Low | Web UI / composer | Fixed 2026-09-04 (found by this round's width sweep) |
+| [FIXED-384](#fixed-384--two-path-fields-taught-a-shape-that-cannot-exist-on-two-of-three-platforms) | Low | Web UI / model library | Fixed 2026-09-04 (found by this round's width sweep) |
 
 ---
 
@@ -16752,3 +16753,34 @@ Chat and Build at 390 and 768, which is how it was verified.
 
 The same sweep asserts two more properties at every width: the document never
 scrolls sideways, and no element bleeds out of a `visible` box.
+
+
+---
+
+## FIXED-384 — Two path fields taught a shape that cannot exist on two of three platforms
+
+**Severity: Low. Area: Web UI / model library. Status: Fixed 2026-09-04 (found by
+this round's own width sweep).**
+
+**Observed.** Models → Local → **Approved folders** offered `D:\Models` as its
+placeholder, and first-run's backup field offered `D:\Raiker Backups`. Both were
+hardcoded. Raiker ships for Windows, macOS and Linux, so on two of the three the
+example path **cannot exist**, and a placeholder is not decoration: it is an
+instruction about the shape of the answer.
+
+Caught on a Linux host by the width sweep's screenshots, which is the point of
+capturing them at all — no assertion can tell a wrong example from a right one.
+
+**Fixed.** Both placeholders describe the answer instead of inventing one:
+*"Full path to a folder of models"* and *"Full path to a backup folder"*. The
+concrete answer is already one control away and always correct: **Browse…** lists
+the host's own folders, with the host's own separator, which is what BUG-251
+built it for.
+
+**Not** solved by detecting the platform in the browser. The browser's OS is the
+host's only while Raiker is loopback-only, and `--allow-public` exists precisely
+so it is not — a placeholder that is right until someone opens Raiker from
+another machine is the same defect with a longer fuse.
+
+**User-interface outcome.** Neither field claims a drive letter on a machine that
+has none, and the field that can answer concretely is the one that does.

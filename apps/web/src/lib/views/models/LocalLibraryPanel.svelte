@@ -122,10 +122,15 @@
         void addRoot();
       }}
     >
+      <!-- The placeholder is not an example path. `D:\Models` cannot exist on
+           macOS or Linux, so on two of the three platforms Raiker ships for it
+           was teaching the wrong shape. Browse… beside this field lists the
+           host's own folders (BUG-251), which is the right way to offer a
+           concrete answer without guessing which machine this is. -->
       <label
         ><span>Absolute folder path</span><input
           bind:value={root}
-          placeholder="D:\Models"
+          placeholder="Full path to a folder of models"
           aria-label="Absolute model folder"
         /></label
       >

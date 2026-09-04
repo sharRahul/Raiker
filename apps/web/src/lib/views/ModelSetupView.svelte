@@ -166,7 +166,7 @@
         <h2 id="setup-title">Create your first backup</h2>
         <p>No backup is configured until Raiker writes and verifies a real encrypted local snapshot.</p>
       </header>
-      <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="D:\Raiker Backups" /></label>
+      <label>Local, removable, or NAS folder<input bind:value={backupTarget} placeholder="Full path to a backup folder" /></label>
       <div class="actions"><button class="quiet" onclick={() => save({ stage: "privacy" })}>Back</button><button class="quiet" onclick={() => save({ stage: "finish", backup_mode: "later" })}>Set up later</button><button class="primary" disabled={busy || !backupTarget.trim()} onclick={createBackup}>Create and verify backup</button></div>
     {:else}
       <header>

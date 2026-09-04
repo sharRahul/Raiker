@@ -1143,13 +1143,19 @@ appears in this repository.
 7. Each of the five items also carries its own unit and API coverage, and every
    surface they changed was walked at all four widths with no console error.
 
-**What it found**, both fixed in this change rather than deferred:
+**What it found**, all fixed in this change rather than deferred:
 
 * **The model picker said "Provider unreachable" about a provider that had just
   answered in full.** `testNote` has read the server's classification since
   BUG-272; `pickerNote` switched on status alone and threw it away — and the
   picker is the control on the path an owner actually walks. Closed as
   [FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered).
+* **Two path fields taught a shape that cannot exist on this host.** `D:\Models`
+  and `D:\Raiker Backups` were hardcoded placeholders on a product that ships for
+  three platforms. Caught by reading the sweep's own screenshots, which is what
+  capturing them is for — no assertion can tell a wrong example from a right one.
+  Closed as
+  [FIXED-384](FIXED_ITEMS.md#fixed-384--two-path-fields-taught-a-shape-that-cannot-exist-on-two-of-three-platforms).
 * **The composer's model control was a blank circle below 1024px whenever no
   model was chosen** — which is the state a fresh install is always in. The
   narrow-width rule hides the label and the chevron and leaves the provider logo;
@@ -1200,7 +1206,7 @@ dialog. No key appears in this repository.
 6. Every route captured and rendered in explicit light and dark themes, no
    console error, no page repeating the topbar's own sentence.
 
-**What it found**, both fixed in this change rather than deferred:
+**What it found**, all fixed in this change rather than deferred:
 
 * The guidance for a workspace refusal was wired to the *save*, which never
   contacts the provider. Two paths actually meet it — the readiness check with a

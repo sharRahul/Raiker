@@ -133,6 +133,13 @@ test("every page fits, contains itself, and names its controls at four widths", 
 
         for (const element of Array.from(document.querySelectorAll<HTMLElement>("main#main *"))) {
           if (element.offsetWidth === 0 && element.offsetHeight === 0) continue;
+          // SVG has its own layout model: `clientWidth` on an `<svg:text>` is
+          // not a content box, and comparing it to `scrollWidth` reported a
+          // graph label as bleeding when it was drawing exactly where the graph
+          // put it. A label that outgrows its node is a rendering question for
+          // that view, not a page-layout defect, and this check is about the
+          // page.
+          if (element.namespaceURI !== "http://www.w3.org/1999/xhtml") continue;
           const style = getComputedStyle(element);
           // A deliberate scroller and a deliberate truncation are both correct.
           // Only content bleeding out of a `visible` box is a defect.

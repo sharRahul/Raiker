@@ -1108,7 +1108,11 @@ appears in this repository.
 
 **What it proved.**
 
-1. **Every route at 390, 768, 1280 and 1920**, measured rather than photographed:
+1. **Every route at 390, 768, 1280 and 1920**, measured rather than photographed
+   — and the check learned one thing about its own scope on the way: SVG has its
+   own layout model, so `clientWidth` on a graph label is not a content box and
+   comparing it to `scrollWidth` reported the knowledge map's own rendering as a
+   page-layout defect. The bleed check is HTML-only, stated in the spec:
    the document never scrolls sideways, no element bleeds out of a `visible` box,
    every control has an accessible name, and — new this round — **no control
    draws nothing**. `e2e/ui-sweep-widths-live.spec.ts` is that check; the two
@@ -1150,6 +1154,11 @@ appears in this repository.
   BUG-272; `pickerNote` switched on status alone and threw it away — and the
   picker is the control on the path an owner actually walks. Closed as
   [FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered).
+* **A hook rule pushed its own card past a 390px window.** A grid item's default
+  `min-width: auto` refuses to shrink below its content, so one unbreakable
+  string — an `http` handler's URL — carried the card four pixels wide. Found by
+  the sweep on the very rule this round added, which is the sweep doing its job
+  on new work rather than on old.
 * **Two path fields taught a shape that cannot exist on this host.** `D:\Models`
   and `D:\Raiker Backups` were hardcoded placeholders on a product that ships for
   three platforms. Caught by reading the sweep's own screenshots, which is what

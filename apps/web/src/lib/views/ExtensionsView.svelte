@@ -1161,10 +1161,20 @@
   .hook-list > li,
   .hook-errors > li {
     display: grid;
+    /* A grid item's default `min-width: auto` refuses to shrink below its
+       content, so one unbreakable string — an `http` handler's URL — pushed the
+       whole card four pixels past a 390px window. Found by the width sweep on
+       the very rule this round added. */
+    min-width: 0;
     gap: 0.3rem;
     padding: var(--space-3);
     border: 1px solid var(--neutral-border);
     border-radius: var(--r-md);
+  }
+  /* And the string itself wraps, rather than relying on there being room. */
+  .handler-list code,
+  .hook-list code {
+    overflow-wrap: anywhere;
   }
   /* The event catalogue is a reference list, not a set of findings. Ten bordered
      cards for ten one-line facts read as ten things to deal with, and pushed the

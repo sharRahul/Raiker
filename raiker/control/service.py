@@ -1079,6 +1079,45 @@ class RuntimeControlService:
         )
         return ControlResult(ok=True, data={"destination_id": destination_id})
 
+    def set_telemetry_destination_cadence(
+        self, acting_principal_id: str | None, destination_id: str, cadence: str
+    ) -> ControlResult:
+        """BUG-276 — how often this destination is delivered to, without a button.
+
+        Human-only, like adding the destination itself: choosing that a record
+        leaves this machine on a timer is the same decision as choosing that it
+        leaves at all, made once instead of every time.
+
+        The cadence names come from the scheduler's own interval table, so a
+        cadence this accepts is one the host tick already knows how to advance.
+        ``off`` clears the next run as well as the cadence — a destination the
+        owner has taken off a timer must not keep one claim in the queue.
+        """
+        from raiker.tasks.scheduler import RECURRING_INTERVALS, next_run_after
+
+        principal, err = resolve_local_principal(self._workspace_root, acting_principal_id)
+        if principal is None:
+            return ControlResult(ok=False, reason_code=err or "principal_not_resolved")
+        if principal.principal_type != PrincipalType.HUMAN:
+            return ControlResult(ok=False, reason_code="not_authorized_human")
+        clean = (cadence or "").strip()
+        if clean != "off" and clean not in RECURRING_INTERVALS:
+            return ControlResult(ok=False, reason_code="telemetry_unknown_cadence")
+        # The first run is one interval away rather than immediate: turning a
+        # cadence on should not also be a delivery the owner did not ask for.
+        next_at = None if clean == "off" else next_run_after(utc_now(), RECURRING_INTERVALS[clean])
+        changed = self._store.set_telemetry_destination_cadence(
+            destination_id,
+            principal.principal_id,
+            cadence=clean,
+            next_delivery_at=next_at,
+        )
+        if not changed:
+            return ControlResult(ok=False, reason_code="telemetry_destination_not_found")
+        return ControlResult(
+            ok=True, data={"delivery_cadence": clean, "next_delivery_at": next_at}
+        )
+
     def delete_telemetry_destination(
         self, acting_principal_id: str | None, destination_id: str
     ) -> ControlResult:

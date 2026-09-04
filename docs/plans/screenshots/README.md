@@ -76,6 +76,7 @@ forty-seven, not a missing capture.
 
 | Prefix | Round | Provider |
 |---|---|---|
+| `bug-276-`, `bug-277-`, `bug-278-`, refreshed `pages/` | **2026-09-04 (third)**, a telemetry destination on an owner-chosen cadence, a valid key answered with a repair instead of "check your network", and connector conditions readable in greyscale | Anthropic, a third identity-linked key entered through the interface |
 | `bug-274-`, refreshed `pages/` | **2026-09-04**, a key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at 390/768/1024/1440 in both themes | Anthropic, an identity-linked key entered through the interface |
 | `bug-256-`, refreshed `pages/` | **2026-09-03**, dictation transcribed by a runtime on this machine, the Voice section that chooses it, and a full responsive catalogue at 390/1920/3840/7680 in both themes | Anthropic, key entered through the interface; the transcription runtime is a loopback stand-in |
 | `bug-244-`, `bug-246-` | **2026-08-29**, an import that says what is already stored before it writes, and the delegated-authority verdicts readable at 390 px | none — neither scenario needs a model |

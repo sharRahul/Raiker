@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 /**
  * What one ordinary turn actually puts on screen.
@@ -14,26 +14,14 @@ import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = OWNER_CREDENTIALS.password;
 
 test("a single turn's transcript, mid-stream and settled", async ({ page }) => {
   test.setTimeout(600_000);
 
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Unlock Raiker" }).click();
-  }
-  for (const name of ["Skip for now", "Decide later", "Balanced", "Set up later", "Open Workbench"]) {
-    const b = page.getByRole("button", { name, exact: true });
-    if (await b.isVisible().catch(() => false)) await b.click();
-  }
+  // BUG-248 — the shared sign-in. The copy this replaced clicked "Skip for now",
+  // a control that no longer exists anywhere in the app, and then assumed the
+  // wizard's remaining stages arrived in a fixed order.
+  await signInAsOwner(page, BASE);
 
   await page.goto(`${BASE}/#/new-chat`);
   const composer = page.locator("textarea#prompt-input");

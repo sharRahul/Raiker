@@ -16,6 +16,7 @@ from raiker.api.schemas import (
     RecordThreatModelAckRequest,
     SetCapabilityDecisionModeRequest,
     SetCapabilityStateRequest,
+    TelemetryCadenceRequest,
     serialize_dto,
 )
 from raiker.api.sessions import ApiSession
@@ -428,6 +429,23 @@ async def create_telemetry_destination(
         endpoint_url=body.endpoint_url,
         header_ref=body.header_ref,
         include_content=body.include_content,
+    )
+    if not result.ok:
+        _deny(result.reason_code)
+    return {"ok": True, **result.data}
+
+
+@router.put("/api/telemetry/destinations/{destination_id}/cadence")
+async def set_telemetry_cadence(
+    destination_id: str,
+    request: Request,
+    body: TelemetryCadenceRequest,
+    auth_data: tuple[ApiSession, Principal] = Depends(_auth),
+) -> dict[str, Any]:
+    """BUG-276 — put this destination on a cadence, or take it off one."""
+    session, _principal = auth_data
+    result = _get_service(request).set_telemetry_destination_cadence(
+        session.principal_id, destination_id, body.cadence
     )
     if not result.ok:
         _deny(result.reason_code)

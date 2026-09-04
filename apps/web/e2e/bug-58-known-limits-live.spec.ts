@@ -45,7 +45,7 @@
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { signInAsOwner, useHostedModel } from "./hosted-provider";
+import { requireFirstRunWorkspace, signInAsOwner, useHostedModel } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
@@ -151,6 +151,15 @@ test.beforeAll(async ({ browser }: { browser: Browser }) => {
     colorScheme: "light",
   });
   page = await context.newPage();
+  // BUG-250 — said before anything runs rather than discovered by an assertion
+  // about a gate the previous spec's turns already moved. Two of the claims
+  // below are about what a capability gate does *before* the owner has touched
+  // it, and this run turns `web_fetch` on itself.
+  await requireFirstRunWorkspace(
+    page,
+    BASE,
+    "This spec asserts what two capability gates do before the owner has touched them.",
+  );
   await signIn(page);
 });
 

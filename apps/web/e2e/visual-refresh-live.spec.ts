@@ -1,29 +1,20 @@
 import { expect, test, type Page } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 const BASE = "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "docs", "plans", "screenshots", "working");
-const PASSWORD = OWNER_CREDENTIALS.password;
 
 test.describe.configure({ mode: "serial" });
 let page: Page;
 
 test.beforeAll(async ({ browser }) => {
   page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, colorScheme: "light" });
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 20_000 });
-  const confirm = page.getByLabel("Confirm password");
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: /unlock|sign in/i }).click();
-  }
-  await expect(page.getByRole("heading", { name: /Welcome/ })).toBeVisible({ timeout: 20_000 });
+  // BUG-248 — the shared sign-in, which also finishes the setup wizard. This
+  // copy waited for a "Welcome" heading, which a workspace with a saved startup
+  // route never shows.
+  await signInAsOwner(page, BASE);
 });
 
 test.afterAll(async () => await page?.close());

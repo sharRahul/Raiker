@@ -3765,3 +3765,24 @@ TASK_SURFACE_MIGRATION_ID = "RAIKER-2054-task-surface"
 TASK_SURFACE_SQL = """
 ALTER TABLE tasks ADD COLUMN surface TEXT NOT NULL DEFAULT 'chat';
 """
+
+
+# BUG-276 — governed events only left when somebody pressed a button.
+#
+# The wire backlog #18 built delivers only on demand, so events accumulated
+# behind the cursor until an owner looked. A collector that receives while its
+# operator is watching is not something a dashboard can be built on.
+#
+# `delivery_cadence` is the owner's answer to "how often", drawn from the same
+# interval table a scheduled task's `recurrence` is drawn from, so the product
+# has one cadence vocabulary rather than two. `off` is the shipped default and
+# means exactly what the card said before this column existed: on demand only.
+# `next_delivery_at` is the claim the host tick reads and advances, mirroring
+# `tasks.scheduled_at` — a delivery that is due is claimed once, whichever
+# worker sees it first.
+TELEMETRY_CADENCE_MIGRATION_ID = "RAIKER-2055-telemetry-cadence"
+
+TELEMETRY_CADENCE_SQL = """
+ALTER TABLE telemetry_destinations ADD COLUMN delivery_cadence TEXT NOT NULL DEFAULT 'off';
+ALTER TABLE telemetry_destinations ADD COLUMN next_delivery_at TEXT;
+"""

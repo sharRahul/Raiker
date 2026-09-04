@@ -138,10 +138,51 @@ _QUOTA_MARKERS: tuple[str, ...] = (
 # Classified from the body for the same reason quota is: the status alone means
 # nothing (400 is also an ordinary bad request), and the fix is the owner's to
 # make rather than a retry's.
-_WORKSPACE_MARKERS: tuple[str, ...] = (
-    "workspace-id is required",
-    "workspace_id is required",
-    "identity-linked api key",
+# BUG-277 — the markers matched one wording, and the provider sends another.
+#
+# A live round on 2026-09-04 pasted an identity-linked key and met
+# `provider_http_error:http_400` → *"Anthropic could not be reached. Check that
+# it is running and reachable from this device."* The provider had answered in
+# full, and precisely:
+#
+#     This API key is not scoped to a workspace, so this request must include
+#     the anthropic-workspace-id header with the ID of the workspace to use.
+#
+# Not one of the three literals below it matched, so every repair FIXED-370 and
+# FIXED-372 built — the classification, the Workspace ID field, the remediation
+# that names it — was unreachable for the message the provider actually sends.
+#
+# **So this is no longer a list of sentences.** A list of sentences is a bet that
+# a message Raiker does not control will keep its wording, and that bet has now
+# been lost once. The classification is a *conjunction* instead: the body has to
+# mention the workspace **and** say that one is absent. Both halves are the
+# stable part of any phrasing of this refusal; the sentence around them is not.
+# Widening a match is normally the wrong direction, and it is right here for one
+# reason worth stating: the alternative it replaces is not a stricter answer, it
+# is *no* answer — an owner sent to debug a network that is working.
+
+#: The subject the refusal has to be about. Both spellings, and the header name,
+#: because a message may name only the header it wanted.
+_WORKSPACE_SUBJECTS: tuple[str, ...] = (
+    "workspace",
+    "workspace_id",
+    "workspace-id",
+)
+
+#: What the message has to say about that subject for it to be a *missing* one.
+#: Every entry is a way of saying "there isn't one and there needs to be".
+_WORKSPACE_ABSENT_MARKERS: tuple[str, ...] = (
+    "is required",
+    "are required",
+    "must include",
+    "must be included",
+    "must specify",
+    "must provide",
+    "not scoped",
+    "no workspace",
+    "missing",
+    "identity-linked",
+    "identity linked",
 )
 
 
@@ -176,7 +217,13 @@ def needs_workspace_id(status: int, body: str) -> bool:
         # bodies share vocabulary and only this one names a value the owner
         # already supplied.
         return False
-    return any(marker in haystack for marker in _WORKSPACE_MARKERS)
+    # BUG-277 — both halves, not one sentence. A 400 that mentions a workspace
+    # but says nothing about one being absent is an ordinary bad request and
+    # keeps its own classification; a 400 that says something is required but
+    # never names a workspace is about some other field.
+    return any(subject in haystack for subject in _WORKSPACE_SUBJECTS) and any(
+        marker in haystack for marker in _WORKSPACE_ABSENT_MARKERS
+    )
 
 
 def workspace_id_rejected(status: int, body: str) -> bool:

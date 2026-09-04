@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
-import { OWNER_CREDENTIALS } from "./hosted-provider";
+import { signInAsOwner } from "./hosted-provider";
 
 /**
  * BUG-208 slice A: the guide is reachable from inside the product.
@@ -14,7 +14,6 @@ import { OWNER_CREDENTIALS } from "./hosted-provider";
 
 const BASE = process.env.RAIKER_LIVE_BASE ?? "http://127.0.0.1:8765";
 const SHOTS = join(import.meta.dirname, "..", "..", "..", "output", "playwright");
-const PASSWORD = OWNER_CREDENTIALS.password;
 
 test("the guide opens from the sidebar and from a deep link", async ({ page }) => {
   test.setTimeout(300_000);
@@ -23,21 +22,11 @@ test("the guide opens from the sidebar and from a deep link", async ({ page }) =
     if (m.type() === "error") consoleErrors.push(m.text());
   });
 
-  await page.goto(`${BASE}/#/workbench`);
-  await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });
-  await page.getByLabel("Username").fill(OWNER_CREDENTIALS.user);
-  await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  const confirm = page.getByLabel("Confirm password");
-  if (await confirm.isVisible().catch(() => false)) {
-    await confirm.fill(PASSWORD);
-    await page.getByRole("button", { name: "Create a User Account", exact: true }).click();
-  } else {
-    await page.getByRole("button", { name: "Unlock Raiker" }).click();
-  }
-  for (const name of ["Skip for now", "Decide later", "Balanced", "Set up later", "Open Workbench"]) {
-    const b = page.getByRole("button", { name, exact: true });
-    if (await b.isVisible().catch(() => false)) await b.click();
-  }
+  // BUG-248 — the shared sign-in, which finishes the wizard from whichever of
+  // its five stages a used workspace resumes on. The copy this replaced clicked
+  // "Skip for now", a control that no longer exists anywhere in the app, and
+  // then assumed the remaining stages came in a fixed order.
+  await signInAsOwner(page, BASE);
 
   // Reachable the way an owner would reach it: a sidebar destination.
   await page.getByRole("link", { name: "Guide" }).click();

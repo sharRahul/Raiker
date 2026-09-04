@@ -14,6 +14,39 @@ export function relativeTime(iso: string | null | undefined, now: Date = new Dat
   return then.toLocaleDateString();
 }
 
+/**
+ * BUG-279 — the same compactness, for a time that has not happened yet.
+ *
+ * `relativeTime` is a *past* formatter, and it says so honestly: a future
+ * instant falls through to `formatTimestamp` and renders as a full locale
+ * string. Three surfaces show future instants, and all three read badly for it —
+ * a standing agent's card said "next cycle 9/4/2026, 7:17:29 PM" beside a "2m
+ * ago", and a collector said "Next 9/4/2026, 7:17:29 PM" beside "Last run ok ·
+ * 2m ago". Two vocabularies for one kind of fact, and the longer one on the
+ * smaller card.
+ *
+ * A separate function rather than a branch inside `relativeTime`, because the
+ * two answer different questions and a caller that means "when did this happen"
+ * should not silently start saying "in 58m" when a clock drifts. The mirror is
+ * exact: the same thresholds, the same units, and the same fall-through to a
+ * plain date once "in N days" stops being useful.
+ */
+export function relativeFuture(iso: string | null | undefined, now: Date = new Date()): string {
+  if (!iso) return "—";
+  const then = parseTimestamp(iso);
+  if (then === null) return iso;
+  const seconds = Math.floor((then.getTime() - now.getTime()) / 1000);
+  // Already due, or overdue: "in -3m" is not a thing anyone should read. A run
+  // whose moment has passed and which has not happened yet is *due*, which is
+  // the true and useful word for it.
+  if (seconds <= 0) return "due now";
+  if (seconds < 45) return "in under a minute";
+  if (seconds < 3600) return `in ${Math.max(1, Math.floor(seconds / 60))}m`;
+  if (seconds < 86_400) return `in ${Math.floor(seconds / 3600)}h`;
+  if (seconds < 7 * 86_400) return `in ${Math.floor(seconds / 86_400)}d`;
+  return then.toLocaleDateString();
+}
+
 /** Full local timestamp for detail rows; falls back to the raw string. */
 export function formatTimestamp(iso: string | null | undefined): string {
   if (!iso) return "—";

@@ -377,3 +377,212 @@ class TestTheCursorMovesOnDeliveryOnly:
             after_timestamp=None, after_seq=None, limit=100
         )
         assert seen == [row["event_id"] for row in everything]
+
+
+class TestItLeavesWithoutSomebodyPressingAButton:
+    """BUG-276 — the wire delivered only on demand, so events accumulated
+    behind the cursor until an owner looked.
+
+    What has to hold about a cadence:
+
+    * **A cadence the host will actually run.** The names come from the
+      scheduler's own interval table, so a card cannot state a schedule the tick
+      does not know how to advance.
+    * **Claimed exactly once.** Two workers seeing one due destination must
+      produce one delivery, not two.
+    * **Anchored to the slot, not to the clock.** A delivery that took a minute
+      must not drift the schedule by a minute every run.
+    * **Off is off.** A destination the owner has taken off a timer keeps no
+      claim in the queue.
+    * **Paused means paused.** A delivery reaches the network, which is exactly
+      the background work the host's pause switch exists to stop.
+    """
+
+    def test_a_cadence_names_a_schedule_the_scheduler_honours(self) -> None:
+        from raiker.tasks.scheduler import RECURRING_INTERVALS, TELEMETRY_CADENCES
+
+        assert TELEMETRY_CADENCES[0] == "off"
+        # Not a superset and not a subset: one vocabulary, so a name the Tasks
+        # board offers is a name a collector offers, with the same meaning.
+        assert set(TELEMETRY_CADENCES[1:]) == set(RECURRING_INTERVALS)
+
+    def test_setting_a_cadence_arms_a_next_run_and_off_disarms_it(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        from raiker.control.service import RuntimeControlService
+
+        destination_id = _destination(store)
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        # Shipped default: what the card said before the column existed.
+        assert row["delivery_cadence"] == "off"
+        assert row["next_delivery_at"] is None
+
+        service = RuntimeControlService(workspace)
+        result = service.set_telemetry_destination_cadence(_OWNER, destination_id, "hourly")
+        assert result.ok is True
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        assert row["delivery_cadence"] == "hourly"
+        # Armed, and one interval away — turning a cadence on is not itself a
+        # delivery the owner did not ask for.
+        assert row["next_delivery_at"] is not None
+        assert row["next_delivery_at"] > utc_now()
+
+        assert service.set_telemetry_destination_cadence(_OWNER, destination_id, "off").ok
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        assert row["next_delivery_at"] is None
+
+    def test_an_unknown_cadence_is_refused_rather_than_stored(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        from raiker.control.service import RuntimeControlService
+
+        destination_id = _destination(store)
+        result = RuntimeControlService(workspace).set_telemetry_destination_cadence(
+            _OWNER, destination_id, "fortnightly"
+        )
+        assert result.ok is False
+        assert result.reason_code == "telemetry_unknown_cadence"
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        assert row["delivery_cadence"] == "off"
+
+    def test_a_due_destination_is_claimed_once(self, store: SQLiteStore) -> None:
+        from raiker.tasks.scheduler import _next_delivery
+
+        destination_id = _destination(store)
+        store.set_telemetry_destination_cadence(
+            destination_id, _OWNER, cadence="hourly", next_delivery_at="2020-01-01T00:00:00Z"
+        )
+        first = store.claim_due_telemetry_destinations(utc_now(), _next_delivery)
+        second = store.claim_due_telemetry_destinations(utc_now(), _next_delivery)
+        assert [row["destination_id"] for row in first] == [destination_id]
+        # The claim *is* the advance, so the loser of the race finds nothing.
+        assert second == []
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        assert str(row["next_delivery_at"]) > utc_now()
+
+    def test_a_destination_that_is_off_or_disabled_is_never_claimed(
+        self, store: SQLiteStore
+    ) -> None:
+        from raiker.tasks.scheduler import _next_delivery
+
+        off = _destination(store, name="off")
+        disabled = _destination(store, name="disabled")
+        store.set_telemetry_destination_cadence(
+            disabled, _OWNER, cadence="hourly", next_delivery_at="2020-01-01T00:00:00Z"
+        )
+        store.set_telemetry_destination_enabled(disabled, _OWNER, False)
+        claimed = store.claim_due_telemetry_destinations(utc_now(), _next_delivery)
+        assert [row["destination_id"] for row in claimed] == []
+        assert off not in {row["destination_id"] for row in claimed}
+
+    def test_the_next_run_is_anchored_to_the_claimed_slot(self) -> None:
+        from datetime import UTC, datetime, timedelta
+
+        from raiker.tasks.scheduler import _next_delivery
+
+        # A slot an hour in the past on an hourly cadence lands on the next
+        # whole hour from that slot, not an hour from now.
+        slot = (datetime.now(UTC) - timedelta(minutes=50)).replace(microsecond=0)
+        due = slot.isoformat().replace("+00:00", "Z")
+        following = _next_delivery({"delivery_cadence": "hourly", "next_delivery_at": due})
+        assert following == (slot + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+
+    def test_an_unrecognised_stored_cadence_slows_down_rather_than_spinning(self) -> None:
+        from raiker.tasks.scheduler import _next_delivery
+
+        following = _next_delivery(
+            {"delivery_cadence": "fortnightly", "next_delivery_at": "2020-01-01T00:00:00Z"}
+        )
+        # Daily, not "immediately": slower than asked for is the safe direction
+        # for something that reaches the network.
+        assert following > utc_now()
+
+    def test_a_paused_host_delivers_nothing(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        import asyncio
+
+        from raiker.app.host import HostControl
+        from raiker.tasks.scheduler import TaskScheduler
+
+        _write_events(store, 2)
+        destination_id = _destination(store)
+        store.set_telemetry_destination_cadence(
+            destination_id, _OWNER, cadence="hourly", next_delivery_at="2020-01-01T00:00:00Z"
+        )
+        HostControl(workspace).pause()
+        assert asyncio.run(TaskScheduler(workspace).deliver_due_telemetry()) == 0
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        # The claim is left where it was: it becomes due again on resume.
+        assert row["next_delivery_at"] == "2020-01-01T00:00:00Z"
+        assert row["last_attempt_at"] is None
+
+    def test_a_wire_that_starts_failing_notifies_once_and_recovery_notifies_once(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        from raiker.tasks.scheduler import TELEMETRY_DELIVERY_KIND, TaskScheduler
+
+        scheduler = TaskScheduler(workspace)
+        destination = {
+            "destination_id": _destination(store),
+            "principal_id": _OWNER,
+            "name": "local",
+        }
+
+        def notices() -> list[dict[str, Any]]:
+            return [
+                row
+                for row in store.list_notifications(_OWNER)
+                if row.get("kind") == TELEMETRY_DELIVERY_KIND
+            ]
+
+        scheduler._report_delivery(destination, "ok", "http_error:503")  # noqa: SLF001
+        assert len(notices()) == 1
+        # Still failing, and for the same reason: an owner does not need
+        # seventy-two identical notices about one collector being down.
+        scheduler._report_delivery(destination, "http_error:503", "http_error:503")  # noqa: SLF001
+        scheduler._report_delivery(destination, "http_error:503", "http_error:504")  # noqa: SLF001
+        assert len(notices()) == 1
+
+        scheduler._report_delivery(destination, "http_error:504", "ok")  # noqa: SLF001
+        assert len(notices()) == 2
+        # And a wire that has been fine stays quiet.
+        scheduler._report_delivery(destination, "ok", "ok")  # noqa: SLF001
+        assert len(notices()) == 2
+
+    def test_a_due_destination_delivers_through_the_same_governed_path(
+        self, workspace: Path, store: SQLiteStore
+    ) -> None:
+        """End to end on the host tick: claim, route, attempt, record.
+
+        The endpoint is a port nothing is listening on, so the delivery fails —
+        which is the point. What this proves is that the *path* ran without a
+        button: the claim was taken, the governed action was routed, and the
+        outcome landed on the destination row where the card reads it.
+        """
+        import asyncio
+
+        from raiker.tasks.scheduler import TaskScheduler
+
+        _write_events(store, 2)
+        destination_id = _destination(store, endpoint_url="http://127.0.0.1:4/")
+        store.set_telemetry_destination_cadence(
+            destination_id, _OWNER, cadence="hourly", next_delivery_at="2020-01-01T00:00:00Z"
+        )
+        asyncio.run(TaskScheduler(workspace).deliver_due_telemetry())
+
+        row = store.get_telemetry_destination(destination_id, _OWNER)
+        assert row is not None
+        assert row["last_attempt_at"] is not None
+        # Nothing landed, so the cursor did not move: the next run re-sends
+        # exactly what this one could not carry.
+        assert row["cursor_event_id"] is None
+        # And the schedule advanced regardless, so a collector that is down does
+        # not wedge the queue on one due slot.
+        assert str(row["next_delivery_at"]) > utc_now()

@@ -480,11 +480,35 @@
                     <span class="name">{extension.display_name}</span>
                     <span class="category">{extension.category}</span>
                   </span>
+                  <!--
+                    BUG-278 — four pills reading "installed connected enabled
+                    usable" said the opposite of the counters above them.
+
+                    They are the same four conditions the side panel's
+                    `LifecycleTrack` renders, and met/unmet was carried by colour
+                    alone: on a workspace where nothing is installed, twenty-six
+                    rows of grey pills read as twenty-six connectors that *are*
+                    installed and connected, directly under a card saying
+                    "INSTALLED 0 · CONNECTED 0". In greyscale, or to a
+                    colour-blind owner, there was no other channel at all.
+
+                    So each pill carries the marker the side panel already uses —
+                    `✓` met, `○` not — and says which for a screen reader. Not a
+                    new vocabulary: the same one, two components apart, which is
+                    what it should have been.
+                  -->
                   <span class="facts">
-                    <span class="fact" class:on={extension.installed}>installed</span>
-                    <span class="fact" class:on={extension.connected}>connected</span>
-                    <span class="fact" class:on={extension.enabled}>enabled</span>
-                    <span class="fact strong" class:on={extension.usable}>usable</span>
+                    {#each [
+                      ["installed", extension.installed, false],
+                      ["connected", extension.connected, false],
+                      ["enabled", extension.enabled, false],
+                      ["usable", extension.usable, true],
+                    ] as [label, met, strong] (label)}
+                      <span class="fact" class:strong class:on={met}>
+                        <span class="mark" aria-hidden="true">{met ? "✓" : "○"}</span>{label}
+                        <span class="sr-only">: {met ? "yes" : "no"}</span>
+                      </span>
+                    {/each}
                   </span>
                 </button>
               </li>
@@ -1422,6 +1446,9 @@
   }
   .fact.on { border-color: var(--ok-border); background: var(--ok-soft); color: var(--ok); }
   .fact.strong.on { border-color: var(--accent-border); background: var(--accent-soft); color: var(--accent); }
+  /* BUG-278 — the marker is the channel that is not colour. It sits inside the
+     pill so the row stays one line at every width the list is used at. */
+  .fact .mark { margin-right: 0.28rem; font-weight: 700; }
   .empty-row { color: var(--text-3); padding: var(--space-4); }
   .reason { color: var(--ok); font-weight: 600; margin: 0; }
   .reason.blocked { color: var(--warn); }

@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
 import { join } from "node:path";
+import { requireFirstRunWorkspace } from "./hosted-provider";
 
 /**
  * BUG-198's evidence: what stage 02 of the first-run wizard claims about
@@ -19,6 +20,16 @@ const PASSWORD = "First-run-honesty-1!";
 
 test("stage 02 labels every offered backend", async ({ page }) => {
   test.setTimeout(300_000);
+
+  // BUG-250 — the defect this records is what stage 02 of the *first-run*
+  // wizard says, so it needs an instance with no owner. It uses its own port for
+  // that reason; the guard is what turns "that port has been used before" from a
+  // timeout on a screen that has done its job into a stated skip.
+  await requireFirstRunWorkspace(
+    page,
+    BASE,
+    "This spec records what stage 02 of the first-run wizard claims.",
+  );
 
   await page.goto(`${BASE}/#/workbench`);
   await expect(page.getByText(/Verifying runtime/)).toBeHidden({ timeout: 60_000 });

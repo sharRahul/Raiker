@@ -1230,6 +1230,16 @@ export const api = {
       `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/export`,
       {},
     ),
+  // BUG-276 — put a destination on a cadence the host runs, or take it off one.
+  setTelemetryCadence: (destinationId: string, cadence: string) =>
+    request<{ ok: boolean; delivery_cadence: string; next_delivery_at: string | null }>(
+      `/api/telemetry/destinations/${encodeURIComponent(destinationId)}/cadence`,
+      {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cadence }),
+      },
+    ),
   // ── BUG-21: the normalised price registry ──
   modelPricing: () => request<ModelPricingView>("/api/models/pricing"),
   refreshModelPricing: () =>

@@ -67,6 +67,14 @@ class CreateTelemetryDestinationRequest:
 
 
 @dataclass
+class TelemetryCadenceRequest:
+    # BUG-276 — how often this destination is delivered to. `off` is the shipped
+    # default and means what the card said before this field existed: on demand
+    # only. Every other value is a cadence the task scheduler already honours.
+    cadence: str
+
+
+@dataclass
 class CreateStandingGrantRequest:
     # Scoped standing approval grant (F3). Creation is a critical, human-decided
     # action; the authority enforces the human-only + sub-critical ceiling.

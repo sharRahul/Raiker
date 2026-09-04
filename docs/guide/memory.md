@@ -111,11 +111,21 @@ confirmation names the destination and number of memories before text leaves
 the machine. Re-running it indexes only eligible approved memories not already
 represented in that space.
 
-Current boundary: storing learned vectors is implemented, but embedding every
-new question against that provider space is not yet connected. Until that read
-path has its own governed permission, the Memory page states that recall still
-matches words. Raiker does not claim semantic recall when only the stored side
-of the index exists.
+Both sides of that index are connected. A question is embedded once per turn
+through the same governed provider action the write side uses, and both ambient
+recall and `memory_search` search the space with it; when the space cannot be
+reached, or the capability is set to ask or deny, recall falls back to matching
+words rather than parking the turn. The Memory page states which of the two is
+happening on every load — *matches meaning*, *matches words, not meaning*, or
+*stored in this space, but a question is not embedded into it yet* — so the claim
+on screen is read from the runtime rather than asserted.
+
+**How the search itself scales.** Recall keeps a revision-checked index. Up to
+512 vectors are ranked exactly; beyond that it uses a bounded approximate lookup
+and re-ranks the candidates exactly, so a larger corpus costs more time rather
+than accuracy. The index rebuilds whenever an eligible memory, projection or
+vector changes, which is why performance never widens what recall can see. The
+exact-ranking limit is a runtime setting, and Memory names the value in force.
 
 Every retrieval caller supplies a budget. The current assembler limits how much
 memory reaches a prompt and preserves provenance labels. Post-Stage-J work will

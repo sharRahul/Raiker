@@ -18,7 +18,7 @@
  * Keeping both here means the next change to either surface is one edit rather
  * than eighteen, and a spec that cannot connect fails saying so.
  */
-import { expect, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "@playwright/test";
 
 /**
  * The owner every live spec signs in as, unless it is *about* signing in.
@@ -40,6 +40,90 @@ export const OWNER_CREDENTIALS = {
   user: process.env.RAIKER_LIVE_OWNER ?? process.env.RAIKER_LIVE_USER ?? "Rahul",
   password: process.env.RAIKER_LIVE_PASSWORD ?? "Ithink@10",
 };
+
+/**
+ * Say, before anything else runs, that this spec needs a workspace nothing has
+ * touched — and skip with the reason when it does not have one.
+ *
+ * BUG-250. Once BUG-229, BUG-247 and BUG-248 had peeled away the assumptions
+ * that stopped two specs sharing a workspace, a round finally *could* run
+ * against one — and the layer underneath was that a handful of specs are about
+ * the state a first run leaves. `bug-58-known-limits-live` asserts what two
+ * gates do before the owner has touched them, `default-ollama-live` asserts the
+ * model a fresh install names, and the three sign-in specs are about creating
+ * the account. None of them is wrong; all of them are unrunnable second.
+ *
+ * **The signal is the account, and it is the honest one.** A workspace with no
+ * owner offers "Confirm password" on the sign-in form, because the form is
+ * creating an account rather than unlocking one. That is not a proxy for
+ * freshness — it *is* freshness, from the product's own surface, read the way an
+ * owner would read it. Nothing is inferred from a file, a timestamp, or an
+ * environment variable a runner would have to remember to set.
+ *
+ * A skip rather than a failure, and a skip that says why: a round that runs the
+ * whole suite against one instance should be told which specs need their own
+ * one, not left to work it out from an assertion about a readiness window.
+ */
+export async function requireFirstRunWorkspace(
+  page: Page,
+  base: string,
+  reason: string,
+): Promise<void> {
+  await page.goto(`${base}/#/workbench`);
+  await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByLabel("Username")).toBeEnabled({ timeout: 60_000 });
+  const fresh = await page
+    .getByLabel("Confirm password")
+    .isVisible()
+    .catch(() => false);
+  test.skip(
+    !fresh,
+    `${reason} This workspace already has an owner account, so it is not a first run. ` +
+      "Point RAIKER_LIVE_BASE at a new instance to run it.",
+  );
+}
+
+/**
+ * Turn a capability on the way an owner does, from the Permissions page.
+ *
+ * Every live spec that needs a gated capability had its own copy of this, and
+ * the copies rotted the way BUG-229's sign-ins did. The one that mattered:
+ * `page.waitForLoadState("networkidle")` returns before the capability list has
+ * rendered, so `page.locator(".cap.card")` found **nothing** and the spec
+ * skipped the whole turn-on quietly — leaving the gate closed, the control
+ * disabled, and a failure two hundred lines later that read as a product defect.
+ * Waiting for the search field, which is part of the list's own shell, is what
+ * makes this deterministic.
+ *
+ * Idempotent: a capability that is already on is left alone rather than being
+ * turned off and on again, so a spec can call this against a used workspace.
+ */
+export async function enableCapability(
+  page: Page,
+  base: string,
+  label: string,
+  reason: string,
+): Promise<void> {
+  await page.goto(`${base}/#/capabilities`);
+  await page.getByPlaceholder(/Search capabilities/).waitFor({ timeout: 60_000 });
+  const card = page.locator(".cap.card").filter({ hasText: label }).first();
+  await expect(card).toBeVisible({ timeout: 60_000 });
+  await card.locator("button.cap-toggle").click();
+  const turnOn = card.getByRole("button", { name: "Turn on", exact: true });
+  // Already on: the detail offers "Turn off" instead, and pressing anything here
+  // would be a change this helper was not asked to make.
+  if (!(await turnOn.isVisible().catch(() => false))) return;
+  await turnOn.click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible({ timeout: 30_000 });
+  await dialog.getByLabel("Reason (required)").fill(reason);
+  const token = dialog.getByLabel(/Confirmation token/);
+  if (await token.isVisible().catch(() => false)) await token.fill("CONFIRM");
+  const acknowledgement = dialog.getByLabel(/reviewed the threat model/);
+  if (await acknowledgement.isVisible().catch(() => false)) await acknowledgement.check();
+  await dialog.getByRole("button", { name: "Confirm change" }).click();
+  await expect(dialog).toBeHidden({ timeout: 60_000 });
+}
 
 /**
  * Complete the first-run setup wizard if it is up, from whichever stage it is on.

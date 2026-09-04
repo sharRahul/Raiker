@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 (third) | Targeted + measured four-width sweep + full page sweep | `bug-276-`, `bug-277-`, `bug-278-`, `pages/` | Anthropic, a third **identity-linked** key entered through the interface | A telemetry cadence that runs without a button, and three defects the round found in the product by using it: a valid key answered with "check your network", twenty-six connectors that said they were installed, and a "next run" printed as a full timestamp |
 | 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
 | 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
 | 2026-09-03 | Targeted + full responsive sweep | `bug-256-`, `pages/` | Anthropic, key entered through the interface | Dictation running with nothing leaving the machine, a locked load that refuses nothing, and every page measured at four widths in both themes |
@@ -1097,6 +1098,109 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 [`screenshots/working/`](screenshots/working). The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
+---
+
+## 2026-09-04 (third) — A wire with a clock, and three defects found by using the product
+
+**Tier: targeted + measured four-width sweep + full page sweep.** Production web
+build, a fresh workspace, and one provider: Anthropic, with a third
+**identity-linked** key entered through the Connect dialog. No key appears in
+this repository.
+
+**What it proved.**
+
+1. **A collector delivered to on a cadence, without anybody pressing a button.**
+   A destination was added through **Observability → Overview**, put on **Hourly**
+   through the select on its own card, and the card then read *"Next in 58m"*.
+   Setting it back to **On demand only** cleared the claim. The interface outcome
+   [BUG-276](TO_BE_FIXED.md#bug-276--governed-events-only-leave-when-somebody-presses-a-button)
+   required is met: the card states which of the two it is on, always. Evidence:
+   `bug-276-delivery-cadence.png`. Closed as
+   [FIXED-386](FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button).
+2. **And the schedule was then measured against a real collector, twice, with
+   the failure first.** A local OTLP/HTTP receiver was started on
+   `127.0.0.1:4318` and the destination's next run was moved into the past so the
+   host tick would claim it. Both halves were observed on the running host,
+   without a browser and without anybody pressing anything:
+
+   * **With nothing listening**, the row recorded
+     `telemetry_delivery_failed:fetch_failed:URLError`, the **cursor did not
+     move** (`cursor_event_id` stayed `NULL`, so nothing was lost), the schedule
+     still advanced to the next whole hour anchored to the claimed slot
+     (`20:00:00Z`, not "an hour from now"), and exactly one notification was
+     raised: *"Telemetry delivery is failing."*
+   * **With the receiver up**, the next tick delivered **247 governed events**,
+     moved the cursor to `evt_c0582d4a…`, and raised exactly one more notice:
+     *"Telemetry delivery recovered."* The received records carry `event_id`,
+     `event_type`, `actor` and `session_id` and **no summary and no path** —
+     metadata-only asserted against the wire rather than against the encoder,
+     the same standard the 2026-09-04 (second) round held the on-demand path to.
+
+   Two notices for two transitions, across four ticks. The rule that a failing
+   wire says so once rather than once per cycle is the part a unit test can only
+   assert and this round watched happen.
+3. **Twenty-six connector rows that can be read in greyscale.** Every condition
+   on a row carries `✓` or `○` and says which for a screen reader, so a row can
+   no longer be read as *installed* when the card above it says none are.
+   Evidence: `bug-278-connector-facts.png`. Closed as
+   [FIXED-389](FIXED_ITEMS.md#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were).
+4. **All 26 route/tab states captured again** into
+   [`screenshots/pages/`](screenshots/pages), and the thirteen existing
+   width/clipping/responsive specs re-run green at 390, 768, 1280, 1920, 4K and
+   8K in both themes.
+5. **Eight live specs converted to the shared sign-in and each re-run against a
+   *used* workspace** — which is what made the conversions evidence rather than
+   substitutions, because three of them then failed for reasons that were nothing
+   to do with signing in. See below.
+
+**What it found, and this is the larger half of the round.**
+
+* **A valid key answered with "check your network."** The first live press of
+  **Test** with this round's key produced *"Anthropic could not be reached. Check
+  that it is running and reachable from this device."* The provider had answered
+  in under a second: *"This API key is not scoped to a workspace, so this request
+  must include the anthropic-workspace-id header…"*. The classifier matched three
+  exact strings, none of which appear in that body — they had been written from
+  the header name and the concept, and the fixture that exercised them had been
+  written the same way, so **every literal was matched only by the test that
+  invented it**. Two rounds of repair (FIXED-370, FIXED-372) were unreachable for
+  the message the provider actually sends. Closed as
+  [FIXED-388](FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network);
+  evidence `bug-277-workspace-repair-live.png` and
+  `bug-274-workspace-answer-live.png`.
+* **A "next run" printed as a full timestamp.** Verifying the cadence card showed
+  *"Next 9/4/2026, 7:17:29 PM"* beside *"Last run ok · 2m ago"* — `relativeTime`
+  is a past formatter and falls through for a future instant. Two Workbench
+  surfaces had the same thing. Closed as
+  [FIXED-390](FIXED_ITEMS.md#fixed-390--three-surfaces-said-next-and-printed-a-full-timestamp).
+* **One tab answering an empty list with a grey line.** Observability →
+  Notifications, alone among eleven list surfaces. Closed as
+  [FIXED-391](FIXED_ITEMS.md#fixed-391--one-tab-in-the-observability-hub-answered-an-empty-list-with-a-grey-line).
+* **A docstring that described the shipped gate table and called it the product.**
+  `telemetry_export` "ships enabled" in `default_capability_gates()` and resolves
+  **off** for an account, which is what the live round met. Closed as
+  [FIXED-392](FIXED_ITEMS.md#fixed-392--the-source-said-a-gate-ships-enabled-the-product-said-it-was-off).
+* **Three harness defects, each found by re-running a converted spec against a
+  workspace that had been used.** A seeding step written as a shell comment for a
+  person to run by hand; an assertion scoped to the page instead of to the
+  inventory it was about, which passed exactly once and then failed as a
+  strict-mode violation naming four elements; and a missing network precondition
+  reported as a three-minute timeout on a click. All three are recorded under
+  [BUG-248](TO_BE_FIXED.md#bug-248--twenty-seven-live-specs-still-sign-in-inside-a-test-body)
+  and [BUG-250](TO_BE_FIXED.md#bug-250--a-shared-live-workspace-carries-state-between-specs).
+
+**What it could not run, for the third round in a row.** The three scenarios of
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+need a model to answer, and this round's key is identity-linked like the last
+two. `/v1/organizations/me`, `/v1/organizations/workspaces` and
+`/v1/organizations/api_keys` all answer it `403`, so the workspace id is again
+not recoverable from the credential — only its owner has it. One conversion,
+`c17-b14-recall-and-inline-diff-live`, was **reverted rather than committed
+unverified** for the same reason.
+
+The attempt was still worth making: FIXED-388 exists only because a third key was
+pasted into the product and the answer was read.
+
 ---
 
 ## 2026-09-04 (second) — Five priority items, and two defects the sweep found in itself

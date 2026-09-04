@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { capture } from "./capture";
-import { dismissFirstRunModelSetup } from "./hosted-provider";
+import { dismissFirstRunModelSetup, requireFirstRunWorkspace } from "./hosted-provider";
 
 async function unlock(page: import("@playwright/test").Page) {
   if (await page.getByRole("button", { name: /Unlock Raiker/i }).isVisible()) {
@@ -18,6 +18,14 @@ test("live empty-account Workbench review", async ({ page }) => {
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
   });
+  // BUG-250 — this is the *empty-account* review: it asserts that a workbench
+  // with nothing on it offers nothing to resume. It also creates its own owner,
+  // so it cannot run against a workspace another spec already signed into.
+  await requireFirstRunWorkspace(
+    page,
+    "http://127.0.0.1:8765",
+    "This is the empty-account Workbench review, and it registers its own owner.",
+  );
   await page.goto("http://127.0.0.1:8765/#/workbench");
   if (await page.getByLabel("Confirm password").isVisible()) {
     await expect(page.getByText("Verifying runtime…")).toBeHidden({ timeout: 15_000 });

@@ -361,6 +361,8 @@ from raiker.storage.migrations import (
     TASK_SURFACE_SQL,
     TASK_THREAD_SESSION_MIGRATION_ID,
     TASK_THREAD_SESSION_SQL,
+    TELEMETRY_CADENCE_MIGRATION_ID,
+    TELEMETRY_CADENCE_SQL,
     TELEMETRY_DESTINATIONS_MIGRATION_ID,
     TELEMETRY_DESTINATIONS_SQL,
     TEXT_SEARCH_FTS4,
@@ -1572,6 +1574,11 @@ CREATE TABLE IF NOT EXISTS model_session_state (
             self._apply_migration(
                 TASK_SURFACE_MIGRATION_ID,
                 TASK_SURFACE_SQL,
+                connection,
+            )
+            self._apply_migration(
+                TELEMETRY_CADENCE_MIGRATION_ID,
+                TELEMETRY_CADENCE_SQL,
                 connection,
             )
             self._apply_migration(TURN_REASONING_MIGRATION_ID, TURN_REASONING_SQL, connection)
@@ -9436,6 +9443,9 @@ CREATE TABLE IF NOT EXISTS model_session_state (
         data = dict(row)
         data["include_content"] = bool(data.get("include_content", 0))
         data["enabled"] = bool(data.get("enabled", 1))
+        # BUG-276 — a row written before the cadence column existed reads as
+        # `off`, which is what it was: on demand only.
+        data["delivery_cadence"] = str(data.get("delivery_cadence") or "off")
         return data
 
     def list_telemetry_destinations(self, principal_id: str) -> list[dict[str, Any]]:
@@ -9468,6 +9478,68 @@ CREATE TABLE IF NOT EXISTS model_session_state (
                 (1 if enabled else 0, destination_id, principal_id),
             )
             return cursor.rowcount > 0
+
+    def set_telemetry_destination_cadence(
+        self,
+        destination_id: str,
+        principal_id: str,
+        *,
+        cadence: str,
+        next_delivery_at: str | None,
+    ) -> bool:
+        """BUG-276 — how often this destination is delivered to, and when next.
+
+        Both fields move together on purpose. A cadence with no next run would
+        never fire, and a next run with no cadence would fire once and stop; a
+        card that reads "every hour" has to be backed by a claim the host can
+        actually see.
+        """
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE telemetry_destinations"
+                " SET delivery_cadence = ?, next_delivery_at = ?"
+                " WHERE destination_id = ? AND principal_id = ?",
+                (cadence, next_delivery_at, destination_id, principal_id),
+            )
+            return cursor.rowcount > 0
+
+    def claim_due_telemetry_destinations(
+        self,
+        now: str,
+        next_delivery_at: Callable[[dict[str, Any]], str],
+        limit: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Atomically claim the destinations whose next delivery is due.
+
+        The same shape as :meth:`claim_due_tasks`, and for the same reason: the
+        host runs a tick worker and a nudged worker, and two of them seeing one
+        due destination must not produce two deliveries. The claim *is* the
+        advance — the row's next run moves forward inside the same statement
+        that selects it, conditioned on the value that was read — so the loser
+        of a race finds nothing to claim rather than sending a duplicate.
+
+        ``next_delivery_at`` is passed in rather than computed here because the
+        interval table belongs to the scheduler, not to storage.
+        """
+        with self.connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM telemetry_destinations"
+                " WHERE enabled = 1 AND delivery_cadence != 'off'"
+                " AND next_delivery_at IS NOT NULL AND next_delivery_at <= ?"
+                " ORDER BY next_delivery_at ASC LIMIT ?",
+                (now, limit),
+            ).fetchall()
+            claimed: list[dict[str, Any]] = []
+            for row in rows:
+                record = self._telemetry_row(row)
+                due = str(record["next_delivery_at"])
+                if connection.execute(
+                    "UPDATE telemetry_destinations SET next_delivery_at = ?"
+                    " WHERE destination_id = ? AND next_delivery_at = ?",
+                    (next_delivery_at(record), record["destination_id"], due),
+                ).rowcount:
+                    claimed.append(record)
+        return claimed
 
     def delete_telemetry_destination(self, destination_id: str, principal_id: str) -> bool:
         with self.connect() as connection:

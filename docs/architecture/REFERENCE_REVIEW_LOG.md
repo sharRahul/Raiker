@@ -21,6 +21,52 @@ Rounds are newest-first within each group, as they were written.
 
 ---
 
+## 2026-09-04 review (second pass) — a wire with no clock, a result with one shape, and a sentence that was never true
+
+Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,
+DeepSeek Harness and Hermes Agent. Scope: whether a governed record can *arrive*
+somewhere rather than be fetched; what a connected MCP server's answer is allowed
+to carry; and — found rather than planned — what a product owes an owner whose
+provider has already told it exactly what is wrong.
+
+**Two of the four things this round shipped were found by running the product,
+not by reading it.** That is the argument for a live round in one line, and both
+had survived every previous pass:
+
+* The round's supplied Anthropic key was pasted into Models and **Test** pressed.
+  The card said *"Anthropic could not be reached. Check that it is running and
+  reachable from this device."* The provider had answered in under a second,
+  naming the exact header it wanted. Two rounds of repair — FIXED-370's
+  classification and FIXED-372's Workspace ID field — were sitting behind three
+  string literals the provider does not send, and the fixture that exercised them
+  had been written from the concept rather than from a response. Closed as
+  [FIXED-388](../plans/FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network).
+* A page capture of Extensions → Connectors showed twenty-six rows reading
+  *"installed connected enabled usable"* directly under a card reading
+  **INSTALLED 0 · CONNECTED 0**. Met and unmet were carried by colour alone.
+  Closed as [FIXED-389](../plans/FIXED_ITEMS.md#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were).
+
+### Shipped this round
+
+| Control | Beyond the reference set? | Why |
+|---|---|---|
+| **Governed events delivered on an owner-chosen cadence** ([FIXED-386](../plans/FIXED_ITEMS.md#fixed-386--governed-events-only-left-when-somebody-pressed-a-button)) | **Yes — improvement** | [Cowork exports six event types to an OTLP collector on a live wire](https://claude.com/docs/cowork/monitoring); a scheduled exporter is therefore *parity*, and Raiker had only a button. What goes beyond it is what the schedule answers to: the delivery is the same governed action the button is, so it passes the same capability gate, appears in the log it exported, and stops when the owner pauses the host. No compared product's telemetry pipeline is itself a governed, audited, pausable action — in every one of them the exporter is infrastructure that sits outside the permission model. |
+| **Refusing to run it as a model turn** (same entry) | **Yes — differentiator, and it is a refusal rather than a feature** | The entry that asked for this proposed a task-board *routine*. A task cycle in Raiker is a governed turn: a model reads a prompt and decides what to call. Delivery is arithmetic over a cursor, and making it a judgement would put a model in the one path that answers "did the record leave the machine". Every compared product would simply run a cron; the interesting claim is not that Raiker schedules it but that it declined to route it through the model, in writing, at the call site. |
+| **Every MCP content-block shape reaching the model** ([FIXED-387](../plans/FIXED_ITEMS.md#fixed-387--a-tool-result-had-one-shape-and-the-revision-defines-six)) | **No — parity** | Claude Code and Codex both parse `structuredContent`, resource links and embedded resources. Raiker read the `text` field of every block and nothing else, so a server answering the way the specification tells it to returned an empty string. This is the bar. |
+| **A `resource_link` that is named and never followed** (same entry) | **Yes — improvement** | Every compared client treats a resource link as something to read. Raiker renders the name, the URI and the media type, and performs no read: following it is a separate governed action, and a *tool result* must not be able to cause a fetch the owner's policy never saw. This is the same rule that made `web_fetch` a capability rather than a convenience, applied one layer further in — and it costs a real capability, which is why it is written down rather than assumed. |
+| **A provider refusal classified by meaning rather than wording** ([FIXED-388](../plans/FIXED_ITEMS.md#fixed-388--a-valid-key-was-answered-with-check-your-network)) | **No — parity in the product, improvement in the method** | Every compared product maps provider errors to guidance; being wrong about one is a defect, not a gap. What is worth keeping is the rule the fix established: **a body a provider was observed sending outranks one this repository wrote down.** The live body is now the first fixture any change to that classification is measured against, precisely because the invented one had validated itself for two rounds. |
+| **Four conditions readable without colour** ([FIXED-389](../plans/FIXED_ITEMS.md#fixed-389--twenty-six-connectors-said-they-were-installed-under-a-card-saying-none-were)) | **No — parity, and it was below it** | WCAG 1.4.1 is a floor, not a differentiator. Recorded because of *where* it failed: the list an owner reads to answer "what can reach my data" was unreadable in greyscale, which is the worst surface in the product to lose. |
+
+### Assessed and deliberately not built
+
+| Item | Why not, this round |
+|---|---|
+| [**Backlog #19** — credential masking with sentinel substitution](REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-medium-effort) | Chosen as an item, then dropped after reading the code, and the reason is worth recording because the backlog row understates it. `CommandRequest` already carries `credential_bindings`, and **every backend refuses a non-empty one** — `local_strict`, `native`, `container` and `remote` all raise `selected_environment_credential_unsupported`. Delivering a credential to a child at all is [backlog #7](REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort), whose copy-on-write and delta-quarantine proofs are blocked on a container daemon this host does not have ([BUG-194](../plans/TO_BE_FIXED.md#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution)). Raiker's governed command path is also argv-only by design — every backend refuses `shell` — so the obvious sentinel shape, a shell variable the child expands, has nothing to expand it. The two rows should be re-ordered as one piece of work behind #7 rather than costed separately. |
+| **Incremental SSE for streamable HTTP** ([BUG-234](../plans/TO_BE_FIXED.md#bug-234--the-remainder-what-raiker-does-not-use-of-the-mcp-revision-it-now-speaks) remainder) | The transport conforms and reads an event stream whole; streaming it incrementally buys latency on a call Raiker already bounds by bytes and time. Named on the server's card, as the rule requires. |
+| **Elicitation** (same entry) | Its stated blocker is gone — the mid-turn question surface shipped as [FIXED-308](../plans/FIXED_ITEMS.md#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant) — and it still needs an answer to *whose* question it is. `ask_owner_question` carries no authority because Raiker's own runtime raised it; a question a connected server composes is a different object, and giving it the same surface would let an outside program borrow the one interruption in this product that is trusted. |
+
+---
+
 ## 2026-09-04 review — a credential the product refused to accept, and what a turn pays before it starts
 
 Run against Claude Cowork, Claude Code, ChatGPT Chat/Work, Codex, OpenClaw,

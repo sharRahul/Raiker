@@ -49,6 +49,10 @@ GATEWAY_CONSTRUCTORS = {
 #: this one names the actual seam.
 LOCAL_GATE_CHECK_MODULES = {
     "raiker/graph/codemap_service.py",
+    # B10 — for the same reason the code map beside it is here: the three
+    # language reads are read-shaped, so they resolve their own gate rather than
+    # parking a local parse at chokepoint B.
+    "raiker/graph/language_service.py",
     "raiker/memory/candidates.py",
     "raiker/models/policy_state.py",
     "raiker/runtime/advisor.py",
@@ -147,10 +151,10 @@ def test_i3_every_real_executor_capability_is_named_in_the_enumeration() -> None
     )
 
 
-def test_i3b_the_tool_reachable_set_is_exactly_sixteen() -> None:
+def test_i3b_the_tool_reachable_set_is_exactly_seventeen() -> None:
     """The one reachability fact that *is* exactly computable.
 
-    Sixteen capabilities are reached by a model tool through
+    Seventeen capabilities are reached by a model tool through
     `CAPABILITY_GATE_MAP`. Everything else is reached by an approval, by the
     control plane, by a tool that checks its own gate (§4), or by nothing at all
     (§3.5). A change here moves a capability between those categories and the
@@ -163,9 +167,9 @@ def test_i3b_the_tool_reachable_set_is_exactly_sixteen() -> None:
     by_tool = {
         CAPABILITY_GATE_MAP.get(d.name, d.name) for d in TOOL_DEFINITIONS
     } & REAL_EXECUTOR_CAPABILITIES
-    assert len(by_tool) == 16, (
+    assert len(by_tool) == 17, (
         "The number of capabilities a model tool can name changed "
-        f"({len(by_tool)}, was 16). Update §3.6 of {ENTRY_PATHS_DOC}: "
+        f"({len(by_tool)}, was 17). Update §3.6 of {ENTRY_PATHS_DOC}: "
         f"{sorted(by_tool)}"
     )
 

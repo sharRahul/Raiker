@@ -626,7 +626,7 @@ export interface Diagnostics {
 /**
  * MEM-09 — GET /api/memory/integrity. The owner-started scan of every index and
  * projection the memory store depends on, including the conversation index
- * behind Search chats. Counts are drift, not errors: each one names rows that
+ * behind Threads. Counts are drift, not errors: each one names rows that
  * disagree with the table that owns them.
  */
 export interface MemoryIntegrity {

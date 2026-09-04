@@ -23,7 +23,7 @@
     type ProviderErrorGuidance,
   } from "../providerErrors";
   import { modelName } from "../modelPresentation";
-  import { readinessLabel } from "../modelReadinessLabels";
+  import { readinessLabel, UNPINNED_MODEL } from "../modelReadinessLabels";
   import { isChoosableModel } from "../modelReadiness.svelte";
   import { setModels } from "../models.svelte";
   import LocalLibraryPanel from "./models/LocalLibraryPanel.svelte";
@@ -445,8 +445,16 @@
         return `${name}'s model list was denied by provider policy — enable its gate first.`;
       case "unsupported":
         return `${name} does not support model listing. Type a model id instead.`;
-      default:
+      default: {
+        // BUG-272 — "could not be reached" is the FIXED-355 defect on the
+        // catalogue path: the server had already classified *why*, and this
+        // discarded it and sent the owner to debug their network. A code with
+        // guidance says what to do; only a genuinely unclassified failure falls
+        // back to reachability.
+        const guidance = providerErrorGuidance(list.reason_code);
+        if (guidance !== null) return `${name}: ${guidance.message} ${guidance.fix}`;
         return `${name} could not be reached. Check that it is running and reachable from this device.`;
+      }
     }
   }
 
@@ -458,6 +466,19 @@
   // the exact-model readiness check and reports (and records) that verdict;
   // profiles with no model pinned still get the catalogue reachability note,
   // which is the only honest answer available for them.
+  /**
+   * BUG-270 — whether this profile may be shown as *naming* a model.
+   *
+   * The `<model>` placeholder was never the only way a profile could fail to
+   * name a real model. A profile whose runtime is not on this machine names a
+   * string that resolves to nothing here, and printing it beside "Not installed
+   * on this machine" tells the owner two contradictory things at once. Both
+   * cases now take the same "no model" treatment, from one predicate.
+   */
+  function namesAModel(profile: ModelProfile): boolean {
+    return profile.model !== UNPINNED_MODEL && profile.configured !== false;
+  }
+
   async function redetectRuntimes() {
     detecting = true;
     try {
@@ -1162,7 +1183,7 @@
                           <h3>{providerName(p.provider)}</h3>
                         </div>
                         <p class="row-model">
-                          {#if p.model === "<model>"}<span
+                          {#if !namesAModel(p)}<span
                               class="model-unpinned"
                               >model chosen at selection</span
                             >{:else}<code>{modelName(p.model)}</code>{/if}
@@ -1316,7 +1337,7 @@
                         </div>
                       </div>
                       <p class="pc-model">
-                        {#if p.model === "<model>"}<span class="model-unpinned"
+                        {#if !namesAModel(p)}<span class="model-unpinned"
                             >no model pinned</span
                           >{:else}<code>{modelName(p.model)}</code>{/if}
                       </p>
@@ -1595,7 +1616,7 @@
             <option value="">Add a backend…</option>
             {#each addable as p (p.profile_id)}
               <option value={p.profile_id}
-                >{providerName(p.provider)}{p.model !== "<model>"
+                >{providerName(p.provider)}{namesAModel(p)
                   ? ` (${modelName(p.model)})`
                   : " (no model)"}</option
               >

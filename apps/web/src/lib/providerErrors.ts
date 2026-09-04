@@ -42,6 +42,13 @@ const GUIDANCE: Record<string, Omit<ProviderErrorGuidance, "code">> = {
     href: "#/capabilities",
     linkLabel: "Open Permissions",
   },
+  // BUG-272 — the credential is valid and there is nothing to rotate. Its
+  // *shape* is the problem: an identity-linked key needs a workspace named on
+  // every request, and Raiker's provider calls do not carry one.
+  provider_workspace_required: {
+    message: "This key is identity-linked, so the provider wants a workspace named with it.",
+    fix: "Use a standard API key from the provider's console, or one scoped to a single workspace, then connect again. The key you pasted is not broken — it is the wrong kind for this call.",
+  },
   connector_vault_key_unset: {
     message: "There is no vault key, so Raiker cannot encrypt the credential you just entered.",
     fix: "Open Settings → Security & Login, select Generate key, confirm your password and save. Then connect the provider again.",
@@ -122,6 +129,12 @@ export function providerErrorGuidance(
   reasonCode: string | null | undefined,
 ): ProviderErrorGuidance | null {
   if (!reasonCode) return null;
+  // A provider code may carry a `:http_400` detail. The family is what has
+  // guidance; the detail is for the audit trail, and stripping it here is what
+  // stops a status suffix turning a known code into an unknown one.
+  const family = reasonCode.split(":", 1)[0];
+  if (GUIDANCE[family] !== undefined && GUIDANCE[reasonCode] === undefined)
+    return { ...GUIDANCE[family], code: reasonCode };
   if (reasonCode.startsWith("model_egress_denied:"))
     return { ...egressGuidance(reasonCode), code: reasonCode };
   if (reasonCode.startsWith("missing_endpoint_env:"))

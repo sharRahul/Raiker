@@ -143,9 +143,9 @@ into children routed to Chat or Build, under the same ownership.
 | Interactive, background and remote execution in the sandbox | [BUG-194](TO_BE_FIXED.md#bug-194--the-governed-shell-has-an-os-boundary-but-no-interactive-background-or-remote-execution) | Open — POSIX-only PTY and reattachment |
 | Filtered domain egress unproven | [backlog #6](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#high-priority-high-effort) | Open |
 | Remote supervisor install lifecycle | [backlog #22](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md#medium-priority-high-effort) | Open |
-| No resolved call graph; textual find-references | [B10](GAP_BUILD_CHAT.md#b10--no-language-intelligence) | Open by design, stated |
+| No resolved call graph; textual find-references | [B10](GAP_BUILD_CHAT.md#b10--no-language-intelligence) | Closed 2026-09-03 as [FIXED-366](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it). Matching stays textual by design and says so; symbols, exact-name definitions and parse diagnostics ship |
 | Polyglot linker rules and polymorphic resolution | [ADD-25](TO_BE_ADDED.md#add-25--post-stage-j-memory-expansion), [FME-04](MEMORY_RELIABILITY_PLAN.md#fme-04--polyglot-linker-rules-and-polymorphic-resolution) | Future — evidence-labelled Python/Rust and TypeScript/service boundaries after snapshot isolation |
-| LSP surface | [BUG-227](TO_BE_FIXED.md#bug-227--there-is-no-lsp-surface-for-a-plugin-to-contribute-to) | Open — **decide whether Raiker wants one at all** |
+| LSP surface | [BUG-227](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it) | Closed 2026-09-03 — **decided: no**. B10's tool set delivers what Build needed without a language-server subprocess, and both plugin specs state what that costs |
 | Worktrees for parallel work | [backlog #27](../architecture/REFERENCE_PLATFORM_COMPATIBILITY.md) | Rejected — checkpoints answer the same need better for undo |
 | GAP-BUILD remainder | [GAP-BUILD](GAP_BUILD_CHAT.md#gap-build--what-build-needs-to-stand-against-a-class-leading-coding-agent) | 7 items (5 open, 2 partial) |
 

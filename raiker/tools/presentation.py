@@ -99,6 +99,10 @@ _FAMILY_BY_TOOL: dict[str, str] = {
     "github_write": FAMILY_REPOSITORY,
     "code_map_search": FAMILY_REPOSITORY,
     "code_map_references": FAMILY_REPOSITORY,
+    # B10 — three more reads of the repository, so the same family.
+    "document_symbols": FAMILY_REPOSITORY,
+    "find_definition": FAMILY_REPOSITORY,
+    "diagnostics": FAMILY_REPOSITORY,
     "knowledge_graph": FAMILY_MEMORY,
     # The owner's own accounts, reached through a governed connector.
     "gmail_read": FAMILY_CONNECTOR,
@@ -155,6 +159,9 @@ _LABEL_BY_TOOL: dict[str, str] = {
     "github_write": "Write to GitHub",
     "code_map_search": "Search the code map",
     "code_map_references": "Find references",
+    "document_symbols": "Outline a file",
+    "find_definition": "Find where this is defined",
+    "diagnostics": "Check files for problems",
     "gmail_read": "Read Gmail",
     "gcal_read": "Read Calendar",
     "slack_read": "Read Slack",
@@ -306,7 +313,15 @@ def humanize_tool_name(tool_name: str) -> str:
 def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR0911, PLR0912
     """What this call acted on, in one short phrase, or "" when nothing is safe."""
     # ── Paths ────────────────────────────────────────────────────────────────
-    if tool_name in {"read_file", "stat_path", "write_file", "edit_file", "create_document"}:
+    if tool_name in {
+        "read_file",
+        "stat_path",
+        "write_file",
+        "edit_file",
+        "create_document",
+        # B10 — an outline names the one file it read, exactly as a read does.
+        "document_symbols",
+    }:
         return _path(args)
     if tool_name == "list_directory":
         return _path(args) or "the workspace root"
@@ -326,7 +341,7 @@ def _action_phrase(tool_name: str, args: dict[str, Any]) -> str:  # noqa: PLR091
         "conversation_search",
     }:
         return _quoted(args, "query")
-    if tool_name == "code_map_references":
+    if tool_name in {"code_map_references", "find_definition"}:
         return _quoted(args, "name")
     if tool_name == "skill_load":
         return _clean(args.get("name"))[:_MAX_PHRASE]

@@ -292,6 +292,26 @@ class ProviderCatalogueProbe:
             evidence={"provider": provider},
         )
 
+    def _workspace_required(
+        self, key: ModelReadinessKey, label: str, provider: str
+    ) -> ModelReadiness:
+        """BUG-272 — the key is valid and names no workspace.
+
+        Its own answer for the same reason quota has one: the repair is neither
+        a network fix nor a new key. An identity-linked key is the wrong *shape*
+        of credential for a request that does not carry a workspace, and telling
+        the owner to rotate it would send them round the same loop.
+        """
+        return self._result(
+            key,
+            ModelReadinessState.AUTHENTICATION_FAILED,
+            f"{label} needs a workspace named alongside this kind of key.",
+            "provider_workspace_required",
+            f"This key is identity-linked. Use a standard {label} API key from the "
+            "provider's console, or one scoped to a single workspace, then check again.",
+            provider=provider,
+        )
+
     def _quota_exhausted(
         self, key: ModelReadinessKey, label: str, provider: str
     ) -> ModelReadiness:
@@ -323,6 +343,7 @@ class ProviderCatalogueProbe:
             ProviderResponseValidationError,
             ProviderTimeoutError,
             ProviderUnsupportedCapabilityError,
+            ProviderWorkspaceRequiredError,
         )
         from raiker.models.policy_state import provider_runtime_policy_from_gates
         from raiker.models.registry import ModelProfileRegistry, profile_with_model
@@ -360,6 +381,8 @@ class ProviderCatalogueProbe:
                 "Review the provider policy and check again.",
                 provider=profile.provider,
             )
+        except ProviderWorkspaceRequiredError:
+            return self._workspace_required(key, label, profile.provider)
         except ProviderQuotaExhaustedError:
             return self._quota_exhausted(key, label, profile.provider)
         except ProviderConfigurationError:
@@ -455,6 +478,8 @@ class ProviderCatalogueProbe:
                     "Update the provider credential and check again.",
                     provider=profile.provider,
                 )
+            except ProviderWorkspaceRequiredError:
+                return self._workspace_required(key, label, profile.provider)
             except ProviderQuotaExhaustedError:
                 return self._quota_exhausted(key, label, profile.provider)
             except ProviderModelNotFoundError:

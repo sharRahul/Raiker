@@ -377,6 +377,12 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-362](#fixed-362--an-expected-answer-was-written-to-the-console-as-a-failure) | Low | Authentication / web UI | Fixed 2026-09-03 (BUG-267) |
 | [FIXED-363](#fixed-363--dictation-was-the-last-surface-that-was-not-local) | Medium | Voice / privacy posture | Fixed 2026-09-03 (BUG-256) |
 | [FIXED-364](#fixed-364--a-live-round-could-start-on-the-previous-rounds-data) | Low | Live test harness / host lifecycle | Fixed 2026-09-03 (BUG-266) |
+| [FIXED-365](#fixed-365--a-fresh-install-named-a-model-nobody-had) | Medium | Models / first-run default | Fixed 2026-09-03 (BUG-270) |
+| [FIXED-366](#fixed-366--build-could-read-a-repository-and-not-understand-it) | — | Build / language intelligence | Fixed 2026-09-03 (GAP-BUILD B10; BUG-227 answered by decision) |
+| [FIXED-367](#fixed-367--background-work-finished-into-a-status-line) | — | Chat / tasks | Fixed 2026-09-03 (GAP-CHAT C11) |
+| [FIXED-368](#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not) | — | Chat / cross-chat surface | Fixed 2026-09-03 (GAP-CHAT C18) |
+| [FIXED-369](#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between) | — | Build / Approvals / code review | Fixed 2026-09-03 (GAP-BUILD B14 remainder) |
+| [FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status) | Medium | Models / provider errors | Fixed 2026-09-03 (BUG-272, raised and closed in the same round) |
 
 ---
 
@@ -15495,3 +15501,364 @@ a handle that clears on the second attempt, and a host still holding the port.
 
 **User-interface outcome.** None; this is harness behaviour. The outcome is that
 a live round either starts on a genuinely empty workspace or refuses to start.
+
+---
+
+## FIXED-365 — A fresh install named a model nobody had
+
+**Severity: Medium. Area: models / first-run default. Status: Fixed 2026-09-03
+(BUG-270).**
+
+**Observed.** On a machine with no `ollama` binary and nothing listening on
+`11434`, a brand-new workspace selected `ollama-local-openai-compatible` and
+reported `gemma4:31b-cloud` as the model for the next turn. Models read
+**"5 models set up"**, the **Global model** control read *Gemma 4:31B Cloud*, and
+both composers offered it. Nothing named on any of those surfaces existed on the
+machine, and `gemma4:31b-cloud` is not even a local model — the `cloud` suffix is
+Ollama's hosted tier.
+
+**Root cause, in two halves.** The profile hard-codes that model string and is
+the only `is_native_default`, so a fresh install adopts it. It also declares
+`"default_state": "disabled_until_provider_detected"` — and nothing detected the
+provider, so the declaration had no enforcer and was inert. The count was wrong
+for a related reason: `configured` meant `effective_model != "<model>"`, which is
+only *"this profile names a model string"*, and the four managed llama.cpp slots
+name `local-gguf`…`local-gguf-4` — aliases **Raiker itself** invents when it
+deploys into a slot, not models anyone has.
+
+**Which of BUG-270's two options this is.** **B — detect before claiming.** Option
+A (replace the model with the `<model>` placeholder) would have removed the
+runtime's out-of-box fallback and changed what pressing Send does on an
+unconfigured install; five tests encode that contract directly. B keeps the
+concrete default for an owner who *does* have Ollama and makes every surface
+honest for one who does not, which is what the entry asked for and the smaller
+change to the runtime.
+
+**Fixed.**
+
+* `raiker/models/local_presence.py` is the detector the declaration never had.
+  It is a **PATH lookup and never a connection**, which is how it honours
+  [FIXED-357](#fixed-357--a-fresh-raiker-adopted-whichever-chatgpt-account-codex-was-signed-in-to)'s
+  rule that a status read must not perform one — the detector has no way of
+  breaking it. The result is written to `local_runtime_presence`, so a status
+  read is a row read; `detect` re-probes only a row that is missing or an hour
+  old, and `POST /api/local-runtimes/detect` forces a fresh look for the owner
+  who just installed something.
+* **"Not looked yet" is not "absent".** A runtime nothing has detected returns
+  `None`, and the predicate treats unknown as *do not claim* — the fail-closed
+  direction for a promise about someone else's machine.
+* `_names_an_available_model` is the honest predicate. A profile declaring
+  `disabled_until_provider_detected` earns `configured` by detection, by a saved
+  connection, or by a completed deployment (which already writes a row through
+  `save_configured_model`); every other profile is unchanged.
+* The implicit native default is adopted only when it names an available model.
+  An **explicit** selection is still honoured whatever detection says — the owner
+  is the authority on their own machine.
+* `usable_provider_count` answers "how many models are set up" on the server,
+  where the deployment and detection facts are, instead of in the browser from a
+  model string.
+
+**Guarded.** `tests/test_local_runtime_presence.py` covers absent, present and
+never-looked-at; the cache and its expiry; both routes and their auth; and the
+count for empty and deployed slots. The three tests that encoded the defective
+contract — in `test_api_model_selection.py`, `test_api_model_readiness.py` and
+`test_api_diagnostics.py` — were rewritten to assert the new one *and* its
+mirror image, so the case where Ollama **is** installed is covered rather than
+assumed. `default-ollama-live.spec.ts` walks the same three surfaces it used to
+and asserts none of them names the model.
+
+**User-interface outcome.** A fresh install does not name a model that is not
+installed — not in the setup meter, not in the Global model control, not in
+either composer's model chip. The provider card says **"Not installed on this
+machine"** with a **Look again**, and says nothing at all when detection has no
+answer.
+
+---
+
+## FIXED-366 — Build could read a repository and not understand it
+
+**Severity: — (GAP-BUILD B10, and BUG-227's scope decision). Area: Build /
+language intelligence. Status: Fixed 2026-09-03.**
+
+**What was missing.** The code map answers *where is this declared* and *where is
+it used*. B10 named the three questions it does not answer: what is in this file,
+where exactly is this defined, and — the one that costs a coding agent most —
+did I just break it? Verifying an edit meant spending a command approval and a
+subprocess on a full checker run.
+
+**Fixed.** `raiker/graph/language_service.py`, behind its own
+`language_intelligence` capability:
+
+* **`document_symbols`** — one file's outline, parsed from disk rather than read
+  from the stored index, so it is right the instant after the agent's own edit.
+  An outline that needs a rebuild before it is correct is a cache, not language
+  intelligence.
+* **`find_definition`** — exact-name resolution, ranked by proximity to the file
+  that asked. `code_map_search` ranks a fuzzy query and will return
+  `ConfigLoader` for `Config`; *"which of the four did I mean"* is the question
+  it cannot answer and this one can.
+* **`diagnostics`** — the edit → verify loop without a command approval.
+
+**B10's fourth item already shipped.** `find_references` is
+`code_map_references`, delivered with B9 as
+[FIXED-113](#fixed-113--every-turn-started-cold-the-repository-had-no-index). It is
+deliberately not duplicated: two names for one behaviour is a choice the model
+would have to make for no reason.
+
+**The contract that makes `diagnostics` worth having.** It is parse-level —
+syntax and structure, not types, imports or lint rules — and a file in a language
+this runtime cannot parse comes back under `unsupported`, explicitly **not**
+claimed to be clean. A tool that reports "no problems" about a file it did not
+open is worse than no tool, because it is trusted the same and is wrong. The tool
+description tells the model to read `checked` rather than the empty list, and the
+web surface renders *"Not checked — no parser for this language here."*
+
+**Its own capability, not the code map's.** `code_map_indexing` governs *writing
+a derived index of the owner's machine*; these three parse a file `read_file`
+would already open. One switch meaning two postures is the defect this codebase
+keeps finding, so each names what it governs. Both resolve an unset gate the same
+way, so an owner meets one posture for "read my repository" rather than two.
+
+**BUG-227 is answered by a decision, not by a client.** Its first step was to
+decide whether Raiker wants an LSP client at all. It does not: a language server
+is a long-running subprocess that reads the workspace, so it would need
+`CommandService`'s execution boundary, its own lifecycle, its own capability and
+a crash-recovery story — and everything Build actually needed is obtainable
+without one, and is *better* without one for a governed agent. The cost is stated
+rather than hidden in both `PLUGIN_MANIFEST_SCHEMA.md` and `PLUGIN_SYSTEM_SPEC.md`:
+no cross-file type inference, no rename refactoring, no completions, and
+parse-level rather than type-level diagnostics. `contributes.lsp_servers` stays
+accepted-and-inert and now says *why* in those words.
+
+**Guarded.** `tests/test_language_intelligence.py` — 23 tests including the
+outline that follows an edit without a rebuild, the two-`Widget` case that
+proximity ranking exists for, containment refusals on every entry point, the
+bounded diagnostics pass, and the `unsupported`-is-not-clean contract.
+`tests/test_code_repo_files_api.py` covers the workspace route, including that it
+cannot reach outside the repository.
+
+**User-interface outcome.** Build's file viewer says whether the file it is
+showing still parses: the problems with their line and column, *"No syntax
+problems."*, or *"Not checked — no parser for this language here."* — never
+silence in place of the third. Permissions carries **Language intelligence** as
+its own switch under Workspace, and the transcript names the reads as *Outline
+file*, *Find definition* and *Check for problems*.
+
+---
+
+## FIXED-367 — Background work finished into a status line
+
+**Severity: — (GAP-CHAT C11). Area: Chat / tasks. Status: Fixed 2026-09-03.**
+
+**Observed.** Every task belonging to a principal ran in one
+`sess_inbox_<principal>` session, which Chat deliberately hides from RECENT
+CHATS (BUG-10). So the overnight research routine and the hourly build check
+interleaved their turns in a single transcript nobody could open. *"What did the
+overnight run find?"* had no thread to be asked in, and a reply had nowhere to
+land.
+
+**Fixed.** Each task carries a durable conversation of its own —
+`thread_session_id`, created with the task and titled after it. Every cycle runs
+in that thread, so a recurring routine accumulates a readable history instead of
+overwriting a summary field. The task keeps `session_id` pointing at the Inbox,
+because that is where the owner principal has always been carried and a task
+created before this existed still works: `run_session_id` answers "where does
+this run" in one place, so the scheduler, the resume path and the API cannot
+disagree.
+
+**Why this is steering and not annotation.** The owner's reply lands in the same
+conversation the next cycle runs in, so it is context that cycle reads. Nothing
+new had to be built for that — it is conversation memory
+([FIXED-04](#fixed-04--chat-had-no-conversation-memory-at-all-was-bug-02-critical))
+applied to a thread that now exists.
+
+**Guarded.** `tests/test_task_conversation_thread.py` — a thread per task,
+titled after it, not shared between two tasks, kept out of RECENT CHATS; the
+cycle running in it; a pre-thread task still running in its Inbox; and the owner
+still being read from the Inbox rather than the thread, which is the failure that
+would have looked like a scheduler bug rather than a lost field.
+
+**User-interface outcome.** A task card carries **Thread · N**, opening the
+routine's own conversation in Chat where the owner can read every cycle and
+reply. It is offered only once the thread holds something: a link to an empty
+transcript is a dead end, and a routine that has not run has one.
+
+---
+
+## FIXED-368 — "Where did I say that" was answered; "what am I working on" was not
+
+**Severity: — (GAP-CHAT C18). Area: Chat / cross-chat surface. Status: Fixed
+2026-09-03.**
+
+**Observed.** Chat search covered titles and message text. There was no view
+across projects, and no way to reach — let alone resume — the threads a routine
+is advancing. The last of those was not an omission so much as an impossibility:
+until [FIXED-367](#fixed-367--background-work-finished-into-a-status-line) gave
+each task a conversation, there were no such threads to list.
+
+**Fixed.** `GET /api/work-threads` is the join nothing was performing: the
+owner's own conversations and the threads their routines are advancing, in one
+list, newest first, each naming the project it sits in and what it is blocked on.
+Every field is read from a row that already existed; the view records nothing.
+
+`waiting_on` states only a blocker the runtime is actually holding — an approval
+a task is parked on. A thread nobody is waiting on says so by saying nothing,
+rather than by having a staleness heuristic invented for it.
+
+**Guarded.** `tests/test_work_threads.py` — both kinds in one ordering, the
+project join, the blocked routine, the Inbox never appearing as resumable work,
+and a routine with no turns yet being left out, because every row on this board
+is supposed to be somewhere to continue.
+
+**User-interface outcome.** The rail's **Threads** destination is the board with
+an empty box — chats and routines together, filterable by kind and by project —
+and the search it always was as soon as anything is typed. The filters narrow the
+board and never the search: a query already names what it is looking for, and a
+scope chip on top of it would be a second, silent predicate on the same question.
+The Workbench's **Continue working** card reads the same list, so a routine's
+thread is offered to resume beside the owner's own conversations and is labelled
+as one.
+
+---
+
+## FIXED-369 — A reviewer could accept a change or reject it, and nothing between
+
+**Severity: — (GAP-BUILD B14 remainder). Area: Build / Approvals / code review.
+Status: Fixed 2026-09-03.**
+
+**Observed.** An approval governed the whole change set. A reviewer who wanted
+two of five hunks had to reject everything and ask again — the single
+interaction a coding agent's review surface exists to support. B14's own entry
+said neither per-hunk accept nor edit-then-accept was offered "rather than being
+shown as a control the server would refuse", which was the right call and left
+the work.
+
+**Fixed.** A decision may now carry the hunks the reviewer kept, and the property
+that makes it safe is that **a selection narrows and never edits**. The code is
+written so it cannot do otherwise:
+
+* Ids are **positions** in the approved diff — `<file index>:<hunk index>` — not
+  content. There is nothing in an id for a caller to smuggle a change through.
+* `select_hunks` copies bytes out of the approved patch and copies nothing else
+  in, so it can only ever remove hunks; it cannot add a line, reorder one, or
+  reach a file the approved patch did not name.
+* An id naming no hunk in the approved patch **refuses the whole decision**
+  rather than being ignored — ignoring it would apply a change the owner did not
+  press Accept on.
+* The narrowing is applied in the relay *after* the A1 immutable-intent hash
+  check, so that hash still covers the entire approved change set.
+* Accepting no part of a change is refused rather than run as an empty patch,
+  because "nothing was changed" should be a stated outcome and not a silent one.
+
+The selection is stored in its own `decision_scope_json` column. It is
+deliberately neither `arguments_json` nor `answer_json`: a narrowed approval is
+neither a different action nor an answer to a question, and folding it into
+either would make the distinction depend on reading a field's contents to know
+which kind of row you had — the defect
+[FIXED-308](#fixed-308--raiker-could-ask-permission-and-could-not-ask-what-you-meant)'s
+own migration note warns about.
+
+**Why dropping a hunk is safe to apply.** `apply_patch_content` matches hunks by
+context with offset tolerance rather than by the line numbers in the hunk header,
+so the hunks that remain still find their own context; `old_start` was only ever
+a hint about where to look first.
+
+**The two parsers had to agree.** A hunk id means nothing unless the browser and
+the server derive the same one from the same diff. `diff.ts` now counts file
+sections by their `---`/`+++` pair exactly as `patch_selection._sections` does,
+with a `diff --git` preamble travelling with the section it introduces rather
+than starting one. A diff carrying no such pair is still readable and is
+deliberately **not** selectable — the applier would refuse it, and a control the
+server must reject is worse than none. The agreement is pinned by vectors taken
+from the Python side rather than written from the same assumption twice.
+
+**Still open, and named as such.** *Edit then accept* remains unbuilt. It is a
+different thing from a narrowing — it is a **different action**, not a smaller
+one, so it cannot ride the immutable-intent hash and needs its own proposal path.
+It is recorded in [`TO_BE_FIXED.md`](TO_BE_FIXED.md).
+
+**Guarded.** `tests/test_partial_change_acceptance.py` — the selector's
+narrow-only property line by line, the relay applying only the accepted hunk, the
+unknown-id refusal leaving the file untouched and the approval pending, an empty
+selection refused, and the whole change staying the default. `diff.test.ts` pins
+the cross-language id agreement; `DiffView.test.ts` and `ApprovalsView.test.ts`
+cover the control being offered only where the server can honour it.
+
+**User-interface outcome.** In Build and in Approvals, the shared diff reader
+carries a checkbox on each hunk, a *"2 of 5 hunks"* count with **Select all** /
+**Select none**, and dims the lines of a declined hunk as a second signal beside
+the checkbox rather than as the only one. It is offered only on a pending,
+unexpired decision, only on a diff the applier understands, and only when there
+is more than one hunk — accepting the only hunk is what Accept already does.
+
+---
+
+## FIXED-370 — A valid key was reported as a bare HTTP status
+
+**Severity: Medium. Area: models / provider errors. Status: Fixed 2026-09-03
+(BUG-272, raised and closed in the same round).**
+
+**Observed.** Found on 2026-09-03 while driving the live suite against a real
+Anthropic key. The key was valid and there was nothing to rotate: it is
+**identity-linked**, and Anthropic requires `anthropic-workspace-id` on every
+request made with one. The provider said exactly that, in the response body:
+
+```
+"anthropic-workspace-id is required when authenticating with an identity-linked
+ API key; send the id of the workspace this request acts in."
+```
+
+Raiker reported `provider_http_error:http_400`, and the provider card rendered
+it as *"Anthropic could not be reached. Check that it is running and reachable
+from this device."* Both send the owner to debug the wrong thing — the network,
+or a credential that is not the problem. That is the same shape as
+[FIXED-355](#fixed-355--a-rejected-key-was-reported-as-a-network-failure), one
+layer further out.
+
+**Root cause, in two places.**
+
+* `_map_status` in both providers falls through to a generic connection error
+  for any unclassified 400. The body that said what was wrong was read for two
+  other conditions (`is_quota_exhausted`, the thinking-shape retry) and
+  discarded for this one.
+* `testNote` in `ModelsView` ignored `reason_code` on the catalogue read
+  entirely and printed a fixed reachability sentence, so even a code the server
+  *had* classified came out as "could not be reached".
+
+**Fixed.** `needs_workspace_id` classifies the condition from the body, exactly
+as quota is classified and for the same reason: the status alone means nothing —
+400 is the busiest status a provider has — and only the body says which 400 it
+is. It raises `ProviderWorkspaceRequiredError`, which carries the fixed code
+`provider_workspace_required:http_400`.
+
+**Nothing from the body is kept**, which is the rule
+`provider_error_code` exists to enforce: the reason code is a constant, so a
+provider that names an organisation or an account in this message cannot carry
+it into an event, an API response, or the readiness record.
+
+`providerErrorGuidance` now also matches on the code *family*, so a
+`:http_400` detail no longer turns a known code into an unknown one, and the
+catalogue path uses it instead of its own sentence.
+
+**Why it is authentication_failed and not a new readiness state.** The owner's
+repair is on the credential, which is what that state means. What it must not
+say is *"update the key"* — the key is fine and its **shape** is the problem —
+so the remediation names the fix instead: use a standard console key, or one
+scoped to a single workspace.
+
+**Guarded.** `tests/test_provider_workspace_required.py` — the real body
+classified, an ordinary 400 not classified, only 400 considered, both providers
+raising it, the quota case not stolen, and nothing from the body reaching the
+code. `providerErrors.test.ts` covers the family match and that an unknown code
+still returns null so a caller falls back to the raw status.
+
+**Found by the harness, and the harness had to be told.**
+`checkModelReady`'s accepted outcomes are a closed set on purpose: an outcome
+missing from it does not fail, it hangs for two minutes and then blames the spec
+rather than the key. The new answer was added to it in the same change.
+
+**User-interface outcome.** The provider card says: *"This key is
+identity-linked, so the provider wants a workspace named with it. Use a standard
+API key from the provider's console, or one scoped to a single workspace, then
+connect again. The key you pasted is not broken — it is the wrong kind for this
+call."* Evidence: [`screenshots/working/bug-272-provider-answer-live.png`](screenshots/working/bug-272-provider-answer-live.png).

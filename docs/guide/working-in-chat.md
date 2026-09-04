@@ -219,8 +219,16 @@ Every chat appears under **RECENT CHATS** in the sidebar with its title and a
 relative timestamp. The `⋯` menu offers Copy local link, Rename, Move to
 project, Pin, Archive, and Delete.
 
-**Search chats** searches conversation titles *and* message text across every
-conversation you have had, however old. Each result shows the exchange that
+**Threads** is two things in one place, and which one it is follows the box.
+
+With the box empty it is the board: everything you have going, newest first —
+the conversations you started **and** the threads your routines are advancing on
+their own. Each row names the project it sits in and says what it is blocked on;
+a routine's row says how often it runs. Narrow it to **Chats** or **Routines**,
+or to one project, when the whole list is more than you wanted.
+
+Type anything and it becomes the search it has always been: conversation titles
+*and* message text across every conversation you have had, however old. Each result shows the exchange that
 matched beneath its title — so you can tell which chat it is before opening it —
 and groups results by the day they happened. Where the match was in a message,
 *"Open the match →"* opens the conversation **at that exchange** and marks it for

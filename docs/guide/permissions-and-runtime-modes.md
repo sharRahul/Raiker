@@ -127,7 +127,7 @@ kept out of the interactive list and reported in Diagnostics instead.
 
 | Group | Examples |
 |---|---|
-| Workspace | Audit export, Code map, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
+| Workspace | Audit export, Code map, Language intelligence, File writes, Git writes, Memory store/forget, Patch apply, Task creation, Project assignment, Semantic memory, Vector embeddings, Graph indexing |
 | Local execution | Shell commands, Processes, Container execution, Subagents, Multi-agent teams |
 | Network | Web fetch, Git push, External channels, Channel approval relay |
 | Models | Hosted models, Home-lab models, Advisor model, Provider embeddings |
@@ -235,6 +235,26 @@ signature. Reading the code still goes through the same file read, the same
 workspace containment, and the same policy check as any other read, so turning
 the map on does not widen what the agent may open. Turn it off and the agent
 falls back to searching by pattern.
+
+### Language intelligence
+
+**Language intelligence** sits beside Code map and is a different switch on
+purpose. With it on, Raiker can outline one file, jump to where an exact name is
+declared, and check a file for syntax problems after editing it.
+
+The distinction between the two is what each does to your machine. Code map
+**writes** an index of your repository and keeps it. Language intelligence writes
+nothing at all — every answer is a parse of a file the agent could already open
+with a file read, and nothing outlives the turn that asked. So you can have
+either without the other, and turning one off does not quietly disable half of
+the other.
+
+What it checks and what it does not: the check is parse-level — syntax and
+structure, not types, imports or lint rules — over Python, JSON, TOML and YAML. A
+file in any other language is reported as **not checked**, never as clean. There
+is no language server: Raiker starts no long-running process for this, which is
+why there is no cross-file type inference, no rename refactoring and no
+completions.
 
 *Not to be confused with* **Graph memory indexing**, further down the same group.
 That is a separate, unimplemented subsystem — a durable governed store of code

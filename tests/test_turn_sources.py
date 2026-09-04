@@ -137,6 +137,26 @@ class TestSourceDerivation:
                 {"name": "f"},
                 {"count": 1, "repository": "repo", "results": [{"path": "a.py", "line": 2, "text": "f()"}]},
             ),
+            # B10 — three more reads of the repository, so three more things an
+            # answer can be *drawn from*. Declaring a source kind and producing
+            # no source is exactly the defect this invariant exists to catch.
+            "document_symbols": (
+                {"path": "a.py"},
+                {"path": "a.py", "count": 1, "symbols": [{"name": "f", "line_start": 1}]},
+            ),
+            "find_definition": (
+                {"name": "f"},
+                {
+                    "name": "f",
+                    "count": 1,
+                    "repository": "repo",
+                    "definitions": [{"path": "a.py", "line_start": 1}],
+                },
+            ),
+            "diagnostics": (
+                {"paths": ["a.py"]},
+                {"repository": "repo", "checked": ["a.py"], "count": 0, "diagnostics": []},
+            ),
             "memory_search": ({"query": "keys"}, {"count": 1, "results": [{"text": "x"}]}),
             "memory_list": ({}, {"count": 1, "results": [{"text": "x"}]}),
             "memory_get": ({}, {"memory_id": "mem_1", "text": "x"}),

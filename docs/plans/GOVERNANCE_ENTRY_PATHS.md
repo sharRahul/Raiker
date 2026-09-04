@@ -216,7 +216,7 @@ first column is computed (`CAPABILITY_GATE_MAP` over `TOOL_DEFINITIONS`,
 `EXECUTABLE_ON_APPROVAL`); the rest is read from the code and marked where it was
 not fully traced.
 
-**Reached by a model tool** — sixteen, each entering chokepoint B by name:
+**Reached by a model tool** — seventeen, each entering chokepoint B by name:
 
 | Capability | Tool(s) |
 |---|---|
@@ -231,15 +231,16 @@ not fully traced.
 | `task_management_runtime` | `create_task` |
 | `project_assignment_runtime` | `assign_session_project` |
 | `code_map_indexing` | `code_map_search`, `code_map_references` |
+| `language_intelligence` | `document_symbols`, `find_definition`, `diagnostics` |
 | `graph_indexing_runtime` | `knowledge_graph` |
 | `web_fetch` | `web_fetch`, `web_search` |
 | `remote_execution_cap` | `remote_execute` |
 | `cloud_execution_cap` | `cloud_execute` |
 | `subagents` | `spawn_subagent` |
 
-Twelve of these sixteen are also **relayed by an approval**
-(`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `graph_indexing_runtime`,
-`web_fetch` and `subagents` are not. The thirteenth relayed capability,
+Twelve of these seventeen are also **relayed by an approval**
+(`EXECUTABLE_ON_APPROVAL`); `code_map_indexing`, `language_intelligence`,
+`graph_indexing_runtime`, `web_fetch` and `subagents` are not. The thirteenth relayed capability,
 `checkpoint_restore_execution`, has no model tool at all: only paths 21 and 22
 propose a restore, so an agent can never rewind the workspace on its own say-so.
 
@@ -304,6 +305,7 @@ which is GEP-01 closed.
 | `raiker/runtime/advisor.py` | `advisor_model_runtime` | **Egress** |
 | `raiker/tools/mcp_tools.py` | `mcp_connector_runtime` | **Subprocess + egress** |
 | `raiker/graph/codemap_service.py` | `code_map_indexing` | Local read-derived |
+| `raiker/graph/language_service.py` | `language_intelligence` | Local read; derives nothing durable |
 | `raiker/runtime/retrieval.py` | `vector_embedding_runtime` | Local read |
 | `raiker/memory/candidates.py` | memory candidates | Local read |
 | `raiker/models/policy_state.py` | provider gate state | Local read |

@@ -52,6 +52,21 @@ Choosing happens in the model picker, which has a search: there is no dropdown
 to scroll. A local runtime that is not installed offers to open the vendor's own
 download instead of a control that could not work.
 
+## What a fresh install claims, and what it does not
+
+Nothing. Raiker ships profiles for every backend it speaks to, but a profile only
+*names* a model once that model can exist here — the runtime was found on this
+machine, you connected the provider, or you deployed a file into a slot. Until
+then the profile is offered for setup and names nothing, so the setup meter, the
+Global model control and both composers stay honest rather than pointing at
+software you have not installed.
+
+A local provider card says **"Not installed on this machine"** when Raiker looked
+and did not find it, and says nothing when it has not looked. Detection is a
+lookup of your `PATH` — never a connection to anything — and the answer is
+remembered, so opening Models does not re-scan. **Look again** on the card is
+there for the minute after you install something.
+
 ## Local discovery and acquisition
 
 - **Ollama:** open the official installer from Models and pull a model by exact

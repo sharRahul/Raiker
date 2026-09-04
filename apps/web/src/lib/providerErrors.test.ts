@@ -41,3 +41,30 @@ describe("providerErrorGuidance", () => {
     expect(providerErrorGuidance(undefined)).toBeNull();
   });
 });
+
+// BUG-272 — found on a live round: a valid, identity-linked key was refused with
+// HTTP 400 and reported as `provider_http_error:http_400`, then rendered as
+// "could not be reached". Both send the owner to debug the wrong thing — the
+// same shape FIXED-355 removed from a rejected key.
+describe("an identity-linked key", () => {
+  it("says the key is the wrong kind rather than telling you to rotate it", () => {
+    const guidance = providerErrorGuidance("provider_workspace_required");
+    expect(guidance).not.toBeNull();
+    expect(guidance?.message).toMatch(/identity-linked/i);
+    expect(guidance?.fix).toMatch(/not broken/i);
+  });
+
+  it("matches through the status detail the provider code carries", () => {
+    // The code arrives as `provider_workspace_required:http_400`; the suffix is
+    // for the audit trail and must not turn a known code into an unknown one.
+    const guidance = providerErrorGuidance("provider_workspace_required:http_400");
+    expect(guidance?.message).toMatch(/identity-linked/i);
+    // The exact code is kept for correlation, detail and all.
+    expect(guidance?.code).toBe("provider_workspace_required:http_400");
+  });
+
+  it("still returns null for a code nothing knows about", () => {
+    // Callers fall back to the raw status, so nothing is silently swallowed.
+    expect(providerErrorGuidance("provider_http_error:http_418")).toBeNull();
+  });
+});

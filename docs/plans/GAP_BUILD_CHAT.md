@@ -286,10 +286,20 @@ evaluation harness as this entry used to claim.
 
 #### B10 — No language intelligence
 
-No symbol lookup, no
-definition/reference navigation, no type or lint feedback loop. **Work:** an
-LSP-backed read tool set (`find_definition`, `find_references`,
-`document_symbols`, `diagnostics`) — read-only, so it needs no approval path.
+✅ **Done — see [FIXED-366](FIXED_ITEMS.md#fixed-366--build-could-read-a-repository-and-not-understand-it), 2026-09-03.**
+`document_symbols`, `find_definition` and `diagnostics` ship under their own
+`language_intelligence` capability, read-only and with no approval path, exactly
+as this entry asked. The fourth name here, `find_references`, already shipped as
+`code_map_references` (B9 / FIXED-113) and is deliberately not duplicated.
+
+Two deviations from the wording above, both deliberate. It is **not LSP-backed**:
+BUG-227's first question was whether Raiker wants a language-server client, and
+the answer is no — a long-running subprocess reading the workspace would need
+`CommandService`'s boundary, its own lifecycle and a crash-recovery story, and
+everything Build needed is obtainable without one. And the feedback loop is
+**parse-level, not type-level**: a file in a language this runtime cannot parse
+is reported as *not checked*, never as clean, because a clean bill from a check
+that did not happen is trusted the same as a real one and is wrong.
 
 #### B11 — No git write path
 
@@ -370,10 +380,16 @@ buttons, through a shared reader that gives added and removed lines the hunk's
 own line numbers and a screen-reader label rather than colour alone; Approvals
 uses the same component, so a change looks the same wherever it is decided.
 
-**Still open:** per-hunk accept/reject and an "edit then accept" path. Both need
-a decision the runtime can record — today an approval governs the whole change
-set — so neither is offered rather than being shown as a control the server would
-refuse.
+**Per-hunk accept/reject landed 2026-09-03, as
+[FIXED-369](FIXED_ITEMS.md#fixed-369--a-reviewer-could-accept-a-change-or-reject-it-and-nothing-between).**
+The decision the runtime can record is a *narrowing*: hunk positions in the
+approved diff, validated against it, applied after the immutable-intent hash
+check, and only ever able to remove hunks from what runs.
+
+**Still open: "edit then accept".** It did not come with the other half because
+it is not a smaller version of it — an edit is a **different action**, whose
+bytes no human approved, so it cannot ride that hash and needs its own proposal
+path. Tracked as [BUG-271](TO_BE_FIXED.md#bug-271--a-reviewer-can-narrow-a-change-and-cannot-correct-one).
 
 #### B15 — Terminal/output pane
 
@@ -521,7 +537,11 @@ and per-message edit and retry. **B16 was already closed** by BUG-206 slice D an
 now landed**, which is the tier-3 item that changes what an owner dares leave
 running. **B13 landed 2026-08-30** — the repository is on screen beside the
 conversation about it, which is the tier-3 item an owner meets on every turn.
-B14's remainder is the remaining tier-3 work. Everything else is depth. B20 is a *policy* decision before it
+**B10 and B14's per-hunk half landed 2026-09-03**: the agent can ask where a name
+is declared and whether its own edit still parses, and a reviewer can accept part
+of a change instead of all or none. What is left of B14 is *edit then accept*,
+which is a different action rather than a smaller one and is tracked as
+BUG-271. Everything else is depth. B20 is a *policy* decision before it
 is an engineering one and belongs to the owner, not to an implementer.
 
 ---
@@ -678,11 +698,17 @@ cheapest and it makes routines useful), then one external channel end to end.
 
 #### C11 — Background work is not conversational
 
-Scheduled and background tasks
-run as isolated turns; their output lands in a task record, not in a thread the
-owner can reply to. **Work:** file each routine's cycle into a durable
-conversation, so "what did the overnight run find?" is answerable in Chat and a
-reply steers the next cycle.
+✅ **Done — see [FIXED-367](FIXED_ITEMS.md#fixed-367--background-work-finished-into-a-status-line), 2026-09-03.**
+Each task owns a durable conversation, titled after it; every cycle runs in that
+thread; and the card links to it. The reply steers rather than merely records
+because the next cycle runs in the same conversation the reply is in — nothing
+new had to be built for that, it is conversation memory (FIXED-04) applied to a
+thread that now exists.
+
+The entry understated the defect slightly, and the correction is worth keeping:
+the output did reach a *session* — but every task for a principal shared one
+`sess_inbox_<principal>` transcript that Chat deliberately hides, so the nightly
+run and the hourly check interleaved in a thread nobody could open.
 
 #### C12 — No collaboration
 
@@ -774,9 +800,12 @@ feature invisible for a different reason than this entry recorded.
 
 #### C18 — No cross-chat surface
 
-Chat search covers titles and message text only.
-There is no "what am I working on", no cross-project view, no resumption of the
-threads a routine is advancing.
+✅ **Done — see [FIXED-368](FIXED_ITEMS.md#fixed-368--where-did-i-say-that-was-answered-what-am-i-working-on-was-not), 2026-09-03.**
+All three: `GET /api/work-threads` answers "what am I working on" across chats
+and routines, names the project each sits in, and — because C11 gave each task a
+conversation first — makes the threads a routine is advancing resumable at all.
+The rail's **Threads** destination is that board with an empty box and the search
+it always was as soon as anything is typed.
 
 > **This ordering covers one pillar.** The order that spans all four — and the
 > reason two items here are outranked by work in other documents — is
@@ -786,7 +815,10 @@ threads a routine is advancing.
 
 C1 and C2 make Chat capable of work — C1's blocking half has landed (FIXED-08),
 leaving document output; C3 makes it feel like it knows the owner;
-C10/C11 make it present when the owner is not watching. C4–C6 and C13–C16 are
+C10/C11 make it present when the owner is not watching — **C11 landed
+2026-09-03**, so a routine now owns a thread the owner can read and reply into,
+and **C18 with it**, so those threads are findable beside the owner's own
+conversations. C4–C6 and C13–C16 are
 the daily-use polish that determines whether any of it gets used; **C4, C6, C7,
 C13, C14 and C16 have landed** — an answer says what it was drawn from and opens it at
 the passage used, Chat can look something up instead of guessing, a turn can be

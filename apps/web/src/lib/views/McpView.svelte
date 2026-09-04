@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import NotificationCenter from "../components/NotificationCenter.svelte";
   import { api, ApiError } from "../api";
@@ -300,11 +301,12 @@
   });
 </script>
 
+<!-- The tab strip above already says "MCP servers", and the panel is named by
+     it, so a heading here said the page's own name a second time and a
+     paragraph explained it a third. What an MCP server is belongs in the guide;
+     this page opens with its own state. -->
 <div class="header">
-  <div>
-    <h2>MCP Servers</h2>
-    <p>Build, connect, and monitor governed local or remote MCP servers for this workspace.</p>
-  </div>
+  <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
   <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
 </div>
 
@@ -526,8 +528,6 @@
 
 <style>
   .header { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
-  .header h2 { font-size: 1.25rem; margin: 0; }
-  .header p { color: var(--text-2); margin: 0.2rem 0 0; }
   .icon { display: grid; place-items: center; border: 0; background: transparent; color: var(--text-2); padding: 0.45rem; cursor: pointer; }
   .notice { display: flex; align-items: center; gap: 0.5rem; margin-bottom: var(--space-3); }
   .notice a { color: var(--accent); font-weight: 600; }

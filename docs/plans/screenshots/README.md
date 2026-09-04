@@ -11,6 +11,7 @@ evidence those write-ups point at.
 | [`working/`](working) | Verified behaviour — every surface that did what it claims. Round-stamped: a file here is evidence of what was true on the day its prefix names, and is **not** re-captured later, because a defect that no longer reproduces cannot be photographed again |
 | [`not-working/`](not-working) | Reproduced defects, one per file, named for its entry in [To be fixed](../TO_BE_FIXED.md) |
 | [`pages/`](pages) | The **current** state of every application page. Unlike the two above this folder is not an archive — it is re-captured in full by [`ui-sweep-responsive-live.spec.ts`](../../../apps/web/e2e/ui-sweep-responsive-live.spec.ts), so a file here is always the latest version and a stale one is a bug in the sweep |
+| [`widths/`](widths) | The **current** state of every route at 390 and 1920, written by [`ui-sweep-widths-live.spec.ts`](../../../apps/web/e2e/ui-sweep-widths-live.spec.ts). That spec's captures are the visible half of a run whose real output is four *assertions* per route per width — no sideways scroll, nothing bleeding out of a `visible` box, every control named, and no control that draws nothing. Like `pages/` it is re-captured rather than archived |
 
 ## Current adaptive-shell catalogue — 2026-09-03
 

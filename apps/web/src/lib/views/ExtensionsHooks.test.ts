@@ -307,7 +307,9 @@ describe("Extensions → Hooks", () => {
     render(ExtensionsView, { tab: "hooks" });
 
     expect(await screen.findByText("tool-free model advisory")).toBeInTheDocument();
-    expect(screen.getByText(/per-handler timeout and token budget/i)).toBeInTheDocument();
+    // The handler-types card says the same thing in a clause rather than in a
+    // paragraph; what has to survive is that a prompt handler reads as advisory.
+    expect(screen.getByText(/one tool-free model call; advisory only/i)).toBeInTheDocument();
     expect(screen.queryByText("Can deny or ask")).not.toBeInTheDocument();
   });
 

@@ -935,6 +935,15 @@ surfaces themselves were walked live at four widths with no console error. What
 is missing is the end-to-end evidence a FIXED entry is normally held to: a real
 turn, in a real thread, on a real provider.
 
+**Re-attempted 2026-09-04 (second round), and still blocked on the same value.**
+The key was connected through the interface again and the refusal now reads as
+itself on the picker as well as under **Test**
+([FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered)).
+What was also established this round is that **the id cannot be recovered from
+the key**: `/v1/organizations/me` and `/v1/organizations/workspaces` answer a key
+of this kind with `403`, so there is no path from the credential to the workspace
+it acts in. Nothing further is Raiker's to build.
+
 **Reduced 2026-09-04.** The fix is still not code *in the product* — that half
 is done. [FIXED-372](FIXED_ITEMS.md#fixed-372--the-answer-to-an-identity-linked-key-was-go-and-get-another-one)
 gives the connection a **Workspace ID**, so the identity-linked key supplied for

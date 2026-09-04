@@ -178,7 +178,13 @@
     onclick={() => (open = !open)}
     onkeydown={closeOnEscape}
   >
-    {#if active}<ProviderLogo provider={active.provider} />{/if}
+    <!-- The narrow-composer rule hides the label, the effort chip and the
+         chevron, leaving the provider logo as the whole control. With no model
+         selected there was no logo either, so the control was an empty circle —
+         the same defect the rule's own comment records fixing once, alive again
+         in the one state a fresh install is always in. The fallback is never
+         `svg:last-child`, so it survives that rule by construction. -->
+    {#if active}<ProviderLogo provider={active.provider} />{:else}<Icon name="models" size={15} />{/if}
     <span>{label}</span>
     {#if effortLabel !== ""}<span class="model-effort">{effortLabel}</span>{/if}
     <Icon name="chevron-down" size={14} />

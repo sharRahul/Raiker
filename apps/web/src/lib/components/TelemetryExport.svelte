@@ -188,7 +188,12 @@
 </section>
 
 <style>
-  .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); font-size: 0.85rem; }
+  /* The four sections above this one are styled by ObserveView, whose CSS is
+     scoped to that file — so a heading given the same class here inherited
+     nothing and rendered a size larger than its siblings. Matched rather than
+     hoisted: one component owning one heading is the smaller change. */
+  .otlp .section-h { font-size: 0.95rem; margin: 0 0 var(--space-3); }
+  .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 68ch; }
   .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
   .list li { border: 1px solid var(--border); border-radius: var(--radius-2); padding: var(--space-3); display: grid; gap: 0.35rem; }
   .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }

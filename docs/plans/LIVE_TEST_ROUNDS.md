@@ -33,6 +33,7 @@ process environment, for the duration of the round only.
 
 | Date | Tier | Prefix | Providers | What it covered |
 |---|---|---|---|---|
+| 2026-09-04 (second) | Targeted + measured four-width sweep | `widths/`, `anthropic-identity-linked-key` | Anthropic, the same **identity-linked** key entered through the interface | Five priority items landed and measured live, and two interface defects the sweep itself found: a model picker that called a provider unreachable after it had answered, and a control that drew nothing |
 | 2026-09-04 | Targeted + full responsive sweep | `bug-274-`, `pages/` | Anthropic, an **identity-linked** key entered through the interface | A key Raiker previously had no way to use, the field that makes it usable reached from where the refusal is read, and every route measured at four widths in both themes |
 | 2026-09-03 | Targeted + full responsive sweep | `bug-256-`, `pages/` | Anthropic, key entered through the interface | Dictation running with nothing leaving the machine, a locked load that refuses nothing, and every page measured at four widths in both themes |
 | 2026-08-30 | Targeted + measured responsive sweep | `b13-`, `bug-239-`, `bug-245-`, `ui-sweep-` | Anthropic (`claude-haiku-4-5-20251001`), key entered through the interface | The repository on screen in Build, Permissions telling the truth about an untouched gate, a cited exchange that opens — and every route *measured* at three widths rather than photographed |
@@ -1096,6 +1097,57 @@ through FIXED-170. Screenshots: `round0810-01-first-run-model-setup.png` through
 [`screenshots/working/`](screenshots/working). The production build reports no
 chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
+---
+
+## 2026-09-04 (second) — Five priority items, and two defects the sweep found in itself
+
+**Tier: targeted + measured four-width sweep.** Production web build, a workspace
+reset through `scripts/reset_live_workspace.py`, and one provider: Anthropic,
+with the same **identity-linked** key entered through the Connect dialog. No key
+appears in this repository.
+
+**What it proved.**
+
+1. **Every route at 390, 768, 1280 and 1920**, measured rather than photographed:
+   the document never scrolls sideways, no element bleeds out of a `visible` box,
+   every control has an accessible name, and — new this round — **no control
+   draws nothing**. `e2e/ui-sweep-widths-live.spec.ts` is that check; the two
+   extremes are captured to [`screenshots/widths/`](screenshots/widths).
+2. **The round's key connected through the interface**, and the refusal read as
+   itself. `e2e/anthropic-key-live.spec.ts` connects it, opens the model picker,
+   and asserts the dialog names the workspace requirement rather than
+   reachability.
+3. The five items of this round — declared MCP tool schemas, streamable HTTP
+   conformance, the OTLP export, the `http` hook handler, and per-child surface
+   routing — each carry their own unit and API coverage, and the surfaces they
+   changed were walked at all four widths with no console error.
+
+**What it found**, both fixed in this change rather than deferred:
+
+* **The model picker said "Provider unreachable" about a provider that had just
+  answered in full.** `testNote` has read the server's classification since
+  BUG-272; `pickerNote` switched on status alone and threw it away — and the
+  picker is the control on the path an owner actually walks. Closed as
+  [FIXED-382](FIXED_ITEMS.md#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered).
+* **The composer's model control was a blank circle below 1024px whenever no
+  model was chosen** — which is the state a fresh install is always in. The
+  narrow-width rule hides the label and the chevron and leaves the provider logo;
+  with no model there is no logo. Closed as
+  [FIXED-383](FIXED_ITEMS.md#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen),
+  and the sweep now fails on the whole class rather than on this instance:
+  reverting the one-line fix makes it fail on Chat and Build at 390 and 768.
+
+**What it could not prove.** A real provider *turn*. The key is identity-linked
+and authenticating needs the workspace id itself, which only the key's owner has
+— and the key cannot be asked for it: `/v1/organizations/*` answers a key of this
+kind with `403`.
+[BUG-273](TO_BE_FIXED.md#bug-273--three-live-scenarios-of-the-2026-09-03-round-are-written-and-unrun)
+stays open for that reason, unchanged: it is waiting on a value, not on code.
+
+**Screenshots:** [`screenshots/widths/`](screenshots/widths) — every route at 390
+and 1920 — and `anthropic-identity-linked-key.png` in
+[`screenshots/working/`](screenshots/working).
+
 ---
 
 ## 2026-09-04 — Identity-linked key, and the sweep at four widths

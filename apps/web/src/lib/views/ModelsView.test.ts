@@ -1075,6 +1075,40 @@ describe("ModelsView routing, selection, and provider catalogue", () => {
     );
   });
 
+  // A live run against an identity-linked Anthropic key found the FIXED-355 /
+  // FIXED-370 defect alive in the *other* control on this page. The provider
+  // answered in full, naming the workspace id it wanted; `testNote` reads that
+  // classification and the picker did not, so the one control on the path an
+  // owner actually walks — connect, then choose a model — said "Provider
+  // unreachable" about a provider that had just replied.
+  it("says why the catalogue failed in the picker, not only under Test", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [
+          profile({
+            profile_id: "anthropic-claude",
+            provider: "anthropic",
+            model: "<model>",
+          }),
+        ],
+      }),
+      "GET /api/models/anthropic-claude/provider-models": {
+        profile_id: "anthropic-claude",
+        provider: "anthropic",
+        status: "unavailable",
+        reason_code: "provider_workspace_required",
+        models: [],
+      },
+    });
+    render(ModelsView);
+    await waitFor(() => expect(screen.getByText("Select models…")).toBeTruthy());
+
+    await fireEvent.click(screen.getByText("Select models…"));
+
+    expect(await screen.findByText(/identity-linked, so it acts inside one workspace/i)).toBeTruthy();
+    expect(screen.queryByText(/Provider unreachable/i)).toBeNull();
+  });
+
   it("lists the provider's models on demand and selects one", async () => {
     const mock = stubFetch({
       "GET /api/models": models({

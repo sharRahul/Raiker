@@ -638,6 +638,10 @@
     pickerLoading = true;
     try {
       pickerList = normalizePickerList(await api.providerModels(profileId));
+      // The same governed code the Test button reads. Opening the picker is how
+      // most owners meet this refusal, so it has to offer the field that fixes
+      // it too — otherwise the answer depends on which button you pressed.
+      noteWorkspaceRefusal(profileId, pickerList?.reason_code);
     } catch {
       pickerList = null; // manual entry still works
     } finally {
@@ -749,8 +753,20 @@
         return "Model list denied by provider policy — enable the provider's gate first. You can still type a model id.";
       case "unsupported":
         return "This provider does not support model listing — type a model id.";
-      default:
+      default: {
+        // The FIXED-355 / FIXED-370 defect, alive in the *other* control on
+        // this page. `testNote` has read the server's classification since
+        // BUG-272; this one printed "Provider unreachable" for every failure —
+        // and it is the one on the path an owner actually walks, because
+        // choosing a model is what you do straight after connecting.
+        //
+        // A live run against an identity-linked key showed it: the provider
+        // answered in full, naming the workspace id it wanted, and the picker
+        // said the provider could not be reached.
+        const guidance = providerErrorGuidance(list.reason_code);
+        if (guidance !== null) return `${guidance.message} ${guidance.fix}`;
         return "Provider unreachable — type a model id if you know it.";
+      }
     }
   }
 

@@ -14,6 +14,7 @@
    * refusal here is a refusal there.
    */
   import { onMount } from "svelte";
+  import GuideLink from "../components/GuideLink.svelte";
   import Icon from "../components/Icon.svelte";
   import Badge from "../components/Badge.svelte";
   import PageState from "../components/PageState.svelte";
@@ -302,10 +303,14 @@
 <section aria-labelledby="skills-h">
   <div class="header">
     <div>
-      <h2 id="skills-h">Skills</h2>
-    <p class="page-lead">
-      Reusable <code>SKILL.md</code> instructions. Skills grant no capability and run no code.
-    </p>
+      <!-- Named for the panel's `aria-labelledby`, and not repeated on screen:
+           the tab strip above already says "Skills". What a skill *is* moved to
+           the guide; what it grants stays here, because a reader who mistakes
+           this tab for a permission surface has to be corrected on the page
+           rather than in a document they may never open. -->
+      <h2 id="skills-h" class="sr-only">Skills</h2>
+      <p class="page-lead">Skills grant no capability and run no code.</p>
+      <GuideLink section="extensions-and-mcp" label="How skills work" />
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
       <Icon name="refresh" size={15} /> Refresh
@@ -728,7 +733,7 @@
     gap: var(--space-3);
   }
   .header h2 { margin: 0 0 0.2rem; }
-  .page-lead { max-width: 52rem; }
+  .page-lead { color: var(--text-2); margin: 0 0 0.25rem; max-width: 52rem; }
   .notice { margin-bottom: var(--space-3); }
   .add {
     display: grid;

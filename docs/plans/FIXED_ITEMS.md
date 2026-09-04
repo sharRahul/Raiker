@@ -394,6 +394,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-379](#fixed-379--raiker-recorded-more-than-anyone-exports-and-could-not-export-it) | Medium | Observability / governed events | Fixed 2026-09-04 (compatibility backlog item 18) |
 | [FIXED-380](#fixed-380--three-of-the-five-hook-handler-types-did-not-exist-now-two) | Low | Hooks / handlers | Fixed 2026-09-04 (the `http` slice of BUG-226) |
 | [FIXED-381](#fixed-381--a-parent-owned-its-childrens-outcomes-and-could-not-say-how-they-work) | Medium | Tasks / delegation | Fixed 2026-09-04 (compatibility backlog item 23) |
+| [FIXED-382](#fixed-382--the-model-picker-said-unreachable-about-a-provider-that-had-just-answered) | Medium | Models / provider errors / web UI | Fixed 2026-09-04 (BUG-275, raised and closed in this round) |
+| [FIXED-383](#fixed-383--the-model-control-was-an-empty-circle-whenever-no-model-was-chosen) | Low | Web UI / composer | Fixed 2026-09-04 (found by this round's width sweep) |
 
 ---
 
@@ -16635,3 +16637,95 @@ Once, Routine, Background — and a second row inside a project says *how*: **Ch
 or **Build**. On the board, a task's footer says `· Build` when that is what it
 is, and says nothing when it is the default, so the common case stays quiet and a
 delegated Build child stands out in the tree it is nested in.
+
+---
+
+## FIXED-382 — The model picker said "unreachable" about a provider that had just answered
+
+**Severity: Medium. Area: Models / provider errors / web UI. Status: Fixed
+2026-09-04 (BUG-275, raised and closed in this round's own live run).**
+
+**Observed.** With the round's identity-linked Anthropic key connected through
+the UI, opening **Select models…** on the Anthropic card answered:
+
+> Provider unreachable — type a model id if you know it.
+
+The provider was reached perfectly well. It answered in full, with the reason:
+`anthropic-workspace-id is required when authenticating with an identity-linked
+API key`. The server had already classified it as `provider_workspace_required`
+and put that code in the response.
+
+**Root cause, and why it is the same defect twice.** `ModelsView` has two
+controls that report a catalogue failure. `testNote` — behind **Test** — has read
+the server's `reason_code` since BUG-272 and says what to do. `pickerNote` —
+inside the model dialog — switched on `status` alone and printed one sentence for
+every `unavailable`, discarding the classification the server had already made.
+
+That is precisely the defect
+[FIXED-355](#fixed-355--a-rejected-key-was-reported-as-a-network-failure) and
+[FIXED-370](#fixed-370--a-valid-key-was-reported-as-a-bare-http-status) closed,
+alive in the sibling control — and in the *worse* one, because opening the picker
+is what an owner does immediately after connecting, while **Test** is a
+deliberate second step many never press. The correct explanation existed in the
+same file, eighty lines above the wrong one.
+
+The second half was the same shape: `noteWorkspaceRefusal` — which puts the
+**Workspace ID** field on the card — was called from both of Test's paths and
+from neither of the picker's. So whether the owner was offered the field that
+fixes their problem depended on which button they had pressed.
+
+**Fixed.** `pickerNote` reads `providerErrorGuidance(list.reason_code)`, exactly
+as `testNote` does, and falls back to reachability only for a genuinely
+unclassified failure. Opening the picker records a governed workspace refusal the
+same way Test does. One classification, read by every control that reports it.
+
+**Guarded.** `ModelsView.test.ts` — the picker naming an identity-linked key's
+workspace requirement and *not* saying "Provider unreachable" — and, live,
+`e2e/anthropic-key-live.spec.ts`, which connects the round's real key through the
+UI and asserts the dialog explains itself.
+
+**User-interface outcome.** Connecting the round's key and opening **Select
+models…** now reads: *"This key is identity-linked, so it acts inside one
+workspace. Add the workspace ID to this connection — it is beside the key in the
+provider's console — then connect again. The key you pasted is fine."* Evidence:
+[`screenshots/working/anthropic-identity-linked-key.png`](screenshots/working/anthropic-identity-linked-key.png).
+
+---
+
+## FIXED-383 — The model control was an empty circle whenever no model was chosen
+
+**Severity: Low. Area: Web UI / composer. Status: Fixed 2026-09-04 (found by this
+round's own width sweep).**
+
+**Observed.** In Chat and Build below 1024px, the composer's model control
+rendered as a **blank circle** beside Send. At 390px it is the most prominent
+thing on the toolbar and it says nothing at all.
+
+**Root cause, and it is a recurrence with its own comment.** The narrow-composer
+rule hides the control's label, its effort chip and its chevron, leaving the
+provider logo as the whole control. That rule already carries a comment recording
+this exact defect being fixed once: an earlier version hid `> span`, which took
+the logo with it. What neither the fix nor the comment covered is the state where
+**there is no logo**: `{#if active}<ProviderLogo …/>{/if}` renders nothing when no
+model is selected, so the control had a label that was hidden, a chevron that was
+hidden, and nothing else.
+
+That is the state a **fresh install is always in**, which is what makes it worse
+than its severity suggests: the first narrow window an owner opens shows an
+unexplained grey circle beside Send.
+
+**Fixed.** The control falls back to the `models` icon when no model is active.
+It is never `svg:last-child`, so it survives the narrow rule by construction
+rather than by the rule remembering it.
+
+**Guarded, and this is the part that matters.** A screenshot showed this and no
+assertion did — twice. `e2e/ui-sweep-widths-live.spec.ts` now walks every page at
+390, 768, 1280 and 1920 and fails on **a control that draws nothing**: a button
+with a box of its own and no painted content. It measures with a `Range` over the
+element's contents rather than reading `textContent`, because `textContent`
+happily reports a label the CSS has set to `display: none` — which is the whole
+state this check exists to catch. Reverting the one-line fix makes it fail on
+Chat and Build at 390 and 768, which is how it was verified.
+
+The same sweep asserts two more properties at every width: the document never
+scrolls sideways, and no element bleeds out of a `visible` box.

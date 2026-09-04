@@ -570,13 +570,15 @@
 {:else if tab === "hooks"}
   <div id="panel-hooks" role="tabpanel" aria-labelledby="tab-hooks">
     <section class="card">
-      <h2>Hooks</h2>
+      <!-- The tab strip already says "Hooks", and what a hook *is* was five
+           lines read once and in the way on every later visit. The one claim
+           that must stay on the page is the one an owner would otherwise have to
+           take on trust: a hook can only ever make an action stricter. -->
+      <h2 class="sr-only">Hooks</h2>
       <p class="note">
-        A hook runs your own logic at a lifecycle point. It can only make an action
-        <strong>stricter</strong> — a hook may deny a tool call or turn it into a decision, and can
-        never allow one the runtime refused, skip an approval, or reach past the tool broker.
-        Prompt handlers are tool-free model advisories; their output can add context and never
-        carries decision authority.
+        A hook can only make an action <strong>stricter</strong> — never allow one the runtime
+        refused, skip an approval, or reach past the tool broker.
+        <GuideLink section="extensions-and-mcp" label="How hooks work" />
       </p>
       {#if hooks === null}
         <p class="note">{hooksError ?? "Reading hook configuration…"}</p>
@@ -681,12 +683,19 @@
     {/if}
 
     {#if hooks !== null}
+      <!-- Twenty rows of reference on a page an owner opens to check one rule.
+           Collapsed, with the counts in the summary, so the answer to "how many
+           can decide" is readable without the list and the list is one press
+           away when it is the question. -->
       <section class="card">
-        <h2>What fires, and what it can change</h2>
-        <p class="note">
-          Every event a configuration file may name. A rule written for an event this build does not
-          emit parses cleanly and never runs, which is why the list says which is which.
-        </p>
+        <details class="events">
+          <summary>
+            <h2 class="events-h">What fires, and what it can change</h2>
+            <span class="note">
+              {hooks.events.filter((event) => event.dispatched).length} events ·
+              {hooks.events.filter((event) => event.can_decide).length} can decide
+            </span>
+          </summary>
         <ul class="event-list">
           {#each hooks.events as event (event.event)}
             <li class:event-dead={!event.dispatched}>
@@ -706,28 +715,31 @@
             </li>
           {/each}
         </ul>
+        </details>
       </section>
 
       <section class="card">
         <h2>Handler types</h2>
-        <p class="note">
-          <strong>command</strong> runs a bounded workspace-local program. <strong>http</strong>
-          posts the bounded, redacted event to a host named in
-          <code>RAIKER_HOOK_EGRESS_ALLOWLIST</code>, which is empty until you set it and revokes
-          every http rule at once when cleared. <strong>prompt</strong> uses the owner-selected
-          provider with a per-handler timeout and token budget, exposes no tools, refuses nesting,
-          and contributes advisory context only. <strong>builtin</strong> runs Raiker's reviewed
-          in-process logic. MCP tool and agent handlers remain refused rather than gaining an
-          ungoverned execution path.
-        </p>
+        <!-- One clause each. The paragraph this replaced said the same four
+             things in eight lines, and the detail behind each is in the guide. -->
+        <ul class="event-list">
+          <li><strong>command</strong> <span class="note">a bounded program in your workspace</span></li>
+          <li>
+            <strong>http</strong>
+            <span class="note">
+              posts the redacted event to a host in <code>RAIKER_HOOK_EGRESS_ALLOWLIST</code>,
+              empty until you set it
+            </span>
+          </li>
+          <li><strong>prompt</strong> <span class="note">one tool-free model call; advisory only</span></li>
+          <li><strong>builtin</strong> <span class="note">Raiker's own reviewed logic</span></li>
+        </ul>
+        <p class="note">MCP tool and agent handlers stay refused. <GuideLink section="extensions-and-mcp" label="Why" /></p>
       </section>
 
       <section class="card">
         <h2>Built-in handlers</h2>
-        <p class="note">
-          Raiker's own code, so a builtin always carries decision authority. A rule naming anything
-          else parses, matches, and then fails every time.
-        </p>
+        <p class="note">Raiker's own code, so a builtin always carries decision authority.</p>
         <ul class="event-list">
           {#each hooks.builtins as builtin (builtin)}
             <li><strong>{builtin}</strong></li>
@@ -765,13 +777,19 @@
          narrower than every card above it). -->
     <section class="card">
       <h2>Hooks are configured in a file, not here</h2>
-      <p class="measure">
-        Raiker reads <code>config/managed-hooks.json</code>, <code>config/hooks.json</code> and
-        <code>.raiker/hooks.json</code>, in that order of authority, then any rules an installed
-        plugin contributed under <code>.raiker/plugins/</code>. A lower scope can never override a
-        higher-scope deny, so a plugin can make an action stricter and never loosen one you set.
-        This page reports what the runtime loaded; it does not edit those files, because a surface
-        that rewrote your own configuration would need an authority story it does not have yet.
+      <!-- The paragraph this replaced spent six lines saying what four rows say.
+           The rows stay on the page rather than moving to the guide because they
+           are the authority order: which file wins, and that a plugin's rules
+           sit below every one of yours. -->
+      <ul class="event-list">
+        <li><code>config/managed-hooks.json</code> <span class="note">managed — nothing below overrides it</span></li>
+        <li><code>config/hooks.json</code> <span class="note">project — travels with the repository</span></li>
+        <li><code>.raiker/hooks.json</code> <span class="note">local — this machine only</span></li>
+        <li><code>.raiker/plugins/</code> <span class="note">plugin — lowest, so it can only make an action stricter</span></li>
+      </ul>
+      <p class="note">
+        This page reports what the runtime loaded; it does not edit those files.
+        <GuideLink section="extensions-and-mcp" label="How hooks are configured" />
       </p>
     </section>
   </div>
@@ -1245,6 +1263,8 @@
     color: var(--warn);
   }
   .matcher,
+  .events summary { cursor: pointer; display: flex; align-items: baseline; gap: 0.5rem; flex-wrap: wrap; }
+  .events-h { font-size: 0.95rem; font-weight: 600; margin: 0; display: inline; }
   .handler-type {
     font-family: var(--font-mono);
     font-size: 0.72rem;
@@ -1408,7 +1428,6 @@
   .deferred { max-width: 46rem; }
   /* A reading measure for one prose paragraph, without borrowing `deferred`'s
      meaning to get it. */
-  .measure { max-width: 46rem; }
   .deferred h2 { margin-top: 0; }
 
   /* A connector row: identity and state on one line, the controls under it, and

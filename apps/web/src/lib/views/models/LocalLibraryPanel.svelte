@@ -233,7 +233,7 @@
     justify-content: space-between;
     gap: 24px;
     padding: 24px;
-    border-left: 4px solid var(--accent, #2563eb);
+    border-left: 4px solid var(--accent);
   }
   .library-intro h2,
   .section-title h3 {
@@ -326,8 +326,8 @@
     place-items: center;
     width: 40px;
     height: 40px;
-    background: #171717;
-    color: #fff;
+    background: var(--brand-black);
+    color: var(--brand-white);
     border-radius: 8px;
     font:
       750 0.78rem ui-monospace,
@@ -349,7 +349,7 @@
     color: var(--text-muted);
   }
   .notice {
-    color: var(--success, #15803d);
+    color: var(--success);
   }
   @media (max-width: 700px) {
     .library-intro {

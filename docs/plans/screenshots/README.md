@@ -511,3 +511,15 @@ of them loudest.
 | `working/round0904-observe-overview-no-disabled-chips.png` | FIXED-397 — Observability → Overview with no *"Disabled / deferred capabilities"* chip list; the closed-gate tile still states the honest count and the 18 with no executor, linking to Permissions |
 
 Neither image contains a credential value; no dialog was open in either.
+
+## The design system, enforced — 2026-09-04
+
+Captured against a production build after the token migration, on the same
+workspace the day's earlier rounds used.
+
+| File | Records |
+|---|---|
+| `working/round0904-knowledge-map-light.png` | FIXED-399 — the Knowledge Map in the light theme, drawn entirely from tokens; the "you" node is visible against the light canvas it used to disappear into |
+| `working/round0904-knowledge-map-dark.png` | FIXED-399 — the same page and the same rules in the dark theme, with all four hard-coded palette blocks removed |
+
+Neither image contains a credential value.

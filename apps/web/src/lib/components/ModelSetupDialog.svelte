@@ -149,7 +149,7 @@
 {/if}
 
 <style>
-  dialog { width: min(31rem, calc(100vw - 2rem)); padding: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-3); }
+  dialog { width: min(31rem, calc(100vw - 2rem)); padding: 0; border: 1px solid var(--neutral-border); border-radius: var(--r-lg); background: var(--surface); color: var(--text-2); box-shadow: var(--shadow-2); }
   dialog::backdrop { background: var(--overlay); backdrop-filter: blur(3px); }
   .dialog-card { padding: 1.2rem; }
   .eyebrow { color: var(--accent); font-size: .68rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }

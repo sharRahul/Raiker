@@ -134,7 +134,7 @@
     cursor: pointer;
   }
   .guide-sections button:hover {
-    background: var(--surface-2);
+    background: var(--sunken);
   }
   .guide-sections button.active {
     border-color: var(--accent-border);

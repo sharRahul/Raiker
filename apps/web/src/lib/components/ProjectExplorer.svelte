@@ -386,7 +386,7 @@
   }
   .entry:hover,
   .entry.selected {
-    background: var(--surface-2, rgba(127, 127, 127, 0.12));
+    background: var(--sunken);
   }
   .entry-name {
     overflow: hidden;

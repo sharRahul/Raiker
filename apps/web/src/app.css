@@ -193,6 +193,24 @@
   --brand-grey: #9c9c9c;
   --brand-black: #000000;
   --brand-white: #ffffff;
+
+  /* A vendor's colour is theirs in both themes, and a logo plate has to stay
+     the plate or the mark disappears into the surface behind it. These are the
+     only colours in the product that are deliberately theme-independent, and
+     naming them here is what lets the rule below — components use tokens, never
+     raw colours — hold without an exception per provider. */
+  --brand-huggingface: #ffd21e;
+
+  /* The command output pane renders a real program's output, so it is dark in
+     both themes: inverting it in light mode would misrepresent what the program
+     drew. Six literals used to live in the component; they live here now, which
+     is also what lets a future terminal theme be one edit. */
+  --term-bg: #171a1c;
+  --term-fg: #e8e8e2;
+  --term-dim: #a9aaa4;
+  --term-bright: #d6d7d1;
+  --term-border: #30363b;
+  --term-rule: #ffffff1a;
 }
 
 /* ── Light theme tokens ("paper") ── */

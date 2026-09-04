@@ -410,6 +410,9 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-395](#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | Fixed 2026-09-04 (BUG-284, found by the width sweep on a *used* workspace) |
 | [FIXED-396](#fixed-396--eight-provider-cards-printed-the-same-placeholder-about-pinning) | Low | Models / information architecture | Fixed 2026-09-04 (raised by the owner) |
 | [FIXED-397](#fixed-397--a-chip-list-of-disabled-capabilities-that-named-the-page-it-was-drawn-on) | Medium | Observability / documentation truthfulness | Fixed 2026-09-04 (raised by the owner) |
+| [FIXED-398](#fixed-398--the-design-system-was-stated-in-a-comment-and-enforced-by-nothing) | High | Web UI / design system | Fixed 2026-09-04 (raised by the owner, from Hermes Agent and OpenClaw) |
+| [FIXED-399](#fixed-399--the-knowledge-map-carried-four-palettes-and-two-of-them-were-the-same-one) | High | Web UI / theming | Fixed 2026-09-04 (found by FIXED-398's audit) |
+| [FIXED-400](#fixed-400--ten-var-references-to-tokens-that-do-not-exist) | Medium | Web UI / design system | Fixed 2026-09-04 (found by FIXED-398's audit) |
 
 ---
 
@@ -17475,3 +17478,155 @@ material, and reference material belongs in the guide.
 **User-interface outcome.** Nothing in Observability claims a capability is
 disabled. `grep -rn "disabled_capabilities" apps/web/src/` returns type
 declarations and test fixtures only — no rendering code.
+
+## FIXED-398 — The design system was stated in a comment and enforced by nothing
+
+**Severity: High. Area: Web UI / design system. Status: Fixed 2026-09-04. Raised
+by the owner, who pointed at [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+and [OpenClaw](https://github.com/openclaw/openclaw) and said they look clean.**
+
+**Observed.** Both were read before anything was changed, and they turn out to be
+clean by opposite routes. Hermes has 255 lines of global CSS and **no
+per-component CSS at all**: a theme is three colours — `--foreground`,
+`--midground`, `--background` — and every surface is a `color-mix` off them
+(cards `midground 4%` over background, borders `15%`, muted `8%`). Nothing can
+clash because no page can invent a colour. OpenClaw is the opposite: **56,451
+lines of CSS** and 215 tokens, a vocabulary almost identical to Raiker's own
+(`--bg`, `--bg-elevated`, `--text`, `--text-strong`, `--border`,
+`--border-strong`) — but its CSS lives in thirty *named feature stylesheets*, so
+shared patterns are actually shared.
+
+Measured against them, Raiker is not missing a design system. `app.css` opens by
+stating one, including the rule: *"Components use tokens only — never raw colours
+— so both themes stay in lockstep."* Nothing checked it.
+
+| | Raiker (before) | Hermes | OpenClaw |
+|---|---|---|---|
+| Global CSS | 1,329 | 255 | 1,183 |
+| Per-component CSS | 10,666 lines / 115 components | 0 | 30 feature sheets |
+| Raw colours in component styles | **183 distinct, 20 components** | 0 | 0 |
+
+**Root cause.** A stated rule with no check is a preference. The 183 were not one
+bad page; they were a slow accumulation of near-misses, which is the thing you
+notice as *almost* uniform without being able to point at it. The audit split
+them into four kinds, and only the first was what anybody would have guessed:
+
+* **Genuinely new colours** — a `#2563eb` blue in the model-operation tray that
+  exists nowhere in the palette, present twice more in `rgb(37 99 235/…)` form.
+* **Dead fallbacks** — `var(--danger, #b42318)` in one component and
+  `var(--danger, #b3292f)` in another. The token always exists, so neither
+  literal can ever render; they exist only to disagree with each other.
+* **Reimplemented tokens** — `--overlay` hand-rolled four times at four different
+  alphas, `--shadow-2` hand-rolled four times, the elevation ramp re-derived as
+  `0 14px 40px color-mix(…)`.
+* **Content, not chrome** — a CSS illustration of a person at a desk, and
+  `mask-image` gradients where `#000` is an alpha channel. These are the only
+  legitimate cases and they are now the only exemptions.
+
+**Two contrast defects fell out of it.** Both were invisible until the colours
+were listed side by side:
+
+* The notification badge set `background: var(--danger); color: #fff`. In the
+  dark theme `--danger` is `#FFEDD5` — a pale peach. **White on near-white**: the
+  unread count was unreadable in the flagship theme. Now `var(--text-inverse)`,
+  which is near-black on the dark theme's pale danger and white on the light
+  theme's deep red.
+* The gold **Connect** buttons on Models set `color: #fff` on `--brand`
+  (`#ecd06f` in *both* themes) — about 1.9:1. Now `--brand-black`, about 11.9:1.
+
+**Fix.** 183 raw colours to **zero** across every component style block.
+Everything mapped onto the existing palette; three genuinely theme-independent
+groups were named rather than scattered — `--brand-huggingface` for a vendor
+mark, and a six-token `--term-*` group for the command output pane, which is dark
+in both themes because it renders a real program's output and inverting it would
+misrepresent what the program drew.
+
+`apps/web/scripts/check-design-tokens.mjs` now runs as the first half of
+`npm run check`, which CI already invokes, so the rule holds. Exemptions live in
+the script with a reason each — never inline — so adding one is a visible
+decision. Verified failing on an injected violation before being trusted.
+
+**User-interface outcome.** Every page renders in both themes at 390 / 768 /
+1280 / 1920 / 4K / 8K: `all-pages-theme-live`, `ui-sweep-clipping-live`,
+`ui-sweep-responsive-live`, `ui-sweep-widths-live` and `all-pages-live` — 14
+specs — all pass. `.muted` and `.sub` were also collapsed onto `--text-sm`, from
+the four sizes (0.78 / 0.8 / 0.82 / 0.84rem) they had drifted into.
+
+## FIXED-399 — The Knowledge Map carried four palettes, and two of them were the same one
+
+**Severity: High. Area: Web UI / theming. Status: Fixed 2026-09-04. Found by
+FIXED-398's audit.**
+
+**Observed.** `BrainView.svelte` held 58 of the 183 raw colours — including
+**eight near-identical greys** (`#607689`, `#7f899e`, `#8892a5`, `#a9b0bf`,
+`#687286`, `#718697`, `#6e8292`, `#526b7e`) where the palette offers `--text-1`,
+`--text-2` and `--text-3`, and **five near-identical borders** where it offers
+two.
+
+**Root cause, which is the interesting part.** The file contained four palettes
+stacked on top of each other:
+
+1. a complete hard-coded **dark** palette in the base rules;
+2. a complete hard-coded **light** palette immediately below it, overriding the
+   first for every property it set — so palette 1 was largely dead CSS;
+3. a **tokenised** dark override keyed on `[data-theme="dark"]`, patching the
+   theme back on top of the hard-coded light one;
+4. **that same override again, verbatim**, inside a `prefers-color-scheme: dark`
+   query for the viewer who never chose a theme — thirteen rules duplicated, with
+   `:global(…)` repeated on every selector.
+
+The comment above the duplicate named the symptom precisely — *"Without this the
+Knowledge Map stayed light inside an otherwise dark app on every machine set to
+follow the OS"* — without naming the cause. The cause is that the base rules were
+painted in literals, so every theme had to be patched back over them, and each
+patch needed its own copy for each way a theme can be selected.
+
+**Fix.** The base rules are painted in tokens, so they are already correct in
+both themes, and **all four override blocks are gone**. `BrainView.svelte` is
+850 → 704 lines; its style block went from about 120 lines to 48.
+
+**One thing the fix exposed.** The graph's categorical node key is deliberately
+fixed across themes — it is a legend, not chrome. Every entry is a saturated
+mid-tone that reads on either ground except `user: "#f3f5fa"`, near-white,
+chosen to be the brightest thing on a canvas that used to be hard-coded dark.
+Once the canvas followed the theme, the "you" node vanished into the light one.
+It is now rose (`#fb7185`) — the same brightness, distinct from the purple,
+orange and yellow already in the key, and visible on both.
+
+**User-interface outcome.** The Knowledge Map follows the theme through the same
+mechanism as every other page, including for a viewer who never chose one.
+Screenshots: `round0904-knowledge-map-light.png` and
+`round0904-knowledge-map-dark.png`.
+
+## FIXED-400 — Ten `var()` references to tokens that do not exist
+
+**Severity: Medium. Area: Web UI / design system. Status: Fixed 2026-09-04.
+Found by FIXED-398's audit.**
+
+**Observed.** Ten custom properties were referenced with no definition anywhere
+and no fallback: `--bg-2`, `--radius-2`, `--shadow-3`, `--shadow-sm`, `--space-7`,
+`--surface-1`, `--surface-2`, `--surface-3`, `--text` and `--warning-soft`,
+across fifteen components. Four more hid behind a fallback that therefore always
+won: `--shadow-lg`, `--danger-text`, and two more uses of `--surface-2`.
+
+**Why nobody saw it.** CSS fails silently. An undefined custom property with no
+fallback makes the *whole declaration* invalid, so it is dropped:
+
+* `border-radius: var(--radius-2)` → **0**. The collector cards on Observability
+  had square corners while every other card in the product had 12px.
+* `color: var(--danger-text, var(--text-2))` → a **failure message rendered in
+  body grey** instead of red, on the model picker.
+* `background: var(--surface-2)` → transparent, in five components.
+
+None of this appears in review, and none of it is wrong enough to report as a
+bug. It is exactly the residue that reads as "this doesn't look quite right".
+
+**Fix.** Each was repointed at the vocabulary that exists — `--radius-2` →
+`--r-md`, `--surface-2` → `--sunken`, `--text` → `--text-1`, `--shadow-sm` →
+`--shadow-0`, and so on. The five properties that are legitimately set from
+markup (`--sz`, `--depth`, `--logo-size`, `--link-width`, `--content-h`,
+`--explorer-w`) are declared as such in the checker rather than being confused
+for dangling ones.
+
+**User-interface outcome.** No `var()` in any component names a token nothing
+defines, and the checker fails the build if one appears.

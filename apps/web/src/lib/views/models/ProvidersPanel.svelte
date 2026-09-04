@@ -227,7 +227,7 @@
     text-decoration: none;
   }
   .message {
-    color: var(--success, #15803d);
+    color: var(--success);
     margin: 0;
   }
   @media (max-width: 760px) {

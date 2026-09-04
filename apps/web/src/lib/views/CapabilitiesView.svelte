@@ -642,7 +642,7 @@
   }
   .muted {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
   }
   .runtime-note {
     display: flex;

@@ -2356,7 +2356,7 @@
     .thread { display: block; overflow: visible; }
     .turn { break-inside: avoid; margin-bottom: 1.5rem; }
     .message-group { max-width: none; }
-    .message-bubble { box-shadow: none; border: 1px solid #bbb; }
+    .message-bubble { box-shadow: none; border: 1px solid var(--border); }
     :global(.md-code) { break-inside: avoid; }
     @page { margin: 18mm 15mm; }
   }

@@ -218,11 +218,11 @@
   .usage-row > header { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3); border-bottom: 1px solid var(--border); }
   .usage-row h3 { margin: 0; font-size: .95rem; }
   .usage-row code { color: var(--text-3); font-size: .68rem; }
-  .provider-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--surface-2); }
+  .provider-mark { display: grid; place-items: center; width: 36px; height: 36px; border-radius: var(--r-sm); background: var(--sunken); }
   .window-chip { margin-left: auto; color: var(--text-2); font-size: .7rem; font-weight: 700; border: 1px solid var(--border); border-radius: 999px; padding: .18rem .48rem; }
   .source-pair { display: grid; grid-template-columns: 1fr 1fr; }
   .source { padding: var(--space-3); min-width: 0; }
-  .source + .source { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface-2) 55%, transparent); }
+  .source + .source { border-left: 1px solid var(--border); background: color-mix(in srgb, var(--sunken) 55%, transparent); }
   .source-label { margin: 0 0 .45rem; color: var(--text-3); font-size: .68rem; font-weight: 750; letter-spacing: .07em; text-transform: uppercase; }
   .source > strong { font-size: 1.15rem; letter-spacing: -.02em; }
   .source > p:not(.source-label) { margin: .25rem 0 0; color: var(--text-2); font-size: .78rem; }
@@ -233,7 +233,7 @@
   .budget-row { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3) 0; border-top: 1px solid var(--border); }
   .budget-copy { display: flex; flex-direction: column; min-width: 155px; font-size: .72rem; color: var(--text-3); }
   .budget-copy strong { color: var(--text-1); font-size: .82rem; }
-  .budget-track { flex: 1; min-width: 80px; height: 5px; border-radius: 999px; background: var(--surface-3); overflow: hidden; }
+  .budget-track { flex: 1; min-width: 80px; height: 5px; border-radius: 999px; background: var(--raised); overflow: hidden; }
   .budget-track span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
   .budget-row label { flex: 1; }
   .budget-row .input { width: 100%; }

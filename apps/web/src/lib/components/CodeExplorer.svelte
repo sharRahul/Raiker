@@ -356,7 +356,7 @@
     min-height: 0;
     min-width: 0;
     height: 100%;
-    background: var(--surface-1);
+    background: var(--surface);
     border: 1px solid var(--border);
     border-radius: var(--r-lg);
     overflow: hidden;
@@ -402,8 +402,8 @@
     font-weight: 600;
   }
   .icon-btn:hover {
-    background: var(--surface-2);
-    color: var(--text);
+    background: var(--sunken);
+    color: var(--text-1);
   }
   .tree-pane {
     flex: 1 1 auto;
@@ -457,10 +457,10 @@
   }
   .entry:hover,
   .entry.selected {
-    background: var(--surface-2);
+    background: var(--sunken);
   }
   .entry.selected {
-    color: var(--text);
+    color: var(--text-1);
     font-weight: 600;
   }
   .entry-name {
@@ -494,14 +494,14 @@
     max-height: 7rem;
     overflow: auto;
     border-bottom: 1px solid var(--border);
-    background: var(--warn-soft, var(--surface-2));
+    background: var(--warn-soft, var(--sunken));
   }
   .problems li {
     display: flex;
     align-items: baseline;
     gap: 0.4rem;
     font-size: 0.76rem;
-    color: var(--warn, var(--text));
+    color: var(--warn, var(--text-1));
     line-height: 1.5;
   }
   .problems .where {

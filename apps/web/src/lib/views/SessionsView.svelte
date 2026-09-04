@@ -591,7 +591,7 @@
     width: 100%;
     padding: var(--space-2) var(--space-3);
     overflow-x: auto;
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-0);
   }
   .table .check-col {
     width: 2rem;
@@ -713,7 +713,7 @@
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.78rem;
+    font-size: var(--text-sm);
   }
   .detail-col {
     width: 100%;
@@ -723,7 +723,7 @@
   }
   .detail-col :global(.card) {
     border-left: 3px solid var(--accent);
-    box-shadow: var(--shadow-sm);
+    box-shadow: var(--shadow-0);
   }
   .session-links {
     display: flex;

@@ -412,8 +412,8 @@
     width: 52px;
     height: 52px;
     border-radius: 13px;
-    background: #ffd21e;
-    color: #171717;
+    background: var(--brand-huggingface);
+    color: var(--brand-black);
     font-weight: 850;
   }
   .token-card {
@@ -473,7 +473,7 @@
   }
   .results > button:hover,
   .results > button.selected {
-    background: var(--surface-raised, #f5f6f8);
+    background: var(--surface-raised);
   }
   .repo {
     font:
@@ -485,7 +485,7 @@
     color: var(--text-muted);
   }
   .results em {
-    color: #a16207;
+    color: var(--warn);
     font-size: 0.75rem;
   }
   .variants > header {
@@ -509,8 +509,8 @@
     color: inherit;
   }
   .variant-list button.selected {
-    box-shadow: inset 3px 0 #2563eb;
-    background: var(--surface-raised, #f5f6f8);
+    box-shadow: inset 3px 0 var(--accent);
+    background: var(--surface-raised);
   }
   .variant-list button span {
     display: grid;
@@ -548,10 +548,10 @@
     gap: 18px;
     align-items: end;
     padding: 20px;
-    border-top: 3px solid #2563eb;
+    border-top: 3px solid var(--accent);
   }
   .conversion-card {
-    border-top-color: #7c3aed;
+    border-top-color: var(--brand);
   }
   .download-drawer h3,
   .conversion-card h3 {
@@ -574,7 +574,7 @@
     color: var(--text-muted);
   }
   .notice {
-    color: var(--success, #15803d);
+    color: var(--success);
   }
   .curated-embedding {
     display: flex;
@@ -582,7 +582,7 @@
     justify-content: space-between;
     gap: 18px;
     padding: 16px 18px;
-    border-left: 3px solid var(--accent, #2563eb);
+    border-left: 3px solid var(--accent);
   }
   .curated-embedding p {
     margin: 3px 0 0;

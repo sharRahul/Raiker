@@ -200,7 +200,7 @@
 </dialog>
 
 <style>
-  .dialog::backdrop { background: color-mix(in srgb, #0b1417 55%, transparent); }
+  .dialog::backdrop { background: var(--overlay); }
   .dialog {
     color: var(--text-1);
     width: min(30rem, 100%);

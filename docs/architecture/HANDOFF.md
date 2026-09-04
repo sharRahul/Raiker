@@ -336,11 +336,22 @@ python scripts/validate_local_single_user_runtime.py      # PASSED
 Web gates (from `apps/web`) on the Task 4b tree:
 
 ```text
-npm run check     # 0 errors, 0 warnings
+npm run check     # design tokens clean, then 0 errors, 0 warnings
 npm run lint      # clean
 npm test -- --run # 141 passed, 1 skipped (McpView 4/4)
 npm run build     # exit 0
 ```
+
+`npm run check` runs `scripts/check-design-tokens.mjs` before `svelte-check`. It
+enforces the rule `app.css` has always stated in its header — *components use
+tokens only, never raw colours* — and a second one the audit that added it found
+underneath: a `var()` naming a token nothing defines. CSS fails silently on the
+second, so an undefined custom property with no fallback drops the whole
+declaration; ten of those were live, giving cards square corners beside rounded
+ones and rendering an error message in body grey. Files that legitimately carry
+raw colour (a CSS illustration, `mask-image` gradients) are listed in the script
+with a reason each, so an exemption is a visible decision rather than an inline
+comment.
 
 ## Current product state — 2026-07-15
 

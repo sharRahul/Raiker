@@ -95,7 +95,7 @@
     border: 1px solid var(--border);
     border-radius: var(--r-md);
     background: var(--surface);
-    box-shadow: var(--shadow-2, 0 8px 24px rgb(0 0 0 / 12%));
+    box-shadow: var(--shadow-2);
     overflow: hidden;
   }
   .menu-heading {

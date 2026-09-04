@@ -194,7 +194,7 @@
 </section>
 
 <style>
-  .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: 0 14px 40px color-mix(in srgb, #17262c 15%, transparent); z-index: 5; }
+  .context-popover { position: absolute; right: 0; bottom: calc(100% + .55rem); width: min(35rem, calc(100vw - 2rem)); padding: 1.35rem 1.5rem; border: 1px solid var(--neutral-border); border-radius: .75rem; background: var(--surface); box-shadow: var(--shadow-2); z-index: 5; }
   .context-heading { display:flex; justify-content:space-between; gap:1rem; color:var(--text-1); } .context-heading span { color:var(--text-2); font-size:.82rem; font-weight:650; }
   .usage-figure { display:grid; gap:.15rem; margin-top:1rem; } .usage-figure strong { font-size:1.2rem; color:var(--text-1); } .usage-figure span { color:var(--text-3); font-size:.82rem; }
   p { color:var(--text-3); margin:.75rem 0 0; font-size:.8rem; }
@@ -208,7 +208,7 @@
   .compaction strong { color:var(--text-1); font-size:.8rem; }
   .compaction > span { color:var(--text-2); font-size:.74rem; font-variant-numeric:tabular-nums; }
   .compaction p { grid-column:1 / -1; margin:.05rem 0 0; font-size:.72rem; }
-  .compaction.failed { border-left-color:var(--warning, #a86b17); }
+  .compaction.failed { border-left-color:var(--warning); }
   .compaction.failed > span { grid-column:1 / -1; }
   .cost { margin:1.2rem -1.5rem -1.35rem; padding:.9rem 1.5rem; border-top:1px solid var(--border); border-radius:0 0 .75rem .75rem; background:var(--sunken); }
   .cost-row { display:flex; justify-content:space-between; gap:1rem; font-size:.84rem; color:var(--text-1); }

@@ -305,10 +305,10 @@
   .otlp .section-h { font-size: 0.95rem; margin: 0 0 var(--space-3); }
   .otlp p { margin: 0 0 var(--space-3); color: var(--text-2); max-width: 68ch; }
   .list { list-style: none; margin: 0 0 var(--space-3); padding: 0; display: grid; gap: var(--space-3); }
-  .list li { border: 1px solid var(--border); border-radius: var(--radius-2); padding: var(--space-3); display: grid; gap: 0.35rem; }
+  .list li { border: 1px solid var(--border); border-radius: var(--r-md); padding: var(--space-3); display: grid; gap: 0.35rem; }
   .row { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
   .name { font-weight: 600; }
-  .muted { color: var(--text-3); font-size: 0.78rem; }
+  .muted { color: var(--text-3); font-size: var(--text-sm); }
   .tag { font-size: 0.72rem; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 0.05rem 0.5rem; }
   .cadence select { font-size: 0.78rem; padding: 0.2rem 0.4rem; }
   .error { color: var(--danger); }

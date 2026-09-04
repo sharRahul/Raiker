@@ -606,7 +606,7 @@
     padding: var(--space-3);
     border: 1px solid var(--neutral-border);
     border-radius: var(--r-md);
-    background: var(--bg-2);
+    background: var(--sunken);
   }
   .posture-label {
     color: var(--text-2);
@@ -672,7 +672,7 @@
     padding: 2px 10px;
     border-radius: 999px;
     font-size: 0.8rem;
-    background: var(--bg-2);
+    background: var(--sunken);
     color: var(--text-2);
   }
   .pill-ok {
@@ -688,8 +688,8 @@
     display: block;
     word-break: break-all;
     padding: var(--space-2);
-    background: var(--bg-2);
-    border-radius: var(--radius-2);
+    background: var(--sunken);
+    border-radius: var(--r-md);
     margin: var(--space-2) 0;
   }
   .link {
@@ -717,7 +717,7 @@
   .hint code {
     font-family: var(--font-mono, monospace);
     font-size: 0.78rem;
-    background: var(--bg-2);
+    background: var(--sunken);
     padding: 0.05rem 0.3rem;
     border-radius: 4px;
   }

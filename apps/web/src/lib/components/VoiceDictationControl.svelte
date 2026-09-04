@@ -347,7 +347,7 @@
     background: var(--surface); box-shadow: var(--shadow-2); color: var(--text-2); font-size: 0.68rem; line-height: 1.4;
   }
   .voice-info p + p { bottom: calc(100% + 4.8rem); }
-  .voice-error { margin: 0.25rem 0 0; color: var(--danger, #b42318); font-size: 0.7rem; line-height: 1.35; }
+  .voice-error { margin: 0.25rem 0 0; color: var(--danger); font-size: 0.7rem; line-height: 1.35; }
   @keyframes voice-pulse { 50% { opacity: 0.35; transform: scale(0.82); } }
   @media (prefers-reduced-motion: reduce) { .live-dot { animation: none; } }
   @media print { .voice-control, .voice-error { display: none; } }

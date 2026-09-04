@@ -675,7 +675,7 @@
      sits above everything else because it changes the meaning of the counts
      below it: "0 Pending review" reads very differently when nothing is able
      to propose. */
-  .posture-card { display:flex; align-items:flex-start; gap:var(--space-2); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface-2); }
+  .posture-card { display:flex; align-items:flex-start; gap:var(--space-2); padding:var(--space-3) var(--space-4); margin-bottom:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--sunken); }
   .posture-card p { margin:0; color:var(--text-2); flex:1; }
   .posture-card :global(svg) { flex:none; margin-top:.1rem; color:var(--text-3); }
   .posture-proposes { border-color:var(--ok-border,var(--border)); }
@@ -702,18 +702,18 @@
      wrapped into a three-line column beside its heading, and so did the
      observations count. A short count still sits inline. */
   .section-head > :last-child:not(:first-child) { flex:none; max-width:100%; } .memory-grid { display:grid; gap:var(--space-3); }
-  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warning-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
+  .memory-card { padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .memory-card.pinned { border-color:var(--accent-border); } .memory-card.pending { margin-bottom:var(--space-3); background:var(--warn-soft); } .memory-card h4 { font-size:1rem; } .memory-title textarea { width:100%; }
   .pin-label { display:flex; align-items:center; gap:.25rem; color:var(--accent); font-size:.72rem; } .meta { display:flex; flex-wrap:wrap; gap:.35rem; margin:.6rem 0; } .meta span { padding:.22rem .48rem; border-radius:var(--r-pill); background:var(--sunken); color:var(--text-2); font-size:.72rem; } dl { display:grid; grid-template-columns:2fr 1fr 1fr; gap:var(--space-3); padding-block:var(--space-3); border-block:1px solid var(--border); } dl div { min-width:0; } dt { color:var(--text-3); font-size:.7rem; } dd { margin:.15rem 0 0; overflow-wrap:anywhere; font-size:.82rem; } .card-actions { justify-content:flex-start; flex-wrap:wrap; margin-top:var(--space-3); } .danger { color:var(--danger); } details { margin-top:var(--space-3); color:var(--text-2); font-size:.78rem; } details summary { cursor:pointer; color:var(--text-1); }
   /* MEM-04 — an observation reads as a memory card with one difference: a
      refused one is drawn in the warning tone the pending proposals already use,
      because both are "here is something Raiker did not act on by itself". */
   .section-head p.section-note { margin:.2rem 0 0; color:var(--text-3); font-size:.8rem; max-width:52rem; }
-  .memory-card.observation.refused { background:var(--warning-soft); border-color:var(--warn-border,var(--border-strong)); }
+  .memory-card.observation.refused { background:var(--warn-soft); border-color:var(--warn-border,var(--border-strong)); }
   .refused-label { display:flex; align-items:center; gap:.25rem; flex:none; color:var(--warn,var(--text-3)); font-size:.72rem; }
   .refused-note,.gist-note { margin:.5rem 0 0; color:var(--text-2); font-size:.8rem; }
   .gist-note { display:flex; align-items:baseline; gap:.4rem; }
   .gist-note :global(svg) { flex:none; align-self:center; color:var(--accent); }
-  .empty { padding:var(--space-7); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
+  .empty { padding:var(--space-6); text-align:center; border:1px dashed var(--border-strong); border-radius:var(--r-lg); color:var(--text-2); } .empty h4 { color:var(--text-1); margin-top:var(--space-2); }
   .advanced { margin-top:var(--space-6); padding:var(--space-4); border:1px solid var(--border); border-radius:var(--r-lg); background:var(--surface); } .advanced summary { margin:0; list-style:none; } .advanced summary span { display:grid; gap:.2rem; } .advanced small { color:var(--text-2); font-weight:400; } .advanced-body { display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); padding-top:var(--space-4); } .file-button input { position:absolute; width:1px; height:1px; opacity:0; } .import-review { width:100%; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-3); padding:var(--space-3); background:var(--sunken); border-radius:var(--r-md); } .import-notice { width:100%; margin:var(--space-2) 0 0; color:var(--text-2); font-size:.84rem; }
   @media (max-width:45rem) {
     .summary { grid-template-columns:repeat(2,1fr); }

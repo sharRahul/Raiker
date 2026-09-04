@@ -184,7 +184,7 @@
 
 <style>
   .dialog::backdrop {
-    background: color-mix(in srgb, #0b1417 55%, transparent);
+    background: var(--overlay);
   }
   .dialog {
     color:var(--text-1);
@@ -242,7 +242,7 @@
   .format-detail { grid-column: 2; color: var(--text-2); font-size: 0.76rem; }
   footer { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
   .spacer { flex: 1; }
-  .muted { color: var(--text-2); font-size: 0.84rem; margin: 0; }
+  .muted { color: var(--text-2); font-size: var(--text-sm); margin: 0; }
   .error { color: var(--danger); font-size: 0.82rem; margin: 0; }
   .ok { color: var(--ok); font-size: 0.82rem; margin: 0; font-weight: 600; }
 </style>

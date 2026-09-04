@@ -273,7 +273,7 @@
   }
   .failure {
     margin: 0;
-    color: var(--danger-text, var(--text-2));
+    color: var(--danger);
     font-size: 0.72rem;
   }
 </style>

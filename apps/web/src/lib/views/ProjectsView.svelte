@@ -854,7 +854,7 @@
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0.3rem 0 0;
     overflow-wrap: anywhere;
   }

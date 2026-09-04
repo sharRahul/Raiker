@@ -2579,11 +2579,11 @@
   .pc-connect {
     background: var(--brand);
     border-color: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
   }
   .pc-connect:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand) 88%, #000);
-    border-color: color-mix(in srgb, var(--brand) 88%, #000);
+    background: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
+    border-color: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
   }
 
   .chips {
@@ -2656,7 +2656,7 @@
   /* ── Sign-in modal ── */
   .signin-overlay {
     align-items: center;
-    background: color-mix(in srgb, #000 55%, transparent);
+    background: var(--overlay);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -2715,7 +2715,7 @@
     padding: 0.55rem 1rem;
     border-radius: var(--r-sm);
     background: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
     font-weight: 600;
     font-size: 0.86rem;
     text-decoration: none;
@@ -2781,11 +2781,11 @@
     flex: 1;
     background: var(--brand);
     border-color: var(--brand);
-    color: #fff;
+    color: var(--brand-black);
   }
   .signin-connect:hover:not(:disabled) {
-    background: color-mix(in srgb, var(--brand) 88%, #000);
-    border-color: color-mix(in srgb, var(--brand) 88%, #000);
+    background: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
+    border-color: color-mix(in srgb, var(--brand) 88%, var(--brand-black));
   }
   .signin-foot {
     margin: 0.4rem 0 0;
@@ -2830,7 +2830,7 @@
   /* ── Details modal ── */
   .details-overlay {
     align-items: center;
-    background: color-mix(in srgb, #000 45%, transparent);
+    background: var(--overlay);
     display: flex;
     inset: 0;
     justify-content: center;
@@ -2985,7 +2985,7 @@
     margin: 0 0 var(--space-4);
     padding: var(--space-3);
     border: 1px solid var(--border);
-    border-radius: var(--radius-2);
+    border-radius: var(--r-md);
   }
   .gates dt {
     font-size: 0.72rem;
@@ -2999,7 +2999,7 @@
   }
   .sub {
     color: var(--text-3);
-    font-size: 0.8rem;
+    font-size: var(--text-sm);
     margin: 0;
   }
   .error {

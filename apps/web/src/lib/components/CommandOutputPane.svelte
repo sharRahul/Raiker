@@ -246,11 +246,11 @@
 </section>
 
 <style>
-  .command-pane { margin: 0 1.5rem .7rem; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; box-shadow: var(--shadow-sm); }
+  .command-pane { margin: 0 1.5rem .7rem; border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); overflow: hidden; box-shadow: var(--shadow-0); }
   .command-pane.expanded { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); }
-  .pane-toggle { width: 100%; min-height: 48px; display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
-  .pane-toggle:hover { background: var(--surface-2); }
-  .terminal-mark { display: grid; place-items: center; width: 30px; height: 28px; border-radius: var(--r-sm); background: var(--text); color: var(--surface); font: 700 .72rem/1 var(--font-mono); }
+  .pane-toggle { width: 100%; min-height: 48px; display: flex; align-items: center; gap: .7rem; padding: .55rem .8rem; border: 0; background: transparent; color: var(--text-1); text-align: left; cursor: pointer; }
+  .pane-toggle:hover { background: var(--sunken); }
+  .terminal-mark { display: grid; place-items: center; width: 30px; height: 28px; border-radius: var(--r-sm); background: var(--text-1); color: var(--surface); font: 700 .72rem/1 var(--font-mono); }
   .pane-heading { display: grid; gap: .08rem; flex: 1; }
   .pane-heading strong { font-size: .8rem; letter-spacing: .01em; }
   .pane-heading small { color: var(--text-3); font-size: .68rem; }
@@ -263,13 +263,13 @@
   .receipt-rail span.ready { color: var(--text-2); }
   .receipt-rail span.ready i { border-color: var(--ok); background: var(--ok); }
   .receipt-rail b { height: 1px; background: var(--border); }
-  .command-row { display: flex; align-items: center; gap: .45rem; padding: .42rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--surface-2); }
+  .command-row { display: flex; align-items: center; gap: .45rem; padding: .42rem .5rem; border: 1px solid var(--border); border-radius: var(--r-md); background: var(--sunken); }
   .command-notice { color: var(--text-2); font-size: .72rem; }
   .posture { display: flex; justify-content: space-between; gap: .8rem; padding: .48rem .1rem; color: var(--text-3); font-size: .66rem; }
   .posture span { display: inline-flex; align-items: center; gap: .28rem; }
-  .output-shell { min-height: 112px; overflow: hidden; border: 1px solid #30363b; border-radius: var(--r-md); background: #171a1c; color: #e8e8e2; color-scheme: dark; }
-  .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid #ffffff1a; color: #a9aaa4; font: .62rem var(--font-mono); }
-  .run-backend { color: #d6d7d1; font-weight: 600; }
+  .output-shell { min-height: 112px; overflow: hidden; border: 1px solid var(--term-border); border-radius: var(--r-md); background: var(--term-bg); color: var(--term-fg); color-scheme: dark; }
+  .output-head { display: flex; justify-content: space-between; gap: .8rem; padding: .42rem .58rem; border-bottom: 1px solid var(--term-rule); color: var(--term-dim); font: .62rem var(--font-mono); }
+  .run-backend { color: var(--term-bright); font-weight: 600; }
   pre { margin: 0; min-height: 72px; max-height: 240px; overflow: auto; padding: .62rem; white-space: pre-wrap; word-break: break-word; font: .72rem/1.55 var(--font-mono); }
   .receipt-card { margin-top: .55rem; padding: .42rem .55rem; border: 1px solid var(--border); border-radius: var(--r-md); color: var(--text-2); font-size: .7rem; }
   .receipt-card summary { cursor: pointer; }

@@ -564,7 +564,7 @@
   .declared dd { margin: 0; color: var(--text-3); }
   .tools-label { font-size: 0.72rem; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.05em; }
   .chip { font-size: 0.75rem; font-weight: 600; padding: 0.2rem 0.6rem; border-radius: 999px; background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
-  .muted { color: var(--text-3); font-size: 0.8rem; }
+  .muted { color: var(--text-3); font-size: var(--text-sm); }
   .reach { font-size: .72rem; font-weight: 600; padding: .2rem .6rem; border-radius: 999px; background: var(--warn-soft, var(--sunken)); color: var(--warn); border: 1px solid var(--border); }
   .reach.ok { background: var(--ok-soft, var(--sunken)); color: var(--ok); }
   .notice code { font-family: var(--font-mono); font-size: 0.78rem; background: var(--sunken); padding: 0.05rem 0.35rem; border-radius: 4px; }

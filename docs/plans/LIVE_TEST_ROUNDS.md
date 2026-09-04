@@ -1101,6 +1101,46 @@ chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
 ---
 
+## 2026-09-04 (sixth) — A stated rule, and the 183 colours that had accumulated behind it
+
+**Tier: full theme + responsive sweep.** Production web build, the same workspace
+the previous three rounds used. Prompted by the owner pointing at Hermes Agent
+and OpenClaw and saying they look clean; both repositories were read before
+anything changed.
+
+**What it proved.**
+
+1. **Every page renders in both themes at every width.** Fourteen live specs:
+   `all-pages-theme-live`, `ui-sweep-clipping-live`, `ui-sweep-responsive-live`
+   (390 / 768 / 1080p / 4K / 8K, light and dark), `ui-sweep-widths-live` and
+   `all-pages-live`. All pass.
+2. **183 raw colours to zero** across every component style block, with the
+   Knowledge Map — 58 of them — now following the theme through the same
+   mechanism as everything else, including for a viewer who never chose one.
+3. **The rule is enforced, not stated.** `npm run check` fails on a raw colour in
+   a component style block or a `var()` naming an undefined token. Verified
+   against an injected violation before being trusted.
+
+**What it found, and it is the more useful half.** Three defects nobody could
+have seen without listing the colours side by side. Two were contrast: the unread
+notification badge painted **white on the dark theme's `--danger`, which is a
+pale peach** — unreadable in the flagship theme; and the gold Connect buttons on
+Models sat at about 1.9:1. The third was quieter and larger — **ten `var()`
+references to tokens that do not exist**, in fifteen components. CSS fails
+silently there, so `border-radius: var(--radius-2)` resolved to 0 and gave the
+collector cards square corners beside every other card's 12px, and a failure
+message rendered in body grey instead of red. None of that is visible in review;
+all of it is visible as "this doesn't look quite right".
+
+Closed as [FIXED-398](FIXED_ITEMS.md#fixed-398--the-design-system-was-stated-in-a-comment-and-enforced-by-nothing),
+[FIXED-399](FIXED_ITEMS.md#fixed-399--the-knowledge-map-carried-four-palettes-and-two-of-them-were-the-same-one)
+and [FIXED-400](FIXED_ITEMS.md#fixed-400--ten-var-references-to-tokens-that-do-not-exist).
+
+**Screenshots:** `round0904-knowledge-map-light.png` and
+`round0904-knowledge-map-dark.png` in [`screenshots/working/`](screenshots/working).
+
+---
+
 ## 2026-09-04 (fifth) — Two lines the owner asked to lose, and what one of them was actually saying
 
 **Tier: targeted + measured four-width sweep.** Production web build, the same

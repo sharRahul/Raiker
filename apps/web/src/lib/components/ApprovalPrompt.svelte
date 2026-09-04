@@ -225,7 +225,7 @@
     border-radius: var(--r-md);
     background: var(--surface);
     color: var(--text-2);
-    box-shadow: 0 10px 30px rgb(0 0 0 / 18%);
+    box-shadow: var(--shadow-2);
   }
   header {
     display: flex;

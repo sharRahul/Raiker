@@ -132,5 +132,5 @@
   .approval-choice:hover:not(:disabled) .choice-detail { color: var(--text-2); }
   .approval-choice:hover:not(:disabled) { background: var(--surface-raised); color: var(--text-1); }
   .approval-choice:disabled { opacity: .6; cursor: wait; }
-  [role="status"] { color: var(--danger, #b3292f); font-size: .74rem; }
+  [role="status"] { color: var(--danger); font-size: .74rem; }
 </style>

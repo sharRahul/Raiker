@@ -513,7 +513,7 @@
     background:
       radial-gradient(circle at 30% 22%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 30rem),
       linear-gradient(135deg, var(--surface), var(--bg));
-    color: var(--text);
+    color: var(--text-1);
     padding: clamp(1rem, 3vw, 2rem);
   }
   .lock-header {
@@ -709,7 +709,7 @@
     cursor: pointer;
   }
   .eye-toggle:hover {
-    color: var(--text);
+    color: var(--text-1);
   }
   .submit {
     margin-top: var(--space-3);
@@ -742,7 +742,7 @@
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 0.75rem;
-    color: var(--text);
+    color: var(--text-1);
     font-weight: 600;
     cursor: pointer;
   }
@@ -804,8 +804,8 @@
     }
   }
   .status-bar {
-    background: #0d1420;
-    color: #e7ecf3;
+    background: var(--sunken);
+    color: var(--text-1);
     border-radius: 1rem;
     padding: var(--space-3) var(--space-5);
     max-width: 76rem;
@@ -821,13 +821,13 @@
     width: 0.65rem;
     height: 0.65rem;
     border-radius: 999px;
-    background: #8a94a6;
+    background: var(--text-3);
   }
   .status-dot.ok {
-    background: #34d399;
+    background: var(--success);
   }
   .status-dot.bad {
-    background: #f87171;
+    background: var(--danger);
   }
   .status-text {
     display: flex;
@@ -837,7 +837,7 @@
     font-size: 0.72rem;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: #97a1b3;
+    color: var(--text-3);
   }
   .status-value {
     font-size: 0.95rem;

@@ -216,7 +216,7 @@ switches an owner could hold on or off changed nothing at all
 ([FIXED-280](../plans/FIXED_ITEMS.md)).
 
 [`raiker/runtime/authority/entry_paths.py`](../../raiker/runtime/authority/entry_paths.py)
-records the answer for all forty-five, and it is the source the DTO and the web
+records the answer for all forty-six, and it is the source the DTO and the web
 UI read:
 
 | Value | Meaning | Example |

@@ -703,7 +703,7 @@ standing:
 - *"Eight gated capabilities have no threat model"* — **done**. Re-deriving the
   comparison found the count understated, because it credited any document that
   mentioned a capability's name in passing; eleven documents were written rather
-  than eight, and **all forty-five capabilities with a real executor now have
+  than eight, and **all forty-six capabilities with a real executor now have
   one**. See
   [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
 - *"`RUNTIME_EXECUTORS_SPEC.md` omits 17 capabilities"* was carried here after it

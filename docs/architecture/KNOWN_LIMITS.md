@@ -402,7 +402,7 @@ on the shipped build, not estimated.
   `process_execution` and `semantic_memory_runtime` — and left
   `file_write_execution` / `patch_apply_execution` with only a section of
   `THREAT_MODEL.md` whose central claim had gone stale. Eleven documents now
-  close it, and **all forty-five capabilities with a real executor have one**,
+  close it, and **all forty-six capabilities with a real executor have one**,
   each reachable from
   [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one)
   rather than only by filename. A test asserts the coverage so it cannot drift

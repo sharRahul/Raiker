@@ -65,7 +65,7 @@ kept here as the record of what they were:
 The **eight capabilities with no threat model** were a third item here and are
 **closed** (2026-08-23). Re-deriving the comparison found the count understated —
 it credited a passing mention — so eleven documents were written rather than
-eight, and all forty-five capabilities with a real executor now have one. See
+eight, and all forty-six capabilities with a real executor have one. See
 [the threat-models index](../threat-models/README.md#coverage--every-capability-with-a-real-executor-has-one).
 
 `RUNTIME_EXECUTORS_SPEC.md` completeness was a fourth item here and is **closed**:

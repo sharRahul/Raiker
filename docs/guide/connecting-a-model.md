@@ -118,7 +118,9 @@ That is the whole flow. Behind it:
 
 Then press **Choose model…** — Raiker asks the provider for its current live
 catalogue — pick a model, and **Use model**. Switching model takes effect on the
-next turn; the composer chip and provider card both name the pinned model.
+next turn; the composer chip and provider card both name the chosen model. A card
+that has not got one says nothing on that line — **Select models…** is the offer,
+and the card's connection and readiness lines already say where it stands.
 
 ### What is still refused
 

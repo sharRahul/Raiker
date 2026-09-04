@@ -1101,6 +1101,51 @@ chunk-size warning: the entry chunk is 237 kB against the previous 690 kB, and
 the largest route chunk is Models at 82 kB.
 ---
 
+## 2026-09-04 (fifth) — Two lines the owner asked to lose, and what one of them was actually saying
+
+**Tier: targeted + measured four-width sweep.** Production web build, the same
+workspace the third and fourth rounds used, signed in as the existing owner. Both
+items came from the owner in one sentence each.
+
+**What it proved.**
+
+1. **Models → Hosted carries no pinning placeholder.** Eight cards, none of them
+   reading *"no model pinned"*, and the local rows no longer read *"model chosen
+   at selection"*. Each card still states its connection, its readiness chip, and
+   **Select models…**; a card with a chosen model still names it. Guarded from
+   both directions in `ModelsView.test.ts` — neither placeholder anywhere on the
+   tab, **Haiku 4.5** still on the connected card, and exactly one `.pc-model`
+   element for two profiles. Closed as
+   [FIXED-396](FIXED_ITEMS.md#fixed-396--eight-provider-cards-printed-the-same-placeholder-about-pinning).
+2. **Nothing in Observability claims a capability is disabled.** The overview
+   reads *Ready*, *49 closed capability gates* with "18 more have no executor and
+   stay closed", and one missing-configuration item — each linking to where the
+   owner acts. Closed as
+   [FIXED-397](FIXED_ITEMS.md#fixed-397--a-chip-list-of-disabled-capabilities-that-named-the-page-it-was-drawn-on).
+3. **Every route still fits at 390, 768, 1280 and 1920** after the card layout
+   lost a row — `ui-sweep-widths-live.spec.ts` green in 1.1 minutes.
+
+**What it found, and it is the more useful half.** The Observability card was
+asked to be removed for information-architecture reasons; reading what it
+rendered made it a truthfulness defect. It printed
+`phase_gates.list_disabled_capabilities()` — the *shipped registry's* build-out
+flags, fourteen entries including `dashboard` and `web_ui`. It was telling an
+owner, in the dashboard, in a browser, that the dashboard and the web UI were
+disabled. It was never showing the deferred domains its heading implied, which
+are a different set arrived at a different way. Both facts now live in
+[Capabilities with no enable path](../guide/permissions-and-runtime-modes.md#capabilities-with-no-enable-path),
+which names the deferred domains, enumerates the fourteen phase gates by phase,
+says what a phase gate is *not*, and points at `/capabilities` for the live set.
+Four guide pages that pointed at the removed card were corrected in the same
+edit.
+
+**Screenshots:** `round0904-models-hosted-no-pinning-placeholder.png` and
+`round0904-observe-overview-no-disabled-chips.png` in
+[`screenshots/working/`](screenshots/working). No dialog was open in either and
+neither contains a credential value.
+
+---
+
 ## 2026-09-04 (fourth) — Two tabs that were copies, and three bleeds an empty page hid
 
 **Tier: targeted + measured four-width sweep.** Production web build, the same

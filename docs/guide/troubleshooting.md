@@ -51,7 +51,7 @@ in the process environment.
 |---|---|---|
 | A surface says "enable it in Capabilities" but the gate **is** on | The gate is at `enabled_policy_gated`, not `enabled_runtime` | Turn it on again from **Permissions** and pick the runtime level. If it still will not go, the agent runtime itself is disabled — Settings → Runtime configuration → Enable |
 | `activation_blocked: runtime_mode_not_active` | The agent runtime is disabled. It no longer names one of five modes — there is one runtime | Settings → Runtime configuration → **Enable agent runtime** |
-| **Turn on** is missing entirely | Deferred capability — no governed executor exists | Nothing to do. Observability → Diagnostics lists all deferred capabilities |
+| **Turn on** is missing entirely | Deferred capability — no governed executor exists | Nothing to do. The deferred set is named in [Capabilities with no enable path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path) |
 | `Confirm change` stays greyed out | Reason, confirmation token, or threat-model tick missing | The confirmation token is **any phrase you type** — it records intent, it is not a credential |
 | `disabled_by_capability_gate` from an API call | Gate off for your account | Permissions → find the capability → Turn on |
 
@@ -91,8 +91,8 @@ in the process environment.
 
 ## Where to look next
 
-- **Observability → Diagnostics** — runtime mode, readiness checks, per-profile
-  provider status, configuration gaps, deferred capabilities.
+- **Observability → Overview** — runtime state, readiness, memory integrity, and
+  the reason and remediation for any readiness check that failed.
 - **Observability → Audit log** — every governed step, filterable.
 - **[To be fixed](../plans/TO_BE_FIXED.md)** — known defects with reproductions.
 - **[Live manual test plan](../plans/RAIKER_LIVE_MANUAL_TEST_PLAN.md)** — what

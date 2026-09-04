@@ -231,7 +231,7 @@ projections, and graph edges. A divergence between a record and its index has no
 symptom you would notice: search simply stops finding something it found last
 week.
 
-**Observability → Diagnostics → Memory integrity** compares each one against the
+**Observability → Overview → Memory integrity** compares each one against the
 table that owns it. It reports `clean`, or names only the findings that are not
 zero, and **Rescan** runs it again on request — nothing sweeps in the background.
 When the conversation index has drifted, and only then, the card offers **Rebuild

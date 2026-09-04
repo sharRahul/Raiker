@@ -124,9 +124,12 @@ vault material. Run `raiker-app --print-paths` before backup or uninstall.
 ## Deliberately unavailable domains
 
 Finance, medical, CCTV, home-security, pregnancy/baby, and direct hardware
-actions have no governed executor or enable path. They fail closed and are
-listed under **Observability → Diagnostics**. Raiker's ordinary assistant output
-is not a substitute for professional advice or authorization in those domains.
+actions have no governed executor or enable path. They fail closed, they are
+absent from **Permissions** rather than switched off in it, and the set is named
+in full under [Capabilities with no enable
+path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path).
+Raiker's ordinary assistant output is not a substitute for professional advice or
+authorization in those domains.
 
 For implementation-level boundaries, see
 [Security architecture](../architecture/SECURITY_ARCHITECTURE.md) and

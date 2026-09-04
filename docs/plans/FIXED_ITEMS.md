@@ -408,6 +408,8 @@ Evidence: [`screenshots/working/`](screenshots/working) (verified behaviour),
 | [FIXED-393](#fixed-393--the-guide-described-a-boundary-the-product-removed-nine-days-earlier) | Medium | Documentation / memory | Fixed 2026-09-04 (BUG-282, raised by this round's page sweep) |
 | [FIXED-394](#fixed-394--thirty-destinations-and-two-of-them-were-copies-of-the-others) | Low | Web UI / information architecture | Fixed 2026-09-04 (BUG-283, raised by the owner) |
 | [FIXED-395](#fixed-395--three-mobile-bleeds-that-only-existed-once-the-workspace-held-anything) | Medium | Web UI / responsive layout | Fixed 2026-09-04 (BUG-284, found by the width sweep on a *used* workspace) |
+| [FIXED-396](#fixed-396--eight-provider-cards-printed-the-same-placeholder-about-pinning) | Low | Models / information architecture | Fixed 2026-09-04 (raised by the owner) |
+| [FIXED-397](#fixed-397--a-chip-list-of-disabled-capabilities-that-named-the-page-it-was-drawn-on) | Medium | Observability / documentation truthfulness | Fixed 2026-09-04 (raised by the owner) |
 
 ---
 
@@ -17396,3 +17398,80 @@ against a used one **finds defects an empty one hides**.
 
 **User-interface outcome.** Nothing draws over its neighbour at 390px on any
 route, with a workspace that has been worked in.
+
+## FIXED-396 — Eight provider cards printed the same placeholder about pinning
+
+**Severity: Low. Area: Models / information architecture. Status: Fixed
+2026-09-04. Raised by the owner: "There is no need for pinned models on Models
+page."**
+
+**Observed.** On a workspace with no provider connected, Models → Hosted drew
+eight cards and every one of them carried the line **no model pinned**. The
+local rows carried the same placeholder in different words, **model chosen at
+selection**. Counted against the page, it was the single largest block of
+repeated text on it, and none of it was a fact about the owner's providers.
+
+**Root cause, and why it is not a wording fix.** The line was rendered
+unconditionally: `{#if !namesAModel(p)}<span class="model-unpinned">no model
+pinned</span>{:else}<code>{modelName(p.model)}</code>{/if}`. The `{:else}` branch
+states something — *this provider answers with this model* — and the `{#if}`
+branch states the absence of it, in Raiker's own vocabulary, to somebody who had
+not asked to learn what pinning is. The card already answers it twice over: the
+status line reads **Not connected**, the readiness chip reads **Not checked**,
+and **Select models…** sits directly underneath as the offer. Three surfaces
+saying "you have not chosen a model" is not emphasis, it is noise, and the one of
+them written in the internal vocabulary is the one to lose.
+
+**Fix.** The model line renders only when there is a model to name, on both the
+hosted cards and the local rows; `.model-unpinned` went with it. A card with a
+chosen model is unchanged — the fact survives, the placeholder does not.
+
+**User-interface outcome.** A hosted card names its model or says nothing on
+that line. `ModelsView.test.ts` holds the rule from both directions: neither
+placeholder appears anywhere on the Hosted tab, the connected card still names
+**Haiku 4.5**, and exactly one `.pc-model` element exists for two profiles.
+
+## FIXED-397 — A chip list of disabled capabilities that named the page it was drawn on
+
+**Severity: Medium. Area: Observability / documentation truthfulness. Status:
+Fixed 2026-09-04. Raised by the owner: "I don't think we need disabled and
+deferred capability in Observability page. It can be recorded in docs."**
+
+**Observed.** Observability → Diagnostics carried a card headed **Disabled /
+deferred capabilities** with a chip per entry. Removing it was asked for as an
+information-architecture change; reading what it actually rendered turned it into
+a truthfulness one.
+
+**Root cause.** The card read `diagnostics.disabled_capabilities`, which is
+`phase_gates.list_disabled_capabilities()` — capabilities whose **phase gate** in
+the shipped registry has `runtime_enabled = False`. That set is fourteen entries
+and it includes `dashboard` and `web_ui`. So the card told an owner, in the
+dashboard, in a browser, that the dashboard and the web UI were disabled. It was
+not showing the deferred domains its heading implied (finance, medical, CCTV,
+home security, pregnancy/baby, hardware), which are a different set arrived at a
+different way, and which are absent from Permissions rather than switched off in
+it. A phase gate is a build-out flag; it is not an account decision and refuses
+nothing on its own, because per-account resolution is what
+`admission.unset_resolution_for` reads and what the Permissions page writes.
+
+**Fix.** The card is gone — it left with the Diagnostics tab in the same pass —
+and both facts it was reaching for are written down where each is true.
+[Capabilities with no enable path](../guide/permissions-and-runtime-modes.md#capabilities-with-no-enable-path)
+now names the deferred domains *and* enumerates the fourteen phase gates by
+phase, says what a phase gate is not, and points at `/capabilities` in the
+terminal client for the current set straight from the registry. Four guide pages
+that pointed at the removed card were corrected in the same edit:
+`security-and-privacy.md`, `troubleshooting.md` (twice),
+`permissions-and-runtime-modes.md` itself, and `memory.md`, whose Memory
+integrity path moved to **Observability → Overview**.
+
+**Why it is recorded rather than re-sited.** A number an owner cannot act on, on
+a page they visit when something is wrong, is worse than no number: this one
+invited the reading "the web UI is disabled, that is why my page is broken".
+Every capability's own state is on its Permissions card, beside the switch that
+changes it. That is the surface; the registry's phase table is reference
+material, and reference material belongs in the guide.
+
+**User-interface outcome.** Nothing in Observability claims a capability is
+disabled. `grep -rn "disabled_capabilities" apps/web/src/` returns type
+declarations and test fixtures only — no rendering code.

@@ -1311,12 +1311,16 @@
                         <div class="row-title">
                           <h3>{providerName(p.provider)}</h3>
                         </div>
-                        <p class="row-model">
-                          {#if !namesAModel(p)}<span
-                              class="model-unpinned"
-                              >model chosen at selection</span
-                            >{:else}<code>{modelName(p.model)}</code>{/if}
-                        </p>
+                        <!-- The model line states a fact when there is one and
+                             says nothing when there is not. It used to print
+                             "model chosen at selection" on every row that had
+                             not named one — a placeholder that told an owner
+                             about Raiker's pinning vocabulary rather than about
+                             their provider, on a page where "Select models…"
+                             already offers the choice. -->
+                        {#if namesAModel(p)}
+                          <p class="row-model"><code>{modelName(p.model)}</code></p>
+                        {/if}
                         <p class="row-help">{providerHelp(p)}</p>
                         <!-- BUG-270 — "On this device" is a section whose whole
                              claim is about this device, so the one fact it can
@@ -1484,11 +1488,15 @@
                           <h3>{providerName(p.provider)}</h3>
                         </div>
                       </div>
-                      <p class="pc-model">
-                        {#if !namesAModel(p)}<span class="model-unpinned"
-                            >no model pinned</span
-                          >{:else}<code>{modelName(p.model)}</code>{/if}
-                      </p>
+                      <!-- Same rule as the local rows: name the model when one
+                           is named, and print nothing when none is. Eight cards
+                           reading "no model pinned" was the largest single block
+                           of text on this page and the least of it about the
+                           owner's providers — "Not connected" below and
+                           "Select models…" beneath that already carry it. -->
+                      {#if namesAModel(p)}
+                        <p class="pc-model"><code>{modelName(p.model)}</code></p>
+                      {/if}
                       <p class="pc-status">
                         <!-- BUG-198 — this line reports whether a connection is
                              *saved*, which is not whether the provider answers:
@@ -2601,10 +2609,6 @@
     border-color: var(--warn-border);
     background: var(--warn-soft);
     color: var(--warn);
-  }
-  .model-unpinned {
-    color: var(--text-3);
-    font-style: italic;
   }
 
   .picker-dialog {

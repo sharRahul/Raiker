@@ -498,3 +498,16 @@ claiming a hosted turn succeeded.
 
 All retained images were inspected at rendered resolution and contain no
 credential value.
+
+## Two surfaces the owner asked to lose — 2026-09-04
+
+Captured against a production build on a workspace with no provider connected,
+which is the state both defects were reported from and the state that made each
+of them loudest.
+
+| File | Records |
+|---|---|
+| `working/round0904-models-hosted-no-pinning-placeholder.png` | FIXED-396 — eight hosted cards, none of them carrying *"no model pinned"*; each still states its connection, its readiness, and **Select models…** |
+| `working/round0904-observe-overview-no-disabled-chips.png` | FIXED-397 — Observability → Overview with no *"Disabled / deferred capabilities"* chip list; the closed-gate tile still states the honest count and the 18 with no executor, linking to Permissions |
+
+Neither image contains a credential value; no dialog was open in either.

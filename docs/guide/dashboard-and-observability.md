@@ -76,6 +76,13 @@ the closed-gate count that Permissions already lists with controls, and a
 provider table thinner than the one on Models. Its unique half is the section
 above; `#/diagnostics` and `#/observe?tab=diagnostics` still open it.
 
+Its *"Disabled / deferred capabilities"* chip list went with it, and unlike the
+rest it was not a duplicate — it was wrong. It listed the shipped registry's
+phase gates, so it named `web_ui` and `dashboard` as disabled to somebody reading
+it in the dashboard. Both facts it was reaching for are now written down where
+they are true: see
+[Capabilities with no enable path](permissions-and-runtime-modes.md#capabilities-with-no-enable-path).
+
 Checkpoint capture is size-bounded. A file over 8 MiB may still be changed, but
 Raiker warns before approval that the particular change cannot be rewound. Git
 commits and pushes are recovered with Git or the remote host, not with Raiker's

@@ -521,6 +521,40 @@ describe("ModelsView state grammar", () => {
     ).not.toBeInTheDocument();
   });
 
+  // A card's model line is a fact about the owner's provider or it is nothing.
+  //
+  // Every hosted card with no model named printed "no model pinned" and every
+  // local row "model chosen at selection" — on a fresh workspace that was eight
+  // identical lines, the largest block of text on the page, and none of it about
+  // the providers it sat on. "Not connected" and "Select models…" already say
+  // that nothing has been chosen; the placeholder only taught Raiker's own
+  // pinning vocabulary to somebody who had not asked to learn it.
+  it("names a card's model when there is one, and says nothing when there is not", async () => {
+    stubFetch({
+      "GET /api/models": models({
+        profiles: [hostedProfile(), profile({
+          profile_id: "openai-hosted",
+          provider: "openai",
+          model: "<model>",
+          local_only: false,
+          requires_network: true,
+          off_machine: true,
+          endpoint_kind: "hosted",
+        })],
+        chat_profiles: [hostedProfile()],
+      }),
+    });
+    render(ModelsView, { tab: "hosted" });
+
+    expect(await screen.findByText("Your hosted providers")).toBeInTheDocument();
+    expect(screen.queryByText(/no model pinned/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/model chosen at selection/i)).not.toBeInTheDocument();
+    // The fact itself stays: a connected provider still says which model answers.
+    expect(screen.getByText("Haiku 4.5")).toBeInTheDocument();
+    // …and only the card that has one carries the line at all.
+    expect(document.querySelectorAll(".pc-model")).toHaveLength(1);
+  });
+
   // Readiness and the global default describe the whole page, not one panel.
   // Reaching them used to mean navigating back to Providers first.
   it("shows readiness and the global default from every tab", async () => {

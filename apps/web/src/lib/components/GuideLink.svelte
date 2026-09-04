@@ -35,7 +35,7 @@
 
 {#if target !== null}
   <a class="guide-link" href={`#/guide?section=${target.slug}`}>
-    <Icon name="info" size={14} />
+    <Icon name="info" size="sm" />
     <span>{label ?? target.label}</span>
   </a>
 {/if}

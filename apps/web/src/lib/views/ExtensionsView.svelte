@@ -418,7 +418,7 @@
   <GuideLink route="extensions" />
         </div>
         <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-          <Icon name="refresh" size={15} /> Refresh
+          <Icon name="refresh" size="sm" /> Refresh
         </button>
       </div>
 

@@ -307,12 +307,12 @@
      this page opens with its own state. -->
 <div class="header">
   <GuideLink section="extensions-and-mcp" label="How MCP servers work" />
-  <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size={17} /></button>
+  <button class="icon" aria-label="Refresh servers" onclick={load}><Icon name="refresh" size="md" /></button>
 </div>
 
 {#each blocks as block (block.reason)}
   <div class="notice notice-warn" role="status">
-    <Icon name="warning" size={16} />
+    <Icon name="warning" size="md" />
     <span>
       {block.reason}
       {#if block.action}{block.action}{/if}
@@ -323,7 +323,7 @@
 
 {#if accessBlock}
   <div class="notice notice-warn" role="status">
-    <Icon name="warning" size={16} />
+    <Icon name="warning" size="md" />
     <span>
       {accessBlock.text}
       {accessBlock.action}
@@ -334,7 +334,7 @@
   </div>
 {:else if agentAccess?.callable && agentAccess.projected_tools > 0}
   <div class="notice notice-ok" role="status">
-    <Icon name="check" size={15} />
+    <Icon name="check" size="sm" />
     <span>
       {agentAccess.projected_tools}
       {agentAccess.projected_tools === 1 ? "tool is" : "tools are"} available to Raiker in Chat and Build
@@ -344,7 +344,7 @@
 {/if}
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
-{#if notice}<div class="notice notice-ok"><Icon name="check" size={15} /> {notice}</div>{/if}
+{#if notice}<div class="notice notice-ok"><Icon name="check" size="sm" /> {notice}</div>{/if}
 <NotificationCenter {notifications} />
 
 <form class="create" onsubmit={create}>

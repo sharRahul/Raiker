@@ -127,11 +127,11 @@
       aria-expanded={exportPanelOpen}
       aria-controls="audit-export-panel"
     >
-      <Icon name="download" size={15} />
+      <Icon name="download" size="sm" />
       Export
     </button>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh events">
-      <Icon name="refresh" size={15} />
+      <Icon name="refresh" size="sm" />
       Refresh
     </button>
   </div>

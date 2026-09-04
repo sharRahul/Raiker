@@ -313,12 +313,12 @@
       <GuideLink section="extensions-and-mcp" label="How skills work" />
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-      <Icon name="refresh" size={15} /> Refresh
+      <Icon name="refresh" size="sm" /> Refresh
     </button>
   </div>
 
   {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
-  {#if notice}<div class="notice notice-ok" role="status"><Icon name="check" size={15} /> {notice}</div>{/if}
+  {#if notice}<div class="notice notice-ok" role="status"><Icon name="check" size="sm" /> {notice}</div>{/if}
 
   <div class="add">
     <div class="add-block">

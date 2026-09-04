@@ -172,17 +172,17 @@
       </div>
 
       <div class="command-row command-notice">
-        <Icon name="shield" size={14} />
+        <Icon name="shield" size="sm" />
         <span>Commands start through the governed agent path after an approval or bounded session grant.</span>
         {#if selected && !terminal}
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => void stop()} disabled={busy}>
-            <Icon name="stop" size={13} /> Stop
+            <Icon name="stop" size="sm" /> Stop
           </button>
         {/if}
       </div>
 
       <div class="posture" role="status">
-        <span><Icon name="shield" size={13} /> {boundaryLabel(environment)}</span>
+        <span><Icon name="shield" size="sm" /> {boundaryLabel(environment)}</span>
         <span>{posturaLine(environment)}</span>
       </div>
 
@@ -233,7 +233,7 @@
       {/if}
       {#if selected && failed}
         <p class="failure-nav" role="status">
-          <Icon name="warning" size={13} />
+          <Icon name="warning" size="sm" />
           <span>
             {humanize(selected.termination_reason ?? selected.state)}{selected.exit_code !== null ? ` · exit ${selected.exit_code}` : ""}
           </span>

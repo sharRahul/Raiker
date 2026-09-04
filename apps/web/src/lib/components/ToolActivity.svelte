@@ -56,9 +56,9 @@
           {#if row.state === "running"}
             <span class="tool-pulse"></span>
           {:else if row.state === "waiting"}
-            <Icon name="hand" size={14} />
+            <Icon name="hand" size="sm" />
           {:else}
-            <Icon name={familyIcon(row.family)} size={14} />
+            <Icon name={familyIcon(row.family)} size="sm" />
           {/if}
         </span>
         <span class="tool-label">{row.label}</span>

@@ -49,7 +49,7 @@
         aria-checked={theme === option.value}
         onclick={() => chooseTheme(option.value)}
       >
-        <Icon name={option.value === "light" ? "sun" : option.value === "dark" ? "moon" : "system"} size={16} />
+        <Icon name={option.value === "light" ? "sun" : option.value === "dark" ? "moon" : "system"} size="md" />
         {option.label}
       </button>
     {/each}

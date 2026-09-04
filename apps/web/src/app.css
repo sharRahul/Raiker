@@ -1120,6 +1120,68 @@ code,
    and card hover treatments. Each one is a token composition, never a new
    colour, so both themes stay in lockstep and a view cannot drift. */
 
+/* ── Range inputs ──
+   Nothing styled these, so every slider was the browser's default pill — the
+   one control in the product with fully rounded geometry, against a surface
+   language whose radii are 8 / 12 / 16 / 20px and whose buttons and fields are
+   all rectangles. Squared here, once, rather than per view: the graph's force
+   controls and the recall-depth slider are the same control and should not have
+   to agree by hand.
+
+   Both vendor pseudo-elements are needed and neither can be grouped with the
+   other — a selector list containing an unrecognised pseudo-element is dropped
+   whole by both engines, so the WebKit and Firefox rules are written out
+   separately even though their bodies match. */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 1.25rem;
+  background: transparent;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+input[type="range"]:disabled { cursor: not-allowed; opacity: 0.5; }
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 0;
+  background: var(--border-strong);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 0;
+  background: var(--border-strong);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 0.7rem;
+  height: 1rem;
+  margin-top: -6px;
+  border: 1px solid var(--accent-strong);
+  border-radius: 0;
+  background: var(--accent);
+}
+input[type="range"]::-moz-range-thumb {
+  width: 0.7rem;
+  height: 1rem;
+  border: 1px solid var(--accent-strong);
+  border-radius: 0;
+  background: var(--accent);
+}
+input[type="range"]:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+
+/* ── Dialog type ──
+   A dialog opens on top of the page that summoned it, so text inside it that is
+   smaller than the text behind it reads as a demotion — and every dialog in the
+   product was setting its own body size somewhere between 0.68 and 0.86rem
+   against a 1rem page. The floor is set here so a dialog inherits the page's
+   voice; a dialog that genuinely needs small print still reaches for
+   `--text-xs` deliberately rather than arriving there by default. */
+dialog { font-size: var(--text-base); }
+dialog p,
+dialog label,
+dialog li { font-size: var(--text-sm); line-height: 1.5; }
+
 /* A card the user can act on. The lift is small and motion-gated: it signals
    "this responds", it does not animate for its own sake. */
 .card-interactive {

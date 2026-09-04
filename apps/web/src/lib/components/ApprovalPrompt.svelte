@@ -184,11 +184,11 @@
 {#if current !== null && !onApprovals}
   <section class="approval-prompt" aria-label="Approval needed">
     <header>
-      <Icon name="shield" size={15} />
+      <Icon name="shield" size="sm" />
       <strong>Approval needed</strong>
       {#if queue.length > 1}<span class="more">{queue.length - 1} more</span>{/if}
       <button type="button" class="dismiss" aria-label="Decide later" onclick={later}>
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
       </button>
     </header>
     <p class="what">
@@ -202,7 +202,7 @@
       {#if failure}<p class="note" role="alert">{failure}</p>{/if}
       <div class="actions">
         <button type="button" class="primary" disabled={busy} onclick={() => void decide(true)}>
-          <Icon name="check" size={14} /> Approve
+          <Icon name="check" size="sm" /> Approve
         </button>
         <button type="button" disabled={busy} onclick={() => void decide(false)}>Deny</button>
         <button type="button" class="quiet" onclick={review}>Details</button>

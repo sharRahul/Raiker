@@ -166,7 +166,7 @@
 
       {#if escalates}
         <div class="notice notice-danger" role="alert">
-          <Icon name="warning" size={16} />
+          <Icon name="warning" size="md" />
           <span>
             This would overwrite work last changed by a different principal — a cross-principal
             escalation, so only a live human can approve it.
@@ -190,7 +190,7 @@
 
       {#if requested}
         <div class="notice notice-ok" role="status">
-          <Icon name="check" size={16} />
+          <Icon name="check" size="md" />
           <span>
             Raised as approval <span class="mono">{shortId(requested.approval_id)}</span>. Nothing
             has changed yet.

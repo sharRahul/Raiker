@@ -157,13 +157,13 @@
   p { margin: .35rem 0; font-size: .82rem; line-height: 1.5; }
   .summary { color: var(--text-1); font-weight: 700; }
   .preserved { color: var(--text-3); }
-  details { margin-top: .85rem; border-top: 1px solid var(--border); padding-top: .65rem; font-size: .74rem; }
+  details { margin-top: .85rem; border-top: 1px solid var(--border); padding-top: .65rem; font-size: var(--text-sm); }
   summary { width: max-content; color: var(--text-2); cursor: pointer; }
   dl { display: grid; grid-template-columns: auto 1fr; gap: .35rem .65rem; }
   dt { color: var(--text-3); } dd { margin: 0; overflow-wrap: anywhere; }
   .retry-status { color: var(--text-3); }
   .actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
-  button { border-radius: var(--r-pill); padding: .42rem .72rem; font: inherit; font-size: .76rem; font-weight: 750; cursor: pointer; }
+  button { border-radius: var(--r-pill); padding: .42rem .72rem; font: inherit; font-size: var(--text-sm); font-weight: 750; cursor: pointer; }
   button:disabled { opacity: .62; cursor: wait; }
   .secondary { border: 1px solid var(--neutral-border); background: var(--surface); color: var(--text-1); }
   .primary { border: 1px solid var(--accent-border); background: var(--accent); color: var(--accent-contrast, white); }

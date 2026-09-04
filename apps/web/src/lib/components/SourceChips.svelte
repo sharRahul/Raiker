@@ -89,7 +89,7 @@
             onclick={() => onopen(source)}
           >
             <span class="marker" aria-hidden="true">{source.source_id.slice(1)}</span>
-            <Icon name={icon(source.kind)} size={13} />
+            <Icon name={icon(source.kind)} size="sm" />
             <span class="label">{source.title}</span>
             {#if citedIds.has(source.source_id)}
               <span class="sr-only">— cited in this answer</span>

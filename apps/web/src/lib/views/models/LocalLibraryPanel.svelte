@@ -135,7 +135,7 @@
         /></label
       >
       <button type="button" class="btn" onclick={() => (browsing = true)}>
-        <Icon name="folder" size={14} /> Browse
+        <Icon name="folder" size="sm" /> Browse
       </button>
       <button class="btn" type="submit" disabled={busy || !root.trim()}
         >Add and scan</button

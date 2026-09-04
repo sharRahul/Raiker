@@ -292,7 +292,7 @@
     </form>
   {:else}
     <button type="button" class="btn btn-sm" onclick={() => (adding = true)}>
-      <Icon name="globe" size={15} /> Add collector
+      <Icon name="globe" size="sm" /> Add collector
     </button>
   {/if}
 </section>

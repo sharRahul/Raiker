@@ -189,18 +189,18 @@
 <div class="header">
   <GuideLink route="connections" />
   <button class="btn" onclick={() => (showManifest = true)}
-    ><Icon name="file" size={15} /> Import manifest</button
+    ><Icon name="file" size="sm" /> Import manifest</button
   >
 </div>
 <div class="controls">
   <label class="search"
-    ><Icon name="search" size={17} /><span class="sr-only"
+    ><Icon name="search" size="md" /><span class="sr-only"
       >Search connectors</span
     ><input bind:value={query} placeholder="Search connectors" /></label
   ><label
     ><input type="checkbox" bind:checked={installedOnly} /> Installed</label
   ><button class="icon" aria-label="Refresh connectors" onclick={load}
-    ><Icon name="refresh" size={17} /></button
+    ><Icon name="refresh" size="md" /></button
   >
 </div>
 <div
@@ -218,7 +218,7 @@
 
 {#if error}<div class="notice notice-danger" role="alert">{error}</div>{/if}
 {#if view && !view.vault_configured}<div class="notice notice-warn">
-    <Icon name="lock" size={16} /> Configure
+    <Icon name="lock" size="md" /> Configure
     <code>RAIKER_CONNECTOR_VAULT_KEY</code> before linking accounts. Credentials fail
     closed without it.
   </div>{/if}
@@ -274,7 +274,7 @@
       tabindex="-1"
     >
       <button class="close" aria-label="Close" onclick={() => (selected = null)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <div class="detail-head">
         <span class="logo">{selected.display_name[0]}</span>
@@ -322,7 +322,7 @@
               onclick={() => authenticate(selected!)}
               disabled={busy || !secret}>Connect</button
             >{:else}<div class="notice notice-ok">
-              <Icon name="check" size={15} /> Account connected
+              <Icon name="check" size="sm" /> Account connected
             </div>{/if}
         </section>
         <section>
@@ -388,7 +388,7 @@
         class="close"
         aria-label="Close"
         onclick={() => (mcpConnector = null)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <h2 id="mcp-title">Connect {mcpConnector.display_name} via MCP</h2>
       <p>
@@ -462,7 +462,7 @@
         class="close"
         aria-label="Close"
         onclick={() => (showManifest = false)}
-        ><Icon name="x" size={18} /></button
+        ><Icon name="x" size="md" /></button
       >
       <h2 id="manifest-title">Register connector manifest</h2>
       <p>

@@ -150,7 +150,7 @@
       onclick={() => void go(listing?.parent ?? "")}
       aria-label="Up one level"
     >
-      <Icon name="folder-up" size={14} />
+      <Icon name="folder-up" size="sm" />
     </button>
     <span class="here" title={current}>{current || "This computer"}</span>
   </div>
@@ -174,7 +174,7 @@
             aria-current={selected === entry.path ? "true" : undefined}
             onclick={() => activate(entry)}
           >
-            <Icon name={entry.is_directory ? "folder" : "file"} size={14} />
+            <Icon name={entry.is_directory ? "folder" : "file"} size="sm" />
             <span>{entry.name}</span>
           </button>
         </li>
@@ -227,7 +227,7 @@
   .here {
     flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: var(--text-xs); color: var(--text-2);
+    font-size: var(--text-sm); color: var(--text-2);
   }
   .entries { list-style: none; margin: 0; padding: 0; overflow-y: auto; display: grid; gap: 1px; }
   .entry {
@@ -245,8 +245,8 @@
   .picked {
     flex: 1; min-width: 0;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    font-size: var(--text-xs); color: var(--text-3);
+    font-size: var(--text-sm); color: var(--text-3);
   }
-  .muted { margin: 0; color: var(--text-3); font-size: var(--text-xs); }
-  .error { margin: 0; color: var(--danger, var(--text-1)); font-size: var(--text-xs); }
+  .muted { margin: 0; color: var(--text-3); font-size: var(--text-sm); }
+  .error { margin: 0; color: var(--danger); font-size: var(--text-sm); }
 </style>

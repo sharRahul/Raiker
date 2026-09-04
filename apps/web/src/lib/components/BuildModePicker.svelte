@@ -67,9 +67,9 @@
     onclick={() => (open = !open)}
     onkeydown={closeOnEscape}
   >
-    <Icon name={icon(mode)} size={15} />
+    <Icon name={icon(mode)} size="sm" />
     <span>{spec.label}</span>
-    <Icon name="chevron-down" size={14} />
+    <Icon name="chevron-down" size="sm" />
   </button>
 
   {#if open}
@@ -84,13 +84,13 @@
           {disabled}
           onclick={() => choose(option.id)}
         >
-          <Icon name={icon(option.id)} size={15} />
+          <Icon name={icon(option.id)} size="sm" />
           <span>
             <strong>{option.label}</strong>
             <small>{option.summary}</small>
           </span>
           {#if mode === option.id}
-            <Icon name="check" size={15} label="Selected mode" />
+            <Icon name="check" size="sm" label="Selected mode" />
           {:else}
             <kbd>{index + 1}</kbd>
           {/if}

@@ -18,7 +18,7 @@
   <div class="sheet-head">
     <strong>Keyboard shortcuts</strong>
     <button type="button" class="sheet-close" aria-label="Close shortcuts" onclick={onclose}>
-      <Icon name="x" size={14} />
+      <Icon name="x" size="sm" />
     </button>
   </div>
   <dl>

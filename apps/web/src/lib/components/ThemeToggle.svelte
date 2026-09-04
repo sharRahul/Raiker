@@ -26,7 +26,7 @@
 </script>
 
 <button type="button" class="btn btn-ghost theme-toggle" onclick={cycle} aria-label={LABELS[choice]}>
-  <Icon name={ICONS[choice]} size={17} />
+  <Icon name={ICONS[choice]} size="md" />
   <span class="choice-label">{choice}</span>
 </button>
 

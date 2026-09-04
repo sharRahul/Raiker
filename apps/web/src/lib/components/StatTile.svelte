@@ -30,7 +30,7 @@
 
 <article class="tile" data-tone={tone}>
   <p class="label">
-    {#if icon}<Icon name={icon} size={14} />{/if}
+    {#if icon}<Icon name={icon} size="sm" />{/if}
     {label}
   </p>
   <strong class="value">{value}</strong>

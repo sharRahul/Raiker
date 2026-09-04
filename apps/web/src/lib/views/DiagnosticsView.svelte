@@ -135,7 +135,7 @@
     Derived from stored state only — nothing here probes the network or fabricates health.
   </p>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh runtime health">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -223,7 +223,7 @@
     {#each failedReadiness as check (check.key)}
       <section class="card readiness-failed" aria-labelledby={`diag-readiness-${check.key}`}>
         <h2 id={`diag-readiness-${check.key}`}>
-          <Icon name="warning" size={15} /> {readinessLabel(check.key)}
+          <Icon name="warning" size="sm" /> {readinessLabel(check.key)}
         </h2>
         <p>Change capture failed — writes may not be reversible.</p>
         <p class="mono">{humanize(check.detail.reason_code)}</p>

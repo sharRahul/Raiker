@@ -191,23 +191,23 @@
       <GuideLink route="home" />
       <span aria-live="polite">{updatedAt ? `Updated ${relativeTime(updatedAt.toISOString())}` : "Updating…"}</span>
       <button class="btn btn-ghost btn-sm" aria-label="Refresh Workbench" type="button" onclick={load}>
-        <Icon name="refresh" size={15} /> Refresh
+        <Icon name="refresh" size="sm" /> Refresh
       </button>
     </div>
   </div>
 
   <nav class="start-row" aria-label="Start work">
     <a class="start-card" href="#/new-chat">
-      <Icon name="chat" size={18} /><span><strong>Start a conversation</strong><small>Ask, think, work with a file</small></span>
+      <Icon name="chat" size="md" /><span><strong>Start a conversation</strong><small>Ask, think, work with a file</small></span>
     </a>
     <a class="start-card" href="#/build">
-      <Icon name="code" size={18} /><span><strong>Start a build</strong><small>Change a repository under governance</small></span>
+      <Icon name="code" size="md" /><span><strong>Start a build</strong><small>Change a repository under governance</small></span>
     </a>
     <a class="start-card" href="#/tasks">
-      <Icon name="tasks" size={18} /><span><strong>Plan a task or agent</strong><small>Run once, on a cadence, or in the background</small></span>
+      <Icon name="tasks" size="md" /><span><strong>Plan a task or agent</strong><small>Run once, on a cadence, or in the background</small></span>
     </a>
     <a class="start-card" href="#/projects">
-      <Icon name="projects" size={18} /><span><strong>Open a project</strong><small>{projectCount === 0 ? "None yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}</small></span>
+      <Icon name="projects" size="md" /><span><strong>Open a project</strong><small>{projectCount === 0 ? "None yet" : `${projectCount} project${projectCount === 1 ? "" : "s"}`}</small></span>
     </a>
   </nav>
 

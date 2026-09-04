@@ -181,7 +181,7 @@
           disabled={downloadState === "working"}
           aria-label={`Download ${preview?.filename || filename}`}
         >
-          <Icon name="download" size={15} />
+          <Icon name="download" size="sm" />
           {downloadState === "working" ? "Downloading…" : downloadState === "done" ? "Downloaded" : "Download"}
         </button>
       {/if}
@@ -192,7 +192,7 @@
         bind:this={closeButton}
         aria-label="Close file preview"
       >
-        <Icon name="x" size={15} />
+        <Icon name="x" size="sm" />
       </button>
     </div>
   </header>
@@ -260,7 +260,7 @@
     {:else if source !== null}
       <section class="source" aria-label="Source passage">
         <div class="source-head">
-          <span class="source-eyebrow"><Icon name="quote" size={14} /> Source</span>
+          <span class="source-eyebrow"><Icon name="quote" size="sm" /> Source</span>
           {#if source.title}<strong>{source.title}</strong>{/if}
         </div>
         {#if source.status === "resolved" && source.resolution_method}

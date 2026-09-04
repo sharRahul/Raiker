@@ -293,7 +293,7 @@
 
 <section class="tasks">
   <header>  <GuideLink route="tasks" />
-<button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size={15} /> Refresh</button></header>
+<button type="button" class="btn btn-ghost btn-sm" onclick={load}><Icon name="refresh" size="sm" /> Refresh</button></header>
 
   <form
     class="card composer"
@@ -348,7 +348,7 @@
             {#if (task.attachments ?? []).length > 0}
               <div class="task-attachments" aria-label="Files attached to this task">
                 {#each task.attachments ?? [] as attachment}
-                  <span><Icon name="file" size={14} /> {attachmentLabel(attachment)}</span>
+                  <span><Icon name="file" size="sm" /> {attachmentLabel(attachment)}</span>
                 {/each}
               </div>
             {/if}
@@ -360,11 +360,11 @@
                  offers the retry, so a granted approval is never a dead end. -->
             {#if task.status === "continuing"}
               <p class="continuing" role="status">
-                <Icon name="refresh" size={14} /> Approved — continuing this run now.
+                <Icon name="refresh" size="sm" /> Approved — continuing this run now.
               </p>
             {:else if pending.length > 0}
               <p class="blocked" role="status">
-                <Icon name="approvals" size={14} />
+                <Icon name="approvals" size="sm" />
                 Waiting on {pending.length === 1 ? "a decision" : `${pending.length} decisions`} before this can continue.
                 <a href={`#/approvals?session=${encodeURIComponent(task.session_id)}`}>Review {pending.length === 1 ? "it" : "them"}</a>
               </p>
@@ -374,7 +374,7 @@
                    the owner would otherwise have to work out by reading the
                    tree themselves. -->
               <p class="blocked" role="status">
-                <Icon name="tasks" size={14} />
+                <Icon name="tasks" size="sm" />
                 Its own run finished. Waiting on {childCount(task)} delegated {childCount(task) === 1 ? "task" : "tasks"}.
               </p>
             {:else if task.status === "waiting_for_approval"}
@@ -383,7 +383,7 @@
                    It is styled and labelled as one: quiet, and stated as what
                    to press when a granted run has not moved. -->
               <p class="blocked" role="status">
-                <Icon name="approvals" size={14} />
+                <Icon name="approvals" size="sm" />
                 {outcome(task) ?? "This run is waiting for your approval to continue."}
                 <span class="recovery">
                   <span class="recovery-note">Approving continues this run automatically.</span>
@@ -421,7 +421,7 @@
                      run yet has one. -->
                 {#if task.thread_session_id && (task.thread_turns ?? 0) > 0}
                   <a class="btn btn-ghost btn-sm thread-link" href={`#/new-chat?session=${task.thread_session_id}`}>
-                    <Icon name="chat" size={14} />
+                    <Icon name="chat" size="sm" />
                     Thread · {task.thread_turns}
                   </a>
                 {/if}

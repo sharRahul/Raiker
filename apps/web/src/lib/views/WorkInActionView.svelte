@@ -86,8 +86,8 @@ const ACTIVE = new Set(["queued", "running", "continuing", "paused", "waiting_fo
 </script>
 
 <div class="head-row">
-  <div><p class="page-lead">Live operational view for this Raiker instance. Every task, status, schedule, and assignment comes from stored runtime records.</p><p class="truth-note"><Icon name="activity" size={15} /> Idle character movement is visual-only; it does not mean the agent is working.</p></div>
-  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}><Icon name="refresh" size={15} /> {refreshing ? "Refreshing…" : "Refresh"}</button>
+  <div><p class="page-lead">Live operational view for this Raiker instance. Every task, status, schedule, and assignment comes from stored runtime records.</p><p class="truth-note"><Icon name="activity" size="sm" /> Idle character movement is visual-only; it does not mean the agent is working.</p></div>
+  <button type="button" class="btn btn-ghost btn-sm" onclick={load} disabled={refreshing}><Icon name="refresh" size="sm" /> {refreshing ? "Refreshing…" : "Refresh"}</button>
 </div>
 
 {#if loadError}

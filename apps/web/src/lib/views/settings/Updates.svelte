@@ -50,12 +50,12 @@
     {#if update.available}
       <p class="description">Version {update.available.version} is ready to install. Its release metadata and bundle are verified before Raiker replaces files.</p>
       <button class="btn btn-primary" type="button" disabled={busy !== null} onclick={() => void apply()}>
-        <Icon name="refresh" size={15} /> {busy === "applying" ? "Starting update…" : confirm ? "Confirm update and restart" : "Update and restart"}
+        <Icon name="refresh" size="sm" /> {busy === "applying" ? "Starting update…" : confirm ? "Confirm update and restart" : "Update and restart"}
       </button>
     {/if}
   {/if}
   <button class="btn btn-ghost btn-sm" type="button" disabled={busy !== null} onclick={() => void check()}>
-    <Icon name="refresh" size={14} /> {busy === "checking" ? "Checking…" : "Check for updates"}
+    <Icon name="refresh" size="sm" /> {busy === "checking" ? "Checking…" : "Check for updates"}
   </button>
   {#if notice}<p class="notice" role="status">{notice}</p>{/if}
 </section>

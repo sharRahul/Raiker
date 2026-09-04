@@ -178,11 +178,11 @@
 <section class="code-explorer" aria-labelledby="code-explorer-heading">
   <header class="head">
     <h2 id="code-explorer-heading">
-      <Icon name="folder" size={14} />
+      <Icon name="folder" size="sm" />
       <span class="repo">{repoLabel}</span>
     </h2>
     <button type="button" class="icon-btn" aria-label="Close files" onclick={onclose}>
-      <Icon name="x" size={15} />
+      <Icon name="x" size="sm" />
     </button>
   </header>
 
@@ -237,7 +237,7 @@
               fileDiagnostics = null;
             }}
           >
-            <Icon name="x" size={14} />
+            <Icon name="x" size="sm" />
           </button>
         </span>
       </header>
@@ -252,7 +252,7 @@
           <ul class="problems" aria-label={`Problems in ${openPath}`}>
             {#each fileDiagnostics.diagnostics as problem (`${problem.line}:${problem.column}:${problem.message}`)}
               <li>
-                <Icon name="warning" size={13} />
+                <Icon name="warning" size="sm" />
                 <span class="where">{problem.line}:{problem.column}</span>
                 <span class="what">{problem.message}</span>
               </li>
@@ -309,7 +309,7 @@
         >
           <Icon
             name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"}
-            size={13}
+            size="sm"
           />
         </button>
       {:else}
@@ -322,7 +322,7 @@
         onclick={() => (entry.is_directory ? void toggle(entry) : void openFile(entry))}
         aria-label={entry.is_directory ? `Open ${entry.name}` : `Read ${entry.name}`}
       >
-        <Icon name={entry.is_directory ? "folder" : "file"} size={13} />
+        <Icon name={entry.is_directory ? "folder" : "file"} size="sm" />
         <span class="entry-name">{entry.name}</span>
         {#if !entry.is_directory}
           <span class="entry-meta">{formatSize(entry.size_bytes)}</span>

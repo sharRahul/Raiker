@@ -53,7 +53,7 @@
 {#if notice !== null}
   <div class="composer-menu menu-surface" role="status">
     <p class="menu-notice">
-      <Icon name="info" size={13} />
+      <Icon name="info" size="sm" />
       <span>
         {plain(notice.text)}
         {#if notice.href}<a href={notice.href}>{notice.linkLabel ?? "Open"}</a>{/if}

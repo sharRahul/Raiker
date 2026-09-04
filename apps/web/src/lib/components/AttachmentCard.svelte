@@ -61,11 +61,11 @@
   {:else}
     <span class="glyph" data-kind={attachment.kind} aria-hidden="true">
       {#if attachment.kind === "path"}
-        <Icon name="folder" size={16} />
+        <Icon name="folder" size="md" />
       {:else if isImage}
-        <Icon name="eye" size={16} />
+        <Icon name="eye" size="md" />
       {:else}
-        <Icon name="file" size={16} />
+        <Icon name="file" size="md" />
       {/if}
     </span>
   {/if}
@@ -99,7 +99,7 @@
       aria-label={`Remove attachment ${attachment.label}`}
       {disabled}
     >
-      <Icon name="x" size={12} />
+      <Icon name="x" size="sm" />
     </button>
   {/if}
 </div>

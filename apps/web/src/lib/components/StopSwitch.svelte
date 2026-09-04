@@ -86,7 +86,7 @@
 </script>
 
 <button type="button" class="stop-btn" onclick={show} aria-haspopup="dialog">
-  <Icon name="stop" size={16} />
+  <Icon name="stop" size="md" />
   STOP
 </button>
 

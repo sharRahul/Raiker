@@ -340,7 +340,7 @@
 <div class="head-row">
   <GuideLink route="projects" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh projects">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -406,7 +406,7 @@
         aria-label="Folder path"
       />
       <button type="button" class="btn btn-sm" onclick={() => (browsing = true)}>
-        <Icon name="folder" size={14} /> Browse
+        <Icon name="folder" size="sm" /> Browse
       </button>
     </div>
     <label class="check-row">
@@ -549,7 +549,7 @@
               {exporting ? "Exporting…" : "Export project"}
             </button>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => (detail = null)}>
-              <Icon name="x" size={14} />
+              <Icon name="x" size="sm" />
               Close
             </button>
           </div>

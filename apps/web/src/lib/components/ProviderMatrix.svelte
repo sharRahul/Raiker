@@ -701,7 +701,7 @@
             </select>
           </label>
           <button class="btn btn-ghost btn-sm" type="button" onclick={() => void scanGguf()}>
-            <Icon name="refresh" size={14} /> Scan
+            <Icon name="refresh" size="sm" /> Scan
           </button>
           <button
             class="btn btn-sm btn-primary"
@@ -757,7 +757,7 @@
             disabled={busy[row.profileId] !== undefined}
             onclick={() => void detect(row)}
           >
-            <Icon name="refresh" size={14} /> Detect
+            <Icon name="refresh" size="sm" /> Detect
           </button>
           {#if needsInstall(row)}
             <!-- BUG-262 — a runtime that is not installed is the one case where
@@ -802,12 +802,12 @@
       <div class="controls">
         {#if isConnected(row)}
           <span class="stored">
-            <Icon name="lock" size={13} />
+            <Icon name="lock" size="sm" />
             {subscriptionPlan
               ? `${subscriptionPlan.charAt(0).toUpperCase()}${subscriptionPlan.slice(1)} connected`
               : "Connected"}
           </span>
-          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void detect(row)}><Icon name="refresh" size={14} /> Refresh</button>
+          <button class="btn btn-ghost btn-sm" type="button" disabled={busy[row.profileId] !== undefined} onclick={() => void detect(row)}><Icon name="refresh" size="sm" /> Refresh</button>
           {#if (catalogue[row.profileId]?.models.length ?? 0) > 0}
             <button class="btn btn-sm btn-primary" type="button" onclick={() => (pickerFor = row)}>{row.pinned ? "Change model" : "Choose a model"}</button>
           {/if}
@@ -857,7 +857,7 @@
 
       <div class="controls">
         {#if isConnected(row)}
-          <span class="stored"><Icon name="lock" size={13} /> Key stored</span>
+          <span class="stored"><Icon name="lock" size="sm" /> Key stored</span>
           {#if busy[row.profileId] === "detecting"}
             <span class="row-note" role="status">Asking {row.label}…</span>
           {:else if (catalogue[row.profileId]?.models.length ?? 0) > 0}

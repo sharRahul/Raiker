@@ -174,7 +174,7 @@
            record behind it, is in the guide. -->
       <p class="page-lead">Every card links to the record it is derived from.</p>
       <button type="button" class="btn btn-ghost btn-sm" onclick={load}>
-        <Icon name="refresh" size={15} /> Refresh
+        <Icon name="refresh" size="sm" /> Refresh
       </button>
     </div>
 

@@ -64,7 +64,7 @@
 </script>
 
 <article class="runtime-row" aria-label="Speech runtime">
-  <span class="row-logo"><Icon name="mic" size={22} /></span>
+  <span class="row-logo"><Icon name="mic" size="lg" /></span>
   <div class="row-main">
     <div class="row-heading">
       <div>

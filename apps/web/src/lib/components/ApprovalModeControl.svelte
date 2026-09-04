@@ -77,9 +77,9 @@
     onclick={() => (open = !open)}
     onkeydown={closeOnEscape}
   >
-    <Icon name={descriptor(mode).icon} size={16} />
+    <Icon name={descriptor(mode).icon} size="md" />
     <span>{descriptor(mode).label}</span>
-    <Icon name="chevron-down" size={14} />
+    <Icon name="chevron-down" size="sm" />
   </button>
 
   {#if open}
@@ -93,7 +93,7 @@
           disabled={busy}
           onclick={() => void select(option.mode)}
         >
-          <Icon name={option.icon} size={16} />
+          <Icon name={option.icon} size="md" />
           <span class="choice-copy">
             <span class="choice-label">{option.menuLabel ?? option.label}</span>
             <!-- Four postures is one more than a label alone can carry: "Skip"
@@ -101,7 +101,7 @@
                  opposite things. The line under each says which. -->
             <span class="choice-detail">{option.detail}</span>
           </span>
-          {#if mode === option.mode}<Icon name="check" size={16} label="Selected approval mode" />{/if}
+          {#if mode === option.mode}<Icon name="check" size="md" label="Selected approval mode" />{/if}
         </button>
       {/each}
     </div>

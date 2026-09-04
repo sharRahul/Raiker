@@ -263,7 +263,7 @@
     </dl>
     <div class="actions">
       <a href="#/activity">View change history</a>
-      <a class="btn btn-ghost btn-sm" href="#/capabilities"><Icon name="capabilities" size={15} /> Review permissions</a>
+      <a class="btn btn-ghost btn-sm" href="#/capabilities"><Icon name="capabilities" size="sm" /> Review permissions</a>
     </div>
   {/if}
 </section>
@@ -363,7 +363,7 @@
                  would imply it is a setting away. -->
             {#if capabilityRows(environment.features).length}
               <ul class="capabilities">
-                {#each capabilityRows(environment.features) as capability (capability)}<li><Icon name="check" size={13} /> {capability}</li>{/each}
+                {#each capabilityRows(environment.features) as capability (capability)}<li><Icon name="check" size="sm" /> {capability}</li>{/each}
               </ul>
             {/if}
             {#if environment.features?.persistent_environment}

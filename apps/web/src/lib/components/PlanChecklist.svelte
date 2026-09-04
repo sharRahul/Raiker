@@ -45,7 +45,7 @@
         aria-controls="plan-steps"
         onclick={() => (collapsed = !collapsed)}
       >
-        <Icon name={collapsed ? "chevron-right" : "chevron-down"} size={14} />
+        <Icon name={collapsed ? "chevron-right" : "chevron-down"} size="sm" />
         <span id="plan-heading">Plan</span>
       </button>
       <span class="count">{done} of {steps.length} done</span>
@@ -72,7 +72,7 @@
         {#each steps as step, index (index)}
           <li class={step.status}>
             <span class="marker" aria-hidden="true">
-              <Icon name={MARK[step.status] ?? "circle"} size={13} />
+              <Icon name={MARK[step.status] ?? "circle"} size="sm" />
             </span>
             <span class="body">
               <span class="title">{step.title}</span>

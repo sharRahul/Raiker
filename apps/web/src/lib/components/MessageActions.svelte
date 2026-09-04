@@ -100,7 +100,7 @@
 
 <div class="message-actions">
   <button type="button" class="msg-action" onclick={() => void copy()} aria-label="Copy this message">
-    <Icon name={copied === "copied" ? "check" : "copy"} size={13} />
+    <Icon name={copied === "copied" ? "check" : "copy"} size="sm" />
     <span>{copied === "copied" ? "Copied" : copied === "failed" ? "Blocked" : "Copy"}</span>
   </button>
   <button
@@ -110,7 +110,7 @@
     onclick={() => onedit(text)}
     aria-label="Edit this message and send it again"
   >
-    <Icon name="file-edit" size={13} /><span>Edit</span>
+    <Icon name="file-edit" size="sm" /><span>Edit</span>
   </button>
   <button
     type="button"
@@ -119,7 +119,7 @@
     onclick={() => onretry(text)}
     aria-label="Send this message again"
   >
-    <Icon name="refresh" size={13} /><span>Retry</span>
+    <Icon name="refresh" size="sm" /><span>Retry</span>
   </button>
   {#if hasMore}
     <div class="more" bind:this={moreEl}>
@@ -132,7 +132,7 @@
         aria-label="More actions for this message"
         onclick={() => (moreOpen = !moreOpen)}
       >
-        <Icon name="more" size={13} /><span class="sr-only">More</span>
+        <Icon name="more" size="sm" /><span class="sr-only">More</span>
       </button>
       {#if moreOpen}
         <div class="more-menu" role="menu">
@@ -146,7 +146,7 @@
                 onbranch();
               }}
             >
-              <Icon name="branch" size={13} />
+              <Icon name="branch" size="sm" />
               <span>
                 <strong>{branching ? "Branching…" : "Branch"}</strong>
                 <em>A second conversation from here. This one keeps every turn.</em>
@@ -163,7 +163,7 @@
                 oncompact();
               }}
             >
-              <Icon name="fit" size={13} />
+              <Icon name="fit" size="sm" />
               <span>
                 <strong>{compacting ? "Summarising…" : "Summarise up to here"}</strong>
                 <em>Shortens what the model is sent. Nothing leaves this transcript.</em>
@@ -180,7 +180,7 @@
                 onrewind();
               }}
             >
-              <Icon name="checkpoints" size={13} />
+              <Icon name="checkpoints" size="sm" />
               <span>
                 <strong>{rewinding ? "Reading checkpoint…" : "Rewind to before this"}</strong>
                 <em>Previews the file changes, then asks for approval.</em>

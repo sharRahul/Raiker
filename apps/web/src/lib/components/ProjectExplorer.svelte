@@ -199,7 +199,7 @@
           onclick={() => void indexNow()}
           disabled={indexing || missing}
         >
-          <Icon name="refresh" size={15} />
+          <Icon name="refresh" size="sm" />
           {indexing ? "Indexing…" : "Index this folder"}
         </button>
       </div>
@@ -270,7 +270,7 @@
           onclick={() => void toggle(entry)}
           aria-label={`${expanded[entry.relative_path] ? "Collapse" : "Expand"} ${entry.name}`}
         >
-          <Icon name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"} size={14} />
+          <Icon name={expanded[entry.relative_path] ? "chevron-down" : "chevron-right"} size="sm" />
         </button>
       {:else}
         <span class="twisty spacer"></span>
@@ -282,7 +282,7 @@
         onclick={() => (entry.is_directory ? void toggle(entry) : select(entry))}
         aria-label={entry.is_directory ? `Open ${entry.name}` : `Inspect ${entry.name}`}
       >
-        <Icon name={entry.is_directory ? "folder" : "file"} size={14} />
+        <Icon name={entry.is_directory ? "folder" : "file"} size="sm" />
         <span class="entry-name">{entry.name}</span>
         {#if !entry.is_directory}
           <span class="entry-meta">{formatSize(entry.size_bytes)}</span>

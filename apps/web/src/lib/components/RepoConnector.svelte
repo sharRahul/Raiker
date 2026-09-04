@@ -215,7 +215,7 @@
       </p>
     </div>
     <button type="button" class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Close repositories">
-      <Icon name="x" size={15} />
+      <Icon name="x" size="sm" />
     </button>
   </header>
 
@@ -224,7 +224,7 @@
       {#each view.repos as item (item.repo_id)}
         <li class="repo" class:selected={item.selected}>
           <span class="repo-icon" aria-hidden="true">
-            <Icon name={item.kind === "github" ? "branch" : "folder"} size={15} />
+            <Icon name={item.kind === "github" ? "branch" : "folder"} size="sm" />
           </span>
           <span class="repo-body">
             <span class="repo-label">{item.label}</span>
@@ -260,7 +260,7 @@
               onclick={() => disconnect(item)}
               aria-label={`Disconnect ${item.label}`}
             >
-              <Icon name="x" size={14} />
+              <Icon name="x" size="sm" />
             </button>
           </span>
         </li>
@@ -272,7 +272,7 @@
     <section class="code-map" aria-label="Code map">
       <div class="code-map-body">
         <span class="code-map-title">
-          <Icon name="search" size={14} />
+          <Icon name="search" size="sm" />
           Code map · {codeMap.repository}
         </span>
         <span class="code-map-detail" class:warn={!codeMap.enabled || codeMap.status === "failed"}>
@@ -296,10 +296,10 @@
 
   <div class="source-toggle chip-row" role="group" aria-label="Repository source">
     <button type="button" class="chip" aria-pressed={source === "local"} onclick={() => (source = "local")}>
-      <Icon name="folder" size={14} /> Local folder
+      <Icon name="folder" size="sm" /> Local folder
     </button>
     <button type="button" class="chip" aria-pressed={source === "github"} onclick={() => (source = "github")}>
-      <Icon name="branch" size={14} /> GitHub
+      <Icon name="branch" size="sm" /> GitHub
     </button>
   </div>
 

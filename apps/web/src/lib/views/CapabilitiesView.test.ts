@@ -214,4 +214,44 @@ describe("CapabilitiesView", () => {
     expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
     expect(screen.getByText("Web fetch")).toBeInTheDocument();
   });
+
+  // 66 gates across a dozen domains all rendered expanded, so reaching the one
+  // you came for meant scrolling past every one you did not.
+  it("folds a domain group away and brings it back", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(screen.getByText("Shell commands")).toBeInTheDocument());
+
+    const fold = screen
+      .getAllByRole("button", { expanded: true })
+      .find((b) => b.className.includes("phase-fold"));
+    expect(fold).toBeDefined();
+    await fireEvent.click(fold!);
+
+    expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
+    // The heading and the count stay, so a folded group still says what is in it.
+    expect(fold).toHaveAttribute("aria-expanded", "false");
+
+    await fireEvent.click(fold!);
+    expect(screen.getByText("Shell commands")).toBeInTheDocument();
+  });
+
+  // A search is a request to see matches; answering it with a folded group would
+  // be the page arguing with the query.
+  it("overrides a fold while a search is active", async () => {
+    stubFetch({ "GET /api/capability-gates": GATES });
+    render(CapabilitiesView, { principal: "prin_owner" });
+    await waitFor(() => expect(screen.getByText("Shell commands")).toBeInTheDocument());
+
+    const fold = screen
+      .getAllByRole("button", { expanded: true })
+      .find((b) => b.className.includes("phase-fold"));
+    await fireEvent.click(fold!);
+    expect(screen.queryByText("Shell commands")).not.toBeInTheDocument();
+
+    await fireEvent.input(screen.getByLabelText(/search capabilities/i), {
+      target: { value: "shell" },
+    });
+    expect(screen.getByText("Shell commands")).toBeInTheDocument();
+  });
 });

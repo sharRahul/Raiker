@@ -415,7 +415,6 @@
     const timer = window.setTimeout(autoFit, 4_000);
     return () => window.clearTimeout(timer);
   });
-  async function toggleFullscreen() { if (!document.fullscreenElement) await graphElement?.requestFullscreen(); else await document.exitFullscreen(); }
 
   // The picker opens on the *boundary*, never on a listing. Browsing starts
   // from a root the owner already has — a project's files, what Raiker
@@ -519,11 +518,19 @@
   <section class="knowledge-shell" aria-label="Knowledge Map">
     <header class="graph-toolbar">
       <div class="title-block"><span class="eyebrow">Workspace intelligence</span><h2>Knowledge Map</h2></div>
-      <label class="search"><Icon name="search" size={16} /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
-      <div class="mode-switch" role="group" aria-label="Graph scope"><button class:active={graphMode === "global"} onclick={() => graphMode = "global"}>Global</button><button class:active={graphMode === "local"} disabled={!centreId} onclick={() => graphMode = "local"}>Local</button></div>
+      <!-- Global/Local was a segmented control that spent most of its life half
+           disabled: `centreNode()` already switches to local when you focus a
+           node, so the switch's only unique job was getting back out again. That
+           belongs beside the depth slider, which is the other control that only
+           exists in local mode, rather than holding permanent toolbar space to
+           say which mode you are already looking at.
+
+           Fullscreen went too. The graph fills the content area already, and the
+           browser's own fullscreen took the sidebar and topbar away without
+           putting anything in their place. -->
       <button class="icon-button" aria-label="Add workspace source" title="Add source" onclick={() => void openSourcePicker()}>+</button>
-      <button class="icon-button" aria-label="Graph settings" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}><Icon name="settings" size={17} /></button>
-      <button class="icon-button" aria-label="Enter fullscreen" onclick={toggleFullscreen}>⛶</button>
+      <button class="icon-button" aria-label="Graph settings" aria-expanded={settingsOpen} onclick={() => settingsOpen = !settingsOpen}><Icon name="settings" size="md" /></button>
+      <label class="search"><Icon name="search" size="md" /><input bind:value={search} placeholder="Search records or use type:, status:…" aria-label="Search records" /></label>
     </header>
 
     <div class="graph-workspace" bind:this={graphElement} use:graphInteractions role="application" aria-label="Interactive force-directed knowledge graph">
@@ -559,7 +566,7 @@
       {/if}
 
       <button class="summary-pill" aria-expanded={summaryOpen} onclick={(event) => { event.stopPropagation(); summaryOpen = !summaryOpen; }}>{#if showingStarter}<span>Starter view</span><i></i><span>nothing recorded yet</span>{:else}<span>{renderedNodes.length} node{renderedNodes.length === 1 ? "" : "s"}</span><i></i><span>{renderedLinks.length} relationship{renderedLinks.length === 1 ? "" : "s"}</span>{/if}<span aria-hidden="true">{summaryOpen ? "⌃" : "⌄"}</span></button>
-      {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size={13} /> Governed workspace boundary</small></section>{/if}
+      {#if summaryOpen}<section class="summary-popover"><h3>Workspace summary</h3>{#each summary as item}<p><span>{item[0]}</span><b>{item[1]}</b></p>{/each}<small><Icon name="shield" size="sm" /> Governed workspace boundary</small></section>{/if}
 
       <div class="viewport-controls"><button aria-label="Fit graph" onclick={fitGraph}>Fit</button><button aria-label="Zoom out" onclick={() => transform = { ...transform, k: Math.max(.35, transform.k - .15) }}>−</button><span>{Math.round(transform.k * 100)}%</span><button aria-label="Zoom in" onclick={() => transform = { ...transform, k: Math.min(3, transform.k + .15) }}>+</button></div>
       <div class="graph-meta"><span class="live-dot"></span>{updatedAt ? "Live workspace graph" : "Loading"}<button onclick={(event) => { event.stopPropagation(); void load(); }} disabled={refreshing}>{refreshing ? "Updating…" : "Refresh"}</button></div>
@@ -567,7 +574,7 @@
       {#if settingsOpen}
         <aside class="settings-panel" aria-label="Graph settings">
           <div class="panel-title"><div><span>Graph settings</span><small>Personal workspace view</small></div><button aria-label="Close graph settings" onclick={() => settingsOpen = false}>×</button></div>
-          <details open><summary>Filters</summary><label class="panel-search"><Icon name="search" size={14} /><input bind:value={search} placeholder="Search records…" /></label>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{FILTER_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
+          <details open><summary>Filters</summary>{#each FILTER_TYPES as type}<label class="check-row"><input type="checkbox" checked={enabledTypes[type]} onchange={(event) => enabledTypes = { ...enabledTypes, [type]: event.currentTarget.checked }} /><span>{FILTER_LABELS[type] ?? type.charAt(0).toUpperCase() + type.slice(1) + "s"}</span></label>{/each}<label class="check-row"><input type="checkbox" bind:checked={showOrphans} /><span>Orphan records</span></label></details>
           <details open><summary>Groups</summary>{#each groups as group}<div class="group-row"><i style={`background:${group.color}`}></i><span><b>{group.name}</b><small>{group.query}</small></span></div>{/each}<button class="text-action" onclick={() => newGroupOpen = !newGroupOpen}>+ New group</button>{#if newGroupOpen}<div class="group-form"><input bind:value={groupName} placeholder="Group name" /><input bind:value={groupQuery} placeholder='type:memory status:approved' /><label>Colour <input type="color" bind:value={groupColor} /></label><button onclick={addGroup}>Add group</button></div>{/if}</details>
           <details open><summary>Display</summary><label class="check-row"><input type="checkbox" bind:checked={showArrows} /><span>Direction arrows</span></label><label class="check-row"><input type="checkbox" bind:checked={showLabels} /><span>Node labels</span></label><label class="check-row"><input type="checkbox" bind:checked={showParticles} /><span>Relationship particles</span></label><label class="range-row"><span>Text fade threshold</span><input type="range" min="0.35" max="1.5" step="0.05" bind:value={labelThreshold} /></label><label class="range-row"><span>Node size</span><input type="range" min="0.7" max="1.7" step="0.1" bind:value={nodeScale} /></label><label class="range-row"><span>Link thickness</span><input type="range" min="0.5" max="2.5" step="0.1" bind:value={linkThickness} /></label></details>
           <details open><summary>Forces</summary><label class="range-row"><span>Centre force</span><input type="range" min="0" max="0.3" step="0.01" bind:value={centerStrength} /></label><label class="range-row"><span>Repel force</span><input type="range" min="-500" max="-40" step="10" bind:value={chargeStrength} /></label><label class="range-row"><span>Link force</span><input type="range" min="0" max="1" step="0.05" bind:value={linkStrength} /></label><label class="range-row"><span>Link distance</span><input type="range" min="30" max="220" step="5" bind:value={linkDistance} /></label><label class="range-row"><span>Collision radius</span><input type="range" min="0" max="30" step="1" bind:value={collisionPadding} /></label></details>
@@ -583,7 +590,8 @@
       {/if}
 
       {#if graphMode === "local"}
-        <div class="depth-control"><span>Relationship depth</span><input type="range" min="1" max="3" step="1" bind:value={depth} aria-label="Relationship depth" /><b>{depth}</b></div>
+        <!-- The way out of local mode, offered where local mode is visible. -->
+        <div class="depth-control"><span>Relationship depth</span><input type="range" min="1" max="3" step="1" bind:value={depth} aria-label="Relationship depth" /><b>{depth}</b><button type="button" class="text-action" onclick={() => { graphMode = "global"; centreId = null; }}>Show all</button></div>
       {/if}
     </div>
   </section>
@@ -655,10 +663,10 @@
      on top of them. Painted in tokens, the base is already right in both
      themes, and all three override blocks are gone. */
   .knowledge-shell { height:calc(100vh - 58px); min-height:650px; display:grid; grid-template-rows:64px 1fr; background:var(--bg); color:var(--text-1); }
-  .graph-toolbar { display:grid; grid-template-columns:auto minmax(220px, 620px) auto auto auto auto; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); z-index:20; }
-  .title-block { min-width:190px; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:var(--text-1); font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:var(--text-2); font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; }
-  .search { display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text-2); } .search:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); } .search input { width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:.78rem; }
-  .mode-switch { display:flex; padding:3px; border:1px solid var(--border-strong); border-radius:7px; background:var(--sunken); } .mode-switch button,.icon-button { border:0; color:var(--text-2); background:transparent; cursor:pointer; } .mode-switch button { padding:6px 10px; border-radius:5px; font:inherit; font-size:.72rem; } .mode-switch button.active { background:var(--accent-soft); color:var(--accent-strong); box-shadow:var(--shadow-0); } .mode-switch button:disabled { opacity:.38; cursor:not-allowed; }
+  .graph-toolbar { display:flex; gap:10px; align-items:center; padding:0 18px; border-bottom:1px solid var(--border); background:color-mix(in srgb, var(--surface) 96%, transparent); box-shadow:var(--shadow-1); z-index:20; }
+  .title-block { min-width:190px; margin-right:auto; } .title-block h2 { overflow-wrap:anywhere; } .title-block h2 { margin:1px 0 0; color:var(--text-1); font-size:1.06rem; letter-spacing:-.01em; } .eyebrow { color:var(--text-2); font-size:.7rem; letter-spacing:.13em; text-transform:uppercase; }
+  .search { flex:0 1 min(380px, 42vw); display:flex; align-items:center; gap:8px; height:36px; padding:0 11px; border:1px solid var(--border-strong); border-radius:7px; background:var(--surface); color:var(--text-2); } .search:focus-within { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-soft); } .search input { width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:.78rem; }
+  .icon-button { border:0; color:var(--text-2); background:transparent; cursor:pointer; }
   .icon-button { display:grid; place-items:center; width:34px; height:34px; border:1px solid var(--border-strong); border-radius:7px; font-size:1.25rem; } .icon-button:hover { color:var(--accent-strong); border-color:var(--accent-border); background:var(--accent-soft); }
   .graph-workspace { position:relative; min-height:0; overflow:hidden; touch-action:none; cursor:grab; background:radial-gradient(circle at 50% 45%, var(--raised) 0%, var(--surface) 45%, var(--bg) 100%); } .graph-workspace:active { cursor:grabbing; } .graph-workspace:fullscreen { width:100vw; height:100vh; }
   .vignette { position:absolute; inset:0; pointer-events:none; background:radial-gradient(ellipse at center, transparent 48%, color-mix(in srgb, var(--overlay) 25%, transparent) 100%); z-index:1; }
@@ -689,7 +697,7 @@
   .settings-panel,.inspector { position:absolute; z-index:10; top:14px; right:14px; bottom:58px; width:300px; overflow:auto; border:1px solid var(--border-strong); border-radius:11px; background:color-mix(in srgb, var(--surface) 96%, transparent); backdrop-filter:blur(18px); box-shadow:var(--shadow-2); cursor:default; }
   .panel-title { position:sticky; top:0; z-index:2; display:flex; justify-content:space-between; align-items:center; padding:15px 16px 12px; border-bottom:1px solid var(--border); background:var(--raised); text-transform:uppercase; letter-spacing:.1em; font-size:.68rem; } .panel-title small { display:block; margin-top:4px; color:var(--text-3); text-transform:none; letter-spacing:0; } .panel-title button,.close { border:0; background:transparent; color:var(--text-2); cursor:pointer; font-size:1.3rem; }
   details { border-bottom:1px solid var(--border); padding:12px 16px; } summary { color:var(--text-1); cursor:pointer; font-size:.72rem; font-weight:650; letter-spacing:.04em; } details > :not(summary) { margin-top:10px; }
-  .panel-search { display:flex; align-items:center; gap:7px; height:31px; padding:0 8px; border:1px solid var(--border); border-radius:6px; color:var(--text-2); background:var(--sunken); } .panel-search input,.group-form input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:.7rem; }
+  .group-form input { min-width:0; width:100%; border:0; outline:0; background:transparent; color:var(--text-1); font:inherit; font-size:.7rem; }
   .check-row,.range-row { display:flex; align-items:center; justify-content:space-between; gap:10px; color:var(--text-2); font-size:.7rem; margin:8px 0 0 !important; } .check-row { justify-content:flex-start; } input[type="checkbox"],input[type="radio"] { accent-color:var(--accent); } .range-row input { width:120px; accent-color:var(--accent); }
   .group-row { display:flex; align-items:center; gap:8px; } .group-row i,.record-kicker i { width:8px; height:8px; flex:none; border-radius:50%; box-shadow:0 0 5px currentColor; } .group-row span { display:grid; } .group-row b { color:var(--text-1); font-size:.69rem; } .group-row small { color:var(--text-3); font-size:.6rem; } .text-action { border:0; padding:0; background:transparent; color:var(--accent); font:inherit; font-size:.68rem; cursor:pointer; }
   .group-form { display:grid; gap:7px; padding:9px; border:1px solid var(--border); border-radius:6px; background:var(--sunken); } .group-form input { padding:6px; border:1px solid var(--border); border-radius:4px; } .group-form label { display:flex; justify-content:space-between; align-items:center; color:var(--text-2); font-size:.65rem; } .group-form label input { width:38px; padding:0; } .group-form button { border:0; border-radius:4px; padding:6px; background:var(--accent); color:var(--text-inverse); cursor:pointer; }
@@ -707,5 +715,5 @@
   .source-browser { display:grid; max-height:280px; overflow:auto; margin:0 0 12px; border:1px solid var(--border); border-radius:7px; } .source-browser button { display:flex; gap:8px; border:0; border-bottom:1px solid var(--border); padding:7px 9px; background:transparent; color:var(--text-2); text-align:left; cursor:pointer; } .source-browser button:hover,.source-browser button.selected { background:var(--accent-soft); } .source-browser button span { width:42px; color:var(--text-3); font-size:.62rem; } .source-browser button b { font-size:.7rem; } .source-browser small { padding:8px; color:var(--text-3); } .source-review { margin-top:12px; padding:12px; border:1px solid var(--border); border-radius:7px; background:var(--sunken); } .source-review h3 { margin:0 0 6px; } .source-review p { font-size:.7rem; } .source-review .warning { color:var(--warn); }
   .context-menu { position:fixed; z-index:120; display:grid; min-width:160px; padding:5px; border:1px solid var(--border-strong); border-radius:7px; background:var(--raised); box-shadow:var(--shadow-2); } .context-menu button { border:0; border-radius:4px; padding:7px 9px; background:transparent; color:var(--text-1); text-align:left; cursor:pointer; font-size:.7rem; } .context-menu button:hover { background:var(--accent-soft); }
   @media (prefers-reduced-motion: reduce) { .particle { display:none; } }
-  @media (max-width:800px) { .graph-toolbar { grid-template-columns:1fr auto auto auto; } .search { grid-row:2; grid-column:1/-1; margin-bottom:8px; } .knowledge-shell { grid-template-rows:auto 1fr; } .title-block { min-width:0; } .mode-switch { margin-left:auto; } .settings-panel,.inspector { width:min(300px, calc(100% - 28px)); } }
+  @media (max-width:800px) { .graph-toolbar { flex-wrap:wrap; } .search { flex:1 0 100%; order:2; margin-bottom:8px; } .knowledge-shell { grid-template-rows:auto 1fr; } .title-block { min-width:0; } .settings-panel,.inspector { width:min(300px, calc(100% - 28px)); } }
 </style>

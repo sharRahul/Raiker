@@ -166,10 +166,10 @@
     </div>
     <div class="header-actions">
       <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh background work">
-        <Icon name="refresh" size={14} />
+        <Icon name="refresh" size="sm" />
       </button>
       <button type="button" class="btn btn-ghost btn-sm" onclick={onclose} aria-label="Hide background work">
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
       </button>
     </div>
   </header>

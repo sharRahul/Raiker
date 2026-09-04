@@ -84,7 +84,7 @@
 
 {#if showing && link !== null}
   <div class="skill-link" role="status">
-    <Icon name="spark" size={15} />
+    <Icon name="spark" size="sm" />
     <div class="body">
       {#if installed !== null}
         <p><strong>“{installed}”</strong> is installed. <a href="#/extensions?tab=skills">Open Skills</a></p>

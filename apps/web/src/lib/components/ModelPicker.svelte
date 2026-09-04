@@ -184,10 +184,10 @@
          the same defect the rule's own comment records fixing once, alive again
          in the one state a fresh install is always in. The fallback is never
          `svg:last-child`, so it survives that rule by construction. -->
-    {#if active}<ProviderLogo provider={active.provider} />{:else}<Icon name="models" size={15} />{/if}
+    {#if active}<ProviderLogo provider={active.provider} />{:else}<Icon name="models" size="sm" />{/if}
     <span>{label}</span>
     {#if effortLabel !== ""}<span class="model-effort">{effortLabel}</span>{/if}
-    <Icon name="chevron-down" size={14} />
+    <Icon name="chevron-down" size="sm" />
   </button>
 
   {#if open}
@@ -222,7 +222,7 @@
               <span>{modelName(profile.model)}</span>
               {#if active?.profile_id === profile.profile_id && active?.model === profile.model}<Icon
                   name="check"
-                  size={15}
+                  size="sm"
                   label="Selected model"
                 />{/if}
             </button>
@@ -257,7 +257,7 @@
           >
             <span>Effort</span>
             <span class="effort-value">{effort === "" ? "None" : effortLabel}</span>
-            <Icon name={effortOpen ? "chevron-down" : "chevron-right"} size={14} />
+            <Icon name={effortOpen ? "chevron-down" : "chevron-right"} size="sm" />
           </button>
           {#if effortOpen}
             <p class="effort-note">
@@ -274,7 +274,7 @@
                 onclick={() => chooseEffort(level)}
               >
                 <span>{level.charAt(0).toUpperCase() + level.slice(1)}</span>
-                {#if effort === level}<Icon name="check" size={15} label="Selected effort" />{/if}
+                {#if effort === level}<Icon name="check" size="sm" label="Selected effort" />{/if}
               </button>
             {/each}
             <button

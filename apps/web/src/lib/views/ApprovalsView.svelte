@@ -423,7 +423,7 @@
 <div class="head-row">
   <GuideLink route="approvals" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh approvals">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -550,7 +550,7 @@
         {isQuestion ? "Answer a question" : `Review ${humanize(selected.approval.tool_name)}`}
       </h2>
       <button type="button" class="btn btn-ghost btn-sm" onclick={() => (selected = null)}>
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
         Close
       </button>
     </div>

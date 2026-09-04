@@ -1103,7 +1103,7 @@
     disabled={catalogueRefreshing}
     aria-label="Refresh connected providers"
   >
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     {catalogueRefreshing ? "Refreshing…" : "Refresh connected providers"}
   </button>
 </div>
@@ -1331,7 +1331,7 @@
                              then. -->
                         {#if p.provider_detected === false}
                           <p class="posture-line runtime-missing">
-                            <Icon name="warning" size={14} />
+                            <Icon name="warning" size="sm" />
                             Not installed on this machine
                             {#if installerRuntimeFor(p.provider)}
                               <!-- The offer, not just the finding. Raiker opens
@@ -1544,7 +1544,7 @@
                            output then. -->
                       {#if p.provider_detected === false}
                         <p class="posture-line runtime-missing">
-                          <Icon name="warning" size={14} />
+                          <Icon name="warning" size="sm" />
                           Not installed on this machine
                           {#if installerRuntimeFor(p.provider)}
                             <button

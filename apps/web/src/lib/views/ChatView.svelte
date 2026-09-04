@@ -1594,7 +1594,7 @@
         aria-label="Background work"
         title="Background work"
       >
-        <Icon name="panel" size={15} />
+        <Icon name="panel" size="sm" />
       </button>
     </div>
   </header>
@@ -1610,7 +1610,7 @@
        start the same way. The original is reachable and unchanged. -->
   {#if branchOrigin !== null}
     <p class="branch-origin">
-      <Icon name="branch" size={14} />
+      <Icon name="branch" size="sm" />
       <span>
         Branched from
         <a href={`#/new-chat?session=${encodeURIComponent(branchOrigin.source_session_id ?? "")}`}
@@ -1779,7 +1779,7 @@
                 onclick={() => void copyAnswer(turn)}
                 aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                 title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
-              ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+              ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
               </div>
             {/if}
           {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
@@ -1829,7 +1829,7 @@
             <section class="artifact-stack" aria-label="Generated documents">
               {#each generatedFiles as file (file.attachmentId)}
                 <article class="artifact-card" data-status={file.attachmentId ? "ready" : "unavailable"}>
-                  <div class="artifact-icon" aria-hidden="true"><Icon name="file" size={20} /></div>
+                  <div class="artifact-icon" aria-hidden="true"><Icon name="file" size="lg" /></div>
                   <div class="artifact-copy">
                     <div class="artifact-heading">
                       <strong>{file.label}</strong>
@@ -1856,7 +1856,7 @@
                         class="btn btn-ghost btn-sm artifact-download"
                         aria-label={`Download ${file.label}`}
                         onclick={() => void downloadArtifact(file.attachmentId as string, file.label)}
-                      ><Icon name="download" size={14} /> Download</button>
+                      ><Icon name="download" size="sm" /> Download</button>
                     </div>
                   {:else}
                     <span class="artifact-unavailable">Preview unavailable</span>
@@ -1900,12 +1900,12 @@
                 </p>
               {:else if turn.resumeState === "elsewhere"}
                 <p class="approval-title" role="status" aria-live="polite">
-                  <Icon name="approvals" size={15} /> Continued in another tab
+                  <Icon name="approvals" size="sm" /> Continued in another tab
                 </p>
                 <p class="approval-note">{turn.resumeNote}</p>
               {:else}
                 <p class="approval-title">
-                  <Icon name="approvals" size={15} /> Waiting for approval
+                  <Icon name="approvals" size="sm" /> Waiting for approval
                 </p>
                 <p class="approval-body">{turn.response.approval.message}</p>
                 <p class="approval-note">
@@ -2024,7 +2024,7 @@
           {#if projects && projects.projects.length > 0}
             <label class="composer-scope">
               <span class="sr-only">Project for this chat</span>
-              <Icon name="folder" size={14} />
+              <Icon name="folder" size="sm" />
               <select
                 class="bar-select"
                 value={projectId}
@@ -2088,7 +2088,7 @@
             disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked}
             aria-label={streaming ? "Running" : "Send"}
           >
-            <Icon name="send" size={15} />
+            <Icon name="send" size="sm" />
             <span class="send-label">{streaming ? "Running…" : "Send"}</span>
           </button>
         </div>

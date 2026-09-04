@@ -296,7 +296,7 @@
       Show archived
     </label>
     <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh sessions">
-      <Icon name="refresh" size={15} />
+      <Icon name="refresh" size="sm" />
       Refresh
     </button>
   </div>
@@ -328,7 +328,7 @@
         onclick={deleteSelected}
         disabled={deleting}
       >
-        <Icon name="x" size={14} />
+        <Icon name="x" size="sm" />
         {deleting ? "Deleting…" : "Delete selected"}
       </button>
     </div>
@@ -492,11 +492,11 @@
                 turnDetail.turn.turn_id,
               )}
             >
-              <Icon name="chat" size={14} />
+              <Icon name="chat" size="sm" />
               Open in the conversation
             </a>
             <button type="button" class="btn btn-ghost btn-sm" onclick={() => (turnDetail = null)}>
-              <Icon name="x" size={14} />
+              <Icon name="x" size="sm" />
               Close
             </button>
           </div>

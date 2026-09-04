@@ -85,7 +85,7 @@
       aria-controls="all-navigation"
       aria-expanded={navigationOpen}
       onclick={(event) => onNavigationToggle(event.currentTarget)}
-    ><Icon name="panel" size={18} /></button>
+    ><Icon name="panel" size="md" /></button>
   </div>
   <div class="page-id"><h1 class="page-title">{title}</h1><p class="page-hint">{hint}</p></div>
   <div class="status" role="status" aria-live="polite">
@@ -101,7 +101,7 @@
         onclick={togglePanel}
         bind:this={notificationTrigger}
       >
-        <Icon name="bell" size={17} />
+        <Icon name="bell" size="md" />
         {#if unread.length > 0}<span class="unread-count">{unread.length}</span>{/if}
       </button>
       {#if panelOpen}

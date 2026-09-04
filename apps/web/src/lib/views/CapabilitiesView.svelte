@@ -37,6 +37,29 @@
   let loadError = $state<string | null>(null);
   let search = $state("");
   let expanded = $state<string | null>(null);
+
+  /**
+   * Domain groups the owner has folded away.
+   *
+   * The registry holds 66 gates across a dozen domains and every one of them
+   * rendered expanded, so finding the capability you came for meant scrolling
+   * past every capability you did not. Collapsed by name rather than by index,
+   * so filtering the list does not fold a different group than the one that was
+   * closed.
+   *
+   * A search overrides it: typing is asking to see matches, and answering that
+   * with a folded group would be the page arguing with the query.
+   */
+  let collapsedDomains = $state<string[]>([]);
+  const searching = $derived(search.trim() !== "");
+  function isCollapsed(domain: string): boolean {
+    return !searching && collapsedDomains.includes(domain);
+  }
+  function toggleDomain(domain: string) {
+    collapsedDomains = collapsedDomains.includes(domain)
+      ? collapsedDomains.filter((d) => d !== domain)
+      : [...collapsedDomains, domain];
+  }
   let notice = $state<{ kind: "ok" | "error"; text: string } | null>(null);
 
   // The per-capability decision mode is the primary control here. It arrives inline
@@ -310,7 +333,7 @@
 
 {#if integratedButOff > 0}
   <div class="runtime-note" role="note">
-    <Icon name="info" size={16} />
+    <Icon name="info" size="md" />
     <!-- Five lines teaching the fail-closed model, on a page that already links
          to the guide section that teaches it. What is left is the one fact this
          page must state about its own rows, and the one route it is not. -->
@@ -334,7 +357,7 @@
 
 <div class="toolbar">
   <div class="search">
-    <Icon name="search" size={15} />
+    <Icon name="search" size="sm" />
     <label class="sr-only" for="cap-search">Search capabilities</label>
     <input
       id="cap-search"
@@ -345,7 +368,7 @@
     />
   </div>
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh capabilities">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -367,8 +390,21 @@
           />
           {group.domain}
         </label>
+        <button
+          type="button"
+          class="phase-fold"
+          aria-expanded={!isCollapsed(group.domain)}
+          onclick={() => toggleDomain(group.domain)}
+        >
+          <span class="phase-count">{group.gates.length}</span>
+          <Icon name={isCollapsed(group.domain) ? "chevron-right" : "chevron-down"} size="sm" />
+          <span class="sr-only">
+            {isCollapsed(group.domain) ? "Show" : "Hide"}
+            {group.domain} capabilities
+          </span>
+        </button>
       </div>
-      {#each group.gates as gate (gate.capability)}
+      {#each isCollapsed(group.domain) ? [] : group.gates as gate (gate.capability)}
         {@const isOpen = expanded === gate.capability}
         {@const mode = modeFor(gate)}
         <div class="cap card" class:open={isOpen}>
@@ -387,7 +423,7 @@
               onclick={() => toggleExpand(gate.capability)}
             >
               <span class="chev" aria-hidden="true">
-                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size={15} />
+                <Icon name={isOpen ? "chevron-down" : "chevron-right"} size="sm" />
               </span>
               <span class="cap-name">
                 <span class="cap-label">{capabilityLabel(gate.capability)}</span>
@@ -534,7 +570,10 @@
     gap: var(--space-2);
     margin-bottom: var(--space-2);
   }
-  .phase-head { padding: 0 0.9rem 0.3rem; }
+  .phase-head { display:flex; align-items:center; justify-content:space-between; gap:var(--space-3); padding: 0 0.9rem 0.3rem; }
+  .phase-fold { display:flex; align-items:center; gap:0.35rem; border:0; padding:0.15rem 0.2rem; background:transparent; color:var(--text-3); cursor:pointer; }
+  .phase-fold:hover { color: var(--text-1); }
+  .phase-count { font-size: var(--text-2xs); font-variant-numeric: tabular-nums; }
   .phase-select-all { display:flex; align-items:center; gap:0.4rem; font-size:0.72rem; font-weight:650; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-3); cursor:pointer; }
   .phase-select-all input { accent-color: var(--accent); }
   .cap-check { accent-color: var(--accent); flex:0 0 auto; }

@@ -1647,9 +1647,9 @@
           onclick={() => (reposOpen = !reposOpen)}
           aria-expanded={reposOpen}
         >
-          <Icon name={activeRepo?.kind === "github" ? "branch" : "folder"} size={15} />
+          <Icon name={activeRepo?.kind === "github" ? "branch" : "folder"} size="sm" />
           <span class="repo-name">{activeRepo?.label ?? "No repository"}</span>
-          <Icon name="chevron-down" size={14} />
+          <Icon name="chevron-down" size="sm" />
         </button>
         {#if activeRepo?.kind === "local" && !activeRepo.local_exists}
           <span class="repo-warning" role="status">That folder is no longer in the workspace.</span>
@@ -1709,7 +1709,7 @@
               ? "Hide files"
               : "Show files"}
         >
-          <Icon name="folder" size={15} />
+          <Icon name="folder" size="sm" />
           <span class="rail-label">{filesOpen ? "Hide files" : "Files"}</span>
         </button>
         <button
@@ -1721,7 +1721,7 @@
           aria-label={railOpen ? "Hide background work" : "Show background work"}
           title={railOpen ? "Hide background work" : "Background work"}
         >
-          <Icon name="panel" size={15} />
+          <Icon name="panel" size="sm" />
           <span class="rail-label">{railOpen ? "Hide background work" : "Background work"}</span>
         </button>
       </div>
@@ -1826,7 +1826,7 @@
                 {:else if turn.resumeState === "elsewhere"}
                   <p role="status" aria-live="polite">{turn.resumeNote}</p>
                 {:else}
-                  <p><Icon name="approvals" size={14} /> Waiting for approval</p>
+                  <p><Icon name="approvals" size="sm" /> Waiting for approval</p>
                   {#if liveChannelDown}
                     <button
                       type="button"
@@ -1899,7 +1899,7 @@
                   onclick={() => void copyAnswer(turn)}
                   aria-label={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
                   title={copiedTurnId === String(turn.id) ? "Response copied" : "Copy response"}
-                ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size={15} /></button>
+                ><Icon name={copiedTurnId === String(turn.id) ? "check" : "copy"} size="sm" /></button>
                 </div>
               {/if}
             {:else if !turn.streaming && turn.error === null && turn.response !== null && turn.response.status !== "needs_approval"}
@@ -1933,7 +1933,7 @@
 
             {#if turn.events.some((event) => event.kind === "lifecycle" || event.kind === "tool")}
               <details class="governance" open={turn.streaming}>
-                <summary><Icon name="shield" size={13} /> How this turn was governed</summary>
+                <summary><Icon name="shield" size="sm" /> How this turn was governed</summary>
                 <ol>
                   {#each groupPhases(turn.events) as row (row.phase)}
                     <li>
@@ -2159,7 +2159,7 @@
             />
             <BuildModePicker {mode} onchange={setMode} disabled={streaming} />
             <label class="project-picker" data-selected={projectReady}>
-              <Icon name="folder" size={14} />
+              <Icon name="folder" size="sm" />
               <span class="sr-only">Project for this build</span>
               <select
                 class="bar-select"
@@ -2224,7 +2224,7 @@
               class="btn btn-primary send"
               disabled={streaming || attachStore.uploading || promptText.trim() === "" || modelBlocked || !projectReady}
             >
-              <Icon name={streaming ? "clock" : "send"} size={15} />
+              <Icon name={streaming ? "clock" : "send"} size="sm" />
               <span class="send-label">{streaming ? "Working…" : "Send"}</span>
             </button>
           </div>

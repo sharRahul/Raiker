@@ -246,7 +246,7 @@
             disabled={checking}
             onclick={() => checkForUpdates()}
           >
-            <Icon name="refresh" size={14} /> {checking ? "Checking…" : "Check for updates"}
+            <Icon name="refresh" size="sm" /> {checking ? "Checking…" : "Check for updates"}
           </button>
         {/if}
       </div>
@@ -262,11 +262,11 @@
       <div class="actions">
         {#if host?.paused}
           <button type="button" class="btn btn-soft btn-sm" disabled={busy} onclick={() => act("resume")}>
-            <Icon name="play" size={14} /> Resume
+            <Icon name="play" size="sm" /> Resume
           </button>
         {:else}
           <button type="button" class="btn btn-sm" disabled={busy} onclick={() => act("pause")}>
-            <Icon name="hand" size={14} /> Pause
+            <Icon name="hand" size="sm" /> Pause
           </button>
         {/if}
         <button
@@ -276,10 +276,10 @@
           title={host?.restartable ? undefined : "Raiker is not registered to start in the background, so nothing would start it again."}
           onclick={() => act("restart", confirming === "restart")}
         >
-          <Icon name="refresh" size={14} /> Restart
+          <Icon name="refresh" size="sm" /> Restart
         </button>
         <button type="button" class="btn btn-danger btn-sm" disabled={busy} onclick={() => act("quit", confirming === "quit")}>
-          <Icon name="stop" size={14} /> Quit
+          <Icon name="stop" size="sm" /> Quit
         </button>
       </div>
       <p class="foot">Pause stops new scheduled work. A run you have already approved still finishes.</p>

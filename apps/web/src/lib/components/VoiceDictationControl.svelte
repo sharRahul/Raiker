@@ -293,10 +293,10 @@
       disabled={phase === "transcribing"}
       onclick={done}
     >
-      <Icon name="check" size={15} />
+      <Icon name="check" size="sm" />
     </button>
     <button type="button" class="voice-button" aria-label="Cancel dictation" onclick={cancel}>
-      <Icon name="x" size={15} />
+      <Icon name="x" size="sm" />
     </button>
   {:else}
     <button
@@ -308,12 +308,12 @@
       disabled={disabled || !supported}
       onclick={start}
     >
-      <Icon name="mic" size={15} />
+      <Icon name="mic" size="sm" />
     </button>
   {/if}
 
   <details class="voice-info" ontoggle={keepDisclosureOnScreen}>
-    <summary aria-label="About dictation privacy"><Icon name="info" size={14} /></summary>
+    <summary aria-label="About dictation privacy"><Icon name="info" size="sm" /></summary>
     <p id={disclosureId}>{disclosure}</p>
     {#if !supported}
       <p id={unavailableId}>{unavailableReason}</p>

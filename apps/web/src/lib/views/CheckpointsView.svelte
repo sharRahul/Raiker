@@ -75,7 +75,7 @@
 <div class="head-row">
   <GuideLink route="checkpoints" />
   <button type="button" class="btn btn-ghost btn-sm" onclick={load} aria-label="Refresh checkpoints">
-    <Icon name="refresh" size={15} />
+    <Icon name="refresh" size="sm" />
     Refresh
   </button>
 </div>
@@ -115,7 +115,7 @@
   {#each groups as group (group.sessionId)}
     <section class="session-group" aria-label={`Checkpoints for session ${group.sessionId}`}>
       <h2 class="session-head">
-        <Icon name="sessions" size={14} />
+        <Icon name="sessions" size="sm" />
         <span>Session</span>
         <span class="mono">{shortId(group.sessionId)}</span>
         <span class="count">{group.items.length} snapshot{group.items.length === 1 ? "" : "s"}</span>

@@ -100,7 +100,7 @@
     title={speaking ? "Stop speaking" : "Read this response aloud"}
     onclick={toggle}
   >
-    <Icon name={speaking ? "stop" : "volume"} size={14} />
+    <Icon name={speaking ? "stop" : "volume"} size="sm" />
   </button>
   {#if status}<span class="playback-status" role="status">{status}</span>{/if}
 </span>

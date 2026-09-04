@@ -187,7 +187,7 @@
       onclick={() => void refresh()}
       disabled={refreshing}
     >
-      <Icon name="refresh" size={14} />
+      <Icon name="refresh" size="sm" />
       {refreshing ? "Refreshing…" : "Refresh now"}
     </button>
   </div>

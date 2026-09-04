@@ -78,7 +78,7 @@
         bind:this={closeButton}
         aria-label="Close details"
       >
-        <Icon name="x" size={15} />
+        <Icon name="x" size="sm" />
       </button>
     </header>
     <div class="body">{@render children()}</div>

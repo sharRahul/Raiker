@@ -39,8 +39,8 @@
 {#if memories.length > 0}
   <section class="recall" aria-label="Memories used in this answer">
     <button type="button" class="recall-toggle" aria-expanded={open} onclick={() => (open = !open)}>
-      <Icon name={open ? "chevron-down" : "chevron-right"} size={13} />
-      <Icon name="spark" size={13} />
+      <Icon name={open ? "chevron-down" : "chevron-right"} size="sm" />
+      <Icon name="spark" size="sm" />
       <span>Remembered {memories.length}</span>
     </button>
     {#if open}

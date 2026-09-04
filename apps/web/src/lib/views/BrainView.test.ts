@@ -43,9 +43,21 @@ describe("BrainView", () => {
     expect(screen.getByRole("heading", { name: "Knowledge Map" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Researcher, agent record/i })).toBeInTheDocument();
     expect(screen.getByRole("application", { name: /interactive force-directed knowledge graph/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Global" })).toHaveAttribute("class", expect.stringContaining("active"));
-    expect(screen.getByRole("button", { name: "Local" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Add workspace source" })).toBeInTheDocument();
+
+    // The Global/Local segmented control is gone. It sat in the toolbar
+    // permanently while being half disabled: `centreNode()` already enters local
+    // mode when a node is focused, so the switch's only unique job was leaving
+    // it again — and that now lives beside the depth slider, which is the other
+    // control that exists only in local mode. Nothing announces the scope you
+    // are already looking at.
+    expect(screen.queryByRole("button", { name: "Global" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Local" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /fullscreen/i })).toBeNull();
+    // Global is the resting scope, so neither the depth control nor its way out
+    // is on screen until something is focused.
+    expect(screen.queryByLabelText("Relationship depth")).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
   });
 
   it("shows evidence and lets the owner reject a reviewed entity link", async () => {
